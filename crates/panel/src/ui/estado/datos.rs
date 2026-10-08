@@ -152,6 +152,13 @@ pub struct EstadoVista {
     pub wifi: Vec<RedWifiVista>,
     /// Hora de los datos de clientes y WiFi.
     pub lentos_at: Option<i64>,
+    /// Bajada y subida de la última muestra, solo si es de la misma lectura
+    /// que el resto del estado (a menos de 3 intervalos de `at`).
+    pub bajada_bps: Option<f64>,
+    pub subida_bps: Option<f64>,
+    /// Hasta cuándo valen los datos: `ahora` si el sondeo está sano, `at` si
+    /// no (los tiempos de conexión no siguen creciendo sin datos).
+    pub medido_hasta: i64,
     pub avisos: Vec<Aviso>,
 }
 
@@ -183,11 +190,15 @@ pub async fn estado_actual() -> Result<EstadoVista, ServerFnError> {
     let ultimo = crate::series::ultimo_corte(&state.db)
         .await
         .map_err(servidor::interno)?;
+    let muestra = crate::series::ultima_muestra(&state.db)
+        .await
+        .map_err(servidor::interno)?;
     Ok(servidor::vista(
         p.latest(),
         p.error(),
         p.healthy(),
         ultimo,
+        muestra,
         &state.catalogo,
         crate::series::now(),
     ))
@@ -237,7 +248,7 @@ pub(crate) mod servidor {
     use super::*;
     use crate::{
         poller::Snapshot,
-        series::WanEvento,
+        series::{Sample, WanEvento},
         state::AppState,
         ui::charts::{formato_fecha_hora, formato_hora},
     };
@@ -247,6 +258,9 @@ pub(crate) mod servidor {
 
     /// Conexión PPP principal.
     const WAN: &str = "ip2";
+    /// Distancia máxima entre la última muestra y la instantánea (3
+    /// intervalos de 10 s).
+    const MUESTRA_VIGENTE_S: i64 = 30;
 
     pub fn app_state() -> Result<AppState, ServerFnError> {
         use_context::<AppState>().ok_or_else(|| ServerFnError::new("falta el estado del panel"))
@@ -255,7 +269,11 @@ pub(crate) mod servidor {
     /// Registra el error con un id y devuelve un mensaje genérico con ese id.
     pub fn interno(e: impl fmt::Display) -> ServerFnError {
         let mut id = [0u8; 4];
-        getrandom::fill(&mut id).expect("generador aleatorio del sistema");
+        // Sin generador aleatorio, los milisegundos: el id solo sirve para
+        // encontrar el registro.
+        if getrandom::fill(&mut id).is_err() {
+            id = (crate::series::now_ms() as u32).to_be_bytes();
+        }
         let id: String = id.iter().map(|b| format!("{b:02x}")).collect();
         tracing::error!(id, "error interno en la página de estado: {e}");
         if let Some(resp) = use_context::<leptos_axum::ResponseOptions>() {
@@ -333,13 +351,14 @@ pub(crate) mod servidor {
     }
 
     /// Construye la vista a partir de la instantánea del sondeo (`snap`), el
-    /// error del último ciclo, si el sondeo está sano y el último corte de la
-    /// WAN registrado.
+    /// error del último ciclo, si el sondeo está sano, el último corte de la
+    /// WAN registrado y la última muestra guardada.
     pub fn vista(
         snap: Option<Snapshot>,
         error: Option<String>,
         sano: bool,
         ultimo_corte: Option<WanEvento>,
+        ultima_muestra: Option<Sample>,
         cat: &Catalogo,
         ahora: i64,
     ) -> EstadoVista {
@@ -372,6 +391,9 @@ pub(crate) mod servidor {
                 leases: Vec::new(),
                 wifi: Vec::new(),
                 lentos_at: None,
+                bajada_bps: None,
+                subida_bps: None,
+                medido_hasta: ahora,
                 avisos,
             };
         };
@@ -533,6 +555,11 @@ pub(crate) mod servidor {
             });
         }
 
+        // La muestra solo vale si es de la misma lectura (o casi) que la
+        // instantánea: tras un hueco, una tasa vieja parecería actual.
+        let tasas = ultima_muestra
+            .as_ref()
+            .filter(|m| (s.at - m.ts).abs() <= MUESTRA_VIGENTE_S);
         let n = |v: usize| u32::try_from(v).unwrap_or(u32::MAX);
         EstadoVista {
             ahora,
@@ -555,6 +582,9 @@ pub(crate) mod servidor {
             leases,
             wifi,
             lentos_at: s.slow_at,
+            bajada_bps: tasas.and_then(|m| m.rx_bps),
+            subida_bps: tasas.and_then(|m| m.tx_bps),
+            medido_hasta: if sano { ahora } else { s.at },
             avisos,
         }
     }
@@ -563,7 +593,10 @@ pub(crate) mod servidor {
 #[cfg(all(test, feature = "ssr"))]
 mod tests {
     use super::{servidor::vista, *};
-    use crate::{poller::Snapshot, series::WanEvento};
+    use crate::{
+        poller::Snapshot,
+        series::{Sample, WanEvento},
+    };
     use catalogo::Catalogo;
     use hgu::models::{
         DhcpLease, LanHost, StaticLease, Summary, WanConn, WifiAp, WifiAssoc, WifiRadio, WifiStatus,
@@ -681,7 +714,7 @@ mod tests {
 
     #[test]
     fn clientes_leases_y_wifi() {
-        let v = vista(Some(snapshot()), None, true, None, &cat(), AHORA);
+        let v = vista(Some(snapshot()), None, true, None, None, &cat(), AHORA);
         assert!(v.router_ok);
         assert_eq!((v.clientes, v.clientes_wifi), (2, 1));
         assert_eq!(v.ram_pct, 75.0);
@@ -718,7 +751,7 @@ mod tests {
         let mut s = snapshot();
         s.tr69_activo = Some(true);
         s.slow_error = Some("error de red: x".into());
-        let v = vista(Some(s), None, true, None, &cat(), AHORA);
+        let v = vista(Some(s), None, true, None, None, &cat(), AHORA);
         let textos: Vec<&str> = v.avisos.iter().map(|a| a.texto.as_str()).collect();
         assert_eq!(textos.len(), 3, "{textos:?}");
         assert!(textos[0].contains("desactualizados"), "{textos:?}");
@@ -740,6 +773,7 @@ mod tests {
             Some("error de red: tiempo agotado".into()),
             false,
             None,
+            None,
             &cat(),
             AHORA,
         );
@@ -759,13 +793,14 @@ mod tests {
 
     #[test]
     fn sin_datos() {
-        let v = vista(None, None, false, None, &cat(), AHORA);
+        let v = vista(None, None, false, None, None, &cat(), AHORA);
         assert_eq!((v.at, v.error.clone()), (None, None));
         assert!(v.avisos.is_empty());
         let v = vista(
             None,
             Some("error de red: x".into()),
             false,
+            None,
             None,
             &cat(),
             AHORA,
@@ -782,7 +817,7 @@ mod tests {
         let con = |corte: Option<WanEvento>, up: bool| {
             let mut s = snapshot();
             s.wan[0].up = up;
-            let v = vista(Some(s), None, true, corte, &cat(), AHORA);
+            let v = vista(Some(s), None, true, corte, None, &cat(), AHORA);
             (v.conexion_desde, v.caida_desde, v.encendido_desde)
         };
         // Sin cortes registrados: solo el arranque del router.
@@ -813,5 +848,65 @@ mod tests {
         );
         // Caída sin corte abierto registrado (aún): no se sabe desde cuándo.
         assert_eq!(con(Some(cerrado), false), (None, None, Some(arranque)));
+    }
+
+    fn muestra(ts: i64) -> Sample {
+        Sample {
+            ts,
+            rx_bps: Some(8e6),
+            tx_bps: Some(1e6),
+            load1: 0.5,
+            ram_used_pct: 50.0,
+            clients: Some(2),
+            wan_up: true,
+        }
+    }
+
+    #[test]
+    fn tasas_solo_de_una_muestra_vigente() {
+        let at = AHORA - 5;
+        let con = |m: Sample, sano: bool| {
+            let v = vista(Some(snapshot()), None, sano, None, Some(m), &cat(), AHORA);
+            (v.bajada_bps, v.subida_bps)
+        };
+        assert_eq!(con(muestra(at), true), (Some(8e6), Some(1e6)));
+        assert_eq!(con(muestra(at - 30), true), (Some(8e6), Some(1e6)));
+        // De hace más de 3 intervalos: no se presenta como la tasa actual.
+        assert_eq!(con(muestra(at - 31), true), (None, None));
+        // Con el router caído se conserva la del último dato (la UI la
+        // muestra como «Último dato»).
+        assert_eq!(con(muestra(at), false), (Some(8e6), Some(1e6)));
+        let v = vista(None, None, false, None, Some(muestra(at)), &cat(), AHORA);
+        assert_eq!((v.bajada_bps, v.subida_bps), (None, None));
+    }
+
+    #[test]
+    fn sin_router_los_tiempos_se_cuentan_hasta_el_ultimo_dato() {
+        let corte = WanEvento {
+            desde: AHORA - 600,
+            hasta: Some(AHORA - 300),
+        };
+        let v = vista(
+            Some(snapshot()),
+            None,
+            true,
+            Some(corte.clone()),
+            None,
+            &cat(),
+            AHORA,
+        );
+        assert_eq!(v.medido_hasta, AHORA);
+        let v = vista(
+            Some(snapshot()),
+            Some("error de red: x".into()),
+            false,
+            Some(corte),
+            None,
+            &cat(),
+            AHORA + 3600,
+        );
+        // Una hora después sin datos: la conexión duró hasta el último dato.
+        assert_eq!(v.medido_hasta, AHORA - 5);
+        assert_eq!(v.medido_hasta - v.conexion_desde.unwrap(), 295);
     }
 }

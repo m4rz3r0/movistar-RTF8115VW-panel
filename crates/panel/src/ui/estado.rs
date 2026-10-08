@@ -133,6 +133,8 @@ fn Contenido(
         [
             estado.get().and_then(Result::err),
             historico.get().and_then(|(_, r)| r.err()),
+            cortes_r.get().and_then(Result::err),
+            hora.get().and_then(Result::err),
         ]
         .into_iter()
         .flatten()
@@ -266,11 +268,6 @@ fn Avisos(vista: Memo<Option<EstadoVista>>) -> impl IntoView {
     }
 }
 
-/// Último valor no nulo de una serie.
-fn ultimo(m: &[SampleVista], f: impl Fn(&SampleVista) -> Option<f64>) -> Option<f64> {
-    m.iter().rev().find_map(f)
-}
-
 /// Fila de indicadores.
 #[component]
 fn Indicadores(
@@ -334,8 +331,21 @@ fn Indicadores(
                 (true, Some(d), _) => ("Tiempo de conexión", Some(d), None),
                 (true, None, _) => ("Router encendido", v.encendido_desde, None),
             };
-            let valor = desde.map_or_else(|| "—".to_owned(), |d| formato_duracion(v.ahora - d));
-            let sub = desde.map(|d| format!("desde el {}", formato_fecha_hora(d, false)));
+            // Sin conexión con el router, hasta el último dato: no sigue
+            // creciendo como si se estuviera midiendo.
+            let valor =
+                desde.map_or_else(|| "—".to_owned(), |d| formato_duracion(v.medido_hasta - d));
+            let sub = desde.map(|d| {
+                let desde = format!("desde el {}", formato_fecha_hora(d, false));
+                if v.router_ok {
+                    desde
+                } else {
+                    format!(
+                        "{desde} hasta el último dato ({})",
+                        formato_hora(v.medido_hasta, false)
+                    )
+                }
+            });
             Some((titulo, valor, sub, estado))
         })
     });
@@ -352,18 +362,36 @@ fn Indicadores(
         })
     };
 
-    let tasa = move |f: fn(&SampleVista) -> Option<f64>| {
+    // Tasas: la de la última muestra vigente (el servidor la descarta si es
+    // vieja). Sin conexión con el router no se presentan como actuales.
+    let tasa = move |f: fn(&EstadoVista) -> Option<f64>| {
         Signal::derive(move || {
-            ultima_hora.with(|m| ultimo(m, f).map_or_else(|| "—".to_owned(), formato_bps))
+            vista.with(|v| match v.as_ref() {
+                Some(v) if v.router_ok => f(v).map_or_else(|| "—".to_owned(), formato_bps),
+                _ => "—".to_owned(),
+            })
         })
     };
-    let maximo = move |f: fn(&SampleVista) -> Option<f64>| {
+    let tasa_sub = move |f: fn(&EstadoVista) -> Option<f64>, g: fn(&SampleVista) -> Option<f64>| {
         Signal::derive(move || {
-            ultima_hora.with(|m| {
-                m.iter()
-                    .filter_map(f)
-                    .reduce(f64::max)
-                    .map(|x| format!("máx. 1 h: {}", formato_bps(x)))
+            let caido = vista.with(|v| {
+                v.as_ref().filter(|v| !v.router_ok).map(|v| {
+                    let valor = f(v).map_or_else(|| "sin dato".to_owned(), formato_bps);
+                    match v.at {
+                        Some(at) => {
+                            format!("Último dato: {valor} a las {}", formato_hora(at, false))
+                        }
+                        None => "Sin datos del router".to_owned(),
+                    }
+                })
+            });
+            caido.or_else(|| {
+                ultima_hora.with(|m| {
+                    m.iter()
+                        .filter_map(g)
+                        .reduce(f64::max)
+                        .map(|x| format!("máx. 1 h: {}", formato_bps(x)))
+                })
             })
         })
     };
@@ -399,15 +427,15 @@ fn Indicadores(
             {indicador_conexion}
             <Indicador
                 titulo="Bajada"
-                valor=tasa(|s| s.rx_bps)
-                sub=maximo(|s| s.rx_bps)
+                valor=tasa(|v| v.bajada_bps)
+                sub=tasa_sub(|v| v.bajada_bps, |s| s.rx_bps)
                 minigrafica=mini(|s| s.rx_bps)
                 tono=Tono::Primario
             />
             <Indicador
                 titulo="Subida"
-                valor=tasa(|s| s.tx_bps)
-                sub=maximo(|s| s.tx_bps)
+                valor=tasa(|v| v.subida_bps)
+                sub=tasa_sub(|v| v.subida_bps, |s| s.tx_bps)
                 minigrafica=mini(|s| s.tx_bps)
                 tono=Tono::Secundario
             />
@@ -589,6 +617,8 @@ fn filas_hosts(v: &EstadoVista) -> Vec<Vec<Celda>> {
 /// Tiempo restante a partir del cual una concesión se da por vencida (el
 /// contador de 32 bits del router dio la vuelta).
 const CADUCADA_DESDE: u64 = (1 << 32) - 365 * 86_400;
+/// `u32::MAX` es una concesión infinita.
+const SIN_CADUCIDAD: u64 = u32::MAX as u64;
 
 /// Filas de la tabla de concesiones DHCP.
 fn filas_leases(v: &EstadoVista) -> Vec<Vec<Celda>> {
@@ -613,6 +643,7 @@ fn filas_leases(v: &EstadoVista) -> Vec<Vec<Celda>> {
                     None => Celda::Vacia,
                     // El router da el tiempo restante como un entero de 32
                     // bits: una concesión vencida aparece como ~49 710 días.
+                    Some(SIN_CADUCIDAD) => Celda::Texto("Sin caducidad".into()),
                     Some(s) if s >= CADUCADA_DESDE => Celda::Texto("Caducada".into()),
                     Some(s) => {
                         Celda::Numero(formato_duracion(i64::try_from(s).unwrap_or(i64::MAX)))
@@ -759,4 +790,69 @@ fn Tablas(vista: Memo<Option<EstadoVista>>) -> impl IntoView {
         </section>
     }
     .into_any()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn caducidad_de_las_concesiones() {
+        let lease = |caduca_s| LeaseVista {
+            ip: "192.168.1.2".into(),
+            mac: "02:00:00:00:00:01".into(),
+            nombre: String::new(),
+            fijo: false,
+            activa: true,
+            caduca_s,
+        };
+        let v = EstadoVista {
+            leases: vec![
+                lease(Some(600)),
+                lease(Some(u64::from(u32::MAX))),
+                lease(Some(u64::from(u32::MAX) - 1)),
+                lease(None),
+            ],
+            ..vista_vacia()
+        };
+        let caducidad: Vec<Celda> = filas_leases(&v).into_iter().map(|f| f[4].clone()).collect();
+        assert_eq!(
+            caducidad,
+            [
+                Celda::Numero("10 min".into()),
+                Celda::Texto("Sin caducidad".into()),
+                Celda::Texto("Caducada".into()),
+                Celda::Vacia,
+            ]
+        );
+    }
+
+    fn vista_vacia() -> EstadoVista {
+        EstadoVista {
+            ahora: 0,
+            at: None,
+            router_ok: false,
+            error: None,
+            modelo: String::new(),
+            firmware: String::new(),
+            internet_up: false,
+            ip_publica: None,
+            conexion_desde: None,
+            caida_desde: None,
+            encendido_desde: None,
+            load: (0.0, 0.0, 0.0),
+            ram_pct: 0.0,
+            ram_total_kb: 0,
+            clientes: 0,
+            clientes_wifi: 0,
+            hosts: Vec::new(),
+            leases: Vec::new(),
+            wifi: Vec::new(),
+            lentos_at: None,
+            bajada_bps: None,
+            subida_bps: None,
+            medido_hasta: 0,
+            avisos: Vec::new(),
+        }
+    }
 }

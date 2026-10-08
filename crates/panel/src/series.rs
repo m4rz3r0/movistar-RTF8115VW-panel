@@ -199,6 +199,13 @@ pub async fn wan_state(pool: &SqlitePool, up: bool, now: i64) -> Result<(), sqlx
     Ok(())
 }
 
+/// La muestra cruda más reciente, si la hay.
+pub async fn ultima_muestra(pool: &SqlitePool) -> Result<Option<Sample>, sqlx::Error> {
+    sqlx::query_as("SELECT * FROM samples_raw ORDER BY ts DESC LIMIT 1")
+        .fetch_optional(pool)
+        .await
+}
+
 /// El corte más reciente (abierto o cerrado), si hay alguno registrado.
 pub async fn ultimo_corte(pool: &SqlitePool) -> Result<Option<WanEvento>, sqlx::Error> {
     sqlx::query_as("SELECT desde, hasta FROM wan_events ORDER BY desde DESC, id DESC LIMIT 1")
@@ -462,5 +469,17 @@ mod tests {
                 hasta: Some(now - 10)
             })
         );
+    }
+
+    #[tokio::test]
+    async fn ultima_muestra_es_la_mas_reciente() {
+        let (pool, _dir) = pool().await;
+        assert_eq!(ultima_muestra(&pool).await.unwrap(), None);
+        for ts in [300, 100, 200] {
+            insert(&pool, &muestra(ts, Some(1.0), Some(3), true))
+                .await
+                .unwrap();
+        }
+        assert_eq!(ultima_muestra(&pool).await.unwrap().unwrap().ts, 300);
     }
 }

@@ -175,6 +175,8 @@ const MARGEN_ABAJO: f64 = 26.0;
 /// Anchura estimada de un carácter del texto de los ejes (11–12 px, cifras
 /// tabulares).
 pub(super) const ANCHO_CARACTER: f64 = 7.0;
+/// Anchura mínima (px) de un tramo para rellenar su área.
+const ANCHO_MIN_AREA: f64 = 4.0;
 /// Separación mínima entre ticks de tiempo.
 pub(super) const SEPARACION_TICKS_X: f64 = 84.0;
 
@@ -374,7 +376,10 @@ pub fn geometria(
                     trazo.sueltos.push(px[0]);
                     continue;
                 }
-                if s.area {
+                // Un tramo muy estrecho (unas pocas muestras entre cortes) con
+                // área parecería una barra a toda altura: solo la línea.
+                let ancho_tramo = px[px.len() - 1].0 - px[0].0;
+                if s.area && ancho_tramo >= ANCHO_MIN_AREA {
                     trazo.areas.push(ruta_area(&px, y0));
                 }
                 trazo.lineas.push(ruta_linea(&px));
@@ -545,6 +550,25 @@ mod tests {
         let g = geometria(&[serie], Unidad::Decimal, 400.0, 200.0, None);
         assert_eq!(g.trazos[0].sueltos.len(), 2);
         assert_eq!(g.trazos[0].lineas.len(), 1);
+    }
+
+    #[test]
+    fn sin_area_en_tramos_estrechos() {
+        // Un tramo de 2 muestras tras un corte, en una hora de 10 s: ~2 px
+        // de ancho. Su área sería una «barra» engañosa; solo va la línea.
+        let mut puntos: Vec<(i64, Option<f64>)> = (0..300).map(|i| (i * 10, Some(5e6))).collect();
+        puntos.extend([
+            (3000, None),
+            (3010, Some(5e6)),
+            (3020, Some(5e6)),
+            (3030, None),
+        ]);
+        puntos.extend((304..360).map(|i| (i * 10, Some(5e6))));
+        let serie = Serie::new("Bajada", Tono::Primario, puntos).con_area();
+        let g = geometria(&[serie], Unidad::Bps, 600.0, 200.0, None);
+        let t = &g.trazos[0];
+        assert_eq!(t.lineas.len(), 3);
+        assert_eq!(t.areas.len(), 2);
     }
 
     #[test]
