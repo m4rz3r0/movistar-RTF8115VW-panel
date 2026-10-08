@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Response><cbGetTr69Config><cwmp_data><enableCWMP>1</enableCWMP><acs_URL>X-REDACTED-X</acs_URL><acs_username>X-REDACTED-X</acs_username><acs_password>X-REDACTED-X</acs_password><periodicInformEnable>1</periodicInformEnable><periodicInformInterval>604800</periodicInformInterval><connectionRequestURL>X-REDACTED-X</connectionRequestURL><connectionRequestUsername>X-REDACTED-X</connectionRequestUsername><connectionRequestPassword>X-REDACTED-X</connectionRequestPassword></cwmp_data><Result>0</Result></cbGetTr69Config></Response>

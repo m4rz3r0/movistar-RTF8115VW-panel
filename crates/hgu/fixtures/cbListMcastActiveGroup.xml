@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Response><cbListMcastActiveGroup><rtm_ipv4_grp_addr_list><rtm_ipv4_grp_addr_0i>0</rtm_ipv4_grp_addr_0i><rtm_ipv4_grp_addr>224.0.1.187</rtm_ipv4_grp_addr><interface_list>eth0.1</interface_list></rtm_ipv4_grp_addr_list><Result>0</Result></cbListMcastActiveGroup></Response>

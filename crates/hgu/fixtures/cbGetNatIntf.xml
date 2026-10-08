@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Response><cbGetNatIntf><rtm_cfg_nat_intf><nat_intf_0i>0</nat_intf_0i><nat_intf_id>0</nat_intf_id><adm_state>1</adm_state><ip_intf_id>2</ip_intf_id><type>0</type></rtm_cfg_nat_intf><rtm_cfg_nat_intf><nat_intf_0i>1</nat_intf_0i><nat_intf_id>1</nat_intf_id><adm_state>1</adm_state><ip_intf_id>3</ip_intf_id><type>0</type></rtm_cfg_nat_intf><rtm_cfg_nat_intf><nat_intf_0i>2</nat_intf_0i><nat_intf_id>2</nat_intf_id><adm_state>1</adm_state><ip_intf_id>4</ip_intf_id><type>1</type></rtm_cfg_nat_intf><Result>0</Result></cbGetNatIntf></Response>

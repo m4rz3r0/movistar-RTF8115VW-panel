@@ -1,0 +1,17 @@
+[package]
+name = "router-sim"
+version = "0.1.0"
+description = "Router Askey RTF8115VW simulado para pruebas y desarrollo"
+default-run = "router-sim"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+hgu = { path = "../hgu" }
+axum.workspace = true
+regex.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+roxmltree.workspace = true

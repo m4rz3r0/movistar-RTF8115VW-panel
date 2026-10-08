@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Response><cbGetTR98L2Marking><mll_tr098_dpm_cfg_egress_marking><mll_br_marking_0i>0</mll_br_marking_0i><mll_br_marking_id>0</mll_br_marking_id><adm_state>1</adm_state><opr_status>1</opr_status><marking_br_id>1</marking_br_id><marking_intf>30</marking_intf><untagged>0</untagged><vid_value>-1</vid_value><vid_override>1</vid_override><pbit_value>1</pbit_value><pbit_override>1</pbit_override></mll_tr098_dpm_cfg_egress_marking><Result>0</Result></cbGetTR98L2Marking></Response>

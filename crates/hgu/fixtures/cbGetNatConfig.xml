@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Response><cbGetNatConfig><rtm_cfg_nat_lb_intf><rtm_cfg_nat_lb_intf_0i>0</rtm_cfg_nat_lb_intf_0i><rtm_cfg_nat_lb_intf_id>0</rtm_cfg_nat_lb_intf_id><adm_state>1</adm_state><opr_status>1</opr_status><ip_intf_id>1</ip_intf_id><rtsp_enable>1</rtsp_enable><ftp_enable>1</ftp_enable><h323_enable>1</h323_enable><pptp_enable>1</pptp_enable><sip_enable>0</sip_enable><ipsec_enable>0</ipsec_enable></rtm_cfg_nat_lb_intf><Result>0</Result></cbGetNatConfig></Response>

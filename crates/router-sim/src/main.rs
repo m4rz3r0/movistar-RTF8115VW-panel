@@ -1,0 +1,44 @@
+//! Router simulado para desarrollo.
+//!
+//! Uso: `router-sim [--listen 127.0.0.1:8081] [--fixtures crates/hgu/fixtures]
+//! [--user U] [--password P]` (por defecto usuario y contraseña `sim`).
+
+use router_sim::{Sim, SimConfig};
+use std::process::ExitCode;
+
+const USAGE: &str =
+    "uso: router-sim [--listen DIR:PUERTO] [--fixtures DIR] [--user U] [--password P]";
+
+#[tokio::main]
+async fn main() -> ExitCode {
+    let mut cfg = SimConfig::new("sim", "sim", "crates/hgu/fixtures");
+    let mut listen = "127.0.0.1:8081".to_owned();
+    let mut args = std::env::args().skip(1);
+    while let Some(flag) = args.next() {
+        let Some(value) = args.next() else {
+            eprintln!("{USAGE}");
+            return ExitCode::from(2);
+        };
+        match flag.as_str() {
+            "--listen" => listen = value,
+            "--fixtures" => cfg.fixtures_dir = value.into(),
+            "--user" => cfg.user = value,
+            "--password" => cfg.password = value,
+            _ => {
+                eprintln!("{USAGE}");
+                return ExitCode::from(2);
+            }
+        }
+    }
+    match listen.parse() {
+        Ok(addr) => cfg.listen = Some(addr),
+        Err(e) => {
+            eprintln!("--listen {listen}: {e}");
+            return ExitCode::from(2);
+        }
+    }
+    let user = cfg.user.clone();
+    let sim = Sim::start(cfg).await;
+    eprintln!("router-sim escuchando en {} (usuario {user})", sim.base_url);
+    std::future::pending::<ExitCode>().await
+}

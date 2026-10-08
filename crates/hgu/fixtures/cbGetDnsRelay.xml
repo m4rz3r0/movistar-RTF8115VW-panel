@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Response><cbGetDnsRelay><rtm_cfg_igd><dns_relay_adm_state>0</dns_relay_adm_state></rtm_cfg_igd><Result>0</Result></cbGetDnsRelay></Response>

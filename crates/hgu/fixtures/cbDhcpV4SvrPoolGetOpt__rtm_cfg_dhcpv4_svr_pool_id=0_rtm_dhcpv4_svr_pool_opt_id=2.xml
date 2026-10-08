@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Response><cbDhcpV4SvrPoolGetOpt><rtm_dhcpv4_svr_pool_opt><rtm_dhcpv4_svr_pool_opt_0i>-1</rtm_dhcpv4_svr_pool_opt_0i><rtm_dhcpv4_svr_pool_opt_id>2</rtm_dhcpv4_svr_pool_opt_id><adm_state>1</adm_state><opt_code>125</opt_code><opt_len>38</opt_len><opt_value>X-REDACTED-X</opt_value></rtm_dhcpv4_svr_pool_opt><Result>0</Result></cbDhcpV4SvrPoolGetOpt></Response>

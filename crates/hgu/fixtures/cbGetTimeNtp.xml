@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Response><cbGetTimeNtp><rtm_time_ntp><adm_state>1</adm_state><ntp_state>2</ntp_state><ever_synced>1</ever_synced><ip_intf_id>2</ip_intf_id><ntp_svr_1>hora.ngn.rima-tde.net</ntp_svr_1><ntp_svr_2></ntp_svr_2><ntp_svr_3></ntp_svr_3><ntp_svr_4></ntp_svr_4><ntp_svr_5></ntp_svr_5><timezone>CET-1CEST,M3.5.0,M10.5.0</timezone></rtm_time_ntp><Result>0</Result></cbGetTimeNtp></Response>

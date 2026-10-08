@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Response><cbGetDiagConfig><diagnosis_config><wan_mirror>0</wan_mirror><dst_lan_port>0</dst_lan_port></diagnosis_config><Result>0</Result></cbGetDiagConfig></Response>

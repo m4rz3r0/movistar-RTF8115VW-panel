@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Response><cbGetVoicePhysical><tr104_issue1_vp_fxs><fxs_0i>0</fxs_0i><fxs_id>0</fxs_id><adm_state>1</adm_state><opr_status>1</opr_status><fax_passthrough_adm_state>1</fax_passthrough_adm_state><modem_passthrough_adm_state>1</modem_passthrough_adm_state><tx_gain>0</tx_gain><rx_gain>0</rx_gain><hook_flash_min_time>0</hook_flash_min_time><hook_flash_max_time>0</hook_flash_max_time></tr104_issue1_vp_fxs><Result>0</Result></cbGetVoicePhysical></Response>

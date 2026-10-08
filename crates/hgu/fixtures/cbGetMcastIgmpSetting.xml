@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Response><cbGetMcastIgmpSetting><mcast_igmp_setting><ip_intf_id>1</ip_intf_id><eth_link_id>0</eth_link_id><br_id>4</br_id><igmp_max_group>128</igmp_max_group><igmp_robustness>2</igmp_robustness><igmp_qry_interval>15</igmp_qry_interval><igmp_qry_resp_time>10</igmp_qry_resp_time><igmp_last_mbr_qry_resp_time>10</igmp_last_mbr_qry_resp_time><igmp_last_mbr_qry_count>0</igmp_last_mbr_qry_count></mcast_igmp_setting><Result>0</Result></cbGetMcastIgmpSetting></Response>
