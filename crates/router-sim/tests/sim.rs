@@ -588,3 +588,18 @@ async fn reads_fail_after_next_write() {
     sim.control.fail_reads("cbGetUpnpCfg", false);
     c.call("cbGetUpnpCfg", &[]).await.unwrap();
 }
+
+#[tokio::test]
+async fn hangs_after_next_write() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_millis(300));
+    sim.control.hang_after_next_write();
+    c.call("cbGetUpnpCfg", &[]).await.unwrap();
+    c.write("upnp.asp", "cbSetUpnpCfg", &[("adm_state", "1")])
+        .await
+        .unwrap();
+    let r = c.call("cbGetUpnpCfg", &[]).await;
+    assert!(matches!(r, Err(Error::Network(_))), "{r:?}");
+    sim.control.set_unresponsive(false);
+    c.call("cbGetUpnpCfg", &[]).await.unwrap();
+}

@@ -179,6 +179,13 @@ impl SimControl {
         self.inner.state().fail_reads_after_write = Some(name.to_owned());
     }
 
+    /// Tras responder a la próxima escritura real, el router deja de
+    /// responder (como [`SimControl::set_unresponsive`]) hasta que se llame a
+    /// `set_unresponsive(false)`.
+    pub fn hang_after_next_write(&self) {
+        self.inner.state().hang_after_write = HangAfterWrite::Armed;
+    }
+
     /// Suma bytes a `rx_byte`/`tx_byte` de `ip2` en `cbGetStatistic`.
     pub fn counters_bump(&self, rx: u64, tx: u64) {
         let mut st = self.inner.state();
@@ -220,6 +227,15 @@ struct Lease {
     ipv4_addr: String,
 }
 
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
+enum HangAfterWrite {
+    #[default]
+    Off,
+    Armed,
+    /// La escritura llegó: colgarse en cuanto se responda.
+    Now,
+}
+
 #[derive(Default)]
 struct SimState {
     seed: u32,
@@ -236,6 +252,8 @@ struct SimState {
     failing_reads: HashSet<String>,
     /// Lectura que empieza a fallar tras la próxima escritura.
     fail_reads_after_write: Option<String>,
+    /// `hang_after_next_write`.
+    hang_after_write: HangAfterWrite,
     rx_extra: u64,
     tx_extra: u64,
     writes: Vec<(String, Params)>,
@@ -585,7 +603,12 @@ async fn cgi(
     } else if is_read(name) {
         xml(read(&s, &st, name, &params))
     } else {
-        xml(write(&mut st, name, &params))
+        let body = write(&mut st, name, &params);
+        if st.hang_after_write == HangAfterWrite::Now {
+            st.hang_after_write = HangAfterWrite::Off;
+            s.unresponsive.store(true, Ordering::SeqCst);
+        }
+        xml(body)
     }
 }
 
@@ -735,6 +758,9 @@ fn write(st: &mut SimState, name: &str, params: &[(String, String)]) -> String {
         st.writes.push((name.to_owned(), clean.clone()));
         if let Some(r) = st.fail_reads_after_write.take() {
             st.failing_reads.insert(r);
+        }
+        if st.hang_after_write == HangAfterWrite::Armed {
+            st.hang_after_write = HangAfterWrite::Now;
         }
     }
     if let Some(err) = st.fail_next.take() {

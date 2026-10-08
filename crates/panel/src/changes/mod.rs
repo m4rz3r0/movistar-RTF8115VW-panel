@@ -553,18 +553,25 @@ impl ChangeManager {
 
     /// Motivo por el que `original` ya no se puede deshacer: lo deshizo otro
     /// cambio que está en curso o aplicado.
+    /// Si no se puede consultar, también se rechaza (mejor no deshacer que
+    /// deshacer dos veces).
     async fn ya_deshecho(&self, original: i64) -> Option<String> {
-        let r: Option<(i64, String)> = sqlx::query_as(
+        let r: Option<(i64, String)> = match sqlx::query_as(
             "SELECT d.id, d.estado FROM changes o JOIN changes d ON d.id = o.deshecho_por \
              WHERE o.id = ?",
         )
         .bind(original)
         .fetch_optional(&self.state.db)
         .await
-        .unwrap_or_else(|e| {
-            tracing::error!(cambio = original, "no se puede leer deshecho_por: {e}");
-            None
-        });
+        {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::error!(cambio = original, "no se puede leer deshecho_por: {e}");
+                return Some(format!(
+                    "no se puede comprobar si el cambio {original} ya se deshizo: {e}"
+                ));
+            }
+        };
         let (d, estado) = r?;
         let vigente = [Estado::Aplicando, Estado::Vigilando, Estado::Aplicado]
             .iter()
@@ -612,8 +619,23 @@ impl ChangeManager {
         {
             return;
         }
-        self.reanudar_filas().await;
-        self.listo.send_replace(true);
+        // En su propia tarea: si entra en pánico se registra, y `listo` se
+        // marca al salir pase lo que pase (también si se abandona este
+        // futuro: la tarea sigue y lo marca al terminar).
+        struct ListoAlSalir(Arc<ChangeManager>);
+        impl Drop for ListoAlSalir {
+            fn drop(&mut self) {
+                self.0.listo.send_replace(true);
+            }
+        }
+        let m = self.clone();
+        let h = tokio::spawn(async move {
+            let _listo = ListoAlSalir(m.clone());
+            m.reanudar_filas().await;
+        });
+        if let Err(e) = h.await {
+            tracing::error!("error interno al retomar los cambios pendientes: {e}");
+        }
     }
 
     async fn reanudar_filas(self: &Arc<Self>) {
@@ -1112,8 +1134,10 @@ impl ChangeManager {
         };
         tracing::warn!(cambio = id, "{motivo}; revirtiendo");
         let fin = Instant::now() + self.tiempos.alto;
+        // Plan del último intento que llegó a escribir (o pudo llegar).
+        let mut enviado = None;
         let ultimo = loop {
-            let error = match self.revertir_una_vez(&req, plan).await {
+            let error = match self.revertir_una_vez(&req, plan, &mut enviado).await {
                 Ok(()) => {
                     let e = format!("{motivo}; revertido a los valores anteriores");
                     self.marcar(id, Estado::Revertido, Some(&e), nota).await;
@@ -1137,44 +1161,64 @@ impl ChangeManager {
     }
 
     /// Un intento de reversión de `original` con la petición inversa `req`.
+    ///
+    /// Idempotente: antes de escribir comprueba si un intento anterior ya
+    /// surtió efecto (`enviado`: lo que se escribió; p. ej. la instancia
+    /// recreada ya existe) o si el router ya muestra lo anterior (p. ej. la
+    /// instancia creada ya no existe). En ese caso termina sin escribir.
     async fn revertir_una_vez(
         &self,
         req: &ChangeRequest,
         original: &Plan,
+        enviado: &mut Option<Plan>,
     ) -> Result<(), FalloReversion> {
         use FalloReversion::{Definitivo, Reintentar};
+        let no_verificada =
+            |v: Vec<String>| Definitivo(format!("reversión no verificada: {}", v.join("; ")));
         // El sondeo se pausa si se puede; si no, se revierte igualmente (las
         // peticiones al router van serializadas de todos modos).
         let _pausa = tokio::time::timeout(self.tiempos.pausa_max, self.state.poller.pause())
             .await
             .ok();
+        if let Some(previo) = enviado.as_ref() {
+            match self.comprobar(previo, Lado::Nuevo).await {
+                Comprobacion::Coincide(_) => return Ok(()),
+                Comprobacion::SinLectura(e) => return Err(Reintentar(e)),
+                Comprobacion::Limitada | Comprobacion::Difiere(_) => {}
+            }
+        }
+        match self.comprobar(original, Lado::Anterior).await {
+            Comprobacion::Coincide(_) => return Ok(()),
+            Comprobacion::SinLectura(e) => return Err(Reintentar(e)),
+            Comprobacion::Limitada | Comprobacion::Difiere(_) => {}
+        }
         let plan = match self.planificar(req, true).await {
             Ok(p) => p,
-            // Nada que escribir: solo vale si el router muestra de verdad
-            // los valores anteriores (p. ej. un intento previo ya escribió).
+            // Nada que escribir pero el router no muestra lo anterior.
             Err(CambioError::SinCambios) => {
                 return match self.comprobar(original, Lado::Anterior).await {
                     Comprobacion::Coincide(_) | Comprobacion::Limitada => Ok(()),
                     Comprobacion::SinLectura(e) => Err(Reintentar(e)),
-                    Comprobacion::Difiere(v) => Err(Definitivo(format!(
-                        "reversión no verificada: {}",
-                        v.join("; ")
-                    ))),
+                    Comprobacion::Difiere(v) => Err(no_verificada(v)),
                 };
             }
             Err(CambioError::Router(e)) => return Err(Reintentar(e)),
             Err(e) => return Err(Definitivo(e.to_string())),
         };
-        self.enviar(&plan)
-            .await
-            .map_err(|e| Reintentar(e.to_string()))?;
+        // Desde aquí la escritura puede haber llegado aunque falle la respuesta.
+        *enviado = Some(plan.clone());
+        match self.enviar(&plan).await {
+            Ok(()) => {}
+            // El router rechazó los valores: reintentar no cambiaría nada.
+            Err(e @ hgu::Error::CallFailed { .. }) => {
+                return Err(Definitivo(format!("el router rechazó la reversión: {e}")));
+            }
+            Err(e) => return Err(Reintentar(e.to_string())),
+        }
         match self.comprobar(&plan, Lado::Nuevo).await {
             Comprobacion::Coincide(_) | Comprobacion::Limitada => Ok(()),
             Comprobacion::SinLectura(e) => Err(Reintentar(e)),
-            Comprobacion::Difiere(v) => Err(Definitivo(format!(
-                "reversión no verificada: {}",
-                v.join("; ")
-            ))),
+            Comprobacion::Difiere(v) => Err(no_verificada(v)),
         }
     }
 
