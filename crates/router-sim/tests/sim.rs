@@ -517,3 +517,60 @@ async fn unresponsive_times_out() {
     sim.control.set_unresponsive(false);
     c.call("cbGetUpnpCfg", &[]).await.unwrap();
 }
+
+#[tokio::test]
+async fn reboot_resets_uptime() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    let uptime = |n: &XmlNode| n.text_of("SysUptime").unwrap().parse::<u64>().unwrap();
+    let before = uptime(&c.call("cbGetSummary", &[]).await.unwrap());
+    assert!(before > 1000);
+    c.write("reboot.asp", "cbReboot", &[]).await.unwrap();
+    let after = uptime(&c.call("cbGetSummary", &[]).await.unwrap());
+    assert!(after < 5, "{after}");
+}
+
+#[tokio::test]
+async fn basic_write_por_get_con_session_key() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    c.basic_write(
+        "te_wifi.asp",
+        "te_wifi.wl",
+        &[("wlSsid", "Casa nueva"), ("wlSsidIdx", "0")],
+    )
+    .await
+    .unwrap();
+    c.basic_write(
+        "te_wifi.asp",
+        "te_wifi.cmd?action=save",
+        &[("wlMACaddr", "02:00:00:00:00:01")],
+    )
+    .await
+    .unwrap();
+    let w = sim.control.writes();
+    assert_eq!(w.len(), 2);
+    assert_eq!(w[0].0, "te_wifi.wl");
+    assert_eq!(
+        w[0].1,
+        vec![
+            ("wlSsid".to_owned(), "Casa nueva".to_owned()),
+            ("wlSsidIdx".to_owned(), "0".to_owned())
+        ]
+    );
+    assert_eq!(w[1].0, "te_wifi.cmd");
+    assert_eq!(
+        w[1].1,
+        vec![
+            ("action".to_owned(), "save".to_owned()),
+            ("wlMACaddr".to_owned(), "02:00:00:00:00:01".to_owned())
+        ]
+    );
+    // Sin sesión básica válida, el router redirige al login: el cliente
+    // vuelve a entrar y repite con un sessionKey nuevo.
+    sim.control.invalidate_sessions();
+    c.basic_write("te_wifi.asp", "te_wifi.wl", &[("wlEnbl", "1")])
+        .await
+        .unwrap();
+    assert_eq!(sim.control.writes().len(), 3);
+}

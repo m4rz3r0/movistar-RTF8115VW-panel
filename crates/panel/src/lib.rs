@@ -11,9 +11,13 @@ pub mod ui {
 }
 
 #[cfg(feature = "ssr")]
+pub mod changes;
+#[cfg(feature = "ssr")]
 pub mod cli;
 #[cfg(feature = "ssr")]
 pub mod config;
+#[cfg(feature = "ssr")]
+pub mod crypto;
 #[cfg(feature = "ssr")]
 pub mod db;
 #[cfg(feature = "ssr")]

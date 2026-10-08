@@ -9,7 +9,7 @@ pub mod sanitize;
 use axum::{
     Router,
     body::Bytes,
-    extract::{Path, Request, State},
+    extract::{Path, RawQuery, Request, State},
     http::{HeaderMap, StatusCode, header},
     middleware::{self, Next},
     response::{IntoResponse, Response},
@@ -24,7 +24,7 @@ use std::{
         Arc, Mutex, MutexGuard,
         atomic::{AtomicBool, Ordering},
     },
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 /// Cuerpo que devuelve el router cuando la sesión no es válida.
@@ -103,7 +103,7 @@ impl Sim {
             .route("/", get(root))
             .route("/cgi-bin/te_acceso_router.cgi", post(basic_login))
             .route("/cgi-bin/te_logout.cgi", get(logout))
-            .route("/cgi-bin/{file}", post(cgi))
+            .route("/cgi-bin/{file}", post(cgi).get(basic_cgi))
             .route("/{page}", get(page))
             .layer(middleware::from_fn_with_state(
                 inner.clone(),
@@ -180,7 +180,9 @@ impl SimControl {
     }
 
     /// Escrituras recibidas con `sessionKey` válido (sin él), en orden. No
-    /// incluye las llamadas de solo validación (`validation_only=1`).
+    /// incluye las llamadas de solo validación (`validation_only=1`). Las de
+    /// la UI básica (`GET /cgi-bin/<x>.cmd|.cgi|.wl?…`) aparecen con el
+    /// nombre del fichero y los parámetros de la URL (incluido `action`).
     pub fn writes(&self) -> Vec<(String, Vec<(String, String)>)> {
         self.inner.state().writes.clone()
     }
@@ -232,6 +234,8 @@ struct SimState {
     upnp_adm_state: Option<String>,
     /// Campos escritos por punto de acceso (`dpm_cfg_wifi_acc_pt_id`).
     wifi: BTreeMap<String, BTreeMap<String, String>>,
+    /// Último `cbReboot`: `SysUptime` cuenta desde aquí.
+    rebooted: Option<Instant>,
 }
 
 impl SimState {
@@ -515,6 +519,37 @@ async fn page(
     .into_response()
 }
 
+/// Escritura de la UI básica: `GET /cgi-bin/<x>.cmd|.cgi|.wl?…&sessionKey=…`.
+/// Se registra en `writes` y responde OK; no cambia el estado simulado.
+async fn basic_cgi(
+    State(s): State<Arc<Inner>>,
+    Path(file): Path<String>,
+    RawQuery(query): RawQuery,
+    headers: HeaderMap,
+) -> Response {
+    if ![".cmd", ".cgi", ".wl"].iter().any(|e| file.ends_with(e)) {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    let mut st = s.state();
+    if !has_basic(&st, &cookies(&headers)) {
+        return LOGGED_OUT.into_response();
+    }
+    let params = form(query.unwrap_or_default().as_bytes());
+    let key_ok = st
+        .session_key
+        .as_deref()
+        .is_some_and(|k| param(&params, "sessionKey") == Some(k));
+    if !key_ok {
+        return "<html><body>sessionKey no válido</body></html>".into_response();
+    }
+    let clean: Params = params
+        .into_iter()
+        .filter(|(k, _)| k != "sessionKey")
+        .collect();
+    st.writes.push((file, clean));
+    "<html><body>ok</body></html>".into_response()
+}
+
 async fn cgi(
     State(s): State<Arc<Inner>>,
     Path(file): Path<String>,
@@ -646,6 +681,11 @@ fn patch(st: &SimState, name: &str, node: &mut XmlNode) {
                 set_child(n, k, v);
             }
         }),
+        "cbGetSummary" => {
+            if let Some(t) = st.rebooted {
+                set_child(node, "SysUptime", &t.elapsed().as_secs().to_string());
+            }
+        }
         "cbGetWanIPIntf" if !st.wan_up => for_each_node(node, &mut |n| {
             if n.text_of("name") == Some(WAN) {
                 set_child(n, "opr_status", "0");
@@ -700,6 +740,7 @@ fn write(st: &mut SimState, name: &str, params: &[(String, String)]) -> String {
         "cbSetWifiAccPt" => set_wifi_acc_pt(st, &clean),
         "cbReboot" => {
             st.invalidate_sessions();
+            st.rebooted = Some(Instant::now());
             return response(&result_node(
                 name,
                 vec![leaf("Msg", "Rebooting...")],

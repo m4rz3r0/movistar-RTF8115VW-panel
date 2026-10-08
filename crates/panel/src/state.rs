@@ -2,6 +2,7 @@
 
 use crate::{
     config::{self, Config},
+    crypto::HistoryKey,
     db,
     poller::PollerHandle,
 };
@@ -28,11 +29,13 @@ pub struct AppState {
     /// Sondeo del router: última instantánea y pausa para escribir. Inactivo
     /// hasta `Poller::spawn`.
     pub poller: PollerHandle,
+    /// Clave con la que el historial cifra los valores secretos.
+    pub history_key: Arc<HistoryKey>,
 }
 
 impl AppState {
-    /// Carga el catálogo, lee la contraseña del router y abre la base de
-    /// datos. Cualquier fallo impide arrancar; el mensaje nunca incluye
+    /// Carga el catálogo, lee la contraseña del router y la clave del
+    /// historial (la crea si no existe) y abre la base de datos. Cualquier fallo impide arrancar; el mensaje nunca incluye
     /// secretos.
     pub async fn new(cfg: Config, leptos: LeptosOptions) -> Result<AppState, String> {
         tokio::task::spawn_blocking(crate::auth::warm_up)
@@ -41,6 +44,7 @@ impl AppState {
         let catalogo = Catalogo::load().map_err(|e| e.to_string())?;
         let mascara = Mascara::load().map_err(|e| e.to_string())?;
         let password = config::read_router_secret(&cfg.router_secret_file)?;
+        let history_key = HistoryKey::load_or_create(&cfg.history_key_file)?;
         let hgu = hgu::Client::new(hgu::ClientConfig::new(
             &cfg.router_url,
             &cfg.router_user,
@@ -61,6 +65,7 @@ impl AppState {
             leptos,
             login_lock: Arc::new(Mutex::new(())),
             poller: PollerHandle::default(),
+            history_key: Arc::new(history_key),
         })
     }
 }

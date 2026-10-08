@@ -135,6 +135,37 @@ impl Client {
         self.call_locked(&mut st, name, &all).await
     }
 
+    /// Escritura de la UI básica: obtiene el `sessionKey` de `page` y hace
+    /// `GET /cgi-bin/<path>` con `params` y `sessionKey` en la URL (`path`
+    /// puede llevar ya su `?action=…`). Los valores van tal cual: ofuscar
+    /// las claves (XOR 0x1f) es cosa de quien llama. Si el router pide
+    /// iniciar sesión, entra de nuevo y repite una vez con un `sessionKey`
+    /// nuevo. Devuelve el cuerpo de la respuesta.
+    pub async fn basic_write(
+        &self,
+        page: &str,
+        path: &str,
+        params: &[(&str, &str)],
+    ) -> Result<String, Error> {
+        let mut st = self.shared.state.lock().await;
+        let path = path.trim_start_matches('/');
+        let sep = if path.contains('?') { '&' } else { '?' };
+        for _ in 0..2 {
+            let key = self.session_key_locked(&mut st, page).await?;
+            let mut all: Vec<(&str, &str)> = params.to_vec();
+            all.push(("sessionKey", &key));
+            let url = format!("/cgi-bin/{path}{sep}{}", form_body(&all));
+            let body = self.send(&mut st, Method::GET, &url, None).await?;
+            if !looks_logged_out(&body) {
+                return Ok(body);
+            }
+            Self::invalidate(&mut st);
+        }
+        Err(Error::SessionExpired(format!(
+            "{path}: el router sigue pidiendo iniciar sesión"
+        )))
+    }
+
     /// Devuelve el HTML de una página básica (reinicia sesión una vez si hace falta).
     pub async fn basic_page(&self, path: &str) -> Result<String, Error> {
         let mut st = self.shared.state.lock().await;

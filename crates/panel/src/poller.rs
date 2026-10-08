@@ -287,7 +287,7 @@ async fn supervised<T: Send + 'static>(
     match tokio::spawn(fut).await {
         Ok(v) => Some(v),
         Err(e) => {
-            eprintln!("panel: error interno en el sondeo ({what}): {e}");
+            tracing::error!("error interno en el sondeo ({what}): {e}");
             None
         }
     }
@@ -528,10 +528,10 @@ impl Poller {
 
         let db = &self.state.db;
         if let Err(e) = series::insert(db, &sample).await {
-            eprintln!("panel: no se puede guardar la muestra: {e}");
+            tracing::error!("no se puede guardar la muestra: {e}");
         }
         if let Err(e) = series::wan_state(db, wan_up, now).await {
-            eprintln!("panel: no se puede registrar el estado de la WAN: {e}");
+            tracing::error!("no se puede registrar el estado de la WAN: {e}");
         }
     }
 
@@ -544,7 +544,7 @@ impl Poller {
         }
         self.last_compact = Some(Instant::now());
         if let Err(e) = series::compact(&self.state.db, series::now()).await {
-            eprintln!("panel: no se pueden compactar las series: {e}");
+            tracing::error!("no se pueden compactar las series: {e}");
         }
     }
 }

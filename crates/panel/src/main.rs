@@ -4,6 +4,7 @@
 #[cfg(feature = "ssr")]
 #[tokio::main]
 async fn main() -> std::process::ExitCode {
+    init_logging();
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.is_empty() {
         serve().await
@@ -12,10 +13,28 @@ async fn main() -> std::process::ExitCode {
     }
 }
 
+/// Registros a stderr; nivel según `RP_LOG` (sintaxis de `EnvFilter`), por
+/// defecto `info`.
+#[cfg(feature = "ssr")]
+fn init_logging() {
+    use tracing_subscriber::EnvFilter;
+    let filter = EnvFilter::try_from_env("RP_LOG").unwrap_or_else(|_| EnvFilter::new("info"));
+    tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_writer(std::io::stderr)
+        .init();
+}
+
 #[cfg(feature = "ssr")]
 async fn serve() -> std::process::ExitCode {
     use leptos::config::get_configuration;
-    use panel::{build_router, config::Config, poller::Poller, state::AppState};
+    use panel::{
+        build_router,
+        changes::{ChangeManager, Tiempos},
+        config::Config,
+        poller::Poller,
+        state::AppState,
+    };
     use std::{net::SocketAddr, process::ExitCode};
 
     let cfg = match Config::from_env() {
@@ -50,6 +69,13 @@ async fn serve() -> std::process::ExitCode {
         }
     };
     Poller::spawn(state.clone());
+    // Retoma los cambios que quedaron a medias si el proceso se cortó (en
+    // segundo plano: si el router no responde, no retrasa el arranque).
+    let cambios = ChangeManager::new(state.clone(), Tiempos::default());
+    tokio::spawn({
+        let cambios = cambios.clone();
+        async move { cambios.reanudar_pendientes().await }
+    });
     eprintln!("panel escuchando en http://{listen}");
     let app = build_router(state).into_make_service_with_connect_info::<SocketAddr>();
     if let Err(e) = axum::serve(listener, app).await {
