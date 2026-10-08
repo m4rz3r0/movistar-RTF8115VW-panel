@@ -156,11 +156,6 @@ etiqueta = "Puerta de enlace"
 tipo = "ip"
 partido = "ip4"
 
-[[funcion.parametro]]
-nombre = "del"
-etiqueta = "Borrar (siempre «DEL»)"
-tipo = "text"
-
 [[funcion]]
 name = "cbGetRoutingV6Rule"
 area = "wan"
@@ -236,11 +231,6 @@ tipo = "int"
 [[funcion.parametro]]
 nombre = "fwd_policy"
 etiqueta = "Política"
-tipo = "text"
-
-[[funcion.parametro]]
-nombre = "del"
-etiqueta = "Borrar (siempre «DEL»)"
 tipo = "text"
 
 [[funcion]]
@@ -410,11 +400,6 @@ etiqueta = "Máscara estática"
 tipo = "ip"
 partido = "ip4"
 
-[[funcion.parametro]]
-nombre = "del"
-etiqueta = "Borrar (siempre «DEL»)"
-tipo = "text"
-
 [[funcion]]
 name = "te_mm.cmd?action=Apply"
 area = "wan"
@@ -573,11 +558,6 @@ nombre = "rtm_cfg_dhcpv4_svr_pool_id"
 etiqueta = "Pool DHCP"
 tipo = "int"
 
-[[funcion.parametro]]
-nombre = "del"
-etiqueta = "Borrar (siempre «DEL»)"
-tipo = "text"
-
 [[funcion]]
 name = "cbDhcpV4SvrPoolGetStatic"
 area = "lan_dhcp"
@@ -641,11 +621,6 @@ nombre = "mac_addr"
 etiqueta = "Dirección MAC"
 tipo = "mac"
 partido = "mac6"
-
-[[funcion.parametro]]
-nombre = "del"
-etiqueta = "Borrar (siempre «DEL»)"
-tipo = "text"
 
 [[funcion]]
 name = "cbGetArpCache"
@@ -844,11 +819,6 @@ etiqueta = "MAC de la condición"
 tipo = "mac"
 partido = "mac6"
 
-[[funcion.parametro]]
-nombre = "del"
-etiqueta = "Borrar (siempre «DEL»)"
-tipo = "text"
-
 [[funcion]]
 name = "cbGetLanHostList"
 area = "lan_dhcp"
@@ -916,11 +886,6 @@ nombre = "ipv4_mask"
 etiqueta = "Máscara"
 tipo = "ip"
 partido = "ip4"
-
-[[funcion.parametro]]
-nombre = "del"
-etiqueta = "Borrar (siempre «DEL»)"
-tipo = "text"
 
 [[funcion]]
 name = "cbGetLanIPv4Intf"
@@ -1019,11 +984,6 @@ tipo = "int"
 nombre = "mll_bridge_id"
 etiqueta = "Puente (id; -1 = nuevo)"
 tipo = "int"
-
-[[funcion.parametro]]
-nombre = "del"
-etiqueta = "Borrar (siempre «DEL»)"
-tipo = "text"
 
 [[funcion]]
 name = "cbGetTR98L2Filtering"
@@ -1138,11 +1098,6 @@ tipo = "mac"
 nombre = "mll_br_filter_id"
 etiqueta = "Filtro (id; -1 = nuevo)"
 tipo = "int"
-
-[[funcion.parametro]]
-nombre = "del"
-etiqueta = "Borrar (siempre «DEL»)"
-tipo = "text"
 
 [[funcion]]
 name = "te_mapa_red_local.asp"
@@ -1637,11 +1592,6 @@ descripcion = "Crea, modifica o borra un enlace WDS con otro punto de acceso."
 riesgo = "medio"
 lectura_pareada = { funcion = "cbGetWifiWds", params = [["dpm_cfg_wifi_wds_0i", "{dpm_cfg_wifi_wds_id}"]] }
 lista = { id_param = "dpm_cfg_wifi_wds_id", all = false, del = true }
-
-[[funcion.parametro]]
-nombre = "del"
-etiqueta = "Borrar (siempre «DEL»)"
-tipo = "text"
 
 [[funcion.parametro]]
 nombre = "dpm_cfg_wifi_wds_id"
@@ -2276,11 +2226,6 @@ etiqueta = "IP remota permitida"
 tipo = "ip"
 partido = "ip4"
 
-[[funcion.parametro]]
-nombre = "del"
-etiqueta = "Borrar (siempre «DEL»)"
-tipo = "text"
-
 [[funcion]]
 name = "cbGetUpnpCfg"
 area = "nat"
@@ -2827,11 +2772,6 @@ nombre = "rtm_ddns_id"
 etiqueta = "Entrada DDNS (id; -1 = nueva)"
 tipo = "int"
 
-[[funcion.parametro]]
-nombre = "del"
-etiqueta = "Borrar (siempre «DEL»)"
-tipo = "text"
-
 [[funcion]]
 name = "cbGetDnsRelay"
 area = "dns"
@@ -2904,11 +2844,6 @@ nombre = "dns_addr"
 etiqueta = "Servidor DNS"
 tipo = "ip"
 partido = "ip4"
-
-[[funcion.parametro]]
-nombre = "del"
-etiqueta = "Borrar (siempre «DEL»)"
-tipo = "text"
 
 # ======================================================================
 # Área: ipv6
@@ -3032,7 +2967,7 @@ origen = "basica"
 tipo = "escritura"
 pagina = "te_ipv6.asp"
 descripcion = "Abre puertos IPv6 hacia un equipo de la LAN (UI básica)."
-riesgo = "bajo"
+riesgo = "alto"
 lectura_pareada = { funcion = "te_ipv6.asp", params = [] }
 
 [[funcion.parametro]]
@@ -3052,7 +2987,7 @@ origen = "basica"
 tipo = "escritura"
 pagina = "te_ipv6.asp"
 descripcion = "Borra una apertura de puertos IPv6 (UI básica)."
-riesgo = "bajo"
+riesgo = "alto"
 lectura_pareada = { funcion = "te_ipv6.asp", params = [] }
 
 [[funcion.parametro]]
@@ -3072,7 +3007,7 @@ origen = "basica"
 tipo = "escritura"
 pagina = "te_ipv6.asp"
 descripcion = "Guarda la lista de aperturas de puertos IPv6 (UI básica)."
-riesgo = "bajo"
+riesgo = "alto"
 lectura_pareada = { funcion = "te_ipv6.asp", params = [] }
 
 [[funcion.parametro]]
@@ -3480,11 +3415,6 @@ nombre = "rtm_cfg_qos_cls_id"
 etiqueta = "Regla (id; -1 = nueva)"
 tipo = "int"
 
-[[funcion.parametro]]
-nombre = "del"
-etiqueta = "Borrar (siempre «DEL»)"
-tipo = "text"
-
 [[funcion]]
 name = "cbGetQueue"
 area = "qos"
@@ -3598,11 +3528,6 @@ opciones = [["0", "0"], ["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"], ["5", "5
 nombre = "mll_br_marking_id"
 etiqueta = "Marcado (id; -1 = nuevo)"
 tipo = "int"
-
-[[funcion.parametro]]
-nombre = "del"
-etiqueta = "Borrar (siempre «DEL»)"
-tipo = "text"
 
 # ======================================================================
 # Área: voip
@@ -3814,7 +3739,7 @@ tipo = "int"
 [[funcion.parametro]]
 nombre = "user_agent_domain"
 etiqueta = "Dominio SIP"
-tipo = "text"
+tipo = "secret"
 
 [[funcion.parametro]]
 nombre = "user_agent_port"
@@ -4041,7 +3966,7 @@ lectura_pareada = { funcion = "cbGetUserList", params = [] }
 [[funcion.parametro]]
 nombre = "rqDelList"
 etiqueta = "Usuarios a borrar"
-tipo = "text"
+tipo = "secret"
 
 [[funcion]]
 name = "cbGetUserList"

@@ -149,6 +149,8 @@ mod tests {
             "radius_secret",
             "api_token",
             "admin_pwd",
+            "user_agent_domain",
+            "rqDelList",
         ] {
             assert!(m.es_secreto(n), "{n} debería ser secreto");
         }
@@ -223,14 +225,10 @@ mod tests {
     }
 
     /// Etiquetas que el saneado de fixtures redacta por privacidad pero que no
-    /// son credenciales: nombre del concentrador PPPoE, servicio PPPoE,
-    /// dominio y dominio SIP del operador.
-    const NO_CREDENCIALES: &[&str] = &[
-        "ac_name",
-        "service_name",
-        "domain_name",
-        "user_agent_domain",
-    ];
+    /// son credenciales: nombre del concentrador PPPoE, servicio PPPoE y
+    /// dominio del operador. (`user_agent_domain` sí se enmascara: lleva la
+    /// cuenta SIP incrustada.)
+    const NO_CREDENCIALES: &[&str] = &["ac_name", "service_name", "domain_name"];
 
     #[test]
     fn mascara_oculta_psk_y_ppp() {

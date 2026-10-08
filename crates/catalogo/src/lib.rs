@@ -143,10 +143,27 @@ impl Catalogo {
                     }
                 }
             }
-            if let Some(l) = &f.lista
-                && l.id_param.trim().is_empty()
-            {
-                return Err(mal(f, "lista sin id_param".into()));
+            if f.tipo != Tipo::Lectura && f.bloqueada.is_none() && f.pagina.is_none() {
+                return Err(mal(f, "sin página de la que sacar el sessionKey".into()));
+            }
+            if let Some(l) = &f.lista {
+                let en_lectura = f
+                    .lectura_pareada
+                    .as_ref()
+                    .is_some_and(|lp| lp.params.iter().any(|(k, _)| *k == l.id_param));
+                if f.parametro(&l.id_param).is_none() && !en_lectura {
+                    return Err(mal(
+                        f,
+                        format!("id_param {} no es un parámetro", l.id_param),
+                    ));
+                }
+                if l.del && f.parametro("del").is_some() {
+                    return Err(mal(
+                        f,
+                        "con lista.del, `del` no es un parámetro editable (lo añade el gestor)"
+                            .into(),
+                    ));
+                }
             }
         }
         Ok(())
@@ -212,6 +229,32 @@ riesgo = "bajo"
         assert!(Catalogo::from_toml(&enum_vacio).is_err());
         let lectura_con_riesgo = base.replace("\"bajo\"", "\"alto\"");
         assert!(Catalogo::from_toml(&lectura_con_riesgo).is_err());
+        let escritura = |extra: &str| {
+            format!(
+                "{base}\n[[funcion]]\nname = \"cbSetX\"\narea = \"wan\"\norigen = \"avanzada\"\n\
+                 tipo = \"escritura\"\ndescripcion = \"x\"\nriesgo = \"alto\"\n\
+                 lectura_pareada = {{ funcion = \"cbGetX\", params = [[\"x_0i\", \"{{x_id}}\"]] }}\n{extra}\n\
+                 [[funcion.parametro]]\nnombre = \"x_id\"\netiqueta = \"X\"\ntipo = \"int\"\n"
+            )
+        };
+        let buena = escritura("pagina = \"x.asp\"\nlista = { id_param = \"x_id\", del = true }");
+        assert!(
+            Catalogo::from_toml(&buena).is_ok(),
+            "{:?}",
+            Catalogo::from_toml(&buena)
+        );
+        let sin_pagina = escritura("lista = { id_param = \"x_id\", del = true }");
+        assert!(Catalogo::from_toml(&sin_pagina).is_err());
+        let bloqueada_sin_pagina = escritura("bloqueada = \"motivo suficiente\"");
+        assert!(Catalogo::from_toml(&bloqueada_sin_pagina).is_ok());
+        let id_ajeno = escritura("pagina = \"x.asp\"\nlista = { id_param = \"y_id\" }");
+        assert!(Catalogo::from_toml(&id_ajeno).is_err());
+        let id_de_lectura = escritura("pagina = \"x.asp\"\nlista = { id_param = \"x_0i\" }");
+        assert!(Catalogo::from_toml(&id_de_lectura).is_ok());
+        let del_editable = format!(
+            "{buena}\n[[funcion.parametro]]\nnombre = \"del\"\netiqueta = \"D\"\ntipo = \"text\"\n"
+        );
+        assert!(Catalogo::from_toml(&del_editable).is_err());
     }
 
     #[test]

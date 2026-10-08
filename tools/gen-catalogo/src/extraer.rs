@@ -355,7 +355,11 @@ fn llamadas(fuentes: &[Fuente]) -> Vec<Sitio> {
         }
         for c in FETCH.captures_iter(t) {
             let ini = c.get(0).expect("grupo 0").start();
-            let antes = &t[ini.saturating_sub(600)..ini];
+            let mut desde = ini.saturating_sub(600);
+            while !t.is_char_boundary(desde) {
+                desde += 1;
+            }
+            let antes = &t[desde..ini];
             let antes = &antes[antes.rfind("URLSearchParams").unwrap_or(0)..];
             out.push(Sitio {
                 cb: c[1].to_owned(),
@@ -952,6 +956,10 @@ pub fn extraer(dir: &Path) -> Result<Vec<Funcion>, String> {
             }),
             _ => None,
         };
+        if del && lista.is_some() {
+            // `del=DEL` lo añade el gestor de cambios al borrar.
+            params.retain(|p| p.nombre != "del");
+        }
         let mut f = Funcion {
             name: (*cb).to_owned(),
             area,

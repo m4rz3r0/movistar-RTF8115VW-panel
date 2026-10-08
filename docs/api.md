@@ -126,7 +126,6 @@ Lista: instancia por `rtm_rulev4_id`; `del=DEL` borra
 | `dst_addr` | Destino | ip (Ip4) |  |
 | `dst_mask` | Máscara de destino | ip (Ip4) |  |
 | `gw_addr` | Puerta de enlace | ip (Ip4) |  |
-| `del` | Borrar (siempre «DEL») | text |  |
 
 ### `cbGetRoutingV6Rule`
 
@@ -164,7 +163,6 @@ Lista: instancia por `rtm_rulev6_id`; `del=DEL` borra
 | `next_hop_addr` | Siguiente salto | text |  |
 | `metric` | Métrica | int |  |
 | `fwd_policy` | Política | text |  |
-| `del` | Borrar (siempre «DEL») | text |  |
 
 ### `cbGetStatistic`
 
@@ -224,7 +222,6 @@ Lista: instancia por `ip_intf_id`; `del=DEL` borra
 | `static_ipv4_addr` | IP estática | ip (Ip4) |  |
 | `static_ipv4_gw` | Puerta de enlace estática | ip (Ip4) |  |
 | `static_ipv4_mask` | Máscara estática | ip (Ip4) |  |
-| `del` | Borrar (siempre «DEL») | text |  |
 
 ### `te_mm.cmd?action=Apply`
 
@@ -311,7 +308,6 @@ Lista: instancia por `rtm_dhcpv4_svr_pool_opt_id`; `del=DEL` borra
 | `opt_value` | Valor (hexadecimal) | text |  |
 | `rtm_dhcpv4_svr_pool_opt_id` | Opción (id; -1 = nueva) | int |  |
 | `rtm_cfg_dhcpv4_svr_pool_id` | Pool DHCP | int |  |
-| `del` | Borrar (siempre «DEL») | text |  |
 
 ### `cbDhcpV4SvrPoolGetStatic`
 
@@ -346,7 +342,6 @@ Lista: instancia por `rtm_dhcpv4_svr_pool_static_id`; `del=DEL` borra
 | `rtm_cfg_dhcpv4_svr_pool_id` | Pool DHCP | int |  |
 | `ipv4_addr` | Dirección IPv4 | ip (Ip4) |  |
 | `mac_addr` | Dirección MAC | mac (Mac6) |  |
-| `del` | Borrar (siempre «DEL») | text |  |
 
 ### `cbGetArpCache`
 
@@ -411,7 +406,6 @@ Lista: instancia por `rtm_cfg_dhcpv4_svr_pool_id`; `del=DEL` borra
 | `ipv4_mask` | Máscara | ip (Ip4) |  |
 | `mac_addr_mask` | Máscara de MAC | mac (Mac6) |  |
 | `mac_addr_value` | MAC de la condición | mac (Mac6) |  |
-| `del` | Borrar (siempre «DEL») | text |  |
 
 ### `cbGetLanHostList`
 
@@ -453,7 +447,6 @@ Lista: instancia por `ipv4_addr_id`; `del=DEL` borra
 | `ipv4_addr_id` | Dirección (id) | int |  |
 | `ipv4_addr` | Dirección IPv4 | ip (Ip4) |  |
 | `ipv4_mask` | Máscara | ip (Ip4) |  |
-| `del` | Borrar (siempre «DEL») | text |  |
 
 ### `cbGetLanIPv4Intf`
 
@@ -510,7 +503,6 @@ Lista: instancia por `mll_bridge_id`; `del=DEL` borra
 | `adm_state` | Activado | enum | `1` Activado, `0` Desactivado |
 | `default_vid_value` | VLAN por defecto | int |  |
 | `mll_bridge_id` | Puente (id; -1 = nuevo) | int |  |
-| `del` | Borrar (siempre «DEL») | text |  |
 
 ### `cbGetTR98L2Filtering`
 
@@ -555,7 +547,6 @@ Lista: instancia por `mll_br_filter_id`; `del=DEL` borra
 | `cls_dst_mac_addr` | MAC de destino | mac |  |
 | `cls_dst_mac_mask` | Máscara de MAC de destino | mac |  |
 | `mll_br_filter_id` | Filtro (id; -1 = nuevo) | int |  |
-| `del` | Borrar (siempre «DEL») | text |  |
 
 ### `te_mapa_red_local.asp`
 
@@ -766,7 +757,6 @@ Lista: instancia por `dpm_cfg_wifi_wds_id`; `del=DEL` borra
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
-| `del` | Borrar (siempre «DEL») | text |  |
 | `dpm_cfg_wifi_wds_id` | Enlace WDS (id; -1 = nuevo) | int |  |
 | `wds_adm_state` | WDS activado | enum | `1` Activado, `0` Desactivado |
 | `wifi_acc_pt_id` | Punto de acceso | int |  |
@@ -1029,7 +1019,6 @@ Lista: instancia por `nat_port_mapping_id`; `del=DEL` borra
 | `int_l4_port_min_value` | Puerto interno desde | int |  |
 | `int_l4_port_max_value` | Puerto interno hasta | int |  |
 | `rmt_ip_addr` | IP remota permitida | ip (Ip4) |  |
-| `del` | Borrar (siempre «DEL») | text |  |
 
 ### `cbGetUpnpCfg`
 
@@ -1276,7 +1265,6 @@ Lista: instancia por `rtm_ddns_id`; `del=DEL` borra
 | `account` | Cuenta | secret |  |
 | `password` | Contraseña | secret |  |
 | `rtm_ddns_id` | Entrada DDNS (id; -1 = nueva) | int |  |
-| `del` | Borrar (siempre «DEL») | text |  |
 
 ### `cbGetDnsRelay`
 
@@ -1328,7 +1316,6 @@ Lista: instancia por `rtm_cfg_dns_relay_id`; `del=DEL` borra
 | `ip_intf_id` | Interfaz IP | int |  |
 | `rtm_cfg_dns_relay_id` | Servidor DNS (id; -1 = nuevo) | int |  |
 | `dns_addr` | Servidor DNS | ip (Ip4) |  |
-| `del` | Borrar (siempre «DEL») | text |  |
 
 ## IPv6
 
@@ -1371,7 +1358,7 @@ Lectura pareada: `cbGetLanIPv6Config`
 
 ### `scbidirectionalfwl.cmd?action=create`
 
-*escritura* · UI básica · riesgo bajo · página `te_ipv6.asp`
+*escritura* · UI básica · riesgo alto · página `te_ipv6.asp`
 
 Abre puertos IPv6 hacia un equipo de la LAN (UI básica).
 
@@ -1384,7 +1371,7 @@ Lectura pareada: `te_ipv6.asp`
 
 ### `scbidirectionalfwl.cmd?action=delete`
 
-*escritura* · UI básica · riesgo bajo · página `te_ipv6.asp`
+*escritura* · UI básica · riesgo alto · página `te_ipv6.asp`
 
 Borra una apertura de puertos IPv6 (UI básica).
 
@@ -1397,7 +1384,7 @@ Lectura pareada: `te_ipv6.asp`
 
 ### `scbidirectionalfwl.cmd?action=save`
 
-*escritura* · UI básica · riesgo bajo · página `te_ipv6.asp`
+*escritura* · UI básica · riesgo alto · página `te_ipv6.asp`
 
 Guarda la lista de aperturas de puertos IPv6 (UI básica).
 
@@ -1578,7 +1565,6 @@ Lista: instancia por `rtm_cfg_qos_cls_id`; `del=DEL` borra
 | `cls_dst_ipv4_addr` | IP de destino | ip |  |
 | `cls_dst_ipv4_mask` | Máscara de IP de destino | ip |  |
 | `rtm_cfg_qos_cls_id` | Regla (id; -1 = nueva) | int |  |
-| `del` | Borrar (siempre «DEL») | text |  |
 
 ### `cbGetQueue`
 
@@ -1638,7 +1624,6 @@ Lista: instancia por `mll_br_marking_id`; `del=DEL` borra
 | `pbit_override` | Reescribir prioridad 802.1p | bool |  |
 | `pbit_value` | Prioridad 802.1p | enum | `0` 0, `1` 1, `2` 2, `3` 3, `4` 4, `5` 5, `6` 6, `7` 7 |
 | `mll_br_marking_id` | Marcado (id; -1 = nuevo) | int |  |
-| `del` | Borrar (siempre «DEL») | text |  |
 
 ## VoIP
 
@@ -1711,7 +1696,7 @@ Lectura pareada: `cbGetVoicePhysical`
 
 Configuración SIP: servidores proxy y de registro, dominio, tiempos y DTMF.
 
-Elementos de la respuesta: `adm_state`, `alt_outbound_proxy_cfg` 🔒, `alt_outbound_proxy_port`, `alt_proxy_server_cfg` 🔒, `alt_proxy_server_port`, `alt_proxy_server_transport`, `alt_registrar_server_cfg` 🔒, `alt_registrar_server_port`, `alt_registrar_server_transport`, `conference_call_domain_uri` 🔒, `conference_call_remote_mixer_enable`, `digit_map_str`, `dtmf_method`, `hook_flash_method`, `invite_expires`, `ip_intf_id`, `map_id`, `min_session_expires`, `net_status`, `opr_outbound_proxy`, `outbound_proxy_cfg` 🔒, `outbound_proxy_port`, `proxy_server_cfg` 🔒, `proxy_server_port`, `proxy_server_transport`, `region`, `register_expires`, `register_min_expires`, `register_retry_interval`, `registrar_server_cfg` 🔒, `registrar_server_port`, `registrar_server_transport`, `registration_period`, `reinvite_expires`, `rtp_dscp_mark`, `session_expires`, `sip_clt_id`, `sip_dscp_mark`, `t38_enable`, `tr104_issue1_vp_sip`, `user_agent_domain`, `user_agent_port`, `user_agent_transport`
+Elementos de la respuesta: `adm_state`, `alt_outbound_proxy_cfg` 🔒, `alt_outbound_proxy_port`, `alt_proxy_server_cfg` 🔒, `alt_proxy_server_port`, `alt_proxy_server_transport`, `alt_registrar_server_cfg` 🔒, `alt_registrar_server_port`, `alt_registrar_server_transport`, `conference_call_domain_uri` 🔒, `conference_call_remote_mixer_enable`, `digit_map_str`, `dtmf_method`, `hook_flash_method`, `invite_expires`, `ip_intf_id`, `map_id`, `min_session_expires`, `net_status`, `opr_outbound_proxy`, `outbound_proxy_cfg` 🔒, `outbound_proxy_port`, `proxy_server_cfg` 🔒, `proxy_server_port`, `proxy_server_transport`, `region`, `register_expires`, `register_min_expires`, `register_retry_interval`, `registrar_server_cfg` 🔒, `registrar_server_port`, `registrar_server_transport`, `registration_period`, `reinvite_expires`, `rtp_dscp_mark`, `session_expires`, `sip_clt_id`, `sip_dscp_mark`, `t38_enable`, `tr104_issue1_vp_sip`, `user_agent_domain` 🔒, `user_agent_port`, `user_agent_transport`
 
 ### `cbSetVoiceSip`
 
@@ -1734,7 +1719,7 @@ Lectura pareada: `cbGetVoiceSip`
 | `rtp_dscp_mark` | DSCP de RTP | int |  |
 | `web` | Origen del formulario (BASIC/ADVANCED) | text |  |
 | `ip_intf_id` | Interfaz IP | int |  |
-| `user_agent_domain` | Dominio SIP | text |  |
+| `user_agent_domain` | Dominio SIP | secret |  |
 | `user_agent_port` | Puerto local SIP | int |  |
 | `user_agent_transport` | Transporte local | enum | `1` UDP |
 | `outbound_proxy_cfg` | Proxy de salida | secret |  |
@@ -1833,7 +1818,7 @@ Lectura pareada: `cbGetUserList`
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
-| `rqDelList` | Usuarios a borrar | text |  |
+| `rqDelList` | Usuarios a borrar | secret |  |
 
 ### `cbGetUserList`
 
