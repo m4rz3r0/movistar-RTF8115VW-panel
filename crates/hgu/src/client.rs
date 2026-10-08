@@ -169,17 +169,25 @@ impl Client {
         let path = format!("/cgi-bin/{name}.xml");
         let body = form_body(params);
         for attempt in 0..2 {
-            self.ensure_advanced(st).await?;
+            if !self.ensure_advanced(st).await? {
+                tracing::debug!("{name}: sesión básica caducada (intento {attempt})");
+                continue;
+            }
             let raw = self
                 .send(st, Method::POST, &path, Some(body.clone()))
                 .await?;
+            if looks_logged_out(&raw) {
+                tracing::debug!("{name}: sesión caducada (intento {attempt})");
+                Self::invalidate(st);
+                continue;
+            }
             match parse_response(name, &raw) {
                 Ok(node) if node.result_ok() => return Ok(node),
                 Ok(node) => {
                     return Err(Error::CallFailed {
                         name: name.to_owned(),
                         result: node.text_of("Result").unwrap_or("").to_owned(),
-                        error: node.text_of("Error").unwrap_or("").to_owned(),
+                        error: node.text_of("ErrorString").unwrap_or("").to_owned(),
                     });
                 }
                 Err(XmlError::NotResponse) => {
@@ -247,9 +255,10 @@ impl Client {
         }
     }
 
-    async fn ensure_advanced(&self, st: &mut State) -> Result<(), Error> {
+    /// `Ok(false)`: la sesión básica había caducado (ya invalidada); hay que reintentar.
+    async fn ensure_advanced(&self, st: &mut State) -> Result<bool, Error> {
         if st.adv_ok {
-            return Ok(());
+            return Ok(true);
         }
         self.ensure_basic(st).await?;
         tracing::debug!("login avanzado");
@@ -265,9 +274,8 @@ impl Client {
         let node = match parse_response("cbCheckLogin", &raw) {
             Ok(n) => n,
             Err(XmlError::NotResponse) => {
-                // El login básico ya no vale: se vuelve a empezar en la próxima llamada.
                 Self::invalidate(st);
-                return Err(Error::Auth("el router no aceptó la sesión básica"));
+                return Ok(false);
             }
             Err(e) => return Err(Error::Unexpected(format!("cbCheckLogin: {e}"))),
         };
@@ -284,7 +292,7 @@ impl Client {
         st.cookies.insert("LoginName".into(), urlencode(&user));
         st.cookies.insert("TimeOut".into(), "600".into());
         st.adv_ok = true;
-        Ok(())
+        Ok(true)
     }
 
     /// Una petición HTTP: respeta `min_gap`, envía las cookies y guarda las nuevas.

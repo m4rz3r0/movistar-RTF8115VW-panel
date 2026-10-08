@@ -27,6 +27,8 @@ struct Fake {
     adv_logins: AtomicUsize,
     in_flight: AtomicUsize,
     overlaps: AtomicUsize,
+    malformed_logout: std::sync::atomic::AtomicBool,
+    basic_valid: std::sync::atomic::AtomicBool,
     always_logout: std::sync::atomic::AtomicBool,
     valid_sid: Mutex<Option<String>>,
     last_write: Mutex<Option<HashMap<String, String>>>,
@@ -76,6 +78,7 @@ async fn basic_login(State(s): State<S>, body: Bytes) -> String {
     let f = form(&body);
     assert_eq!(f["curWebPage"], "/te_wifi.asp");
     if f["loginUsername"] == mess_userpass(USER) && f["loginPassword"] == mess_userpass(PASS) {
+        s.basic_valid.store(true, Ordering::SeqCst);
         "<script>location.href = \"/te_wifi.asp\"</script>".into()
     } else {
         "<script>location.href = \"/te_acceso_router.asp\"</script>".into()
@@ -86,6 +89,9 @@ async fn adv_login(State(s): State<S>, body: Bytes) -> String {
     let n = s.adv_logins.fetch_add(1, Ordering::SeqCst) + 1;
     let f = form(&body);
     assert_eq!(f["rqTimeout"], "600");
+    if !s.basic_valid.load(Ordering::SeqCst) {
+        return LOGGED_OUT.into();
+    }
     if f["rqUsername"] == mess_userpass(USER) && f["rqPasswd"] == mess_userpass(PASS) {
         let sid = format!("sid{n}");
         *s.valid_sid.lock().unwrap() = Some(sid.clone());
@@ -122,6 +128,9 @@ async fn api(
             cookie.contains(&format!("SessionID={sid}")) && cookie.contains("SessionStatus=Valid")
         });
     if !ok {
+        if s.malformed_logout.load(Ordering::SeqCst) {
+            return "<script>if(a&&b)top.location.href='te_acceso_router.asp';</script>".into();
+        }
         return LOGGED_OUT.into();
     }
     let name = name.trim_end_matches(".xml");
@@ -129,12 +138,12 @@ async fn api(
     match name {
         "cbGet" => "<Response><cbGet><Result>0</Result><v>7</v></cbGet></Response>".into(),
         "cbFail" => {
-            "<Response><cbFail><Result>1</Result><Error>no se pudo</Error></cbFail></Response>"
+            "<Response><cbFail><Result>1</Result><ErrorString>no se pudo</ErrorString></cbFail></Response>"
                 .into()
         }
         "cbSet" => {
             if f.get("sessionKey").map(String::as_str) != Some("42") {
-                return "<Response><cbSet><Result>1</Result><Error>clave</Error></cbSet></Response>"
+                return "<Response><cbSet><Result>1</Result><ErrorString>clave</ErrorString></cbSet></Response>"
                     .into();
             }
             *s.last_write.lock().unwrap() = Some(f);
@@ -266,4 +275,27 @@ async fn requests_are_serialized() {
         t.await.unwrap().unwrap();
     }
     assert_eq!(s.overlaps.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn malformed_logged_out_body_triggers_relogin() {
+    let (url, s) = start().await;
+    let c = client(&url, PASS);
+    c.call("cbGet", &[]).await.unwrap();
+    *s.valid_sid.lock().unwrap() = None;
+    s.malformed_logout.store(true, Ordering::SeqCst);
+    let n = c.call("cbGet", &[]).await.unwrap();
+    assert_eq!(n.text_of("v"), Some("7"));
+    assert_eq!(s.adv_logins.load(Ordering::SeqCst), 2);
+}
+
+#[tokio::test]
+async fn expired_basic_session_during_advanced_login_retries() {
+    let (url, s) = start().await;
+    let c = client(&url, PASS);
+    c.basic_page("dhcp.asp").await.unwrap();
+    s.basic_valid.store(false, Ordering::SeqCst);
+    let n = c.call("cbGet", &[]).await.unwrap();
+    assert_eq!(n.text_of("v"), Some("7"));
+    assert_eq!(s.basic_logins.load(Ordering::SeqCst), 2);
 }
