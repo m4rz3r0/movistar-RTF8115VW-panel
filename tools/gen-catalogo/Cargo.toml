@@ -1,0 +1,14 @@
+[package]
+name = "gen-catalogo"
+version = "0.1.0"
+description = "Genera el borrador de funciones.toml a partir del análisis del router y docs/api.md del catálogo"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+catalogo = { path = "../../crates/catalogo" }
+regex.workspace = true
+serde.workspace = true
+toml.workspace = true

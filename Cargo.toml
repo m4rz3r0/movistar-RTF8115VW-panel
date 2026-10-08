@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/*"]
+members = ["crates/*", "tools/gen-catalogo"]
 
 [workspace.package]
 edition = "2024"
@@ -16,3 +16,4 @@ tokio = { version = "1", features = ["sync", "time", "macros", "rt-multi-thread"
 tracing = "0.1"
 axum = "0.8"
 serde = { version = "1", features = ["derive"] }
+toml = "1"

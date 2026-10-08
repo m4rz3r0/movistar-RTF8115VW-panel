@@ -1,0 +1,13 @@
+[package]
+name = "catalogo"
+version = "0.1.0"
+description = "Catálogo revisado de funciones del router Askey RTF8115VW y enmascarado de secretos"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+hgu = { path = "../hgu" }
+serde.workspace = true
+thiserror.workspace = true
+toml.workspace = true

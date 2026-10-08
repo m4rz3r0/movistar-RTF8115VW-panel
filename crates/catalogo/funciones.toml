@@ -1,0 +1,4735 @@
+# Catálogo de funciones del router Askey RTF8115VW (Movistar/O2).
+#
+# Fuente de verdad, revisada a mano. El borrador inicial lo generó
+# `cargo run -p gen-catalogo -- borrador <dir_bruto> <salida>` a partir de las
+# páginas y scripts capturados del router; el generador nunca escribe aquí.
+# `docs/api.md` se genera de este fichero (`cargo run -p gen-catalogo -- --api-md`).
+#
+# Campos: ver crates/catalogo/src/model.rs. Reglas de riesgo: WAN, IP de la
+# LAN, puentes, cortafuegos y TR-069 alto; WiFi, DNS y rango DHCP medio; resto
+# bajo; las lecturas no tienen riesgo. En `lectura_pareada.params`, `{p}` es el
+# valor del parámetro `p` de la escritura.
+
+# ======================================================================
+# Área: wan
+
+[[funcion]]
+name = "cbGetGPONInfo"
+area = "wan"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "summary.asp"
+descripcion = "Estado de la fibra (GPON): estado de la ONT, serie y contraseña GPON (enmascaradas)."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbGetIpIntf"
+area = "wan"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "ipv4.asp"
+descripcion = "Lista de interfaces IP (LAN y WAN) con `all=ALL`; la usan muchas páginas para rellenar desplegables."
+riesgo = "bajo"
+
+[[funcion.parametro]]
+nombre = "all"
+etiqueta = "Todas (siempre «ALL»)"
+tipo = "text"
+
+[[funcion]]
+name = "cbGetRipIntf"
+area = "wan"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "rip.asp"
+descripcion = "Configuración de RIP por interfaz."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbSetRipIntf"
+area = "wan"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "rip.asp"
+descripcion = "Activa RIP y el envío/recepción de anuncios en una interfaz."
+riesgo = "alto"
+lectura_pareada = { funcion = "cbGetRipIntf", params = [] }
+
+[[funcion.parametro]]
+nombre = "adm_state"
+etiqueta = "Activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "accept_ra"
+etiqueta = "Aceptar anuncios RIP"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "send_ra"
+etiqueta = "Enviar anuncios RIP"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "rip_intf_id"
+etiqueta = "Interfaz RIP (id)"
+tipo = "int"
+
+[[funcion]]
+name = "cbGetRoutingV4Rule"
+area = "wan"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "default_gateway.asp"
+descripcion = "Rutas IPv4 (estáticas y puerta de enlace por defecto con `desc=Default`)."
+riesgo = "bajo"
+lista = { id_param = "rtm_rulev4_0i", all = true, del = false }
+
+[[funcion.parametro]]
+nombre = "all"
+etiqueta = "Todas (siempre «ALL»)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "desc"
+etiqueta = "Descripción"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "rtm_rulev4_0i"
+etiqueta = "Ruta IPv4 (índice)"
+tipo = "int"
+
+[[funcion]]
+name = "cbSetRoutingV4Rule"
+area = "wan"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "default_gateway.asp"
+descripcion = "Crea, modifica o borra una ruta IPv4 o la puerta de enlace por defecto."
+riesgo = "alto"
+lectura_pareada = { funcion = "cbGetRoutingV4Rule", params = [["rtm_rulev4_0i", "{rtm_rulev4_id}"]] }
+lista = { id_param = "rtm_rulev4_id", all = false, del = true }
+
+[[funcion.parametro]]
+nombre = "ip_intf_id"
+etiqueta = "Interfaz IP"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "rtm_rulev4_id"
+etiqueta = "Ruta (id; -1 = nueva)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "adm_state"
+etiqueta = "Activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "metric"
+etiqueta = "Métrica"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "fwd_policy"
+etiqueta = "Política"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "dst_addr"
+etiqueta = "Destino"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "dst_mask"
+etiqueta = "Máscara de destino"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "gw_addr"
+etiqueta = "Puerta de enlace"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "del"
+etiqueta = "Borrar (siempre «DEL»)"
+tipo = "text"
+
+[[funcion]]
+name = "cbGetRoutingV6Rule"
+area = "wan"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "default_gateway.asp"
+descripcion = "Rutas IPv6 (estáticas y puerta de enlace por defecto con `desc=Default`)."
+riesgo = "bajo"
+lista = { id_param = "rtm_rulev6_0i", all = true, del = false }
+
+[[funcion.parametro]]
+nombre = "all"
+etiqueta = "Todas (siempre «ALL»)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "desc"
+etiqueta = "Descripción"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "rtm_rulev6_0i"
+etiqueta = "Ruta IPv6 (índice)"
+tipo = "int"
+
+[[funcion]]
+name = "cbSetRoutingV6Rule"
+area = "wan"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "default_gateway.asp"
+descripcion = "Crea, modifica o borra una ruta IPv6 o la puerta de enlace IPv6 por defecto."
+riesgo = "alto"
+lectura_pareada = { funcion = "cbGetRoutingV6Rule", params = [["rtm_rulev6_0i", "{rtm_rulev6_id}"]] }
+lista = { id_param = "rtm_rulev6_id", all = false, del = true }
+
+[[funcion.parametro]]
+nombre = "ip_intf_id"
+etiqueta = "Interfaz IP"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "rtm_rulev6_id"
+etiqueta = "Ruta (id; -1 = nueva)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "adm_state"
+etiqueta = "Activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "dst_addr"
+etiqueta = "Destino"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "dst_prefix"
+etiqueta = "Longitud de prefijo"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "next_hop_addr"
+etiqueta = "Siguiente salto"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "metric"
+etiqueta = "Métrica"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "fwd_policy"
+etiqueta = "Política"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "del"
+etiqueta = "Borrar (siempre «DEL»)"
+tipo = "text"
+
+[[funcion]]
+name = "cbGetStatistic"
+area = "wan"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "wanstats.asp"
+descripcion = "Contadores de tráfico por interfaz (bytes, paquetes, errores); la WAN PPP es `ip2`."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbGetWanIPIntf"
+area = "wan"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "wanintf.asp"
+descripcion = "Conexiones WAN (PPPoE/DHCP/estática, VLAN, IPv6): estado operativo, IP y credenciales PPP (enmascaradas). Sin parámetros, todas; con `ip_intf_0i`, una."
+riesgo = "bajo"
+lista = { id_param = "ip_intf_0i", all = false, del = false }
+
+[[funcion.parametro]]
+nombre = "ip_intf_0i"
+etiqueta = "Conexión WAN (índice)"
+tipo = "int"
+
+[[funcion]]
+name = "cbSetWanIPIntf"
+area = "wan"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "wanintf.asp"
+descripcion = "Crea, modifica o borra una conexión WAN: tipo, VLAN, credenciales PPP, IP estática, DNS e IPv6. Puede dejar sin internet."
+riesgo = "alto"
+lectura_pareada = { funcion = "cbGetWanIPIntf", params = [["ip_intf_0i", "{ip_intf_id}"]] }
+lista = { id_param = "ip_intf_id", all = false, del = true }
+
+[[funcion.parametro]]
+nombre = "adm_state"
+etiqueta = "Activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "untagged"
+etiqueta = "Sin etiqueta VLAN"
+tipo = "enum"
+opciones = [["0", "Con etiqueta"], ["1", "Sin etiqueta"]]
+
+[[funcion.parametro]]
+nombre = "vlanid"
+etiqueta = "VLAN"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "vlan8021p"
+etiqueta = "Prioridad 802.1p"
+tipo = "enum"
+opciones = [["0", "0"], ["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"], ["5", "5"], ["6", "6"], ["7", "7"]]
+
+[[funcion.parametro]]
+nombre = "wan_type"
+etiqueta = "Tipo de conexión"
+tipo = "enum"
+opciones = [["0", "PPPoE"], ["1", "DHCP"], ["2", "IP estática"]]
+
+[[funcion.parametro]]
+nombre = "username"
+etiqueta = "Usuario PPP"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "password"
+etiqueta = "Contraseña"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "service_name"
+etiqueta = "Nombre de servicio PPPoE"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "ac_name"
+etiqueta = "Concentrador PPPoE (AC)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "trigger"
+etiqueta = "Conexión bajo demanda"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "idle_dis_time"
+etiqueta = "Desconexión por inactividad (s)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "dhcpv4_req_opt60_value"
+etiqueta = "Opción 60 enviada"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "dhcpv4_req_opt61_value"
+etiqueta = "Opción 61 enviada"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "dhcpv4_req_opt77_value"
+etiqueta = "Opción 77 enviada"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "dns_override"
+etiqueta = "DNS manuales"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "ipv6_type"
+etiqueta = "IPv6"
+tipo = "enum"
+opciones = [["0", "Doble pila"], ["1", "Solo IPv6"], ["2", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "ipv6_unnumbered"
+etiqueta = "IPv6 sin numerar"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "ipv6_addr_type"
+etiqueta = "Direccionamiento IPv6"
+tipo = "enum"
+opciones = [["1", "SLAAC"], ["0", "DHCP"]]
+
+[[funcion.parametro]]
+nombre = "ip_intf_id"
+etiqueta = "Interfaz IP"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "dnsv4_svr0"
+etiqueta = "DNS primario"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "dnsv4_svr1"
+etiqueta = "DNS secundario"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "static_ipv4_addr"
+etiqueta = "IP estática"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "static_ipv4_gw"
+etiqueta = "Puerta de enlace estática"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "static_ipv4_mask"
+etiqueta = "Máscara estática"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "del"
+etiqueta = "Borrar (siempre «DEL»)"
+tipo = "text"
+
+[[funcion]]
+name = "te_mm.cmd?action=Apply"
+area = "wan"
+origen = "basica"
+tipo = "escritura"
+pagina = "te_multipuesto_monopuesto.asp"
+descripcion = "Cambia entre multipuesto (router) y monopuesto (puente) con usuario y contraseña PPPoE. Puede dejar sin internet."
+riesgo = "alto"
+lectura_pareada = { funcion = "te_multipuesto_monopuesto.asp", params = [] }
+
+[[funcion.parametro]]
+nombre = "userselection"
+etiqueta = "Modo (multipuesto/monopuesto)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "PPPoEUsername"
+etiqueta = "Usuario PPPoE"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "PPPoEPassword"
+etiqueta = "Contraseña PPPoE"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "curWebPage"
+etiqueta = "Página de retorno"
+tipo = "text"
+
+[[funcion]]
+name = "te_mrl.cmd?action=wanApply"
+area = "wan"
+origen = "basica"
+tipo = "escritura"
+pagina = "te_mapa_red_local.asp"
+descripcion = "Cambia el modo WAN (multipuesto/monopuesto) y las credenciales PPPoE desde el mapa de red de la UI básica."
+riesgo = "alto"
+lectura_pareada = { funcion = "te_mapa_red_local.asp", params = [] }
+
+[[funcion.parametro]]
+nombre = "userselection"
+etiqueta = "Modo (multipuesto/monopuesto)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "PPPoEUsername"
+etiqueta = "Usuario PPPoE"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "PPPoEPassword"
+etiqueta = "Contraseña PPPoE"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "curWebPage"
+etiqueta = "Página de retorno"
+tipo = "text"
+
+[[funcion]]
+name = "te_multipuesto_monopuesto.asp"
+area = "wan"
+origen = "basica"
+tipo = "lectura"
+pagina = "te_multipuesto_monopuesto.asp"
+descripcion = "Página básica del modo WAN; sus variables (`userselection`, `wanPpp`) dan el modo y las credenciales PPPoE (enmascaradas)."
+riesgo = "bajo"
+
+# ======================================================================
+# Área: lan_dhcp
+
+[[funcion]]
+name = "cbDhcpV4SvrPoolGetClt"
+area = "lan_dhcp"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "dhcp.asp"
+descripcion = "Clientes con concesión DHCP de un pool (IP, MAC, tiempo restante)."
+riesgo = "bajo"
+
+[[funcion.parametro]]
+nombre = "rtm_cfg_dhcpv4_svr_pool_id"
+etiqueta = "Pool DHCP"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "all"
+etiqueta = "Todas (siempre «ALL»)"
+tipo = "text"
+
+[[funcion]]
+name = "cbDhcpV4SvrPoolGetOpt"
+area = "lan_dhcp"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "dhcp.asp"
+descripcion = "Opciones DHCP que entrega un pool."
+riesgo = "bajo"
+lista = { id_param = "rtm_dhcpv4_svr_pool_opt_id", all = true, del = false }
+
+[[funcion.parametro]]
+nombre = "rtm_cfg_dhcpv4_svr_pool_id"
+etiqueta = "Pool DHCP"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "rtm_dhcpv4_svr_pool_opt_id"
+etiqueta = "Opción (id; -1 = nueva)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "all"
+etiqueta = "Todas (siempre «ALL»)"
+tipo = "text"
+
+[[funcion]]
+name = "cbDhcpV4SvrPoolSetOpt"
+area = "lan_dhcp"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "dhcp.asp"
+descripcion = "Crea, modifica o borra una opción DHCP de un pool (valor en hexadecimal)."
+riesgo = "bajo"
+lectura_pareada = { funcion = "cbDhcpV4SvrPoolGetOpt", params = [["rtm_cfg_dhcpv4_svr_pool_id", "{rtm_cfg_dhcpv4_svr_pool_id}"], ["rtm_dhcpv4_svr_pool_opt_id", "{rtm_dhcpv4_svr_pool_opt_id}"]] }
+lista = { id_param = "rtm_dhcpv4_svr_pool_opt_id", all = false, del = true }
+
+[[funcion.parametro]]
+nombre = "adm_state"
+etiqueta = "Activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "opt_code"
+etiqueta = "Código de opción"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "opt_len"
+etiqueta = "Longitud"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "opt_value"
+etiqueta = "Valor (hexadecimal)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "rtm_dhcpv4_svr_pool_opt_id"
+etiqueta = "Opción (id; -1 = nueva)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "rtm_cfg_dhcpv4_svr_pool_id"
+etiqueta = "Pool DHCP"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "del"
+etiqueta = "Borrar (siempre «DEL»)"
+tipo = "text"
+
+[[funcion]]
+name = "cbDhcpV4SvrPoolGetStatic"
+area = "lan_dhcp"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "dhcp.asp"
+descripcion = "Reservas (IP fija por MAC) de un pool DHCP."
+riesgo = "bajo"
+lista = { id_param = "rtm_dhcpv4_svr_pool_static_id", all = true, del = false }
+
+[[funcion.parametro]]
+nombre = "rtm_cfg_dhcpv4_svr_pool_id"
+etiqueta = "Pool DHCP"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "rtm_dhcpv4_svr_pool_static_id"
+etiqueta = "Reserva (id; -1 = nueva)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "all"
+etiqueta = "Todas (siempre «ALL»)"
+tipo = "text"
+
+[[funcion]]
+name = "cbDhcpV4SvrPoolSetStatic"
+area = "lan_dhcp"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "dhcp.asp"
+descripcion = "Crea, modifica o borra una reserva DHCP (IP fija por MAC)."
+riesgo = "bajo"
+lectura_pareada = { funcion = "cbDhcpV4SvrPoolGetStatic", params = [["rtm_cfg_dhcpv4_svr_pool_id", "{rtm_cfg_dhcpv4_svr_pool_id}"], ["rtm_dhcpv4_svr_pool_static_id", "{rtm_dhcpv4_svr_pool_static_id}"]] }
+lista = { id_param = "rtm_dhcpv4_svr_pool_static_id", all = false, del = true }
+
+[[funcion.parametro]]
+nombre = "adm_state"
+etiqueta = "Activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "rtm_dhcpv4_svr_pool_static_id"
+etiqueta = "Reserva (id; -1 = nueva)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "rtm_cfg_dhcpv4_svr_pool_id"
+etiqueta = "Pool DHCP"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "ipv4_addr"
+etiqueta = "Dirección IPv4"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "mac_addr"
+etiqueta = "Dirección MAC"
+tipo = "mac"
+partido = "mac6"
+
+[[funcion.parametro]]
+nombre = "del"
+etiqueta = "Borrar (siempre «DEL»)"
+tipo = "text"
+
+[[funcion]]
+name = "cbGetArpCache"
+area = "lan_dhcp"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "arpstats.asp"
+descripcion = "Tabla ARP del router."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbGetDhcpv4ServerPool"
+area = "lan_dhcp"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "dhcp.asp"
+descripcion = "Pools del servidor DHCPv4: rango, máscara, puerta de enlace, DNS, concesión y condiciones por opción."
+riesgo = "bajo"
+lista = { id_param = "rtm_cfg_dhcpv4_svr_pool_0i", all = false, del = false }
+
+[[funcion.parametro]]
+nombre = "rtm_cfg_dhcpv4_svr_pool_0i"
+etiqueta = "Pool DHCP"
+tipo = "int"
+
+[[funcion]]
+name = "cbSetDhcpv4ServerPool"
+area = "lan_dhcp"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "dhcp.asp"
+descripcion = "Configura un pool DHCPv4 (rango, máscara, puerta de enlace, DNS, concesión, IP reservadas y condiciones)."
+riesgo = "medio"
+lectura_pareada = { funcion = "cbGetDhcpv4ServerPool", params = [["rtm_cfg_dhcpv4_svr_pool_0i", "{rtm_cfg_dhcpv4_svr_pool_id}"]] }
+lista = { id_param = "rtm_cfg_dhcpv4_svr_pool_id", all = false, del = true }
+
+[[funcion.parametro]]
+nombre = "rtm_cfg_dhcpv4_svr_pool_id"
+etiqueta = "Pool DHCP"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "reserved_ipv4_addr"
+etiqueta = "IP reservada (no se reparte)"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "reserved_ipv4_mask"
+etiqueta = "Máscara de la reservada"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "adm_state"
+etiqueta = "Activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "ip_intf_id"
+etiqueta = "Interfaz IP"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "order_p"
+etiqueta = "Posición"
+tipo = "enum"
+opciones = [["1", "Primera"], ["2", "Según el orden"], ["3", "Última"]]
+
+[[funcion.parametro]]
+nombre = "order"
+etiqueta = "Orden"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "lease_time"
+etiqueta = "Duración de la concesión (s)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "lease_time_u"
+etiqueta = "Concesión ilimitada"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "dhcpv4_opt60"
+etiqueta = "Condición por opción 60 (vendor ID)"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "dhcpv4_opt60_value"
+etiqueta = "Valor de la opción 60"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "dhcpv4_opt60_ex"
+etiqueta = "Opción 60: incluir/excluir"
+tipo = "enum"
+opciones = [["0", "Incluir"], ["1", "Excluir"]]
+
+[[funcion.parametro]]
+nombre = "dhcpv4_opt60_matching_mode"
+etiqueta = "Opción 60: comparación"
+tipo = "enum"
+opciones = [["0", "Exacta"], ["1", "Prefijo"], ["2", "Sufijo"], ["3", "Subcadena"]]
+
+[[funcion.parametro]]
+nombre = "dhcpv4_opt61"
+etiqueta = "Condición por opción 61 (client ID)"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "dhcpv4_opt61_value"
+etiqueta = "Valor de la opción 61 (hex)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "dhcpv4_opt61_ex"
+etiqueta = "Opción 61: incluir/excluir"
+tipo = "enum"
+opciones = [["0", "Incluir"], ["1", "Excluir"]]
+
+[[funcion.parametro]]
+nombre = "dhcpv4_opt77"
+etiqueta = "Condición por opción 77 (user class)"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "dhcpv4_opt77_value"
+etiqueta = "Valor de la opción 77 (hex)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "dhcpv4_opt77_ex"
+etiqueta = "Opción 77: incluir/excluir"
+tipo = "enum"
+opciones = [["0", "Incluir"], ["1", "Excluir"]]
+
+[[funcion.parametro]]
+nombre = "mac_addr"
+etiqueta = "Dirección MAC"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "mac_addr_ex"
+etiqueta = "MAC: incluir/excluir"
+tipo = "enum"
+opciones = [["0", "Incluir"], ["1", "Excluir"]]
+
+[[funcion.parametro]]
+nombre = "ipv4_addr_max"
+etiqueta = "Última IP del rango"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "ipv4_addr_min"
+etiqueta = "Primera IP del rango"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "ipv4_dns_addr_0"
+etiqueta = "DNS primario"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "ipv4_dns_addr_1"
+etiqueta = "DNS secundario"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "ipv4_gw_addr"
+etiqueta = "Puerta de enlace"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "ipv4_mask"
+etiqueta = "Máscara"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "mac_addr_mask"
+etiqueta = "Máscara de MAC"
+tipo = "mac"
+partido = "mac6"
+
+[[funcion.parametro]]
+nombre = "mac_addr_value"
+etiqueta = "MAC de la condición"
+tipo = "mac"
+partido = "mac6"
+
+[[funcion.parametro]]
+nombre = "del"
+etiqueta = "Borrar (siempre «DEL»)"
+tipo = "text"
+
+[[funcion]]
+name = "cbGetLanHostList"
+area = "lan_dhcp"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "hoststats.asp"
+descripcion = "Equipos conocidos en la LAN: IP, MAC, nombre, interfaz y si tienen reserva."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbGetLanIPv4Addr"
+area = "lan_dhcp"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "ipv4.asp"
+descripcion = "Direcciones IPv4 de las interfaces LAN (la IP del router)."
+riesgo = "bajo"
+lista = { id_param = "ipv4_addr_id", all = false, del = false }
+
+[[funcion.parametro]]
+nombre = "ipv4_addr_id"
+etiqueta = "Dirección (id)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "ip_intf_id"
+etiqueta = "Interfaz IP"
+tipo = "int"
+
+[[funcion]]
+name = "cbSetLanIPv4Addr"
+area = "lan_dhcp"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "ipv4.asp"
+descripcion = "Cambia, añade o borra la IP y máscara LAN del router. Cambia la dirección del propio panel: riesgo alto."
+riesgo = "alto"
+lectura_pareada = { funcion = "cbGetLanIPv4Addr", params = [["ip_intf_id", "{ip_intf_id}"], ["ipv4_addr_id", "{ipv4_addr_id}"]] }
+lista = { id_param = "ipv4_addr_id", all = false, del = true }
+
+[[funcion.parametro]]
+nombre = "adm_state"
+etiqueta = "Activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "ip_intf_id"
+etiqueta = "Interfaz IP"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "ipv4_addr_id"
+etiqueta = "Dirección (id)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "ipv4_addr"
+etiqueta = "Dirección IPv4"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "ipv4_mask"
+etiqueta = "Máscara"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "del"
+etiqueta = "Borrar (siempre «DEL»)"
+tipo = "text"
+
+[[funcion]]
+name = "cbGetLanIPv4Intf"
+area = "lan_dhcp"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "ipv4.asp"
+descripcion = "Interfaces LAN IPv4 (puente, enlace Ethernet, IGMP snooping)."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbSetLanIPv4Intf"
+area = "lan_dhcp"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "ipv4.asp"
+descripcion = "Activa una interfaz LAN y su IGMP snooping. Puede dejar sin acceso al router."
+riesgo = "alto"
+lectura_pareada = { funcion = "cbGetLanIPv4Intf", params = [] }
+
+[[funcion.parametro]]
+nombre = "adm_state"
+etiqueta = "Activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "igmp_snooping"
+etiqueta = "IGMP snooping"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "ip_intf_id"
+etiqueta = "Interfaz IP"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "eth_link_id"
+etiqueta = "Enlace Ethernet (id)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "br_id"
+etiqueta = "Puente (id)"
+tipo = "int"
+
+[[funcion]]
+name = "cbGetTR98L2Bridge"
+area = "lan_dhcp"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "bridging.asp"
+descripcion = "Puentes de nivel 2 (TR-098): nombre, VLAN por defecto e interfaces."
+riesgo = "bajo"
+lista = { id_param = "mll_bridge_0i", all = true, del = false }
+
+[[funcion.parametro]]
+nombre = "all"
+etiqueta = "Todas (siempre «ALL»)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "mll_bridge_0i"
+etiqueta = "Puente (índice)"
+tipo = "int"
+
+[[funcion]]
+name = "cbSetTR98L2Bridge"
+area = "lan_dhcp"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "bridging.asp"
+descripcion = "Crea, modifica o borra un puente de nivel 2. Puede aislar la LAN: riesgo alto."
+riesgo = "alto"
+lectura_pareada = { funcion = "cbGetTR98L2Bridge", params = [["mll_bridge_0i", "{mll_bridge_id}"]] }
+lista = { id_param = "mll_bridge_id", all = false, del = true }
+
+[[funcion.parametro]]
+nombre = "name"
+etiqueta = "Nombre"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "adm_state"
+etiqueta = "Activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "default_vid_value"
+etiqueta = "VLAN por defecto"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "mll_bridge_id"
+etiqueta = "Puente (id; -1 = nuevo)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "del"
+etiqueta = "Borrar (siempre «DEL»)"
+tipo = "text"
+
+[[funcion]]
+name = "cbGetTR98L2Filtering"
+area = "lan_dhcp"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "filtering.asp"
+descripcion = "Filtros de puente: qué interfaz entra en qué puente y con qué condiciones (VLAN, EtherType, MAC)."
+riesgo = "bajo"
+lista = { id_param = "mll_br_filter_0i", all = true, del = false }
+
+[[funcion.parametro]]
+nombre = "all"
+etiqueta = "Todas (siempre «ALL»)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "mll_br_filter_0i"
+etiqueta = "Filtro (índice)"
+tipo = "int"
+
+[[funcion]]
+name = "cbSetTR98L2Filtering"
+area = "lan_dhcp"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "filtering.asp"
+descripcion = "Crea, modifica o borra un filtro de puente. Puede aislar la LAN: riesgo alto."
+riesgo = "alto"
+lectura_pareada = { funcion = "cbGetTR98L2Filtering", params = [["mll_br_filter_0i", "{mll_br_filter_id}"]] }
+lista = { id_param = "mll_br_filter_id", all = false, del = true }
+
+[[funcion.parametro]]
+nombre = "adm_state"
+etiqueta = "Activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "order_p"
+etiqueta = "Posición"
+tipo = "enum"
+opciones = [["1", "Primera"], ["2", "Según el orden"], ["3", "Última"]]
+
+[[funcion.parametro]]
+nombre = "order"
+etiqueta = "Orden"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "filter_intf"
+etiqueta = "Interfaz de entrada"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "filter_br_id"
+etiqueta = "Puente asociado"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "cls_admit_only_vlan_tagged"
+etiqueta = "Paquetes admitidos"
+tipo = "enum"
+opciones = [["0", "Todos"], ["1", "Solo con etiqueta"]]
+
+[[funcion.parametro]]
+nombre = "cls_vid_value"
+etiqueta = "VLAN (1-4094)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "cls_ethertype"
+etiqueta = "Comprobar EtherType"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "cls_ethertype_value"
+etiqueta = "EtherType"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "cls_src_mac"
+etiqueta = "Comprobar MAC de origen"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "cls_src_mac_addr"
+etiqueta = "MAC de origen"
+tipo = "mac"
+
+[[funcion.parametro]]
+nombre = "cls_src_mac_mask"
+etiqueta = "Máscara de MAC de origen"
+tipo = "mac"
+
+[[funcion.parametro]]
+nombre = "cls_dst_mac"
+etiqueta = "Comprobar MAC de destino"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "cls_dst_mac_addr"
+etiqueta = "MAC de destino"
+tipo = "mac"
+
+[[funcion.parametro]]
+nombre = "cls_dst_mac_mask"
+etiqueta = "Máscara de MAC de destino"
+tipo = "mac"
+
+[[funcion.parametro]]
+nombre = "mll_br_filter_id"
+etiqueta = "Filtro (id; -1 = nuevo)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "del"
+etiqueta = "Borrar (siempre «DEL»)"
+tipo = "text"
+
+[[funcion]]
+name = "te_mapa_red_local.asp"
+area = "lan_dhcp"
+origen = "basica"
+tipo = "lectura"
+pagina = "te_mapa_red_local.asp"
+descripcion = "Mapa de red de la UI básica; sus variables dan LAN, DHCP, modo WAN y credenciales PPPoE (enmascaradas)."
+riesgo = "bajo"
+
+[[funcion]]
+name = "te_mapa_red_local.cgi"
+area = "lan_dhcp"
+origen = "basica"
+tipo = "escritura"
+pagina = "te_mapa_red_local.asp"
+descripcion = "Igual que te_red_local.cgi, desde el mapa de red de la UI básica."
+riesgo = "alto"
+lectura_pareada = { funcion = "te_mapa_red_local.asp", params = [] }
+
+[[funcion.parametro]]
+nombre = "ethIpAddress"
+etiqueta = "IP del router"
+tipo = "ip"
+
+[[funcion.parametro]]
+nombre = "ethSubnetMask"
+etiqueta = "Máscara de la LAN"
+tipo = "ip"
+
+[[funcion.parametro]]
+nombre = "enblDhcpSrv"
+etiqueta = "Servidor DHCP"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "dhcpEthStart"
+etiqueta = "Primera IP de DHCP"
+tipo = "ip"
+
+[[funcion.parametro]]
+nombre = "dhcpEthEnd"
+etiqueta = "Última IP de DHCP"
+tipo = "ip"
+
+[[funcion.parametro]]
+nombre = "lanHostDns"
+etiqueta = "DNS anunciado"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "lanHostDhcp"
+etiqueta = "Reservas DHCP"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "curWebPage"
+etiqueta = "Página de retorno"
+tipo = "text"
+
+[[funcion]]
+name = "te_mrl.cmd?action=setpc"
+area = "lan_dhcp"
+origen = "basica"
+tipo = "escritura"
+pagina = "te_mapa_red_local.asp"
+descripcion = "Pone nombre y tipo a un equipo del mapa de red de la UI básica."
+riesgo = "bajo"
+lectura_pareada = { funcion = "te_mapa_red_local.asp", params = [] }
+
+[[funcion.parametro]]
+nombre = "hostName"
+etiqueta = "Nombre del equipo"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "deviceType"
+etiqueta = "Tipo de equipo"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "deviceIPAddress"
+etiqueta = "IP del equipo"
+tipo = "ip"
+
+[[funcion.parametro]]
+nombre = "curWebPage"
+etiqueta = "Página de retorno"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "deviceMac"
+etiqueta = "MAC del equipo"
+tipo = "mac"
+
+[[funcion]]
+name = "te_red_local.asp"
+area = "lan_dhcp"
+origen = "basica"
+tipo = "lectura"
+pagina = "te_red_local.asp"
+descripcion = "Página básica de la red local; sus variables dan IP y máscara del router, DHCP y rango."
+riesgo = "bajo"
+
+[[funcion]]
+name = "te_red_local.cgi"
+area = "lan_dhcp"
+origen = "basica"
+tipo = "escritura"
+pagina = "te_red_local.asp"
+descripcion = "Cambia desde la UI básica la IP y máscara del router, el servidor DHCP y su rango. Cambia la dirección del propio panel."
+riesgo = "alto"
+lectura_pareada = { funcion = "te_red_local.asp", params = [] }
+
+[[funcion.parametro]]
+nombre = "ethIpAddress"
+etiqueta = "IP del router"
+tipo = "ip"
+
+[[funcion.parametro]]
+nombre = "ethSubnetMask"
+etiqueta = "Máscara de la LAN"
+tipo = "ip"
+
+[[funcion.parametro]]
+nombre = "enblDhcpSrv"
+etiqueta = "Servidor DHCP"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "dhcpEthStart"
+etiqueta = "Primera IP de DHCP"
+tipo = "ip"
+
+[[funcion.parametro]]
+nombre = "dhcpEthEnd"
+etiqueta = "Última IP de DHCP"
+tipo = "ip"
+
+[[funcion.parametro]]
+nombre = "lanHostDns"
+etiqueta = "DNS anunciado"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "lanHostDhcp"
+etiqueta = "Reservas DHCP"
+tipo = "text"
+
+# ======================================================================
+# Área: wifi
+
+[[funcion]]
+name = "cbGetWifi"
+area = "wifi"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "wifi.asp"
+descripcion = "Configuración de una radio (0 = 2,4 GHz, 1 = 5 GHz): estándar, canal, ancho, potencia, roaming."
+riesgo = "bajo"
+lista = { id_param = "dpm_cfg_wifi_0i", all = false, del = false }
+
+[[funcion.parametro]]
+nombre = "dpm_cfg_wifi_0i"
+etiqueta = "Radio (0 = 2,4 GHz, 1 = 5 GHz)"
+tipo = "int"
+
+[[funcion]]
+name = "cbSetWifi"
+area = "wifi"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "wifi.asp"
+descripcion = "Configura una radio WiFi: activación, país, estándar, canal, ancho, potencia y opciones avanzadas. Los valores válidos dependen de la banda."
+riesgo = "medio"
+lectura_pareada = { funcion = "cbGetWifi", params = [["dpm_cfg_wifi_0i", "{dpm_cfg_wifi_id}"]] }
+
+[[funcion.parametro]]
+nombre = "radio_adm_state"
+etiqueta = "Radio activada"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "country_code"
+etiqueta = "País"
+tipo = "enum"
+opciones = [["UN", "Sin país (UN)"], ["AR", "Argentina"], ["BR", "Brasil"], ["CL", "Chile"], ["CO", "Colombia"], ["ES", "España"], ["PE", "Perú"]]
+
+[[funcion.parametro]]
+nombre = "standard"
+etiqueta = "Estándar (2.4: 2 b, 4 g, 8 n, 6 b/g, 12 g/n, 14 b/g/n; 5: 9 a/n, 25 a/n/ac)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "adm_bandwidth"
+etiqueta = "Ancho de canal (1 = 20, 2 = 20/40, 3 = 20/40/80 MHz)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "chn_40mhz_ext_pos"
+etiqueta = "Canal secundario (1 = superior, 2 = inferior)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "adm_channel"
+etiqueta = "Canal (0 = automático)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "wifi_bg_rate"
+etiqueta = "Velocidad b/g (0 = auto)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "mcs"
+etiqueta = "MCS (-1 = auto)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "spatial_streams"
+etiqueta = "Flujos espaciales"
+tipo = "enum"
+opciones = [["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"]]
+
+[[funcion.parametro]]
+nombre = "frag_threshold"
+etiqueta = "Umbral de fragmentación"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "rts_threshold"
+etiqueta = "Umbral RTS"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "beacon_interval"
+etiqueta = "Intervalo de baliza (ms)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "dtim_interval"
+etiqueta = "Periodo DTIM"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "adm_tx_pwr_ratio"
+etiqueta = "Potencia de emisión"
+tipo = "enum"
+opciones = [["255", "Automático"], ["100", "100%"], ["90", "90%"], ["80", "80%"], ["70", "70%"], ["60", "60%"], ["50", "50%"], ["40", "40%"], ["30", "30%"], ["20", "20%"], ["10", "10%"], ["0", "0%"]]
+
+[[funcion.parametro]]
+nombre = "adm_tx_preamble"
+etiqueta = "Preámbulo"
+tipo = "enum"
+opciones = [["1", "Corto"], ["2", "Largo"]]
+
+[[funcion.parametro]]
+nombre = "adm_guard_interval"
+etiqueta = "Intervalo de guarda"
+tipo = "enum"
+opciones = [["0", "Automático"], ["1", "400ns"], ["2", "800ns"]]
+
+[[funcion.parametro]]
+nombre = "dpm_cfg_wifi_id"
+etiqueta = "Radio (0 = 2,4 GHz, 1 = 5 GHz)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "scs"
+etiqueta = "Selección inteligente de canal"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "wifi_off_cac"
+etiqueta = "Sin CAC (DFS)"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "qhop"
+etiqueta = "QHop"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "beamforming"
+etiqueta = "Beamforming"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "roaming_adm_state"
+etiqueta = "Roaming"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "roaming_role"
+etiqueta = "Papel en el roaming"
+tipo = "enum"
+opciones = [["1", "Principal"], ["0", "Secundario"]]
+
+[[funcion]]
+name = "cbGetWifiAccPt"
+area = "wifi"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "wifi.asp"
+descripcion = "Configuración de un punto de acceso: SSID, seguridad, claves (enmascaradas), WMM, WPS y aislamiento."
+riesgo = "bajo"
+lista = { id_param = "dpm_cfg_wifi_acc_pt_id", all = false, del = false }
+
+[[funcion.parametro]]
+nombre = "dpm_cfg_wifi_acc_pt_0i"
+etiqueta = "Punto de acceso (índice)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "dpm_cfg_wifi_acc_pt_id"
+etiqueta = "Punto de acceso (id)"
+tipo = "int"
+
+[[funcion]]
+name = "cbListWifiAccPt"
+area = "wifi"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "wifi.asp"
+descripcion = "Puntos de acceso (SSID) de una radio."
+riesgo = "bajo"
+lista = { id_param = "dpm_cfg_wifi_id", all = false, del = false }
+
+[[funcion.parametro]]
+nombre = "dpm_cfg_wifi_id"
+etiqueta = "Radio (0 = 2,4 GHz, 1 = 5 GHz)"
+tipo = "int"
+
+[[funcion]]
+name = "cbSetWifiAccPt"
+area = "wifi"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "wifi.asp"
+descripcion = "Configura un punto de acceso: SSID, ocultación, seguridad y clave, clientes máximos, WMM, aislamiento y WPS. Con `validation_only=1` solo valida."
+riesgo = "medio"
+lectura_pareada = { funcion = "cbGetWifiAccPt", params = [["dpm_cfg_wifi_acc_pt_id", "{dpm_cfg_wifi_acc_pt_id}"]] }
+
+[[funcion.parametro]]
+nombre = "adm_state"
+etiqueta = "Activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "ssid"
+etiqueta = "SSID"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "ssid_hide"
+etiqueta = "Ocultar SSID"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "authentication"
+etiqueta = "Autenticación"
+tipo = "enum"
+opciones = [["0", "Ninguna"], ["3", "WPA2-PSK"], ["4", "WPA/WPA2-PSK mixto"]]
+
+[[funcion.parametro]]
+nombre = "encryption"
+etiqueta = "Cifrado"
+tipo = "enum"
+opciones = [["0", "Ninguna"], ["1", "WEP 64"], ["2", "WEP 128"], ["3", "TKIP"], ["4", "AES"], ["5", "TKIP-AES"]]
+
+[[funcion.parametro]]
+nombre = "wep_key_idx"
+etiqueta = "Clave WEP activa"
+tipo = "enum"
+opciones = [["1", "Clave 1"], ["2", "Clave 2"], ["3", "Clave 3"], ["4", "Clave 4"]]
+
+[[funcion.parametro]]
+nombre = "wep_key1_data"
+etiqueta = "Clave WEP 1"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "wep_key2_data"
+etiqueta = "Clave WEP 2"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "wep_key3_data"
+etiqueta = "Clave WEP 3"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "wep_key4_data"
+etiqueta = "Clave WEP 4"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "key_phrase"
+etiqueta = "Clave WiFi (WPA)"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "regen_key_interval"
+etiqueta = "Renovación de clave de grupo (s)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "max_clt_count"
+etiqueta = "Máximo de clientes"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "wmm"
+etiqueta = "WMM"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "wmm_ps"
+etiqueta = "Ahorro de energía WMM"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "isolation"
+etiqueta = "Aislamiento de clientes"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "wps_adm_state"
+etiqueta = "WPS activado"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "dpm_cfg_wifi_ssid_id"
+etiqueta = "SSID (id)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "dpm_cfg_wifi_acc_pt_id"
+etiqueta = "Punto de acceso (id)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "validation_only"
+etiqueta = "Solo validar (1) o aplicar (0)"
+tipo = "bool"
+
+[[funcion]]
+name = "cbListWifiAccPtAssociation"
+area = "wifi"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "wifi.asp"
+descripcion = "Estaciones asociadas a una radio (MAC, RSSI, velocidades)."
+riesgo = "bajo"
+
+[[funcion.parametro]]
+nombre = "dpm_cfg_wifi_id"
+etiqueta = "Radio (0 = 2,4 GHz, 1 = 5 GHz)"
+tipo = "int"
+
+[[funcion]]
+name = "cbGetWifiWds"
+area = "wifi"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "wifi.asp"
+descripcion = "Enlaces WDS (puente inalámbrico) configurados."
+riesgo = "bajo"
+
+[[funcion.parametro]]
+nombre = "dpm_cfg_wifi_wds_0i"
+etiqueta = "Enlace WDS (índice)"
+tipo = "int"
+
+[[funcion]]
+name = "cbSetWifiWds"
+area = "wifi"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "wifi.asp"
+descripcion = "Crea, modifica o borra un enlace WDS con otro punto de acceso."
+riesgo = "medio"
+lectura_pareada = { funcion = "cbGetWifiWds", params = [["dpm_cfg_wifi_wds_0i", "{dpm_cfg_wifi_wds_id}"]] }
+lista = { id_param = "dpm_cfg_wifi_wds_id", all = false, del = true }
+
+[[funcion.parametro]]
+nombre = "del"
+etiqueta = "Borrar (siempre «DEL»)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "dpm_cfg_wifi_wds_id"
+etiqueta = "Enlace WDS (id; -1 = nuevo)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "wds_adm_state"
+etiqueta = "WDS activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "wifi_acc_pt_id"
+etiqueta = "Punto de acceso"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "peer_bssid"
+etiqueta = "MAC del otro extremo"
+tipo = "mac"
+
+[[funcion]]
+name = "cbTriggerWifiAccPtWpsProc"
+area = "wifi"
+origen = "avanzada"
+tipo = "accion"
+pagina = "wifi.asp"
+descripcion = "Arranca un emparejamiento WPS (formulario WiFiWPSStartForm, que no aparece en las páginas capturadas: sus campos no se conocen)."
+riesgo = "medio"
+
+[[funcion]]
+name = "te_wifi.asp"
+area = "wifi"
+origen = "basica"
+tipo = "lectura"
+pagina = "te_wifi.asp"
+descripcion = "Página básica de la WiFi 2,4 GHz; sus variables dan SSID, seguridad, canal, filtro MAC y clave (enmascarada)."
+riesgo = "bajo"
+
+[[funcion]]
+name = "te_wifi.cmd?action=save"
+area = "wifi"
+origen = "basica"
+tipo = "escritura"
+pagina = "te_wifi.asp"
+descripcion = "Guarda la lista del filtro MAC de la WiFi 2,4 GHz (UI básica)."
+riesgo = "medio"
+lectura_pareada = { funcion = "te_wifi.asp", params = [] }
+
+[[funcion.parametro]]
+nombre = "wlMACaddr"
+etiqueta = "Lista de MAC (MAC1,-MAC2: «-» desactivada)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "unitNum"
+etiqueta = "Radio (unidad)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "curWebPage"
+etiqueta = "Página de retorno"
+tipo = "text"
+
+[[funcion]]
+name = "te_wifi.wl"
+area = "wifi"
+origen = "basica"
+tipo = "escritura"
+pagina = "te_wifi.asp"
+descripcion = "Configura la WiFi 2,4 GHz desde la UI básica: SSID, ocultación, seguridad, clave (XOR 0x1f), activación, canal y filtro MAC."
+riesgo = "medio"
+lectura_pareada = { funcion = "te_wifi.asp", params = [] }
+
+[[funcion.parametro]]
+nombre = "wlSsidIdx"
+etiqueta = "SSID (índice)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "ssid_id"
+etiqueta = "SSID (id)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "acc_pt_id"
+etiqueta = "Punto de acceso (id)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "wlSsid"
+etiqueta = "Nombre de la red (SSID)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "wlHide"
+etiqueta = "Ocultar SSID"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "wlAuthMode"
+etiqueta = "Seguridad"
+tipo = "enum"
+opciones = [["00", "Abierta"], ["02", "WEP"], ["34", "WPA2-PSK"], ["44", "WPA/WPA2-PSK mixto"]]
+
+[[funcion.parametro]]
+nombre = "wlKeyIndex"
+etiqueta = "Clave WEP activa"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "wlKey1"
+etiqueta = "Clave WEP 1 (XOR 0x1f)"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "wlKey2"
+etiqueta = "Clave WEP 2 (XOR 0x1f)"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "wlKey3"
+etiqueta = "Clave WEP 3 (XOR 0x1f)"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "wlKey4"
+etiqueta = "Clave WEP 4 (XOR 0x1f)"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "wlWpaPsk"
+etiqueta = "Clave WiFi (XOR 0x1f)"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "wlEnbl"
+etiqueta = "WiFi activada"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "wlChannel"
+etiqueta = "Canal"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "wlSyncNvram"
+etiqueta = "Guardar (siempre 1)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "wlFltMacMode"
+etiqueta = "Filtro MAC activado"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "wlFltMacList"
+etiqueta = "MAC permitidas (separadas por comas)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "unitNum"
+etiqueta = "Radio (unidad)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "curWebPage"
+etiqueta = "Página de retorno"
+tipo = "text"
+
+[[funcion]]
+name = "te_wifi_5ghz.asp"
+area = "wifi"
+origen = "basica"
+tipo = "lectura"
+pagina = "te_wifi_5ghz.asp"
+descripcion = "Página básica de la WiFi 5 GHz; sus variables dan SSID, seguridad, canal, filtro MAC y clave (enmascarada)."
+riesgo = "bajo"
+
+[[funcion]]
+name = "te_wifi_5ghz.cmd?action=save"
+area = "wifi"
+origen = "basica"
+tipo = "escritura"
+pagina = "te_wifi_5ghz.asp"
+descripcion = "Guarda la lista del filtro MAC de la WiFi 5 GHz (UI básica)."
+riesgo = "medio"
+lectura_pareada = { funcion = "te_wifi_5ghz.asp", params = [] }
+
+[[funcion.parametro]]
+nombre = "wlMACaddr"
+etiqueta = "Lista de MAC (MAC1,-MAC2: «-» desactivada)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "unitNum"
+etiqueta = "Radio (unidad)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "curWebPage"
+etiqueta = "Página de retorno"
+tipo = "text"
+
+[[funcion]]
+name = "te_wifi_5ghz.wl"
+area = "wifi"
+origen = "basica"
+tipo = "escritura"
+pagina = "te_wifi_5ghz.asp"
+descripcion = "Configura la WiFi 5 GHz desde la UI básica (mismos campos que te_wifi.wl)."
+riesgo = "medio"
+lectura_pareada = { funcion = "te_wifi_5ghz.asp", params = [] }
+
+[[funcion.parametro]]
+nombre = "wlSsidIdx"
+etiqueta = "SSID (índice)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "ssid_id"
+etiqueta = "SSID (id)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "acc_pt_id"
+etiqueta = "Punto de acceso (id)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "wlSsid"
+etiqueta = "Nombre de la red (SSID)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "wlHide"
+etiqueta = "Ocultar SSID"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "wlAuthMode"
+etiqueta = "Seguridad"
+tipo = "enum"
+opciones = [["00", "Abierta"], ["02", "WEP"], ["34", "WPA2-PSK"], ["44", "WPA/WPA2-PSK mixto"]]
+
+[[funcion.parametro]]
+nombre = "wlKeyIndex"
+etiqueta = "Clave WEP activa"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "wlKey1"
+etiqueta = "Clave WEP 1 (XOR 0x1f)"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "wlKey2"
+etiqueta = "Clave WEP 2 (XOR 0x1f)"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "wlKey3"
+etiqueta = "Clave WEP 3 (XOR 0x1f)"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "wlKey4"
+etiqueta = "Clave WEP 4 (XOR 0x1f)"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "wlWpaPsk"
+etiqueta = "Clave WiFi (XOR 0x1f)"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "wlEnbl"
+etiqueta = "WiFi activada"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "wlChannel"
+etiqueta = "Canal"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "wlSyncNvram"
+etiqueta = "Guardar (siempre 1)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "wlFltMacMode"
+etiqueta = "Filtro MAC activado"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "wlFltMacList"
+etiqueta = "MAC permitidas (separadas por comas)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "unitNum"
+etiqueta = "Radio (unidad)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "curWebPage"
+etiqueta = "Página de retorno"
+tipo = "text"
+
+[[funcion]]
+name = "te_wifi_guest.asp"
+area = "wifi"
+origen = "basica"
+tipo = "lectura"
+pagina = "te_wifi_guest.asp"
+descripcion = "Página básica de la red de invitados; sus variables dan SSID, seguridad y clave (enmascarada)."
+riesgo = "bajo"
+
+[[funcion]]
+name = "te_wifi_guest.wl"
+area = "wifi"
+origen = "basica"
+tipo = "escritura"
+pagina = "te_wifi_guest.asp"
+descripcion = "Configura la red de invitados desde la UI básica: SSID, seguridad, clave (XOR 0x1f), activación y máximo de invitados."
+riesgo = "medio"
+lectura_pareada = { funcion = "te_wifi_guest.asp", params = [] }
+
+[[funcion.parametro]]
+nombre = "wlSsidIdx"
+etiqueta = "SSID (índice)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "ssid_id"
+etiqueta = "SSID (id)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "acc_pt_id"
+etiqueta = "Punto de acceso (id)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "wlSsid"
+etiqueta = "Nombre de la red (SSID)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "wlAuthMode"
+etiqueta = "Seguridad"
+tipo = "enum"
+opciones = [["00", "Abierta"], ["02", "WEP"], ["34", "WPA2-PSK"], ["44", "WPA/WPA2-PSK mixto"]]
+
+[[funcion.parametro]]
+nombre = "wlKeyIndex"
+etiqueta = "Clave WEP activa"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "wlKey1"
+etiqueta = "Clave WEP 1 (XOR 0x1f)"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "wlKey2"
+etiqueta = "Clave WEP 2 (XOR 0x1f)"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "wlKey3"
+etiqueta = "Clave WEP 3 (XOR 0x1f)"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "wlKey4"
+etiqueta = "Clave WEP 4 (XOR 0x1f)"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "wlWpaPsk"
+etiqueta = "Clave WiFi (XOR 0x1f)"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "wlEnbl"
+etiqueta = "WiFi activada"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "wlMaxAssoc"
+etiqueta = "Máximo de invitados"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "wlSyncNvram"
+etiqueta = "Guardar (siempre 1)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "unitNum"
+etiqueta = "Radio (unidad)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "curWebPage"
+etiqueta = "Página de retorno"
+tipo = "text"
+
+[[funcion]]
+name = "te_wifirefresh.wl"
+area = "wifi"
+origen = "basica"
+tipo = "lectura"
+pagina = "te_wifi.asp"
+descripcion = "Refresca el estado de la WiFi 2,4 GHz (UI básica)."
+riesgo = "bajo"
+
+[[funcion.parametro]]
+nombre = "wlRefresh"
+etiqueta = "Refrescar (0)"
+tipo = "int"
+
+[[funcion]]
+name = "te_wifirefresh_5ghz.wl"
+area = "wifi"
+origen = "basica"
+tipo = "lectura"
+pagina = "te_wifi_5ghz.asp"
+descripcion = "Refresca el estado de la WiFi 5 GHz (UI básica)."
+riesgo = "bajo"
+
+[[funcion.parametro]]
+nombre = "wlRefresh"
+etiqueta = "Refrescar (0)"
+tipo = "int"
+
+[[funcion]]
+name = "te_wifirefresh_guest.wl"
+area = "wifi"
+origen = "basica"
+tipo = "lectura"
+pagina = "te_wifi_guest.asp"
+descripcion = "Refresca el estado de la red de invitados (UI básica)."
+riesgo = "bajo"
+
+[[funcion.parametro]]
+nombre = "wlRefresh"
+etiqueta = "Refrescar (0)"
+tipo = "int"
+
+# ======================================================================
+# Área: nat
+
+[[funcion]]
+name = "cbGetNatConfig"
+area = "nat"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "natalg.asp"
+descripcion = "ALG (FTP, H.323, PPTP, SIP) y NAT loopback."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbSetNatConfig"
+area = "nat"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "natalg.asp"
+descripcion = "Activa o desactiva los ALG o el NAT loopback (formularios NatAlgForm y NatLoopbackForm)."
+riesgo = "bajo"
+lectura_pareada = { funcion = "cbGetNatConfig", params = [] }
+
+[[funcion.parametro]]
+nombre = "ftp_enable"
+etiqueta = "ALG de FTP"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "h323_enable"
+etiqueta = "ALG de H.323"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "pptp_enable"
+etiqueta = "ALG de PPTP"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "sip_enable"
+etiqueta = "ALG de SIP"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "set_nf_conntrack"
+etiqueta = "Aplicar ALG (siempre 1)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "adm_state"
+etiqueta = "Activado"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "rtm_cfg_nat_lb_intf_id"
+etiqueta = "Interfaz de loopback (id)"
+tipo = "int"
+
+[[funcion]]
+name = "cbGetNatIntf"
+area = "nat"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "natintf.asp"
+descripcion = "Interfaces con NAT y su tipo."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbSetNatIntf"
+area = "nat"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "natintf.asp"
+descripcion = "Activa o cambia el NAT de una interfaz."
+riesgo = "bajo"
+lectura_pareada = { funcion = "cbGetNatIntf", params = [] }
+
+[[funcion.parametro]]
+nombre = "adm_state"
+etiqueta = "Activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "type"
+etiqueta = "Tipo"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "nat_intf_id"
+etiqueta = "Interfaz NAT (id)"
+tipo = "int"
+
+[[funcion]]
+name = "cbGetNatPortMapping"
+area = "nat"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "natportmap.asp"
+descripcion = "Redirecciones de puertos; con `dmz=1`, el host DMZ; con `nat_port_mapping_0i`, una redirección."
+riesgo = "bajo"
+lista = { id_param = "nat_port_mapping_0i", all = false, del = false }
+
+[[funcion.parametro]]
+nombre = "dmz"
+etiqueta = "DMZ (1 = leer el host DMZ)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "nat_port_mapping_0i"
+etiqueta = "Redirección (índice)"
+tipo = "int"
+
+[[funcion]]
+name = "cbSetNatPortMapping"
+area = "nat"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "natportmap.asp"
+descripcion = "Crea, modifica o borra una redirección de puertos o el host DMZ."
+riesgo = "bajo"
+lectura_pareada = { funcion = "cbGetNatPortMapping", params = [["nat_port_mapping_0i", "{nat_port_mapping_id}"]] }
+lista = { id_param = "nat_port_mapping_id", all = false, del = true }
+
+[[funcion.parametro]]
+nombre = "adm_state"
+etiqueta = "Activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "int_ip_addr"
+etiqueta = "IP interna"
+tipo = "ip"
+
+[[funcion.parametro]]
+nombre = "nat_port_mapping_id"
+etiqueta = "Redirección (id; -1 = nueva)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "ip_intf_id"
+etiqueta = "Interfaz IP"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "desc"
+etiqueta = "Descripción"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "l4_protocol_value"
+etiqueta = "Protocolo"
+tipo = "enum"
+opciones = [["6", "TCP"], ["17", "UDP"]]
+
+[[funcion.parametro]]
+nombre = "ext_l4_port_min_value"
+etiqueta = "Puerto externo desde"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "ext_l4_port_max_value"
+etiqueta = "Puerto externo hasta"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "int_l4_port_min_value"
+etiqueta = "Puerto interno desde"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "int_l4_port_max_value"
+etiqueta = "Puerto interno hasta"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "rmt_ip_addr"
+etiqueta = "IP remota permitida"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "del"
+etiqueta = "Borrar (siempre «DEL»)"
+tipo = "text"
+
+[[funcion]]
+name = "cbGetUpnpCfg"
+area = "nat"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "upnp.asp"
+descripcion = "Estado de UPnP."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbSetUpnpCfg"
+area = "nat"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "upnp.asp"
+descripcion = "Activa o desactiva UPnP."
+riesgo = "bajo"
+lectura_pareada = { funcion = "cbGetUpnpCfg", params = [] }
+
+[[funcion.parametro]]
+nombre = "adm_state"
+etiqueta = "Activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion]]
+name = "te_ppp_pm.cmd?action=retrieve"
+area = "nat"
+origen = "basica"
+tipo = "lectura"
+pagina = "te_puertos.asp"
+descripcion = "Lee las redirecciones de puertos de la UI básica (respuesta en texto)."
+riesgo = "bajo"
+
+[[funcion.parametro]]
+nombre = "type"
+etiqueta = "Tipo"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "id"
+etiqueta = "Id"
+tipo = "int"
+
+[[funcion]]
+name = "te_ppp_pm.cmd?action=create"
+area = "nat"
+origen = "basica"
+tipo = "escritura"
+pagina = "te_puertos.asp"
+descripcion = "Crea una redirección de puertos desde la UI básica (campos de la regla separados por comas)."
+riesgo = "bajo"
+lectura_pareada = { funcion = "te_ppp_pm.cmd?action=retrieve", params = [] }
+
+[[funcion.parametro]]
+nombre = "inst"
+etiqueta = "Regla (campos separados por comas)"
+tipo = "text"
+
+[[funcion]]
+name = "te_ppp_pm.cmd?action=delete"
+area = "nat"
+origen = "basica"
+tipo = "escritura"
+pagina = "te_puertos.asp"
+descripcion = "Borra una redirección de puertos desde la UI básica."
+riesgo = "bajo"
+lectura_pareada = { funcion = "te_ppp_pm.cmd?action=retrieve", params = [] }
+
+[[funcion.parametro]]
+nombre = "id"
+etiqueta = "Id"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "intf"
+etiqueta = "Interfaz de entrada"
+tipo = "text"
+
+[[funcion]]
+name = "te_ppp_pm.cmd?action=update"
+area = "nat"
+origen = "basica"
+tipo = "escritura"
+pagina = "te_puertos.asp"
+descripcion = "Modifica una redirección de puertos desde la UI básica."
+riesgo = "bajo"
+lectura_pareada = { funcion = "te_ppp_pm.cmd?action=retrieve", params = [] }
+
+[[funcion.parametro]]
+nombre = "inst"
+etiqueta = "Regla (campos separados por comas)"
+tipo = "text"
+
+[[funcion]]
+name = "te_puertos.asp"
+area = "nat"
+origen = "basica"
+tipo = "lectura"
+pagina = "te_puertos.asp"
+descripcion = "Página básica de redirección de puertos; sus variables dan la LAN y la interfaz PPP de las reglas."
+riesgo = "bajo"
+
+[[funcion]]
+name = "te_puertos.cmd?action=active"
+area = "nat"
+origen = "basica"
+tipo = "escritura"
+pagina = "te_puertos.asp"
+descripcion = "Activa o desactiva una regla de puertos con el formato antiguo de la UI básica."
+riesgo = "bajo"
+lectura_pareada = { funcion = "te_puertos.asp", params = [] }
+
+[[funcion.parametro]]
+nombre = "portName"
+etiqueta = "Nombre de la regla"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "portProtocol"
+etiqueta = "Protocolo"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "wanPortRange"
+etiqueta = "Puertos externos"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "lanPortRange"
+etiqueta = "Puertos internos"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "portIPAddress"
+etiqueta = "IP interna"
+tipo = "ip"
+
+[[funcion.parametro]]
+nombre = "portActive"
+etiqueta = "Activa"
+tipo = "bool"
+
+[[funcion]]
+name = "te_puertos.cmd?action=delete"
+area = "nat"
+origen = "basica"
+tipo = "escritura"
+pagina = "te_puertos.asp"
+descripcion = "Borra una regla de puertos con el formato antiguo de la UI básica."
+riesgo = "bajo"
+lectura_pareada = { funcion = "te_puertos.asp", params = [] }
+
+[[funcion.parametro]]
+nombre = "portName"
+etiqueta = "Nombre de la regla"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "portProtocol"
+etiqueta = "Protocolo"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "wanPortRange"
+etiqueta = "Puertos externos"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "lanPortRange"
+etiqueta = "Puertos internos"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "portIPAddress"
+etiqueta = "IP interna"
+tipo = "ip"
+
+[[funcion]]
+name = "te_upnp.cmd"
+area = "nat"
+origen = "basica"
+tipo = "escritura"
+pagina = "te_otras_funcionalidades.asp"
+descripcion = "Activa o desactiva UPnP desde la UI básica."
+riesgo = "bajo"
+lectura_pareada = { funcion = "cbGetUpnpCfg", params = [] }
+
+[[funcion.parametro]]
+nombre = "enblUpnp"
+etiqueta = "UPnP activado"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "curWebPage"
+etiqueta = "Página de retorno"
+tipo = "text"
+
+# ======================================================================
+# Área: cortafuegos
+
+[[funcion]]
+name = "scbidirectionalflt.cmd?action=view"
+area = "cortafuegos"
+origen = "oculta"
+tipo = "lectura"
+pagina = "scbidirectionalflt_ls.asp"
+descripcion = "Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Lista las reglas IPv4/IPv6 (HTML)."
+riesgo = "bajo"
+
+[[funcion.parametro]]
+nombre = "escape"
+etiqueta = "Escapar (true)"
+tipo = "text"
+
+[[funcion]]
+name = "scbidirectionalflt.cmd?action=add"
+area = "cortafuegos"
+origen = "oculta"
+tipo = "escritura"
+pagina = "scbidirectionalflt_ed.asp"
+descripcion = "Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Añade una entrada (interfaz, versión, acción por defecto) o una regla (protocolo, origen, destino, puertos, acción)."
+riesgo = "alto"
+lectura_pareada = { funcion = "scbidirectionalflt.cmd?action=view", params = [] }
+
+[[funcion.parametro]]
+nombre = "id"
+etiqueta = "Id"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "escape"
+etiqueta = "Escapar (true)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "target"
+etiqueta = "Objetivo (entry/rule)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "belong"
+etiqueta = "Entrada a la que pertenece"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "version"
+etiqueta = "Versión de IGMP"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "enabled"
+etiqueta = "Activada"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "protocol"
+etiqueta = "Protocolo"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "specificAction"
+etiqueta = "Acción"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "rejectType"
+etiqueta = "Tipo de rechazo"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "icmpType"
+etiqueta = "Tipo ICMP"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "srcaddr"
+etiqueta = "IP de origen"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "srcmask"
+etiqueta = "Máscara de origen"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "srcportstart"
+etiqueta = "Puerto de origen desde"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "srcportend"
+etiqueta = "Puerto de origen hasta"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "dstaddr"
+etiqueta = "IP de destino"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "dstmask"
+etiqueta = "Máscara de destino"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "dstportstart"
+etiqueta = "Puerto de destino desde"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "dstportend"
+etiqueta = "Puerto de destino hasta"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "name"
+etiqueta = "Nombre"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "interface"
+etiqueta = "Interfaz"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "type"
+etiqueta = "Tipo"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "default"
+etiqueta = "Acción por defecto"
+tipo = "text"
+
+[[funcion]]
+name = "scbidirectionalflt.cmd?action=modify"
+area = "cortafuegos"
+origen = "oculta"
+tipo = "escritura"
+pagina = "scbidirectionalflt_ed.asp"
+descripcion = "Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Modifica una entrada o regla."
+riesgo = "alto"
+lectura_pareada = { funcion = "scbidirectionalflt.cmd?action=view", params = [] }
+
+[[funcion.parametro]]
+nombre = "id"
+etiqueta = "Id"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "escape"
+etiqueta = "Escapar (true)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "target"
+etiqueta = "Objetivo (entry/rule)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "belong"
+etiqueta = "Entrada a la que pertenece"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "version"
+etiqueta = "Versión de IGMP"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "enabled"
+etiqueta = "Activada"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "protocol"
+etiqueta = "Protocolo"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "specificAction"
+etiqueta = "Acción"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "rejectType"
+etiqueta = "Tipo de rechazo"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "icmpType"
+etiqueta = "Tipo ICMP"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "srcaddr"
+etiqueta = "IP de origen"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "srcmask"
+etiqueta = "Máscara de origen"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "srcportstart"
+etiqueta = "Puerto de origen desde"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "srcportend"
+etiqueta = "Puerto de origen hasta"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "dstaddr"
+etiqueta = "IP de destino"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "dstmask"
+etiqueta = "Máscara de destino"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "dstportstart"
+etiqueta = "Puerto de destino desde"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "dstportend"
+etiqueta = "Puerto de destino hasta"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "name"
+etiqueta = "Nombre"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "interface"
+etiqueta = "Interfaz"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "type"
+etiqueta = "Tipo"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "default"
+etiqueta = "Acción por defecto"
+tipo = "text"
+
+[[funcion]]
+name = "scbidirectionalflt.cmd?action=remove"
+area = "cortafuegos"
+origen = "oculta"
+tipo = "escritura"
+pagina = "scbidirectionalflt_ls.asp"
+descripcion = "Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Borra una entrada o regla."
+riesgo = "alto"
+lectura_pareada = { funcion = "scbidirectionalflt.cmd?action=view", params = [] }
+
+[[funcion.parametro]]
+nombre = "item"
+etiqueta = "Elemento a borrar"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "escape"
+etiqueta = "Escapar (true)"
+tipo = "text"
+
+# ======================================================================
+# Área: dns
+
+[[funcion]]
+name = "cbGetDdns"
+area = "dns"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "ddns.asp"
+descripcion = "Entradas de DNS dinámico (proveedor, nombre, cuenta)."
+riesgo = "bajo"
+lista = { id_param = "rtm_ddns_0i", all = true, del = false }
+
+[[funcion.parametro]]
+nombre = "all"
+etiqueta = "Todas (siempre «ALL»)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "rtm_ddns_0i"
+etiqueta = "Entrada DDNS (índice)"
+tipo = "int"
+
+[[funcion]]
+name = "cbSetDdns"
+area = "dns"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "ddns.asp"
+descripcion = "Crea, modifica o borra una entrada de DNS dinámico."
+riesgo = "medio"
+lectura_pareada = { funcion = "cbGetDdns", params = [["rtm_ddns_0i", "{rtm_ddns_id}"]] }
+lista = { id_param = "rtm_ddns_id", all = false, del = true }
+
+[[funcion.parametro]]
+nombre = "adm_state"
+etiqueta = "Activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "provider"
+etiqueta = "Proveedor"
+tipo = "enum"
+opciones = [["0", "No-IP"], ["1", "Now-IP"], ["2", "DynDNS"], ["3", "Now-DNS"]]
+
+[[funcion.parametro]]
+nombre = "hostname"
+etiqueta = "Nombre de host"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "ip_intf_id"
+etiqueta = "Interfaz IP"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "account"
+etiqueta = "Cuenta"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "password"
+etiqueta = "Contraseña"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "rtm_ddns_id"
+etiqueta = "Entrada DDNS (id; -1 = nueva)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "del"
+etiqueta = "Borrar (siempre «DEL»)"
+tipo = "text"
+
+[[funcion]]
+name = "cbGetDnsRelay"
+area = "dns"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "dnsrelay.asp"
+descripcion = "Estado del relé DNS."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbSetDnsRelay"
+area = "dns"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "dnsrelay.asp"
+descripcion = "Activa o desactiva el relé DNS."
+riesgo = "medio"
+lectura_pareada = { funcion = "cbGetDnsRelay", params = [] }
+
+[[funcion.parametro]]
+nombre = "dns_relay_adm_state"
+etiqueta = "Relé DNS activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion]]
+name = "cbGetDnsRelayServer"
+area = "dns"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "dnsrelay.asp"
+descripcion = "Servidores DNS del relé."
+riesgo = "bajo"
+lista = { id_param = "rtm_cfg_dns_relay_id", all = false, del = false }
+
+[[funcion.parametro]]
+nombre = "rtm_cfg_dns_relay_id"
+etiqueta = "Servidor DNS (id; -1 = nuevo)"
+tipo = "int"
+
+[[funcion]]
+name = "cbSetDnsRelayServer"
+area = "dns"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "dnsrelay.asp"
+descripcion = "Añade, modifica o borra un servidor DNS del relé."
+riesgo = "medio"
+lectura_pareada = { funcion = "cbGetDnsRelayServer", params = [["rtm_cfg_dns_relay_id", "{rtm_cfg_dns_relay_id}"]] }
+lista = { id_param = "rtm_cfg_dns_relay_id", all = false, del = true }
+
+[[funcion.parametro]]
+nombre = "adm_state"
+etiqueta = "Activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "ip_intf_id"
+etiqueta = "Interfaz IP"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "rtm_cfg_dns_relay_id"
+etiqueta = "Servidor DNS (id; -1 = nuevo)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "dns_addr"
+etiqueta = "Servidor DNS"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "del"
+etiqueta = "Borrar (siempre «DEL»)"
+tipo = "text"
+
+# ======================================================================
+# Área: ipv6
+
+[[funcion]]
+name = "cbGetLanIPv6Config"
+area = "ipv6"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "ipv6.asp"
+descripcion = "IPv6 de la LAN: prefijo delegado, ULA, anuncios de router y DHCPv6."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbSetLanIPv6Config"
+area = "ipv6"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "ipv6.asp"
+descripcion = "Configura IPv6 en la LAN: activación, prefijo delegado, ULA, RA y DHCPv6."
+riesgo = "bajo"
+lectura_pareada = { funcion = "cbGetLanIPv6Config", params = [] }
+
+[[funcion.parametro]]
+nombre = "ipv6_adm_state"
+etiqueta = "IPv6 en la LAN"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "radv_adm_state"
+etiqueta = "Anuncios de router (RA)"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "sc_ipv6_parent_prefix_interface_id"
+etiqueta = "WAN que delega el prefijo"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "ss_ipv6_prefix_adm_state"
+etiqueta = "Prefijo ULA"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "ss_ipv6_prefix"
+etiqueta = "Prefijo ULA"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "ss_preferred_lifetime"
+etiqueta = "Vida preferida (s)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "ss_valid_lifetime"
+etiqueta = "Vida válida (s)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "dhcpv6_mode"
+etiqueta = "Servidor DHCPv6"
+tipo = "enum"
+opciones = [["0", "Desactivado"], ["1", "Sin estado"], ["2", "Con estado"]]
+
+[[funcion.parametro]]
+nombre = "iana_manual_addr_min"
+etiqueta = "Primer id de interfaz"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "iana_manual_addr_max"
+etiqueta = "Último id de interfaz"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "lease_time"
+etiqueta = "Duración de la concesión (s)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "ip_intf_id"
+etiqueta = "Interfaz IP"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "radv_intf_id"
+etiqueta = "Interfaz RA (id)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "l_ipv6_addr_id"
+etiqueta = "Dirección de enlace local (id)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "g_ipv6_addr_id"
+etiqueta = "Dirección global (id)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "sc_ipv6_prefix_id"
+etiqueta = "Prefijo delegado (id)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "ss_ipv6_prefix_id"
+etiqueta = "Prefijo ULA (id)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "dhcpv6_svr_pool_id"
+etiqueta = "Pool DHCPv6 (id)"
+tipo = "int"
+
+[[funcion]]
+name = "scbidirectionalfwl.cmd?action=create"
+area = "ipv6"
+origen = "basica"
+tipo = "escritura"
+pagina = "te_ipv6.asp"
+descripcion = "Abre puertos IPv6 hacia un equipo de la LAN (UI básica)."
+riesgo = "bajo"
+lectura_pareada = { funcion = "te_ipv6.asp", params = [] }
+
+[[funcion.parametro]]
+nombre = "newinst"
+etiqueta = "Regla nueva"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "curWebPage"
+etiqueta = "Página de retorno"
+tipo = "text"
+
+[[funcion]]
+name = "scbidirectionalfwl.cmd?action=delete"
+area = "ipv6"
+origen = "basica"
+tipo = "escritura"
+pagina = "te_ipv6.asp"
+descripcion = "Borra una apertura de puertos IPv6 (UI básica)."
+riesgo = "bajo"
+lectura_pareada = { funcion = "te_ipv6.asp", params = [] }
+
+[[funcion.parametro]]
+nombre = "oldinst"
+etiqueta = "Regla a borrar"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "curWebPage"
+etiqueta = "Página de retorno"
+tipo = "text"
+
+[[funcion]]
+name = "scbidirectionalfwl.cmd?action=save"
+area = "ipv6"
+origen = "basica"
+tipo = "escritura"
+pagina = "te_ipv6.asp"
+descripcion = "Guarda la lista de aperturas de puertos IPv6 (UI básica)."
+riesgo = "bajo"
+lectura_pareada = { funcion = "te_ipv6.asp", params = [] }
+
+[[funcion.parametro]]
+nombre = "inst"
+etiqueta = "Regla (campos separados por comas)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "curWebPage"
+etiqueta = "Página de retorno"
+tipo = "text"
+
+[[funcion]]
+name = "te_ipv6.asp"
+area = "ipv6"
+origen = "basica"
+tipo = "lectura"
+pagina = "te_ipv6.asp"
+descripcion = "Página básica de IPv6; sus variables dan prefijos, DHCPv6 y las aperturas de puertos IPv6."
+riesgo = "bajo"
+
+[[funcion]]
+name = "te_ipv6.cmd?action=dhcpapply"
+area = "ipv6"
+origen = "basica"
+tipo = "escritura"
+pagina = "te_ipv6.asp"
+descripcion = "Configura DHCPv6 (modo y rango) desde la UI básica."
+riesgo = "bajo"
+lectura_pareada = { funcion = "te_ipv6.asp", params = [] }
+
+[[funcion.parametro]]
+nombre = "IPv6DHCPMode"
+etiqueta = "Modo DHCPv6"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "startIPv6Address"
+etiqueta = "Primera dirección IPv6"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "endIPv6Address"
+etiqueta = "Última dirección IPv6"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "curWebPage"
+etiqueta = "Página de retorno"
+tipo = "text"
+
+[[funcion]]
+name = "te_ipv6.cmd?action=lanapply"
+area = "ipv6"
+origen = "basica"
+tipo = "escritura"
+pagina = "te_ipv6.asp"
+descripcion = "Cambia el prefijo IPv6 de la LAN desde la UI básica."
+riesgo = "bajo"
+lectura_pareada = { funcion = "te_ipv6.asp", params = [] }
+
+[[funcion.parametro]]
+nombre = "globalIPv6Address"
+etiqueta = "Dirección IPv6 global"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "globalIPv6Prefixlength"
+etiqueta = "Longitud del prefijo"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "curWebPage"
+etiqueta = "Página de retorno"
+tipo = "text"
+
+# ======================================================================
+# Área: multicast
+
+[[funcion]]
+name = "cbListMcastActiveGroup"
+area = "multicast"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "igmp.asp"
+descripcion = "Grupos multicast activos."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbGetMcastIgmpSetting"
+area = "multicast"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "igmp.asp"
+descripcion = "Parámetros de IGMP (grupos máximos, intervalos de consulta)."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbSetMcastIgmpSetting"
+area = "multicast"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "igmp.asp"
+descripcion = "Configura los parámetros de IGMP."
+riesgo = "bajo"
+lectura_pareada = { funcion = "cbGetMcastIgmpSetting", params = [] }
+
+[[funcion.parametro]]
+nombre = "igmp_max_group"
+etiqueta = "Máximo de grupos"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "igmp_qry_interval"
+etiqueta = "Intervalo de consulta (s)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "ip_intf_id"
+etiqueta = "Interfaz IP"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "eth_link_id"
+etiqueta = "Enlace Ethernet (id)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "br_id"
+etiqueta = "Puente (id)"
+tipo = "int"
+
+[[funcion]]
+name = "cbGetMcastIntf"
+area = "multicast"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "multicastintf.asp"
+descripcion = "Interfaces multicast y su versión de IGMP."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbSetMcastIntf"
+area = "multicast"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "multicastintf.asp"
+descripcion = "Activa multicast y la versión de IGMP en una interfaz."
+riesgo = "bajo"
+lectura_pareada = { funcion = "cbGetMcastIntf", params = [] }
+
+[[funcion.parametro]]
+nombre = "adm_state"
+etiqueta = "Activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "version"
+etiqueta = "Versión de IGMP"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "rtm_ip_mcast_intf_id"
+etiqueta = "Interfaz multicast (id)"
+tipo = "int"
+
+# ======================================================================
+# Área: qos
+
+[[funcion]]
+name = "cbGetAvailableIntf"
+area = "qos"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "classification.asp"
+descripcion = "Interfaces disponibles para QoS y puentes (`all=ALL`)."
+riesgo = "bajo"
+
+[[funcion.parametro]]
+nombre = "all"
+etiqueta = "Todas (siempre «ALL»)"
+tipo = "text"
+
+[[funcion]]
+name = "cbGetClassification"
+area = "qos"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "classification.asp"
+descripcion = "Reglas de clasificación de QoS."
+riesgo = "bajo"
+lista = { id_param = "rtm_cfg_qos_cls_0i", all = true, del = false }
+
+[[funcion.parametro]]
+nombre = "all"
+etiqueta = "Todas (siempre «ALL»)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "rtm_cfg_qos_cls_0i"
+etiqueta = "Regla (índice)"
+tipo = "int"
+
+[[funcion]]
+name = "cbSetClassification"
+area = "qos"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "classification.asp"
+descripcion = "Crea, modifica o borra una regla de clasificación de QoS (condiciones y remarcado DSCP/802.1p)."
+riesgo = "bajo"
+lectura_pareada = { funcion = "cbGetClassification", params = [["rtm_cfg_qos_cls_0i", "{rtm_cfg_qos_cls_id}"]] }
+lista = { id_param = "rtm_cfg_qos_cls_id", all = false, del = true }
+
+[[funcion.parametro]]
+nombre = "order_p"
+etiqueta = "Posición"
+tipo = "enum"
+opciones = [["1", "Primera"], ["2", "Según el orden"], ["3", "Última"]]
+
+[[funcion.parametro]]
+nombre = "order"
+etiqueta = "Orden"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "adm_state"
+etiqueta = "Activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "traffic_class"
+etiqueta = "Cola de destino"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "mod_dscp"
+etiqueta = "Remarcar DSCP"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "mod_dscp_value"
+etiqueta = "DSCP nuevo (0-63)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "mod_pbit"
+etiqueta = "Remarcar prioridad 802.1p"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "mod_pbit_value"
+etiqueta = "Prioridad nueva (0-7)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "intf"
+etiqueta = "Interfaz de entrada"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "cls_ethertype"
+etiqueta = "Comprobar EtherType"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "cls_ethertype_value"
+etiqueta = "EtherType"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "cls_pbit"
+etiqueta = "Comprobar prioridad 802.1p"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "cls_pbit_value"
+etiqueta = "Prioridad (0-7)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "cls_vid"
+etiqueta = "Comprobar VLAN"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "cls_vid_value"
+etiqueta = "VLAN (1-4094)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "cls_src_mac"
+etiqueta = "Comprobar MAC de origen"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "cls_src_mac_addr"
+etiqueta = "MAC de origen"
+tipo = "mac"
+
+[[funcion.parametro]]
+nombre = "cls_src_mac_mask"
+etiqueta = "Máscara de MAC de origen"
+tipo = "mac"
+
+[[funcion.parametro]]
+nombre = "cls_dst_mac"
+etiqueta = "Comprobar MAC de destino"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "cls_dst_mac_addr"
+etiqueta = "MAC de destino"
+tipo = "mac"
+
+[[funcion.parametro]]
+nombre = "cls_dst_mac_mask"
+etiqueta = "Máscara de MAC de destino"
+tipo = "mac"
+
+[[funcion.parametro]]
+nombre = "cls_dscp"
+etiqueta = "Comprobar DSCP"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "cls_dscp_value"
+etiqueta = "DSCP (0-63)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "cls_l4_protocol"
+etiqueta = "Comprobar protocolo"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "cls_l4_protocol_value"
+etiqueta = "Protocolo (1-255)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "cls_src_l4_port"
+etiqueta = "Comprobar puerto de origen"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "cls_src_l4_port_value_min"
+etiqueta = "Puerto de origen desde"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "cls_src_l4_port_value_max"
+etiqueta = "Puerto de origen hasta"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "cls_dst_l4_port"
+etiqueta = "Comprobar puerto de destino"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "cls_dst_l4_port_value_min"
+etiqueta = "Puerto de destino desde"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "cls_dst_l4_port_value_max"
+etiqueta = "Puerto de destino hasta"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "cls_src_ipv4"
+etiqueta = "Comprobar IP de origen"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "cls_src_ipv4_addr"
+etiqueta = "IP de origen"
+tipo = "ip"
+
+[[funcion.parametro]]
+nombre = "cls_src_ipv4_mask"
+etiqueta = "Máscara de IP de origen"
+tipo = "ip"
+
+[[funcion.parametro]]
+nombre = "cls_dst_ipv4"
+etiqueta = "Comprobar IP de destino"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "cls_dst_ipv4_addr"
+etiqueta = "IP de destino"
+tipo = "ip"
+
+[[funcion.parametro]]
+nombre = "cls_dst_ipv4_mask"
+etiqueta = "Máscara de IP de destino"
+tipo = "ip"
+
+[[funcion.parametro]]
+nombre = "rtm_cfg_qos_cls_id"
+etiqueta = "Regla (id; -1 = nueva)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "del"
+etiqueta = "Borrar (siempre «DEL»)"
+tipo = "text"
+
+[[funcion]]
+name = "cbGetQueue"
+area = "qos"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "queue.asp"
+descripcion = "Colas de QoS y cola por defecto."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbSetQueue"
+area = "qos"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "queue.asp"
+descripcion = "Configura una cola de QoS."
+riesgo = "bajo"
+lectura_pareada = { funcion = "cbGetQueue", params = [] }
+
+[[funcion.parametro]]
+nombre = "dpm_cfg_queue_id"
+etiqueta = "Cola (id)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "default_traffic_class"
+etiqueta = "Cola por defecto"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "adm_state"
+etiqueta = "Activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion]]
+name = "cbGetTR98L2Marking"
+area = "qos"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "marking.asp"
+descripcion = "Marcado de nivel 2 (VLAN y prioridad 802.1p) por interfaz."
+riesgo = "bajo"
+lista = { id_param = "mll_br_marking_0i", all = true, del = false }
+
+[[funcion.parametro]]
+nombre = "all"
+etiqueta = "Todas (siempre «ALL»)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "mll_br_marking_0i"
+etiqueta = "Marcado (índice)"
+tipo = "int"
+
+[[funcion]]
+name = "cbSetTR98L2Marking"
+area = "qos"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "marking.asp"
+descripcion = "Crea, modifica o borra un marcado de nivel 2."
+riesgo = "bajo"
+lectura_pareada = { funcion = "cbGetTR98L2Marking", params = [["mll_br_marking_0i", "{mll_br_marking_id}"]] }
+lista = { id_param = "mll_br_marking_id", all = false, del = true }
+
+[[funcion.parametro]]
+nombre = "adm_state"
+etiqueta = "Activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "marking_intf"
+etiqueta = "Interfaz"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "marking_br_id"
+etiqueta = "Puente asociado"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "untagged"
+etiqueta = "Sin etiqueta VLAN"
+tipo = "enum"
+opciones = [["1", "Sin etiqueta"], ["0", "Con etiqueta"]]
+
+[[funcion.parametro]]
+nombre = "vid_override"
+etiqueta = "Reescribir VLAN"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "vid_value"
+etiqueta = "VLAN"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "pbit_override"
+etiqueta = "Reescribir prioridad 802.1p"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "pbit_value"
+etiqueta = "Prioridad 802.1p"
+tipo = "enum"
+opciones = [["0", "0"], ["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"], ["5", "5"], ["6", "6"], ["7", "7"]]
+
+[[funcion.parametro]]
+nombre = "mll_br_marking_id"
+etiqueta = "Marcado (id; -1 = nuevo)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "del"
+etiqueta = "Borrar (siempre «DEL»)"
+tipo = "text"
+
+# ======================================================================
+# Área: voip
+
+[[funcion]]
+name = "cbGetPbxExtension"
+area = "voip"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "pbxstats.asp"
+descripcion = "Extensiones SIP de la centralita interna."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbGetVoiceLine"
+area = "voip"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "voiceadvance.asp"
+descripcion = "Líneas de voz: número, usuario y contraseña SIP (enmascarados), servicios."
+riesgo = "bajo"
+
+[[funcion.parametro]]
+nombre = "interwork_id"
+etiqueta = "Línea (id)"
+tipo = "int"
+
+[[funcion]]
+name = "cbSetVoiceLine"
+area = "voip"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "voiceadvance.asp"
+descripcion = "Configura una línea de voz: credenciales SIP, línea directa y VAD."
+riesgo = "bajo"
+lectura_pareada = { funcion = "cbGetVoiceLine", params = [["interwork_id", "{interwork_id}"]] }
+
+[[funcion.parametro]]
+nombre = "adm_state"
+etiqueta = "Activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "warmline_hotline_flag"
+etiqueta = "Modo línea directa"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "warmline_hotline"
+etiqueta = "Línea directa (hotline/warmline)"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "warmline_hotline_number"
+etiqueta = "Número de la línea directa"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "warmline_hotline_timeout"
+etiqueta = "Espera de la warmline (s)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "interwork_id"
+etiqueta = "Línea (id)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "web"
+etiqueta = "Origen del formulario (BASIC/ADVANCED)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "auth_username"
+etiqueta = "Usuario SIP"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "auth_password"
+etiqueta = "Contraseña SIP"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "vad_state"
+etiqueta = "Detección de silencio (VAD)"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion]]
+name = "cbGetVoicePhysical"
+area = "voip"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "voiceadvance.asp"
+descripcion = "Puertos de teléfono (FXS): ganancias y paso directo de fax/módem."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbSetVoicePhysical"
+area = "voip"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "voiceadvance.asp"
+descripcion = "Configura un puerto de teléfono (ganancias, fax y módem)."
+riesgo = "bajo"
+lectura_pareada = { funcion = "cbGetVoicePhysical", params = [] }
+
+[[funcion.parametro]]
+nombre = "fax_passthrough_adm_state"
+etiqueta = "Fax en paso directo"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "modem_passthrough_adm_state"
+etiqueta = "Módem en paso directo"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "tx_gain"
+etiqueta = "Ganancia de emisión (dB)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "rx_gain"
+etiqueta = "Ganancia de recepción (dB)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "fxs_id"
+etiqueta = "Puerto de teléfono (id)"
+tipo = "int"
+
+[[funcion]]
+name = "cbGetVoiceSip"
+area = "voip"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "voiceadvance.asp"
+descripcion = "Configuración SIP: servidores proxy y de registro, dominio, tiempos y DTMF."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbSetVoiceSip"
+area = "voip"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "voiceadvance.asp"
+descripcion = "Configura SIP (servidores, puertos, tiempos, DTMF, T.38). Puede dejar sin teléfono."
+riesgo = "bajo"
+lectura_pareada = { funcion = "cbGetVoiceSip", params = [] }
+
+[[funcion.parametro]]
+nombre = "adm_state"
+etiqueta = "Activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "region"
+etiqueta = "Región"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "registration_period"
+etiqueta = "Periodo de registro (s)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "register_retry_interval"
+etiqueta = "Reintento de registro (s)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "register_expires"
+etiqueta = "Caducidad del registro (s)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "session_expires"
+etiqueta = "Caducidad de sesión (s)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "min_session_expires"
+etiqueta = "Caducidad mínima de sesión (s)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "sip_dscp_mark"
+etiqueta = "DSCP de SIP"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "rtp_dscp_mark"
+etiqueta = "DSCP de RTP"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "web"
+etiqueta = "Origen del formulario (BASIC/ADVANCED)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "ip_intf_id"
+etiqueta = "Interfaz IP"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "user_agent_domain"
+etiqueta = "Dominio SIP"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "user_agent_port"
+etiqueta = "Puerto local SIP"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "user_agent_transport"
+etiqueta = "Transporte local"
+tipo = "enum"
+opciones = [["1", "UDP"]]
+
+[[funcion.parametro]]
+nombre = "outbound_proxy_cfg"
+etiqueta = "Proxy de salida"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "outbound_proxy_port"
+etiqueta = "Puerto del proxy de salida"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "proxy_server_cfg"
+etiqueta = "Servidor proxy"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "proxy_server_port"
+etiqueta = "Puerto del proxy"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "proxy_server_transport"
+etiqueta = "Transporte del proxy"
+tipo = "enum"
+opciones = [["1", "UDP"]]
+
+[[funcion.parametro]]
+nombre = "registrar_server_cfg"
+etiqueta = "Servidor de registro"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "registrar_server_port"
+etiqueta = "Puerto de registro"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "registrar_server_transport"
+etiqueta = "Transporte de registro"
+tipo = "enum"
+opciones = [["1", "UDP"]]
+
+[[funcion.parametro]]
+nombre = "digit_map_str"
+etiqueta = "Plan de marcación"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "dtmf_method"
+etiqueta = "Método DTMF"
+tipo = "enum"
+opciones = [["1", "InBand"], ["2", "RFC2833"], ["3", "SIPInfo"]]
+
+[[funcion.parametro]]
+nombre = "hook_flash_method"
+etiqueta = "Método de flash"
+tipo = "enum"
+opciones = [["0", "Ninguna"], ["1", "SIPInfo"]]
+
+[[funcion.parametro]]
+nombre = "t38_enable"
+etiqueta = "Fax T.38"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+# ======================================================================
+# Área: tr069
+
+[[funcion]]
+name = "cbGetTr69Config"
+area = "tr069"
+origen = "oculta"
+tipo = "lectura"
+pagina = "cwmp.asp"
+descripcion = "TR-069: activación, URL y credenciales del ACS, Inform periódico y credenciales de connection request (enmascaradas). Solo la usa cwmp.asp, que ningún menú enlaza."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbSetTr69Config"
+area = "tr069"
+origen = "oculta"
+tipo = "escritura"
+pagina = "cwmp.asp"
+descripcion = "Configura TR-069 (ACS, credenciales, Inform). Desde cwmp.asp (oculta). Desactivarlo corta la gestión remota del operador."
+riesgo = "alto"
+lectura_pareada = { funcion = "cbGetTr69Config", params = [] }
+
+[[funcion.parametro]]
+nombre = "enableCWMP"
+etiqueta = "TR-069 activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "acs_URL"
+etiqueta = "URL del ACS"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "acs_username"
+etiqueta = "Usuario del ACS"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "acs_password"
+etiqueta = "Contraseña del ACS"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "periodicInformEnable"
+etiqueta = "Inform periódico"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "periodicInformInterval"
+etiqueta = "Intervalo de Inform (s)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "connectionRequestUsername"
+etiqueta = "Usuario de connection request"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "connectionRequestPassword"
+etiqueta = "Contraseña de connection request"
+tipo = "secret"
+
+# ======================================================================
+# Área: usuarios
+
+[[funcion]]
+name = "cbAddUser"
+area = "usuarios"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "user_profile.asp"
+descripcion = "Crea un usuario de la interfaz web con su grupo (user, admin; system solo si la sesión es system)."
+riesgo = "bajo"
+lectura_pareada = { funcion = "cbGetUserList", params = [] }
+
+[[funcion.parametro]]
+nombre = "rqUser"
+etiqueta = "Usuario"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "rqPwd"
+etiqueta = "Contraseña"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "rqGroup"
+etiqueta = "Grupo (user/admin/system)"
+tipo = "text"
+
+[[funcion]]
+name = "cbCheckLogin"
+area = "usuarios"
+origen = "avanzada"
+tipo = "accion"
+pagina = "login.asp"
+descripcion = "Inicio de sesión en la UI avanzada: devuelve SessionID. Usuario y contraseña van ofuscados con XOR 0x1f."
+riesgo = "bajo"
+bloqueada = "la usa hgu::Client para su propia sesión; invocarla desde el explorador rompería la sesión compartida del panel"
+
+[[funcion.parametro]]
+nombre = "rqUsername"
+etiqueta = "Usuario (XOR 0x1f)"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "rqPasswd"
+etiqueta = "Contraseña (XOR 0x1f)"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "rqTimeout"
+etiqueta = "Caducidad de la sesión (s)"
+tipo = "int"
+
+[[funcion]]
+name = "cbCheckLogout"
+area = "usuarios"
+origen = "avanzada"
+tipo = "accion"
+pagina = "logout.asp"
+descripcion = "Cierra la sesión de la UI avanzada."
+riesgo = "bajo"
+bloqueada = "la usa hgu::Client para su propia sesión; invocarla desde el explorador rompería la sesión compartida del panel"
+
+[[funcion]]
+name = "cbCheckSession"
+area = "usuarios"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "summary.asp"
+descripcion = "Comprueba la sesión: devuelve LoginRole y AccessMask. Todas las páginas avanzadas la llaman al cargar."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbDeleteUser"
+area = "usuarios"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "user_profile.asp"
+descripcion = "Borra usuarios de la interfaz web (lista de nombres)."
+riesgo = "bajo"
+lectura_pareada = { funcion = "cbGetUserList", params = [] }
+
+[[funcion.parametro]]
+nombre = "rqDelList"
+etiqueta = "Usuarios a borrar"
+tipo = "text"
+
+[[funcion]]
+name = "cbGetUserList"
+area = "usuarios"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "user_profile.asp"
+descripcion = "Lista los usuarios de la interfaz web con su rol. Incluye un usuario oculto del operador, con rol system, que la interfaz no deja tocar (su nombre se enmascara)."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbModifyPwd"
+area = "usuarios"
+origen = "avanzada"
+tipo = "accion"
+pagina = "user_profile.asp"
+descripcion = "Cambia la contraseña del usuario con sesión iniciada (contraseña actual y nueva)."
+riesgo = "bajo"
+bloqueada = "cambia la contraseña con la que el propio panel inicia sesión: la vigilancia no podría volver a entrar ni revertir; se cambia desde el router"
+
+[[funcion.parametro]]
+nombre = "rqUser"
+etiqueta = "Usuario"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "rqOPwd"
+etiqueta = "Contraseña actual"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "rqNPwd"
+etiqueta = "Contraseña nueva"
+tipo = "secret"
+
+[[funcion]]
+name = "cbModifyPwdOther"
+area = "usuarios"
+origen = "avanzada"
+tipo = "accion"
+pagina = "user_profile.asp"
+descripcion = "Cambia la contraseña y el grupo de otro usuario (ventana user_profile_modifyOthers.asp). No se puede comprobar después: acción."
+riesgo = "medio"
+
+[[funcion.parametro]]
+nombre = "rqUser"
+etiqueta = "Usuario"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "rqNPwd"
+etiqueta = "Contraseña nueva"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "rqGroup"
+etiqueta = "Grupo (user/admin/system)"
+tipo = "text"
+
+[[funcion]]
+name = "te_acceso_router.cgi"
+area = "usuarios"
+origen = "basica"
+tipo = "accion"
+pagina = "te_acceso_router.asp"
+descripcion = "Inicio de sesión en la UI básica (formulario de te_acceso_router.asp): fija la cookie _httpdSessionId_."
+riesgo = "bajo"
+bloqueada = "la usa hgu::Client para su propia sesión; invocarla desde el explorador rompería la sesión compartida del panel"
+
+[[funcion.parametro]]
+nombre = "curWebPage"
+etiqueta = "Página de retorno"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "loginUsername"
+etiqueta = "Usuario (XOR 0x1f)"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "loginPassword"
+etiqueta = "Contraseña (XOR 0x1f)"
+tipo = "secret"
+
+[[funcion]]
+name = "te_cambio_contrasena.cgi"
+area = "usuarios"
+origen = "basica"
+tipo = "accion"
+pagina = "te_cambio_contrasena.asp"
+descripcion = "Cambia la contraseña de acceso desde la UI básica (actual y nueva, XOR 0x1f)."
+riesgo = "bajo"
+bloqueada = "cambia la contraseña con la que el propio panel inicia sesión: la vigilancia no podría volver a entrar ni revertir; se cambia desde el router"
+
+[[funcion.parametro]]
+nombre = "inOrgPassword"
+etiqueta = "Contraseña actual (XOR 0x1f)"
+tipo = "secret"
+
+[[funcion.parametro]]
+nombre = "changePassword"
+etiqueta = "Contraseña nueva (XOR 0x1f)"
+tipo = "secret"
+
+[[funcion]]
+name = "te_logout.cgi"
+area = "usuarios"
+origen = "basica"
+tipo = "accion"
+pagina = "te_header.asp"
+descripcion = "Cierra la sesión de la UI básica."
+riesgo = "bajo"
+bloqueada = "la usa hgu::Client para su propia sesión; invocarla desde el explorador rompería la sesión compartida del panel"
+
+# ======================================================================
+# Área: sistema
+
+[[funcion]]
+name = "backup_restore.asp"
+area = "sistema"
+origen = "avanzada"
+tipo = "accion"
+pagina = "backup_restore.asp"
+descripcion = "Página de copia y restauración de la configuración."
+riesgo = "bajo"
+bloqueada = "al cargarse llama a cbSaveConfig con backup=1 (genera la copia con secretos)"
+
+[[funcion]]
+name = "cbDownloadConfig"
+area = "sistema"
+origen = "avanzada"
+tipo = "accion"
+pagina = "backup_restore.asp"
+descripcion = "Descarga el fichero de copia generado por cbSaveConfig (backup=1)."
+riesgo = "bajo"
+bloqueada = "descarga la configuración completa con todas las contraseñas y claves en claro"
+
+[[funcion.parametro]]
+nombre = "fileName"
+etiqueta = "Fichero"
+tipo = "text"
+
+[[funcion]]
+name = "cbFWUpgradeByFTP"
+area = "sistema"
+origen = "avanzada"
+tipo = "accion"
+pagina = "fw_upgrade.asp"
+descripcion = "Descarga un firmware de un servidor FTP/TFTP y lo graba."
+riesgo = "alto"
+bloqueada = "graba un firmware: un fallo deja el router inservible"
+
+[[funcion.parametro]]
+nombre = "rqProtocol"
+etiqueta = "Protocolo"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "rqServerIP"
+etiqueta = "Servidor"
+tipo = "ip"
+
+[[funcion.parametro]]
+nombre = "rqPort"
+etiqueta = "Puerto"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "rqFileName"
+etiqueta = "Fichero"
+tipo = "text"
+
+[[funcion]]
+name = "cbGetDiagConfig"
+area = "sistema"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "diagsw.asp"
+descripcion = "Configuración del espejo de la WAN (copia el tráfico WAN a un puerto LAN para diagnóstico)."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbSetDiagConfig"
+area = "sistema"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "diagsw.asp"
+descripcion = "Activa o desactiva el espejo de la WAN hacia un puerto LAN."
+riesgo = "bajo"
+lectura_pareada = { funcion = "cbGetDiagConfig", params = [] }
+
+[[funcion.parametro]]
+nombre = "wan_mirror"
+etiqueta = "Espejo de la WAN"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "dst_lan_port"
+etiqueta = "Puerto LAN de destino"
+tipo = "enum"
+opciones = [["1", "1"], ["2", "2"], ["4", "3"], ["8", "4"]]
+
+[[funcion]]
+name = "cbGetFWUpgradeInfo"
+area = "sistema"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "fw_upgrade.asp"
+descripcion = "Estado de la última actualización de firmware."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbGetSummary"
+area = "sistema"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "summary.asp"
+descripcion = "Resumen del equipo: modelo, versiones de firmware y hardware, tiempo encendido, carga media 1/5/15 y memoria."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbGetSyslog"
+area = "sistema"
+origen = "avanzada"
+tipo = "lectura"
+pagina = "syslog.asp"
+descripcion = "Configuración del registro del sistema (local/remoto, severidad, servidor)."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbSetSyslog"
+area = "sistema"
+origen = "avanzada"
+tipo = "accion"
+pagina = "syslog.asp"
+descripcion = "Configura el registro del sistema; con `export=EXPORT` exporta el registro (lo que syslog.asp hace al cargarse). Acción explícita."
+riesgo = "bajo"
+
+[[funcion.parametro]]
+nombre = "export"
+etiqueta = "Exportar (siempre «EXPORT»)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "syslog_enable"
+etiqueta = "Registro activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "syslog_mode"
+etiqueta = "Destino del registro"
+tipo = "enum"
+opciones = [["2", "Local y remoto"], ["1", "Remoto"], ["0", "Local"]]
+
+[[funcion.parametro]]
+nombre = "remote_severity"
+etiqueta = "Severidad mínima remota"
+tipo = "enum"
+opciones = [["0", "Emergencia"], ["1", "Alerta"], ["2", "Crítico"], ["3", "Error"], ["4", "Aviso"], ["5", "Nota"], ["6", "Información"], ["7", "Depuración"]]
+
+[[funcion.parametro]]
+nombre = "bind_interface"
+etiqueta = "Interfaz de salida"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "remote_ip"
+etiqueta = "Servidor syslog"
+tipo = "ip"
+
+[[funcion.parametro]]
+nombre = "remote_port"
+etiqueta = "Puerto syslog"
+tipo = "int"
+
+[[funcion]]
+name = "cbReboot"
+area = "sistema"
+origen = "avanzada"
+tipo = "accion"
+pagina = "reboot.asp"
+descripcion = "Reinicia el router. El panel vigila su vuelta hasta 5 minutos."
+riesgo = "alto"
+
+[[funcion]]
+name = "cbRestoreConfig"
+area = "sistema"
+origen = "avanzada"
+tipo = "accion"
+pagina = "restore_default.asp"
+descripcion = "Restaura un perfil de configuración guardado y reinicia el router."
+riesgo = "alto"
+bloqueada = "sustituye toda la configuración y reinicia; no hay forma de comprobarla ni de deshacerla desde el panel"
+
+[[funcion.parametro]]
+nombre = "file"
+etiqueta = "Perfil guardado"
+tipo = "text"
+
+[[funcion]]
+name = "cbSaveConfig"
+area = "sistema"
+origen = "avanzada"
+tipo = "accion"
+pagina = "save.asp"
+descripcion = "Con `save=1` graba la configuración en flash; con `backup=1` genera el fichero de copia (lo que hace backup_restore.asp al cargarse)."
+riesgo = "bajo"
+
+[[funcion.parametro]]
+nombre = "backup"
+etiqueta = "Generar copia (1)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "save"
+etiqueta = "Guardar en flash (1)"
+tipo = "int"
+
+[[funcion]]
+name = "syslog.asp"
+area = "sistema"
+origen = "avanzada"
+tipo = "accion"
+pagina = "syslog.asp"
+descripcion = "Página del registro del sistema."
+riesgo = "bajo"
+bloqueada = "al cargarse llama a cbSetSyslog con export=EXPORT (exportación del registro)"
+
+[[funcion]]
+name = "upload/cfgupload.asp"
+area = "sistema"
+origen = "avanzada"
+tipo = "accion"
+pagina = "upload/cfgupload.asp"
+descripcion = "Recibe un fichero de configuración y lo aplica."
+riesgo = "alto"
+bloqueada = "sube y aplica una configuración completa; no se puede comprobar ni deshacer"
+
+[[funcion]]
+name = "upload/imgupgrade.asp"
+area = "sistema"
+origen = "avanzada"
+tipo = "accion"
+pagina = "upload/imgupgrade.asp"
+descripcion = "Recibe un firmware y lo graba."
+riesgo = "alto"
+bloqueada = "graba un firmware: un fallo deja el router inservible"
+
+[[funcion]]
+name = "restoreinfo.cgi"
+area = "sistema"
+origen = "basica"
+tipo = "accion"
+pagina = "te_otras_funcionalidades.asp"
+descripcion = "Restablece los valores de fábrica (enlace de te_otras_funcionalidades.asp)."
+riesgo = "alto"
+bloqueada = "reset de fábrica: borra la configuración, incluidas las credenciales PPP y WiFi"
+
+[[funcion]]
+name = "te_acerca_de___.asp"
+area = "sistema"
+origen = "basica"
+tipo = "lectura"
+pagina = "te_acerca_de___.asp"
+descripcion = "Página básica «Acerca de»: datos del equipo."
+riesgo = "bajo"
+
+[[funcion]]
+name = "te_otras_funcionalidades.asp"
+area = "sistema"
+origen = "basica"
+tipo = "lectura"
+pagina = "te_otras_funcionalidades.asp"
+descripcion = "Página básica de otras funciones (UPnP, DNS, copia y restauración, reset de fábrica, enlace al cortafuegos)."
+riesgo = "bajo"
+
+[[funcion]]
+name = "te_uploadinfo.asp"
+area = "sistema"
+origen = "basica"
+tipo = "accion"
+pagina = "te_uploadinfo.asp"
+descripcion = "Recibe un firmware desde la UI básica y lo graba."
+riesgo = "alto"
+bloqueada = "graba un firmware: un fallo deja el router inservible"
+
+[[funcion]]
+name = "te_uploadsettings.asp"
+area = "sistema"
+origen = "basica"
+tipo = "accion"
+pagina = "te_uploadsettings.asp"
+descripcion = "Recibe un fichero de configuración desde la UI básica y lo aplica."
+riesgo = "alto"
+bloqueada = "sube y aplica una configuración completa; no se puede comprobar ni deshacer"
+
+[[funcion]]
+name = "cbSetLocalTime"
+area = "sistema"
+origen = "oculta"
+tipo = "accion"
+pagina = "ntp.asp"
+descripcion = "Fija la hora local del router a mano (ntp.asp, oculta). Sin lectura que la compruebe: acción."
+riesgo = "bajo"
+
+[[funcion.parametro]]
+nombre = "SysTime"
+etiqueta = "Hora local"
+tipo = "text"
+
+[[funcion]]
+name = "cbGetTimeNtp"
+area = "sistema"
+origen = "oculta"
+tipo = "lectura"
+pagina = "ntp.asp"
+descripcion = "Configuración NTP (servidores 1-5, interfaz, estado de sincronización). Solo la usa ntp.asp, que ningún menú enlaza."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbSetTimeNtp"
+area = "sistema"
+origen = "oculta"
+tipo = "escritura"
+pagina = "ntp.asp"
+descripcion = "Configura NTP: activación, interfaz y servidores. Desde ntp.asp (oculta)."
+riesgo = "bajo"
+lectura_pareada = { funcion = "cbGetTimeNtp", params = [] }
+
+[[funcion.parametro]]
+nombre = "adm_state"
+etiqueta = "Activado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "ip_intf_id"
+etiqueta = "Interfaz IP"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "ntp_svr_1"
+etiqueta = "Servidor NTP 1"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "ntp_svr_2"
+etiqueta = "Servidor NTP 2"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "ntp_svr_3"
+etiqueta = "Servidor NTP 3"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "ntp_svr_4"
+etiqueta = "Servidor NTP 4"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "ntp_svr_5"
+etiqueta = "Servidor NTP 5"
+tipo = "text"
+
+[[funcion]]
+name = "cbGetNTPInfo"
+area = "sistema"
+origen = "incompleta"
+tipo = "lectura"
+pagina = "system.asp"
+descripcion = "NTP según system.asp. Restos de system.asp: la página existe pero el router responde 404 a sus llamadas."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbSetNTPInfo"
+area = "sistema"
+origen = "incompleta"
+tipo = "escritura"
+pagina = "system.asp"
+descripcion = "Configura NTP según system.asp. Restos de system.asp: la página existe pero el router responde 404 a sus llamadas."
+riesgo = "bajo"
+lectura_pareada = { funcion = "cbGetNTPInfo", params = [] }
+
+[[funcion.parametro]]
+nombre = "rqNTPOnOff"
+etiqueta = "NTP activado"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "rqNTP1"
+etiqueta = "Servidor NTP 1"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "rqNTP2"
+etiqueta = "Servidor NTP 2"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "rqNTP3"
+etiqueta = "Servidor NTP 3"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "rqNTP4"
+etiqueta = "Servidor NTP 4"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "rqNTP5"
+etiqueta = "Servidor NTP 5"
+tipo = "text"
+
+[[funcion]]
+name = "cbGetSystemTime"
+area = "sistema"
+origen = "incompleta"
+tipo = "lectura"
+pagina = "system.asp"
+descripcion = "Hora del sistema según system.asp. Restos de system.asp: la página existe pero el router responde 404 a sus llamadas."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbSetSystemTime"
+area = "sistema"
+origen = "incompleta"
+tipo = "accion"
+pagina = "system.asp"
+descripcion = "Fija la hora del sistema según system.asp. Restos de system.asp: la página existe pero el router responde 404 a sus llamadas."
+riesgo = "bajo"
+
+[[funcion.parametro]]
+nombre = "rqUTCSec"
+etiqueta = "Hora (segundos UTC)"
+tipo = "int"
+
+[[funcion]]
+name = "cbGetSystemTimeZone"
+area = "sistema"
+origen = "incompleta"
+tipo = "lectura"
+pagina = "system.asp"
+descripcion = "Zona horaria y horario de verano según system.asp. Restos de system.asp: la página existe pero el router responde 404 a sus llamadas."
+riesgo = "bajo"
+
+[[funcion]]
+name = "cbSetSystemTimeZone"
+area = "sistema"
+origen = "incompleta"
+tipo = "escritura"
+pagina = "system.asp"
+descripcion = "Configura la zona horaria según system.asp. Restos de system.asp: la página existe pero el router responde 404 a sus llamadas."
+riesgo = "bajo"
+lectura_pareada = { funcion = "cbGetSystemTimeZone", params = [] }
+
+[[funcion.parametro]]
+nombre = "rqOffset"
+etiqueta = "Desfase horario"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "rqDstOnOff"
+etiqueta = "Horario de verano"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "rqMonthS"
+etiqueta = "Inicio: mes"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "rqWeekS"
+etiqueta = "Inicio: semana"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "rqDayS"
+etiqueta = "Inicio: día"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "rqHourS"
+etiqueta = "Inicio: hora"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "rqMonthE"
+etiqueta = "Fin: mes"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "rqWeekE"
+etiqueta = "Fin: semana"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "rqDayE"
+etiqueta = "Fin: día"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "rqHourE"
+etiqueta = "Fin: hora"
+tipo = "text"
+
+[[funcion]]
+name = "cbSyncTime"
+area = "sistema"
+origen = "incompleta"
+tipo = "accion"
+pagina = "system.asp"
+descripcion = "Fuerza la sincronización horaria según system.asp. Restos de system.asp: la página existe pero el router responde 404 a sus llamadas."
+riesgo = "bajo"
+
+# ======================================================================
+# Área: ocultas
+
+[[funcion]]
+name = "cwmp.asp"
+area = "ocultas"
+origen = "oculta"
+tipo = "lectura"
+pagina = "cwmp.asp"
+descripcion = "Página de TR-069 (CWMP) que ningún menú enlaza: muestra y edita ACS, credenciales e Inform periódico (cbGetTr69Config/cbSetTr69Config)."
+riesgo = "bajo"
+
+[[funcion]]
+name = "ntp.asp"
+area = "ocultas"
+origen = "oculta"
+tipo = "lectura"
+pagina = "ntp.asp"
+descripcion = "Página de hora y NTP que ningún menú enlaza (cbGetTimeNtp, cbSetTimeNtp, cbSetLocalTime)."
+riesgo = "bajo"
+
+[[funcion]]
+name = "scbidirectionalflt_ed.asp"
+area = "ocultas"
+origen = "oculta"
+tipo = "lectura"
+pagina = "scbidirectionalflt_ed.asp"
+descripcion = "Editor de entradas y reglas del cortafuegos, abierto desde scbidirectionalflt_ls.asp."
+riesgo = "bajo"
+
+[[funcion]]
+name = "scbidirectionalflt_ls.asp"
+area = "ocultas"
+origen = "oculta"
+tipo = "lectura"
+pagina = "scbidirectionalflt_ls.asp"
+descripcion = "Lista del cortafuegos IPv4/IPv6 completo; solo enlazada desde el texto de ayuda de te_otras_funcionalidades.asp (el bloque Firewall del menú avanzado está comentado)."
+riesgo = "bajo"
+
+[[funcion]]
+name = "user_profile_add.asp"
+area = "ocultas"
+origen = "oculta"
+tipo = "lectura"
+pagina = "user_profile_add.asp"
+descripcion = "Ventana emergente para crear usuarios (cbAddUser); no está en el menú, la abre un botón de user_profile.asp."
+riesgo = "bajo"
+
+[[funcion]]
+name = "user_profile_modifyOthers.asp"
+area = "ocultas"
+origen = "oculta"
+tipo = "lectura"
+pagina = "user_profile_modifyOthers.asp"
+descripcion = "Ventana emergente para cambiar contraseña y grupo de otros usuarios (cbModifyPwdOther); permite elegir el grupo system si la sesión es system."
+riesgo = "bajo"
+
+[[funcion]]
+name = "notsupport.asp"
+area = "ocultas"
+origen = "incompleta"
+tipo = "lectura"
+pagina = "notsupport.asp"
+descripcion = "Destino de «Online User Info», comentado en el menú (monu.asp): solo muestra «NOT support»."
+riesgo = "bajo"
+
+[[funcion]]
+name = "system.asp"
+area = "ocultas"
+origen = "incompleta"
+tipo = "lectura"
+pagina = "system.asp"
+descripcion = "Página antigua de hora, zona horaria y NTP; sus llamadas dan 404."
+riesgo = "bajo"
