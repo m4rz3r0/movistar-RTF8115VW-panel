@@ -1,6 +1,6 @@
 //! Aplicación Leptos: documento HTML y rutas de la interfaz.
 
-use crate::ui::{layout::Layout, login::PaginaLogin, muestra::Muestra};
+use crate::ui::{estado::PaginaEstado, layout::Layout, login::PaginaLogin};
 use leptos::prelude::*;
 use leptos_meta::{Link, MetaTags, Stylesheet, Title, provide_meta_context};
 use leptos_router::{
@@ -60,19 +60,11 @@ pub fn App() -> impl IntoView {
             <Routes fallback=NoEncontrada>
                 <Route path=StaticSegment("login") view=PaginaLogin />
                 <ParentRoute path=StaticSegment("") view=Layout>
-                    <Route path=StaticSegment("") view=Inicio />
-                    // Muestra temporal de los componentes con datos sintéticos.
-                    <Route path=StaticSegment("_muestra") view=Muestra />
+                    <Route path=StaticSegment("") view=PaginaEstado />
                 </ParentRoute>
             </Routes>
         </Router>
     }
-}
-
-/// Página de inicio provisional.
-#[component]
-fn Inicio() -> impl IntoView {
-    view! { <h1>"Panel en construcción"</h1> }
 }
 
 /// Página para rutas que no existen.

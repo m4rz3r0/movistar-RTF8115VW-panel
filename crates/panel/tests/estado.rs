@@ -1,0 +1,202 @@
+//! Pruebas de la página de estado y sus server functions contra `router-sim`.
+
+mod common;
+
+use common::{Panel, body_text, get_con_cookie, panel, post_form, send, sesion};
+use panel::poller::{Poller, PollerConfig, PollerHandle};
+use serde_json::Value;
+use std::time::{Duration, Instant};
+
+/// Arranca el sondeo con intervalos cortos y un cliente del router de tiempo
+/// de espera corto.
+fn arrancar_sondeo(p: &mut Panel) -> PollerHandle {
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, common::USER, common::PASS);
+    cfg.timeout = Duration::from_millis(200);
+    cfg.min_gap = Duration::from_millis(1);
+    p.state.hgu = hgu::Client::new(cfg);
+    Poller::spawn_with(
+        p.state.clone(),
+        PollerConfig {
+            fast: Duration::from_millis(50),
+            slow: Duration::from_millis(200),
+            backoff_max: Duration::from_millis(200),
+            ..PollerConfig::default()
+        },
+    )
+}
+
+async fn esperar(que: &str, mut cond: impl FnMut() -> bool) {
+    let start = Instant::now();
+    while !cond() {
+        assert!(start.elapsed() < Duration::from_secs(5), "no llega: {que}");
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+}
+
+/// Llama a la server function `nombre` con la sesión `cookie` y devuelve el
+/// estado HTTP y el cuerpo.
+async fn llamar(p: &Panel, nombre: &str, cuerpo: &str, cookie: Option<&str>) -> (u16, String) {
+    let mut req = post_form(&format!("/api/{nombre}"), cuerpo, "127.0.0.1");
+    if let Some(c) = cookie {
+        req.headers_mut().insert("cookie", c.parse().unwrap());
+    }
+    let resp = send(&p.app, req).await;
+    let status = resp.status().as_u16();
+    (status, body_text(resp).await)
+}
+
+async fn estado(p: &Panel, cookie: &str) -> (String, Value) {
+    let (status, body) = llamar(p, "estado_actual", "", Some(cookie)).await;
+    assert_eq!(status, 200, "{body}");
+    let json = serde_json::from_str(&body).unwrap();
+    (body, json)
+}
+
+#[tokio::test]
+async fn estado_actual_con_sim() {
+    let mut p = panel().await;
+    let cookie = sesion(&p).await;
+    let h = arrancar_sondeo(&mut p);
+    esperar("datos de 60 s", || {
+        h.latest().is_some_and(|s| s.slow_at.is_some())
+    })
+    .await;
+    let (body, v) = estado(&p, &cookie).await;
+    assert!(body.contains("RTF8115VW"), "{body}");
+    assert_eq!(v["router_ok"], true, "{body}");
+    assert_eq!(v["error"], Value::Null, "{body}");
+    assert!(v["clientes"].as_u64().unwrap() > 0, "{body}");
+    assert_eq!(v["internet_up"], true, "{body}");
+    assert_eq!(v["ip_publica"], "203.0.113.6", "{body}");
+    // Fixtures: 9 equipos activos de 10; la reserva fija 02:00:00:00:00:04.
+    assert_eq!(v["clientes"], 9, "{body}");
+    let hosts = v["hosts"].as_array().unwrap();
+    assert_eq!(hosts.len(), 10, "{body}");
+    let fijo = hosts
+        .iter()
+        .find(|h| h["mac"] == "02:00:00:00:00:04")
+        .unwrap();
+    assert_eq!(fijo["fijo"], true, "{body}");
+    // La fixture tiene TR-069 activo; WPS está configurado, pero en redes
+    // desactivadas, así que no se avisa.
+    let avisos = v["avisos"].to_string();
+    assert!(avisos.contains("TR-069"), "{avisos}");
+    assert!(!avisos.contains("WPS"), "{avisos}");
+    assert!(!v["wifi"].as_array().unwrap().is_empty(), "{body}");
+}
+
+#[tokio::test]
+async fn estado_sin_router_muestra_error() {
+    let mut p = panel().await;
+    let cookie = sesion(&p).await;
+    p.sim.control.set_unresponsive(true);
+    let h = arrancar_sondeo(&mut p);
+    esperar("error del sondeo", || h.error().is_some()).await;
+    let (body, v) = estado(&p, &cookie).await;
+    assert_eq!(v["router_ok"], false, "{body}");
+    assert_eq!(v["at"], Value::Null, "{body}");
+    assert!(v["error"].as_str().is_some_and(|e| !e.is_empty()), "{body}");
+    assert!(!body.contains(common::PASS), "{body}");
+    let avisos = v["avisos"].to_string();
+    assert!(avisos.contains("Sin conexión con el router"), "{avisos}");
+
+    // La página lo dice sin esperar al navegador.
+    let html = body_text(get_con_cookie(&p.app, "/", &cookie).await).await;
+    assert!(html.contains("Sin conexión con el router"), "{html}");
+    assert!(html.contains("sin datos todavía"), "{html}");
+}
+
+#[tokio::test]
+async fn estado_con_datos_y_router_caido_avisa_con_la_hora() {
+    let mut p = panel().await;
+    let cookie = sesion(&p).await;
+    let h = arrancar_sondeo(&mut p);
+    esperar("primer dato", || h.healthy()).await;
+    p.sim.control.set_unresponsive(true);
+    esperar("router caído", || !h.healthy() && h.error().is_some()).await;
+    let (body, v) = estado(&p, &cookie).await;
+    assert_eq!(v["router_ok"], false, "{body}");
+    // Los datos anteriores siguen ahí.
+    assert!(body.contains("RTF8115VW"), "{body}");
+    assert!(v["at"].as_i64().is_some(), "{body}");
+    assert!(
+        v["avisos"]
+            .to_string()
+            .contains("Sin conexión con el router desde"),
+        "{body}"
+    );
+}
+
+#[tokio::test]
+async fn estado_no_envia_claves_wifi() {
+    let mut p = panel().await;
+    let cookie = sesion(&p).await;
+    let h = arrancar_sondeo(&mut p);
+    esperar("datos de 60 s", || {
+        h.latest().is_some_and(|s| s.slow_at.is_some())
+    })
+    .await;
+    let (body, v) = estado(&p, &cookie).await;
+    assert!(!v["wifi"].as_array().unwrap().is_empty(), "{body}");
+    // Ni valores (la fixture los trae como X-REDACTED-X) ni campos de clave.
+    for prohibido in [
+        "X-REDACTED-X",
+        "key_phrase",
+        "pre_shared_key",
+        "wps_device_pin",
+        "acs_password",
+        common::PASS,
+    ] {
+        assert!(!body.contains(prohibido), "{prohibido} en {body}");
+    }
+    // La red sabe si tiene clave, pero no cuál es.
+    let red = &v["wifi"][0];
+    assert!(red["con_clave"].is_boolean(), "{body}");
+}
+
+#[tokio::test]
+async fn series_y_cortes_con_sim() {
+    let mut p = panel().await;
+    let cookie = sesion(&p).await;
+    let h = arrancar_sondeo(&mut p);
+    esperar("primer dato", || h.healthy()).await;
+    p.sim.control.counters_bump(1_000_000, 100_000);
+    tokio::time::sleep(Duration::from_millis(1100)).await;
+    let (status, body) = llamar(&p, "series", "rango=Hora", Some(&cookie)).await;
+    assert_eq!(status, 200, "{body}");
+    let muestras: Vec<Value> = serde_json::from_str(&body).unwrap();
+    assert!(!muestras.is_empty(), "{body}");
+    assert!(muestras.iter().all(|m| m["wan_up"] == true), "{body}");
+    assert!(muestras.iter().any(|m| m["rx_bps"].is_f64()), "{body}");
+
+    let (status, body) = llamar(&p, "cortes", "rango=Dia", Some(&cookie)).await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body, "[]");
+    p.sim.control.set_wan_up(false);
+    esperar("corte registrado", || {
+        h.latest()
+            .is_some_and(|s| s.wan.iter().any(|w| w.name == "ip2" && !w.up))
+    })
+    .await;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    let (_, body) = llamar(&p, "cortes", "rango=Hora", Some(&cookie)).await;
+    let cortes: Vec<Value> = serde_json::from_str(&body).unwrap();
+    assert_eq!(cortes.len(), 1, "{body}");
+    assert_eq!(cortes[0]["hasta"], Value::Null, "{body}");
+    let (_, v) = estado(&p, &cookie).await;
+    assert_eq!(v["internet_up"], false);
+    assert!(v["caida_desde"].as_i64().is_some(), "{v}");
+}
+
+#[tokio::test]
+async fn server_fns_de_estado_exigen_sesion() {
+    let p = panel().await;
+    for (nombre, cuerpo) in [
+        ("estado_actual", ""),
+        ("series", "rango=Hora"),
+        ("cortes", "rango=Hora"),
+    ] {
+        let (status, _) = llamar(&p, nombre, cuerpo, None).await;
+        assert_eq!(status, 401, "{nombre}");
+    }
+}

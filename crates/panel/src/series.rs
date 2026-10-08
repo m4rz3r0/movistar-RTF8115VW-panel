@@ -199,6 +199,13 @@ pub async fn wan_state(pool: &SqlitePool, up: bool, now: i64) -> Result<(), sqlx
     Ok(())
 }
 
+/// El corte más reciente (abierto o cerrado), si hay alguno registrado.
+pub async fn ultimo_corte(pool: &SqlitePool) -> Result<Option<WanEvento>, sqlx::Error> {
+    sqlx::query_as("SELECT desde, hasta FROM wan_events ORDER BY desde DESC, id DESC LIMIT 1")
+        .fetch_optional(pool)
+        .await
+}
+
 /// Cortes que tocan el `rango` hasta ahora, en orden.
 pub async fn cortes(pool: &SqlitePool, rango: Rango) -> Result<Vec<WanEvento>, sqlx::Error> {
     cortes_at(pool, rango, now()).await
@@ -429,6 +436,31 @@ mod tests {
                 .await
                 .unwrap()
                 .is_empty()
+        );
+    }
+
+    #[tokio::test]
+    async fn ultimo_corte_es_el_mas_reciente() {
+        let (pool, _dir) = pool().await;
+        let now = 1_000 * 86_400;
+        assert_eq!(ultimo_corte(&pool).await.unwrap(), None);
+        wan_state(&pool, false, now - 500).await.unwrap();
+        wan_state(&pool, true, now - 400).await.unwrap();
+        wan_state(&pool, false, now - 50).await.unwrap();
+        assert_eq!(
+            ultimo_corte(&pool).await.unwrap(),
+            Some(WanEvento {
+                desde: now - 50,
+                hasta: None
+            })
+        );
+        wan_state(&pool, true, now - 10).await.unwrap();
+        assert_eq!(
+            ultimo_corte(&pool).await.unwrap(),
+            Some(WanEvento {
+                desde: now - 50,
+                hasta: Some(now - 10)
+            })
         );
     }
 }

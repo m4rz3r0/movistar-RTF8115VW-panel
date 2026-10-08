@@ -152,7 +152,11 @@ async fn portada_renderiza_en_servidor() {
     assert_eq!(resp.status(), StatusCode::OK);
     let html = body_text(resp).await;
     assert!(html.contains("Router · RTF8115VW"), "{html}");
-    assert!(html.contains("Panel en construcción"), "{html}");
+    assert!(html.contains("<h1>Estado</h1>"), "{html}");
+    assert!(
+        html.contains("Esperando el primer dato del router"),
+        "{html}"
+    );
 }
 
 #[tokio::test]

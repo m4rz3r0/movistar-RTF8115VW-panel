@@ -97,7 +97,7 @@ async fn login_ok_crea_cookie_con_atributos() {
     // Con la cookie se entra en la portada.
     let resp = get_con_cookie(&p.app, "/", &format!("{COOKIE_NAME}={id}")).await;
     assert_eq!(resp.status(), 200);
-    assert!(body_text(resp).await.contains("Panel en construcción"));
+    assert!(body_text(resp).await.contains("<h1>Estado</h1>"));
 }
 
 #[tokio::test]

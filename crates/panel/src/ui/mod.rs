@@ -6,9 +6,9 @@
 //! con icono y texto, nunca solos.
 
 pub mod charts;
+pub mod estado;
 pub mod layout;
 pub mod login;
-pub mod muestra;
 pub mod table;
 
 use leptos::prelude::*;
