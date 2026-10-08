@@ -270,8 +270,65 @@ async fn pagina_de_login_es_publica() {
 #[tokio::test]
 async fn server_fn_sin_sesion_401() {
     let p = panel().await;
-    let resp = send(&p.app, post_form("/api/logout", "", "127.0.0.1")).await;
+    let resp = send(&p.app, post_form("/api/quien_soy", "", "127.0.0.1")).await;
     assert_eq!(resp.status(), 401);
+}
+
+#[tokio::test]
+async fn quien_soy_con_sesion() {
+    let p = panel().await;
+    let cookie = sesion(&p).await;
+    let mut req = post_form("/api/quien_soy", "", "127.0.0.1");
+    req.headers_mut().insert("cookie", cookie.parse().unwrap());
+    let resp = send(&p.app, req).await;
+    assert_eq!(resp.status(), 200);
+    assert_eq!(body_text(resp).await, format!("\"{PANEL_USER}\""));
+}
+
+#[tokio::test]
+async fn logout_sin_sesion_caduca_la_cookie() {
+    let p = panel().await;
+    let mut req = post_form("/api/logout", "", "127.0.0.1");
+    req.headers_mut().insert(
+        "cookie",
+        format!("{COOKIE_NAME}=caducada-o-inventada")
+            .parse()
+            .unwrap(),
+    );
+    let resp = send(&p.app, req).await;
+    assert_eq!(resp.status(), 200);
+    assert!(set_cookie(&resp).contains("Max-Age=0"));
+}
+
+#[tokio::test]
+async fn login_con_cookie_previa_la_sustituye() {
+    let p = panel().await;
+    let vieja = sesion(&p).await;
+    let mut req = post_form(
+        "/api/login",
+        &login_body(PANEL_USER, PANEL_PASS),
+        "127.0.0.1",
+    );
+    req.headers_mut().insert("cookie", vieja.parse().unwrap());
+    let resp = send(&p.app, req).await;
+    assert_eq!(resp.status(), 200);
+    let sesiones: i64 = sqlx::query_scalar("SELECT count(*) FROM sessions")
+        .fetch_one(&p.state.db)
+        .await
+        .unwrap();
+    assert_eq!(sesiones, 1, "la sesión anterior se borra");
+    assert_eq!(get_con_cookie(&p.app, "/", &vieja).await.status(), 303);
+}
+
+#[tokio::test]
+async fn contrasena_enorme_es_un_fallo_normal() {
+    let p = panel().await;
+    crear_usuario(&p).await;
+    let enorme = "x".repeat(1025);
+    let (status, body) = login_desde(&p, PANEL_USER, &enorme, "127.0.0.1").await;
+    assert_eq!(status, 401, "{body}");
+    assert!(body.contains("Usuario o contraseña incorrectos"), "{body}");
+    assert_eq!(fallos(&p, "user", PANEL_USER).await, Some(1));
 }
 
 #[tokio::test]
@@ -304,11 +361,28 @@ async fn post_con_origin_ajeno_403() {
         req.headers_mut().insert(h, v.parse().unwrap());
         req
     };
-    let resp = send(&p.app, ajeno("origin", "https://evil.example")).await;
+    // Origin ajeno sin Sec-Fetch-Site (cliente sin Fetch Metadata).
+    let mut req = ajeno("origin", "https://evil.example");
+    req.headers_mut().remove("sec-fetch-site");
+    let resp = send(&p.app, req).await;
     assert_eq!(resp.status(), 403);
     assert!(resp.headers().get("set-cookie").is_none());
+    // Lo que manda un navegador desde otro sitio.
+    let mut req = ajeno("origin", "https://evil.example");
+    req.headers_mut()
+        .insert("sec-fetch-site", "cross-site".parse().unwrap());
+    assert_eq!(send(&p.app, req).await.status(), 403);
     let resp = send(&p.app, ajeno("sec-fetch-site", "cross-site")).await;
-    assert_eq!(resp.status(), 403);
+    assert_eq!(resp.status(), 403, "cross-site aunque Origin coincida");
+
+    // `Origin: null` sin Sec-Fetch-Site se rechaza.
+    let mut req = ajeno("origin", "null");
+    req.headers_mut().remove("sec-fetch-site");
+    assert_eq!(send(&p.app, req).await.status(), 403);
+
+    // `Origin: null` con `Sec-Fetch-Site: same-origin` (navegador real) pasa.
+    let resp = send(&p.app, ajeno("origin", "null")).await;
+    assert_eq!(resp.status(), 200);
 
     // Sin ninguna de las dos cabeceras (clientes sin Fetch Metadata) se acepta.
     let mut req = Request::post("/api/login")

@@ -48,7 +48,7 @@ async fn salud_responde_aunque_el_router_no() {
 
 fn assert_cabeceras_fijas(resp: &Response<Body>, uri: &str) {
     let h = resp.headers();
-    assert_eq!(h["referrer-policy"], "no-referrer", "{uri}");
+    assert_eq!(h["referrer-policy"], "same-origin", "{uri}");
     assert_eq!(h["x-content-type-options"], "nosniff", "{uri}");
     assert_eq!(h["x-frame-options"], "DENY", "{uri}");
 }

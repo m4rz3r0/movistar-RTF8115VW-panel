@@ -31,6 +31,9 @@ impl AppState {
     /// datos. Cualquier fallo impide arrancar; el mensaje nunca incluye
     /// secretos.
     pub async fn new(cfg: Config, leptos: LeptosOptions) -> Result<AppState, String> {
+        tokio::task::spawn_blocking(crate::auth::warm_up)
+            .await
+            .map_err(|e| e.to_string())?;
         let catalogo = Catalogo::load().map_err(|e| e.to_string())?;
         let mascara = Mascara::load().map_err(|e| e.to_string())?;
         let password = config::read_router_secret(&cfg.router_secret_file)?;

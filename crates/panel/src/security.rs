@@ -31,7 +31,9 @@ static CSP_SIN_NONCE: LazyLock<HeaderValue> =
     LazyLock::new(|| HeaderValue::from_str(&csp(None)).expect("CSP válida como cabecera"));
 
 const OTHER_HEADERS: [(HeaderName, &str); 3] = [
-    (header::REFERRER_POLICY, "no-referrer"),
+    // `same-origin` y no `no-referrer`: con `no-referrer` los navegadores mandan
+    // `Origin: null` en los POST del propio panel.
+    (header::REFERRER_POLICY, "same-origin"),
     (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
     (header::X_FRAME_OPTIONS, "DENY"),
 ];
@@ -54,10 +56,10 @@ fn add_headers(mut resp: Response) -> Response {
 }
 
 /// Middleware CSRF: rechaza con 403 las peticiones que cambian estado
-/// (cualquier método salvo `GET`, `HEAD` y `OPTIONS`) a `/api/*` cuando
-/// `Origin` o `Sec-Fetch-Site` delatan otro origen. Si faltan ambas cabeceras
-/// se deja pasar: la server function sigue exigiendo la cookie de sesión, que
-/// es `SameSite=Strict`.
+/// (cualquier método salvo `GET`, `HEAD` y `OPTIONS`) a `/api/*` que no vengan
+/// del propio panel según [`same_origin`]. Si faltan `Sec-Fetch-Site` y
+/// `Origin` se deja pasar: la server function sigue exigiendo la cookie de
+/// sesión, que es `SameSite=Strict`.
 pub async fn csrf(State(state): State<AppState>, req: Request, next: Next) -> Response {
     let safe_method = matches!(*req.method(), Method::GET | Method::HEAD | Method::OPTIONS);
     if !safe_method
@@ -69,18 +71,19 @@ pub async fn csrf(State(state): State<AppState>, req: Request, next: Next) -> Re
     next.run(req).await
 }
 
-/// `true` salvo que `Origin` sea distinto de `public_origin` o
-/// `Sec-Fetch-Site` distinto de `same-origin`.
+/// ¿Viene la petición del propio panel? `Sec-Fetch-Site`, si está, manda
+/// (todas sus copias deben ser `same-origin`). Si no está, `Origin` (todas sus
+/// copias) debe ser exactamente `public_origin`; `Origin: null` no vale. Sin
+/// ninguna de las dos, sí.
 fn same_origin(headers: &HeaderMap, public_origin: &str) -> bool {
-    let origin_ok = headers
+    let sites = headers.get_all("sec-fetch-site");
+    if sites.iter().next().is_some() {
+        return sites.iter().all(|v| v.as_bytes() == b"same-origin");
+    }
+    headers
         .get_all(header::ORIGIN)
         .iter()
-        .all(|v| v.as_bytes() == public_origin.as_bytes());
-    let site_ok = headers
-        .get_all("sec-fetch-site")
-        .iter()
-        .all(|v| v.as_bytes() == b"same-origin");
-    origin_ok && site_ok
+        .all(|v| v.as_bytes() == public_origin.as_bytes())
 }
 
 #[cfg(test)]
@@ -99,42 +102,32 @@ mod tests {
     #[test]
     fn mismo_origen_segun_cabeceras() {
         let o = "https://router.example";
-        assert!(same_origin(&headers(&[]), o));
-        assert!(same_origin(
-            &headers(&[("origin", "https://router.example")]),
-            o
-        ));
-        assert!(same_origin(
-            &headers(&[("sec-fetch-site", "same-origin")]),
-            o
-        ));
-        assert!(!same_origin(
-            &headers(&[("origin", "https://otro.example")]),
-            o
-        ));
-        assert!(!same_origin(&headers(&[("origin", "null")]), o));
-        assert!(!same_origin(
-            &headers(&[("sec-fetch-site", "same-site")]),
-            o
-        ));
-        assert!(!same_origin(
-            &headers(&[("sec-fetch-site", "cross-site")]),
-            o
-        ));
-        assert!(!same_origin(
-            &headers(&[
-                ("origin", "https://router.example"),
-                ("sec-fetch-site", "cross-site")
-            ]),
-            o
-        ));
-        assert!(!same_origin(
-            &headers(&[
-                ("origin", "https://router.example"),
-                ("origin", "https://otro.example")
-            ]),
-            o
-        ));
+        let ok = |pairs: &[(&'static str, &'static str)]| same_origin(&headers(pairs), o);
+        // Sin ninguna de las dos cabeceras se deja pasar (la sesión sigue
+        // siendo obligatoria).
+        assert!(ok(&[]));
+        assert!(ok(&[("origin", "https://router.example")]));
+        assert!(ok(&[("sec-fetch-site", "same-origin")]));
+        // Sec-Fetch-Site manda cuando está: el navegador manda `Origin: null`
+        // en algunos POST del mismo origen.
+        assert!(ok(&[("origin", "null"), ("sec-fetch-site", "same-origin")]));
+        assert!(!ok(&[
+            ("origin", "https://router.example"),
+            ("sec-fetch-site", "cross-site")
+        ]));
+        assert!(!ok(&[("sec-fetch-site", "same-site")]));
+        assert!(!ok(&[("sec-fetch-site", "none")]));
+        assert!(!ok(&[
+            ("sec-fetch-site", "same-origin"),
+            ("sec-fetch-site", "cross-site")
+        ]));
+        // Sin Sec-Fetch-Site, Origin debe ser exactamente el público.
+        assert!(!ok(&[("origin", "https://otro.example")]));
+        assert!(!ok(&[("origin", "null")]));
+        assert!(!ok(&[
+            ("origin", "https://router.example"),
+            ("origin", "https://otro.example")
+        ]));
     }
 
     #[test]

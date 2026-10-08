@@ -1,8 +1,8 @@
 //! Autenticación del panel: usuarios con contraseña Argon2id, sesiones en
 //! SQLite con cookie `__Host-rp_session`, freno de fuerza bruta por IP y por
-//! usuario, y las server functions `login` y `logout`.
+//! usuario, y las server functions `login`, `logout` y `quien_soy`.
 //!
-//! Toda server function salvo `login` empieza con [`require_user`]; las
+//! Toda server function salvo `login` y `logout` empieza con [`require_user`]; las
 //! páginas SSR quedan protegidas por [`require_page_session`] (extractor
 //! [`AuthUser`]), que redirige a `/login?next=<ruta>`.
 
@@ -12,7 +12,7 @@ use leptos::prelude::*;
 pub use server::{
     AuthUser, LoginError, MIN_PASSWORD_CHARS, SESSION_COOKIE, User, UserError, attempt_login,
     client_ip, create_user, delay_secs, hash_password, require_page_session, require_user,
-    set_password, verify,
+    set_password, verify, warm_up,
 };
 
 /// Destino tras el login: `next` solo si es una ruta local (empieza por una
@@ -40,10 +40,17 @@ pub async fn login(usuario: String, contrasena: String) -> Result<(), ServerFnEr
     server::login_endpoint(usuario, contrasena).await
 }
 
-/// Cierra la sesión actual: borra la fila y caduca la cookie.
+/// Cierra la sesión: borra la fila de la cookie (si la hay) y siempre
+/// devuelve la cookie caducada. No exige sesión vigente.
 #[server(endpoint = "logout")]
 pub async fn logout() -> Result<(), ServerFnError> {
     server::logout_endpoint().await
+}
+
+/// Nombre del usuario de la sesión.
+#[server(endpoint = "quien_soy")]
+pub async fn quien_soy() -> Result<String, ServerFnError> {
+    Ok(require_user().await?.username)
 }
 
 #[cfg(feature = "ssr")]
@@ -75,6 +82,9 @@ mod server {
     pub const SESSION_COOKIE: &str = "__Host-rp_session";
     /// Longitud mínima de la contraseña del panel, en caracteres.
     pub const MIN_PASSWORD_CHARS: usize = 12;
+    /// Longitud máxima de la contraseña en el login, en bytes: más larga es un
+    /// fallo normal, sin gastar Argon2.
+    const MAX_LOGIN_PASSWORD_BYTES: usize = 1024;
     /// Longitud máxima del nombre de usuario, en caracteres.
     const MAX_USERNAME_CHARS: usize = 64;
     /// Caducidad por inactividad.
@@ -131,6 +141,12 @@ mod server {
     /// coste (y el tiempo) sea el mismo que con un usuario real.
     static DUMMY_HASH: LazyLock<String> =
         LazyLock::new(|| hash_password("contraseña ficticia para igualar tiempos"));
+
+    /// Calcula ya el hash ficticio, para que el primer login con un usuario
+    /// inexistente no tarde más que los demás. Se llama al arrancar.
+    pub fn warm_up() {
+        LazyLock::force(&DUMMY_HASH);
+    }
 
     async fn hash_blocking(password: &str) -> String {
         let password = password.to_owned();
@@ -475,6 +491,11 @@ mod server {
             return Err(LoginError::Throttled((wait + 999) / 1000));
         }
 
+        if password.len() > MAX_LOGIN_PASSWORD_BYTES {
+            record_failure(db, &ip_key, &user_key).await?;
+            return Err(LoginError::BadCredentials);
+        }
+
         let row: Option<(i64, String)> =
             sqlx::query_as("SELECT id, password_hash FROM users WHERE username = ?")
                 .bind(username)
@@ -538,6 +559,9 @@ mod server {
         let ip = client_ip(peer.ip(), &headers, state.cfg.trusted_proxy);
         match attempt_login(&state, ip, &usuario, &contrasena).await {
             Ok(id) => {
+                if let Err(e) = delete_cookie_session(&state.db, &headers).await {
+                    return internal(e);
+                }
                 set_cookie(&session_cookie(&id));
                 Ok(())
             }
@@ -552,20 +576,27 @@ mod server {
         }
     }
 
+    /// Borra la sesión de la cookie que trae la petición, si la hay.
+    async fn delete_cookie_session(
+        db: &SqlitePool,
+        headers: &HeaderMap,
+    ) -> Result<(), sqlx::Error> {
+        if let Some(id) = cookie_session_id(headers) {
+            sqlx::query("DELETE FROM sessions WHERE id = ?")
+                .bind(session_key(id))
+                .execute(db)
+                .await?;
+        }
+        Ok(())
+    }
+
     pub(super) async fn logout_endpoint() -> Result<(), ServerFnError> {
-        require_user().await?;
         let state = app_state()?;
         let headers: HeaderMap = leptos_axum::extract().await?;
-        if let Some(id) = cookie_session_id(&headers) {
-            let res = sqlx::query("DELETE FROM sessions WHERE id = ?")
-                .bind(session_key(id))
-                .execute(&state.db)
-                .await;
-            if let Err(e) = res {
-                return internal(e);
-            }
-        }
         set_cookie(&expired_cookie());
+        if let Err(e) = delete_cookie_session(&state.db, &headers).await {
+            return internal(e);
+        }
         Ok(())
     }
 
