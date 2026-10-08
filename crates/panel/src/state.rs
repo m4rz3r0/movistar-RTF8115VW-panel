@@ -9,6 +9,7 @@ use catalogo::{Catalogo, mask::Mascara};
 use leptos::prelude::LeptosOptions;
 use sqlx::SqlitePool;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 
 /// Estado del servidor, compartido por las rutas Axum y las server functions.
 /// Barato de clonar.
@@ -20,6 +21,9 @@ pub struct AppState {
     pub catalogo: Arc<Catalogo>,
     pub mascara: Arc<Mascara>,
     pub leptos: LeptosOptions,
+    /// Serializa los intentos de login: el freno de fuerza bruta se comprueba
+    /// y se actualiza sin carreras entre peticiones simultáneas.
+    pub login_lock: Arc<Mutex<()>>,
 }
 
 impl AppState {
@@ -48,6 +52,7 @@ impl AppState {
             catalogo: Arc::new(catalogo),
             mascara: Arc::new(mascara),
             leptos,
+            login_lock: Arc::new(Mutex::new(())),
         })
     }
 }

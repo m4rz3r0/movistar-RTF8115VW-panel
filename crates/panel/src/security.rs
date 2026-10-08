@@ -1,8 +1,12 @@
-//! Cabeceras de seguridad comunes a todas las respuestas.
+//! Cabeceras de seguridad comunes a todas las respuestas y freno de CSRF en
+//! las server functions.
 
+use crate::state::AppState;
 use axum::{
-    http::{HeaderName, HeaderValue, header},
-    response::Response,
+    extract::{Request, State},
+    http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, header},
+    middleware::Next,
+    response::{IntoResponse, Response},
 };
 use std::sync::LazyLock;
 use tower::util::MapResponseLayer;
@@ -49,9 +53,89 @@ fn add_headers(mut resp: Response) -> Response {
     resp
 }
 
+/// Middleware CSRF: rechaza con 403 las peticiones que cambian estado
+/// (cualquier método salvo `GET`, `HEAD` y `OPTIONS`) a `/api/*` cuando
+/// `Origin` o `Sec-Fetch-Site` delatan otro origen. Si faltan ambas cabeceras
+/// se deja pasar: la server function sigue exigiendo la cookie de sesión, que
+/// es `SameSite=Strict`.
+pub async fn csrf(State(state): State<AppState>, req: Request, next: Next) -> Response {
+    let safe_method = matches!(*req.method(), Method::GET | Method::HEAD | Method::OPTIONS);
+    if !safe_method
+        && req.uri().path().starts_with("/api/")
+        && !same_origin(req.headers(), &state.cfg.public_origin)
+    {
+        return (StatusCode::FORBIDDEN, "Origen no permitido").into_response();
+    }
+    next.run(req).await
+}
+
+/// `true` salvo que `Origin` sea distinto de `public_origin` o
+/// `Sec-Fetch-Site` distinto de `same-origin`.
+fn same_origin(headers: &HeaderMap, public_origin: &str) -> bool {
+    let origin_ok = headers
+        .get_all(header::ORIGIN)
+        .iter()
+        .all(|v| v.as_bytes() == public_origin.as_bytes());
+    let site_ok = headers
+        .get_all("sec-fetch-site")
+        .iter()
+        .all(|v| v.as_bytes() == b"same-origin");
+    origin_ok && site_ok
+}
+
 #[cfg(test)]
 mod tests {
-    use super::csp;
+    use super::{csp, same_origin};
+    use axum::http::HeaderMap;
+
+    fn headers(pairs: &[(&'static str, &'static str)]) -> HeaderMap {
+        let mut h = HeaderMap::new();
+        for (k, v) in pairs {
+            h.append(*k, v.parse().unwrap());
+        }
+        h
+    }
+
+    #[test]
+    fn mismo_origen_segun_cabeceras() {
+        let o = "https://router.example";
+        assert!(same_origin(&headers(&[]), o));
+        assert!(same_origin(
+            &headers(&[("origin", "https://router.example")]),
+            o
+        ));
+        assert!(same_origin(
+            &headers(&[("sec-fetch-site", "same-origin")]),
+            o
+        ));
+        assert!(!same_origin(
+            &headers(&[("origin", "https://otro.example")]),
+            o
+        ));
+        assert!(!same_origin(&headers(&[("origin", "null")]), o));
+        assert!(!same_origin(
+            &headers(&[("sec-fetch-site", "same-site")]),
+            o
+        ));
+        assert!(!same_origin(
+            &headers(&[("sec-fetch-site", "cross-site")]),
+            o
+        ));
+        assert!(!same_origin(
+            &headers(&[
+                ("origin", "https://router.example"),
+                ("sec-fetch-site", "cross-site")
+            ]),
+            o
+        ));
+        assert!(!same_origin(
+            &headers(&[
+                ("origin", "https://router.example"),
+                ("origin", "https://otro.example")
+            ]),
+            o
+        ));
+    }
 
     #[test]
     fn csp_sin_nonce_es_la_politica_global() {

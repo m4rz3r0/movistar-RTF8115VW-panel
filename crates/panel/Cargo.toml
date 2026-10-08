@@ -22,6 +22,12 @@ tower = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 hgu = { path = "../hgu", optional = true }
 catalogo = { path = "../catalogo", optional = true }
+argon2 = { workspace = true, optional = true }
+sha2 = { workspace = true, optional = true }
+base64 = { workspace = true, optional = true }
+getrandom = { workspace = true, optional = true }
+form_urlencoded = { workspace = true, optional = true }
+rpassword = { workspace = true, optional = true }
 # Navegador (feature `hydrate`).
 wasm-bindgen = { workspace = true, optional = true }
 console_error_panic_hook = { workspace = true, optional = true }
@@ -42,6 +48,12 @@ ssr = [
     "dep:serde_json",
     "dep:hgu",
     "dep:catalogo",
+    "dep:argon2",
+    "dep:sha2",
+    "dep:base64",
+    "dep:getrandom",
+    "dep:form_urlencoded",
+    "dep:rpassword",
     "leptos/ssr",
     "leptos_meta/ssr",
     "leptos_router/ssr",
@@ -49,4 +61,8 @@ ssr = [
 
 [[test]]
 name = "http"
+required-features = ["ssr"]
+
+[[test]]
+name = "auth"
 required-features = ["ssr"]

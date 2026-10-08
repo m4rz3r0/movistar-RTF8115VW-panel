@@ -6,6 +6,16 @@ use std::{
     str::FromStr,
 };
 
+/// Fichero SQLite por defecto.
+const DEFAULT_DB: &str = "/var/db/routerpanel/panel.db";
+
+/// Fichero SQLite según `RP_DB`. Es lo único que necesitan las órdenes de
+/// administración (`panel user …`), que no deben exigir el resto de la
+/// configuración del servidor.
+pub fn db_path_from_env() -> PathBuf {
+    std::env::var_os("RP_DB").map_or_else(|| DEFAULT_DB.into(), PathBuf::from)
+}
+
 /// Configuración del panel.
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -39,7 +49,7 @@ impl Config {
         let get = |name: &str, default: &str| var(name).unwrap_or_else(|| default.to_owned());
         Ok(Config {
             listen: parse("RP_LISTEN", &get("RP_LISTEN", "0.0.0.0:3000"))?,
-            db_path: get("RP_DB", "/var/db/routerpanel/panel.db").into(),
+            db_path: get("RP_DB", DEFAULT_DB).into(),
             router_url: get("RP_ROUTER_URL", "http://192.168.1.1"),
             router_user: get("RP_ROUTER_USER", "1234"),
             router_secret_file: get(

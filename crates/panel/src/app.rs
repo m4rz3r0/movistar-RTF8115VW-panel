@@ -1,5 +1,6 @@
 //! Aplicación Leptos: documento HTML y rutas de la interfaz.
 
+use crate::ui::login::PaginaLogin;
 use leptos::prelude::*;
 use leptos_meta::{MetaTags, Stylesheet, Title, provide_meta_context};
 use leptos_router::{
@@ -56,6 +57,7 @@ pub fn App() -> impl IntoView {
             <main>
                 <Routes fallback=|| "Página no encontrada".into_view()>
                     <Route path=StaticSegment("") view=Inicio />
+                    <Route path=StaticSegment("login") view=PaginaLogin />
                 </Routes>
             </main>
         </Router>

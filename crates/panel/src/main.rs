@@ -1,8 +1,19 @@
-//! Servidor del panel.
+//! Servidor del panel. Con argumentos, órdenes de administración
+//! (`panel user add|passwd <usuario>`).
 
 #[cfg(feature = "ssr")]
 #[tokio::main]
 async fn main() -> std::process::ExitCode {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.is_empty() {
+        serve().await
+    } else {
+        panel::cli::run(&args).await
+    }
+}
+
+#[cfg(feature = "ssr")]
+async fn serve() -> std::process::ExitCode {
     use leptos::config::get_configuration;
     use panel::{build_router, config::Config, state::AppState};
     use std::{net::SocketAddr, process::ExitCode};

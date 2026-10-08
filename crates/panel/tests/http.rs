@@ -1,66 +1,15 @@
 //! Pruebas HTTP del panel en proceso, contra `router-sim`.
 
+mod common;
+
 use axum::{
-    Router,
     body::Body,
-    http::{Request, Response, StatusCode},
+    http::{Response, StatusCode},
 };
-use leptos::prelude::LeptosOptions;
-use panel::{config::Config, state::AppState};
-use router_sim::{Sim, SimConfig, SimHandle};
-use std::{path::PathBuf, time::Duration};
-use tempfile::TempDir;
-use tower::ServiceExt;
+use common::{body_text, get, get_con_cookie, panel, sesion};
+use std::time::Duration;
 
-const USER: &str = "1234";
-const PASS: &str = "clave-de-prueba";
 const CSP: &str = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'";
-
-struct Panel {
-    app: Router,
-    sim: SimHandle,
-    state: AppState,
-    _dir: TempDir,
-}
-
-async fn panel() -> Panel {
-    let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../hgu/fixtures");
-    let sim = Sim::start(SimConfig::new(USER, PASS, fixtures)).await;
-    let dir = tempfile::tempdir().unwrap();
-    let secret = dir.path().join("router.secret");
-    std::fs::write(&secret, format!("{PASS}\n")).unwrap();
-    let cfg = Config {
-        listen: "127.0.0.1:0".parse().unwrap(),
-        db_path: dir.path().join("panel.db"),
-        router_url: sim.base_url.clone(),
-        router_user: USER.into(),
-        router_secret_file: secret,
-        history_key_file: dir.path().join("history.key"),
-        trusted_proxy: "127.0.0.1".parse().unwrap(),
-        public_origin: "http://localhost:3000".into(),
-    };
-    let site = dir.path().join("site");
-    std::fs::create_dir_all(site.join("pkg")).unwrap();
-    std::fs::write(site.join("pkg/panel.css"), "main { padding: 0 }\n").unwrap();
-    let leptos = LeptosOptions::builder()
-        .output_name("panel")
-        .site_root(site.to_str().unwrap())
-        .build();
-    let state = AppState::new(cfg, leptos).await.unwrap();
-    Panel {
-        app: panel::build_router(state.clone()),
-        sim,
-        state,
-        _dir: dir,
-    }
-}
-
-async fn get(app: &Router, uri: &str) -> Response<Body> {
-    app.clone()
-        .oneshot(Request::get(uri).body(Body::empty()).unwrap())
-        .await
-        .unwrap()
-}
 
 async fn json(resp: Response<Body>) -> serde_json::Value {
     let bytes = axum::body::to_bytes(resp.into_body(), 1 << 20)
@@ -104,13 +53,6 @@ fn assert_cabeceras_fijas(resp: &Response<Body>, uri: &str) {
     assert_eq!(h["x-frame-options"], "DENY", "{uri}");
 }
 
-async fn body_text(resp: Response<Body>) -> String {
-    let bytes = axum::body::to_bytes(resp.into_body(), 1 << 20)
-        .await
-        .unwrap();
-    String::from_utf8(bytes.to_vec()).unwrap()
-}
-
 #[tokio::test]
 async fn cabeceras_de_seguridad_presentes() {
     let p = panel().await;
@@ -144,9 +86,9 @@ async fn assert_csp_con_nonce(resp: Response<Body>, uri: &str) {
 #[tokio::test]
 async fn pagina_leptos_lleva_csp_con_su_nonce() {
     let p = panel().await;
-    let resp = get(&p.app, "/").await;
+    let resp = get(&p.app, "/login").await;
     assert_eq!(resp.status(), StatusCode::OK);
-    assert_csp_con_nonce(resp, "/").await;
+    assert_csp_con_nonce(resp, "/login").await;
 }
 
 /// La 404 la genera Leptos (página HTML con sus scripts): también lleva nonce.
@@ -171,7 +113,8 @@ async fn fichero_estatico_con_cabeceras() {
 #[tokio::test]
 async fn portada_renderiza_en_servidor() {
     let p = panel().await;
-    let resp = get(&p.app, "/").await;
+    let cookie = sesion(&p).await;
+    let resp = get_con_cookie(&p.app, "/", &cookie).await;
     assert_eq!(resp.status(), StatusCode::OK);
     let html = body_text(resp).await;
     assert!(html.contains("Router · RTF8115VW"), "{html}");

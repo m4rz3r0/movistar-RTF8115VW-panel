@@ -4,7 +4,14 @@
 //! ejecuta en el navegador (WASM).
 
 pub mod app;
+pub mod auth;
+pub mod ui {
+    //! Páginas de la interfaz.
+    pub mod login;
+}
 
+#[cfg(feature = "ssr")]
+pub mod cli;
 #[cfg(feature = "ssr")]
 pub mod config;
 #[cfg(feature = "ssr")]
@@ -21,10 +28,10 @@ pub use server::build_router;
 mod server {
     use crate::{
         app::{App, shell},
-        security,
+        auth, security,
         state::AppState,
     };
-    use axum::{Json, Router, extract::State, routing::get};
+    use axum::{Json, Router, extract::State, middleware, routing::get};
     use leptos_axum::{LeptosRoutes, generate_route_list};
     use serde_json::{Value, json};
     use std::time::Duration;
@@ -32,17 +39,29 @@ mod server {
     /// Tiempo máximo que `/salud` espera al router.
     const SALUD_TIMEOUT: Duration = Duration::from_secs(3);
 
-    /// Construye el router Axum completo: `/salud`, rutas Leptos, ficheros
-    /// estáticos y cabeceras de seguridad en todas las respuestas.
+    /// Construye el router Axum completo: rutas Leptos (páginas con sesión
+    /// obligatoria salvo `/login`; server functions en `/api/*`, que la
+    /// comprueban ellas mismas), `/salud`, ficheros estáticos, freno de CSRF
+    /// en `/api/*` y cabeceras de seguridad en todas las respuestas.
     pub fn build_router(state: AppState) -> Router {
         let routes = generate_route_list(App);
         Router::new()
-            .route("/salud", get(salud))
             .leptos_routes(&state, routes, {
                 let options = state.leptos.clone();
                 move || shell(options.clone())
             })
+            // Solo afecta a las rutas ya registradas (las de Leptos): `/salud`
+            // y los ficheros estáticos quedan públicos.
+            .route_layer(middleware::from_fn_with_state(
+                state.clone(),
+                auth::require_page_session,
+            ))
+            .route("/salud", get(salud))
             .fallback(leptos_axum::file_and_error_handler::<AppState, _>(shell))
+            .layer(middleware::from_fn_with_state(
+                state.clone(),
+                security::csrf,
+            ))
             .layer(security::layer())
             .with_state(state)
     }
