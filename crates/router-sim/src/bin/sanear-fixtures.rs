@@ -3,11 +3,17 @@
 //! Uso: `sanear-fixtures <dir_bruto> <dir_fixtures> [--secrets <fichero>]`
 //!
 //! Copia las respuestas `cbGet*`, `cbList*` y `cbDhcpV4SvrPool*` que sean un
-//! `<Response>` válido, sustituyendo los valores sensibles. Con `--secrets`
-//! escribe (modo 600) los valores reales retirados, uno por línea.
+//! `<Response>` válido, sustituyendo los valores sensibles. Falla sin tocar
+//! las fixtures si aparece una etiqueta que no está en `fixtures-tags.txt` o
+//! un nombre de fichero con parámetros sensibles. Con `--secrets` añade (modo
+//! 600) los valores reales retirados al fichero, conservando las líneas que ya
+//! tuviera (p. ej. secretos conocidos por otra vía añadidos a mano).
 
 use router_sim::sanitize::Sanitizer;
-use std::{fs, io::Write, os::unix::fs::OpenOptionsExt, path::PathBuf, process::ExitCode};
+use std::{
+    collections::BTreeSet, fs, io::Write, os::unix::fs::OpenOptionsExt, path::PathBuf,
+    process::ExitCode,
+};
 
 const PREFIXES: &[&str] = &["cbGet", "cbList", "cbDhcpV4SvrPool"];
 
@@ -29,14 +35,6 @@ fn run() -> Result<(), String> {
         .collect();
     names.sort();
 
-    fs::create_dir_all(&out).map_err(|e| format!("{}: {e}", out.display()))?;
-    for old in fs::read_dir(&out).map_err(|e| e.to_string())? {
-        let old = old.map_err(|e| e.to_string())?.path();
-        if old.extension().is_some_and(|e| e == "xml") {
-            fs::remove_file(&old).map_err(|e| format!("{}: {e}", old.display()))?;
-        }
-    }
-
     let mut docs = Vec::new();
     for name in &names {
         let text = fs::read_to_string(raw.join(name)).map_err(|e| format!("{name}: {e}"))?;
@@ -53,20 +51,39 @@ fn run() -> Result<(), String> {
     }
 
     // Dos pasadas: los SSID y secretos aprendidos se retiran también de los
-    // ficheros que se procesan antes de encontrarlos.
+    // ficheros que se procesan antes de encontrarlos. Todo se sanea en memoria
+    // antes de tocar el directorio de salida.
     let mut s = Sanitizer::new();
     for (_, text) in &docs {
         s.learn(text);
     }
-    let mut written = 0;
+    let mut clean = Vec::new();
     for (name, text) in &docs {
-        let clean = s.sanitize(text).map_err(|e| format!("{name}: {e}"))?;
-        fs::write(out.join(name), clean).map_err(|e| format!("{name}: {e}"))?;
-        written += 1;
+        s.check_file_name(name.trim_end_matches(".xml"))
+            .map_err(|e| format!("{name}: {e}"))?;
+        clean.push((name, s.sanitize(text).map_err(|e| format!("{name}: {e}"))?));
     }
-    eprintln!("{written} fixtures escritas en {}", out.display());
+
+    fs::create_dir_all(&out).map_err(|e| format!("{}: {e}", out.display()))?;
+    for old in fs::read_dir(&out).map_err(|e| e.to_string())? {
+        let old = old.map_err(|e| e.to_string())?.path();
+        if old.extension().is_some_and(|e| e == "xml") {
+            fs::remove_file(&old).map_err(|e| format!("{}: {e}", old.display()))?;
+        }
+    }
+    for (name, text) in &clean {
+        fs::write(out.join(name), text).map_err(|e| format!("{name}: {e}"))?;
+    }
+    eprintln!("{} fixtures escritas en {}", clean.len(), out.display());
 
     if let Some(path) = secrets {
+        let mut all: BTreeSet<String> = match fs::read_to_string(&path) {
+            Ok(old) => old.lines().map(str::to_owned).collect(),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => BTreeSet::new(),
+            Err(e) => return Err(format!("{}: {e}", path.display())),
+        };
+        all.extend(s.removed_values().map(str::to_owned));
+        all.retain(|v| !v.is_empty());
         let mut f = fs::OpenOptions::new()
             .write(true)
             .create(true)
@@ -74,12 +91,10 @@ fn run() -> Result<(), String> {
             .mode(0o600)
             .open(&path)
             .map_err(|e| format!("{}: {e}", path.display()))?;
-        let mut n = 0;
-        for v in s.removed_values() {
+        for v in &all {
             writeln!(f, "{v}").map_err(|e| e.to_string())?;
-            n += 1;
         }
-        eprintln!("{n} valores reales en {}", path.display());
+        eprintln!("{} valores reales en {}", all.len(), path.display());
     }
     Ok(())
 }

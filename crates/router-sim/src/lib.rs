@@ -145,11 +145,18 @@ impl SimControl {
     }
 
     /// La próxima escritura responde `Result=1` con este `ErrorString`.
+    ///
+    /// Una llamada con `validation_only=1` (la validación previa que hace la
+    /// página WiFi) también lo consume, como cuando el router rechaza la
+    /// validación.
     pub fn fail_next_write(&self, err: &str) {
         self.inner.state().fail_next = Some(err.to_owned());
     }
 
-    /// La próxima escritura responde OK pero no se aplica.
+    /// La próxima escritura real responde OK pero no se aplica.
+    ///
+    /// Las llamadas con `validation_only=1` no lo consumen: nunca aplican
+    /// nada, así que el efecto recae en la escritura real que las sigue.
     pub fn ignore_next_write(&self) {
         self.inner.state().ignore_next = true;
     }
@@ -161,7 +168,8 @@ impl SimControl {
         st.tx_extra = st.tx_extra.saturating_add(tx);
     }
 
-    /// Escrituras recibidas con `sessionKey` válido (sin él), en orden.
+    /// Escrituras recibidas con `sessionKey` válido (sin él), en orden. No
+    /// incluye las llamadas de solo validación (`validation_only=1`).
     pub fn writes(&self) -> Vec<(String, Vec<(String, String)>)> {
         self.inner.state().writes.clone()
     }
@@ -230,23 +238,6 @@ impl SimState {
 
 // ---------------------------------------------------------------- fixtures
 
-/// Divide `k1=v1_k2=v2` (las claves pueden contener `_`, los valores no).
-fn parse_file_params(s: &str) -> Params {
-    let parts: Vec<&str> = s.split('=').collect();
-    let mut out = Vec::new();
-    let mut key = parts[0].to_owned();
-    for (i, part) in parts.iter().enumerate().skip(1) {
-        if i == parts.len() - 1 {
-            out.push((key.clone(), (*part).to_owned()));
-        } else {
-            let (value, next) = part.split_once('_').unwrap_or((part, ""));
-            out.push((key, value.to_owned()));
-            key = next.to_owned();
-        }
-    }
-    out
-}
-
 /// Clave de búsqueda: nombre y parámetros ordenados, sin `sessionKey`.
 fn fixture_key(name: &str, params: &[(String, String)]) -> FixtureKey {
     let mut p: Params = params
@@ -269,10 +260,7 @@ fn load_fixtures(dir: &FsPath) -> std::io::Result<HashMap<FixtureKey, String>> {
         else {
             continue;
         };
-        let (name, params) = match stem.split_once("__") {
-            Some((n, p)) => (n, parse_file_params(p)),
-            None => (stem, Vec::new()),
-        };
+        let (name, params) = sanitize::split_fixture_name(stem);
         map.insert(fixture_key(name, &params), std::fs::read_to_string(&path)?);
     }
     Ok(map)
@@ -676,9 +664,17 @@ fn write(st: &mut SimState, name: &str, params: &[(String, String)]) -> String {
         .filter(|(k, _)| k != "sessionKey")
         .cloned()
         .collect();
-    st.writes.push((name.to_owned(), clean.clone()));
+    // Validación previa (página WiFi): nunca aplica nada ni se registra;
+    // puede consumir `fail_next`, pero no `ignore_next`.
+    let validation_only = param(&clean, "validation_only") == Some("1");
+    if !validation_only {
+        st.writes.push((name.to_owned(), clean.clone()));
+    }
     if let Some(err) = st.fail_next.take() {
         return failure(name, &err);
+    }
+    if validation_only {
+        return ok(name);
     }
     if std::mem::take(&mut st.ignore_next) {
         return ok(name);
@@ -753,9 +749,6 @@ fn set_upnp(st: &mut SimState, p: &[(String, String)]) -> Result<(), &'static st
 
 fn set_wifi_acc_pt(st: &mut SimState, p: &[(String, String)]) -> Result<(), &'static str> {
     let id = param(p, "dpm_cfg_wifi_acc_pt_id").ok_or("falta dpm_cfg_wifi_acc_pt_id")?;
-    if param(p, "validation_only") == Some("1") {
-        return Ok(());
-    }
     let fields = st.wifi.entry(id.to_owned()).or_default();
     for (k, v) in p {
         if k != "dpm_cfg_wifi_acc_pt_id" && k != "validation_only" {
@@ -768,21 +761,6 @@ fn set_wifi_acc_pt(st: &mut SimState, p: &[(String, String)]) -> Result<(), &'st
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn file_params_split_on_underscore_after_value() {
-        assert_eq!(
-            parse_file_params("rtm_cfg_dhcpv4_svr_pool_id=0_all=ALL"),
-            vec![
-                ("rtm_cfg_dhcpv4_svr_pool_id".to_owned(), "0".to_owned()),
-                ("all".to_owned(), "ALL".to_owned())
-            ]
-        );
-        assert_eq!(
-            parse_file_params("dmz=1"),
-            vec![("dmz".to_owned(), "1".to_owned())]
-        );
-    }
 
     #[test]
     fn form_decoding() {

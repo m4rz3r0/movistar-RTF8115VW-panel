@@ -2,7 +2,7 @@
 
 use hgu::{Client, ClientConfig, Error, xml::XmlNode};
 use router_sim::{Sim, SimConfig, SimHandle, sanitize};
-use std::{collections::HashSet, net::Ipv4Addr, path::PathBuf, time::Duration};
+use std::{collections::HashSet, net::Ipv4Addr, path::PathBuf, sync::LazyLock, time::Duration};
 
 const USER: &str = "prueba";
 const PASS: &str = "clave-de-prueba";
@@ -39,17 +39,17 @@ fn leaves(raw: &str) -> Vec<(String, String)> {
         .collect()
 }
 
-fn mac_ok(v: &str) -> bool {
-    let re = regex::Regex::new(r"(?i)\b[0-9a-f]{2}(?::[0-9a-f]{2}){5}\b").unwrap();
-    re.find_iter(v).all(|m| {
-        let m = m.as_str().to_ascii_lowercase();
-        m.starts_with("02:00:00:00:") || m == "00:00:00:00:00:00" || m == "ff:ff:ff:ff:ff:ff"
-    })
-}
+static IPV4: LazyLock<regex::Regex> =
+    LazyLock::new(|| regex::Regex::new(r"\b\d{1,3}(?:\.\d{1,3}){3}\b").unwrap());
 
-#[test]
-fn fixtures_have_no_secrets() {
-    let secrets: HashSet<String> = match std::env::var_os("RTF_SECRETS_FILE") {
+/// Valores reales que no deben aparecer, de `$RTF_SECRETS_FILE` (uno por línea).
+///
+/// Lo genera `tools/sanear-fixtures.sh` con los valores retirados de las
+/// capturas, y se le pueden añadir a mano valores conocidos por otra vía que no
+/// salen en las capturas (contraseña del router, claves WiFi…): la herramienta
+/// conserva las líneas existentes al regenerarlo.
+fn real_secrets() -> HashSet<String> {
+    match std::env::var_os("RTF_SECRETS_FILE") {
         Some(path) => std::fs::read_to_string(path)
             .expect("RTF_SECRETS_FILE legible")
             .lines()
@@ -57,44 +57,80 @@ fn fixtures_have_no_secrets() {
             .map(str::to_owned)
             .collect(),
         None => HashSet::new(),
+    }
+}
+
+/// Comprueba un valor de la fixture `file` (de un elemento o de un parámetro
+/// del nombre del fichero).
+fn check_value(file: &str, tag: &str, value: &str, secrets: &HashSet<String>) {
+    use sanitize::TagClass;
+    let class = sanitize::tag_class(tag)
+        .unwrap_or_else(|| panic!("{file}: <{tag}> no está en fixtures-tags.txt"));
+    assert!(
+        !secrets.contains(value),
+        "{file}: <{tag}> contiene un secreto real"
+    );
+    assert!(
+        !secrets
+            .iter()
+            .any(|s| s.len() >= 8 && value.contains(s.as_str())),
+        "{file}: <{tag}> contiene un secreto real dentro del valor"
+    );
+    if value.is_empty() {
+        return;
+    }
+    let pseudo = |prefix: &str| {
+        value
+            .strip_prefix(prefix)
+            .is_some_and(|n| n.parse::<u32>().is_ok())
     };
-    let ipv4 = regex::Regex::new(r"\b\d{1,3}(?:\.\d{1,3}){3}\b").unwrap();
+    match class {
+        TagClass::Redact => assert_eq!(value, sanitize::REDACTED, "{file}: <{tag}> sin sanear"),
+        TagClass::Ssid => assert!(pseudo("RED-"), "{file}: <{tag}> sin sanear"),
+        TagClass::Host => assert!(pseudo("host-"), "{file}: <{tag}> sin sanear"),
+        TagClass::Desc => assert!(
+            pseudo("desc-") || ["LAN", "Default"].contains(&value) || value.parse::<u64>().is_ok(),
+            "{file}: <{tag}> sin sanear"
+        ),
+        TagClass::Keep => assert!(
+            value == sanitize::REDACTED || !sanitize::is_sensitive(tag, value),
+            "{file}: <{tag}> sin sanear"
+        ),
+    }
+    for mac in sanitize::macs_in(tag, value) {
+        assert!(
+            sanitize::is_fake_mac(&mac),
+            "{file}: <{tag}> contiene una MAC real"
+        );
+    }
+    assert!(
+        sanitize::global_ipv6_in(value).is_empty(),
+        "{file}: <{tag}> contiene una IPv6 global"
+    );
+    for m in IPV4.find_iter(value) {
+        if let Ok(ip) = m.as_str().parse::<Ipv4Addr>() {
+            assert!(!sanitize::is_public_ipv4(ip), "{file}: <{tag}> IP pública");
+        }
+    }
+}
+
+#[test]
+fn fixtures_have_no_secrets() {
+    let secrets = real_secrets();
     let mut files = 0;
     for entry in std::fs::read_dir(fixtures_dir()).expect("directorio de fixtures") {
         let path = entry.unwrap().path();
-        if path.extension().is_none_or(|e| e != "xml") {
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        let Some(stem) = name.strip_suffix(".xml") else {
             continue;
-        }
+        };
         files += 1;
-        let file = path.file_name().unwrap().to_string_lossy().into_owned();
+        for (k, v) in sanitize::split_fixture_name(stem).1 {
+            check_value(&name, &k, &v, &secrets);
+        }
         let raw = std::fs::read_to_string(&path).unwrap();
         for (tag, value) in leaves(&raw) {
-            assert!(
-                !secrets.contains(&value),
-                "{file}: <{tag}> contiene un secreto real"
-            );
-            assert!(
-                !secrets
-                    .iter()
-                    .any(|s| s.len() >= 8 && value.contains(s.as_str())),
-                "{file}: <{tag}> contiene un secreto real dentro del valor"
-            );
-            if value.is_empty() {
-                continue;
-            }
-            if tag.eq_ignore_ascii_case("ssid") {
-                assert!(value.starts_with("RED-"), "{file}: <{tag}> sin sanear");
-            } else if sanitize::is_sensitive(&tag) {
-                assert_eq!(value, sanitize::REDACTED, "{file}: <{tag}> sin sanear");
-            } else if tag == "hostname" {
-                assert!(value.starts_with("host-"), "{file}: <{tag}> sin sanear");
-            }
-            assert!(mac_ok(&value), "{file}: <{tag}> contiene una MAC real");
-            for m in ipv4.find_iter(&value) {
-                if let Ok(ip) = m.as_str().parse::<Ipv4Addr>() {
-                    assert!(!sanitize::is_public_ipv4(ip), "{file}: <{tag}> IP pública");
-                }
-            }
+            check_value(&name, &tag, &value, &secrets);
         }
     }
     assert!(files > 50, "faltan fixtures ({files})");
@@ -310,6 +346,45 @@ async fn ignore_next_write_keeps_state() {
             .unwrap(),
     );
     assert_eq!(again.len(), before.len() + 1, "solo se ignora una");
+}
+
+#[tokio::test]
+async fn validation_call_does_not_consume_ignore_next_write() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    let get = [("dpm_cfg_wifi_acc_pt_id", "1")];
+    let ssid = |n: XmlNode| {
+        n.get("dpm_cfg_wifi_acc_pt")
+            .unwrap()
+            .text_of("ssid")
+            .unwrap()
+            .to_owned()
+    };
+    let before = ssid(c.call("cbGetWifiAccPt", &get).await.unwrap());
+    sim.control.ignore_next_write();
+    let mut params = vec![
+        ("dpm_cfg_wifi_acc_pt_id", "1"),
+        ("ssid", "RED-nueva"),
+        ("validation_only", "1"),
+    ];
+    c.write("wifi.asp", "cbSetWifiAccPt", &params)
+        .await
+        .unwrap();
+    params.pop();
+    c.write("wifi.asp", "cbSetWifiAccPt", &params)
+        .await
+        .unwrap();
+    assert_eq!(ssid(c.call("cbGetWifiAccPt", &get).await.unwrap()), before);
+    let writes = sim.control.writes();
+    assert_eq!(writes.len(), 1, "la validación no se registra");
+    assert!(writes[0].1.iter().all(|(k, _)| k != "validation_only"));
+    c.write("wifi.asp", "cbSetWifiAccPt", &params)
+        .await
+        .unwrap();
+    assert_eq!(
+        ssid(c.call("cbGetWifiAccPt", &get).await.unwrap()),
+        "RED-nueva"
+    );
 }
 
 #[tokio::test]

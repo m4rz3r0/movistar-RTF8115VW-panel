@@ -4,10 +4,16 @@
 #
 # Uso: tools/sanear-fixtures.sh <dir_xml_bruto> [fichero_secretos]
 #
-# Si se indica fichero_secretos, se escriben en él (modo 600) los valores reales
-# retirados, uno por línea, para comprobar las fixtures con
+# Cada etiqueta XML (y cada clave de parámetro en los nombres de fichero) debe
+# figurar en crates/router-sim/fixtures-tags.txt con su clase; si aparece una
+# nueva, la herramienta falla sin tocar las fixtures hasta que se decida.
+#
+# Si se indica fichero_secretos, se añaden a él (modo 600, una por línea,
+# conservando las existentes) los valores reales retirados, para comprobar con
 #   RTF_SECRETS_FILE=<fichero> cargo test -p router-sim fixtures_have_no_secrets
-# Ese fichero contiene secretos: no debe quedar dentro del repositorio.
+# Conviene añadirle a mano los secretos conocidos por otra vía que no salen en
+# las capturas (contraseña del router, claves WiFi…). Ese fichero contiene
+# secretos: no debe quedar dentro del repositorio.
 set -eu
 
 if [ $# -lt 1 ] || [ $# -gt 2 ]; then
