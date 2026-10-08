@@ -23,14 +23,51 @@ pub struct Corte {
     pub hasta: Option<i64>,
 }
 
+/// Parte de un corte que cae dentro del intervalo mostrado.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Tramo {
+    pub desde: i64,
+    pub hasta: i64,
+    /// El corte de origen sigue abierto (`Corte::hasta = None`).
+    pub en_curso: bool,
+}
+
 /// Tramos caídos recortados a `[desde, hasta]` (un corte abierto llega hasta
-/// `hasta`), sin tramos vacíos.
-pub fn tramos_caidos(eventos: &[Corte], desde: i64, hasta: i64) -> Vec<(i64, i64)> {
+/// `hasta`), sin tramos vacíos; cada uno recuerda si su corte sigue abierto.
+pub fn tramos_caidos(eventos: &[Corte], desde: i64, hasta: i64) -> Vec<Tramo> {
     eventos
         .iter()
-        .map(|c| (c.desde.max(desde), c.hasta.unwrap_or(hasta).min(hasta)))
-        .filter(|(a, b)| b > a)
+        .map(|c| Tramo {
+            desde: c.desde.max(desde),
+            hasta: c.hasta.unwrap_or(hasta).min(hasta),
+            en_curso: c.hasta.is_none(),
+        })
+        .filter(|t| t.hasta > t.desde)
         .collect()
+}
+
+/// Cabecera de la lectura de un tramo: `"08/10 13:00 → 13:26"`, o
+/// `"… → ahora"` si su corte sigue abierto.
+fn cabecera_tramo(t: &Tramo) -> String {
+    let fin = if t.en_curso {
+        "ahora".to_owned()
+    } else {
+        formato_hora(t.hasta, false)
+    };
+    format!("{} → {fin}", formato_fecha_hora(t.desde, false))
+}
+
+/// Resumen para lectores de pantalla.
+fn texto_aria(r: &ResumenCortes) -> String {
+    let cortes = match r.cortes {
+        1 => "1 corte".to_owned(),
+        n => format!("{n} cortes"),
+    };
+    format!(
+        "Disponibilidad de internet: {}, {cortes}, {} sin conexión",
+        formato_disponibilidad(r),
+        formato_duracion(r.segundos_caido)
+    )
 }
 
 /// Cortes, segundos sin conexión y porcentaje disponible en un intervalo.
@@ -44,7 +81,7 @@ pub struct ResumenCortes {
 /// Resumen de los cortes en `[desde, hasta]`.
 pub fn resumen_cortes(eventos: &[Corte], desde: i64, hasta: i64) -> ResumenCortes {
     let tramos = tramos_caidos(eventos, desde, hasta);
-    let caido: i64 = tramos.iter().map(|(a, b)| b - a).sum();
+    let caido: i64 = tramos.iter().map(|t| t.hasta - t.desde).sum();
     let total = (hasta - desde).max(1);
     ResumenCortes {
         cortes: tramos.len(),
@@ -120,9 +157,9 @@ pub fn FranjaDisponibilidad(
         let cortes = tramos
             .get()
             .into_iter()
-            .map(|(a, b)| {
-                let x = s(a as f64);
-                let ancho_corte = (s(b as f64) - x).max(2.0);
+            .map(|t| {
+                let x = s(t.desde as f64);
+                let ancho_corte = (s(t.hasta as f64) - x).max(2.0);
                 view! {
                     <rect
                         class="franja-corte"
@@ -169,29 +206,22 @@ pub fn FranjaDisponibilidad(
         let w = ancho.get();
         let (d, h) = (desde.get(), hasta.get());
         let t = escala((0.0, w), (d as f64, h as f64))(x) as i64;
-        let corte = tramos.get().into_iter().find(|&(a, b)| {
-            let xa = s(a as f64);
-            let xb = s(b as f64).max(xa + 2.0);
+        let corte = tramos.get().into_iter().find(|t| {
+            let xa = s(t.desde as f64);
+            let xb = s(t.hasta as f64).max(xa + 2.0);
             x >= xa - ENGANCHE && x <= xb + ENGANCHE
         });
         let (cabecera, filas, resalte) = match corte {
-            Some((a, b)) => {
-                let abierto =
-                    b == h && eventos.with(|e| e.iter().any(|c| c.hasta.is_none_or(|fin| fin > h)));
-                let fin = if abierto {
-                    "ahora".to_owned()
-                } else {
-                    formato_hora(b, false)
-                };
-                let xa = s(a as f64);
+            Some(tramo) => {
+                let xa = s(tramo.desde as f64);
                 (
-                    format!("{} → {fin}", formato_fecha_hora(a, false)),
+                    cabecera_tramo(&tramo),
                     vec![(
                         "franja-clave-corte",
-                        formato_duracion(b - a),
+                        formato_duracion(tramo.hasta - tramo.desde),
                         "sin conexión".to_owned(),
                     )],
-                    Some((xa, (s(b as f64) - xa).max(2.0))),
+                    Some((xa, (s(tramo.hasta as f64) - xa).max(2.0))),
                 )
             }
             None => (
@@ -231,7 +261,7 @@ pub fn FranjaDisponibilidad(
         let centros: Vec<f64> = tramos
             .get_untracked()
             .iter()
-            .map(|&(a, b)| (s(a as f64) + s(b as f64)) / 2.0)
+            .map(|t| (s(t.desde as f64) + s(t.hasta as f64)) / 2.0)
             .collect();
         if centros.is_empty() {
             return;
@@ -282,15 +312,7 @@ pub fn FranjaDisponibilidad(
         })
     };
 
-    let etiqueta_aria = move || {
-        let r = resumen.get();
-        format!(
-            "Disponibilidad de internet: {}, {} cortes, {} sin conexión",
-            formato_disponibilidad(&r),
-            r.cortes,
-            formato_duracion(r.segundos_caido)
-        )
-    };
+    let etiqueta_aria = move || texto_aria(&resumen.get());
 
     view! {
         <figure class="franja">
@@ -384,5 +406,77 @@ mod tests {
             100_000,
         );
         assert_eq!(formato_disponibilidad(&casi), "99,99 %");
+    }
+
+    #[test]
+    fn solo_el_corte_abierto_dice_ahora() {
+        let h = 1_791_417_600 + 14 * 3600;
+        let eventos = vec![
+            // Cerrado, pero termina después del final del intervalo.
+            Corte {
+                desde: h - 600,
+                hasta: Some(h + 600),
+            },
+            // Abierto, empezado antes.
+            Corte {
+                desde: h - 3000,
+                hasta: None,
+            },
+            Corte {
+                desde: h - 7200,
+                hasta: Some(h - 7000),
+            },
+        ];
+        let tramos = tramos_caidos(&eventos, h - 3600, h);
+        assert_eq!(tramos.len(), 2);
+        assert_eq!(
+            tramos[0],
+            Tramo {
+                desde: h - 600,
+                hasta: h,
+                en_curso: false
+            }
+        );
+        assert!(tramos[1].en_curso);
+        assert!(
+            !cabecera_tramo(&tramos[0]).ends_with("ahora"),
+            "{:?}",
+            cabecera_tramo(&tramos[0])
+        );
+        assert!(cabecera_tramo(&tramos[1]).ends_with("→ ahora"));
+    }
+
+    #[test]
+    fn resumen_accesible_con_singular_y_plural() {
+        let uno = resumen_cortes(
+            &[Corte {
+                desde: 10,
+                hasta: Some(70),
+            }],
+            0,
+            1000,
+        );
+        assert!(
+            texto_aria(&uno).contains(", 1 corte,"),
+            "{}",
+            texto_aria(&uno)
+        );
+        let dos = resumen_cortes(
+            &[
+                Corte {
+                    desde: 10,
+                    hasta: Some(70),
+                },
+                Corte {
+                    desde: 100,
+                    hasta: Some(160),
+                },
+            ],
+            0,
+            1000,
+        );
+        assert!(texto_aria(&dos).contains(", 2 cortes,"));
+        let cero = resumen_cortes(&[], 0, 1000);
+        assert!(texto_aria(&cero).contains(", 0 cortes,"));
     }
 }

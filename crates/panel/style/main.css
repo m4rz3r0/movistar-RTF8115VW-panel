@@ -271,6 +271,8 @@ button {
   flex-direction: column;
   gap: var(--esp-5);
   height: 100vh;
+  /* En pantallas bajas se desplaza la barra: «Salir» nunca queda cortado. */
+  overflow-y: auto;
   padding: var(--esp-5) var(--esp-3) var(--esp-4);
   background: linear-gradient(180deg, var(--superficie-1), #121417);
   border-right: 1px solid var(--borde);

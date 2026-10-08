@@ -103,6 +103,9 @@ pub fn Indicador(
     #[prop(into, optional)] sub: MaybeProp<String>,
     #[prop(into, optional)] minigrafica: Option<Signal<Vec<Option<f64>>>>,
     #[prop(into, optional)] estado: MaybeProp<Estado>,
+    /// Color de la minigráfica.
+    #[prop(optional)]
+    tono: Tono,
 ) -> impl IntoView {
     let icono = move || estado.get().map(|estado| view! { <IconoEstado estado /> });
     let clase = move || match estado.get() {
@@ -114,7 +117,7 @@ pub fn Indicador(
             <h3 class="indicador-titulo">{titulo}</h3>
             <p class="indicador-valor">{icono} <span>{valor}</span></p>
             {move || sub.get().map(|s| view! { <p class="indicador-sub">{s}</p> })}
-            {minigrafica.map(|valores| view! { <Minigrafica valores /> })}
+            {minigrafica.map(|valores| view! { <Minigrafica valores tono /> })}
         </article>
     }
     .into_any()
@@ -133,5 +136,23 @@ mod tests {
         );
         assert_eq!(t.lineas.len(), 2);
         assert_eq!(t.fin, Some((120.0, 3.0)));
+    }
+
+    #[cfg(feature = "ssr")]
+    #[test]
+    fn indicador_pasa_el_tono_a_la_minigrafica() {
+        let html = Owner::new().with(|| {
+            view! {
+                <Indicador
+                    titulo="Subida"
+                    valor="1,2 Mbit/s"
+                    minigrafica=vec![Some(1.0), Some(2.0)]
+                    tono=Tono::Secundario
+                />
+            }
+            .to_html()
+        });
+        assert!(html.contains("linea tono-2"), "{html}");
+        assert!(!html.contains("tono-1"), "{html}");
     }
 }

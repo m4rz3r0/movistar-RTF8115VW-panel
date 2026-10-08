@@ -140,7 +140,9 @@ pub fn ticks_tiempo(desde: i64, hasta: i64, max_ticks: usize) -> Vec<(i64, Strin
         if t > hasta {
             break;
         }
-        if t >= desde {
+        // La noche del cambio de marzo, las 02:00 locales no existen y caen en
+        // el mismo instante que las 01:00: un solo tick.
+        if t >= desde && ticks.last().is_none_or(|u: &(i64, String)| u.0 != t) {
             let h = hora_local(t);
             let texto = if paso >= 86_400 || (h.hora == 0 && h.minuto == 0) {
                 format!("{:02}/{:02}", h.dia, h.mes)
@@ -201,6 +203,17 @@ mod tests {
         let semana = ticks_tiempo(D2026_10_08 - 7 * 86_400, D2026_10_08, 8);
         assert!(semana.iter().all(|t| t.1.contains('/')), "{semana:?}");
         assert!(ticks_tiempo(10, 10, 5).is_empty());
+    }
+
+    #[test]
+    fn ticks_de_tiempo_en_el_cambio_de_marzo() {
+        // 29/03/2026 00:00 CET → 05:00 CEST (4 h reales): las 02:00 no existen.
+        let desde = dias_de_civil(2026, 3, 28) * 86_400 + 23 * 3600;
+        let ticks = ticks_tiempo(desde, desde + 4 * 3600, 6);
+        let textos: Vec<&str> = ticks.iter().map(|t| t.1.as_str()).collect();
+        assert_eq!(textos, ["29/03", "01:00", "03:00", "04:00", "05:00"]);
+        assert!(ticks.windows(2).all(|w| w[1].0 > w[0].0), "{ticks:?}");
+        assert!(ticks.len() <= 6);
     }
 
     #[test]

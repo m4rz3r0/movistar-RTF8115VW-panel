@@ -273,6 +273,27 @@ pub fn geometria(
     alto: f64,
     ventana: Option<(i64, i64)>,
 ) -> Geometria {
+    // Con ventana, solo cuentan (y se dibujan) los puntos de dentro: nada se
+    // pinta fuera del área del gráfico ni la cruceta engancha marcas de fuera.
+    let recortadas: Vec<Serie>;
+    let series = match ventana {
+        Some((a, b)) => {
+            recortadas = series
+                .iter()
+                .map(|s| Serie {
+                    puntos: s
+                        .puntos
+                        .iter()
+                        .filter(|p| (a..=b).contains(&p.0))
+                        .copied()
+                        .collect(),
+                    ..s.clone()
+                })
+                .collect();
+            &recortadas[..]
+        }
+        None => series,
+    };
     let mut tiempos: Vec<i64> = series
         .iter()
         .flat_map(|s| s.puntos.iter().map(|p| p.0))
@@ -477,6 +498,37 @@ mod tests {
         assert_eq!(g.trazos[0].lineas.len(), 3);
         assert_eq!(g.trazos[0].areas.len(), 3);
         assert!(g.trazos[0].lineas.iter().all(|d| d.starts_with('M')));
+    }
+
+    #[test]
+    fn la_ventana_recorta_puntos_y_marcas() {
+        let puntos: Vec<(i64, Option<f64>)> = (0..=10).map(|i| (i * 10, Some(i as f64))).collect();
+        let serie = Serie::new("x", Tono::Primario, puntos);
+        let g = geometria(
+            std::slice::from_ref(&serie),
+            Unidad::Decimal,
+            400.0,
+            200.0,
+            Some((30, 60)),
+        );
+        // Solo se puede enganchar dentro de la ventana.
+        assert_eq!(g.tiempos, [30, 40, 50, 60]);
+        let fuera = indice_mas_cercano(&g.tiempos, 100.0).map(|i| g.tiempos[i]);
+        assert_eq!(fuera, Some(60));
+        // Nada se dibuja fuera del área del gráfico.
+        let xs: Vec<f64> = g.trazos[0]
+            .lineas
+            .iter()
+            .flat_map(|d| d.split(['M', 'L']).filter(|p| !p.is_empty()))
+            .map(|p| p.split(',').next().unwrap().parse::<f64>().unwrap())
+            .collect();
+        assert!(!xs.is_empty());
+        assert!(xs.iter().all(|x| (g.izq..=g.der).contains(x)), "{xs:?}");
+        // El eje Y y la etiqueta salen de los datos de la ventana.
+        assert_eq!(g.y_max, 6.0);
+        assert_eq!(g.trazos[0].etiqueta.as_ref().unwrap().2, "6,00");
+        let l = lectura(&[serie], Unidad::Decimal, &g, 3).unwrap();
+        assert_eq!(l.filas[0].1, "6,00");
     }
 
     #[test]

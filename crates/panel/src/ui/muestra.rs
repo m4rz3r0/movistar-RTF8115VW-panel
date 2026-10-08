@@ -152,7 +152,13 @@ pub fn Muestra() -> impl IntoView {
     .into_any();
     let trafico_wan = view! {
         <section class="seccion">
-            <SerieTemporal titulo="Tráfico WAN" series=series_trafico unidad=Unidad::Bps alto=280 />
+            <SerieTemporal
+                titulo="Tráfico WAN"
+                series=series_trafico
+                unidad=Unidad::Bps
+                alto=280
+                ventana=(FIN - 3600, FIN)
+            />
         </section>
     }
     .into_any();

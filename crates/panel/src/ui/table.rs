@@ -61,7 +61,11 @@ fn celda(c: Celda) -> AnyView {
         }
         .into_any(),
         Celda::Estado(estado, texto) => view! { <Insignia estado texto /> }.into_any(),
-        Celda::Vacia => view! { <span class="vacia" aria-label="sin valor">"—"</span> }.into_any(),
+        Celda::Vacia => view! {
+            <span class="vacia" aria-hidden="true">"—"</span>
+            <span class="solo-lector">"sin valor"</span>
+        }
+        .into_any(),
     }
 }
 
@@ -163,6 +167,13 @@ mod tests {
             "{h}"
         );
         assert!(h.contains("<td class=\"num\">"), "{h}");
+        let sin_valor = html(vec![Columna::new("A")], vec![vec![Celda::Vacia]]);
+        assert!(
+            sin_valor.contains("<span aria-hidden=\"true\" class=\"vacia\">—</span>"),
+            "{sin_valor}"
+        );
+        assert!(sin_valor.contains("<span class=\"solo-lector\">sin valor</span>"));
+        assert!(!sin_valor.contains("aria-label"));
         let vacia = html(vec![Columna::new("A")], Vec::new());
         assert!(vacia.contains("Sin datos"), "{vacia}");
     }
