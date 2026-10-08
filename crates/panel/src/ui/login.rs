@@ -22,39 +22,42 @@ pub fn PaginaLogin() -> impl IntoView {
         _ => None,
     };
     view! {
-        <section class="login" aria-labelledby="login-titulo">
-            <h1 id="login-titulo">"Acceso al panel"</h1>
-            <ActionForm action>
-                <p>
-                    <label for="usuario">"Usuario"</label>
-                    <input
-                        id="usuario"
-                        name="usuario"
-                        type="text"
-                        autocomplete="username"
-                        autocapitalize="none"
-                        spellcheck="false"
-                        required
-                        autofocus
-                    />
-                </p>
-                <p>
-                    <label for="contrasena">"Contraseña"</label>
-                    <input
-                        id="contrasena"
-                        name="contrasena"
-                        type="password"
-                        autocomplete="current-password"
-                        required
-                    />
-                </p>
-                <p class="error" role="alert" aria-live="assertive">
-                    {error}
-                </p>
-                <button type="submit" disabled=move || action.pending().get()>
-                    "Entrar"
-                </button>
-            </ActionForm>
-        </section>
+        <main class="acceso">
+            <section class="acceso-tarjeta login" aria-labelledby="login-titulo">
+                <p class="acceso-marca">"RTF8115VW"</p>
+                <h1 id="login-titulo">"Acceso al panel"</h1>
+                <ActionForm action>
+                    <p class="campo">
+                        <label for="usuario">"Usuario"</label>
+                        <input
+                            id="usuario"
+                            name="usuario"
+                            type="text"
+                            autocomplete="username"
+                            autocapitalize="none"
+                            spellcheck="false"
+                            required
+                            autofocus
+                        />
+                    </p>
+                    <p class="campo">
+                        <label for="contrasena">"Contraseña"</label>
+                        <input
+                            id="contrasena"
+                            name="contrasena"
+                            type="password"
+                            autocomplete="current-password"
+                            required
+                        />
+                    </p>
+                    <p class="error" role="alert" aria-live="assertive">
+                        {error}
+                    </p>
+                    <button class="boton" type="submit" disabled=move || action.pending().get()>
+                        "Entrar"
+                    </button>
+                </ActionForm>
+            </section>
+        </main>
     }
 }

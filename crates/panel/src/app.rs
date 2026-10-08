@@ -1,11 +1,11 @@
 //! Aplicación Leptos: documento HTML y rutas de la interfaz.
 
-use crate::ui::login::PaginaLogin;
+use crate::ui::{layout::Layout, login::PaginaLogin, muestra::Muestra};
 use leptos::prelude::*;
-use leptos_meta::{MetaTags, Stylesheet, Title, provide_meta_context};
+use leptos_meta::{Link, MetaTags, Stylesheet, Title, provide_meta_context};
 use leptos_router::{
     StaticSegment,
-    components::{Route, Router, Routes},
+    components::{ParentRoute, Route, Router, Routes},
 };
 
 /// Documento HTML que envuelve la aplicación en el servidor.
@@ -52,14 +52,19 @@ pub fn App() -> impl IntoView {
     provide_meta_context();
     view! {
         <Stylesheet id="leptos" href="/pkg/panel.css" />
+        // Las fuentes de títulos y texto, antes de que las pida la hoja.
+        <Link rel="preload" href="/fonts/inter-var.woff2" as_="font" type_="font/woff2" crossorigin="anonymous" />
+        <Link rel="preload" href="/fonts/chakra-petch-600.woff2" as_="font" type_="font/woff2" crossorigin="anonymous" />
         <Title text="Router · RTF8115VW" />
         <Router>
-            <main>
-                <Routes fallback=|| "Página no encontrada".into_view()>
+            <Routes fallback=NoEncontrada>
+                <Route path=StaticSegment("login") view=PaginaLogin />
+                <ParentRoute path=StaticSegment("") view=Layout>
                     <Route path=StaticSegment("") view=Inicio />
-                    <Route path=StaticSegment("login") view=PaginaLogin />
-                </Routes>
-            </main>
+                    // Muestra temporal de los componentes con datos sintéticos.
+                    <Route path=StaticSegment("_muestra") view=Muestra />
+                </ParentRoute>
+            </Routes>
         </Router>
     }
 }
@@ -68,4 +73,19 @@ pub fn App() -> impl IntoView {
 #[component]
 fn Inicio() -> impl IntoView {
     view! { <h1>"Panel en construcción"</h1> }
+}
+
+/// Página para rutas que no existen.
+#[component]
+fn NoEncontrada() -> impl IntoView {
+    view! {
+        <main class="acceso">
+            <section class="acceso-tarjeta">
+                <h1>"Página no encontrada"</h1>
+                <p>
+                    <a href="/">"Volver al estado"</a>
+                </p>
+            </section>
+        </main>
+    }
 }

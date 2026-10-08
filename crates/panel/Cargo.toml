@@ -13,6 +13,9 @@ crate-type = ["cdylib", "rlib"]
 leptos.workspace = true
 leptos_meta.workspace = true
 leptos_router.workspace = true
+# Posición del puntero en los gráficos (`getBoundingClientRect`); ya la trae
+# Leptos, aquí solo se activa `DomRect`.
+web-sys = { workspace = true, features = ["DomRect"] }
 # Servidor (feature `ssr`).
 leptos_axum = { workspace = true, optional = true }
 axum = { workspace = true, optional = true }

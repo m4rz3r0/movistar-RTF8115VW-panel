@@ -5,10 +5,7 @@
 
 pub mod app;
 pub mod auth;
-pub mod ui {
-    //! Páginas de la interfaz.
-    pub mod login;
-}
+pub mod ui;
 
 #[cfg(feature = "ssr")]
 pub mod changes;
