@@ -3,6 +3,7 @@
 use crate::{
     config::{self, Config},
     db,
+    poller::PollerHandle,
 };
 use axum::extract::FromRef;
 use catalogo::{Catalogo, mask::Mascara};
@@ -24,6 +25,9 @@ pub struct AppState {
     /// Serializa los intentos de login: el freno de fuerza bruta se comprueba
     /// y se actualiza sin carreras entre peticiones simultáneas.
     pub login_lock: Arc<Mutex<()>>,
+    /// Sondeo del router: última instantánea y pausa para escribir. Inactivo
+    /// hasta `Poller::spawn`.
+    pub poller: PollerHandle,
 }
 
 impl AppState {
@@ -56,6 +60,7 @@ impl AppState {
             mascara: Arc::new(mascara),
             leptos,
             login_lock: Arc::new(Mutex::new(())),
+            poller: PollerHandle::default(),
         })
     }
 }

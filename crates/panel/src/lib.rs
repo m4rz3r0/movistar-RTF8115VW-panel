@@ -17,7 +17,11 @@ pub mod config;
 #[cfg(feature = "ssr")]
 pub mod db;
 #[cfg(feature = "ssr")]
+pub mod poller;
+#[cfg(feature = "ssr")]
 pub mod security;
+#[cfg(feature = "ssr")]
+pub mod series;
 #[cfg(feature = "ssr")]
 pub mod state;
 
@@ -34,10 +38,6 @@ mod server {
     use axum::{Json, Router, extract::State, middleware, routing::get};
     use leptos_axum::{LeptosRoutes, generate_route_list};
     use serde_json::{Value, json};
-    use std::time::Duration;
-
-    /// Tiempo máximo que `/salud` espera al router.
-    const SALUD_TIMEOUT: Duration = Duration::from_secs(3);
 
     /// Construye el router Axum completo: rutas Leptos (páginas con sesión
     /// obligatoria salvo `/login`; server functions en `/api/*`, que la
@@ -66,12 +66,14 @@ mod server {
             .with_state(state)
     }
 
-    /// Comprobación de vida para el actualizador (sin login).
+    /// Comprobación de vida para el actualizador (sin login). No consulta al
+    /// router: `router` es `"ok"` si el sondeo tiene datos recientes y sin
+    /// error.
     async fn salud(State(state): State<AppState>) -> Json<Value> {
-        let router = match tokio::time::timeout(SALUD_TIMEOUT, hgu::read::summary(&state.hgu)).await
-        {
-            Ok(Ok(_)) => "ok",
-            _ => "error",
+        let router = if state.poller.healthy() {
+            "ok"
+        } else {
+            "error"
         };
         Json(json!({
             "ok": true,

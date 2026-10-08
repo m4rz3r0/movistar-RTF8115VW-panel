@@ -6,7 +6,8 @@ use axum::{
     body::Body,
     http::{Response, StatusCode},
 };
-use common::{body_text, get, get_con_cookie, panel, sesion};
+use common::{Panel, body_text, get, get_con_cookie, panel, sesion};
+use panel::poller::{Poller, PollerConfig};
 use std::time::Duration;
 
 const CSP: &str = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'";
@@ -18,9 +19,39 @@ async fn json(resp: Response<Body>) -> serde_json::Value {
     serde_json::from_slice(&bytes).unwrap()
 }
 
+/// Arranca el sondeo con intervalos cortos y un cliente del router de tiempo
+/// de espera corto, y espera a que `/salud` lo vea sano.
+async fn con_sondeo(p: &mut Panel) {
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, common::USER, common::PASS);
+    cfg.timeout = Duration::from_millis(500);
+    cfg.min_gap = Duration::from_millis(1);
+    p.state.hgu = hgu::Client::new(cfg);
+    let h = Poller::spawn_with(
+        p.state.clone(),
+        PollerConfig {
+            fast: Duration::from_millis(100),
+            ..PollerConfig::default()
+        },
+    );
+    let start = std::time::Instant::now();
+    while !h.healthy() {
+        assert!(start.elapsed() < Duration::from_secs(5), "sondeo sin datos");
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+}
+
+#[tokio::test]
+async fn salud_sin_sondeo_es_error() {
+    let p = panel().await;
+    let body = json(get(&p.app, "/salud").await).await;
+    assert_eq!(body["ok"], true);
+    assert_eq!(body["router"], "error");
+}
+
 #[tokio::test]
 async fn salud_ok() {
-    let p = panel().await;
+    let mut p = panel().await;
+    con_sondeo(&mut p).await;
     let resp = get(&p.app, "/salud").await;
     assert_eq!(resp.status(), StatusCode::OK);
     assert_eq!(
@@ -31,8 +62,11 @@ async fn salud_ok() {
 
 #[tokio::test]
 async fn salud_responde_aunque_el_router_no() {
-    let p = panel().await;
+    let mut p = panel().await;
+    con_sondeo(&mut p).await;
     p.sim.control.set_unresponsive(true);
+    // Sin datos nuevos en 3 intervalos (300 ms) deja de estar sano.
+    tokio::time::sleep(Duration::from_millis(400)).await;
     let start = std::time::Instant::now();
     let resp = get(&p.app, "/salud").await;
     assert!(

@@ -15,7 +15,7 @@ async fn main() -> std::process::ExitCode {
 #[cfg(feature = "ssr")]
 async fn serve() -> std::process::ExitCode {
     use leptos::config::get_configuration;
-    use panel::{build_router, config::Config, state::AppState};
+    use panel::{build_router, config::Config, poller::Poller, state::AppState};
     use std::{net::SocketAddr, process::ExitCode};
 
     let cfg = match Config::from_env() {
@@ -49,6 +49,7 @@ async fn serve() -> std::process::ExitCode {
             return ExitCode::FAILURE;
         }
     };
+    Poller::spawn(state.clone());
     eprintln!("panel escuchando en http://{listen}");
     let app = build_router(state).into_make_service_with_connect_info::<SocketAddr>();
     if let Err(e) = axum::serve(listener, app).await {
