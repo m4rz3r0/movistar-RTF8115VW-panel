@@ -39,7 +39,13 @@ async fn panel() -> Panel {
         trusted_proxy: "127.0.0.1".parse().unwrap(),
         public_origin: "http://localhost:3000".into(),
     };
-    let leptos = LeptosOptions::builder().output_name("panel").build();
+    let site = dir.path().join("site");
+    std::fs::create_dir_all(site.join("pkg")).unwrap();
+    std::fs::write(site.join("pkg/panel.css"), "main { padding: 0 }\n").unwrap();
+    let leptos = LeptosOptions::builder()
+        .output_name("panel")
+        .site_root(site.to_str().unwrap())
+        .build();
     let state = AppState::new(cfg, leptos).await.unwrap();
     Panel {
         app: panel::build_router(state.clone()),
@@ -91,17 +97,75 @@ async fn salud_responde_aunque_el_router_no() {
     assert_eq!(body["router"], "error");
 }
 
+fn assert_cabeceras_fijas(resp: &Response<Body>, uri: &str) {
+    let h = resp.headers();
+    assert_eq!(h["referrer-policy"], "no-referrer", "{uri}");
+    assert_eq!(h["x-content-type-options"], "nosniff", "{uri}");
+    assert_eq!(h["x-frame-options"], "DENY", "{uri}");
+}
+
+async fn body_text(resp: Response<Body>) -> String {
+    let bytes = axum::body::to_bytes(resp.into_body(), 1 << 20)
+        .await
+        .unwrap();
+    String::from_utf8(bytes.to_vec()).unwrap()
+}
+
 #[tokio::test]
 async fn cabeceras_de_seguridad_presentes() {
     let p = panel().await;
-    for uri in ["/salud", "/", "/no-existe"] {
-        let resp = get(&p.app, uri).await;
-        let h = resp.headers();
-        assert_eq!(h["content-security-policy"], CSP, "{uri}");
-        assert_eq!(h["referrer-policy"], "no-referrer", "{uri}");
-        assert_eq!(h["x-content-type-options"], "nosniff", "{uri}");
-        assert_eq!(h["x-frame-options"], "DENY", "{uri}");
-    }
+    let resp = get(&p.app, "/salud").await;
+    assert_eq!(resp.headers()["content-security-policy"], CSP);
+    assert_cabeceras_fijas(&resp, "/salud");
+}
+
+/// Comprueba que una página HTML de Leptos lleva la CSP global con el nonce
+/// de sus scripts en línea añadido a `script-src`.
+async fn assert_csp_con_nonce(resp: Response<Body>, uri: &str) {
+    assert_cabeceras_fijas(&resp, uri);
+    let csp = resp.headers()["content-security-policy"]
+        .to_str()
+        .unwrap()
+        .to_owned();
+    let html = body_text(resp).await;
+    let nonce = html
+        .split("nonce=\"")
+        .nth(1)
+        .and_then(|rest| rest.split('"').next())
+        .expect("la página lleva scripts con nonce");
+    assert!(!nonce.is_empty(), "{uri}");
+    let esperada = CSP.replace(
+        "script-src 'self' 'wasm-unsafe-eval'",
+        &format!("script-src 'self' 'wasm-unsafe-eval' 'nonce-{nonce}'"),
+    );
+    assert_eq!(csp, esperada, "{uri}");
+}
+
+#[tokio::test]
+async fn pagina_leptos_lleva_csp_con_su_nonce() {
+    let p = panel().await;
+    let resp = get(&p.app, "/").await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_csp_con_nonce(resp, "/").await;
+}
+
+/// La 404 la genera Leptos (página HTML con sus scripts): también lleva nonce.
+#[tokio::test]
+async fn pagina_no_encontrada_lleva_csp_con_su_nonce() {
+    let p = panel().await;
+    let resp = get(&p.app, "/no-existe").await;
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    assert_csp_con_nonce(resp, "/no-existe").await;
+}
+
+#[tokio::test]
+async fn fichero_estatico_con_cabeceras() {
+    let p = panel().await;
+    let resp = get(&p.app, "/pkg/panel.css").await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(resp.headers()["content-security-policy"], CSP);
+    assert_cabeceras_fijas(&resp, "/pkg/panel.css");
+    assert_eq!(body_text(resp).await, "main { padding: 0 }\n");
 }
 
 #[tokio::test]
@@ -109,10 +173,7 @@ async fn portada_renderiza_en_servidor() {
     let p = panel().await;
     let resp = get(&p.app, "/").await;
     assert_eq!(resp.status(), StatusCode::OK);
-    let bytes = axum::body::to_bytes(resp.into_body(), 1 << 20)
-        .await
-        .unwrap();
-    let html = String::from_utf8(bytes.to_vec()).unwrap();
+    let html = body_text(resp).await;
     assert!(html.contains("Router · RTF8115VW"), "{html}");
     assert!(html.contains("Panel en construcción"), "{html}");
 }

@@ -8,7 +8,12 @@ use leptos_router::{
 };
 
 /// Documento HTML que envuelve la aplicación en el servidor.
+///
+/// En el servidor fija la CSP de la página con el nonce que Leptos pone en sus
+/// scripts en línea (carga de la hidratación y datos serializados).
 pub fn shell(options: LeptosOptions) -> impl IntoView {
+    #[cfg(feature = "ssr")]
+    csp_con_nonce();
     view! {
         <!DOCTYPE html>
         <html lang="es">
@@ -23,6 +28,20 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
                 <App />
             </body>
         </html>
+    }
+}
+
+#[cfg(feature = "ssr")]
+fn csp_con_nonce() {
+    use axum::http::{HeaderValue, header};
+    use leptos::nonce::use_nonce;
+    use leptos_axum::ResponseOptions;
+
+    let (Some(nonce), Some(resp)) = (use_nonce(), use_context::<ResponseOptions>()) else {
+        return;
+    };
+    if let Ok(value) = HeaderValue::from_str(&crate::security::csp(Some(&nonce))) {
+        resp.insert_header(header::CONTENT_SECURITY_POLICY, value);
     }
 }
 
