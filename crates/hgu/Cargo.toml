@@ -13,7 +13,9 @@ thiserror.workspace = true
 reqwest.workspace = true
 tokio = { workspace = true, features = ["sync", "time"] }
 tracing.workspace = true
+serde.workspace = true
 
 [dev-dependencies]
 axum.workspace = true
+router-sim = { path = "../router-sim" }
 tokio.workspace = true

@@ -3,6 +3,8 @@
 pub mod client;
 pub mod error;
 pub mod fmt;
+pub mod models;
+pub mod read;
 pub mod xml;
 
 pub use client::{Client, ClientConfig};

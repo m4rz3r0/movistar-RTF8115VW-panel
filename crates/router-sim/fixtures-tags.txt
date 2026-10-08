@@ -580,3 +580,8 @@ wps_opr_state keep
 wps_proc_status keep
 wps_setup_lock keep
 wps_status_string keep
+
+# Fixture sintética de estaciones WiFi (cbListWifiAccPtAssociation, wifi_id=9)
+rssi keep
+rx_rate keep
+tx_rate keep
