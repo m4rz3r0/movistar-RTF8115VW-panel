@@ -241,12 +241,17 @@ pub(super) struct Compuesto {
 }
 
 /// Une valores de la petición y valores actuales. No hace peticiones.
+///
+/// `explicito`: los valores son exactos (reversión o deshacer, con valores
+/// anteriores reales): un secreto vacío se escribe vacío en vez de
+/// entenderse como "sin tocar".
 pub(super) fn componer(
     f: &Funcion,
     m: &Mascara,
     op: Operacion,
     actual: &BTreeMap<String, String>,
     valores: &BTreeMap<String, String>,
+    explicito: bool,
 ) -> Compuesto {
     let ident = identidad(f);
     // Sin tocar (un secreto vacío o cualquier campo que llega enmascarado):
@@ -254,7 +259,8 @@ pub(super) fn componer(
     let mut efectivos = BTreeMap::new();
     for (k, v) in valores {
         let p = f.parametro(k);
-        if v == MASCARA || (es_secreto_param(f, m, k) && v.trim().is_empty()) {
+        let vacio = !explicito && es_secreto_param(f, m, k) && v.trim().is_empty();
+        if v == MASCARA || vacio {
             if let Some(cur) = buscar(actual, k) {
                 efectivos.insert(k.clone(), cur.to_owned());
             }
@@ -373,6 +379,8 @@ pub(super) enum Comprobacion {
     Limitada,
     /// No coincide (motivos, secretos enmascarados).
     Difiere(Vec<String>),
+    /// No se pudo leer el estado del router (error transitorio).
+    SinLectura(String),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -510,7 +518,7 @@ mod tests {
             efectivos,
             payload,
             campos,
-        } = componer(f, &m, Operacion::Editar, &actual, &valores);
+        } = componer(f, &m, Operacion::Editar, &actual, &valores, false);
         let p: BTreeMap<_, _> = payload.into_iter().collect();
         assert_eq!(p["ssid"], "Otra");
         assert_eq!(p["key_phrase"], "clave-actual", "secreto sin tocar");
@@ -530,11 +538,20 @@ mod tests {
         // regla de sufijo numérico) tampoco se escribe enmascarado.
         let actual = mapa(&[("dpm_cfg_wifi_acc_pt_id", "1"), ("wep_key_idx", "2")]);
         let valores = mapa(&[("dpm_cfg_wifi_acc_pt_id", "1"), ("wep_key_idx", MASCARA)]);
-        let r = componer(f, &m, Operacion::Editar, &actual, &valores);
+        let r = componer(f, &m, Operacion::Editar, &actual, &valores, false);
         assert!(r.campos.is_empty());
         assert!(r.payload.contains(&("wep_key_idx".into(), "2".into())));
-        let r = componer(f, &m, Operacion::Editar, &mapa(&[]), &valores);
+        let r = componer(f, &m, Operacion::Editar, &mapa(&[]), &valores, false);
         assert!(r.payload.iter().all(|(_, v)| v != MASCARA));
+
+        // Explícito (reversión): un secreto vacío es el valor a escribir.
+        let actual = mapa(&[("dpm_cfg_wifi_acc_pt_id", "1"), ("key_phrase", "nueva")]);
+        let valores = mapa(&[("dpm_cfg_wifi_acc_pt_id", "1"), ("key_phrase", "")]);
+        let r = componer(f, &m, Operacion::Editar, &actual, &valores, true);
+        assert!(r.payload.contains(&("key_phrase".into(), String::new())));
+        assert_eq!(r.campos.len(), 1);
+        let r = componer(f, &m, Operacion::Editar, &actual, &valores, false);
+        assert!(r.campos.is_empty(), "sin explícito, vacío = sin tocar");
     }
 
     #[test]
@@ -544,7 +561,7 @@ mod tests {
         let f = c.funcion("cbSetWifiAccPt").unwrap();
         let actual = mapa(&[("dpm_cfg_wifi_acc_pt_id", "1"), ("key_phrase", "vieja")]);
         let valores = mapa(&[("dpm_cfg_wifi_acc_pt_id", "1"), ("key_phrase", "nueva")]);
-        let campos = componer(f, &m, Operacion::Editar, &actual, &valores).campos;
+        let campos = componer(f, &m, Operacion::Editar, &actual, &valores, false).campos;
         assert_eq!(campos.len(), 1);
         assert!(campos[0].secreto && campos[0].leido);
         let d = visible(&campos);
@@ -569,7 +586,7 @@ mod tests {
         ]);
         let Compuesto {
             payload, campos, ..
-        } = componer(f, &m, Operacion::Crear, &BTreeMap::new(), &valores);
+        } = componer(f, &m, Operacion::Crear, &BTreeMap::new(), &valores, false);
         let p: BTreeMap<_, _> = payload.into_iter().collect();
         assert_eq!(p["rtm_dhcpv4_svr_pool_static_id"], "-1");
         assert_eq!(p["mac_addr"], "02:00:00:00:00:AA", "IP/MAC sin espacios");
@@ -588,7 +605,7 @@ mod tests {
         ]);
         let Compuesto {
             payload, campos, ..
-        } = componer(f, &m, Operacion::Borrar, &actual, &valores);
+        } = componer(f, &m, Operacion::Borrar, &actual, &valores, false);
         assert_eq!(
             payload,
             vec![

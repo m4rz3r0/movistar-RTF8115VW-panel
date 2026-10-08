@@ -172,6 +172,13 @@ impl SimControl {
         }
     }
 
+    /// Tras la próxima escritura real (no de solo validación), la lectura
+    /// `name` empieza a fallar como con [`SimControl::fail_reads`] hasta que
+    /// se desactive con `fail_reads(name, false)`.
+    pub fn fail_reads_after_next_write(&self, name: &str) {
+        self.inner.state().fail_reads_after_write = Some(name.to_owned());
+    }
+
     /// Suma bytes a `rx_byte`/`tx_byte` de `ip2` en `cbGetStatistic`.
     pub fn counters_bump(&self, rx: u64, tx: u64) {
         let mut st = self.inner.state();
@@ -227,6 +234,8 @@ struct SimState {
     ignore_next: bool,
     /// Lecturas que fallan (`fail_reads`).
     failing_reads: HashSet<String>,
+    /// Lectura que empieza a fallar tras la próxima escritura.
+    fail_reads_after_write: Option<String>,
     rx_extra: u64,
     tx_extra: u64,
     writes: Vec<(String, Params)>,
@@ -724,6 +733,9 @@ fn write(st: &mut SimState, name: &str, params: &[(String, String)]) -> String {
     let validation_only = param(&clean, "validation_only") == Some("1");
     if !validation_only {
         st.writes.push((name.to_owned(), clean.clone()));
+        if let Some(r) = st.fail_reads_after_write.take() {
+            st.failing_reads.insert(r);
+        }
     }
     if let Some(err) = st.fail_next.take() {
         return failure(name, &err);

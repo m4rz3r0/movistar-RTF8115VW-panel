@@ -92,6 +92,23 @@ fn looks_logged_out(body: &str) -> bool {
     body.len() < 1024 && body.contains("te_acceso_router")
 }
 
+/// Ruta sin la consulta: los errores nunca muestran `?…` (en la UI básica
+/// lleva el `sessionKey` y los valores escritos).
+fn sin_consulta(path: &str) -> &str {
+    path.split('?').next().unwrap_or(path)
+}
+
+/// Error conocido en la respuesta (corta) de una escritura de la UI básica.
+fn basic_error(body: &str) -> Option<&'static str> {
+    if body.len() >= 1024 {
+        return None;
+    }
+    let b = body.to_lowercase();
+    let clave = b.contains("sessionkey") || b.contains("session key");
+    let mala = b.contains("no válid") || b.contains("invalid") || b.contains("inválid");
+    (clave && mala).then_some("el router rechazó el sessionKey")
+}
+
 impl Client {
     /// Crea el cliente; no hace ninguna petición hasta la primera llamada.
     pub fn new(cfg: ClientConfig) -> Client {
@@ -140,7 +157,8 @@ impl Client {
     /// puede llevar ya su `?action=…`). Los valores van tal cual: ofuscar
     /// las claves (XOR 0x1f) es cosa de quien llama. Si el router pide
     /// iniciar sesión, entra de nuevo y repite una vez con un `sessionKey`
-    /// nuevo. Devuelve el cuerpo de la respuesta.
+    /// nuevo. Una respuesta de error conocida (`sessionKey` no válido) es
+    /// [`Error::CallFailed`]. Devuelve el cuerpo de la respuesta.
     pub async fn basic_write(
         &self,
         page: &str,
@@ -156,13 +174,21 @@ impl Client {
             all.push(("sessionKey", &key));
             let url = format!("/cgi-bin/{path}{sep}{}", form_body(&all));
             let body = self.send(&mut st, Method::GET, &url, None).await?;
+            if let Some(error) = basic_error(&body) {
+                return Err(Error::CallFailed {
+                    name: sin_consulta(path).to_owned(),
+                    result: String::new(),
+                    error: error.to_owned(),
+                });
+            }
             if !looks_logged_out(&body) {
                 return Ok(body);
             }
             Self::invalidate(&mut st);
         }
         Err(Error::SessionExpired(format!(
-            "{path}: el router sigue pidiendo iniciar sesión"
+            "{}: el router sigue pidiendo iniciar sesión",
+            sin_consulta(path)
         )))
     }
 
@@ -382,7 +408,10 @@ impl Client {
             }
         }
         if status.is_server_error() {
-            return Err(Error::Unexpected(format!("{path}: HTTP {status}")));
+            return Err(Error::Unexpected(format!(
+                "{}: HTTP {status}",
+                sin_consulta(path)
+            )));
         }
         Ok(text)
     }

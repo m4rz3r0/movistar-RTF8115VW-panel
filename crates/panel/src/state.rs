@@ -1,6 +1,7 @@
 //! Estado compartido del servidor.
 
 use crate::{
+    changes,
     config::{self, Config},
     crypto::HistoryKey,
     db,
@@ -31,6 +32,16 @@ pub struct AppState {
     pub poller: PollerHandle,
     /// Clave con la que el historial cifra los valores secretos.
     pub history_key: Arc<HistoryKey>,
+    /// Gestor de cambios del servidor (vacío hasta
+    /// `ChangeManager::instalar`). Toda escritura al router pasa por él.
+    pub cambios: changes::Ranura,
+}
+
+impl AppState {
+    /// Gestor de cambios del servidor, si ya se instaló.
+    pub fn cambios(&self) -> Option<Arc<changes::ChangeManager>> {
+        self.cambios.get().cloned()
+    }
 }
 
 impl AppState {
@@ -66,6 +77,7 @@ impl AppState {
             login_lock: Arc::new(Mutex::new(())),
             poller: PollerHandle::default(),
             history_key: Arc::new(history_key),
+            cambios: changes::Ranura::default(),
         })
     }
 }

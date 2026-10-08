@@ -13,11 +13,21 @@
 //!    `fallos_para_revertir` fallos seguidos se escriben los valores
 //!    anteriores, se verifica y queda `revertido`; si no, `aplicado`.
 //!    `cbReboot` (palabra `REINICIAR`) espera la vuelta del router sin
-//!    revertir.
+//!    revertir. Si la WAN ya estaba caída al confirmar (se guarda en el
+//!    cambio), la vigilancia solo exige que el router deje entrar: no se
+//!    revierte un intento de arreglar una WAN caída (queda anotado).
 //!
 //! Un único cambio activo a la vez: otro `confirmar` mientras tanto recibe
 //! [`CambioError::EnCurso`]. Al arrancar, [`ChangeManager::reanudar_pendientes`]
-//! retoma los cambios que quedaron en `aplicando`/`vigilando`.
+//! retoma los cambios que quedaron en `aplicando`/`vigilando`; hasta que
+//! termina, `confirmar` espera. La aplicación corre en su propia tarea: si
+//! quien llamó a `confirmar` se va, el cambio sigue hasta un estado final.
+//!
+//! Bloqueos de la v1 (antes de dar token): escrituras de la web básica con
+//! parámetros secretos (falta validar su formato con el router real) y las
+//! que cambian la IP LAN del router (cortarían la conexión del panel).
+//! Una edición que cambia un campo que el router no muestra se rechaza: sin
+//! valor anterior no se podría revertir ni deshacer.
 //!
 //! Un valor secreto que llega como [`MASCARA`] o vacío significa "sin tocar":
 //! se reenvía el valor actual leído del router y no cuenta como cambio. Los
@@ -28,7 +38,8 @@ mod plan;
 use plan::*;
 pub use plan::{PALABRA_ACCION, PALABRA_REINICIO};
 
-use crate::{series, state::AppState};
+use crate::{crypto::HistoryKey, poller::PollerHandle, series, state::AppState};
+use catalogo::{Catalogo, mask::Mascara};
 use catalogo::{Funcion, Riesgo, Tipo, mask::MASCARA};
 use hgu::{
     fmt::{mess_userpass, page_vars},
@@ -36,11 +47,14 @@ use hgu::{
 };
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
+use sqlx::SqlitePool;
+use std::sync::OnceLock;
 use std::{
     collections::{BTreeMap, HashMap},
     sync::{Arc, Mutex, MutexGuard},
     time::Duration,
 };
+use tokio::sync::{oneshot, watch};
 use tokio::{task::AbortHandle, time::Instant};
 
 /// Vida de un token de [`ChangeManager::preparar`].
@@ -239,7 +253,43 @@ enum Base {
 struct Pendiente {
     req: ChangeRequest,
     caduca: Instant,
+    /// Valores exactos (deshacer): sin "secreto vacío = sin tocar" ni
+    /// validación de lo que vino del router.
+    explicito: bool,
+    /// Cambio que deshace, si es un deshacer.
+    deshace: Option<i64>,
 }
+
+/// Lo que el gestor usa del estado del servidor (sin el propio gestor, para
+/// que `AppState` pueda guardarlo sin ciclos).
+struct Recursos {
+    db: SqlitePool,
+    hgu: hgu::Client,
+    catalogo: Arc<Catalogo>,
+    mascara: Arc<Mascara>,
+    poller: PollerHandle,
+    history_key: Arc<HistoryKey>,
+}
+
+/// Fallo de un intento de reversión.
+enum FalloReversion {
+    /// Transitorio (el router no responde o no se pudo releer): se reintenta.
+    Reintentar(String),
+    /// Determinista: no tiene sentido reintentar.
+    Definitivo(String),
+}
+
+/// Funciones que cambian la IP LAN del router (bloqueadas en v1).
+const CAMBIAN_IP_LAN: &[&str] = &[
+    "cbSetLanIPv4Addr",
+    "cbSetLanIPv4Intf",
+    "te_red_local.cgi",
+    "te_mapa_red_local.cgi",
+];
+const BLOQUEO_IP_LAN: &str = "bloqueada en v1: cambiar la IP del router corta la conexión del \
+                              propio panel; hazlo desde la web del router";
+const BLOQUEO_SECRETOS_BASICA: &str = "bloqueada en v1: falta validar con el router real el \
+                                       formato de los secretos de la web básica";
 
 /// Mientras viva, el gestor está ocupado con un cambio.
 struct Reserva {
@@ -262,27 +312,54 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-/// Gestor de cambios. Uno por proceso.
+/// Gestor de cambios. Uno por proceso: el del servidor vive en
+/// [`AppState::cambios`] ([`ChangeManager::instalar`]).
 pub struct ChangeManager {
-    state: AppState,
+    state: Recursos,
     tiempos: Tiempos,
     pendientes: Mutex<HashMap<String, Pendiente>>,
     /// Cambio activo: `Some(None)` reservado y aún sin id.
     activo: Mutex<Option<Option<i64>>>,
-    /// Vigilancia en segundo plano.
+    /// Tarea del cambio en curso (aplicación y vigilancia).
     tarea: Mutex<Option<AbortHandle>>,
+    /// `true` cuando [`ChangeManager::reanudar_pendientes`] ha terminado.
+    listo: watch::Sender<bool>,
+    /// `reanudar_pendientes` ya empezó (solo se hace una vez).
+    reanudando: std::sync::atomic::AtomicBool,
 }
 
+/// Hueco de `AppState` para el gestor del servidor.
+pub type Ranura = Arc<OnceLock<Arc<ChangeManager>>>;
+
 impl ChangeManager {
-    /// Crea el gestor.
+    /// Crea un gestor. `confirmar` no acepta cambios hasta que se haya
+    /// llamado a [`ChangeManager::reanudar_pendientes`].
     pub fn new(state: AppState, tiempos: Tiempos) -> Arc<ChangeManager> {
         Arc::new(ChangeManager {
-            state,
+            state: Recursos {
+                db: state.db,
+                hgu: state.hgu,
+                catalogo: state.catalogo,
+                mascara: state.mascara,
+                poller: state.poller,
+                history_key: state.history_key,
+            },
             tiempos,
             pendientes: Mutex::new(HashMap::new()),
             activo: Mutex::new(None),
             tarea: Mutex::new(None),
+            listo: watch::Sender::new(false),
+            reanudando: std::sync::atomic::AtomicBool::new(false),
         })
+    }
+
+    /// El gestor del servidor: lo crea y lo guarda en `state` la primera vez;
+    /// después devuelve siempre el mismo.
+    pub fn instalar(state: &AppState, tiempos: Tiempos) -> Arc<ChangeManager> {
+        state
+            .cambios
+            .get_or_init(|| ChangeManager::new(state.clone(), tiempos))
+            .clone()
     }
 
     /// Id del cambio en curso (aplicándose o vigilándose).
@@ -301,7 +378,16 @@ impl ChangeManager {
     /// Lee el router y calcula el diff de `req`. Devuelve un token para
     /// [`ChangeManager::confirmar`].
     pub async fn preparar(&self, req: ChangeRequest) -> Result<Preparado, CambioError> {
-        let plan = self.planificar(&req).await?;
+        self.preparar_con(req, false, None).await
+    }
+
+    async fn preparar_con(
+        &self,
+        req: ChangeRequest,
+        explicito: bool,
+        deshace: Option<i64>,
+    ) -> Result<Preparado, CambioError> {
+        let plan = self.planificar(&req, explicito).await?;
         let token = nuevo_token();
         let palabra = palabra_requerida(&plan.funcion).map(str::to_owned);
         let mut p = lock(&self.pendientes);
@@ -312,6 +398,8 @@ impl ChangeManager {
             Pendiente {
                 req,
                 caduca: ahora + TOKEN_TTL,
+                explicito,
+                deshace,
             },
         );
         Ok(Preparado {
@@ -324,6 +412,9 @@ impl ChangeManager {
 
     /// Aplica el cambio preparado con `token`: escribe, verifica y deja la
     /// vigilancia en marcha. Devuelve el id del cambio (en `vigilando`).
+    ///
+    /// Desde la reserva del hueco, el trabajo corre en una tarea propia: si
+    /// este futuro se abandona, el cambio sigue hasta un estado final.
     pub async fn confirmar(
         self: &Arc<Self>,
         token: &str,
@@ -343,16 +434,63 @@ impl ChangeManager {
         {
             return Err(CambioError::PalabraIncorrecta);
         }
-        let reserva = self.reservar()?;
-        if lock(&self.pendientes).remove(token).is_none() {
-            return Err(CambioError::TokenInvalido);
+        // Un cambio nuevo no puede adelantarse a uno pendiente de retomar.
+        let mut listo = self.listo.subscribe();
+        if tokio::time::timeout(self.tiempos.pausa_max, listo.wait_for(|v| *v))
+            .await
+            .is_err()
+        {
+            return Err(CambioError::Router(
+                "el gestor aún está retomando cambios pendientes; inténtalo de nuevo".into(),
+            ));
         }
+        let reserva = self.reservar()?;
+        let Some(pendiente) = lock(&self.pendientes).remove(token) else {
+            return Err(CambioError::TokenInvalido);
+        };
+        let (tx, rx) = oneshot::channel();
+        let m = self.clone();
+        let usuario = usuario.to_owned();
+        let h = tokio::spawn(async move {
+            match m.aplicar(&pendiente, &usuario, &reserva).await {
+                Ok((id, plan, base, nota)) => {
+                    let _ = tx.send(Ok(id));
+                    m.seguir(id, plan, base, nota).await;
+                }
+                Err(e) => {
+                    let _ = tx.send(Err(e));
+                }
+            }
+            drop(reserva);
+        });
+        *lock(&self.tarea) = Some(h.abort_handle());
+        rx.await.unwrap_or_else(|_| {
+            Err(CambioError::Router(
+                "la aplicación del cambio se interrumpió".into(),
+            ))
+        })
+    }
+
+    /// Escribe y verifica (con el sondeo en pausa). Devuelve lo necesario
+    /// para vigilar.
+    async fn aplicar(
+        &self,
+        p: &Pendiente,
+        usuario: &str,
+        reserva: &Reserva,
+    ) -> Result<(i64, Plan, Base, Option<String>), CambioError> {
         let pausa = tokio::time::timeout(self.tiempos.pausa_max, self.state.poller.pause())
             .await
             .map_err(|_| {
                 CambioError::Router("el sondeo no se detuvo a tiempo; no se ha escrito nada".into())
             })?;
-        let plan = self.planificar(&req).await?;
+        if let Some(o) = p.deshace
+            && let Some(e) = self.ya_deshecho(o).await
+        {
+            return Err(CambioError::Invalida(e));
+        }
+        let mut plan = self.planificar(&p.req, p.explicito).await?;
+        let f = plan.funcion.clone();
         let c = &self.state.hgu;
         let no_responde =
             |e: hgu::Error| CambioError::Router(format!("el router no responde: {e}"));
@@ -362,7 +500,7 @@ impl ChangeManager {
             Base::Wan(wan_arriba(&read::wan(c).await.map_err(no_responde)?))
         };
         let id = self
-            .insertar(&plan, usuario)
+            .insertar(&plan, usuario, base, p.deshace)
             .await
             .map_err(|e| CambioError::Router(format!("no se puede guardar el cambio: {e}")))?;
         reserva.fijar(id);
@@ -390,6 +528,7 @@ impl ChangeManager {
             Comprobacion::Coincide(nueva) => {
                 if let Some(n) = nueva {
                     self.fijar_instancia(id, &n).await;
+                    plan.instancia = Some(n);
                 }
             }
             Comprobacion::Limitada => {
@@ -401,12 +540,36 @@ impl ChangeManager {
                     .await;
                 return Err(CambioError::Verificacion(v));
             }
+            Comprobacion::SinLectura(e) => {
+                self.marcar(id, Estado::Fallido, Some(&e), None).await;
+                return Err(CambioError::Verificacion(vec![e]));
+            }
         }
         self.marcar(id, Estado::Vigilando, None, nota.as_deref())
             .await;
         drop(pausa);
-        self.vigilar_en_segundo_plano(id, plan, base, nota, reserva);
-        Ok(id)
+        Ok((id, plan, base, nota))
+    }
+
+    /// Motivo por el que `original` ya no se puede deshacer: lo deshizo otro
+    /// cambio que está en curso o aplicado.
+    async fn ya_deshecho(&self, original: i64) -> Option<String> {
+        let r: Option<(i64, String)> = sqlx::query_as(
+            "SELECT d.id, d.estado FROM changes o JOIN changes d ON d.id = o.deshecho_por \
+             WHERE o.id = ?",
+        )
+        .bind(original)
+        .fetch_optional(&self.state.db)
+        .await
+        .unwrap_or_else(|e| {
+            tracing::error!(cambio = original, "no se puede leer deshecho_por: {e}");
+            None
+        });
+        let (d, estado) = r?;
+        let vigente = [Estado::Aplicando, Estado::Vigilando, Estado::Aplicado]
+            .iter()
+            .any(|e| e.as_str() == estado);
+        vigente.then(|| format!("el cambio {original} ya se ha deshecho (cambio {d})"))
     }
 
     /// Prepara el cambio inverso de uno `aplicado` (con los valores
@@ -422,6 +585,9 @@ impl ChangeManager {
                 "solo se puede deshacer un cambio aplicado".into(),
             ));
         }
+        if let Some(e) = self.ya_deshecho(change_id).await {
+            return Err(CambioError::Invalida(e));
+        }
         let plan = self.reconstruir(&fila).map_err(CambioError::Invalida)?;
         let req = inversa(&plan).ok_or_else(|| {
             CambioError::Invalida(
@@ -429,7 +595,7 @@ impl ChangeManager {
                     .into(),
             )
         })?;
-        self.preparar(req).await
+        self.preparar_con(req, true, Some(change_id)).await
     }
 
     /// Retoma los cambios que quedaron en `aplicando`/`vigilando` (llamar al
@@ -437,7 +603,20 @@ impl ChangeManager {
     /// valores nuevos, la vigilancia empieza de cero; si muestra los
     /// anteriores, `fallido` ("interrumpido antes de aplicar"); si no se
     /// puede saber, `fallido` con el motivo.
+    ///
+    /// Solo actúa la primera vez; hasta entonces `confirmar` espera.
     pub async fn reanudar_pendientes(self: &Arc<Self>) {
+        if self
+            .reanudando
+            .swap(true, std::sync::atomic::Ordering::SeqCst)
+        {
+            return;
+        }
+        self.reanudar_filas().await;
+        self.listo.send_replace(true);
+    }
+
+    async fn reanudar_filas(self: &Arc<Self>) {
         let filas = match sqlx::query(
             "SELECT * FROM changes WHERE estado IN ('aplicando', 'vigilando') ORDER BY id",
         )
@@ -455,7 +634,9 @@ impl ChangeManager {
             match self.reconstruir(&fila) {
                 Ok(plan) => {
                     let aplicando = fila.get::<String, _>("estado") == Estado::Aplicando.as_str();
-                    self.reanudar(id, plan, aplicando).await
+                    // La WAN como estaba antes del cambio (nunca la de ahora).
+                    let wan_antes = fila.get::<Option<i64>, _>("wan_antes") != Some(0);
+                    self.reanudar(id, plan, aplicando, wan_antes).await
                 }
                 Err(e) => self.marcar(id, Estado::Fallido, Some(&e), None).await,
             }
@@ -464,7 +645,7 @@ impl ChangeManager {
 
     /// Retoma un cambio; `aplicando`: se cortó antes de terminar de
     /// escribir y verificar.
-    async fn reanudar(self: &Arc<Self>, id: i64, plan: Plan, aplicando: bool) {
+    async fn reanudar(self: &Arc<Self>, id: i64, mut plan: Plan, aplicando: bool, wan_antes: bool) {
         const RETOMADA: &str = "vigilancia retomada tras un reinicio del panel";
         let c = &self.state.hgu;
         if plan.funcion.name == REBOOT {
@@ -486,7 +667,20 @@ impl ChangeManager {
             return;
         }
         let nota = match self.comprobar(&plan, Lado::Nuevo).await {
-            Comprobacion::Coincide(_) => RETOMADA.to_owned(),
+            Comprobacion::Coincide(nueva) => {
+                if let Some(n) = nueva
+                    && plan.instancia.is_none()
+                {
+                    self.fijar_instancia(id, &n).await;
+                    plan.instancia = Some(n);
+                }
+                RETOMADA.to_owned()
+            }
+            Comprobacion::SinLectura(e) => {
+                let e = format!("interrumpido; no se puede comprobar el estado: {e}");
+                self.marcar(id, Estado::Fallido, Some(&e), None).await;
+                return;
+            }
             Comprobacion::Limitada => format!("{RETOMADA}; verificación limitada"),
             Comprobacion::Difiere(v) => {
                 let anterior = self.comprobar(&plan, Lado::Anterior).await;
@@ -509,8 +703,7 @@ impl ChangeManager {
             return;
         };
         reserva.fijar(id);
-        // Sin saber cómo estaba la WAN antes, se exige que esté arriba.
-        let base = Base::Wan(read::wan(c).await.map(|w| wan_arriba(&w)).unwrap_or(true));
+        let base = Base::Wan(wan_antes);
         self.marcar(id, Estado::Vigilando, None, Some(&nota)).await;
         self.vigilar_en_segundo_plano(id, plan, base, Some(nota), reserva);
     }
@@ -552,10 +745,22 @@ impl ChangeManager {
         if f.pagina.is_none() {
             return Err(CambioError::Invalida(format!("{nombre}: sin página")));
         }
+        if CAMBIAN_IP_LAN.contains(&f.name.as_str()) {
+            return Err(CambioError::Bloqueada(BLOQUEO_IP_LAN.into()));
+        }
+        let basica = f.origen == catalogo::Origen::Basica || !f.name.starts_with("cb");
+        if basica
+            && f.parametros
+                .iter()
+                .any(|p| p.tipo == catalogo::TipoParam::Secret)
+        {
+            return Err(CambioError::Bloqueada(BLOQUEO_SECRETOS_BASICA.into()));
+        }
         Ok(f)
     }
 
-    async fn planificar(&self, req: &ChangeRequest) -> Result<Plan, CambioError> {
+    /// `explicito`: valores exactos (reversión/deshacer; ver [`componer`]).
+    async fn planificar(&self, req: &ChangeRequest, explicito: bool) -> Result<Plan, CambioError> {
         let f = self.funcion_escribible(&req.funcion)?;
         for k in req.valores.keys() {
             if f.parametro(k).is_none() {
@@ -602,8 +807,18 @@ impl ChangeManager {
             efectivos,
             payload,
             campos,
-        } = componer(f, &self.state.mascara, op, &actual, &valores);
-        if op != Operacion::Borrar {
+        } = componer(f, &self.state.mascara, op, &actual, &valores, explicito);
+        if op == Operacion::Editar
+            && let Some(c) = campos.iter().find(|c| !c.leido)
+        {
+            return Err(CambioError::Invalida(format!(
+                "no se puede leer el valor actual de {}; sin valor anterior no se podría deshacer",
+                c.nombre
+            )));
+        }
+        // Lo que viene del router (reversión/deshacer) no se valida: puede
+        // estar fuera de las opciones que conoce el catálogo.
+        if op != Operacion::Borrar && !explicito {
             for c in &campos {
                 if let Some(p) = f.parametro(&c.nombre) {
                     validar(p, &c.despues).map_err(CambioError::Invalida)?;
@@ -711,9 +926,8 @@ impl ChangeManager {
     /// ¿Muestra el router el lado `lado` del plan?
     async fn comprobar(&self, plan: &Plan, lado: Lado) -> Comprobacion {
         let f = &plan.funcion;
-        let no_leido = |e: hgu::Error| {
-            Comprobacion::Difiere(vec![format!("no se puede releer el estado: {e}")])
-        };
+        let no_leido =
+            |e: hgu::Error| Comprobacion::SinLectura(format!("no se puede releer el estado: {e}"));
         match (plan.operacion, &plan.lectura) {
             (Operacion::Accion, _) => Comprobacion::Coincide(None),
             (_, Lectura::Ninguna) => Comprobacion::Limitada,
@@ -887,8 +1101,9 @@ impl ChangeManager {
         ))
     }
 
-    /// Escribe los valores anteriores y verifica; si el router no responde,
-    /// reintenta durante `alto`.
+    /// Escribe los valores anteriores y verifica. Los fallos transitorios
+    /// (router sin respuesta, relectura fallida) se reintentan durante
+    /// `alto`; los deterministas terminan en `fallido` en el acto.
     async fn revertir(&self, id: i64, plan: &Plan, motivo: &str, nota: Option<&str>) {
         let Some(req) = inversa(plan) else {
             let e = format!("{motivo}; no se puede revertir: valores anteriores desconocidos");
@@ -898,19 +1113,20 @@ impl ChangeManager {
         tracing::warn!(cambio = id, "{motivo}; revirtiendo");
         let fin = Instant::now() + self.tiempos.alto;
         let ultimo = loop {
-            let error = match self.revertir_una_vez(&req).await {
+            let error = match self.revertir_una_vez(&req, plan).await {
                 Ok(()) => {
                     let e = format!("{motivo}; revertido a los valores anteriores");
                     self.marcar(id, Estado::Revertido, Some(&e), nota).await;
                     return;
                 }
-                Err(CambioError::Verificacion(v)) => {
-                    let e = format!("{motivo}; reversión no verificada: {}", v.join("; "));
+                Err(FalloReversion::Definitivo(e)) => {
+                    let e = format!("{motivo}; no se pudo revertir: {e}");
                     self.marcar(id, Estado::Fallido, Some(&e), nota).await;
                     return;
                 }
-                Err(e) => e.to_string(),
+                Err(FalloReversion::Reintentar(e)) => e,
             };
+            tracing::warn!(cambio = id, "reversión: {error}; se reintenta");
             if Instant::now() >= fin {
                 break error;
             }
@@ -920,29 +1136,57 @@ impl ChangeManager {
         self.marcar(id, Estado::Fallido, Some(&e), nota).await;
     }
 
-    async fn revertir_una_vez(&self, req: &ChangeRequest) -> Result<(), CambioError> {
+    /// Un intento de reversión de `original` con la petición inversa `req`.
+    async fn revertir_una_vez(
+        &self,
+        req: &ChangeRequest,
+        original: &Plan,
+    ) -> Result<(), FalloReversion> {
+        use FalloReversion::{Definitivo, Reintentar};
         // El sondeo se pausa si se puede; si no, se revierte igualmente (las
         // peticiones al router van serializadas de todos modos).
         let _pausa = tokio::time::timeout(self.tiempos.pausa_max, self.state.poller.pause())
             .await
             .ok();
-        let plan = match self.planificar(req).await {
+        let plan = match self.planificar(req, true).await {
             Ok(p) => p,
-            Err(CambioError::SinCambios) => return Ok(()),
-            Err(e) => return Err(e),
+            // Nada que escribir: solo vale si el router muestra de verdad
+            // los valores anteriores (p. ej. un intento previo ya escribió).
+            Err(CambioError::SinCambios) => {
+                return match self.comprobar(original, Lado::Anterior).await {
+                    Comprobacion::Coincide(_) | Comprobacion::Limitada => Ok(()),
+                    Comprobacion::SinLectura(e) => Err(Reintentar(e)),
+                    Comprobacion::Difiere(v) => Err(Definitivo(format!(
+                        "reversión no verificada: {}",
+                        v.join("; ")
+                    ))),
+                };
+            }
+            Err(CambioError::Router(e)) => return Err(Reintentar(e)),
+            Err(e) => return Err(Definitivo(e.to_string())),
         };
         self.enviar(&plan)
             .await
-            .map_err(|e| CambioError::Router(e.to_string()))?;
+            .map_err(|e| Reintentar(e.to_string()))?;
         match self.comprobar(&plan, Lado::Nuevo).await {
-            Comprobacion::Difiere(v) => Err(CambioError::Verificacion(v)),
             Comprobacion::Coincide(_) | Comprobacion::Limitada => Ok(()),
+            Comprobacion::SinLectura(e) => Err(Reintentar(e)),
+            Comprobacion::Difiere(v) => Err(Definitivo(format!(
+                "reversión no verificada: {}",
+                v.join("; ")
+            ))),
         }
     }
 
     // ---- base de datos
 
-    async fn insertar(&self, plan: &Plan, usuario: &str) -> Result<i64, sqlx::Error> {
+    async fn insertar(
+        &self,
+        plan: &Plan,
+        usuario: &str,
+        base: Base,
+        deshace: Option<i64>,
+    ) -> Result<i64, sqlx::Error> {
         let clave = &self.state.history_key;
         // JSON de los valores no secretos y, aparte, los secretos cifrados.
         let partir = |pares: Vec<(&str, &str, bool)>| {
@@ -979,12 +1223,17 @@ impl ChangeManager {
             })
             .map(|(k, v)| (k.as_str(), v.as_str()))
             .collect();
+        let wan_antes = match base {
+            Base::Wan(up) => Some(up),
+            Base::Uptime(_) => None,
+        };
         let now = series::now();
-        sqlx::query_scalar(
+        let mut tx = self.state.db.begin().await?;
+        let id: i64 = sqlx::query_scalar(
             "INSERT INTO changes (ts, updated, user_id, usuario, funcion, instancia, riesgo, \
              estado, operacion, diff, anteriores, anteriores_cifrados, solicitud, nuevos, \
-             nuevos_cifrados) VALUES (?, ?, (SELECT id FROM users WHERE username = ?), ?, ?, ?, \
-             ?, 'aplicando', ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             nuevos_cifrados, wan_antes) VALUES (?, ?, (SELECT id FROM users WHERE username = ?), \
+             ?, ?, ?, ?, 'aplicando', ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
         )
         .bind(now)
         .bind(now)
@@ -1000,8 +1249,18 @@ impl ChangeManager {
         .bind(json(&solicitud))
         .bind(nuevos)
         .bind(nuevos_cifrados)
-        .fetch_one(&self.state.db)
-        .await
+        .bind(wan_antes)
+        .fetch_one(&mut *tx)
+        .await?;
+        if let Some(o) = deshace {
+            sqlx::query("UPDATE changes SET deshecho_por = ? WHERE id = ?")
+                .bind(id)
+                .bind(o)
+                .execute(&mut *tx)
+                .await?;
+        }
+        tx.commit().await?;
+        Ok(id)
     }
 
     /// Cambia el estado; `error` y `nota` solo se escriben si son `Some`.

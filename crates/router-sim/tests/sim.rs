@@ -574,3 +574,17 @@ async fn basic_write_por_get_con_session_key() {
         .unwrap();
     assert_eq!(sim.control.writes().len(), 3);
 }
+
+#[tokio::test]
+async fn reads_fail_after_next_write() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    sim.control.fail_reads_after_next_write("cbGetUpnpCfg");
+    c.call("cbGetUpnpCfg", &[]).await.unwrap();
+    c.write("upnp.asp", "cbSetUpnpCfg", &[("adm_state", "1")])
+        .await
+        .unwrap();
+    assert!(c.call("cbGetUpnpCfg", &[]).await.is_err());
+    sim.control.fail_reads("cbGetUpnpCfg", false);
+    c.call("cbGetUpnpCfg", &[]).await.unwrap();
+}

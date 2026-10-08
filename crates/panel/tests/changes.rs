@@ -5,7 +5,7 @@ mod common;
 
 use catalogo::{Riesgo, mask::MASCARA};
 use common::{Panel, panel};
-use hgu::{fmt::mess_userpass, read};
+use hgu::read;
 use panel::{
     changes::{Cambio, CambioError, ChangeManager, ChangeRequest, Estado, Tiempos},
     poller::{Poller, PollerConfig},
@@ -42,9 +42,16 @@ async fn panel_rapido(timeout: Duration) -> Panel {
     p
 }
 
+/// Gestor listo para confirmar (sin cambios pendientes que retomar).
+async fn gestor(p: &Panel, t: Tiempos) -> Arc<ChangeManager> {
+    let m = ChangeManager::new(p.state.clone(), t);
+    m.reanudar_pendientes().await;
+    m
+}
+
 async fn preparado() -> (Panel, Arc<ChangeManager>) {
     let p = panel_rapido(Duration::from_millis(500)).await;
-    let m = ChangeManager::new(p.state.clone(), tiempos());
+    let m = gestor(&p, tiempos()).await;
     (p, m)
 }
 
@@ -292,7 +299,7 @@ async fn wan_ya_caida_no_provoca_reversion() {
 #[tokio::test]
 async fn revierte_si_el_router_deja_de_responder() {
     let p = panel_rapido(Duration::from_millis(100)).await;
-    let m = ChangeManager::new(p.state.clone(), tiempos());
+    let m = gestor(&p, tiempos()).await;
     let prep = m.preparar(lease0("192.168.1.84")).await.unwrap();
     let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
     p.sim.control.set_unresponsive(true);
@@ -438,13 +445,14 @@ async fn token_de_un_solo_uso() {
 #[tokio::test]
 async fn pausa_que_no_llega_no_escribe() {
     let p = panel_rapido(Duration::from_secs(5)).await;
-    let m = ChangeManager::new(
-        p.state.clone(),
+    let m = gestor(
+        &p,
         Tiempos {
             pausa_max: Duration::from_millis(300),
             ..tiempos()
         },
-    );
+    )
+    .await;
     let prep = m.preparar(lease0("192.168.1.84")).await.unwrap();
     Poller::spawn_with(
         p.state.clone(),
@@ -474,7 +482,7 @@ async fn reanuda_tras_reinicio() {
         bajo: Duration::from_secs(60),
         ..tiempos()
     };
-    let a = ChangeManager::new(p.state.clone(), lento);
+    let a = gestor(&p, lento).await;
     let prep = a.preparar(lease0("192.168.1.84")).await.unwrap();
     let id = a.confirmar(&prep.token, None, "admin").await.unwrap();
     assert_eq!(a.cambio(id).await.unwrap().estado, Estado::Vigilando);
@@ -498,7 +506,7 @@ async fn reanuda_y_marca_fallido_si_no_llego_a_aplicarse() {
         bajo: Duration::from_secs(60),
         ..tiempos()
     };
-    let a = ChangeManager::new(p.state.clone(), lento);
+    let a = gestor(&p, lento).await;
     let prep = a.preparar(lease0("192.168.1.84")).await.unwrap();
     let id = a.confirmar(&prep.token, None, "admin").await.unwrap();
     a.detener();
@@ -606,7 +614,7 @@ async fn reboot_exige_palabra() {
 #[tokio::test]
 async fn reboot_sin_vuelta_es_fallido() {
     let p = panel_rapido(Duration::from_millis(100)).await;
-    let m = ChangeManager::new(p.state.clone(), tiempos());
+    let m = gestor(&p, tiempos()).await;
     let prep = m.preparar(req("cbReboot", None, &[])).await.unwrap();
     let id = m
         .confirmar(&prep.token, Some("REINICIAR"), "admin")
@@ -620,32 +628,53 @@ async fn reboot_sin_vuelta_es_fallido() {
 }
 
 #[tokio::test]
-async fn escritura_basica_ofusca_secretos_y_verifica_lo_que_puede() {
+async fn bloqueos_de_la_v1() {
     let (p, m) = preparado().await;
-    let r = req(
-        "te_wifi.wl",
-        None,
-        &[
-            ("wlSsidIdx", "0"),
-            ("wlSsid", "Casa"),
-            ("wlWpaPsk", MASCARA),
-            ("wlKey1", "abc"),
-        ],
+    // Web básica con parámetros secretos (aunque no se toque el secreto).
+    for f in ["te_wifi.wl", "te_wifi_5ghz.wl", "te_wifi_guest.wl"] {
+        let r = m.preparar(req(f, None, &[("wlSsid", "Casa")])).await;
+        assert!(
+            matches!(&r, Err(CambioError::Bloqueada(e)) if e.contains("bloqueada en v1") && e.contains("web básica")),
+            "{f}: {r:?}"
+        );
+    }
+    // Cambios de la IP LAN del router.
+    for f in [
+        "cbSetLanIPv4Addr",
+        "cbSetLanIPv4Intf",
+        "te_red_local.cgi",
+        "te_mapa_red_local.cgi",
+    ] {
+        let r = m.preparar(req(f, None, &[])).await;
+        assert!(
+            matches!(&r, Err(CambioError::Bloqueada(e)) if e.contains("bloqueada en v1") && e.contains("IP del router")),
+            "{f}: {r:?}"
+        );
+    }
+    assert!(p.sim.control.writes().is_empty());
+}
+
+#[tokio::test]
+async fn editar_un_campo_ilegible_se_rechaza() {
+    let (p, m) = preparado().await;
+    // `validation_only` no aparece en la lectura pareada.
+    let r = m
+        .preparar(req(
+            "cbSetWifiAccPt",
+            None,
+            &[("dpm_cfg_wifi_acc_pt_id", "1"), ("validation_only", "0")],
+        ))
+        .await;
+    assert!(
+        matches!(&r, Err(CambioError::Invalida(e)) if e.contains("no se puede leer el valor actual de validation_only")),
+        "{r:?}"
     );
-    let prep = m.preparar(r).await.unwrap();
-    let nombres: Vec<_> = prep.diff.campos.iter().map(|c| c.nombre.as_str()).collect();
-    assert!(!nombres.contains(&"wlWpaPsk"), "{nombres:?}");
-    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
-    let c = esperar_estado(&m, id, Estado::Aplicado).await;
-    assert!(c.nota.unwrap().contains("verificación limitada"));
-    let w = p.sim.control.writes();
-    assert_eq!(w[0].0, "te_wifi.wl");
-    let params: BTreeMap<_, _> = w[0].1.iter().cloned().collect();
-    assert!(params.values().all(|v| v != MASCARA), "{params:?}");
-    // El simulador no tiene la clave actual: no se envía.
-    assert!(!params.contains_key("wlWpaPsk"));
-    assert_eq!(params["wlKey1"], mess_userpass("abc"));
-    assert_eq!(params["wlSsid"], "Casa");
+    // Web básica sin secretos cuya lectura no muestra el campo.
+    let r = m
+        .preparar(req("te_upnp.cmd", None, &[("enblUpnp", "1")]))
+        .await;
+    assert!(matches!(&r, Err(CambioError::Invalida(_))), "{r:?}");
+    assert!(p.sim.control.writes().is_empty());
 }
 
 #[tokio::test]
@@ -665,4 +694,235 @@ async fn historial_en_orden() {
     assert_eq!(h[0].diff.campos[0].despues, "192.168.1.85");
     assert!(h[0].updated >= h[0].ts);
     assert_eq!(m.historial(1).await.len(), 1);
+}
+
+#[tokio::test]
+async fn reanuda_con_la_wan_de_antes_del_cambio() {
+    let p = panel_rapido(Duration::from_millis(500)).await;
+    let lento = Tiempos {
+        bajo: Duration::from_secs(60),
+        ..tiempos()
+    };
+    let a = gestor(&p, lento).await;
+    let prep = a.preparar(lease0("192.168.1.84")).await.unwrap();
+    let id = a.confirmar(&prep.token, None, "admin").await.unwrap();
+    a.detener();
+    // El cambio tumbó la WAN y el panel se reinició: se vigila con la WAN de
+    // antes (arriba), así que se revierte.
+    p.sim.control.set_wan_up(false);
+    let b = ChangeManager::new(p.state.clone(), tiempos());
+    b.reanudar_pendientes().await;
+    let c = esperar_estado(&b, id, Estado::Revertido).await;
+    assert!(c.error.unwrap().contains("WAN"));
+    assert_eq!(ip_de_lease(&p, "0").await.as_deref(), Some("192.168.1.68"));
+}
+
+#[tokio::test]
+async fn revierte_una_creacion() {
+    let (p, m) = preparado().await;
+    let prep = m.preparar(nueva_reserva()).await.unwrap();
+    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    p.sim.control.set_wan_up(false);
+    esperar_estado(&m, id, Estado::Revertido).await;
+    assert_eq!(ip_de_lease(&p, "2").await, None);
+    let w = p.sim.control.writes();
+    let borrado: BTreeMap<_, _> = w[1].1.iter().cloned().collect();
+    assert_eq!(borrado["del"], "DEL");
+    assert_eq!(borrado["rtm_dhcpv4_svr_pool_static_id"], "2");
+}
+
+#[tokio::test]
+async fn revierte_un_secreto_que_estaba_vacio() {
+    let (p, m) = preparado().await;
+    let ap = [("dpm_cfg_wifi_acc_pt_id", "1"), ("key_phrase", "")];
+    p.state
+        .hgu
+        .write("wifi.asp", "cbSetWifiAccPt", &ap)
+        .await
+        .unwrap();
+    let prep = m
+        .preparar(req(
+            "cbSetWifiAccPt",
+            None,
+            &[
+                ("dpm_cfg_wifi_acc_pt_id", "1"),
+                ("key_phrase", "clave-nueva-123"),
+            ],
+        ))
+        .await
+        .unwrap();
+    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    p.sim.control.set_wan_up(false);
+    esperar_estado(&m, id, Estado::Revertido).await;
+    let w = p.sim.control.writes();
+    assert_eq!(w.len(), 3, "preparación, cambio y reversión");
+    let revert: BTreeMap<_, _> = w[2].1.iter().cloned().collect();
+    assert_eq!(revert["key_phrase"], "");
+    let n = p
+        .state
+        .hgu
+        .call("cbGetWifiAccPt", &[("dpm_cfg_wifi_acc_pt_id", "1")])
+        .await
+        .unwrap();
+    let key = n
+        .get("dpm_cfg_wifi_acc_pt")
+        .unwrap()
+        .text_of("key_phrase")
+        .map(str::to_owned);
+    assert_eq!(key.as_deref(), Some(""));
+}
+
+#[tokio::test]
+async fn confirmar_abandonado_termina_igual() {
+    let (_p, m) = preparado().await;
+    let prep = m.preparar(lease0("192.168.1.84")).await.unwrap();
+    // Quien confirma se va (p. ej. se cierra la pestaña) a mitad de camino.
+    let r = tokio::time::timeout(
+        Duration::from_millis(2),
+        m.confirmar(&prep.token, None, "admin"),
+    )
+    .await;
+    assert!(r.is_err(), "debía abandonarse antes de terminar: {r:?}");
+    let start = Instant::now();
+    let id = loop {
+        if let Some(c) = m.historial(1).await.first() {
+            break c.id;
+        }
+        assert!(start.elapsed() < Duration::from_secs(10), "sin cambio");
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    };
+    esperar_estado(&m, id, Estado::Aplicado).await;
+    esperar_libre(&m).await;
+}
+
+#[tokio::test]
+async fn relectura_fallida_tras_revertir_se_reintenta() {
+    let (p, m) = preparado().await;
+    let prep = m.preparar(lease0("192.168.1.84")).await.unwrap();
+    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    p.sim
+        .control
+        .fail_reads_after_next_write("cbDhcpV4SvrPoolGetStatic");
+    p.sim.control.set_wan_up(false);
+    let start = Instant::now();
+    while p.sim.control.writes().len() < 2 {
+        assert!(start.elapsed() < Duration::from_secs(5), "sin reversión");
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_eq!(m.cambio(id).await.unwrap().estado, Estado::Vigilando);
+    p.sim.control.fail_reads("cbDhcpV4SvrPoolGetStatic", false);
+    esperar_estado(&m, id, Estado::Revertido).await;
+    assert_eq!(p.sim.control.writes().len(), 2, "no se reescribe");
+    assert_eq!(ip_de_lease(&p, "0").await.as_deref(), Some("192.168.1.68"));
+}
+
+#[tokio::test]
+async fn revierte_un_valor_fuera_de_las_opciones() {
+    let (p, m) = preparado().await;
+    // El router tiene un valor que el catálogo no conoce.
+    p.state
+        .hgu
+        .write(
+            "dhcp.asp",
+            LEASES,
+            &[
+                (POOL, "0"),
+                ("rtm_dhcpv4_svr_pool_static_id", "0"),
+                ("adm_state", "2"),
+            ],
+        )
+        .await
+        .unwrap();
+    let prep = m
+        .preparar(req(LEASES, Some("0"), &[(POOL, "0"), ("adm_state", "1")]))
+        .await
+        .unwrap();
+    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    p.sim.control.set_wan_up(false);
+    esperar_estado(&m, id, Estado::Revertido).await;
+    let n = p
+        .state
+        .hgu
+        .call(
+            "cbDhcpV4SvrPoolGetStatic",
+            &[(POOL, "0"), ("rtm_dhcpv4_svr_pool_static_id", "0")],
+        )
+        .await
+        .unwrap();
+    let adm = n
+        .get("rtm_dhcpv4_svr_pool_static")
+        .unwrap()
+        .text_of("adm_state")
+        .map(str::to_owned);
+    assert_eq!(adm.as_deref(), Some("2"));
+}
+
+#[tokio::test]
+async fn no_se_deshace_dos_veces() {
+    let (p, m) = preparado().await;
+    let prep = m.preparar(lease0("192.168.1.84")).await.unwrap();
+    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    esperar_estado(&m, id, Estado::Aplicado).await;
+    esperar_libre(&m).await;
+    let u1 = m.deshacer(id).await.unwrap();
+    let u2 = m.deshacer(id).await.unwrap();
+    let id2 = m.confirmar(&u1.token, None, "admin").await.unwrap();
+    // Con el primero en curso, ni otro deshacer ni el segundo token.
+    let r = m.deshacer(id).await;
+    assert!(
+        matches!(&r, Err(CambioError::Invalida(e)) if e.contains("ya se ha deshecho")),
+        "{r:?}"
+    );
+    esperar_estado(&m, id2, Estado::Aplicado).await;
+    esperar_libre(&m).await;
+    let r = m.confirmar(&u2.token, None, "admin").await;
+    assert!(
+        matches!(&r, Err(CambioError::Invalida(e)) if e.contains("ya se ha deshecho")),
+        "{r:?}"
+    );
+    let r = m.deshacer(id).await;
+    assert!(matches!(r, Err(CambioError::Invalida(_))), "{r:?}");
+    assert_eq!(p.sim.control.writes().len(), 2);
+    assert_eq!(m.historial(10).await.len(), 2);
+}
+
+#[tokio::test]
+async fn confirmar_espera_a_que_se_retome_lo_pendiente() {
+    let p = panel_rapido(Duration::from_millis(500)).await;
+    let lento = Tiempos {
+        bajo: Duration::from_secs(60),
+        ..tiempos()
+    };
+    let a = gestor(&p, lento).await;
+    let prep = a.preparar(lease0("192.168.1.84")).await.unwrap();
+    let pendiente = a.confirmar(&prep.token, None, "admin").await.unwrap();
+    a.detener();
+
+    let b = ChangeManager::new(p.state.clone(), tiempos());
+    let otro = b
+        .preparar(req("cbSetUpnpCfg", None, &[("adm_state", "1")]))
+        .await
+        .unwrap();
+    let (r, ()) = tokio::join!(b.confirmar(&otro.token, None, "admin"), async {
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        b.reanudar_pendientes().await;
+    });
+    // El cambio nuevo esperó y el retomado se quedó el hueco.
+    assert!(matches!(r, Err(CambioError::EnCurso)), "{r:?}");
+    assert_eq!(b.activo(), Some(pendiente));
+    esperar_estado(&b, pendiente, Estado::Aplicado).await;
+    esperar_libre(&b).await;
+    let id = b.confirmar(&otro.token, None, "admin").await.unwrap();
+    esperar_estado(&b, id, Estado::Aplicado).await;
+}
+
+#[tokio::test]
+async fn instalar_deja_un_solo_gestor() {
+    let p = panel_rapido(Duration::from_millis(500)).await;
+    assert!(p.state.cambios().is_none());
+    let a = ChangeManager::instalar(&p.state, tiempos());
+    let b = ChangeManager::instalar(&p.state.clone(), tiempos());
+    assert!(Arc::ptr_eq(&a, &b));
+    assert!(Arc::ptr_eq(&p.state.cambios().unwrap(), &a));
 }

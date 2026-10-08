@@ -71,11 +71,8 @@ async fn serve() -> std::process::ExitCode {
     Poller::spawn(state.clone());
     // Retoma los cambios que quedaron a medias si el proceso se cortó (en
     // segundo plano: si el router no responde, no retrasa el arranque).
-    let cambios = ChangeManager::new(state.clone(), Tiempos::default());
-    tokio::spawn({
-        let cambios = cambios.clone();
-        async move { cambios.reanudar_pendientes().await }
-    });
+    let cambios = ChangeManager::instalar(&state, Tiempos::default());
+    tokio::spawn(async move { cambios.reanudar_pendientes().await });
     eprintln!("panel escuchando en http://{listen}");
     let app = build_router(state).into_make_service_with_connect_info::<SocketAddr>();
     if let Err(e) = axum::serve(listener, app).await {

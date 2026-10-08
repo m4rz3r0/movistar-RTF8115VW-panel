@@ -153,6 +153,16 @@ async fn api(
     }
 }
 
+/// Escrituras de la UI básica: `boom.wl` falla con 500, `mala.wl` responde
+/// como un sessionKey rechazado; el resto, OK.
+async fn basic_cgi(Path(name): Path<String>) -> axum::response::Response {
+    match name.as_str() {
+        "boom.wl" => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, "boom").into_response(),
+        "mala.wl" => "<html><body>sessionKey no válido</body></html>".into_response(),
+        _ => "<html><body>ok</body></html>".into_response(),
+    }
+}
+
 async fn dhcp_page() -> &'static str {
     "<html><script>\nvar sessionKey='42';\n</script></html>"
 }
@@ -164,7 +174,7 @@ async fn start() -> (String, S) {
         .route("/dhcp.asp", get(dhcp_page))
         .route("/cgi-bin/te_acceso_router.cgi", post(basic_login))
         .route("/cgi-bin/cbCheckLogin.xml", post(adv_login))
-        .route("/cgi-bin/{name}", post(api))
+        .route("/cgi-bin/{name}", post(api).get(basic_cgi))
         .with_state(state.clone());
     let l = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let url = format!("http://{}", l.local_addr().unwrap());
@@ -298,4 +308,38 @@ async fn expired_basic_session_during_advanced_login_retries() {
     let n = c.call("cbGet", &[]).await.unwrap();
     assert_eq!(n.text_of("v"), Some("7"));
     assert_eq!(s.basic_logins.load(Ordering::SeqCst), 2);
+}
+
+#[tokio::test]
+async fn basic_write_errors_hide_the_query() {
+    let (url, _s) = start().await;
+    let c = client(&url, PASS);
+    assert!(
+        c.basic_write("dhcp.asp", "ok.wl", &[("a", "1")])
+            .await
+            .unwrap()
+            .contains("ok")
+    );
+    let e = c
+        .basic_write(
+            "dhcp.asp",
+            "boom.wl?action=save",
+            &[("wlWpaPsk", "secreta")],
+        )
+        .await
+        .unwrap_err();
+    let texto = format!("{e} {e:?}");
+    assert!(matches!(e, Error::Unexpected(_)), "{e:?}");
+    assert!(texto.contains("boom.wl"), "{texto}");
+    for oculto in ["?", "secreta", "sessionKey", "42", "action"] {
+        assert!(!texto.contains(oculto), "{oculto} en {texto}");
+    }
+    let e = c
+        .basic_write("dhcp.asp", "mala.wl", &[("x", "1")])
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(&e, Error::CallFailed { name, .. } if name == "mala.wl"),
+        "{e:?}"
+    );
 }
