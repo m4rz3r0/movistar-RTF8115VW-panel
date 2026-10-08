@@ -183,3 +183,53 @@ async fn pausa_espera_al_ciclo_en_curso_y_detiene_el_sondeo() {
     })
     .await;
 }
+
+#[tokio::test]
+async fn fallo_de_lectura_lenta_no_descarta_el_ciclo() {
+    let mut p = panel().await;
+    let h = sondeo(&mut p).await;
+    let antes = h.latest().unwrap();
+
+    p.sim.control.fail_reads("cbGetTr69Config", true);
+    esperar("error de las lecturas de 60 s", || h.slow_error().is_some()).await;
+    let filas = || async {
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM samples_raw")
+            .fetch_one(&p.state.db)
+            .await
+            .unwrap()
+    };
+    let n = filas().await;
+    // Las lecturas de 10 s siguen: hay muestras nuevas (una por segundo como
+    // mucho, `ts` es la clave) y el sondeo está sano.
+    tokio::time::sleep(Duration::from_millis(2100)).await;
+    assert!(filas().await >= n + 2, "no se guardan muestras");
+    assert_eq!(h.error(), None);
+    assert_eq!(h.failures(), 0);
+    assert!(h.healthy());
+    let s = h.latest().unwrap();
+    assert!(s.slow_error.is_some());
+    assert!(s.at > antes.at);
+    // Se conservan los datos de 60 s anteriores.
+    assert_eq!(s.tr69_activo, Some(true));
+    assert_eq!(s.hosts, antes.hosts);
+    assert_eq!(s.slow_at, antes.slow_at);
+
+    // Se reintentan en el ciclo siguiente.
+    p.sim.control.fail_reads("cbGetTr69Config", false);
+    esperar("lecturas de 60 s recuperadas", || {
+        h.slow_error().is_none() && h.latest().unwrap().slow_at > antes.slow_at
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn sigue_sano_durante_una_pausa() {
+    let mut p = panel().await;
+    let h = sondeo(&mut p).await;
+    let pausa = h.pause().await;
+    // Más de 3 intervalos (150 ms) sin datos nuevos.
+    tokio::time::sleep(Duration::from_millis(400)).await;
+    assert!(h.healthy());
+    pausa.resume();
+    assert!(h.healthy(), "deja de estar sano justo al reanudar");
+}

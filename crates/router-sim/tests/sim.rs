@@ -301,6 +301,22 @@ async fn wan_down_reflected() {
 }
 
 #[tokio::test]
+async fn fail_reads_hasta_desactivar() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    sim.control.fail_reads("cbGetTr69Config", true);
+    for _ in 0..2 {
+        assert!(matches!(
+            c.call("cbGetTr69Config", &[]).await,
+            Err(Error::CallFailed { .. })
+        ));
+    }
+    assert!(c.call("cbGetSummary", &[]).await.is_ok());
+    sim.control.fail_reads("cbGetTr69Config", false);
+    assert!(c.call("cbGetTr69Config", &[]).await.is_ok());
+}
+
+#[tokio::test]
 async fn counters_bump_adds_to_ip2() {
     let sim = start().await;
     let c = client(&sim, Duration::from_secs(5));

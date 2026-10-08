@@ -6,9 +6,15 @@
 //! muestra por lectura en `samples_raw`, los cortes de `ip2` en `wan_events`,
 //! y compacta las series cada 10 min.
 //!
-//! Ante errores reintenta con espera creciente hasta 60 s; si el router
-//! rechaza la contraseña, cada 5 min. Las muestras fallidas no se guardan (se
-//! ven como huecos) y el error queda en [`Snapshot::error`].
+//! Ante errores de las lecturas de 10 s reintenta con espera creciente hasta
+//! 60 s; si el router rechaza la contraseña, cada 5 min. Esas muestras no se
+//! guardan (se ven como huecos) y el error queda en [`Snapshot::error`]. Si
+//! solo fallan las lecturas de 60 s, el ciclo sigue adelante con los datos de
+//! 60 s anteriores, el error queda aparte en [`Snapshot::slow_error`] (no
+//! afecta a [`PollerHandle::healthy`]) y se reintentan en el ciclo siguiente.
+//!
+//! Cada ciclo se ejecuta en su propia tarea: si una entra en pánico, se
+//! registra, cuenta como un fallo y el sondeo continúa.
 //!
 //! El gestor de cambios llama a [`PollerHandle::pause`] antes de escribir:
 //! espera a que termine el ciclo en curso y, mientras viva la
@@ -96,15 +102,22 @@ pub struct Snapshot {
     pub slow_at: Option<i64>,
     /// Error del último ciclo, si falló (los datos son los anteriores).
     pub error: Option<String>,
+    /// Error de las últimas lecturas de 60 s, si fallaron (los datos de 60 s
+    /// son los de `slow_at`).
+    pub slow_error: Option<String>,
 }
 
 #[derive(Default)]
 struct Status {
     snapshot: Option<Snapshot>,
     error: Option<String>,
+    slow_error: Option<String>,
     failures: u32,
     /// Cuándo terminó la última lectura correcta.
     last_ok: Option<Instant>,
+    /// Cuándo se soltó la última pausa: el plazo de `healthy` cuenta desde
+    /// aquí si es posterior a `last_ok`.
+    resumed: Option<Instant>,
 }
 
 struct Shared {
@@ -147,6 +160,7 @@ impl PollerHandle {
         let st = self.status();
         st.snapshot.clone().map(|mut s| {
             s.error.clone_from(&st.error);
+            s.slow_error.clone_from(&st.slow_error);
             s
         })
     }
@@ -157,18 +171,30 @@ impl PollerHandle {
         self.status().error.clone()
     }
 
+    /// Error de las últimas lecturas de 60 s, si fallaron.
+    pub fn slow_error(&self) -> Option<String> {
+        self.status().slow_error.clone()
+    }
+
     /// Ciclos fallidos seguidos.
     pub fn failures(&self) -> u32 {
         self.status().failures
     }
 
-    /// `true` si hay datos sin error y de hace menos de 3 intervalos.
+    /// `true` si hay datos sin error y de hace menos de 3 intervalos. Durante
+    /// una pausa no caduca (se mantiene el último estado) y, al reanudar, el
+    /// plazo vuelve a contar desde ese momento.
     pub fn healthy(&self) -> bool {
         let Some(cfg) = self.shared.cfg.get() else {
             return false;
         };
+        let paused = *self.shared.pauses.borrow() > 0;
         let st = self.status();
-        st.error.is_none() && st.last_ok.is_some_and(|t| t.elapsed() < cfg.fast * 3)
+        let Some(last_ok) = st.last_ok else {
+            return false;
+        };
+        let since = st.resumed.map_or(last_ok, |r| r.max(last_ok));
+        st.error.is_none() && (paused || since.elapsed() < cfg.fast * 3)
     }
 
     /// Detiene el sondeo: espera a que acabe el ciclo en curso (si lo hay)
@@ -200,7 +226,15 @@ impl PauseGuard {
 
 impl Drop for PauseGuard {
     fn drop(&mut self) {
-        self.shared.pauses.send_modify(|n| *n -= 1);
+        let mut last = false;
+        self.shared.pauses.send_modify(|n| {
+            *n -= 1;
+            last = *n == 0;
+        });
+        if last {
+            let mut st = self.shared.status.lock().unwrap_or_else(|e| e.into_inner());
+            st.resumed = Some(Instant::now());
+        }
     }
 }
 
@@ -209,7 +243,7 @@ pub struct Poller {
     state: AppState,
     handle: PollerHandle,
     cfg: PollerConfig,
-    /// Última lectura de los contadores de `ip2`: `(ts, rx, tx)`.
+    /// Última lectura de los contadores de `ip2`: `(ts_ms, rx, tx)`.
     prev: Option<(i64, u64, u64)>,
     last_slow: Option<Instant>,
     last_compact: Option<Instant>,
@@ -225,12 +259,15 @@ enum Next {
     Backoff(Duration),
 }
 
-/// Datos de una lectura correcta.
+/// Datos de una lectura de 10 s correcta.
 struct Reading {
     summary: Summary,
     counters: Vec<IfaceCounters>,
+    /// Hora (ms) justo después de leer los contadores.
+    counters_ms: i64,
     wan: Vec<WanConn>,
-    slow: Option<Slow>,
+    /// Lecturas de 60 s, si tocaban.
+    slow: Option<Result<Slow, Error>>,
 }
 
 struct Slow {
@@ -239,6 +276,21 @@ struct Slow {
     statics: Vec<StaticLease>,
     wifi: WifiStatus,
     tr69_activo: Option<bool>,
+}
+
+/// Ejecuta `fut` en su propia tarea; si entra en pánico lo registra y
+/// devuelve `None`.
+async fn supervised<T: Send + 'static>(
+    what: &str,
+    fut: impl Future<Output = T> + Send + 'static,
+) -> Option<T> {
+    match tokio::spawn(fut).await {
+        Ok(v) => Some(v),
+        Err(e) => {
+            eprintln!("panel: error interno en el sondeo ({what}): {e}");
+            None
+        }
+    }
 }
 
 impl Poller {
@@ -257,20 +309,29 @@ impl Poller {
             handle.shared.cfg.set(cfg.clone()).is_ok(),
             "el sondeo ya estaba en marcha"
         );
-        let poller = Poller {
+        tokio::spawn(Self::run(state, handle.clone(), cfg));
+        handle
+    }
+
+    fn new(state: AppState, handle: PollerHandle, cfg: PollerConfig) -> Poller {
+        Poller {
             state,
-            handle: handle.clone(),
+            handle,
             cfg,
             prev: None,
             last_slow: None,
             last_compact: None,
-        };
-        tokio::spawn(poller.run());
-        handle
+        }
     }
 
-    async fn run(mut self) {
-        let shared = self.handle.shared.clone();
+    /// Bucle del sondeo. Cada ciclo (y cada compactación) corre en su propia
+    /// tarea con el `Poller` prestado; si entra en pánico, se pierde su
+    /// memoria (contadores previos, horas de las lecturas de 60 s) y se sigue
+    /// con uno nuevo.
+    async fn run(state: AppState, handle: PollerHandle, cfg: PollerConfig) {
+        let shared = handle.shared.clone();
+        let fresh = || Poller::new(state.clone(), handle.clone(), cfg.clone());
+        let mut poller = fresh();
         let mut pauses = shared.pauses.subscribe();
         loop {
             if pauses.wait_for(|n| *n == 0).await.is_err() {
@@ -282,9 +343,40 @@ impl Poller {
                 if *shared.pauses.borrow() > 0 {
                     continue;
                 }
-                self.cycle().await
+                let run = supervised("ciclo", async move {
+                    let next = poller.cycle().await;
+                    (poller, next)
+                })
+                .await;
+                match run {
+                    Some((p, next)) => {
+                        poller = p;
+                        next
+                    }
+                    None => {
+                        poller = fresh();
+                        let mut st = handle.status();
+                        st.failures = st.failures.saturating_add(1);
+                        st.error = Some("error interno del sondeo".into());
+                        let err = Error::Unexpected(String::new());
+                        Next::Backoff(cfg.delay(st.failures, Some(&err)))
+                    }
+                }
             };
-            self.compact_if_due().await;
+            match supervised("compactación", async move {
+                poller.compact_if_due().await;
+                poller
+            })
+            .await
+            {
+                Some(p) => poller = p,
+                None => {
+                    // Sin memoria de la compactación fallida: no repetirla
+                    // en bucle.
+                    poller = fresh();
+                    poller.last_compact = Some(Instant::now());
+                }
+            }
             match next {
                 Next::Interval(d) => tokio::time::sleep_until(start + d).await,
                 Next::Backoff(d) => tokio::time::sleep(d).await,
@@ -298,9 +390,6 @@ impl Poller {
         let slow_due = self.last_slow.is_none_or(|t| t.elapsed() >= self.cfg.slow);
         match self.read(slow_due).await {
             Ok(r) => {
-                if r.slow.is_some() {
-                    self.last_slow = Some(Instant::now());
-                }
                 self.store(now, r).await;
                 Next::Interval(self.cfg.delay(0, None))
             }
@@ -314,32 +403,41 @@ impl Poller {
         }
     }
 
+    /// Lecturas de 10 s (un error descarta el ciclo) y, si `slow`, las de
+    /// 60 s (su error se devuelve aparte).
     async fn read(&self, slow: bool) -> Result<Reading, Error> {
         let c = &self.state.hgu;
         let summary = read::summary(c).await?;
         let counters = read::counters(c).await?;
+        let counters_ms = series::now_ms();
         let wan = read::wan(c).await?;
         let slow = if slow {
-            Some(Slow {
-                hosts: read::lan_hosts(c).await?,
-                leases: read::dhcp_leases(c).await?,
-                statics: read::static_leases(c).await?,
-                wifi: read::wifi(c).await?,
-                tr69_activo: c
-                    .call("cbGetTr69Config", &[])
-                    .await?
-                    .get("cwmp_data")
-                    .and_then(|n| n.text_of("enableCWMP"))
-                    .map(|v| v == "1"),
-            })
+            Some(self.read_slow().await)
         } else {
             None
         };
         Ok(Reading {
             summary,
             counters,
+            counters_ms,
             wan,
             slow,
+        })
+    }
+
+    async fn read_slow(&self) -> Result<Slow, Error> {
+        let c = &self.state.hgu;
+        Ok(Slow {
+            hosts: read::lan_hosts(c).await?,
+            leases: read::dhcp_leases(c).await?,
+            statics: read::static_leases(c).await?,
+            wifi: read::wifi(c).await?,
+            tr69_activo: c
+                .call("cbGetTr69Config", &[])
+                .await?
+                .get("cwmp_data")
+                .and_then(|n| n.text_of("enableCWMP"))
+                .map(|v| v == "1"),
         })
     }
 
@@ -350,15 +448,13 @@ impl Poller {
             .counters
             .iter()
             .find(|c| c.name == WAN)
-            .map(|c| (now, c.rx_bytes, c.tx_bytes));
+            .map(|c| (r.counters_ms, c.rx_bytes, c.tx_bytes));
         // Tras un hueco (pausa larga) no se promedia sobre él.
-        let gap = i64::try_from((self.cfg.fast * 3).as_secs())
-            .unwrap_or(i64::MAX)
-            .max(1);
+        let gap_ms = i64::try_from((self.cfg.fast * 3).as_millis()).unwrap_or(i64::MAX);
         let (rx_bps, tx_bps) = match (self.prev, bytes) {
-            (Some((pts, prx, ptx)), Some((ts, rx, tx))) if ts - pts <= gap => (
-                series::rate((pts, prx), (ts, rx)),
-                series::rate((pts, ptx), (ts, tx)),
+            (Some((pms, prx, ptx)), Some((ms, rx, tx))) if ms - pms <= gap_ms => (
+                series::rate((pms, prx), (ms, rx)),
+                series::rate((pms, ptx), (ms, tx)),
             ),
             _ => (None, None),
         };
@@ -385,16 +481,25 @@ impl Poller {
                     tr69_activo: None,
                     slow_at: None,
                     error: None,
+                    slow_error: None,
                 },
             };
             snap.at = now;
-            if let Some(slow) = r.slow {
-                snap.hosts = slow.hosts;
-                snap.leases = slow.leases;
-                snap.statics = slow.statics;
-                snap.wifi = slow.wifi;
-                snap.tr69_activo = slow.tr69_activo;
-                snap.slow_at = Some(now);
+            match r.slow {
+                Some(Ok(slow)) => {
+                    snap.hosts = slow.hosts;
+                    snap.leases = slow.leases;
+                    snap.statics = slow.statics;
+                    snap.wifi = slow.wifi;
+                    snap.tr69_activo = slow.tr69_activo;
+                    snap.slow_at = Some(now);
+                    st.slow_error = None;
+                    self.last_slow = Some(Instant::now());
+                }
+                // Se conservan los datos anteriores y `last_slow` sigue
+                // igual: se reintentan en el ciclo siguiente.
+                Some(Err(e)) => st.slow_error = Some(e.to_string()),
+                None => {}
             }
             let s = &snap.summary;
             let ram_used_pct = if s.ram_total_kb == 0 {
@@ -462,5 +567,12 @@ mod tests {
             cfg.delay(1, Some(&Error::Auth("no"))),
             Duration::from_secs(300)
         );
+    }
+
+    #[tokio::test]
+    async fn supervised_sobrevive_a_un_panico() {
+        assert_eq!(supervised("prueba", async { 7 }).await, Some(7));
+        let r: Option<()> = supervised("prueba", async { panic!("a propósito") }).await;
+        assert_eq!(r, None);
     }
 }

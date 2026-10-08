@@ -161,6 +161,17 @@ impl SimControl {
         self.inner.state().ignore_next = true;
     }
 
+    /// Si `on`, la lectura `name` (p. ej. `cbGetTr69Config`) responde
+    /// `Result=1` hasta que se desactive.
+    pub fn fail_reads(&self, name: &str, on: bool) {
+        let mut st = self.inner.state();
+        if on {
+            st.failing_reads.insert(name.to_owned());
+        } else {
+            st.failing_reads.remove(name);
+        }
+    }
+
     /// Suma bytes a `rx_byte`/`tx_byte` de `ip2` en `cbGetStatistic`.
     pub fn counters_bump(&self, rx: u64, tx: u64) {
         let mut st = self.inner.state();
@@ -212,6 +223,8 @@ struct SimState {
     wan_up: bool,
     fail_next: Option<String>,
     ignore_next: bool,
+    /// Lecturas que fallan (`fail_reads`).
+    failing_reads: HashSet<String>,
     rx_extra: u64,
     tx_extra: u64,
     writes: Vec<(String, Params)>,
@@ -523,7 +536,9 @@ async fn cgi(
     if !valid {
         return LOGGED_OUT.into_response();
     }
-    if is_read(name) {
+    if is_read(name) && st.failing_reads.contains(name) {
+        xml(failure(name, "lectura fallida (simulado)"))
+    } else if is_read(name) {
         xml(read(&s, &st, name, &params))
     } else {
         xml(write(&mut st, name, &params))

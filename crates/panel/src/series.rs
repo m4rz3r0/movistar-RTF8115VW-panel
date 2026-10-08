@@ -14,24 +14,30 @@ const M1_KEEP: i64 = 7 * 24 * 3600;
 /// Agregado a 15 min (y eventos de corte): 30 d.
 const M15_KEEP: i64 = 30 * 24 * 3600;
 
-/// Segundos Unix según el reloj del servidor.
-pub fn now() -> i64 {
-    let d = SystemTime::now()
+/// Milisegundos Unix según el reloj del servidor (0 si el reloj marca una
+/// fecha anterior a 1970: nunca entra en pánico).
+pub fn now_ms() -> i64 {
+    SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .expect("reloj posterior a 1970");
-    i64::try_from(d.as_secs()).expect("segundos en i64")
+        .map_or(0, |d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX))
 }
 
-/// Tasa en bit/s entre dos lecturas `(ts, bytes)` de un contador.
+/// Segundos Unix según el reloj del servidor.
+pub fn now() -> i64 {
+    now_ms() / 1000
+}
+
+/// Tasa en bit/s entre dos lecturas `(ts_ms, bytes)` de un contador, con las
+/// marcas de tiempo en milisegundos.
 ///
 /// `None` si el contador ha bajado (reinicio del router, desbordamiento) o
 /// si no ha pasado tiempo entre las lecturas.
 pub fn rate(prev: (i64, u64), cur: (i64, u64)) -> Option<f64> {
-    let dt = cur.0 - prev.0;
-    if cur.1 < prev.1 || dt <= 0 {
+    let dt_ms = cur.0 - prev.0;
+    if cur.1 < prev.1 || dt_ms <= 0 {
         return None;
     }
-    Some((cur.1 - prev.1) as f64 * 8.0 / dt as f64)
+    Some((cur.1 - prev.1) as f64 * 8.0 * 1000.0 / dt_ms as f64)
 }
 
 /// Una muestra del estado.
@@ -221,16 +227,19 @@ mod tests {
 
     #[test]
     fn rate_calcula_bits_por_segundo() {
-        assert_eq!(rate((100, 5_000), (101, 6_000)), Some(8_000.0));
-        assert_eq!(rate((100, 0), (110, 10_000)), Some(8_000.0));
-        assert_eq!(rate((100, 7), (110, 7)), Some(0.0));
+        // Marcas de tiempo en milisegundos.
+        assert_eq!(rate((100_000, 5_000), (101_000, 6_000)), Some(8_000.0));
+        assert_eq!(rate((100_000, 0), (110_000, 10_000)), Some(8_000.0));
+        assert_eq!(rate((100_000, 7), (110_000, 7)), Some(0.0));
+        // 10,4 s no se redondean a 10 s: 13 000 B ⇒ 10 000 bit/s.
+        assert_eq!(rate((100_000, 0), (110_400, 13_000)), Some(10_000.0));
     }
 
     #[test]
     fn rate_descarta_reinicio_de_contador() {
-        assert_eq!(rate((100, 6_000), (110, 5_000)), None);
-        assert_eq!(rate((100, 5_000), (100, 6_000)), None);
-        assert_eq!(rate((110, 5_000), (100, 6_000)), None);
+        assert_eq!(rate((100_000, 6_000), (110_000, 5_000)), None);
+        assert_eq!(rate((100_000, 5_000), (100_000, 6_000)), None);
+        assert_eq!(rate((110_000, 5_000), (100_000, 6_000)), None);
     }
 
     async fn pool() -> (SqlitePool, tempfile::TempDir) {
