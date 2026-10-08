@@ -10,3 +10,10 @@ license.workspace = true
 roxmltree.workspace = true
 regex.workspace = true
 thiserror.workspace = true
+reqwest.workspace = true
+tokio = { workspace = true, features = ["sync", "time"] }
+tracing.workspace = true
+
+[dev-dependencies]
+axum.workspace = true
+tokio.workspace = true

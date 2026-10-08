@@ -11,3 +11,7 @@ license = "MIT"
 roxmltree = "0.20"
 regex = "1"
 thiserror = "2"
+reqwest = { version = "0.13", default-features = false }
+tokio = { version = "1", features = ["sync", "time", "macros", "rt-multi-thread", "net"] }
+tracing = "0.1"
+axum = "0.8"
