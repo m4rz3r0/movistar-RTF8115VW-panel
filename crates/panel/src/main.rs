@@ -1,0 +1,53 @@
+//! Servidor del panel.
+
+#[cfg(feature = "ssr")]
+#[tokio::main]
+async fn main() -> std::process::ExitCode {
+    use leptos::config::get_configuration;
+    use panel::{build_router, config::Config, state::AppState};
+    use std::{net::SocketAddr, process::ExitCode};
+
+    let cfg = match Config::from_env() {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            eprintln!("panel: configuración no válida: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let mut leptos = match get_configuration(None) {
+        Ok(conf) => conf.leptos_options,
+        Err(e) => {
+            eprintln!("panel: configuración de Leptos no válida: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    // `RP_LISTEN` manda sobre `site-addr` de cargo-leptos.
+    leptos.site_addr = cfg.listen;
+    let listen = cfg.listen;
+    let state = match AppState::new(cfg, leptos).await {
+        Ok(state) => state,
+        Err(e) => {
+            eprintln!("panel: no se puede arrancar: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let listener = match tokio::net::TcpListener::bind(listen).await {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("panel: no se puede escuchar en {listen}: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    eprintln!("panel escuchando en http://{listen}");
+    let app = build_router(state).into_make_service_with_connect_info::<SocketAddr>();
+    if let Err(e) = axum::serve(listener, app).await {
+        eprintln!("panel: {e}");
+        return ExitCode::FAILURE;
+    }
+    ExitCode::SUCCESS
+}
+
+#[cfg(not(feature = "ssr"))]
+fn main() {
+    // Sin `ssr` no hay servidor: el binario solo existe para cargo-leptos.
+}

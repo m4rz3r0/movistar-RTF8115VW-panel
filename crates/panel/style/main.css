@@ -1,0 +1,11 @@
+/* Estilos provisionales; el sistema visual llega con la Task 10. */
+:root {
+  color-scheme: dark;
+  font-family: system-ui, sans-serif;
+  background: #0e0f11;
+  color: #e8eaed;
+}
+
+main {
+  padding: 24px;
+}
