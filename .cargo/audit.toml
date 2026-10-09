@@ -1,0 +1,13 @@
+# Configuración de `cargo audit`.
+
+[advisories]
+ignore = [
+    # rsa (Marvin Attack, sin versión corregida): sólo está en Cargo.lock
+    # porque sqlx-macros-core declara sqlx-mysql como opcional; no se compila
+    # (`cargo tree -i rsa --target all` no lo encuentra). El panel sólo usa
+    # SQLite. Revisar si alguna vez se activa la feature `mysql` de sqlx.
+    "RUSTSEC-2023-0071",
+    # paste (sin mantenimiento, sin fallo conocido): proc-macro que pide
+    # leptos 0.8 (either_of, tachys); no hay sustituto y no llega al binario.
+    "RUSTSEC-2024-0436",
+]

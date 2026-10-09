@@ -1,0 +1,44 @@
+# Configuración de `cargo deny check`.
+
+[graph]
+# El panel se compila para el servidor (FreeBSD amd64), para desarrollo en
+# Linux y la parte cliente para wasm32.
+targets = [
+    "x86_64-unknown-freebsd",
+    "x86_64-unknown-linux-gnu",
+    "wasm32-unknown-unknown",
+]
+all-features = false
+
+[advisories]
+ignore = [
+    # (rsa, RUSTSEC-2023-0071, no hace falta aquí: cargo deny mira el grafo
+    # real y rsa no está; cargo audit mira el Cargo.lock, ver
+    # .cargo/audit.toml.)
+    # paste (sin mantenimiento, sin fallo conocido): macro de compilación que
+    # usa leptos (either_of, tachys); no hay sustituto mientras leptos 0.8 la
+    # pida. No llega al binario.
+    { id = "RUSTSEC-2024-0436", reason = "paste: proc-macro de leptos 0.8, sin sustituto, no llega al binario" },
+]
+
+[licenses]
+# Sólo licencias permisivas (las de las dependencias actuales).
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "CC0-1.0",
+    "Unicode-3.0",
+    "Zlib",
+]
+confidence-threshold = 0.9
+
+[bans]
+multiple-versions = "allow"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

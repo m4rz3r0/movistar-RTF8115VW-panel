@@ -5,6 +5,7 @@ description = "Panel web (Leptos + Axum) para gestionar el router Askey RTF8115V
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+publish = false
 
 [lib]
 crate-type = ["cdylib", "rlib"]

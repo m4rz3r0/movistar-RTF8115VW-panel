@@ -5,6 +5,7 @@ description = "Catálogo revisado de funciones del router Askey RTF8115VW y enma
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+publish = false
 
 [dependencies]
 hgu = { path = "../hgu" }
