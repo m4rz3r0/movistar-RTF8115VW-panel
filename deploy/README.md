@@ -138,7 +138,8 @@ Si no hay acceso al repositorio, compila lo que ya tenga el clon.
 4. Saca `target/release/panel` y `target/site/` como un `tar` generado
    **dentro** de la jail (`jexec -U rpbuild … tar -cf -`) y lo extrae en el
    host con `--no-same-owner --no-same-permissions` en
-   `releases/.<versión>.tmp`. Rechaza todo lo que no sea fichero o directorio
+   `releases/.<versión>.tmp` (con `pipefail`: si falla el `tar` de la jail,
+   la versión se descarta). Rechaza todo lo que no sea fichero o directorio
    normal (enlaces simbólicos, dispositivos…) y los enlaces duros; deja todo
    de root con 755/644 (el binario 755) y lo renombra a `releases/<versión>/`.
    El host, que corre como root, nunca abre rutas de la jail de compilación:
@@ -154,7 +155,14 @@ Si no hay acceso al repositorio, compila lo que ya tenga el clon.
 7. Si no responde: para, restaura la base de datos de antes (una versión nueva
    puede haber aplicado una migración que la anterior no conoce, y sqlx no
    arrancaría), vuelve a la versión anterior, arranca y borra la versión
-   fallida; la etiqueta queda marcada como fallida.
+   fallida; la etiqueta queda marcada como fallida. Sin versión anterior a la
+   que volver (primer despliegue, o `current` apunta a una que ya no existe)
+   el servicio queda **parado**, se quita `current` (rc.d no arranca nada sin
+   él, tampoco al reiniciar el host) y se borra igualmente la fallida: nunca
+   queda `current` en una versión que no respondió. Un `--ref` que da la
+   misma versión que la desplegada no cambia nada: reinicia el servicio y
+   comprueba `/salud`; si no responde, la deja desplegada y en marcha (era la
+   que funcionaba; lo normal es que falle otra cosa, p. ej. el router).
 8. Conserva las 3 versiones más recientes (nunca borra la desplegada) y borra
    los `releases/.*.tmp` que haya dejado una ejecución cortada.
 
@@ -186,7 +194,9 @@ reglas de doas nuevas (`doas.conf.snippet`).
 - El interruptor de hombre muerto es `sh -c "sleep 180 && cp … && pfctl -f …"`
   bajo `daemon -p` (el pidfile es el del `sh`). Para desarmarlo se mata primero
   el `sh` y luego su `sleep`; y con `&&`, aunque el `sleep` muriera antes, no se
-  restauraría nada (con `;` sí).
+  restauraría nada (con `;` sí). Si al confirmar el `sh` ya no vive, el
+  interruptor saltó: `--pf-confirmar` falla con ese mensaje (las reglas
+  vigentes son las anteriores) y hay que repetir `--pf-cargar`.
 
 Por eso la jail `routerpanel` **no** se actualiza con `pkg -j` (no tiene red ni
 `pkg`): desde el host,
