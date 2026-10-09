@@ -14,10 +14,10 @@ mod datos;
 mod dialogo;
 mod formulario;
 #[cfg(feature = "ssr")]
-mod servidor;
+pub(crate) mod servidor;
 
 pub use datos::*;
-pub use dialogo::DialogoCambio;
+pub use dialogo::{DialogoCambio, TablaDiff};
 
 use crate::ui::{Estado, IconoEstado, Insignia};
 use dialogo::DialogoRevelar;

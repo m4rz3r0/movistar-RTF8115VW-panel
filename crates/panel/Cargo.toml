@@ -17,7 +17,7 @@ leptos_router.workspace = true
 serde.workspace = true
 # Posición del puntero en los gráficos (`getBoundingClientRect`); ya la trae
 # Leptos, aquí solo se activa `DomRect`.
-web-sys = { workspace = true, features = ["DomRect"] }
+web-sys = { workspace = true, features = ["DomRect", "HtmlDetailsElement"] }
 # Servidor (feature `ssr`).
 leptos_axum = { workspace = true, optional = true }
 axum = { workspace = true, optional = true }
@@ -92,4 +92,8 @@ required-features = ["ssr"]
 
 [[test]]
 name = "explorador"
+required-features = ["ssr"]
+
+[[test]]
+name = "historial"
 required-features = ["ssr"]

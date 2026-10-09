@@ -26,19 +26,19 @@ pub fn app_state() -> Result<AppState, ServerFnError> {
     use_context::<AppState>().ok_or_else(|| ServerFnError::new("falta el estado del panel"))
 }
 
-fn con_estado(status: StatusCode, msg: impl Into<String>) -> ServerFnError {
+pub(crate) fn con_estado(status: StatusCode, msg: impl Into<String>) -> ServerFnError {
     if let Some(resp) = use_context::<leptos_axum::ResponseOptions>() {
         resp.set_status(status);
     }
     ServerFnError::new(msg.into())
 }
 
-fn invalida(msg: impl Into<String>) -> ServerFnError {
+pub(crate) fn invalida(msg: impl Into<String>) -> ServerFnError {
     con_estado(StatusCode::BAD_REQUEST, msg)
 }
 
 /// Registra el error con un id y devuelve un mensaje genérico con ese id.
-fn interno(e: impl fmt::Display) -> ServerFnError {
+pub(crate) fn interno(e: impl fmt::Display) -> ServerFnError {
     let mut id = [0u8; 4];
     if getrandom::fill(&mut id).is_err() {
         id = (crate::series::now_ms() as u32).to_be_bytes();
@@ -51,14 +51,14 @@ fn interno(e: impl fmt::Display) -> ServerFnError {
     )
 }
 
-fn gestor(state: &AppState) -> Result<Arc<ChangeManager>, ServerFnError> {
+pub(crate) fn gestor(state: &AppState) -> Result<Arc<ChangeManager>, ServerFnError> {
     state
         .cambios()
         .ok_or_else(|| interno("el gestor de cambios no está instalado"))
 }
 
 /// Error del gestor en español y con qué hacer.
-fn error_cambio(e: CambioError) -> ServerFnError {
+pub(crate) fn error_cambio(e: CambioError) -> ServerFnError {
     use CambioError as E;
     let (status, msg) = match e {
         E::Bloqueada(m) => (StatusCode::FORBIDDEN, format!("Función bloqueada: {m}.")),
@@ -98,7 +98,7 @@ fn error_cambio(e: CambioError) -> ServerFnError {
     con_estado(status, msg)
 }
 
-fn funcion<'a>(state: &'a AppState, nombre: &str) -> Result<&'a Funcion, ServerFnError> {
+pub(crate) fn funcion<'a>(state: &'a AppState, nombre: &str) -> Result<&'a Funcion, ServerFnError> {
     state.catalogo.funcion(nombre).ok_or_else(|| {
         con_estado(
             StatusCode::NOT_FOUND,
@@ -271,13 +271,13 @@ fn secretos_catalogo(catalogo: &catalogo::Catalogo) -> HashSet<String> {
 }
 
 /// Reglas de enmascarado: `secretos.toml` más los secretos del catálogo.
-struct Ocultar {
+pub(crate) struct Ocultar {
     mascara: Arc<catalogo::mask::Mascara>,
     catalogo: HashSet<String>,
 }
 
 impl Ocultar {
-    fn new(state: &AppState) -> Ocultar {
+    pub(crate) fn new(state: &AppState) -> Ocultar {
         Ocultar::de(state.mascara.clone(), &state.catalogo)
     }
 
@@ -722,9 +722,16 @@ fn valor_diff(p: Option<&catalogo::Parametro>, v: String) -> Valor {
 
 /// Campo del diff del gestor para la interfaz. Secreto si lo dice el gestor
 /// o si la vista de lectura lo enmascararía (nombre o valor).
-fn campo_cambio(f: &Funcion, o: &Ocultar, c: crate::changes::CampoDiff) -> CampoCambio {
+///
+/// `f` es `None` si la función ya no está en el catálogo (un cambio antiguo
+/// del historial): sin etiquetas, y los valores como texto.
+pub(crate) fn campo_cambio(
+    f: Option<&Funcion>,
+    o: &Ocultar,
+    c: crate::changes::CampoDiff,
+) -> CampoCambio {
     let secreto = c.secreto || o.oculto(&c.nombre, &c.antes) || o.oculto(&c.nombre, &c.despues);
-    let p = f.parametro(&c.nombre);
+    let p = f.and_then(|f| f.parametro(&c.nombre));
     let valor = |v: String| {
         if secreto {
             Valor::Secreto
@@ -762,12 +769,23 @@ pub async fn preparar(state: &AppState, p: Peticion) -> Result<PreparadoVista, S
         borrar: p.borrar,
     };
     let prep = g.preparar(req).await.map_err(error_cambio)?;
+    Ok(vista_preparado(state, &g, prep))
+}
+
+/// Cambio preparado del gestor para la interfaz (secretos enmascarados,
+/// opciones con etiqueta).
+pub(crate) fn vista_preparado(
+    state: &AppState,
+    g: &ChangeManager,
+    prep: crate::changes::Preparado,
+) -> PreparadoVista {
     let o = Ocultar::new(state);
-    Ok(PreparadoVista {
+    let f = state.catalogo.funcion(&prep.funcion);
+    PreparadoVista {
         token: prep.token,
-        funcion: f.name.clone(),
-        instancia: p.instancia,
-        borrar: p.borrar,
+        funcion: prep.funcion,
+        instancia: prep.instancia,
+        borrar: prep.borrar,
         campos: prep
             .diff
             .campos
@@ -777,7 +795,7 @@ pub async fn preparar(state: &AppState, p: Peticion) -> Result<PreparadoVista, S
         riesgo: riesgo(prep.riesgo),
         vigilancia_s: g.tiempos().vigilancia(prep.riesgo).as_secs(),
         palabra: prep.palabra,
-    })
+    }
 }
 
 pub async fn confirmar(
@@ -793,7 +811,7 @@ pub async fn confirmar(
         .map_err(error_cambio)
 }
 
-fn estado(e: Estado) -> EstadoDeCambio {
+pub(crate) fn estado(e: Estado) -> EstadoDeCambio {
     match e {
         Estado::Preparado => EstadoDeCambio::Preparado,
         Estado::Aplicando => EstadoDeCambio::Aplicando,
@@ -991,7 +1009,7 @@ mod tests {
         let c = catalogo::Catalogo::load().unwrap();
         let o = Ocultar::de(Arc::new(catalogo::mask::Mascara::load().unwrap()), &c);
         let f = c.funcion("cbDhcpV4SvrPoolSetStatic").unwrap();
-        let d = campo_cambio(f, &o, diff("adm_state", "0", "1"));
+        let d = campo_cambio(Some(f), &o, diff("adm_state", "0", "1"));
         assert_eq!(d.etiqueta, "Activado");
         assert_eq!(
             d.antes,
@@ -1007,7 +1025,7 @@ mod tests {
                 etiqueta: Some("Activado".into())
             }
         );
-        let d = campo_cambio(f, &o, diff("adm_state", "7", ""));
+        let d = campo_cambio(Some(f), &o, diff("adm_state", "7", ""));
         assert_eq!(
             d.antes,
             Valor::Opcion {
@@ -1019,7 +1037,7 @@ mod tests {
         assert_eq!(Valor::texto_opcion("7", None), "(valor desconocido: 7)");
         assert_eq!(Valor::texto_opcion("1", Some("Sí")), "Sí (1)");
         let w = c.funcion("cbSetWifiAccPt").unwrap();
-        let d = campo_cambio(w, &o, diff("ssid_hide", "0", "1"));
+        let d = campo_cambio(Some(w), &o, diff("ssid_hide", "0", "1"));
         assert_eq!(
             d.despues,
             Valor::Opcion {
@@ -1027,7 +1045,7 @@ mod tests {
                 etiqueta: Some("Sí".into())
             }
         );
-        let d = campo_cambio(w, &o, diff("ssid", "A", "B"));
+        let d = campo_cambio(Some(w), &o, diff("ssid", "A", "B"));
         assert_eq!(d.despues, Valor::Texto("B".into()));
     }
 
@@ -1038,13 +1056,13 @@ mod tests {
         let w = c.funcion("cbSetWifiAccPt").unwrap();
         // Nombre sensible con sufijo numérico y valor de texto: el gestor no
         // lo marca, pero la lectura lo enmascara.
-        let d = campo_cambio(w, &o, diff("wep_key_idx", "1", "clave"));
+        let d = campo_cambio(Some(w), &o, diff("wep_key_idx", "1", "clave"));
         assert!(o.oculto("wep_key_idx", "clave"));
         assert_eq!((d.antes, d.despues), (Valor::Secreto, Valor::Secreto));
         // Parámetro secreto del catálogo aunque el gestor no lo marque.
-        let d = campo_cambio(w, &o, diff("key_phrase", "a", "b"));
+        let d = campo_cambio(Some(w), &o, diff("key_phrase", "a", "b"));
         assert_eq!(d.despues, Valor::Secreto);
-        let d = campo_cambio(w, &o, diff("wep_key_idx", "1", "2"));
+        let d = campo_cambio(Some(w), &o, diff("wep_key_idx", "1", "2"));
         assert!(matches!(d.despues, Valor::Opcion { .. }));
     }
 

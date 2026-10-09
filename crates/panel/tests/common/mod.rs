@@ -11,11 +11,14 @@ use axum::{
     http::{Request, Response},
 };
 use leptos::prelude::LeptosOptions;
+use panel::changes::{ChangeManager, Tiempos};
 use panel::{config::Config, state::AppState};
 use router_sim::{Sim, SimConfig, SimHandle};
+use serde_json::{Value, json};
 use std::{
     net::{IpAddr, SocketAddr},
     path::PathBuf,
+    time::{Duration, Instant},
 };
 use tempfile::TempDir;
 use tower::ServiceExt;
@@ -154,4 +157,113 @@ pub async fn body_text(resp: Response<Body>) -> String {
         .await
         .unwrap();
     String::from_utf8(bytes.to_vec()).unwrap()
+}
+
+/// Panel con un cliente del router rápido y el gestor de cambios instalado
+/// (vigilancia de 300 ms), más la cookie de una sesión.
+pub async fn panel_con_gestor() -> (Panel, String) {
+    let mut p = panel().await;
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, USER, PASS);
+    cfg.timeout = Duration::from_millis(500);
+    cfg.min_gap = Duration::from_millis(1);
+    p.state.hgu = hgu::Client::new(cfg);
+    // Un solo cliente del router para las server functions y el gestor.
+    p.app = panel::build_router(p.state.clone());
+    let m = ChangeManager::instalar(
+        &p.state,
+        Tiempos {
+            bajo: Duration::from_millis(300),
+            medio: Duration::from_millis(300),
+            alto: Duration::from_millis(600),
+            intervalo: Duration::from_millis(30),
+            fallos_para_revertir: 3,
+            pausa_max: Duration::from_secs(2),
+        },
+    );
+    m.reanudar_pendientes().await;
+    let cookie = sesion(&p).await;
+    (p, cookie)
+}
+
+/// Llama a la server function `nombre` con un cuerpo JSON.
+pub async fn llamar(p: &Panel, nombre: &str, cuerpo: Value, cookie: Option<&str>) -> (u16, String) {
+    let mut req = post_json(&format!("/api/{nombre}"), &cuerpo.to_string(), "127.0.0.1");
+    if let Some(c) = cookie {
+        req.headers_mut().insert("cookie", c.parse().unwrap());
+    }
+    let resp = send(&p.app, req).await;
+    let status = resp.status().as_u16();
+    (status, body_text(resp).await)
+}
+
+/// Como [`llamar`], exigiendo 200; devuelve el JSON.
+pub async fn ok(p: &Panel, nombre: &str, cuerpo: Value, cookie: &str) -> Value {
+    let (status, body) = llamar(p, nombre, cuerpo, Some(cookie)).await;
+    assert_eq!(status, 200, "{nombre}: {body}");
+    serde_json::from_str(&body).unwrap_or_else(|e| panic!("{nombre}: {e}: {body}"))
+}
+
+/// Valores de un formulario tal como llegan (más sus claves), para enviarlos
+/// sin tocar.
+pub fn valores_de(form: &Value) -> Vec<(String, String)> {
+    let mut v: Vec<(String, String)> = form["claves"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| (c[0].as_str().unwrap().into(), c[1].as_str().unwrap().into()))
+        .collect();
+    for c in form["campos"].as_array().unwrap() {
+        v.push((
+            c["param"]["nombre"].as_str().unwrap().into(),
+            c["valor"].as_str().unwrap().into(),
+        ));
+    }
+    v
+}
+
+pub fn fijar(v: &mut [(String, String)], k: &str, valor: &str) {
+    v.iter_mut()
+        .find(|(n, _)| n == k)
+        .unwrap_or_else(|| panic!("falta {k}"))
+        .1 = valor.into();
+}
+
+pub fn campo<'a>(form: &'a Value, nombre: &str) -> Option<&'a Value> {
+    form["campos"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["param"]["nombre"] == nombre)
+}
+
+/// Prepara y confirma; devuelve el id del cambio.
+pub async fn aplicar(p: &Panel, cookie: &str, peticion: Value) -> i64 {
+    let prep = ok(
+        p,
+        "preparar_cambio",
+        json!({ "peticion": peticion }),
+        cookie,
+    )
+    .await;
+    let id = ok(
+        p,
+        "confirmar_cambio",
+        json!({ "token": prep["token"], "palabra": null }),
+        cookie,
+    )
+    .await;
+    id.as_i64().unwrap()
+}
+
+/// Sondea `estado_cambio` como la interfaz hasta un estado final.
+pub async fn esperar_final(p: &Panel, cookie: &str, id: i64) -> Value {
+    let start = Instant::now();
+    loop {
+        let c = ok(p, "estado_cambio", json!({ "id": id }), cookie).await;
+        if ["Aplicado", "Revertido", "Fallido"].contains(&c["estado"].as_str().unwrap()) {
+            return c;
+        }
+        assert!(start.elapsed() < Duration::from_secs(10), "sin final: {c}");
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
 }

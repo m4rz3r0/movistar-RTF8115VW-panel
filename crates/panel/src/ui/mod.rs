@@ -8,6 +8,7 @@
 pub mod charts;
 pub mod estado;
 pub mod explorador;
+pub mod historial;
 pub mod layout;
 pub mod login;
 pub mod table;

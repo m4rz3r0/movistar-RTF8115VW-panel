@@ -142,6 +142,12 @@ pub struct Preparado {
     pub riesgo: Riesgo,
     /// Palabra que hay que escribir para confirmar (acciones).
     pub palabra: Option<String>,
+    /// Lo que se va a escribir: función, instancia y si es un borrado (lo
+    /// que hace falta para presentarlo sin tener la petición a mano, p. ej.
+    /// al deshacer).
+    pub funcion: String,
+    pub instancia: Option<String>,
+    pub borrar: bool,
 }
 
 /// Errores del gestor.
@@ -391,6 +397,7 @@ impl ChangeManager {
         deshace: Option<i64>,
     ) -> Result<Preparado, CambioError> {
         let plan = self.planificar(&req, explicito).await?;
+        let (funcion, instancia, borrar) = (req.funcion.clone(), req.instancia.clone(), req.borrar);
         let token = nuevo_token();
         let palabra = palabra_requerida(&plan.funcion).map(str::to_owned);
         let mut p = lock(&self.pendientes);
@@ -410,6 +417,9 @@ impl ChangeManager {
             diff: visible(&plan.campos),
             riesgo: plan.funcion.riesgo,
             palabra,
+            funcion,
+            instancia,
+            borrar,
         })
     }
 
@@ -582,9 +592,11 @@ impl ChangeManager {
         vigente.then(|| format!("el cambio {original} ya se ha deshecho (cambio {d})"))
     }
 
-    /// Prepara el cambio inverso de uno `aplicado` (con los valores
-    /// anteriores, secretos incluidos).
-    pub async fn deshacer(&self, change_id: i64) -> Result<Preparado, CambioError> {
+    /// Petición inversa de un cambio `aplicado` que nadie ha deshecho, con
+    /// los valores anteriores (secretos incluidos). Es la única comprobación
+    /// de qué se puede deshacer: la usan [`ChangeManager::deshacer`] y
+    /// [`ChangeManager::se_puede_deshacer`].
+    async fn inversa_de(&self, change_id: i64) -> Result<ChangeRequest, CambioError> {
         let fila = self
             .fila(change_id)
             .await
@@ -599,13 +611,47 @@ impl ChangeManager {
             return Err(CambioError::Invalida(e));
         }
         let plan = self.reconstruir(&fila).map_err(CambioError::Invalida)?;
-        let req = inversa(&plan).ok_or_else(|| {
+        inversa(&plan).ok_or_else(|| {
             CambioError::Invalida(
                 "este cambio no se puede deshacer (acción o valores anteriores desconocidos)"
                     .into(),
             )
-        })?;
+        })
+    }
+
+    /// Prepara el cambio inverso de uno `aplicado` (con los valores
+    /// anteriores, secretos incluidos).
+    pub async fn deshacer(&self, change_id: i64) -> Result<Preparado, CambioError> {
+        let req = self.inversa_de(change_id).await?;
         self.preparar_con(req, true, Some(change_id)).await
+    }
+
+    /// ¿Aceptaría [`ChangeManager::deshacer`] este cambio? Solo mira el
+    /// historial (no el router): para mostrar o no el botón.
+    pub async fn se_puede_deshacer(&self, change_id: i64) -> bool {
+        self.inversa_de(change_id).await.is_ok()
+    }
+
+    /// Enlaces de deshacer de un cambio: el que lo deshizo y el que él
+    /// deshace. Solo guardan el vínculo de la última vez que se deshizo un
+    /// cambio.
+    pub async fn enlaces_deshacer(&self, id: i64) -> (Option<i64>, Option<i64>) {
+        let consulta = |sql: &'static str| async move {
+            sqlx::query_scalar::<_, i64>(sql)
+                .bind(id)
+                .fetch_optional(&self.state.db)
+                .await
+                .unwrap_or_else(|e| {
+                    tracing::error!(cambio = id, "no se pueden leer los enlaces: {e}");
+                    None
+                })
+        };
+        (
+            consulta("SELECT deshecho_por FROM changes WHERE id = ? AND deshecho_por IS NOT NULL")
+                .await,
+            consulta("SELECT id FROM changes WHERE deshecho_por = ? ORDER BY id DESC LIMIT 1")
+                .await,
+        )
     }
 
     /// Retoma los cambios que quedaron en `aplicando`/`vigilando` (llamar al

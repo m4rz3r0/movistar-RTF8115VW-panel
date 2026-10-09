@@ -6,8 +6,8 @@
 //! se está aplicando y, al cerrarse, el foco vuelve a donde estaba.
 
 use super::{
-    CambioVista, EstadoDeCambio, MASCARA, PreparadoVista, Valor, confirmar_cambio, duracion,
-    estado_cambio, revelar, texto_error,
+    CambioVista, CampoCambio, EstadoDeCambio, MASCARA, PreparadoVista, Valor, confirmar_cambio,
+    duracion, estado_cambio, revelar, texto_error,
 };
 use crate::ui::{Estado, Insignia};
 use leptos::{ev::SubmitEvent, html, prelude::*, task::spawn_local};
@@ -47,6 +47,45 @@ fn valor(v: &Valor) -> AnyView {
     }
 }
 
+/// Tabla de un diff: campo (con su nombre técnico), antes y después. Los
+/// secretos van enmascarados y las opciones con su etiqueta.
+#[component]
+pub fn TablaDiff(campos: Vec<CampoCambio>) -> impl IntoView {
+    if campos.is_empty() {
+        return view! { <p class="pagina-sub">"Sin campos que comparar."</p> }.into_any();
+    }
+    let filas = campos
+        .iter()
+        .map(|c| {
+            view! {
+                <tr>
+                    <th scope="row">
+                        {c.etiqueta.clone()}
+                        <span class="mono campo-nombre">{c.nombre.clone()}</span>
+                    </th>
+                    <td>{valor(&c.antes)}</td>
+                    <td>{valor(&c.despues)}</td>
+                </tr>
+            }
+        })
+        .collect_view();
+    view! {
+        <div class="tabla-scroll">
+            <table class="tabla">
+                <thead>
+                    <tr>
+                        <th scope="col">"Campo"</th>
+                        <th scope="col">"Antes"</th>
+                        <th scope="col">"Después"</th>
+                    </tr>
+                </thead>
+                <tbody>{filas}</tbody>
+            </table>
+        </div>
+    }
+    .into_any()
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Fase {
     Revisar,
@@ -67,6 +106,9 @@ pub fn DialogoCambio(
     /// Se llama una vez, cuando el cambio llega a un estado final.
     #[prop(into, optional)]
     on_terminado: Option<Callback<EstadoDeCambio>>,
+    /// Cambio que se deshace (cambia el título y el botón).
+    #[prop(optional)]
+    deshace: Option<i64>,
 ) -> impl IntoView {
     let dlg = NodeRef::<html::Dialog>::new();
     abrir_modal(dlg);
@@ -141,51 +183,17 @@ pub fn DialogoCambio(
         }
     };
 
-    let titulo = match (preparado.borrar, preparado.palabra.is_some()) {
-        (true, _) => "Borrar la instancia",
-        (_, true) => "Ejecutar la acción",
-        _ => "Revisar cambios",
+    let titulo = match (deshace, preparado.borrar, preparado.palabra.is_some()) {
+        (Some(n), ..) => format!("Deshacer el cambio nº {n}"),
+        (_, true, _) => "Borrar la instancia".to_owned(),
+        (_, _, true) => "Ejecutar la acción".to_owned(),
+        _ => "Revisar cambios".to_owned(),
     };
     let instancia = preparado
         .instancia
         .clone()
         .map(|i| format!(", instancia {i}"))
         .unwrap_or_default();
-    let filas = preparado
-        .campos
-        .iter()
-        .map(|c| {
-            view! {
-                <tr>
-                    <th scope="row">
-                        {c.etiqueta.clone()}
-                        <span class="mono campo-nombre">{c.nombre.clone()}</span>
-                    </th>
-                    <td>{valor(&c.antes)}</td>
-                    <td>{valor(&c.despues)}</td>
-                </tr>
-            }
-        })
-        .collect_view();
-    let diff = if preparado.campos.is_empty() {
-        view! { <p class="pagina-sub">"Sin campos que comparar."</p> }.into_any()
-    } else {
-        view! {
-            <div class="tabla-scroll">
-                <table class="tabla">
-                    <thead>
-                        <tr>
-                            <th scope="col">"Campo"</th>
-                            <th scope="col">"Antes"</th>
-                            <th scope="col">"Después"</th>
-                        </tr>
-                    </thead>
-                    <tbody>{filas}</tbody>
-                </table>
-            </div>
-        }
-        .into_any()
-    };
     let vigilancia = duracion(preparado.vigilancia_s);
     let nota = if preparado.palabra.is_some() {
         format!(
@@ -264,8 +272,7 @@ pub fn DialogoCambio(
         Some(texto)
     };
 
-    let pie = move || {
-        match fase.get() {
+    let pie = move || match fase.get() {
         Fase::Seguimiento(_) => view! {
             <button class="boton" type="button" on:click=move |_| cerrar()>
                 "Cerrar"
@@ -282,11 +289,18 @@ pub fn DialogoCambio(
                 "Cancelar"
             </button>
             <button class="boton" type="submit" disabled=f == Fase::Confirmando>
-                {if f == Fase::Confirmando { "Aplicando…" } else if p.with_value(|p| p.borrar) { "Borrar" } else { "Aplicar" }}
+                {if f == Fase::Confirmando {
+                    "Aplicando…"
+                } else if deshace.is_some() {
+                    "Deshacer"
+                } else if p.with_value(|p| p.borrar) {
+                    "Borrar"
+                } else {
+                    "Aplicar"
+                }}
             </button>
         }
         .into_any(),
-    }
     };
 
     view! {
@@ -311,7 +325,7 @@ pub fn DialogoCambio(
                     <span class="mono">{preparado.funcion.clone()}</span>
                     {instancia}
                 </p>
-                {diff}
+                <TablaDiff campos=preparado.campos.clone() />
                 <p class="pagina-sub">{nota}</p>
                 {campo_palabra}
                 <p class="error-formulario" role="alert">

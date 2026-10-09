@@ -3,6 +3,7 @@
 use crate::ui::{
     estado::PaginaEstado,
     explorador::{Explorador, InicioExplorador, PaginaArea, PaginaFuncion},
+    historial::PaginaHistorial,
     layout::Layout,
     login::PaginaLogin,
 };
@@ -66,6 +67,7 @@ pub fn App() -> impl IntoView {
                 <Route path=StaticSegment("login") view=PaginaLogin />
                 <ParentRoute path=StaticSegment("") view=Layout>
                     <Route path=StaticSegment("") view=PaginaEstado />
+                    <Route path=StaticSegment("historial") view=PaginaHistorial />
                     <ParentRoute path=StaticSegment("explorador") view=Explorador>
                         <Route path=StaticSegment("") view=InicioExplorador />
                         <Route path=ParamSegment("area") view=PaginaArea />
