@@ -11,8 +11,8 @@ use leptos::prelude::*;
 #[cfg(feature = "ssr")]
 pub use server::{
     AuthUser, LoginError, MIN_PASSWORD_CHARS, SESSION_COOKIE, User, UserError, attempt_login,
-    client_ip, create_user, delay_secs, hash_password, require_page_session, require_user,
-    set_password, verify, warm_up,
+    client_ip, create_user, delay_secs, hash_password, reauthenticate, require_page_session,
+    require_user, set_password, verify, warm_up,
 };
 
 /// Destino tras el login: `next` solo si es una ruta local (empieza por una
@@ -482,8 +482,46 @@ mod server {
         password: &str,
     ) -> Result<String, LoginError> {
         let _turn = state.login_lock.lock().await;
+        let id = check_throttled(state, ip, Account::Name(username), password).await?;
+        Ok(create_session(&state.db, id).await?)
+    }
+
+    /// Vuelve a pedir la contraseña del usuario de la sesión (p. ej. antes de
+    /// revelar un secreto). Mismo freno que el login: los fallos cuentan para
+    /// la IP y para el usuario, y durante la espera se rechaza sin comprobar.
+    pub async fn reauthenticate(
+        state: &AppState,
+        ip: IpAddr,
+        user: &User,
+        password: &str,
+    ) -> Result<(), LoginError> {
+        let _turn = state.login_lock.lock().await;
+        check_throttled(state, ip, Account::Id(user.id, &user.username), password)
+            .await
+            .map(drop)
+    }
+
+    /// Cuenta cuya contraseña se comprueba.
+    enum Account<'a> {
+        /// Por nombre (login): puede no existir.
+        Name(&'a str),
+        /// Usuario de la sesión: id y nombre.
+        Id(i64, &'a str),
+    }
+
+    /// Comprueba la contraseña con el freno de fuerza bruta; devuelve el id
+    /// del usuario. Hay que llamarla con `state.login_lock` tomado.
+    async fn check_throttled(
+        state: &AppState,
+        ip: IpAddr,
+        account: Account<'_>,
+        password: &str,
+    ) -> Result<i64, LoginError> {
         let db = &state.db;
         let ip_key = ip.to_string();
+        let username = match account {
+            Account::Name(n) | Account::Id(_, n) => n,
+        };
         let user_key: String = username.chars().take(MAX_USERNAME_CHARS).collect();
 
         let wait = wait_ms(db, &ip_key, &user_key).await?;
@@ -496,11 +534,20 @@ mod server {
             return Err(LoginError::BadCredentials);
         }
 
-        let row: Option<(i64, String)> =
-            sqlx::query_as("SELECT id, password_hash FROM users WHERE username = ?")
-                .bind(username)
-                .fetch_optional(db)
-                .await?;
+        let row: Option<(i64, String)> = match account {
+            Account::Name(n) => {
+                sqlx::query_as("SELECT id, password_hash FROM users WHERE username = ?")
+                    .bind(n)
+                    .fetch_optional(db)
+                    .await?
+            }
+            Account::Id(id, _) => {
+                sqlx::query_as("SELECT id, password_hash FROM users WHERE id = ?")
+                    .bind(id)
+                    .fetch_optional(db)
+                    .await?
+            }
+        };
         let (user_id, hash) = match row {
             Some((id, hash)) => (Some(id), hash),
             None => (None, DUMMY_HASH.clone()),
@@ -513,7 +560,7 @@ mod server {
         match user_id {
             Some(id) if ok => {
                 clear_failures(db, &ip_key, &user_key).await?;
-                Ok(create_session(db, id).await?)
+                Ok(id)
             }
             _ => {
                 record_failure(db, &ip_key, &user_key).await?;

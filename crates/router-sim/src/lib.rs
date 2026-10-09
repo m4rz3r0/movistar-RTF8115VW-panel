@@ -540,11 +540,33 @@ async fn page(
     }
     let key = st.next_token();
     st.session_key = Some(key.clone());
+    let vars: String = PAGE_VARS
+        .iter()
+        .filter(|(p, _)| *p == page)
+        .flat_map(|(_, vars)| vars.iter())
+        .map(|(k, v)| format!("var {k}='{v}';\r\n"))
+        .collect();
     format!(
-        "<html><head><script>\r\nvar sessionKey='{key}';\r\n</script></head><body>{page}</body></html>"
+        "<html><head><script>\r\nvar sessionKey='{key}';\r\n{vars}</script></head><body>{page}</body></html>"
     )
     .into_response()
 }
+
+/// Variables `var x='…';` sintéticas de algunas páginas básicas, con nombres
+/// de parámetros del catálogo (incluidos secretos inventados para probar el
+/// enmascarado).
+pub const PAGE_VARS: &[(&str, &[(&str, &str)])] = &[(
+    "te_wifi.asp",
+    &[
+        ("wlSsid", "RED-SIM"),
+        ("wlHide", "0"),
+        ("wlChannel", "6"),
+        ("unitNum", "0"),
+        ("wlMACaddr", "02:00:00:00:00:0d"),
+        ("wlKey1", "wep-sim-secreta"),
+        ("wlWpaPsk", "psk-sim-secreta"),
+    ],
+)];
 
 /// Escritura de la UI básica: `GET /cgi-bin/<x>.cmd|.cgi|.wl?…&sessionKey=…`.
 /// Se registra en `writes` y responde OK; no cambia el estado simulado.

@@ -1,10 +1,15 @@
 //! Aplicación Leptos: documento HTML y rutas de la interfaz.
 
-use crate::ui::{estado::PaginaEstado, layout::Layout, login::PaginaLogin};
+use crate::ui::{
+    estado::PaginaEstado,
+    explorador::{Explorador, InicioExplorador, PaginaArea, PaginaFuncion},
+    layout::Layout,
+    login::PaginaLogin,
+};
 use leptos::prelude::*;
 use leptos_meta::{Link, MetaTags, Stylesheet, Title, provide_meta_context};
 use leptos_router::{
-    StaticSegment,
+    ParamSegment, StaticSegment,
     components::{ParentRoute, Route, Router, Routes},
 };
 
@@ -61,6 +66,14 @@ pub fn App() -> impl IntoView {
                 <Route path=StaticSegment("login") view=PaginaLogin />
                 <ParentRoute path=StaticSegment("") view=Layout>
                     <Route path=StaticSegment("") view=PaginaEstado />
+                    <ParentRoute path=StaticSegment("explorador") view=Explorador>
+                        <Route path=StaticSegment("") view=InicioExplorador />
+                        <Route path=ParamSegment("area") view=PaginaArea />
+                        <Route
+                            path=(ParamSegment("area"), ParamSegment("funcion"))
+                            view=PaginaFuncion
+                        />
+                    </ParentRoute>
                 </ParentRoute>
             </Routes>
         </Router>

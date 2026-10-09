@@ -89,3 +89,7 @@ required-features = ["ssr"]
 [[test]]
 name = "estado"
 required-features = ["ssr"]
+
+[[test]]
+name = "explorador"
+required-features = ["ssr"]

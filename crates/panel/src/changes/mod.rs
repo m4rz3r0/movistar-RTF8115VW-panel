@@ -730,6 +730,54 @@ impl ChangeManager {
         self.vigilar_en_segundo_plano(id, plan, base, Some(nota), reserva);
     }
 
+    /// Tiempos con los que vigila este gestor.
+    pub fn tiempos(&self) -> &Tiempos {
+        &self.tiempos
+    }
+
+    /// ¿Se puede escribir `nombre`? Mismas reglas que [`ChangeManager::preparar`]
+    /// (catálogo y bloqueos de la v1), sin leer el router.
+    pub fn escribible(&self, nombre: &str) -> Result<(), CambioError> {
+        self.funcion_escribible(nombre).map(drop)
+    }
+
+    /// Valores que muestra ahora la lectura pareada de `funcion` para la
+    /// instancia (`valores` lleva los parámetros que la identifican). Son los
+    /// mismos con los que [`ChangeManager::preparar`] calcula el diff. `None`
+    /// si la función no tiene lectura comprobable.
+    pub async fn valores_actuales(
+        &self,
+        funcion: &str,
+        instancia: Option<&str>,
+        valores: &BTreeMap<String, String>,
+    ) -> Result<Option<BTreeMap<String, String>>, CambioError> {
+        let f = self.funcion_escribible(funcion)?;
+        match lectura_de(f, valores, instancia)? {
+            Lectura::Ninguna => Ok(None),
+            l => self.leer(&l).await.map(Some).map_err(|e| {
+                CambioError::Router(format!("no se puede leer el estado actual: {e}"))
+            }),
+        }
+    }
+
+    /// Instancias de la lista de `funcion` según su lectura pareada (sin el
+    /// id, con `all=ALL`), como las ve el gestor al verificar una creación.
+    pub async fn instancias(
+        &self,
+        funcion: &str,
+        valores: &BTreeMap<String, String>,
+    ) -> Result<Vec<BTreeMap<String, String>>, CambioError> {
+        let f = self.funcion_escribible(funcion)?;
+        if f.lista.is_none() {
+            return Err(CambioError::Invalida(format!("{funcion} no es una lista")));
+        }
+        // El id de la lectura se quita al listar: cualquier valor sirve.
+        let l = lectura_de(f, valores, Some("-1"))?;
+        self.listar(&l)
+            .await
+            .map_err(|e| CambioError::Router(format!("no se pueden listar las instancias: {e}")))
+    }
+
     /// Un cambio del historial.
     pub async fn cambio(&self, id: i64) -> Option<Cambio> {
         self.fila(id).await.and_then(|f| a_cambio(&f))

@@ -106,6 +106,15 @@ pub fn post_form(uri: &str, body: &str, peer: &str) -> Request<Body> {
     req
 }
 
+/// `POST` JSON a una server function desde `peer`, como lo haría el navegador
+/// desde el propio panel.
+pub fn post_json(uri: &str, body: &str, peer: &str) -> Request<Body> {
+    let mut req = post_form(uri, body, peer);
+    req.headers_mut()
+        .insert("content-type", "application/json".parse().unwrap());
+    req
+}
+
 /// Cuerpo del formulario de login.
 pub fn login_body(usuario: &str, contrasena: &str) -> String {
     let enc = |s: &str| form_urlencoded::byte_serialize(s.as_bytes()).collect::<String>();
