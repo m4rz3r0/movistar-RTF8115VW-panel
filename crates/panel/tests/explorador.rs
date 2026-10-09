@@ -264,6 +264,20 @@ async fn formulario_static_lease_rellena_valores() {
     assert_eq!(campo(&f, "ipv4_addr").unwrap()["valor"], "");
     assert_eq!(ids_de_reservas(&p, &cookie).await, ["0", "1"]);
 
+    // Un sí/no al crear empieza en «0»: el interruptor apagado se envía.
+    let f = ok(
+        &p,
+        "formulario",
+        json!({ "funcion": "cbSetTR98L2Filtering", "instancia": null, "claves": [] }),
+        &cookie,
+    )
+    .await;
+    assert_eq!(f["operacion"], "Crear");
+    let c = campo(&f, "cls_ethertype").expect("cls_ethertype");
+    assert_eq!(c["param"]["tipo"], "Bool");
+    assert_eq!(c["valor"], "0");
+    assert_eq!(campo(&f, "order").unwrap()["valor"], "");
+
     // Una clave que no identifica instancias se rechaza.
     let (status, _) = llamar(
         &p,

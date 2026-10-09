@@ -192,6 +192,23 @@ pub enum Valor {
     Secreto,
     /// La instancia no tiene ese campo.
     Ausente,
+    /// Valor de una opción (o sí/no) con su etiqueta; `None` si no es una
+    /// de las opciones que conoce el catálogo.
+    Opcion {
+        valor: String,
+        etiqueta: Option<String>,
+    },
+}
+
+impl Valor {
+    /// Texto para mostrar una opción: «Activado (1)» o «(valor
+    /// desconocido: 7)».
+    pub fn texto_opcion(valor: &str, etiqueta: Option<&str>) -> String {
+        match etiqueta {
+            Some(e) => format!("{e} ({valor})"),
+            None => format!("(valor desconocido: {valor})"),
+        }
+    }
 }
 
 /// Campo suelto de una lectura.

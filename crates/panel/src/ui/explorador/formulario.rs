@@ -265,6 +265,9 @@ fn tabla_instancias(
                         }
                         .into_any(),
                         Valor::Ausente => view! { <span class="vacia">"—"</span> }.into_any(),
+                        Valor::Opcion { valor, etiqueta } => {
+                            Valor::texto_opcion(&valor, etiqueta.as_deref()).into_any()
+                        }
                     };
                     view! { <td>{c}</td> }
                 })

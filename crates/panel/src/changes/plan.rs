@@ -95,7 +95,7 @@ pub(super) struct Plan {
 }
 
 /// Valor de `nombre` en `m`: primero exacto, luego sin distinguir mayúsculas.
-pub(super) fn buscar<'a>(m: &'a BTreeMap<String, String>, nombre: &str) -> Option<&'a str> {
+pub(crate) fn buscar<'a>(m: &'a BTreeMap<String, String>, nombre: &str) -> Option<&'a str> {
     m.get(nombre)
         .or_else(|| {
             m.iter()
@@ -147,7 +147,7 @@ pub(super) fn validar(p: &Parametro, v: &str) -> Result<(), String> {
 
 /// Parámetros que identifican la instancia: los que usa la lectura pareada
 /// (`{param}`) y el id de la lista.
-pub(super) fn identidad(f: &Funcion) -> BTreeSet<String> {
+pub(crate) fn identidad(f: &Funcion) -> BTreeSet<String> {
     let mut out: BTreeSet<String> = f
         .lectura_pareada
         .iter()

@@ -1626,7 +1626,7 @@ input {
 .dialogo .tabla th,
 .dialogo .tabla td {
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .formulario-claves {
@@ -1813,6 +1813,15 @@ input {
 @media (max-width: 480px) {
   .dialogo-cuerpo {
     padding: var(--esp-4);
+  }
+
+  .dialogo .tabla .campo-nombre {
+    display: none;
+  }
+
+  .dialogo .tabla th,
+  .dialogo .tabla td {
+    padding: 7px var(--esp-2);
   }
 
   .cabecera-funcion h1 {

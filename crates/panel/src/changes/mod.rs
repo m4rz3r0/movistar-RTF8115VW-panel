@@ -37,6 +37,9 @@ mod plan;
 
 use plan::*;
 pub use plan::{PALABRA_ACCION, PALABRA_REINICIO};
+/// Reglas del gestor que comparte el explorador (qué identifica una
+/// instancia y cómo se busca un campo en una lectura): una sola copia.
+pub(crate) use plan::{buscar, identidad};
 
 use crate::{crypto::HistoryKey, poller::PollerHandle, series, state::AppState};
 use catalogo::{Catalogo, mask::Mascara};

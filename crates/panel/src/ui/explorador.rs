@@ -501,6 +501,9 @@ fn celda_valor(v: Valor, objetivo: Objetivo) -> AnyView {
         }
         .into_any(),
         Valor::Texto(t) => t.into_any(),
+        Valor::Opcion { valor, etiqueta } => {
+            Valor::texto_opcion(&valor, etiqueta.as_deref()).into_any()
+        }
         Valor::Ausente => view! {
             <span class="vacia" aria-hidden="true">"—"</span>
             <span class="solo-lector">"sin valor"</span>
@@ -713,9 +716,14 @@ fn VistaLectura(detalle: FuncionDetalle) -> impl IntoView {
     let hay_params = !campos.is_empty();
     let leer_de_nuevo = move |ev: leptos::ev::SubmitEvent| {
         ev.prevent_default();
-        consulta.set(valores_de());
-        // Misma consulta: se fuerza otra lectura.
-        resultado.refetch();
+        let nuevos = valores_de();
+        if consulta.with_untracked(|c| *c == nuevos) {
+            // Misma consulta: se fuerza otra lectura.
+            resultado.refetch();
+        } else {
+            // Consulta nueva: el recurso ya lee de nuevo (una sola vez).
+            consulta.set(nuevos);
+        }
     };
 
     let datos = {

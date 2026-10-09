@@ -6,14 +6,14 @@
 use super::*;
 use crate::{
     auth::{LoginError, User},
-    changes::{CambioError, ChangeManager, ChangeRequest, Estado},
+    changes::{CambioError, ChangeManager, ChangeRequest, Estado, buscar, identidad},
     state::AppState,
 };
 use axum::http::StatusCode;
 use catalogo::{Area, Funcion, Origen, Riesgo, Tipo, TipoParam};
 use hgu::xml::XmlNode;
 use std::{
-    collections::{BTreeMap, BTreeSet, HashSet},
+    collections::{BTreeMap, HashSet},
     fmt,
     sync::Arc,
 };
@@ -188,22 +188,6 @@ pub fn areas(state: &AppState) -> Vec<AreaVista> {
         .collect()
 }
 
-/// Parámetros que identifican la instancia: los `{p}` de la lectura
-/// pareada y el id de la lista.
-fn identidad(f: &Funcion) -> BTreeSet<String> {
-    let mut out: BTreeSet<String> = f
-        .lectura_pareada
-        .iter()
-        .flat_map(|lp| &lp.params)
-        .filter_map(|(_, v)| v.strip_prefix('{').and_then(|v| v.strip_suffix('}')))
-        .map(str::to_owned)
-        .collect();
-    if let Some(l) = &f.lista {
-        out.insert(l.id_param.clone());
-    }
-    out
-}
-
 /// Nombre sin el sufijo de id (`_id` o `_0i`), si lo tiene.
 fn base_de_id(nombre: &str) -> Option<&str> {
     nombre
@@ -276,9 +260,8 @@ pub fn detalle(state: &AppState, nombre: &str) -> Result<FuncionDetalle, ServerF
 // ---- enmascarado
 
 /// Nombres de parámetros secretos del catálogo (en minúsculas).
-fn secretos_catalogo(state: &AppState) -> HashSet<String> {
-    state
-        .catalogo
+fn secretos_catalogo(catalogo: &catalogo::Catalogo) -> HashSet<String> {
+    catalogo
         .todas()
         .iter()
         .flat_map(|f| &f.parametros)
@@ -295,9 +278,13 @@ struct Ocultar {
 
 impl Ocultar {
     fn new(state: &AppState) -> Ocultar {
+        Ocultar::de(state.mascara.clone(), &state.catalogo)
+    }
+
+    fn de(mascara: Arc<catalogo::mask::Mascara>, catalogo: &catalogo::Catalogo) -> Ocultar {
         Ocultar {
-            mascara: state.mascara.clone(),
-            catalogo: secretos_catalogo(state),
+            mascara,
+            catalogo: secretos_catalogo(catalogo),
         }
     }
 
@@ -569,18 +556,6 @@ fn claves_validas(
     Ok(mapa(claves))
 }
 
-/// Valor de `nombre` en `m`: exacto o sin distinguir mayúsculas (como el
-/// gestor).
-fn buscar<'a>(m: &'a BTreeMap<String, String>, nombre: &str) -> Option<&'a str> {
-    m.get(nombre)
-        .or_else(|| {
-            m.iter()
-                .find(|(k, _)| k.eq_ignore_ascii_case(nombre))
-                .map(|(_, v)| v)
-        })
-        .map(String::as_str)
-}
-
 pub async fn formulario(
     state: &AppState,
     nombre: &str,
@@ -629,10 +604,19 @@ pub async fn formulario(
             continue;
         }
         let cur = buscar(&actual, &p.nombre);
+        // Al crear o ejecutar, un sí/no empieza en «no»: lo que se ve
+        // (interruptor apagado) es lo que se envía.
+        let nuevo = || {
+            if p.tipo == TipoParam::Bool {
+                "0".to_owned()
+            } else {
+                String::new()
+            }
+        };
         let valor = match (operacion, cur) {
-            (Operacion::Accion, _) => String::new(),
-            (Operacion::Crear, Some(_)) => String::new(),
-            (Operacion::Crear, None) if actual.is_empty() => String::new(),
+            (Operacion::Accion, _) => nuevo(),
+            (Operacion::Crear, Some(_)) => nuevo(),
+            (Operacion::Crear, None) if actual.is_empty() => nuevo(),
             (Operacion::Editar, Some(v)) => {
                 if p.tipo == TipoParam::Secret || o.oculto(&p.nombre, v) {
                     MASCARA.to_owned()
@@ -710,6 +694,52 @@ pub async fn instancias(
 
 // ---- cambios
 
+/// Valor del diff para mostrar: opciones y sí/no con su etiqueta.
+fn valor_diff(p: Option<&catalogo::Parametro>, v: String) -> Valor {
+    if v.is_empty() {
+        return Valor::Ausente;
+    }
+    match p.map(|p| (p.tipo, p)) {
+        Some((TipoParam::Enum, p)) => Valor::Opcion {
+            etiqueta: p
+                .opciones
+                .iter()
+                .find(|(o, _)| *o == v)
+                .map(|(_, e)| e.clone()),
+            valor: v,
+        },
+        Some((TipoParam::Bool, _)) => Valor::Opcion {
+            etiqueta: match v.as_str() {
+                "1" => Some("Sí".into()),
+                "0" => Some("No".into()),
+                _ => None,
+            },
+            valor: v,
+        },
+        _ => Valor::Texto(v),
+    }
+}
+
+/// Campo del diff del gestor para la interfaz. Secreto si lo dice el gestor
+/// o si la vista de lectura lo enmascararía (nombre o valor).
+fn campo_cambio(f: &Funcion, o: &Ocultar, c: crate::changes::CampoDiff) -> CampoCambio {
+    let secreto = c.secreto || o.oculto(&c.nombre, &c.antes) || o.oculto(&c.nombre, &c.despues);
+    let p = f.parametro(&c.nombre);
+    let valor = |v: String| {
+        if secreto {
+            Valor::Secreto
+        } else {
+            valor_diff(p, v)
+        }
+    };
+    CampoCambio {
+        etiqueta: p.map_or_else(|| c.nombre.clone(), |p| p.etiqueta.clone()),
+        antes: valor(c.antes),
+        despues: valor(c.despues),
+        nombre: c.nombre,
+    }
+}
+
 pub async fn preparar(state: &AppState, p: Peticion) -> Result<PreparadoVista, ServerFnError> {
     let f = funcion(state, &p.funcion)?;
     let g = gestor(state)?;
@@ -732,19 +762,7 @@ pub async fn preparar(state: &AppState, p: Peticion) -> Result<PreparadoVista, S
         borrar: p.borrar,
     };
     let prep = g.preparar(req).await.map_err(error_cambio)?;
-    let etiqueta = |n: &str| {
-        f.parametro(n)
-            .map_or_else(|| n.to_owned(), |p| p.etiqueta.clone())
-    };
-    let valor = |secreto: bool, v: String| {
-        if secreto {
-            Valor::Secreto
-        } else if v.is_empty() {
-            Valor::Ausente
-        } else {
-            Valor::Texto(v)
-        }
-    };
+    let o = Ocultar::new(state);
     Ok(PreparadoVista {
         token: prep.token,
         funcion: f.name.clone(),
@@ -754,12 +772,7 @@ pub async fn preparar(state: &AppState, p: Peticion) -> Result<PreparadoVista, S
             .diff
             .campos
             .into_iter()
-            .map(|c| CampoCambio {
-                etiqueta: etiqueta(&c.nombre),
-                antes: valor(c.secreto, c.antes),
-                despues: valor(c.secreto, c.despues),
-                nombre: c.nombre,
-            })
+            .map(|c| campo_cambio(f, &o, c))
             .collect(),
         riesgo: riesgo(prep.riesgo),
         vigilancia_s: g.tiempos().vigilancia(prep.riesgo).as_secs(),
@@ -962,6 +975,77 @@ mod tests {
         let a = c.funcion("cbGetWifiAccPt").unwrap();
         assert_eq!(inicial(a, "dpm_cfg_wifi_acc_pt_id"), "0");
         assert_eq!(inicial(a, "dpm_cfg_wifi_acc_pt_0i"), "");
+    }
+
+    fn diff(nombre: &str, antes: &str, despues: &str) -> crate::changes::CampoDiff {
+        crate::changes::CampoDiff {
+            nombre: nombre.into(),
+            antes: antes.into(),
+            despues: despues.into(),
+            secreto: false,
+        }
+    }
+
+    #[test]
+    fn diff_con_etiquetas_de_opciones() {
+        let c = catalogo::Catalogo::load().unwrap();
+        let o = Ocultar::de(Arc::new(catalogo::mask::Mascara::load().unwrap()), &c);
+        let f = c.funcion("cbDhcpV4SvrPoolSetStatic").unwrap();
+        let d = campo_cambio(f, &o, diff("adm_state", "0", "1"));
+        assert_eq!(d.etiqueta, "Activado");
+        assert_eq!(
+            d.antes,
+            Valor::Opcion {
+                valor: "0".into(),
+                etiqueta: Some("Desactivado".into())
+            }
+        );
+        assert_eq!(
+            d.despues,
+            Valor::Opcion {
+                valor: "1".into(),
+                etiqueta: Some("Activado".into())
+            }
+        );
+        let d = campo_cambio(f, &o, diff("adm_state", "7", ""));
+        assert_eq!(
+            d.antes,
+            Valor::Opcion {
+                valor: "7".into(),
+                etiqueta: None
+            }
+        );
+        assert_eq!(d.despues, Valor::Ausente);
+        assert_eq!(Valor::texto_opcion("7", None), "(valor desconocido: 7)");
+        assert_eq!(Valor::texto_opcion("1", Some("Sí")), "Sí (1)");
+        let w = c.funcion("cbSetWifiAccPt").unwrap();
+        let d = campo_cambio(w, &o, diff("ssid_hide", "0", "1"));
+        assert_eq!(
+            d.despues,
+            Valor::Opcion {
+                valor: "1".into(),
+                etiqueta: Some("Sí".into())
+            }
+        );
+        let d = campo_cambio(w, &o, diff("ssid", "A", "B"));
+        assert_eq!(d.despues, Valor::Texto("B".into()));
+    }
+
+    #[test]
+    fn diff_enmascara_lo_que_la_lectura_enmascara() {
+        let c = catalogo::Catalogo::load().unwrap();
+        let o = Ocultar::de(Arc::new(catalogo::mask::Mascara::load().unwrap()), &c);
+        let w = c.funcion("cbSetWifiAccPt").unwrap();
+        // Nombre sensible con sufijo numérico y valor de texto: el gestor no
+        // lo marca, pero la lectura lo enmascara.
+        let d = campo_cambio(w, &o, diff("wep_key_idx", "1", "clave"));
+        assert!(o.oculto("wep_key_idx", "clave"));
+        assert_eq!((d.antes, d.despues), (Valor::Secreto, Valor::Secreto));
+        // Parámetro secreto del catálogo aunque el gestor no lo marque.
+        let d = campo_cambio(w, &o, diff("key_phrase", "a", "b"));
+        assert_eq!(d.despues, Valor::Secreto);
+        let d = campo_cambio(w, &o, diff("wep_key_idx", "1", "2"));
+        assert!(matches!(d.despues, Valor::Opcion { .. }));
     }
 
     #[test]

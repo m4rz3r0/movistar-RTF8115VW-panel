@@ -35,6 +35,10 @@ fn valor(v: &Valor) -> AnyView {
             <span class="solo-lector">"(valor oculto)"</span>
         }
         .into_any(),
+        Valor::Opcion { valor, etiqueta } => {
+            let texto = Valor::texto_opcion(valor, etiqueta.as_deref());
+            view! { <span>{texto}</span> }.into_any()
+        }
         Valor::Ausente => view! {
             <span class="vacia" aria-hidden="true">"—"</span>
             <span class="solo-lector">"sin valor"</span>
