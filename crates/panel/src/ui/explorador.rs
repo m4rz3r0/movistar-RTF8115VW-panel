@@ -13,6 +13,8 @@
 mod datos;
 mod dialogo;
 mod formulario;
+#[cfg(feature = "ssr")]
+mod servidor;
 
 pub use datos::*;
 pub use dialogo::DialogoCambio;
