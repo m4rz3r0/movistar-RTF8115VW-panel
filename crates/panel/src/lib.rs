@@ -3,6 +3,11 @@
 //! Con la feature `ssr` se compila el servidor; con `hydrate`, la parte que se
 //! ejecuta en el navegador (WASM).
 
+// Los tipos de vista anidados de los gráficos (`ui/charts/franja.rs`) superan
+// la profundidad de consultas por defecto (128) al compilar la hidratación en
+// release; sin esto `cargo leptos build --release` no compila.
+#![recursion_limit = "256"]
+
 pub mod app;
 pub mod auth;
 pub mod ui;
