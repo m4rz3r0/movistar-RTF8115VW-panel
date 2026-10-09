@@ -382,8 +382,11 @@ impl Client {
             req = req.header("Cookie", cookie);
         }
         if let Some(b) = body {
+            // Explícito: con un cuerpo vacío hyper no envía `Content-Length` y
+            // el micro_httpd del router responde 400 a ese POST.
             req = req
                 .header("Content-Type", "application/x-www-form-urlencoded")
+                .header("Content-Length", b.len())
                 .body(b);
         }
         let result = async {
@@ -407,7 +410,7 @@ impl Client {
                 st.cookies.insert(k.trim().to_owned(), v.trim().to_owned());
             }
         }
-        if status.is_server_error() {
+        if status.is_client_error() || status.is_server_error() {
             return Err(Error::Unexpected(format!(
                 "{}: HTTP {status}",
                 sin_consulta(path)

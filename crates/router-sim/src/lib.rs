@@ -109,6 +109,7 @@ impl Sim {
                 inner.clone(),
                 hang_if_unresponsive,
             ))
+            .layer(middleware::from_fn(post_needs_content_length))
             .with_state(inner.clone());
         tokio::spawn(async move {
             if let Err(e) = axum::serve(listener, app).await {
@@ -476,6 +477,21 @@ fn has_basic(st: &SimState, c: &HashMap<String, String>) -> bool {
 async fn hang_if_unresponsive(State(s): State<Arc<Inner>>, req: Request, next: Next) -> Response {
     while s.unresponsive.load(Ordering::SeqCst) {
         tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    next.run(req).await
+}
+
+/// Como el micro_httpd del router real: un POST sin `Content-Length` (lo que
+/// hace hyper con un cuerpo vacío) recibe 400 Bad Request.
+async fn post_needs_content_length(req: Request, next: Next) -> Response {
+    if req.method() == axum::http::Method::POST
+        && !req.headers().contains_key(header::CONTENT_LENGTH)
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            "<html><body>400 Bad Request</body></html>",
+        )
+            .into_response();
     }
     next.run(req).await
 }
