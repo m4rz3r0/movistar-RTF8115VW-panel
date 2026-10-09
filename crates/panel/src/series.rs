@@ -44,9 +44,12 @@ pub fn rate(prev: (i64, u64), cur: (i64, u64)) -> Option<f64> {
 #[derive(Clone, Debug, PartialEq, sqlx::FromRow)]
 pub struct Sample {
     pub ts: i64,
-    /// Bajada de la WAN (`ip2`) en bit/s; `None` sin lectura anterior válida.
+    /// Bajada de los dispositivos de la red en bit/s (Σ tx de los puertos LAN
+    /// y los puntos de acceso; ver `poller::lan_rates`); `None` sin lectura
+    /// anterior válida. Las muestras anteriores a v0.1.0 medían `ip2`, que no
+    /// ve el tráfico reenviado por hardware.
     pub rx_bps: Option<f64>,
-    /// Subida de la WAN (`ip2`) en bit/s.
+    /// Subida de los dispositivos de la red en bit/s (Σ rx del lado LAN).
     pub tx_bps: Option<f64>,
     pub load1: f32,
     pub ram_used_pct: f32,

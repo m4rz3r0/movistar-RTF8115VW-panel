@@ -200,3 +200,44 @@ async fn server_fns_de_estado_exigen_sesion() {
         assert_eq!(status, 401, "{nombre}");
     }
 }
+
+/// Regresión de la medida del 09/10 en el router real: una descarga de 1 GiB
+/// en el puerto LAN 4 movió `ip2` rx sólo +51 973 B (reenvío por hardware)
+/// y `eth0.4` tx +1 146 955 629 B. La bajada tiene que seguir al puerto LAN.
+#[tokio::test]
+async fn la_bajada_sigue_a_los_puertos_lan_y_no_a_ip2() {
+    let mut p = panel().await;
+    let h = arrancar_sondeo(&mut p);
+    esperar("primer dato", || h.healthy()).await;
+    // ~1 GiB en 100 pasos de 10 ms por eth0.4 (tx); ip2 casi quieto.
+    let inicio = Instant::now();
+    for _ in 0..100 {
+        p.sim
+            .control
+            .counters_bump_iface("eth0.4", 0, 1_146_955_629 / 100);
+        p.sim.control.counters_bump_iface("ip2", 51_973 / 100, 0);
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    let segundos = inicio.elapsed().as_secs_f64();
+    tokio::time::sleep(Duration::from_millis(60)).await;
+    let muestras = panel::series::query(&p.state.db, panel::series::Rango::Hora)
+        .await
+        .unwrap();
+    let maxima = muestras
+        .iter()
+        .filter_map(|m| m.rx_bps)
+        .fold(0.0_f64, f64::max);
+    let media_eth = 1_146_955_629.0 * 8.0 / segundos;
+    let media_ip2 = 51_973.0 * 8.0 / segundos;
+    // Por muestra la tasa varía con el reparto de los pasos; lo que importa
+    // es el orden de magnitud: el del puerto LAN, no el de ip2.
+    assert!(
+        maxima > media_eth / 4.0,
+        "bajada máxima {maxima} b/s; puerto LAN {media_eth}, ip2 {media_ip2}"
+    );
+    assert!(
+        muestras
+            .iter()
+            .all(|m| m.tx_bps.is_none_or(|t| t < media_eth / 100.0))
+    );
+}

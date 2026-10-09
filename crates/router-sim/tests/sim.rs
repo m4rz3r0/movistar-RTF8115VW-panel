@@ -317,19 +317,35 @@ async fn fail_reads_hasta_desactivar() {
 }
 
 #[tokio::test]
-async fn counters_bump_adds_to_ip2() {
+async fn counters_bump_moves_ip2_and_lan_port() {
     let sim = start().await;
     let c = client(&sim, Duration::from_secs(5));
-    let bytes = |n: XmlNode| {
-        let e = ip2(&n, "rtm_cfg_ip_intf");
+    let bytes = |n: &XmlNode, entry: &str, name: &str| {
+        let e = n
+            .all(entry)
+            .into_iter()
+            .find(|e| e.text_of("name") == Some(name))
+            .expect("entrada");
         let v = |t| e.text_of(t).unwrap().parse::<u64>().unwrap();
         (v("rx_byte"), v("tx_byte"))
     };
-    let (rx, tx) = bytes(c.call("cbGetStatistic", &[]).await.unwrap());
+    let before = c.call("cbGetStatistic", &[]).await.unwrap();
     sim.control.counters_bump(1000, 20);
     sim.control.counters_bump(1, 2);
-    let after = bytes(c.call("cbGetStatistic", &[]).await.unwrap());
-    assert_eq!(after, (rx + 1001, tx + 22));
+    sim.control.counters_bump_iface("ra0", 5, 7);
+    let after = c.call("cbGetStatistic", &[]).await.unwrap();
+    let (rx, tx) = bytes(&before, "rtm_cfg_ip_intf", "ip2");
+    assert_eq!(
+        bytes(&after, "rtm_cfg_ip_intf", "ip2"),
+        (rx + 1001, tx + 22)
+    );
+    // Lado LAN: lo que baja de internet sale (tx) por el puerto del equipo.
+    let (rx, tx) = bytes(&before, "dpm_cfg_eth", "eth0.4");
+    assert_eq!(bytes(&after, "dpm_cfg_eth", "eth0.4"), (rx + 22, tx + 1001));
+    let (rx, tx) = bytes(&before, "dpm_wifi_ap", "ra0");
+    assert_eq!(bytes(&after, "dpm_wifi_ap", "ra0"), (rx + 5, tx + 7));
+    let (rx, tx) = bytes(&before, "dpm_cfg_eth", "eth0.1");
+    assert_eq!(bytes(&after, "dpm_cfg_eth", "eth0.1"), (rx, tx));
 }
 
 #[tokio::test]

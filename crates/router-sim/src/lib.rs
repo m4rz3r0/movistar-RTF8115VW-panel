@@ -32,6 +32,8 @@ const LOGGED_OUT: &str = "<script>top.location.href='te_acceso_router.asp';</scr
 const XML_HEADER: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\r\n";
 /// Interfaz WAN principal (Internet).
 const WAN: &str = "ip2";
+/// Puerto LAN del equipo de `counters_bump`.
+const LAN_PORT: &str = "eth0.4";
 
 /// Configuración del simulador.
 #[derive(Clone, Debug)]
@@ -187,11 +189,23 @@ impl SimControl {
         self.inner.state().hang_after_write = HangAfterWrite::Armed;
     }
 
-    /// Suma bytes a `rx_byte`/`tx_byte` de `ip2` en `cbGetStatistic`.
+    /// Tráfico de internet de un equipo en el puerto LAN 4: `rx` bytes de
+    /// bajada y `tx` de subida. En `cbGetStatistic` suben `ip2` (rx, tx) y,
+    /// del lado LAN, `eth0.4` al revés (lo que baja sale por el puerto: tx).
+    /// El router real apenas los cuenta en `ip2` (reenvío por hardware); el
+    /// panel mide en los puertos LAN.
     pub fn counters_bump(&self, rx: u64, tx: u64) {
+        self.counters_bump_iface(WAN, rx, tx);
+        self.counters_bump_iface(LAN_PORT, tx, rx);
+    }
+
+    /// Suma bytes a `rx_byte`/`tx_byte` de la interfaz `name` de
+    /// `cbGetStatistic`.
+    pub fn counters_bump_iface(&self, name: &str, rx: u64, tx: u64) {
         let mut st = self.inner.state();
-        st.rx_extra = st.rx_extra.saturating_add(rx);
-        st.tx_extra = st.tx_extra.saturating_add(tx);
+        let e = st.counters_extra.entry(name.to_owned()).or_default();
+        e.0 = e.0.saturating_add(rx);
+        e.1 = e.1.saturating_add(tx);
     }
 
     /// Escrituras recibidas con `sessionKey` válido (sin él), en orden. No
@@ -255,8 +269,8 @@ struct SimState {
     fail_reads_after_write: Option<String>,
     /// `hang_after_next_write`.
     hang_after_write: HangAfterWrite,
-    rx_extra: u64,
-    tx_extra: u64,
+    /// Bytes sumados a cada interfaz de `cbGetStatistic`: nombre → (rx, tx).
+    counters_extra: HashMap<String, (u64, u64)>,
     writes: Vec<(String, Params)>,
     leases: Vec<Lease>,
     upnp_adm_state: Option<String>,
@@ -762,8 +776,8 @@ fn patch(st: &SimState, name: &str, node: &mut XmlNode) {
             }
         }),
         "cbGetStatistic" => for_each_node(node, &mut |n| {
-            if n.text_of("name") == Some(WAN) {
-                for (tag, extra) in [("rx_byte", st.rx_extra), ("tx_byte", st.tx_extra)] {
+            if let Some(&(rx, tx)) = n.text_of("name").and_then(|m| st.counters_extra.get(m)) {
+                for (tag, extra) in [("rx_byte", rx), ("tx_byte", tx)] {
                     if let Some(v) = n.text_of(tag).and_then(|v| v.parse::<u64>().ok()) {
                         set_child(n, tag, &v.saturating_add(extra).to_string());
                     }

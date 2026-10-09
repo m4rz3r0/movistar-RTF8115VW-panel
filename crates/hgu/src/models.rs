@@ -65,12 +65,47 @@ impl Summary {
     }
 }
 
+/// Tipo de interfaz de `cbGetStatistic`, según la etiqueta del nodo.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum IfaceKind {
+    /// Puerto físico de la LAN (`dpm_cfg_eth`: `eth0.1`…`eth0.4`).
+    LanPort,
+    /// Punto de acceso WiFi (`dpm_wifi_ap`: `ra*`, `qtn*`).
+    WifiAp,
+    /// Interfaz IP del router (`rtm_cfg_ip_intf`: `ip2` es la WAN). El
+    /// tráfico reenviado por hardware no pasa por sus contadores.
+    IpIntf,
+    /// Cualquier otra etiqueta.
+    #[default]
+    Other,
+}
+
+impl IfaceKind {
+    fn from_tag(tag: &str) -> Self {
+        match tag {
+            "dpm_cfg_eth" => IfaceKind::LanPort,
+            "dpm_wifi_ap" => IfaceKind::WifiAp,
+            "rtm_cfg_ip_intf" => IfaceKind::IpIntf,
+            _ => IfaceKind::Other,
+        }
+    }
+
+    /// Puertos de la LAN y puntos de acceso WiFi: lo que entra y sale de los
+    /// dispositivos de la red (incluido el reenviado por hardware).
+    pub fn is_lan_side(self) -> bool {
+        matches!(self, IfaceKind::LanPort | IfaceKind::WifiAp)
+    }
+}
+
 /// Contadores de una interfaz. Correspondencia con cada elemento de
 /// `cbGetStatistic` que tenga `name`: `rx_byte`, `tx_byte`, `rx_pkt_err`,
-/// `tx_pkt_err`, `rx_pkt_discard`, `tx_pkt_discard`.
+/// `tx_pkt_err`, `rx_pkt_discard`, `tx_pkt_discard`; `kind` sale de la
+/// etiqueta del elemento.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct IfaceCounters {
     pub name: String,
+    #[serde(default)]
+    pub kind: IfaceKind,
     pub rx_bytes: u64,
     pub tx_bytes: u64,
     pub rx_err: u64,
@@ -87,6 +122,7 @@ impl IfaceCounters {
             .filter(|c| c.get("name").is_some() && c.get("rx_byte").is_some())
             .map(|c| IfaceCounters {
                 name: text(c, "name"),
+                kind: IfaceKind::from_tag(&c.tag),
                 rx_bytes: int(c, "rx_byte"),
                 tx_bytes: int(c, "tx_byte"),
                 rx_err: int(c, "rx_pkt_err"),
@@ -370,6 +406,41 @@ mod tests {
         let eth = c.iter().find(|c| c.name == "eth0.1").unwrap();
         assert_eq!((eth.rx_bytes, eth.tx_bytes), (30960130983, 22812082599));
         assert_eq!(eth.rx_drop, 303);
+    }
+
+    #[test]
+    fn counters_know_their_kind() {
+        let c = IfaceCounters::parse_all(&fixture("cbGetStatistic", "cbGetStatistic"));
+        let kind = |name: &str| c.iter().find(|c| c.name == name).unwrap().kind;
+        assert_eq!(kind("eth0.4"), IfaceKind::LanPort);
+        assert_eq!(kind("ra0"), IfaceKind::WifiAp);
+        assert_eq!(kind("qtn3"), IfaceKind::WifiAp);
+        assert_eq!(kind("ip2"), IfaceKind::IpIntf);
+        let lan: Vec<&str> = c
+            .iter()
+            .filter(|c| c.kind.is_lan_side())
+            .map(|c| c.name.as_str())
+            .collect();
+        assert_eq!(lan.len(), 12, "{lan:?}");
+        assert!(!lan.contains(&"ip2"));
+        let otro = IfaceCounters::parse_all(&XmlNode {
+            tag: "cbGetStatistic".into(),
+            text: String::new(),
+            children: vec![XmlNode {
+                tag: "dpm_cfg_gpon".into(),
+                text: String::new(),
+                children: ["name", "rx_byte"]
+                    .iter()
+                    .map(|t| XmlNode {
+                        tag: (*t).into(),
+                        text: "1".into(),
+                        children: vec![],
+                    })
+                    .collect(),
+            }],
+        });
+        assert_eq!(otro[0].kind, IfaceKind::Other);
+        assert!(!otro[0].kind.is_lan_side());
     }
 
     #[test]

@@ -554,7 +554,8 @@ fn Graficas(
                 </div>
             </div>
             <SerieTemporal
-                titulo="Tráfico WAN"
+                titulo="Tráfico de los dispositivos"
+                nota="Lo que envían y reciben los equipos de la red por cable y WiFi. Incluye el tráfico entre equipos conectados a puertos distintos del router."
                 series=trafico
                 unidad=Unidad::Bps
                 alto=280

@@ -111,6 +111,9 @@ pub fn SerieTemporal(
     /// Título visible (y del resumen accesible).
     #[prop(into)]
     titulo: String,
+    /// Aclaración breve bajo el título (qué se mide).
+    #[prop(into, optional)]
+    nota: Option<String>,
     #[prop(into)] series: Signal<Vec<Serie>>,
     unidad: Unidad,
     /// Alto total en píxeles (con el eje X).
@@ -331,6 +334,7 @@ pub fn SerieTemporal(
             <figcaption class="grafica-cabecera">
                 <span class="grafica-titulo">{titulo}</span>
                 {leyenda}
+                {nota.map(|n| view! { <p class="grafica-nota">{n}</p> })}
             </figcaption>
             <div class="grafica-lienzo" node_ref=contenedor>
                 <svg

@@ -30,13 +30,62 @@ use hgu::{
     read,
 };
 use std::{
+    collections::BTreeMap,
     sync::{Arc, Mutex, MutexGuard, OnceLock},
     time::{Duration, Instant},
 };
 use tokio::sync::watch;
 
-/// Interfaz de la conexión PPP principal.
+/// Interfaz de la conexión PPP principal (sólo para saber si hay internet: sus
+/// contadores no ven el tráfico reenviado por hardware).
 const WAN: &str = "ip2";
+
+/// Lectura de los contadores del lado LAN: `(ts_ms, nombre → (rx, tx))` de
+/// los puertos físicos y los puntos de acceso WiFi.
+type LanBytes = (i64, BTreeMap<String, (u64, u64)>);
+
+/// Contadores del lado LAN de una lectura de `cbGetStatistic`; `None` si no
+/// hay ninguna interfaz de ese tipo.
+fn lan_bytes(ms: i64, counters: &[IfaceCounters]) -> Option<LanBytes> {
+    let ifaces: BTreeMap<_, _> = counters
+        .iter()
+        .filter(|c| c.kind.is_lan_side())
+        .map(|c| (c.name.clone(), (c.rx_bytes, c.tx_bytes)))
+        .collect();
+    (!ifaces.is_empty()).then_some((ms, ifaces))
+}
+
+/// Bajada y subida (bit/s) de los dispositivos de la red entre dos lecturas.
+///
+/// El router reenvía el tráfico de internet por hardware y no lo cuenta en
+/// `ip2`, así que se mide en los puertos LAN y los puntos de acceso: lo que
+/// el router **envía** a los dispositivos (Σ tx) es la bajada y lo que
+/// **recibe** de ellos (Σ rx), la subida. Incluye el tráfico entre
+/// dispositivos de puertos distintos del router.
+///
+/// Si alguna interfaz ha reiniciado su contador (ha bajado) o el conjunto de
+/// interfaces ha cambiado, la muestra entera queda sin tasa: sumar sólo las
+/// demás daría un valor más bajo que parecería real; un hueco no engaña.
+fn lan_rates(prev: &LanBytes, cur: &LanBytes) -> (Option<f64>, Option<f64>) {
+    if prev.1.len() != cur.1.len() {
+        return (None, None);
+    }
+    let (mut rx, mut tx) = (0u64, 0u64);
+    for (name, &(crx, ctx)) in &cur.1 {
+        let Some(&(prx, ptx)) = prev.1.get(name) else {
+            return (None, None);
+        };
+        let (Some(drx), Some(dtx)) = (crx.checked_sub(prx), ctx.checked_sub(ptx)) else {
+            return (None, None);
+        };
+        rx = rx.saturating_add(drx);
+        tx = tx.saturating_add(dtx);
+    }
+    (
+        series::rate((prev.0, 0), (cur.0, tx)),
+        series::rate((prev.0, 0), (cur.0, rx)),
+    )
+}
 
 /// Intervalos del sondeo.
 #[derive(Clone, Debug)]
@@ -243,8 +292,8 @@ pub struct Poller {
     state: AppState,
     handle: PollerHandle,
     cfg: PollerConfig,
-    /// Última lectura de los contadores de `ip2`: `(ts_ms, rx, tx)`.
-    prev: Option<(i64, u64, u64)>,
+    /// Última lectura de los contadores del lado LAN.
+    prev: Option<LanBytes>,
     last_slow: Option<Instant>,
     last_compact: Option<Instant>,
 }
@@ -444,18 +493,11 @@ impl Poller {
     /// Actualiza la instantánea y guarda la muestra y el estado de la WAN.
     async fn store(&mut self, now: i64, r: Reading) {
         let wan_up = r.wan.iter().any(|w| w.name == WAN && w.up);
-        let bytes = r
-            .counters
-            .iter()
-            .find(|c| c.name == WAN)
-            .map(|c| (r.counters_ms, c.rx_bytes, c.tx_bytes));
+        let bytes = lan_bytes(r.counters_ms, &r.counters);
         // Tras un hueco (pausa larga) no se promedia sobre él.
         let gap_ms = i64::try_from((self.cfg.fast * 3).as_millis()).unwrap_or(i64::MAX);
-        let (rx_bps, tx_bps) = match (self.prev, bytes) {
-            (Some((pms, prx, ptx)), Some((ms, rx, tx))) if ms - pms <= gap_ms => (
-                series::rate((pms, prx), (ms, rx)),
-                series::rate((pms, ptx), (ms, tx)),
-            ),
+        let (rx_bps, tx_bps) = match (&self.prev, &bytes) {
+            (Some(prev), Some(cur)) if cur.0 - prev.0 <= gap_ms => lan_rates(prev, cur),
             _ => (None, None),
         };
         self.prev = bytes;
@@ -552,6 +594,90 @@ impl Poller {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use hgu::models::IfaceKind;
+
+    fn iface(name: &str, kind: IfaceKind, rx: u64, tx: u64) -> IfaceCounters {
+        IfaceCounters {
+            name: name.into(),
+            kind,
+            rx_bytes: rx,
+            tx_bytes: tx,
+            rx_err: 0,
+            tx_err: 0,
+            rx_drop: 0,
+            tx_drop: 0,
+        }
+    }
+
+    /// Lectura con los contadores de la medida real del 09/10: (ip2, eth0.1,
+    /// eth0.4, ra0) como (rx, tx).
+    fn lectura(ms: i64, v: [(u64, u64); 4]) -> LanBytes {
+        let c = [
+            iface("ip2", IfaceKind::IpIntf, v[0].0, v[0].1),
+            iface("eth0.1", IfaceKind::LanPort, v[1].0, v[1].1),
+            iface("eth0.4", IfaceKind::LanPort, v[2].0, v[2].1),
+            iface("ra0", IfaceKind::WifiAp, v[3].0, v[3].1),
+        ];
+        lan_bytes(ms, &c).unwrap()
+    }
+
+    #[test]
+    fn la_bajada_sale_de_los_puertos_lan_no_de_ip2() {
+        // Descarga de 1 GiB desde un portátil en eth0.4 durante 40 s: ip2 rx
+        // apenas se mueve (+51 973 B, el resto va reenviado por hardware) y
+        // eth0.4 tx sube 1 146 955 629 B; eth0.1 rx +1,9 MB.
+        let antes = lectura(
+            0,
+            [
+                (1_000, 2_000),
+                (30_960_130_983, 22_812_082_599),
+                (2_394_882_504, 30_028_210_591),
+                (21_331, 59_075),
+            ],
+        );
+        let despues = lectura(
+            40_000,
+            [
+                (1_000 + 51_973, 2_000 + 40_000),
+                (30_960_130_983 + 1_900_000, 22_812_082_599),
+                (2_394_882_504 + 20_000_000, 30_028_210_591 + 1_146_955_629),
+                (21_331, 59_075),
+            ],
+        );
+        let (bajada, subida) = lan_rates(&antes, &despues);
+        let bajada = bajada.unwrap();
+        let esperada = 1_146_955_629.0 * 8.0 / 40.0;
+        assert!((bajada - esperada).abs() / esperada < 0.001, "{bajada}");
+        assert!(
+            bajada > 220e6,
+            "≈ 229 Mbit/s, no los ~10 kbit/s de ip2: {bajada}"
+        );
+        let subida = subida.unwrap();
+        let esperada = (1_900_000.0 + 20_000_000.0) * 8.0 / 40.0;
+        assert!((subida - esperada).abs() / esperada < 0.001, "{subida}");
+    }
+
+    #[test]
+    fn reinicio_de_una_interfaz_descarta_la_muestra() {
+        let antes = lectura(0, [(0, 0), (1_000, 1_000), (5_000, 5_000), (10, 10)]);
+        // eth0.4 vuelve a cero (rx) y las demás suben: ni negativa ni enorme.
+        let despues = lectura(10_000, [(0, 0), (2_000, 2_000), (100, 9_000), (20, 20)]);
+        assert_eq!(lan_rates(&antes, &despues), (None, None));
+    }
+
+    #[test]
+    fn cambio_de_interfaces_descarta_la_muestra() {
+        let antes = lectura(0, [(0, 0), (1_000, 1_000), (5_000, 5_000), (10, 10)]);
+        let mut despues = lectura(10_000, [(0, 0), (2_000, 2_000), (6_000, 6_000), (20, 20)]);
+        despues.1.remove("ra0");
+        assert_eq!(lan_rates(&antes, &despues), (None, None));
+        assert_eq!(lan_rates(&despues, &antes), (None, None));
+    }
+
+    #[test]
+    fn sin_interfaces_lan_no_hay_lectura() {
+        assert!(lan_bytes(0, &[iface("ip2", IfaceKind::IpIntf, 1, 1)]).is_none());
+    }
 
     #[test]
     fn espera_creciente_hasta_el_maximo() {
