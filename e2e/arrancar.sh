@@ -23,6 +23,24 @@ printf 'sim' >"$DIR/router.secret"
 chmod 600 "$DIR/router.secret"
 target/debug/router-sim --listen "127.0.0.1:$SIM_PORT" --fixtures crates/hgu/fixtures &
 SIM=$!
+# Que el simulador escuche de verdad (y sea el nuestro) antes de seguir: con
+# el puerto ocupado, el panel sólo vería «Esperando el primer dato».
+n=0
+while :; do
+	if ! kill -0 "$SIM" 2>/dev/null; then
+		echo "router-sim no arrancó en 127.0.0.1:$SIM_PORT (¿puerto ocupado? E2E_SIM_PORT)" >&2
+		exit 1
+	fi
+	if curl -s -m 1 -o /dev/null "http://127.0.0.1:$SIM_PORT/"; then
+		break
+	fi
+	n=$((n + 1))
+	if [ "$n" -ge 50 ]; then
+		echo "router-sim no responde en 127.0.0.1:$SIM_PORT" >&2
+		exit 1
+	fi
+	sleep 0.1
+done
 printf 'e2e-contrasena\n' | RP_DB="$DIR/panel.db" target/debug/panel user add e2e
 RP_LISTEN="127.0.0.1:$PORT" \
 	RP_DB="$DIR/panel.db" \
@@ -37,4 +55,7 @@ RP_LISTEN="127.0.0.1:$PORT" \
 	LEPTOS_SITE_ROOT=target/site \
 	LEPTOS_SITE_PKG_DIR=pkg \
 	LEPTOS_SITE_ADDR="127.0.0.1:$PORT" \
-	target/debug/panel
+	target/debug/panel || {
+	echo "el panel no arrancó en 127.0.0.1:$PORT (¿puerto ocupado? E2E_PORT)" >&2
+	exit 1
+}

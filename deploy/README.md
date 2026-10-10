@@ -33,8 +33,9 @@ En el host:
 - `/var/log/routerpanel-update.log` (rotado por
   `/usr/local/etc/newsyslog.conf.d/routerpanel.conf`) y
   `/var/log/routerpanel-build.log` (salida de cargo de la última compilación).
-- `/var/db/routerpanel-actualizar/fallida` — última versión que no compiló o
-  no arrancó; no se reintenta hasta que haya otra etiqueta.
+- `/var/db/routerpanel-actualizar/fallida` — última etiqueta que no compiló o
+  no arrancó; no se reintenta hasta que haya otra. Los `--ref` no la tocan
+  (ni si fallan ni si van bien).
 - `/root/routerpanel-admin-password.txt` (600) — contraseña inicial del usuario
   `admin` del panel.
 
@@ -191,12 +192,16 @@ reglas de doas nuevas (`doas.conf.snippet`).
   (`192.0.2.10:53`), el panel (`.20:3000`) y a sí misma (las pruebas
   escuchan en 127.0.0.1, que en la jail es su propia IP). Mismo truco: etiqueta
   `ROUTERPANEL_BUILD` en su nat para lo que va por `em0`.
-- El interruptor de hombre muerto es `sh -c "sleep 180 && cp … && pfctl -f …"`
+- El interruptor de hombre muerto es
+  `sh -c "sleep 180 && : >/var/run/routerpanel-pf-deadman.saltado && cp … && pfctl -f …"`
   bajo `daemon -p` (el pidfile es el del `sh`). Para desarmarlo se mata primero
   el `sh` y luego su `sleep`; y con `&&`, aunque el `sleep` muriera antes, no se
-  restauraría nada (con `;` sí). Si al confirmar el `sh` ya no vive, el
-  interruptor saltó: `--pf-confirmar` falla con ese mensaje (las reglas
-  vigentes son las anteriores) y hay que repetir `--pf-cargar`.
+  restauraría nada (con `;` sí). `daemon` borra el pidfile cuando el `sh`
+  termina, así que «saltó» se reconoce por la marca `.saltado` (se crea justo
+  antes de restaurar y `--pf-cargar` la borra al armar): con ella,
+  `--pf-confirmar` falla con «el interruptor ya saltó» (las reglas vigentes son
+  las anteriores) y hay que repetir `--pf-cargar`; sin marca ni pidfile, dice
+  que no hay interruptor armado.
 
 Por eso la jail `routerpanel` **no** se actualiza con `pkg -j` (no tiene red ni
 `pkg`): desde el host,

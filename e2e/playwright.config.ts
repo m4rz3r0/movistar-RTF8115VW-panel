@@ -25,6 +25,8 @@ export default defineConfig({
     url: `http://localhost:${port}/login`,
     env: { E2E_PORT: String(port) },
     reuseExistingServer: false,
+    // SIGTERM (no SIGKILL): arrancar.sh borra su carpeta temporal al salir.
+    gracefulShutdown: { signal: "SIGTERM", timeout: 5_000 },
     timeout: 60_000,
     stdout: "ignore",
     stderr: "pipe",

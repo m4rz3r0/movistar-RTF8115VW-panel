@@ -176,8 +176,12 @@ jails alcanzan sólo lo que deben; sólo entonces confirma.
 - Si una comprobación falla, no confirma: espera 3 minutos y todo vuelve a
   estar como antes. No hace falta hacer nada.
 - Si `--pf-confirmar` dice «el interruptor ya saltó», las comprobaciones
-  tardaron más de 180 s y las reglas vigentes son las anteriores. Repite
-  `deploy/install.sh`.
+  tardaron más de 180 s y las reglas vigentes son las anteriores (queda la
+  marca `/var/run/routerpanel-pf-deadman.saltado` y la línea en syslog).
+  Repite `deploy/install.sh`.
+- Si dice «no hay interruptor armado», no se llegó a cargar nada con
+  `--pf-cargar` o alguien lo paró a mano: mira `doas pfctl -sr` antes de
+  seguir.
 - Para ver qué hay cargado: `doas pfctl -sr | grep -c ROUTERPANEL` (más de 0:
   reglas del panel cargadas). Copia de antes del último cambio:
   `/etc/pf.conf.bak-routerpanel`.
