@@ -33,9 +33,10 @@ En el host:
 - `/var/log/routerpanel-update.log` (rotado por
   `/usr/local/etc/newsyslog.conf.d/routerpanel.conf`) y
   `/var/log/routerpanel-build.log` (salida de cargo de la última compilación).
-- `/var/db/routerpanel-actualizar/fallida` — última etiqueta que no compiló o
-  no arrancó; no se reintenta hasta que haya otra. Los `--ref` no la tocan
-  (ni si fallan ni si van bien).
+- `/var/db/routerpanel-actualizar/fallida` — última etiqueta que falló dos
+  veces seguidas (no compiló o no arrancó); no se reintenta hasta que haya
+  otra. `intentos` (etiqueta y número) lleva la cuenta del primer fallo. Los
+  `--ref` no tocan ninguno de los dos.
 - `/root/routerpanel-admin-password.txt` (600) — contraseña inicial del usuario
   `admin` del panel.
 
@@ -129,9 +130,16 @@ Si no hay acceso al repositorio, compila lo que ya tenga el clon.
 `routerpanel-actualizar` corre en el host como root (cron cada 15 min, con
 `lockf` para no solaparse):
 
-1. `git fetch --tags` en la jail de compilación (como `rpbuild`).
+1. `git fetch --tags` en la jail de compilación (como `rpbuild`). Todas las
+   órdenes de git cuyo resultado usa el host van con `/usr/local/bin/git` y el
+   PATH del sistema (no el de `~rpbuild/.cargo/bin`, que puede escribir
+   cualquier `build.rs`).
 2. Última etiqueta `v*` por `sort -V`; si es la desplegada (o la que ya falló),
-   termina.
+   termina. Lo que sale de la jail no es de fiar: el nombre de la versión
+   (la etiqueta, o `<ref>-<sha>`) tiene que ser `[A-Za-z0-9][A-Za-z0-9._-]*`
+   sin `..` (como mucho 100 caracteres) y el commit, 7–40 cifras
+   hexadecimales; si no, el actualizador registra el error y no hace nada
+   (el nombre acaba en rutas que root borra).
 3. `cargo leptos build --release`, `cargo test --workspace` y
    `cargo test --workspace --features panel/ssr` (como `rpbuild`; si el
    `Cargo.lock` pide otra versión de `wasm-bindgen`, instala antes
@@ -156,7 +164,9 @@ Si no hay acceso al repositorio, compila lo que ya tenga el clon.
 7. Si no responde: para, restaura la base de datos de antes (una versión nueva
    puede haber aplicado una migración que la anterior no conoce, y sqlx no
    arrancaría), vuelve a la versión anterior, arranca y borra la versión
-   fallida; la etiqueta queda marcada como fallida. Sin versión anterior a la
+   fallida. La etiqueta se reintenta en la ejecución siguiente y sólo queda
+   marcada como fallida si falla dos veces seguidas (un tropiezo de red o de
+   una prueba no la descarta). Sin versión anterior a la
    que volver (primer despliegue, o `current` apunta a una que ya no existe)
    el servicio queda **parado**, se quita `current` (rc.d no arranca nada sin
    él, tampoco al reiniciar el host) y se borra igualmente la fallida: nunca
@@ -168,6 +178,14 @@ Si no hay acceso al repositorio, compila lo que ya tenga el clon.
    los `releases/.*.tmp` que haya dejado una ejecución cortada.
 
 Los registros se crean con `umask 027` (640).
+
+**El actualizador sólo despliega el panel.** Los ficheros de `deploy/`
+(`actualizar.sh`, `routerpanel.rc`, `pf.conf.snippet`, cron, newsyslog,
+Caddyfile…) sólo los instala `deploy/install.sh`: si una versión cambia algo
+de `deploy/`, hay que repetir `deploy/install.sh` desde el portátil (es
+idempotente y vuelve a pasar por el interruptor de pf si cambian las reglas).
+Hasta entonces el servidor sigue con los de antes, aunque el panel ya sea el
+nuevo.
 
 **Diferencia con el diseño**: el diseño ponía el cron en la jail de compilación
 y una regla de doas en el host para reiniciar el servicio. No puede funcionar

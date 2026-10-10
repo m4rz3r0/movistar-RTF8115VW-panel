@@ -110,8 +110,15 @@ valores de campos secretos.
   en el host) toma la más reciente (`sort -V`), la compila y prueba en la jail
   `routerpanel-build`, copia la base de datos, cambia la versión y espera a
   `/salud`. Si no responde en 60 s, vuelve a la anterior con la base de datos
-  de antes y marca la etiqueta como fallida (no se reintenta hasta que haya
-  otra).
+  de antes. Una etiqueta que falla (al compilar, en las pruebas o al
+  arrancar) se reintenta una vez en la ejecución siguiente; si vuelve a
+  fallar queda marcada como fallida y no se reintenta hasta que haya otra
+  (`/var/db/routerpanel-actualizar/fallida`; ver `routerpanel-update.log`).
+- **Cambios en `deploy/`** (el propio actualizador, `routerpanel.rc`, pf,
+  cron, Caddy…): el actualizador sólo despliega el panel. Tras publicar una
+  versión que toque `deploy/`, repite `deploy/install.sh` desde el portátil
+  (en la raíz del repositorio, con esa versión sacada). Es idempotente; si
+  cambian las reglas de pf vuelve a pasar por el interruptor de hombre muerto.
 - Para desplegar una rama o un commit a mano (en un terminal propio, ver
   arriba):
 
