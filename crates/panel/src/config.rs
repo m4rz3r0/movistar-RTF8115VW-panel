@@ -78,8 +78,24 @@ where
 }
 
 /// Lee la contraseña del router del fichero `path` (sin el salto de línea
-/// final). El error nunca incluye el contenido del fichero.
+/// final). El fichero no puede ser legible por el grupo ni por otros (600 o
+/// 400), igual que la clave del historial. El error nunca incluye el
+/// contenido del fichero.
 pub fn read_router_secret(path: &Path) -> Result<String, String> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(meta) = std::fs::metadata(path) {
+            let mode = meta.permissions().mode();
+            if mode & 0o077 != 0 {
+                return Err(format!(
+                    "el fichero de la contraseña del router {} tiene permisos {:o}; deben ser 600 o 400",
+                    path.display(),
+                    mode & 0o777
+                ));
+            }
+        }
+    }
     let text = std::fs::read_to_string(path).map_err(|e| {
         format!(
             "no se puede leer la contraseña del router en {} (RP_ROUTER_SECRET): {e}",
@@ -159,12 +175,34 @@ mod tests {
         assert!(e.contains("RP_TRUSTED_PROXY"), "{e}");
     }
 
+    /// Escribe `text` en `path` con permisos `mode`.
+    fn escribir(path: &Path, text: &str, mode: u32) {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::write(path, text).unwrap();
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode)).unwrap();
+    }
+
     #[test]
     fn secreto_sin_salto_de_linea() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("router.secret");
-        std::fs::write(&path, "clave con espacios \n").unwrap();
+        escribir(&path, "clave con espacios \n", 0o600);
         assert_eq!(read_router_secret(&path).unwrap(), "clave con espacios ");
+        escribir(&path, "clave\n", 0o400);
+        assert_eq!(read_router_secret(&path).unwrap(), "clave");
+    }
+
+    #[test]
+    fn secreto_legible_por_otros_es_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("router.secret");
+        for mode in [0o644, 0o640, 0o604] {
+            escribir(&path, "clave-que-no-debe-salir\n", mode);
+            let e = read_router_secret(&path).unwrap_err();
+            assert!(e.contains("permisos"), "{e}");
+            assert!(e.contains(&format!("{mode:o}")), "{e}");
+            assert!(!e.contains("clave-que-no-debe-salir"), "{e}");
+        }
     }
 
     #[test]

@@ -49,6 +49,10 @@ pub async fn panel_con_proxy(trusted_proxy: IpAddr) -> Panel {
     let dir = tempfile::tempdir().unwrap();
     let secret = dir.path().join("router.secret");
     std::fs::write(&secret, format!("{PASS}\n")).unwrap();
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&secret, std::fs::Permissions::from_mode(0o600)).unwrap();
+    }
     let cfg = Config {
         listen: "127.0.0.1:0".parse().unwrap(),
         db_path: dir.path().join("panel.db"),
