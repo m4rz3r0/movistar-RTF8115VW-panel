@@ -182,6 +182,25 @@ impl SimControl {
         self.inner.state().fail_reads_after_write = Some(name.to_owned());
     }
 
+    /// La próxima escritura real no recibe respuesta (la petición se queda
+    /// colgada; el cliente agota su tiempo de espera). Con `aplicar`, el
+    /// router la aplica antes (p. ej. reinicia un servicio y no contesta);
+    /// sin él, no aplica nada (se cortó antes de llegar). Las peticiones
+    /// siguientes se responden con normalidad.
+    pub fn no_answer_next_write(&self, aplicar: bool) {
+        let mut st = self.inner.state();
+        st.no_answer_next = true;
+        if !aplicar {
+            st.ignore_next = true;
+        }
+    }
+
+    /// La próxima reserva DHCP nueva (`cbDhcpV4SvrPoolSetStatic` con id -1)
+    /// se crea dos veces (dos ids nuevos con los mismos valores).
+    pub fn create_twice_next_write(&self) {
+        self.inner.state().create_twice = true;
+    }
+
     /// Tras responder a la próxima escritura real, el router deja de
     /// responder (como [`SimControl::set_unresponsive`]) hasta que se llame a
     /// `set_unresponsive(false)`.
@@ -269,6 +288,10 @@ struct SimState {
     fail_reads_after_write: Option<String>,
     /// `hang_after_next_write`.
     hang_after_write: HangAfterWrite,
+    /// `no_answer_next_write`.
+    no_answer_next: bool,
+    /// `create_twice_next_write`.
+    create_twice: bool,
     /// Bytes sumados a cada interfaz de `cbGetStatistic`: nombre → (rx, tx).
     counters_extra: HashMap<String, (u64, u64)>,
     writes: Vec<(String, Params)>,
@@ -638,29 +661,41 @@ async fn cgi(
     let Some(name) = file.strip_suffix(".xml") else {
         return StatusCode::NOT_FOUND.into_response();
     };
-    let c = cookies(&headers);
-    let params = form(&body);
+    let (respuesta, sin_respuesta) = cgi_sync(&s, name, &headers, &body);
+    if sin_respuesta {
+        std::future::pending::<()>().await;
+    }
+    respuesta
+}
+
+/// Atiende `/cgi-bin/<name>.xml`; el segundo valor dice si hay que dejar la
+/// petición sin respuesta (`no_answer_next_write`).
+fn cgi_sync(s: &Inner, name: &str, headers: &HeaderMap, body: &Bytes) -> (Response, bool) {
+    let c = cookies(headers);
+    let params = form(body);
     let mut st = s.state();
     if name == "cbCheckLogin" {
-        return xml(advanced_login(&s, &mut st, &c, &params));
+        return (xml(advanced_login(s, &mut st, &c, &params)), false);
     }
     let valid = c.get("SessionStatus").is_some_and(|v| v == "Valid")
         && c.get("SessionID")
             .is_some_and(|sid| st.advanced.contains(sid));
     if !valid {
-        return LOGGED_OUT.into_response();
+        return (LOGGED_OUT.into_response(), false);
     }
     if is_read(name) && st.failing_reads.contains(name) {
-        xml(failure(name, "lectura fallida (simulado)"))
+        (xml(failure(name, "lectura fallida (simulado)")), false)
     } else if is_read(name) {
-        xml(read(&s, &st, name, &params))
+        (xml(read(s, &st, name, &params)), false)
     } else {
+        let real = param(&params, "validation_only") != Some("1");
         let body = write(&mut st, name, &params);
         if st.hang_after_write == HangAfterWrite::Now {
             st.hang_after_write = HangAfterWrite::Off;
             s.unresponsive.store(true, Ordering::SeqCst);
         }
-        xml(body)
+        let sin_respuesta = real && std::mem::take(&mut st.no_answer_next);
+        (xml(body), sin_respuesta)
     }
 }
 
@@ -867,7 +902,14 @@ fn set_static_lease(st: &mut SimState, p: &[(String, String)]) -> Result<(), &'s
             mac_addr: param(p, "mac_addr").ok_or("falta mac_addr")?.to_owned(),
             ipv4_addr: param(p, "ipv4_addr").ok_or("falta ipv4_addr")?.to_owned(),
         };
-        st.leases.push(lease);
+        if std::mem::take(&mut st.create_twice) {
+            let mut otra = lease.clone();
+            otra.id += 1;
+            st.leases.push(lease);
+            st.leases.push(otra);
+        } else {
+            st.leases.push(lease);
+        }
         return Ok(());
     }
     let lease = st

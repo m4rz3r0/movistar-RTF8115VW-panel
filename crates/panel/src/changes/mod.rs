@@ -53,7 +53,7 @@ use sqlx::Row;
 use sqlx::SqlitePool;
 use std::sync::OnceLock;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     sync::{Arc, Mutex, MutexGuard},
     time::Duration,
 };
@@ -92,6 +92,15 @@ impl Default for Tiempos {
             pausa_max: Duration::from_secs(30),
         }
     }
+}
+
+/// Resultado de releer tras una escritura sin respuesta.
+enum SinRespuesta {
+    /// Hay que seguir (vigilar), con esta comprobación y esta nota.
+    Aplicada(Comprobacion, String),
+    /// Fallido, con el motivo: el router sigue como antes (no se aplicó) o,
+    /// al crear, no se sabe qué instancia es la del cambio.
+    Fallido(String),
 }
 
 impl Tiempos {
@@ -512,6 +521,9 @@ impl ChangeManager {
         } else {
             Base::Wan(wan_arriba(&read::wan(c).await.map_err(no_responde)?))
         };
+        if plan.operacion == Operacion::Crear && matches!(plan.lectura, Lectura::Xml { .. }) {
+            plan.ids_antes = Some(self.ids_de_la_lista(&plan).await.map_err(no_responde)?);
+        }
         let id = self
             .insertar(&plan, usuario, base, p.deshace)
             .await
@@ -526,18 +538,34 @@ impl ChangeManager {
             "cambio aplicándose"
         );
         let mut nota = None;
-        if let Err(e) = self.enviar(&plan).await {
-            let sin_respuesta = f.name == REBOOT && !matches!(e, hgu::Error::CallFailed { .. });
-            if !sin_respuesta {
+        let comprobacion = match self.enviar(&plan).await {
+            Ok(()) => self.comprobar(&plan, Lado::Nuevo).await,
+            // El router rechazó la escritura: no se aplicó nada.
+            Err(e @ hgu::Error::CallFailed { .. }) => {
                 let e = e.to_string();
                 self.marcar(id, Estado::Fallido, Some(&e), None).await;
                 return Err(CambioError::Router(e));
             }
-            nota = Some(format!(
-                "el router no respondió a la orden de reinicio ({e})"
-            ));
-        }
-        match self.comprobar(&plan, Lado::Nuevo).await {
+            Err(e) if f.name == REBOOT => {
+                nota = Some(format!(
+                    "el router no respondió a la orden de reinicio ({e})"
+                ));
+                self.comprobar(&plan, Lado::Nuevo).await
+            }
+            // Sin respuesta (tiempo agotado, conexión cortada, respuesta
+            // rara): la escritura puede haber llegado. Se relee.
+            Err(e) => match self.tras_escritura_sin_respuesta(&plan, &e).await {
+                SinRespuesta::Aplicada(c, n) => {
+                    nota = Some(n);
+                    c
+                }
+                SinRespuesta::Fallido(e) => {
+                    self.marcar(id, Estado::Fallido, Some(&e), None).await;
+                    return Err(CambioError::Router(e));
+                }
+            },
+        };
+        match comprobacion {
             Comprobacion::Coincide(nueva) => {
                 if let Some(n) = nueva {
                     self.fijar_instancia(id, &n).await;
@@ -545,8 +573,9 @@ impl ChangeManager {
                 }
             }
             Comprobacion::Limitada => {
-                nota =
-                    Some("verificación limitada: el router no muestra los campos escritos".into());
+                nota = Some(nota.unwrap_or_else(|| {
+                    "verificación limitada: el router no muestra los campos escritos".into()
+                }));
             }
             Comprobacion::Difiere(v) => {
                 self.marcar(id, Estado::Fallido, Some(&v.join("; ")), None)
@@ -562,6 +591,67 @@ impl ChangeManager {
             .await;
         drop(pausa);
         Ok((id, plan, base, nota))
+    }
+
+    /// Tras una escritura sin respuesta (error que no es `CallFailed`):
+    /// relee el router, con reintentos durante la vigilancia del riesgo, para
+    /// saber si la escritura llegó.
+    ///
+    /// - Muestra lo nuevo, no se puede comprobar o no se consigue leer ⇒
+    ///   `Aplicada`: se vigila como cualquier cambio (si el router sigue sin
+    ///   responder, la vigilancia revierte) y deshacer queda disponible. La
+    ///   comprobación que se devuelve es `Coincide` o `Limitada`.
+    /// - Muestra otros valores: si son los de antes ⇒ `NoAplicada` (no
+    ///   llegó nada); si no son ni los de antes ni los nuevos (a medias),
+    ///   `Aplicada` con la diferencia en la nota, para poder revertir; al
+    ///   crear, `Fallido` (sin la instancia no hay nada que revertir).
+    async fn tras_escritura_sin_respuesta(&self, plan: &Plan, e: &hgu::Error) -> SinRespuesta {
+        let sin_confirmar = format!("el router no confirmó la escritura ({e})");
+        let fin = Instant::now() + self.tiempos.vigilancia(plan.funcion.riesgo);
+        loop {
+            match self.comprobar(plan, Lado::Nuevo).await {
+                c @ Comprobacion::Coincide(_) => {
+                    return SinRespuesta::Aplicada(
+                        c,
+                        format!("{sin_confirmar}; releído: aplicada"),
+                    );
+                }
+                Comprobacion::Limitada => {
+                    return SinRespuesta::Aplicada(
+                        Comprobacion::Limitada,
+                        format!("{sin_confirmar}; el router no muestra los campos escritos"),
+                    );
+                }
+                Comprobacion::Difiere(v) => {
+                    return match self.comprobar(plan, Lado::Anterior).await {
+                        Comprobacion::Coincide(_) => SinRespuesta::Fallido(format!(
+                            "{sin_confirmar}; el router sigue con los valores de antes: no se aplicó"
+                        )),
+                        // Al crear, sin saber cuál es la instancia nueva no
+                        // se podría revertir ni deshacer: no se toca nada.
+                        _ if plan.operacion == Operacion::Crear => {
+                            SinRespuesta::Fallido(format!("{sin_confirmar}; {}", v.join("; ")))
+                        }
+                        _ => SinRespuesta::Aplicada(
+                            Comprobacion::Limitada,
+                            format!(
+                                "{sin_confirmar}; el router muestra otros valores: {}",
+                                v.join("; ")
+                            ),
+                        ),
+                    };
+                }
+                Comprobacion::SinLectura(l) => {
+                    if Instant::now() >= fin {
+                        return SinRespuesta::Aplicada(
+                            Comprobacion::Limitada,
+                            format!("{sin_confirmar}; tampoco se pudo releer ({l})"),
+                        );
+                    }
+                    tokio::time::sleep(self.tiempos.intervalo).await;
+                }
+            }
+        }
     }
 
     /// Motivo por el que `original` ya no se puede deshacer: lo deshizo otro
@@ -960,7 +1050,21 @@ impl ChangeManager {
             payload,
             campos,
             lectura,
+            ids_antes: None,
         })
+    }
+
+    /// Ids de las instancias de la lista de `plan` (para saber cuál se crea).
+    async fn ids_de_la_lista(&self, plan: &Plan) -> Result<BTreeSet<String>, hgu::Error> {
+        let Some(id_param) = plan.funcion.lista.as_ref().map(|l| l.id_param.as_str()) else {
+            return Ok(BTreeSet::new());
+        };
+        Ok(self
+            .listar(&plan.lectura)
+            .await?
+            .iter()
+            .filter_map(|e| buscar(e, id_param).map(str::to_owned))
+            .collect())
     }
 
     /// Valores de la instancia que muestra `l` (vacío si no hay lectura).
@@ -1059,21 +1163,48 @@ impl ChangeManager {
                     Ok(v) => v,
                     Err(e) => return no_leido(e),
                 };
-                let nueva = lista.iter().find(|e| {
+                let id_param = f.lista.as_ref().map(|l| l.id_param.as_str());
+                let id_de = |e: &BTreeMap<String, String>| {
+                    id_param.and_then(|p| buscar(e, p)).map(str::to_owned)
+                };
+                let con_valores = |e: &BTreeMap<String, String>| {
                     comparar(f, &plan.campos, e, Lado::Nuevo) == Comprobacion::Coincide(None)
-                });
-                match (lado, nueva) {
-                    (Lado::Nuevo, Some(e)) => {
-                        let id_param = f.lista.as_ref().map(|l| l.id_param.as_str());
-                        Comprobacion::Coincide(
-                            id_param.and_then(|p| buscar(e, p)).map(str::to_owned),
-                        )
-                    }
-                    (Lado::Nuevo, None) => {
+                };
+                // La instancia del cambio: la de id conocido; si no, la que
+                // no estaba antes; sin ids de antes, por valores.
+                let candidatas: Vec<&BTreeMap<String, String>> =
+                    match (&plan.instancia, &plan.ids_antes, id_param) {
+                        (Some(id), _, Some(_)) => lista
+                            .iter()
+                            .filter(|e| id_de(e).as_ref() == Some(id))
+                            .collect(),
+                        (None, Some(antes), Some(_)) => lista
+                            .iter()
+                            .filter(|e| id_de(e).is_some_and(|i| !antes.contains(&i)))
+                            .collect(),
+                        _ => lista.iter().filter(|e| con_valores(e)).collect(),
+                    };
+                match (lado, candidatas.as_slice()) {
+                    (Lado::Nuevo, []) => {
                         Comprobacion::Difiere(vec!["no aparece la instancia nueva".into()])
                     }
-                    (Lado::Anterior, None) => Comprobacion::Coincide(None),
-                    (Lado::Anterior, Some(_)) => {
+                    (Lado::Nuevo, [e]) if con_valores(e) => {
+                        Comprobacion::Coincide(plan.instancia.is_none().then(|| id_de(e)).flatten())
+                    }
+                    (Lado::Nuevo, [_]) => Comprobacion::Difiere(vec![
+                        "la instancia nueva no tiene los valores escritos".into(),
+                    ]),
+                    (Lado::Nuevo, varias) => {
+                        let ids: Vec<String> = varias.iter().filter_map(|e| id_de(e)).collect();
+                        Comprobacion::Difiere(vec![format!(
+                            "aparecen {} instancias nuevas ({}): no se sabe cuál es la de este \
+                             cambio; no se borra nada",
+                            varias.len(),
+                            ids.join(", ")
+                        )])
+                    }
+                    (Lado::Anterior, []) => Comprobacion::Coincide(None),
+                    (Lado::Anterior, _) => {
                         Comprobacion::Difiere(vec!["la instancia nueva existe".into()])
                     }
                 }
@@ -1302,6 +1433,13 @@ impl ChangeManager {
             Err(CambioError::Router(e)) => return Err(Reintentar(e)),
             Err(e) => return Err(Definitivo(e.to_string())),
         };
+        let mut plan = plan;
+        if plan.operacion == Operacion::Crear && matches!(plan.lectura, Lectura::Xml { .. }) {
+            match self.ids_de_la_lista(&plan).await {
+                Ok(ids) => plan.ids_antes = Some(ids),
+                Err(e) => return Err(Reintentar(e.to_string())),
+            }
+        }
         // Desde aquí la escritura puede haber llegado aunque falle la respuesta.
         *enviado = Some(plan.clone());
         match self.enviar(&plan).await {
@@ -1373,8 +1511,9 @@ impl ChangeManager {
         let id: i64 = sqlx::query_scalar(
             "INSERT INTO changes (ts, updated, user_id, usuario, funcion, instancia, riesgo, \
              estado, operacion, diff, anteriores, anteriores_cifrados, solicitud, nuevos, \
-             nuevos_cifrados, wan_antes) VALUES (?, ?, (SELECT id FROM users WHERE username = ?), \
-             ?, ?, ?, ?, 'aplicando', ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             nuevos_cifrados, wan_antes, ids_antes) VALUES (?, ?, \
+             (SELECT id FROM users WHERE username = ?), \
+             ?, ?, ?, ?, 'aplicando', ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
         )
         .bind(now)
         .bind(now)
@@ -1391,6 +1530,7 @@ impl ChangeManager {
         .bind(nuevos)
         .bind(nuevos_cifrados)
         .bind(wan_antes)
+        .bind(plan.ids_antes.as_ref().map(json))
         .fetch_one(&mut *tx)
         .await?;
         if let Some(o) = deshace {
@@ -1512,6 +1652,9 @@ impl ChangeManager {
             payload: Vec::new(),
             campos,
             lectura,
+            ids_antes: fila
+                .get::<Option<String>, _>("ids_antes")
+                .and_then(|j| serde_json::from_str(&j).ok()),
         })
     }
 }

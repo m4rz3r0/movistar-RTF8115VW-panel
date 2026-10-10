@@ -268,6 +268,54 @@ async fn error_del_router_deja_fallido() {
     assert_eq!(m.activo(), None);
 }
 
+/// I1: la escritura llega y el router la aplica, pero no contesta (reinicia
+/// un servicio, va cargado…): se relee, se ve aplicada y se vigila, con
+/// deshacer disponible.
+#[tokio::test]
+async fn escritura_sin_respuesta_aplicada_se_vigila() {
+    let (p, m) = preparado().await;
+    let prep = m.preparar(lease0("192.168.1.84")).await.unwrap();
+    p.sim.control.no_answer_next_write(true);
+    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    let c = esperar_estado(&m, id, Estado::Aplicado).await;
+    let nota = c.nota.unwrap_or_default();
+    assert!(nota.contains("no confirmó"), "{nota}");
+    assert_eq!(ip_de_lease(&p, "0").await.as_deref(), Some("192.168.1.84"));
+    esperar_libre(&m).await;
+    assert!(m.se_puede_deshacer(id).await);
+}
+
+/// I1: igual, pero la WAN cae durante la vigilancia: se revierte.
+#[tokio::test]
+async fn escritura_sin_respuesta_aplicada_se_revierte_si_cae_la_wan() {
+    let (p, m) = preparado().await;
+    let prep = m.preparar(lease0("192.168.1.84")).await.unwrap();
+    p.sim.control.no_answer_next_write(true);
+    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    p.sim.control.set_wan_up(false);
+    esperar_estado(&m, id, Estado::Revertido).await;
+    assert_eq!(ip_de_lease(&p, "0").await.as_deref(), Some("192.168.1.68"));
+}
+
+/// I1: la escritura se corta sin aplicarse: el router sigue con lo de
+/// antes ⇒ fallido («no se aplicó»), sin vigilar ni revertir.
+#[tokio::test]
+async fn escritura_sin_respuesta_no_aplicada_queda_fallida() {
+    let (p, m) = preparado().await;
+    let prep = m.preparar(lease0("192.168.1.84")).await.unwrap();
+    p.sim.control.no_answer_next_write(false);
+    let r = m.confirmar(&prep.token, None, "admin").await;
+    assert!(
+        matches!(&r, Err(CambioError::Router(e)) if e.contains("no se aplicó")),
+        "{r:?}"
+    );
+    let ultimo = m.historial(1).await.remove(0);
+    assert_eq!(ultimo.estado, Estado::Fallido);
+    assert_eq!(p.sim.control.writes().len(), 1, "sin reversión");
+    assert_eq!(ip_de_lease(&p, "0").await.as_deref(), Some("192.168.1.68"));
+    assert_eq!(m.activo(), None);
+}
+
 #[tokio::test]
 async fn revierte_si_se_pierde_la_wan() {
     let (p, m) = preparado().await;
@@ -729,6 +777,65 @@ async fn revierte_una_creacion() {
     let borrado: BTreeMap<_, _> = w[1].1.iter().cloned().collect();
     assert_eq!(borrado["del"], "DEL");
     assert_eq!(borrado["rtm_dhcpv4_svr_pool_static_id"], "2");
+}
+
+/// D1: una reserva nueva idéntica a una que ya existía (como cuando el
+/// router «añade» sobrescribiendo): la instancia del cambio es la que
+/// aparece nueva, no la primera con esos valores; al revertir se borra ésa
+/// y la de antes sigue.
+#[tokio::test]
+async fn crear_un_duplicado_revierte_solo_la_nueva() {
+    let (p, m) = preparado().await;
+    let antes = read::static_leases(&p.state.hgu).await.unwrap();
+    let l0 = antes
+        .iter()
+        .find(|l| l.id == "0")
+        .expect("reserva 0")
+        .clone();
+    let dup = req(
+        LEASES,
+        None,
+        &[
+            (POOL, "0"),
+            ("adm_state", "1"),
+            ("mac_addr", &l0.mac),
+            ("ipv4_addr", &l0.ip),
+        ],
+    );
+    let prep = m.preparar(dup).await.unwrap();
+    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    let c = esperar_estado(&m, id, Estado::Vigilando).await;
+    assert_eq!(c.instancia.as_deref(), Some("2"), "la nueva, no la 0");
+    p.sim.control.set_wan_up(false);
+    esperar_estado(&m, id, Estado::Revertido).await;
+    let despues = read::static_leases(&p.state.hgu).await.unwrap();
+    assert!(
+        despues.iter().any(|l| l.id == "0"),
+        "la reserva de antes sigue"
+    );
+    assert!(!despues.iter().any(|l| l.id == "2"));
+    let w = p.sim.control.writes();
+    let borrado: BTreeMap<_, _> = w[1].1.iter().cloned().collect();
+    assert_eq!(borrado["rtm_dhcpv4_svr_pool_static_id"], "2");
+}
+
+/// D1: si aparecen dos instancias nuevas no se sabe cuál es la del cambio:
+/// fallido con un motivo claro y no se borra nada.
+#[tokio::test]
+async fn crear_con_dos_instancias_nuevas_no_borra_nada() {
+    let (p, m) = preparado().await;
+    let prep = m.preparar(nueva_reserva()).await.unwrap();
+    p.sim.control.create_twice_next_write();
+    let r = m.confirmar(&prep.token, None, "admin").await;
+    let Err(CambioError::Verificacion(v)) = r else {
+        panic!("{r:?}");
+    };
+    assert!(v.iter().any(|m| m.contains("2 instancias nuevas")), "{v:?}");
+    let ultimo = m.historial(1).await.remove(0);
+    assert_eq!(ultimo.estado, Estado::Fallido);
+    assert_eq!(p.sim.control.writes().len(), 1, "no se borra nada");
+    let leases = read::static_leases(&p.state.hgu).await.unwrap();
+    assert_eq!(leases.iter().filter(|l| l.ip == "192.168.1.99").count(), 2);
 }
 
 #[tokio::test]

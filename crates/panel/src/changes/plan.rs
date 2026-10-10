@@ -92,6 +92,10 @@ pub(super) struct Plan {
     pub(super) payload: Vec<(String, String)>,
     pub(super) campos: Vec<Campo>,
     pub(super) lectura: Lectura,
+    /// Al crear: ids de la lista antes de escribir. La instancia creada es la
+    /// que aparece nueva (no la primera con esos valores: puede haber una
+    /// igual de antes). `None` si no se leyó (cambios anteriores a v0.1.1).
+    pub(super) ids_antes: Option<BTreeSet<String>>,
 }
 
 /// Valor de `nombre` en `m`: primero exacto, luego sin distinguir mayúsculas.
@@ -641,6 +645,7 @@ mod tests {
             payload: Vec::new(),
             campos: vec![campo("ipv4_addr", "192.168.1.68", "192.168.1.84", true)],
             lectura: Lectura::Ninguna,
+            ids_antes: None,
         };
         let r = inversa(&plan).unwrap();
         assert_eq!(r.instancia.as_deref(), Some("0"));
