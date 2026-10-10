@@ -23,6 +23,8 @@ pub mod crypto;
 #[cfg(feature = "ssr")]
 pub mod db;
 #[cfg(feature = "ssr")]
+pub mod instancia;
+#[cfg(feature = "ssr")]
 pub mod poller;
 #[cfg(feature = "ssr")]
 pub mod security;
@@ -74,9 +76,12 @@ mod server {
 
     /// Comprobación de vida para el actualizador (sin login). No consulta al
     /// router: `router` es `"ok"` si el sondeo tiene datos recientes y sin
-    /// error.
+    /// error, `"sin_configurar"` si el panel aún no tiene las credenciales
+    /// del router (`ok` sigue siendo `true`: el panel funciona).
     async fn salud(State(state): State<AppState>) -> Json<Value> {
-        let router = if state.poller.healthy() {
+        let router = if !state.hgu.configurado() {
+            "sin_configurar"
+        } else if state.poller.healthy() {
             "ok"
         } else {
             "error"

@@ -125,6 +125,9 @@ pub struct EstadoVista {
     pub at: Option<i64>,
     /// El sondeo tiene datos recientes y sin error.
     pub router_ok: bool,
+    /// El panel aún no tiene las credenciales del router: no hay datos ni
+    /// se intenta leerlo.
+    pub sin_configurar: bool,
     /// Error del último intento de lectura.
     pub error: Option<String>,
     pub modelo: String,
@@ -186,6 +189,12 @@ pub struct CorteVista {
 pub async fn estado_actual() -> Result<EstadoVista, ServerFnError> {
     crate::auth::require_user().await?;
     let state = servidor::app_state()?;
+    if !state.hgu.configurado() {
+        return Ok(servidor::vista_sin_configurar(
+            &state.catalogo,
+            crate::series::now(),
+        ));
+    }
     let p = &state.poller;
     let ultimo = crate::series::ultimo_corte(&state.db)
         .await
@@ -350,6 +359,14 @@ pub(crate) mod servidor {
         })
     }
 
+    /// Vista con el router sin configurar: sin datos ni avisos.
+    pub fn vista_sin_configurar(cat: &Catalogo, ahora: i64) -> EstadoVista {
+        EstadoVista {
+            sin_configurar: true,
+            ..vista(None, None, false, None, None, cat, ahora)
+        }
+    }
+
     /// Construye la vista a partir de la instantánea del sondeo (`snap`), el
     /// error del último ciclo, si el sondeo está sano, el último corte de la
     /// WAN registrado y la última muestra guardada.
@@ -374,6 +391,7 @@ pub(crate) mod servidor {
                 ahora,
                 at: None,
                 router_ok: false,
+                sin_configurar: false,
                 error,
                 modelo: String::new(),
                 firmware: String::new(),
@@ -565,6 +583,7 @@ pub(crate) mod servidor {
             ahora,
             at: Some(s.at),
             router_ok: sano,
+            sin_configurar: false,
             error,
             modelo: sm.model.clone(),
             firmware: sm.firmware.clone(),

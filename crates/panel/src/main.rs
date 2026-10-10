@@ -32,6 +32,7 @@ async fn serve() -> std::process::ExitCode {
         build_router,
         changes::{ChangeManager, Tiempos},
         config::Config,
+        instancia,
         poller::Poller,
         state::AppState,
     };
@@ -68,6 +69,10 @@ async fn serve() -> std::process::ExitCode {
             return ExitCode::FAILURE;
         }
     };
+    if let Err(e) = instancia::arrancar_router(&state).await {
+        eprintln!("panel: no se puede arrancar: {e}");
+        return ExitCode::FAILURE;
+    }
     Poller::spawn(state.clone());
     // Retoma los cambios que quedaron a medias si el proceso se cortó (en
     // segundo plano: si el router no responde, no retrasa el arranque).

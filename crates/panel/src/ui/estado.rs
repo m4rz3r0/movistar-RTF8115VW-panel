@@ -217,6 +217,15 @@ fn cabecera(vista: Memo<Option<EstadoVista>>, error_panel: Memo<Option<String>>)
 
 /// Tarjeta cuando aún no hay ningún dato del router.
 fn sin_datos(v: &EstadoVista) -> impl IntoView {
+    if v.sin_configurar {
+        return view! {
+            <section class="tarjeta estado-espera" role="status">
+                <h2>"Router sin configurar"</h2>
+                <p class="pagina-sub">"Configúralo en Ajustes del panel."</p>
+            </section>
+        }
+        .into_any();
+    }
     match &v.error {
         Some(e) => view! {
             <section class="tarjeta estado-espera estado-error" role="status">
@@ -833,6 +842,7 @@ mod tests {
             ahora: 0,
             at: None,
             router_ok: false,
+            sin_configurar: false,
             error: None,
             modelo: String::new(),
             firmware: String::new(),

@@ -1,12 +1,6 @@
 //! Estado compartido del servidor.
 
-use crate::{
-    changes,
-    config::{self, Config},
-    crypto::HistoryKey,
-    db,
-    poller::PollerHandle,
-};
+use crate::{changes, config::Config, crypto::HistoryKey, db, poller::PollerHandle};
 use axum::extract::FromRef;
 use catalogo::{Catalogo, mask::Mascara};
 use leptos::prelude::LeptosOptions;
@@ -45,22 +39,18 @@ impl AppState {
 }
 
 impl AppState {
-    /// Carga el catálogo, lee la contraseña del router y la clave del
-    /// historial (la crea si no existe) y abre la base de datos. Cualquier fallo impide arrancar; el mensaje nunca incluye
-    /// secretos.
+    /// Carga el catálogo, lee la clave maestra (la crea si no existe) y abre
+    /// la base de datos. El cliente del router empieza sin configurar: lo
+    /// configura `instancia::arrancar_router`. Cualquier fallo impide
+    /// arrancar; el mensaje nunca incluye secretos.
     pub async fn new(cfg: Config, leptos: LeptosOptions) -> Result<AppState, String> {
         tokio::task::spawn_blocking(crate::auth::warm_up)
             .await
             .map_err(|e| e.to_string())?;
         let catalogo = Catalogo::load().map_err(|e| e.to_string())?;
         let mascara = Mascara::load().map_err(|e| e.to_string())?;
-        let password = config::read_router_secret(&cfg.router_secret_file)?;
         let history_key = HistoryKey::load_or_create(&cfg.history_key_file)?;
-        let hgu = hgu::Client::new(hgu::ClientConfig::new(
-            &cfg.router_url,
-            &cfg.router_user,
-            &password,
-        ));
+        let hgu = hgu::Client::sin_configurar();
         let db = db::open(&cfg.db_path).await.map_err(|e| {
             format!(
                 "no se puede abrir la base de datos {}: {e}",

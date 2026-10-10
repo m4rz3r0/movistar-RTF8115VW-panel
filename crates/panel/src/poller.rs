@@ -16,6 +16,11 @@
 //! Cada ciclo se ejecuta en su propia tarea: si una entra en pánico, se
 //! registra, cuenta como un fallo y el sondeo continúa.
 //!
+//! Mientras el router no esté configurado (sin credenciales), no se hace
+//! ninguna petición: el estado es «sin configurar»
+//! ([`PollerHandle::sin_configurar`]), no cuenta como fallo y se vuelve a
+//! mirar cada 10 s.
+//!
 //! El gestor de cambios llama a [`PollerHandle::pause`] antes de escribir:
 //! espera a que termine el ciclo en curso y, mientras viva la
 //! [`PauseGuard`] devuelta, el sondeo no hace peticiones al router.
@@ -162,6 +167,8 @@ struct Status {
     error: Option<String>,
     slow_error: Option<String>,
     failures: u32,
+    /// El router no está configurado: no se ha intentado leer.
+    sin_configurar: bool,
     /// Cuándo terminó la última lectura correcta.
     last_ok: Option<Instant>,
     /// Cuándo se soltó la última pausa: el plazo de `healthy` cuenta desde
@@ -223,6 +230,11 @@ impl PollerHandle {
     /// Error de las últimas lecturas de 60 s, si fallaron.
     pub fn slow_error(&self) -> Option<String> {
         self.status().slow_error.clone()
+    }
+
+    /// `true` si el último ciclo no leyó porque el router no está configurado.
+    pub fn sin_configurar(&self) -> bool {
+        self.status().sin_configurar
     }
 
     /// Ciclos fallidos seguidos.
@@ -437,14 +449,32 @@ impl Poller {
     async fn cycle(&mut self) -> Next {
         let now = series::now();
         let slow_due = self.last_slow.is_none_or(|t| t.elapsed() >= self.cfg.slow);
-        match self.read(slow_due).await {
+        let leido = if self.state.hgu.configurado() {
+            self.read(slow_due).await
+        } else {
+            Err(Error::NoConfigurado)
+        };
+        match leido {
             Ok(r) => {
                 self.store(now, r).await;
+                Next::Interval(self.cfg.delay(0, None))
+            }
+            // Sin credenciales no hay nada que leer ni que contar como fallo;
+            // los datos de otro router (si los había) ya no valen.
+            Err(Error::NoConfigurado) => {
+                self.prev = None;
+                self.last_slow = None;
+                let mut st = self.handle.status();
+                *st = Status {
+                    sin_configurar: true,
+                    ..Status::default()
+                };
                 Next::Interval(self.cfg.delay(0, None))
             }
             Err(e) => {
                 self.prev = None;
                 let mut st = self.handle.status();
+                st.sin_configurar = false;
                 st.failures = st.failures.saturating_add(1);
                 st.error = Some(e.to_string());
                 Next::Backoff(self.cfg.delay(st.failures, Some(&e)))
@@ -564,6 +594,7 @@ impl Poller {
             st.snapshot = Some(snap);
             st.error = None;
             st.failures = 0;
+            st.sin_configurar = false;
             st.last_ok = Some(Instant::now());
             sample
         };

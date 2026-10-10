@@ -98,3 +98,7 @@ required-features = ["ssr"]
 [[test]]
 name = "historial"
 required-features = ["ssr"]
+
+[[test]]
+name = "instancia"
+required-features = ["ssr"]
