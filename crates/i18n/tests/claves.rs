@@ -131,6 +131,51 @@ fn claves_usadas_existen() {
     assert!(faltan.is_empty(), "claves que no existen: {faltan:#?}");
 }
 
+/// `fuente` sin los elementos marcados `#[cfg(test)]` (de la marca a la
+/// llave que cierra el elemento): los datos de prueba no son la interfaz.
+fn sin_pruebas(fuente: &str) -> String {
+    let mut out = String::new();
+    let mut resto = fuente;
+    while let Some(i) = resto.find("#[cfg(test)]") {
+        out.push_str(&resto[..i]);
+        let tras = &resto[i..];
+        let Some(abre) = tras.find('{') else {
+            return out;
+        };
+        let (mut nivel, mut en_cadena, mut escape, mut fin) = (0usize, false, false, tras.len());
+        for (j, c) in tras[abre..].char_indices() {
+            match c {
+                _ if escape => escape = false,
+                '\\' if en_cadena => escape = true,
+                '"' => en_cadena = !en_cadena,
+                '{' if !en_cadena => nivel += 1,
+                '}' if !en_cadena => {
+                    nivel -= 1;
+                    if nivel == 0 {
+                        fin = abre + j + 1;
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        resto = &tras[fin..];
+    }
+    out.push_str(resto);
+    out
+}
+
+#[test]
+fn las_pruebas_no_cuentan_como_vistas() {
+    let fuente = "fn a() { view! { <p>{t!(\"x\")}</p> } }\n#[cfg(test)]\nmod tests {\n    fn b() { view! { <p>\"Suelto\"</p> } }\n}\nfn c() {}\n";
+    let limpia = sin_pruebas(fuente);
+    assert!(!limpia.contains("Suelto"), "{limpia}");
+    assert!(
+        limpia.contains("fn a()") && limpia.contains("fn c()"),
+        "{limpia}"
+    );
+}
+
 /// Cuerpos de los `view! { … }` de `fuente`.
 fn vistas(fuente: &str) -> Vec<String> {
     let mut out = Vec::new();
@@ -187,7 +232,7 @@ fn sin_texto_literal_en_vistas() {
     let permitidos = permitidos();
     let mut sueltos = Vec::new();
     for (ruta, fuente) in fuentes_panel() {
-        for v in vistas(&fuente) {
+        for v in vistas(&sin_pruebas(&fuente)) {
             let literales = texto
                 .captures_iter(&v)
                 .filter_map(|c| c.get(1).or(c.get(2)))

@@ -6,6 +6,7 @@ use crate::ui::{
     explorador::{Explorador, InicioExplorador, PaginaArea, PaginaFuncion},
     historial::PaginaHistorial,
     i18n::{idioma_inicial, provide_idioma},
+    instalar::PaginaInstalar,
     layout::Layout,
     login::PaginaLogin,
 };
@@ -70,6 +71,7 @@ pub fn App() -> impl IntoView {
         <Router>
             <Routes fallback=NoEncontrada>
                 <Route path=StaticSegment("login") view=PaginaLogin />
+                <Route path=StaticSegment("instalar") view=PaginaInstalar />
                 <ParentRoute path=StaticSegment("") view=Layout>
                     <Route path=StaticSegment("") view=PaginaEstado />
                     <Route path=StaticSegment("historial") view=PaginaHistorial />

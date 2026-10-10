@@ -2,6 +2,7 @@
 
 use crate::auth::{Login, safe_next};
 use crate::t;
+use crate::ui::i18n::SelectorIdioma;
 use leptos::prelude::*;
 use leptos_router::hooks::{use_navigate, use_query_map};
 
@@ -18,14 +19,17 @@ pub fn PaginaLogin() -> impl IntoView {
         }
     });
     let error = move || match action.value().get() {
-        Some(Err(ServerFnError::ServerError(msg))) => Some(msg),
+        Some(Err(ServerFnError::ServerError(msg))) => Some(super::mensaje_del_servidor(&msg)),
         Some(Err(_)) => Some(t!("comun-error-conexion")),
         _ => None,
     };
     view! {
         <main class="acceso">
             <section class="acceso-tarjeta login" aria-labelledby="login-titulo">
-                <p class="acceso-marca">"RTF8115VW"</p>
+                <div class="acceso-cabeza">
+                    <p class="acceso-marca">"RTF8115VW"</p>
+                    <SelectorIdioma />
+                </div>
                 <h1 id="login-titulo">{t!("login-titulo")}</h1>
                 <ActionForm action>
                     <p class="campo">

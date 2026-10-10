@@ -23,6 +23,7 @@ comun-error-conexion = No se puede contactar con el panel
 comun-error-interno = Error interno del panel
 comun-error-interno-id = Error interno del panel (id { $id })
 comun-error-sesion = Sesión no iniciada o caducada
+comun-error-idioma = No se puede cambiar el idioma; inténtalo de nuevo
 
 ## Valores
 comun-si = Sí

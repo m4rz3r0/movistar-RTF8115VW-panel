@@ -193,6 +193,38 @@ async fn secreto_legible_por_otros_impide_importar() {
     );
 }
 
+#[tokio::test]
+async fn variables_router_parciales_fallan() {
+    let dir = tempfile::tempdir().unwrap();
+    escribir_secreto(&dir.path().join("router.secret"), "no-debe-salir");
+    let completa = config_con_router(dir.path(), "http://192.0.2.1");
+    let parciales = [
+        Config {
+            router_user: None,
+            router_secret_file: None,
+            ..completa.clone()
+        },
+        Config {
+            router_url: None,
+            ..completa.clone()
+        },
+        Config {
+            router_secret_file: None,
+            ..completa.clone()
+        },
+    ];
+    for cfg in parciales {
+        let state = common::estado(cfg, dir.path()).await;
+        let e = instancia::arrancar_router(&state).await.unwrap_err();
+        for var in ["RP_ROUTER_URL", "RP_ROUTER_USER", "RP_ROUTER_SECRET"] {
+            assert!(e.contains(var), "{e}");
+        }
+        assert!(!e.contains("no-debe-salir"), "{e}");
+        assert!(!state.hgu.configurado());
+        state.db.close().await;
+    }
+}
+
 async fn sin_router() -> Panel {
     common::panel_sin_router("127.0.0.1".parse().unwrap()).await
 }

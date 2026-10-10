@@ -41,7 +41,7 @@ impl Nivel {
 /// Texto del error de una server function para la interfaz.
 fn texto_error(e: &ServerFnError) -> String {
     match e {
-        ServerFnError::ServerError(msg) => msg.clone(),
+        ServerFnError::ServerError(msg) => super::mensaje_del_servidor(msg),
         _ => t!("comun-error-conexion"),
     }
 }
@@ -140,7 +140,7 @@ fn Contenido(
         .into_iter()
         .flatten()
         .next()
-        .map(|e| texto_error(&e))
+        .map(|e| (texto_error(&e), super::es_error_de_sesion(&e)))
     });
 
     let cabecera = cabecera(vista, error_panel);
@@ -172,7 +172,10 @@ fn Contenido(
 }
 
 /// Título, modelo y hora del dato; error del panel si lo hay.
-fn cabecera(vista: Memo<Option<EstadoVista>>, error_panel: Memo<Option<String>>) -> impl IntoView {
+fn cabecera(
+    vista: Memo<Option<EstadoVista>>,
+    error_panel: Memo<Option<(String, bool)>>,
+) -> impl IntoView {
     let sub = move || {
         vista.with(|v| {
             let v = v.as_ref()?;
@@ -186,8 +189,7 @@ fn cabecera(vista: Memo<Option<EstadoVista>>, error_panel: Memo<Option<String>>)
         })
     };
     let error = move || {
-        error_panel.get().map(|e| {
-            let sesion = e == t!("comun-error-sesion");
+        error_panel.get().map(|(e, sesion)| {
             view! {
                 <p class="aviso estado-error" role="alert">
                     <IconoEstado estado=Estado::Error />

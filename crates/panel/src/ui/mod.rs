@@ -10,11 +10,30 @@ pub mod estado;
 pub mod explorador;
 pub mod historial;
 pub mod i18n;
+pub mod instalar;
 pub mod layout;
 pub mod login;
 pub mod table;
 
+use crate::t;
 use leptos::prelude::*;
+
+/// Texto de un error que trae una server function: el código fijo de sesión
+/// caducada ([`crate::auth::ERROR_SESION`]) se traduce aquí; el resto ya
+/// viene traducido del servidor.
+pub(crate) fn mensaje_del_servidor(msg: &str) -> String {
+    if msg == crate::auth::ERROR_SESION {
+        t!("comun-error-sesion")
+    } else {
+        msg.to_owned()
+    }
+}
+
+/// ¿El error es por no tener sesión (o haber caducado)? Por el código fijo,
+/// no por el texto, que depende del idioma.
+pub(crate) fn es_error_de_sesion(e: &ServerFnError) -> bool {
+    matches!(e, ServerFnError::ServerError(m) if m == crate::auth::ERROR_SESION)
+}
 
 /// Estado con significado (bien, aviso, error) o neutro.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -90,5 +109,23 @@ pub fn Insignia(estado: Estado, #[prop(into)] texto: String) -> impl IntoView {
             <IconoEstado estado />
             {texto}
         </span>
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn error_de_sesion_por_codigo_y_traducido() {
+        let e = ServerFnError::ServerError(crate::auth::ERROR_SESION.into());
+        assert!(es_error_de_sesion(&e));
+        assert_eq!(
+            mensaje_del_servidor(crate::auth::ERROR_SESION),
+            t!("comun-error-sesion")
+        );
+        let otro = ServerFnError::ServerError(t!("comun-error-sesion"));
+        assert!(!es_error_de_sesion(&otro), "el texto no cuenta");
+        assert_eq!(mensaje_del_servidor("otro error"), "otro error");
     }
 }

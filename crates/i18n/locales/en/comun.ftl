@@ -23,6 +23,7 @@ comun-error-conexion = Cannot reach the panel
 comun-error-interno = Internal panel error
 comun-error-interno-id = Internal panel error (id { $id })
 comun-error-sesion = Not signed in or session expired
+comun-error-idioma = Cannot change the language; try again
 
 ## Values
 comun-si = Yes

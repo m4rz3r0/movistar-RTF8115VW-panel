@@ -2,8 +2,8 @@
 # catalogue (areas, descriptions, labels) is not translated.
 biblioteca-titulo = Explorer
 biblioteca-inicio-texto = Reads run when you open them, with secrets masked. Writes go through the change manager: you see the before and after, and the panel watches the router after applying them and reverts if it stops responding.
-biblioteca-inicio-total = { $n } router functions, from the basic web, the advanced one and those no menu links to.
-biblioteca-buscar = Search function
+biblioteca-inicio-total = { $n } router functions, from the basic web interface, the advanced web interface and those no menu links to.
+biblioteca-buscar = Find a function
 biblioteca-buscar-placeholder = Name or description
 biblioteca-areas = Areas
 biblioteca-ninguna-coincide = No function matches
@@ -36,8 +36,8 @@ biblioteca-origen-basica = Basic
 biblioteca-origen-avanzada = Advanced
 biblioteca-origen-oculta = Hidden
 biblioteca-origen-incompleta = Incomplete
-biblioteca-origen-basica-ayuda = From the router's basic web
-biblioteca-origen-avanzada-ayuda = From the advanced web, linked from its menu
+biblioteca-origen-basica-ayuda = From the router's basic web interface
+biblioteca-origen-avanzada-ayuda = From the advanced web interface, linked from its menu
 biblioteca-origen-oculta-ayuda = Works, but no router menu links to it
 biblioteca-origen-incompleta-ayuda = Unfinished leftovers: may not respond
 biblioteca-riesgo-bajo = Low risk
@@ -128,7 +128,7 @@ biblioteca-validar-control = contains invalid characters
 
 ## Dialogs
 biblioteca-diff-vacio = No fields to compare.
-biblioteca-dialogo-deshacer = Undo change no. { $n }
+biblioteca-dialogo-deshacer = Undo change #{ $n }
 biblioteca-dialogo-borrar = Delete the instance
 biblioteca-dialogo-accion = Run the action
 biblioteca-dialogo-revisar = Review changes
@@ -139,8 +139,8 @@ biblioteca-escribe = Type
 biblioteca-para-confirmar = to confirm
 biblioteca-escribe-mayusculas = Type { $palabra } in capitals
 biblioteca-aplicando-comprobando = Applying the change and checking that the router shows it…
-biblioteca-cambio-comprobando = Change no. { $id }: checking…
-biblioteca-cambio-estado = Change no. { $id }: { $estado }
+biblioteca-cambio-comprobando = Change #{ $id }: checking…
+biblioteca-cambio-estado = Change #{ $id }: { $estado }
 biblioteca-vigilando-quedan = Watching the router: { $resto } left.
 biblioteca-vigilando = Watching the router…
 biblioteca-aplicado-verificado = Applied and verified.
@@ -153,7 +153,7 @@ biblioteca-borrar = Delete
 biblioteca-aplicar = Apply
 biblioteca-revelar-titulo = Reveal a secret
 biblioteca-revelar-para-ver = To see
-biblioteca-revelar-texto = type the panel password. It will be shown for 30 s and logged in the history (without the value).
+biblioteca-revelar-texto = {", "}type the panel password. It will be shown for 30 s and logged in the history (without the value).
 biblioteca-contrasena-panel = Panel password
 biblioteca-comprobando = Checking…
 

@@ -304,6 +304,10 @@ const CAMBIAN_IP_LAN: &[&str] = &[
     "te_red_local.cgi",
     "te_mapa_red_local.cgi",
 ];
+/// Motivo de [`CambioError::Bloqueada`] con el panel en solo lectura
+/// (firmware no probado sin confirmar). Es la clave i18n del texto: la
+/// interfaz lo traduce.
+pub const BLOQUEO_SOLO_LECTURA: &str = "panel-solo-lectura";
 const BLOQUEO_IP_LAN: &str = "bloqueada en v1: cambiar la IP del router corta la conexión del \
                               propio panel; hazlo desde la web del router";
 const BLOQUEO_SECRETOS_BASICA: &str = "bloqueada en v1: falta validar con el router real el \
@@ -394,7 +398,9 @@ impl ChangeManager {
     }
 
     /// Lee el router y calcula el diff de `req`. Devuelve un token para
-    /// [`ChangeManager::confirmar`].
+    /// [`ChangeManager::confirmar`]. Con el panel en solo lectura
+    /// ([`crate::instancia::solo_lectura`]) no prepara nada:
+    /// `Bloqueada(`[`BLOQUEO_SOLO_LECTURA`]`)`.
     pub async fn preparar(&self, req: ChangeRequest) -> Result<Preparado, CambioError> {
         self.preparar_con(req, false, None).await
     }
@@ -405,6 +411,11 @@ impl ChangeManager {
         explicito: bool,
         deshace: Option<i64>,
     ) -> Result<Preparado, CambioError> {
+        // Única entrada de las escrituras (también deshacer): aquí se
+        // comprueba el modo solo lectura.
+        if crate::instancia::solo_lectura(&self.state.db).await {
+            return Err(CambioError::Bloqueada(BLOQUEO_SOLO_LECTURA.into()));
+        }
         let plan = self.planificar(&req, explicito).await?;
         let (funcion, instancia, borrar) = (req.funcion.clone(), req.instancia.clone(), req.borrar);
         let token = nuevo_token();

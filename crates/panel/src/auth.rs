@@ -11,9 +11,14 @@ use leptos::prelude::*;
 #[cfg(feature = "ssr")]
 pub use server::{
     AuthUser, LoginError, MIN_PASSWORD_CHARS, SESSION_COOKIE, User, UserError, attempt_login,
-    client_ip, create_user, delay_secs, hash_password, reauthenticate, require_page_session,
-    require_user, set_password, verify, warm_up,
+    client_ip, create_user, delay_secs, hash_password, poner_cookie_de_sesion, reauthenticate,
+    require_page_session, require_user, set_password, verify, warm_up,
 };
+
+/// Mensaje de error de las server functions sin sesión vigente (con estado
+/// 401). Es un código fijo, no un texto: la interfaz lo reconoce y lo
+/// traduce en el idioma de la página (ver `ui::texto_error`).
+pub const ERROR_SESION: &str = "sesion-caducada";
 
 /// Destino tras el login: `next` solo si es una ruta local (empieza por una
 /// sola `/`); si no, la portada. Evita redirecciones abiertas a otro sitio
@@ -590,6 +595,12 @@ mod server {
         )
     }
 
+    /// Pone en la respuesta la cookie de la sesión `id` (de
+    /// [`attempt_login`]).
+    pub fn poner_cookie_de_sesion(id: &str) {
+        set_cookie(&session_cookie(id));
+    }
+
     fn set_cookie(value: &str) {
         if let (Some(resp), Ok(value)) = (
             use_context::<ResponseOptions>(),
@@ -658,7 +669,7 @@ mod server {
         let headers: HeaderMap = leptos_axum::extract().await?;
         match user_from_headers(&state.db, &headers).await {
             Ok(Some(user)) => Ok(user),
-            Ok(None) => fail(StatusCode::UNAUTHORIZED, &crate::t!("comun-error-sesion")),
+            Ok(None) => fail(StatusCode::UNAUTHORIZED, super::ERROR_SESION),
             Err(e) => internal(e),
         }
     }
@@ -694,13 +705,33 @@ mod server {
 
     /// Middleware de las rutas de páginas: exige sesión salvo en `/login` y en
     /// las server functions (`/api/*`), que se protegen con [`require_user`].
+    ///
+    /// Sin usuarios (panel recién instalado), toda página salvo `/instalar`
+    /// redirige a `/instalar`. Con usuarios, `/instalar` solo existe mientras
+    /// la instalación sigue en curso (y con sesión); si no, 404.
     pub async fn require_page_session(
         State(state): State<AppState>,
         req: Request,
         next: Next,
     ) -> Response {
         let path = req.uri().path();
-        if path == "/login" || path.starts_with("/api/") {
+        if path.starts_with("/api/") {
+            return next.run(req).await;
+        }
+        let instalar = path == "/instalar";
+        match crate::instalar::hay_usuarios(&state).await {
+            Ok(false) if instalar => return next.run(req).await,
+            Ok(false) => return Redirect::to("/instalar").into_response(),
+            Ok(true) if instalar && !crate::instalar::en_curso(&state).await => {
+                return StatusCode::NOT_FOUND.into_response();
+            }
+            Ok(true) => {}
+            Err(e) => {
+                eprintln!("panel: error interno en la autenticación: {e}");
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+        }
+        if path == "/login" {
             return next.run(req).await;
         }
         let (mut parts, body) = req.into_parts();

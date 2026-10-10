@@ -62,6 +62,9 @@ pub(crate) fn gestor(state: &AppState) -> Result<Arc<ChangeManager>, ServerFnErr
 pub(crate) fn error_cambio(e: CambioError) -> ServerFnError {
     use CambioError as E;
     let (status, msg) = match e {
+        E::Bloqueada(m) if m == crate::changes::BLOQUEO_SOLO_LECTURA => {
+            (StatusCode::FORBIDDEN, crate::t!("panel-solo-lectura"))
+        }
         E::Bloqueada(m) => (
             StatusCode::FORBIDDEN,
             crate::t!("biblioteca-error-bloqueada", motivo = m),

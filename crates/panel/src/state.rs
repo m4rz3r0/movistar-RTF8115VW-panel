@@ -29,6 +29,8 @@ pub struct AppState {
     /// Gestor de cambios del servidor (vacío hasta
     /// `ChangeManager::instalar`). Toda escritura al router pasa por él.
     pub cambios: changes::Ranura,
+    /// Asistente de instalación: token y fase (ver `instalar`).
+    pub instalacion: Arc<crate::instalar::Instalacion>,
 }
 
 impl AppState {
@@ -68,6 +70,7 @@ impl AppState {
             poller: PollerHandle::default(),
             history_key: Arc::new(history_key),
             cambios: changes::Ranura::default(),
+            instalacion: Arc::default(),
         })
     }
 }

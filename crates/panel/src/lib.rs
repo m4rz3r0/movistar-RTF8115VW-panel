@@ -10,6 +10,7 @@
 
 pub mod app;
 pub mod auth;
+pub mod instalar;
 pub mod ui;
 
 #[cfg(feature = "ssr")]
@@ -22,6 +23,8 @@ pub mod config;
 pub mod crypto;
 #[cfg(feature = "ssr")]
 pub mod db;
+#[cfg(feature = "ssr")]
+pub mod fotos;
 #[cfg(feature = "ssr")]
 pub mod instancia;
 #[cfg(feature = "ssr")]

@@ -73,6 +73,8 @@ async fn serve() -> std::process::ExitCode {
         eprintln!("panel: no se puede arrancar: {e}");
         return ExitCode::FAILURE;
     }
+    // Sin usuarios: token del asistente de instalación (registro y fichero).
+    panel::instalar::token_inicial(&state).await;
     Poller::spawn(state.clone());
     // Retoma los cambios que quedaron a medias si el proceso se cortó (en
     // segundo plano: si el router no responde, no retrasa el arranque).

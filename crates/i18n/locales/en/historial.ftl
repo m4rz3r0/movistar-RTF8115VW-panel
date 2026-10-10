@@ -8,7 +8,10 @@ historial-volver-recientes = Back to the newest
 historial-paginas = History pages
 historial-mas-recientes = ← Newer
 historial-mas-antiguos = Older →
-historial-pagina-de = Page { $pagina } of { $paginas } · { $total } entries
+historial-pagina-de = Page { $pagina } of { $paginas } · { $total ->
+    [one] { $total } entry
+   *[other] { $total } entries
+}
 historial-sin-campos = No fields
 historial-campos = { $n ->
     [one] { $n } field
@@ -17,12 +20,12 @@ historial-campos = { $n ->
 historial-instancia-sep = { " · " }instance { $i }
 historial-instancia-par = { " " }(instance { $i })
 historial-revelado = Revealed
-historial-revelado-de = of
+historial-revelado-de = in
 historial-secreto = Secret
 historial-creado = Created
 historial-ultimo-estado = Last status change
 historial-deshecho-por = Undone by
 historial-deshace-a = Undoes
 historial-deshacer = Undo
-historial-deshacer-lector = { " " }change no. { $id }
+historial-deshacer-lector = { " " }change #{ $id }
 historial-error-deshacer = Cannot undo: { $motivo }.

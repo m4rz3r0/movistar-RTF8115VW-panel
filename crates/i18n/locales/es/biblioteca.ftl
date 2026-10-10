@@ -153,7 +153,7 @@ biblioteca-borrar = Borrar
 biblioteca-aplicar = Aplicar
 biblioteca-revelar-titulo = Revelar un secreto
 biblioteca-revelar-para-ver = Para ver
-biblioteca-revelar-texto = escribe la contraseña del panel. Se mostrará 30 s y quedará anotado en el historial (sin el valor).
+biblioteca-revelar-texto = {", "}escribe la contraseña del panel. Se mostrará 30 s y quedará anotado en el historial (sin el valor).
 biblioteca-contrasena-panel = Contraseña del panel
 biblioteca-comprobando = Comprobando…
 

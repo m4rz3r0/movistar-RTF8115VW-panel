@@ -170,6 +170,21 @@ pub async fn sesion(p: &Panel) -> String {
     panel::auth::create_user(&p.state.db, PANEL_USER, PANEL_PASS)
         .await
         .unwrap();
+    sesion_de(p).await
+}
+
+/// Panel ya instalado: con el usuario del panel (si no estaba). Sin
+/// usuarios, toda página redirige al asistente de instalación.
+pub async fn con_usuario(p: &Panel) {
+    match panel::auth::create_user(&p.state.db, PANEL_USER, PANEL_PASS).await {
+        Ok(()) | Err(panel::auth::UserError::Exists) => {}
+        Err(e) => panic!("{e}"),
+    }
+}
+
+/// Inicia sesión desde 127.0.0.1 con el usuario del panel (ya creado) y
+/// devuelve la cookie lista para la cabecera `Cookie`.
+pub async fn sesion_de(p: &Panel) -> String {
     let resp = send(
         &p.app,
         post_form(

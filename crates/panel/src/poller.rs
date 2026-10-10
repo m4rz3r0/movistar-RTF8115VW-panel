@@ -183,6 +183,8 @@ struct Shared {
     pauses: watch::Sender<u32>,
     /// Lo tiene el sondeo durante cada ciclo.
     cycle: tokio::sync::Mutex<()>,
+    /// Adelanta el siguiente ciclo ([`PollerHandle::despertar`]).
+    despertar: tokio::sync::Notify,
 }
 
 /// Acceso al sondeo. Barato de clonar; vive en `AppState` desde el arranque,
@@ -200,6 +202,7 @@ impl Default for PollerHandle {
                 status: Mutex::new(Status::default()),
                 pauses: watch::Sender::new(0),
                 cycle: tokio::sync::Mutex::new(()),
+                despertar: tokio::sync::Notify::new(),
             }),
         }
     }
@@ -256,6 +259,13 @@ impl PollerHandle {
         };
         let since = st.resumed.map_or(last_ok, |r| r.max(last_ok));
         st.error.is_none() && (paused || since.elapsed() < cfg.fast * 3)
+    }
+
+    /// Adelanta el siguiente ciclo: el sondeo deja de esperar y lee ya (p.
+    /// ej. nada más configurar el router). Si llega durante un ciclo, el
+    /// siguiente empieza sin esperar.
+    pub fn despertar(&self) {
+        self.shared.despertar.notify_one();
     }
 
     /// Detiene el sondeo: espera a que acabe el ciclo en curso (si lo hay)
@@ -438,9 +448,13 @@ impl Poller {
                     poller.last_compact = Some(Instant::now());
                 }
             }
-            match next {
-                Next::Interval(d) => tokio::time::sleep_until(start + d).await,
-                Next::Backoff(d) => tokio::time::sleep(d).await,
+            let espera = match next {
+                Next::Interval(d) => start + d,
+                Next::Backoff(d) => tokio::time::Instant::now() + d,
+            };
+            tokio::select! {
+                () = tokio::time::sleep_until(espera) => {}
+                () = shared.despertar.notified() => {}
             }
         }
     }

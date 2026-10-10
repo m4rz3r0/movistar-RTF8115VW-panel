@@ -8,7 +8,10 @@ historial-volver-recientes = Volver a las más recientes
 historial-paginas = Páginas del historial
 historial-mas-recientes = ← Más recientes
 historial-mas-antiguos = Más antiguos →
-historial-pagina-de = Página { $pagina } de { $paginas } · { $total } entradas
+historial-pagina-de = Página { $pagina } de { $paginas } · { $total ->
+    [one] { $total } entrada
+   *[other] { $total } entradas
+}
 historial-sin-campos = Sin campos
 historial-campos = { $n ->
     [one] { $n } campo

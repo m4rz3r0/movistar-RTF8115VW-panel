@@ -4,7 +4,7 @@ estado-sub = { $modelo } · firmware { $firmware } · data from { $hora }
 estado-error-actualizar = Cannot refresh the data: { $error }
 estado-volver-a-entrar = Sign in again
 estado-sin-configurar = Router not configured
-estado-sin-configurar-sub = Set it up in the panel settings.
+estado-sin-configurar-sub = Set it up in Settings.
 estado-sin-conexion-router = No connection to the router
 estado-sin-datos-aun = The panel has not been able to read the router yet: no data so far.
 estado-reintenta = It retries on its own; this page refreshes every 10 s.
@@ -16,7 +16,7 @@ estado-indicadores = Indicators
 ## Indicators
 estado-internet = Internet
 estado-desconocido = Unknown
-estado-ultimo-dato = Last data: { $valor } at { $hora }
+estado-ultimo-dato = Last reading: { $valor } at { $hora }
 estado-ip-publica = Public IP { $ip }
 estado-sin-ip-publica = No public IP
 estado-sin-conexion-desde = Disconnected for
@@ -37,7 +37,7 @@ estado-ram-usada = RAM used
 estado-clientes = Clients
 
 ## Charts
-estado-historico = History
+estado-historico = Over time
 estado-intervalo = Chart range
 estado-trafico = Device traffic
 estado-trafico-nota = What the devices on the wired and WiFi network send and receive. Includes traffic between devices plugged into different router ports.
@@ -84,9 +84,9 @@ estado-wifi-abierta = Open
 estado-canal-auto = automatic channel
 estado-canal = channel { $canal }
 estado-sin-clave = No key
-estado-wps-activo = Active
+estado-wps-activo = Enabled
 estado-wps-red-apagada = Enabled (network off)
-estado-wps-activo-insignia = WPS active
+estado-wps-activo-insignia = WPS enabled
 estado-codigo = code { $codigo }
 
 ## Warnings
@@ -97,5 +97,5 @@ estado-aviso-sin-router-desde = No connection to the router since { $cuando }. T
 estado-aviso-sin-router-desde-error = No connection to the router since { $cuando }: { $error }. The data shown is from that time.
 estado-aviso-lentos = Client and WiFi data may be out of date.
 estado-aviso-lentos-desde = Client and WiFi data may be out of date (last data: { $cuando }).
-estado-aviso-wps = WPS active on { $redes }: turn it off if you do not use it (the WPS PIN can be brute-forced).
+estado-aviso-wps = WPS enabled on { $redes }: turn it off if you do not use it (the WPS PIN can be brute-forced).
 estado-aviso-tr69 = Telefónica can manage the router remotely (TR-069).

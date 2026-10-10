@@ -619,3 +619,38 @@ async fn hangs_after_next_write() {
     sim.control.set_unresponsive(false);
     c.call("cbGetUpnpCfg", &[]).await.unwrap();
 }
+
+#[tokio::test]
+async fn lista_sin_selector_junta_sus_instancias() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    // Sin fixture propia sin parámetros: devuelve todas las instancias que
+    // hay en sus fixtures, como hace el router con las listas que sí tienen
+    // (`cbGetWanIPIntf`, `cbGetDnsRelayServer`).
+    let radios = c.call("cbGetWifi", &[]).await.unwrap();
+    assert_eq!(radios.all("dpm_cfg_wifi").len(), 2, "{radios:?}");
+    let aps = c.call("cbListWifiAccPt", &[]).await.unwrap();
+    assert_eq!(aps.all("dpm_cfg_wifi_acc_pt").len(), 8, "{aps:?}");
+    // Una misma instancia en dos fixtures sale una vez.
+    let ap = c.call("cbGetWifiAccPt", &[]).await.unwrap();
+    assert_eq!(ap.all("dpm_cfg_wifi_acc_pt").len(), 1, "{ap:?}");
+    // Con <name>.xml manda esa fixture.
+    let wan = c.call("cbGetWanIPIntf", &[]).await.unwrap();
+    assert_eq!(wan.all("mll_wanconn_data").len(), 3, "{wan:?}");
+}
+
+#[tokio::test]
+async fn firmware_del_resumen_cambiable() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    let fw = |n: &XmlNode| n.text_of("SWVersion").unwrap().to_owned();
+    assert_eq!(
+        fw(&c.call("cbGetSummary", &[]).await.unwrap()),
+        "ES_g14.17_RTF_TEF001_V9.17_V034"
+    );
+    sim.control.set_firmware("ES_g14.18_RTF_TEF001_V9.18_V001");
+    assert_eq!(
+        fw(&c.call("cbGetSummary", &[]).await.unwrap()),
+        "ES_g14.18_RTF_TEF001_V9.18_V001"
+    );
+}

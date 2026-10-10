@@ -8,6 +8,7 @@ use common::{body_text, panel, post_form, send, sesion};
 
 /// HTML de `/login` con las cabeceras dadas.
 async fn login_con(p: &common::Panel, cabeceras: &[(&str, &str)]) -> String {
+    common::con_usuario(p).await;
     let mut req = Request::get("/login");
     for (k, v) in cabeceras {
         req = req.header(*k, *v);
@@ -57,7 +58,7 @@ async fn errores_del_servidor_en_el_idioma_de_la_peticion() {
     req.headers_mut()
         .insert("cookie", "rp_lang=en".parse().unwrap());
     let body = body_text(send(&p.app, req).await).await;
-    assert!(body.contains("Wrong user name or password"), "{body}");
+    assert!(body.contains("Wrong username or password"), "{body}");
 }
 
 #[tokio::test]
@@ -81,4 +82,16 @@ async fn cambiar_idioma_fija_la_cookie() {
     )
     .await;
     assert_ne!(resp.status(), 200);
+}
+
+#[tokio::test]
+async fn login_con_selector_de_idioma() {
+    let p = panel().await;
+    let html = login_con(&p, &[("accept-language", "en")]).await;
+    assert!(html.contains("idioma-selector"), "{html}");
+    // Cada idioma con su nombre y su `lang`.
+    assert!(
+        html.contains(r#"lang="es""#) && html.contains("Español"),
+        "{html}"
+    );
 }

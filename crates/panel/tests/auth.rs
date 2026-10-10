@@ -240,6 +240,7 @@ async fn actividad_renueva_la_sesion_como_mucho_cada_minuto() {
 #[tokio::test]
 async fn pagina_sin_sesion_redirige_a_login() {
     let p = panel().await;
+    crear_usuario(&p).await;
     let resp = get(&p.app, "/?a=1&b=2").await;
     assert_eq!(resp.status(), 303);
     assert_eq!(
@@ -253,6 +254,7 @@ async fn pagina_sin_sesion_redirige_a_login() {
 #[tokio::test]
 async fn pagina_de_login_es_publica() {
     let p = panel().await;
+    crear_usuario(&p).await;
     let resp = get(&p.app, "/login?next=%2F").await;
     assert_eq!(resp.status(), 200);
     let html = body_text(resp).await;

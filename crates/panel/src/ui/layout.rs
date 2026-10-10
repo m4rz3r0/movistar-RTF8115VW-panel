@@ -4,9 +4,8 @@
 
 use crate::auth::{Logout, quien_soy};
 use crate::t;
-use crate::ui::i18n::{cambiar_idioma, use_idioma};
-use ::i18n::Idioma;
-use leptos::{prelude::*, task::spawn_local};
+use crate::ui::i18n::SelectorIdioma;
+use leptos::prelude::*;
 use leptos_router::{components::A, components::Outlet, hooks::use_navigate};
 
 /// Icono de trazo de 20 px; `d` es el trazado.
@@ -145,46 +144,4 @@ pub fn Layout() -> impl IntoView {
         </div>
     }
     .into_any()
-}
-
-/// Nombre de un idioma en ese mismo idioma.
-fn nombre_idioma(i: Idioma) -> String {
-    match i {
-        Idioma::Es => t!("comun-idioma-es"),
-        Idioma::En => t!("comun-idioma-en"),
-    }
-}
-
-/// Selector de idioma: fija la cookie en el servidor y recarga la página.
-#[component]
-fn SelectorIdioma() -> impl IntoView {
-    let idioma = use_idioma();
-    let cambiar = move |ev| {
-        let Some(nuevo) = Idioma::from_codigo(&event_target_value(&ev)) else {
-            return;
-        };
-        spawn_local(async move {
-            if cambiar_idioma(nuevo).await.is_ok() {
-                let _ = window().location().reload();
-            }
-        });
-    };
-    let opciones = Idioma::TODOS
-        .into_iter()
-        .map(|i| {
-            view! {
-                <option value=i.codigo() lang=i.codigo() selected=move || idioma.get() == i>
-                    {nombre_idioma(i)}
-                </option>
-            }
-        })
-        .collect_view();
-    view! {
-        <label class="idioma">
-            <span class="solo-lector">{t!("comun-idioma")}</span>
-            <select class="idioma-selector" on:change=cambiar>
-                {opciones}
-            </select>
-        </label>
-    }
 }

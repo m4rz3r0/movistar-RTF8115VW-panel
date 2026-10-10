@@ -120,6 +120,7 @@ async fn assert_csp_con_nonce(resp: Response<Body>, uri: &str) {
 #[tokio::test]
 async fn pagina_leptos_lleva_csp_con_su_nonce() {
     let p = panel().await;
+    common::con_usuario(&p).await;
     let resp = get(&p.app, "/login").await;
     assert_eq!(resp.status(), StatusCode::OK);
     assert_csp_con_nonce(resp, "/login").await;

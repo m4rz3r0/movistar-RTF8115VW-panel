@@ -409,6 +409,17 @@ button {
 
 .idioma {
   display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.idioma-error {
+  color: var(--error);
+  font-size: 12px;
+}
+
+.idioma-error:empty {
+  display: none;
 }
 
 .idioma-selector {
@@ -1257,6 +1268,66 @@ button {
   border: 1px solid var(--borde);
   border-radius: var(--radio);
   box-shadow: 0 24px 48px rgb(0 0 0 / 0.35);
+}
+
+.acceso-cabeza {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esp-3);
+}
+
+.acceso-cabeza .idioma-selector {
+  width: auto;
+}
+
+.acceso-tarjeta.instalar {
+  width: min(100%, 520px);
+}
+
+.instalar-pasos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-2) var(--esp-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: paso;
+  color: var(--texto-2);
+  font-size: 12px;
+}
+
+.instalar-pasos li {
+  counter-increment: paso;
+}
+
+.instalar-pasos li::before {
+  content: counter(paso) ". ";
+}
+
+.instalar-pasos li[aria-current] {
+  color: var(--acento);
+  font-weight: 600;
+}
+
+.instalar-detectado {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-2);
+  overflow-wrap: anywhere;
+}
+
+.instalar-botones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-3);
+}
+
+.acceso .nota {
+  margin: 0;
+  color: var(--texto-2);
+  font-size: 12px;
 }
 
 .acceso-marca {

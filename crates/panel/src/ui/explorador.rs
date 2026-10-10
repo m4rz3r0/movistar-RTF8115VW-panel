@@ -39,7 +39,7 @@ struct Catalogo(Resource<Result<Vec<AreaVista>, ServerFnError>>);
 /// Texto del error de una server function para la interfaz.
 pub(crate) fn texto_error(e: &ServerFnError) -> String {
     match e {
-        ServerFnError::ServerError(msg) => msg.clone(),
+        ServerFnError::ServerError(msg) => super::mensaje_del_servidor(msg),
         _ => t!("biblioteca-error-conexion"),
     }
 }

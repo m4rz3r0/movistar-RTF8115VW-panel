@@ -18,6 +18,11 @@ pub mod claves {
     pub const FIRMWARE_CONFIRMADO: &str = "firmware_confirmado";
 }
 
+/// Versiones de firmware con las que se ha probado el panel (`SWVersion` de
+/// `cbGetSummary`). Con otra, el panel queda en solo lectura hasta que se
+/// confirme (ver [`fijar_modo_firmware`]).
+pub const FIRMWARES_PROBADOS: &[&str] = &["ES_g14.17_RTF_TEF001_V9.17_V034"];
+
 /// URL, usuario y contraseña del router. `Debug` no muestra la contraseña.
 #[derive(Clone, PartialEq, Eq)]
 pub struct CredencialesRouter {
@@ -37,7 +42,8 @@ impl std::fmt::Debug for CredencialesRouter {
 }
 
 impl CredencialesRouter {
-    fn client_config(&self) -> hgu::ClientConfig {
+    /// Configuración del cliente del router con los tiempos por defecto.
+    pub fn client_config(&self) -> hgu::ClientConfig {
         hgu::ClientConfig::new(&self.url, &self.usuario, &self.contrasena)
     }
 }
@@ -135,22 +141,66 @@ pub async fn escribir(db: &SqlitePool, clave: &str, valor: &Value) -> Result<(),
     .map_err(|e| format!("no se puede guardar el ajuste {clave} de la instancia: {e}"))
 }
 
+/// ¿Se ha probado el panel con esta versión de firmware?
+pub fn firmware_probado(firmware: &str) -> bool {
+    FIRMWARES_PROBADOS.contains(&firmware)
+}
+
+/// Fija el modo de escritura según el firmware del router: con uno no
+/// probado y sin [`claves::FIRMWARE_CONFIRMADO`], solo lectura; si no, se
+/// quita. Devuelve si el firmware está probado.
+pub async fn fijar_modo_firmware(db: &SqlitePool, firmware: &str) -> Result<bool, String> {
+    let probado = firmware_probado(firmware);
+    let confirmado = leer(db, claves::FIRMWARE_CONFIRMADO).await == Some(Value::Bool(true));
+    escribir(
+        db,
+        claves::SOLO_LECTURA,
+        &Value::Bool(!probado && !confirmado),
+    )
+    .await?;
+    Ok(probado)
+}
+
+/// ¿Está el panel en solo lectura (firmware no probado sin confirmar)?
+pub async fn solo_lectura(db: &SqlitePool) -> bool {
+    leer(db, claves::SOLO_LECTURA).await == Some(Value::Bool(true))
+}
+
 /// Configura el cliente del router al arrancar. Por orden: las credenciales
 /// de la base de datos; si no hay, las de `RP_ROUTER_URL`, `RP_ROUTER_USER` y
 /// `RP_ROUTER_SECRET` (las tres), que se importan a la base de datos una sola
 /// vez; si tampoco, el router queda sin configurar.
 ///
-/// Error si las credenciales guardadas no se pueden descifrar, o si están
-/// las tres variables pero el fichero de la contraseña no se puede leer o lo
-/// pueden leer otros (no se usa ni se importa). Registra de dónde salieron
-/// las credenciales, nunca su valor.
+/// Error si solo están una o dos de las tres variables (una errata no debe
+/// dejar el router sin configurar sin que se note), si las credenciales
+/// guardadas no se pueden descifrar, o si están las tres variables pero el
+/// fichero de la contraseña no se puede leer o lo pueden leer otros (no se
+/// usa ni se importa). Registra de dónde salieron las credenciales, nunca su
+/// valor.
 pub async fn arrancar_router(state: &AppState) -> Result<(), String> {
+    let cfg = &state.cfg;
+    let presentes = [
+        ("RP_ROUTER_URL", cfg.router_url.is_some()),
+        ("RP_ROUTER_USER", cfg.router_user.is_some()),
+        ("RP_ROUTER_SECRET", cfg.router_secret_file.is_some()),
+    ];
+    if presentes.iter().any(|(_, p)| *p) && !presentes.iter().all(|(_, p)| *p) {
+        let faltan: Vec<&str> = presentes
+            .iter()
+            .filter(|(_, p)| !p)
+            .map(|(v, _)| *v)
+            .collect();
+        return Err(format!(
+            "faltan {}: RP_ROUTER_URL, RP_ROUTER_USER y RP_ROUTER_SECRET van las tres juntas \
+             (para importar las credenciales del router) o ninguna",
+            faltan.join(" y ")
+        ));
+    }
     if let Some(c) = leer_credenciales(&state.db, &state.history_key).await? {
         tracing::info!("router: credenciales de la base de datos");
         state.hgu.reconfigurar(c.client_config()).await;
         return Ok(());
     }
-    let cfg = &state.cfg;
     match (&cfg.router_url, &cfg.router_user, &cfg.router_secret_file) {
         (Some(url), Some(usuario), Some(fichero)) => {
             let c = CredencialesRouter {
@@ -165,11 +215,7 @@ pub async fn arrancar_router(state: &AppState) -> Result<(), String> {
             );
             state.hgu.reconfigurar(c.client_config()).await;
         }
-        (None, None, None) => tracing::info!("router: sin configurar"),
-        _ => tracing::warn!(
-            "router: sin configurar; para importar las credenciales del entorno hacen falta \
-             RP_ROUTER_URL, RP_ROUTER_USER y RP_ROUTER_SECRET"
-        ),
+        _ => tracing::info!("router: sin configurar"),
     }
     Ok(())
 }

@@ -227,6 +227,11 @@ impl SimControl {
         e.1 = e.1.saturating_add(tx);
     }
 
+    /// Cambia la versión de firmware (`SWVersion`) que da `cbGetSummary`.
+    pub fn set_firmware(&self, firmware: &str) {
+        self.inner.state().firmware = Some(firmware.to_owned());
+    }
+
     /// Escrituras recibidas con `sessionKey` válido (sin él), en orden. No
     /// incluye las llamadas de solo validación (`validation_only=1`). Las de
     /// la UI básica (`GET /cgi-bin/<x>.cmd|.cgi|.wl?…`) aparecen con el
@@ -301,6 +306,8 @@ struct SimState {
     wifi: BTreeMap<String, BTreeMap<String, String>>,
     /// Último `cbReboot`: `SysUptime` cuenta desde aquí.
     rebooted: Option<Instant>,
+    /// `SWVersion` de `cbGetSummary` (`set_firmware`).
+    firmware: Option<String>,
 }
 
 impl SimState {
@@ -377,28 +384,8 @@ fn initial_leases(fixtures: &HashMap<FixtureKey, String>) -> Vec<Lease> {
 
 // ---------------------------------------------------------------- XML
 
-fn escape(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-}
-
-fn write_node(n: &XmlNode, out: &mut String) {
-    out.push_str(&format!("<{}>", n.tag));
-    if n.children.is_empty() {
-        out.push_str(&escape(&n.text));
-    }
-    for c in &n.children {
-        write_node(c, out);
-    }
-    out.push_str(&format!("</{}>", n.tag));
-}
-
 fn response(node: &XmlNode) -> String {
-    let mut out = format!("{XML_HEADER}<Response>");
-    write_node(node, &mut out);
-    out.push_str("</Response>");
-    out
+    format!("{XML_HEADER}<Response>{}</Response>", node.to_xml())
 }
 
 fn leaf(tag: &str, text: &str) -> XmlNode {
@@ -739,15 +726,46 @@ fn read(s: &Inner, st: &SimState, name: &str, params: &[(String, String)]) -> St
         .fixtures
         .get(&fixture_key(name, params))
         .or_else(|| s.fixtures.get(&(name.to_owned(), Vec::new())));
-    let Some(raw) = raw else {
-        return failure(name, "no fixture");
-    };
-    let mut node = match hgu::xml::parse_response(name, raw) {
-        Ok(n) => n,
-        Err(e) => return failure(name, &format!("fixture no válida: {e}")),
+    let mut node = match raw {
+        Some(raw) => match hgu::xml::parse_response(name, raw) {
+            Ok(n) => n,
+            Err(e) => return failure(name, &format!("fixture no válida: {e}")),
+        },
+        None if params.is_empty() => match all_instances(s, name) {
+            Some(n) => n,
+            None => return failure(name, "no fixture"),
+        },
+        None => return failure(name, "no fixture"),
     };
     patch(st, name, &mut node);
     response(&node)
+}
+
+/// Lista leída sin elegir instancia y sin `<name>.xml`: el router devuelve
+/// todas las instancias (así responden las listas de las que hay fixture sin
+/// parámetros, como `cbGetWanIPIntf`). Junta las de las fixtures de `name`
+/// que eligen la instancia con el mismo parámetro (el que más fixtures
+/// tenga; a igualdad, el primero por nombre), en orden de valor.
+fn all_instances(s: &Inner, name: &str) -> Option<XmlNode> {
+    let mut groups: BTreeMap<Vec<&str>, Vec<(&Params, &String)>> = BTreeMap::new();
+    for ((n, p), raw) in &s.fixtures {
+        if n == name && !p.is_empty() {
+            let names = p.iter().map(|(k, _)| k.as_str()).collect();
+            groups.entry(names).or_default().push((p, raw));
+        }
+    }
+    let (_, mut group) = groups.into_iter().rev().max_by_key(|(_, g)| g.len())?;
+    group.sort();
+    let mut children = Vec::new();
+    for (_, raw) in group {
+        let n = hgu::xml::parse_response(name, raw).ok()?;
+        children.extend(
+            n.children
+                .into_iter()
+                .filter(|c| c.tag != "Result" && c.tag != "ErrorString"),
+        );
+    }
+    Some(result_node(name, children, "0", ""))
 }
 
 fn read_leases(st: &SimState, params: &[(String, String)]) -> String {
@@ -803,6 +821,9 @@ fn patch(st: &SimState, name: &str, node: &mut XmlNode) {
         "cbGetSummary" => {
             if let Some(t) = st.rebooted {
                 set_child(node, "SysUptime", &t.elapsed().as_secs().to_string());
+            }
+            if let Some(fw) = &st.firmware {
+                set_child(node, "SWVersion", fw);
             }
         }
         "cbGetWanIPIntf" if !st.wan_up => for_each_node(node, &mut |n| {

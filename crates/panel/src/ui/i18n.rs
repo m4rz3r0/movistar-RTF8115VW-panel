@@ -141,6 +141,60 @@ pub async fn cambiar_idioma(idioma: Idioma) -> Result<(), ServerFnError> {
     Ok(())
 }
 
+/// Nombre de un idioma en ese mismo idioma.
+fn nombre_idioma(i: Idioma) -> String {
+    match i {
+        Idioma::Es => crate::t!("comun-idioma-es"),
+        Idioma::En => crate::t!("comun-idioma-en"),
+    }
+}
+
+/// Selector de idioma: fija la cookie en el servidor y recarga la página.
+/// Si no se puede, vuelve al idioma de la página y lo dice.
+#[component]
+pub fn SelectorIdioma() -> impl IntoView {
+    let idioma = use_idioma();
+    let error = RwSignal::new(false);
+    let select = NodeRef::<leptos::html::Select>::new();
+    let cambiar = move |ev| {
+        let Some(nuevo) = Idioma::from_codigo(&event_target_value(&ev)) else {
+            return;
+        };
+        error.set(false);
+        leptos::task::spawn_local(async move {
+            if cambiar_idioma(nuevo).await.is_ok() {
+                let _ = window().location().reload();
+            } else {
+                if let Some(s) = select.get_untracked() {
+                    s.set_value(idioma.get_untracked().codigo());
+                }
+                error.set(true);
+            }
+        });
+    };
+    let opciones = Idioma::TODOS
+        .into_iter()
+        .map(|i| {
+            view! {
+                <option value=i.codigo() lang=i.codigo() selected=move || idioma.get() == i>
+                    {nombre_idioma(i)}
+                </option>
+            }
+        })
+        .collect_view();
+    view! {
+        <label class="idioma">
+            <span class="solo-lector">{crate::t!("comun-idioma")}</span>
+            <select class="idioma-selector" node_ref=select on:change=cambiar>
+                {opciones}
+            </select>
+            <span class="error idioma-error" role="alert">
+                {move || error.get().then(|| crate::t!("comun-error-idioma"))}
+            </span>
+        </label>
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

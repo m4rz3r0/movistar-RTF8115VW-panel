@@ -32,7 +32,15 @@ macro_rules! locales {
     };
 }
 
-locales!("comun", "login", "estado", "historial", "biblioteca");
+locales!(
+    "comun",
+    "login",
+    "estado",
+    "historial",
+    "biblioteca",
+    "instalar",
+    "panel"
+);
 
 /// Idioma de la interfaz.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -219,6 +227,22 @@ mod tests {
         let mut a = FluentArgs::new();
         a.set("n", 1);
         assert_eq!(tr(Idioma::En, "comun-cortes", Some(&a)), "1 outage");
+    }
+
+    #[test]
+    fn paginas_del_historial_en_singular() {
+        let args = |total: i64| {
+            let mut a = FluentArgs::new();
+            a.set("pagina", 1);
+            a.set("paginas", 1);
+            a.set("total", total);
+            a
+        };
+        let t = |i, n| tr(i, "historial-pagina-de", Some(&args(n)));
+        assert_eq!(t(Idioma::En, 1), "Page 1 of 1 · 1 entry");
+        assert_eq!(t(Idioma::En, 5), "Page 1 of 1 · 5 entries");
+        assert_eq!(t(Idioma::Es, 1), "Página 1 de 1 · 1 entrada");
+        assert_eq!(t(Idioma::Es, 5), "Página 1 de 1 · 5 entradas");
     }
 
     #[test]

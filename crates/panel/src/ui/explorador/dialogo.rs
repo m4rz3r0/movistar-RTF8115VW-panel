@@ -213,7 +213,7 @@ pub fn DialogoCambio(
                 <label for="dialogo-palabra">
                     {t!("biblioteca-escribe")}
                     " "
-                    <strong class="mono">{w}</strong>
+                    <strong class="mono" lang="es">{w}</strong>
                     " "
                     {t!("biblioteca-para-confirmar")}
                 </label>
@@ -414,7 +414,6 @@ pub(super) fn DialogoRevelar(
                     {t!("biblioteca-revelar-para-ver")}
                     " "
                     <span class="mono">{campo}</span>
-                    " "
                     {t!("biblioteca-revelar-texto")}
                 </p>
                 <p class="campo">
