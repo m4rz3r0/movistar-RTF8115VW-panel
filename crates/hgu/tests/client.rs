@@ -37,6 +37,8 @@ struct Fake {
     rotate_key_on_login: std::sync::atomic::AtomicBool,
     key: Mutex<Option<String>>,
     cookies_seen: Mutex<Vec<String>>,
+    /// Retraso extra (ms) de cada llamada `.xml`.
+    delay_ms: std::sync::atomic::AtomicU64,
 }
 
 type S = Arc<Fake>;
@@ -119,7 +121,7 @@ async fn api(
     if s.in_flight.fetch_add(1, Ordering::SeqCst) > 0 {
         s.overlaps.fetch_add(1, Ordering::SeqCst);
     }
-    tokio::time::sleep(Duration::from_millis(5)).await;
+    tokio::time::sleep(Duration::from_millis(5 + s.delay_ms.load(Ordering::SeqCst))).await;
     s.in_flight.fetch_sub(1, Ordering::SeqCst);
 
     let cookie = headers
@@ -370,4 +372,88 @@ async fn basic_write_errors_hide_the_query() {
         matches!(&e, Error::CallFailed { name, .. } if name == "mala.wl"),
         "{e:?}"
     );
+}
+
+fn cfg(url: &str, pass: &str) -> ClientConfig {
+    ClientConfig {
+        base_url: url.to_owned(),
+        user: USER.into(),
+        password: pass.into(),
+        timeout: Duration::from_secs(5),
+        min_gap: Duration::from_millis(1),
+    }
+}
+
+#[tokio::test]
+async fn sin_configurar_devuelve_noconfigurado() {
+    let (_url, s) = start().await;
+    let c = Client::sin_configurar();
+    assert!(!c.configurado());
+    assert_eq!(
+        c.call("cbGetSummary", &[]).await.unwrap_err(),
+        Error::NoConfigurado
+    );
+    assert_eq!(
+        c.basic_page("dhcp.asp").await.unwrap_err(),
+        Error::NoConfigurado
+    );
+    assert_eq!(Error::NoConfigurado.to_string(), "router sin configurar");
+    c.logout().await;
+    assert_eq!(s.basic_logins.load(Ordering::SeqCst), 0);
+    assert!(s.cookies_seen.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn reconfigurar_cambia_credenciales_y_sesion() {
+    let (url, s) = start().await;
+    let c = client(&url, "mala");
+    let r = c.call("cbGet", &[]).await;
+    assert!(matches!(r, Err(Error::Auth(_))), "{r:?}");
+    let antes = s.basic_logins.load(Ordering::SeqCst);
+    c.reconfigurar(cfg(&url, PASS)).await;
+    assert!(c.configurado());
+    let n = c.call("cbGet", &[]).await.unwrap();
+    assert_eq!(n.text_of("v"), Some("7"));
+    assert_eq!(s.basic_logins.load(Ordering::SeqCst), antes + 1);
+    assert_eq!(s.adv_logins.load(Ordering::SeqCst), 1);
+    // Una sesión abierta se descarta al reconfigurar.
+    c.reconfigurar(cfg(&url, PASS)).await;
+    c.call("cbGet", &[]).await.unwrap();
+    assert_eq!(s.adv_logins.load(Ordering::SeqCst), 2);
+}
+
+#[tokio::test]
+async fn reconfigurar_espera_peticion_en_curso() {
+    let (url_a, a) = start().await;
+    let (url_b, b) = start().await;
+    a.delay_ms.store(300, Ordering::SeqCst);
+    let c = client(&url_a, PASS);
+    let lenta = {
+        let c = c.clone();
+        tokio::spawn(async move { c.call("cbGet", &[]).await })
+    };
+    // Deja que la llamada tome el cerrojo y entre en la petición lenta.
+    while a.adv_logins.load(Ordering::SeqCst) == 0 {
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    let cambio = {
+        let c = c.clone();
+        let cfg_b = cfg(&url_b, PASS);
+        tokio::spawn(async move { c.reconfigurar(cfg_b).await })
+    };
+    tokio::time::sleep(Duration::from_millis(60)).await;
+    assert!(
+        !cambio.is_finished(),
+        "reconfigurar no esperó a la petición"
+    );
+    // La petición en curso termina contra el router viejo, con sus cookies.
+    lenta.await.unwrap().unwrap();
+    cambio.await.unwrap();
+    assert!(b.cookies_seen.lock().unwrap().is_empty());
+    assert_eq!(b.basic_logins.load(Ordering::SeqCst), 0);
+    // Tras el cambio, sesión nueva en el router nuevo.
+    c.call("cbGet", &[]).await.unwrap();
+    assert_eq!(b.basic_logins.load(Ordering::SeqCst), 1);
+    assert_eq!(b.adv_logins.load(Ordering::SeqCst), 1);
+    assert_eq!(a.adv_logins.load(Ordering::SeqCst), 1);
 }

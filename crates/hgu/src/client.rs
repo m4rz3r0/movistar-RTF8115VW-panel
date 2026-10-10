@@ -4,7 +4,14 @@ use crate::error::Error;
 use crate::fmt::{mess_userpass, page_vars};
 use crate::xml::{XmlError, XmlNode, parse_response};
 use reqwest::Method;
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use std::{
+    collections::BTreeMap,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
+};
 use tokio::{sync::Mutex, time::Instant};
 
 /// Configuración del cliente.
@@ -49,6 +56,8 @@ impl std::fmt::Debug for ClientConfig {
 
 #[derive(Default)]
 struct State {
+    /// `None` mientras el router no está configurado.
+    cfg: Option<ClientConfig>,
     cookies: BTreeMap<String, String>,
     basic_ok: bool,
     adv_ok: bool,
@@ -56,8 +65,9 @@ struct State {
 }
 
 struct Shared {
-    cfg: ClientConfig,
     http: reqwest::Client,
+    /// Espejo de `state.cfg.is_some()` para consultarlo sin esperar el cerrojo.
+    configurado: AtomicBool,
     state: Mutex<State>,
 }
 
@@ -112,18 +122,52 @@ fn basic_error(body: &str) -> Option<&'static str> {
 impl Client {
     /// Crea el cliente; no hace ninguna petición hasta la primera llamada.
     pub fn new(cfg: ClientConfig) -> Client {
+        Self::con(Some(cfg))
+    }
+
+    /// Cliente sin router: toda llamada da [`Error::NoConfigurado`] y no sale
+    /// ninguna petición hasta que se llame a [`Client::reconfigurar`].
+    pub fn sin_configurar() -> Client {
+        Self::con(None)
+    }
+
+    fn con(cfg: Option<ClientConfig>) -> Client {
+        // El tiempo máximo se fija aquí y no cambia al reconfigurar.
+        let timeout = cfg
+            .as_ref()
+            .map_or_else(|| ClientConfig::new("", "", "").timeout, |c| c.timeout);
         let http = reqwest::Client::builder()
-            .timeout(cfg.timeout)
+            .timeout(timeout)
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .expect("configuración de reqwest válida");
         Client {
             shared: Arc::new(Shared {
-                cfg,
                 http,
-                state: Mutex::new(State::default()),
+                configurado: AtomicBool::new(cfg.is_some()),
+                state: Mutex::new(State {
+                    cfg,
+                    ..State::default()
+                }),
             }),
         }
+    }
+
+    /// Cambia URL, usuario y contraseña (y la pausa entre peticiones) y
+    /// descarta la sesión y las cookies. Espera a que termine la petición en
+    /// curso: toma el mismo cerrojo que todas las llamadas. El tiempo máximo
+    /// por petición sigue siendo el del cliente original.
+    pub async fn reconfigurar(&self, cfg: ClientConfig) {
+        let mut st = self.shared.state.lock().await;
+        Self::invalidate(&mut st);
+        st.last_request = None;
+        st.cfg = Some(cfg);
+        self.shared.configurado.store(true, Ordering::SeqCst);
+    }
+
+    /// Si hay un router configurado.
+    pub fn configurado(&self) -> bool {
+        self.shared.configurado.load(Ordering::SeqCst)
     }
 
     /// Llama a `/cgi-bin/<name>.xml` y devuelve el nodo `<name>`.
@@ -315,11 +359,15 @@ impl Client {
             return Ok(());
         }
         tracing::debug!("login básico");
+        let (user, password) = {
+            let cfg = st.cfg.as_ref().ok_or(Error::NoConfigurado)?;
+            (mess_userpass(&cfg.user), mess_userpass(&cfg.password))
+        };
         self.send(st, Method::GET, "/", None).await?;
         let body = form_body(&[
             ("curWebPage", "/te_wifi.asp"),
-            ("loginUsername", &mess_userpass(&self.shared.cfg.user)),
-            ("loginPassword", &mess_userpass(&self.shared.cfg.password)),
+            ("loginUsername", &user),
+            ("loginPassword", &password),
         ]);
         let resp = self
             .send(
@@ -344,10 +392,13 @@ impl Client {
         }
         self.ensure_basic(st).await?;
         tracing::debug!("login avanzado");
-        let user = mess_userpass(&self.shared.cfg.user);
+        let (user, password) = {
+            let cfg = st.cfg.as_ref().ok_or(Error::NoConfigurado)?;
+            (mess_userpass(&cfg.user), mess_userpass(&cfg.password))
+        };
         let body = form_body(&[
             ("rqUsername", &user),
-            ("rqPasswd", &mess_userpass(&self.shared.cfg.password)),
+            ("rqPasswd", &password),
             ("rqTimeout", "600"),
         ]);
         let raw = self
@@ -385,13 +436,17 @@ impl Client {
         path: &str,
         body: Option<String>,
     ) -> Result<String, Error> {
+        let (base_url, min_gap) = {
+            let cfg = st.cfg.as_ref().ok_or(Error::NoConfigurado)?;
+            (cfg.base_url.trim_end_matches('/').to_owned(), cfg.min_gap)
+        };
         if let Some(last) = st.last_request {
-            let wait = self.shared.cfg.min_gap.saturating_sub(last.elapsed());
+            let wait = min_gap.saturating_sub(last.elapsed());
             if !wait.is_zero() {
                 tokio::time::sleep(wait).await;
             }
         }
-        let url = format!("{}{}", self.shared.cfg.base_url.trim_end_matches('/'), path);
+        let url = format!("{base_url}{path}");
         let mut req = self
             .shared
             .http
