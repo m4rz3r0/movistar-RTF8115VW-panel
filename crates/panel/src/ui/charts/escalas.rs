@@ -1,4 +1,7 @@
-//! Escalas, ticks redondos, formato de números (coma decimal) y unidades.
+//! Escalas, ticks redondos, formato de números (separador decimal del
+//! idioma) y unidades.
+
+use crate::ui::i18n::idioma_actual;
 
 // ---------------------------------------------------------------------------
 // Escalas y ticks
@@ -60,24 +63,29 @@ pub fn ticks_bonitos(min: f64, max: f64, n: usize) -> Vec<f64> {
 }
 
 // ---------------------------------------------------------------------------
-// Formato de números (coma decimal) y unidades
+// Formato de números (separador decimal del idioma) y unidades
 // ---------------------------------------------------------------------------
 
-/// `v` con `decimales` cifras decimales y coma decimal. Nunca «-0».
+/// `v` con `decimales` cifras decimales y el separador decimal del idioma
+/// (coma en español, punto en inglés). Nunca «-0».
 pub fn formato_decimal(v: f64, decimales: usize) -> String {
     let s = format!("{v:.decimales$}");
     let s = match s.strip_prefix('-') {
         Some(resto) if resto.chars().all(|c| c == '0' || c == '.') => resto.to_owned(),
         _ => s,
     };
-    s.replace('.', ",")
+    match idioma_actual().separador_decimal() {
+        '.' => s,
+        sep => s.replace('.', &sep.to_string()),
+    }
 }
 
 /// Número corto para ejes: hasta dos decimales, sin ceros a la derecha.
 pub fn formato_corto(v: f64) -> String {
     let s = formato_decimal(v, 2);
-    if s.contains(',') {
-        s.trim_end_matches('0').trim_end_matches(',').to_owned()
+    let sep = idioma_actual().separador_decimal();
+    if s.contains(sep) {
+        s.trim_end_matches('0').trim_end_matches(sep).to_owned()
     } else {
         s
     }
@@ -240,6 +248,20 @@ mod tests {
         assert_eq!(formato_corto(20.0), "20");
         assert_eq!(formato_valor(Unidad::Porcentaje, 61.26), "61,3 %");
         assert_eq!(formato_valor(Unidad::Entero, 13.6), "14");
+    }
+
+    #[test]
+    fn numeros_en_ingles_con_punto_decimal() {
+        use crate::ui::i18n::provide_idioma;
+        use leptos::reactive::owner::Owner;
+        Owner::new().with(|| {
+            provide_idioma(::i18n::Idioma::En);
+            assert_eq!(formato_decimal(0.4249, 2), "0.42");
+            assert_eq!(formato_corto(2.5), "2.5");
+            assert_eq!(formato_corto(20.0), "20");
+            assert_eq!(formato_bps(1_500.0), "1.5 kbit/s");
+            assert_eq!(formato_valor(Unidad::Porcentaje, 61.26), "61.3 %");
+        });
     }
 
     #[test]

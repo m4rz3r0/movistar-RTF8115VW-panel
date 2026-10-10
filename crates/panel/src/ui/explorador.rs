@@ -9,6 +9,9 @@
 //!   clave/valor o de instancias (secretos enmascarados, con «Revelar»); las
 //!   escrituras y acciones tienen un formulario generado del catálogo que
 //!   pasa por el gestor de cambios ([`DialogoCambio`]).
+//!
+//! La interfaz se traduce; lo que viene del catálogo (áreas, descripciones,
+//! etiquetas de parámetros y opciones) está en español y va con `lang="es"`.
 
 mod datos;
 mod dialogo;
@@ -19,6 +22,7 @@ pub(crate) mod servidor;
 pub use datos::*;
 pub use dialogo::{DialogoCambio, TablaDiff};
 
+use crate::t;
 use crate::ui::{Estado, IconoEstado, Insignia};
 use dialogo::DialogoRevelar;
 use formulario::Escritura;
@@ -36,12 +40,11 @@ struct Catalogo(Resource<Result<Vec<AreaVista>, ServerFnError>>);
 pub(crate) fn texto_error(e: &ServerFnError) -> String {
     match e {
         ServerFnError::ServerError(msg) => msg.clone(),
-        _ => "No se puede contactar con el panel; comprueba la conexión y vuelve a intentarlo."
-            .to_owned(),
+        _ => t!("biblioteca-error-conexion"),
     }
 }
 
-/// «30 s», «2 min», «5 min 30 s».
+/// «30 s», «2 min», «5 min 30 s» (unidades iguales en los dos idiomas).
 pub(crate) fn duracion(s: u64) -> String {
     match (s / 60, s % 60) {
         (0, s) => format!("{s} s"),
@@ -59,13 +62,13 @@ fn Etiquetas(f: FuncionResumen) -> impl IntoView {
     };
     view! {
         <span class="etiquetas">
-            <span class=format!("chip chip-{}", f.tipo.etiqueta().to_lowercase().replace('ó', "o"))>
+            <span class=format!("chip chip-{}", f.tipo.clase())>
                 {f.tipo.etiqueta()}
             </span>
             <span class=origen_clase title=f.origen.ayuda()>
                 {f.origen.etiqueta()}
             </span>
-            {f.bloqueada.is_some().then(|| view! { <Insignia estado=Estado::Error texto="Bloqueada" /> })}
+            {f.bloqueada.is_some().then(|| view! { <Insignia estado=Estado::Error texto=t!("biblioteca-bloqueada") /> })}
         </span>
     }
 }
@@ -100,8 +103,8 @@ pub fn Explorador() -> impl IntoView {
                                 view! {
                                     <li>
                                         <A href=href>
-                                            <span>{etiqueta}</span>
-                                            <span class="cuenta cifras" aria-label=format!("{n} funciones")>
+                                            <span lang="es">{etiqueta}</span>
+                                            <span class="cuenta cifras" aria-label=t!("biblioteca-funciones", n = n)>
                                                 {n}
                                             </span>
                                         </A>
@@ -111,7 +114,7 @@ pub fn Explorador() -> impl IntoView {
                             .collect_view()
                     });
                     view! {
-                        <nav aria-label="Áreas">
+                        <nav aria-label=t!("biblioteca-areas")>
                             <ul class="lista-areas">{items}</ul>
                         </nav>
                     }
@@ -138,7 +141,7 @@ pub fn Explorador() -> impl IntoView {
                                 <li>
                                     <A href=href>
                                         <span class="mono">{f.nombre}</span>
-                                        <span class="resultado-area">{area}</span>
+                                        <span class="resultado-area" lang="es">{area}</span>
                                     </A>
                                 </li>
                             }
@@ -147,10 +150,9 @@ pub fn Explorador() -> impl IntoView {
                     view! {
                         <p class="resultados-cuenta" role="status">
                             {match total {
-                                0 => "Ninguna función coincide".to_owned(),
-                                1 => "1 función".to_owned(),
-                                n if n > 40 => format!("{n} funciones (se muestran 40)"),
-                                n => format!("{n} funciones"),
+                                0 => t!("biblioteca-ninguna-coincide"),
+                                n if n > 40 => t!("biblioteca-funciones-parcial", n = n, mostradas = 40),
+                                n => t!("biblioteca-funciones", n = n),
                             }}
                         </p>
                         <ul class="lista-resultados">{items}</ul>
@@ -166,18 +168,18 @@ pub fn Explorador() -> impl IntoView {
         <div class="explorador">
             <aside class="explorador-lateral">
                 <p class="campo buscador">
-                    <label for="buscar-funcion">"Buscar función"</label>
+                    <label for="buscar-funcion">{t!("biblioteca-buscar")}</label>
                     <input
                         id="buscar-funcion"
                         type="search"
-                        placeholder="Nombre o descripción"
+                        placeholder=t!("biblioteca-buscar-placeholder")
                         autocomplete="off"
                         spellcheck="false"
                         prop:value=busqueda
                         on:input=move |ev| set_busqueda.set(event_target_value(&ev))
                     />
                 </p>
-                <Transition fallback=|| view! { <p class="estado-espera">"Cargando…"</p> }>
+                <Transition fallback=|| view! { <p class="estado-espera">{t!("comun-cargando")}</p> }>
                     {lateral}
                 </Transition>
             </aside>
@@ -200,22 +202,17 @@ pub fn InicioExplorador() -> impl IntoView {
             let tarjetas = areas
                 .into_iter()
                 .map(|a| {
-                    let cuenta = |t, uno: &str, varios: &str| {
-                        match a.funciones.iter().filter(|f| f.tipo == t).count() {
-                            1 => format!("1 {uno}"),
-                            n => format!("{n} {varios}"),
-                        }
-                    };
+                    let cuenta = |tipo| a.funciones.iter().filter(|f| f.tipo == tipo).count();
                     let resumen = [
-                        cuenta(TipoFuncion::Lectura, "lectura", "lecturas"),
-                        cuenta(TipoFuncion::Escritura, "escritura", "escrituras"),
-                        cuenta(TipoFuncion::Accion, "acción", "acciones"),
+                        t!("biblioteca-n-lecturas", n = cuenta(TipoFuncion::Lectura)),
+                        t!("biblioteca-n-escrituras", n = cuenta(TipoFuncion::Escritura)),
+                        t!("biblioteca-n-acciones", n = cuenta(TipoFuncion::Accion)),
                     ]
                     .join(" · ");
                     view! {
                         <li>
                             <a class="tarjeta tarjeta-enlace" href=format!("/explorador/{}", a.slug)>
-                                <h2>{a.etiqueta}</h2>
+                                <h2 lang="es">{a.etiqueta}</h2>
                                 <p class="pagina-sub">{resumen}</p>
                             </a>
                         </li>
@@ -224,9 +221,7 @@ pub fn InicioExplorador() -> impl IntoView {
                 .collect_view();
             view! {
                 <p class="pagina-sub">
-                    {format!(
-                        "{total} funciones del router, de la web básica, la avanzada y las que no enlaza ningún menú.",
-                    )}
+                    {t!("biblioteca-inicio-total", n = total)}
                 </p>
                 <ul class="rejilla-tarjetas lista-limpia">{tarjetas}</ul>
             }
@@ -235,12 +230,10 @@ pub fn InicioExplorador() -> impl IntoView {
     view! {
         <header class="pagina-cabecera">
             <div>
-                <h1>"Explorador"</h1>
+                <h1>{t!("biblioteca-titulo")}</h1>
             </div>
         </header>
-        <p>
-            "Las lecturas se ejecutan al abrirlas, con los secretos enmascarados. Las escrituras pasan por el gestor de cambios: ves el antes y el después, el panel vigila el router tras aplicarlas y revierte si deja de responder."
-        </p>
+        <p>{t!("biblioteca-inicio-texto")}</p>
         <Transition fallback=|| ()>{tarjetas}</Transition>
     }
     .into_any()
@@ -264,9 +257,9 @@ pub fn PaginaArea() -> impl IntoView {
             let Some(area) = areas.into_iter().find(|a| a.slug == slug) else {
                 return view! {
                     <header class="pagina-cabecera">
-                        <h1>"Área desconocida"</h1>
+                        <h1>{t!("biblioteca-area-desconocida")}</h1>
                     </header>
-                    <p>"Elige un área del lateral."</p>
+                    <p>{t!("biblioteca-elige-area")}</p>
                 }
                 .into_any();
             };
@@ -283,7 +276,7 @@ pub fn PaginaArea() -> impl IntoView {
                                 <a class="mono funcion-nombre" href=href>{f.nombre.clone()}</a>
                                 <Etiquetas f=f.clone() />
                             </div>
-                            <p class="funcion-descripcion">{descripcion}</p>
+                            <p class="funcion-descripcion" lang="es">{descripcion}</p>
                         </li>
                     }
                 })
@@ -291,8 +284,8 @@ pub fn PaginaArea() -> impl IntoView {
             view! {
                 <header class="pagina-cabecera">
                     <div>
-                        <h1>{area.etiqueta}</h1>
-                        <p class="pagina-sub">{format!("{n} funciones")}</p>
+                        <h1 lang="es">{area.etiqueta}</h1>
+                        <p class="pagina-sub">{t!("biblioteca-funciones", n = n)}</p>
                     </div>
                 </header>
                 <ul class="lista-funciones">{items}</ul>
@@ -300,7 +293,7 @@ pub fn PaginaArea() -> impl IntoView {
             .into_any()
         })
     };
-    view! { <Transition fallback=|| view! { <p class="estado-espera">"Cargando…"</p> }>{contenido}</Transition> }
+    view! { <Transition fallback=|| view! { <p class="estado-espera">{t!("comun-cargando")}</p> }>{contenido}</Transition> }
         .into_any()
 }
 
@@ -322,9 +315,9 @@ fn tabla_parametros(params: &[ParamVista]) -> impl IntoView + use<> {
             view! {
                 <tr>
                     <td><span class="mono">{p.nombre.clone()}</span></td>
-                    <td>{p.etiqueta.clone()}</td>
+                    <td lang="es">{p.etiqueta.clone()}</td>
                     <td>{p.tipo.etiqueta()}</td>
-                    <td class="celda-larga">{opciones}</td>
+                    <td class="celda-larga" lang="es">{opciones}</td>
                 </tr>
             }
         })
@@ -334,10 +327,10 @@ fn tabla_parametros(params: &[ParamVista]) -> impl IntoView + use<> {
             <table class="tabla">
                 <thead>
                     <tr>
-                        <th scope="col">"Parámetro"</th>
-                        <th scope="col">"Etiqueta"</th>
-                        <th scope="col">"Tipo"</th>
-                        <th scope="col">"Opciones"</th>
+                        <th scope="col">{t!("biblioteca-col-parametro")}</th>
+                        <th scope="col">{t!("biblioteca-col-etiqueta")}</th>
+                        <th scope="col">{t!("biblioteca-col-tipo")}</th>
+                        <th scope="col">{t!("biblioteca-col-opciones")}</th>
                     </tr>
                 </thead>
                 <tbody>{filas}</tbody>
@@ -366,7 +359,7 @@ pub fn PaginaFuncion() -> impl IntoView {
             }
         })
     };
-    view! { <Transition fallback=|| view! { <p class="estado-espera">"Cargando…"</p> }>{contenido}</Transition> }
+    view! { <Transition fallback=|| view! { <p class="estado-espera">{t!("comun-cargando")}</p> }>{contenido}</Transition> }
         .into_any()
 }
 
@@ -374,10 +367,10 @@ fn ficha(d: FuncionDetalle) -> impl IntoView {
     let r = d.resumen.clone();
     let area_href = format!("/explorador/{}", r.area);
     let riesgo = (r.tipo != TipoFuncion::Lectura).then(|| {
-        let texto = format!(
-            "{} · vigilancia {}",
-            r.riesgo.etiqueta(),
-            duracion(d.vigilancia_s)
+        let texto = t!(
+            "biblioteca-riesgo-vigilancia",
+            riesgo = r.riesgo.etiqueta(),
+            vigilancia = duracion(d.vigilancia_s)
         );
         view! { <Insignia estado=r.riesgo.estado() texto /> }
     });
@@ -386,8 +379,9 @@ fn ficha(d: FuncionDetalle) -> impl IntoView {
             <p class="aviso estado-error">
                 <IconoEstado estado=Estado::Error />
                 <span>
-                    <strong>"Bloqueada: "</strong>
-                    {m}
+                    <strong>{t!("biblioteca-bloqueada-motivo")}</strong>
+                    " "
+                    <span lang="es">{m}</span>
                 </span>
             </p>
         }
@@ -398,7 +392,7 @@ fn ficha(d: FuncionDetalle) -> impl IntoView {
             v.push(
                 view! {
                     <div>
-                        <dt>"Página del router"</dt>
+                        <dt>{t!("biblioteca-pagina-router")}</dt>
                         <dd class="mono">{p.clone()}</dd>
                     </div>
                 }
@@ -409,7 +403,7 @@ fn ficha(d: FuncionDetalle) -> impl IntoView {
             v.push(
                 view! {
                     <div>
-                        <dt>"Lectura pareada"</dt>
+                        <dt>{t!("biblioteca-lectura-pareada")}</dt>
                         <dd>
                             <a class="mono" href=ruta_funcion(area, lp)>{lp.clone()}</a>
                         </dd>
@@ -422,11 +416,12 @@ fn ficha(d: FuncionDetalle) -> impl IntoView {
             v.push(
                 view! {
                     <div>
-                        <dt>"Lista"</dt>
+                        <dt>{t!("biblioteca-lista")}</dt>
                         <dd>
-                            "por "
+                            {t!("biblioteca-lista-por")}
+                            " "
                             <span class="mono">{l.id_param.clone()}</span>
-                            {if l.borrar { ", admite borrar" } else { "" }}
+                            {l.borrar.then(|| t!("biblioteca-lista-borrar"))}
                         </dd>
                     </div>
                 }
@@ -438,7 +433,7 @@ fn ficha(d: FuncionDetalle) -> impl IntoView {
     let parametros = (!d.parametros.is_empty()).then(|| {
         view! {
             <section class="seccion" aria-labelledby="titulo-parametros">
-                <h2 id="titulo-parametros" class="titulo-seccion">"Parámetros"</h2>
+                <h2 id="titulo-parametros" class="titulo-seccion">{t!("biblioteca-parametros")}</h2>
                 {tabla_parametros(&d.parametros)}
             </section>
         }
@@ -454,10 +449,10 @@ fn ficha(d: FuncionDetalle) -> impl IntoView {
         <header class="pagina-cabecera">
             <div class="cabecera-funcion">
                 <p class="miga">
-                    <a href=area_href>{d.etiqueta_area.clone()}</a>
+                    <a href=area_href lang="es">{d.etiqueta_area.clone()}</a>
                 </p>
                 <h1>{r.nombre.clone()}</h1>
-                <p class="pagina-sub">{r.descripcion.clone()}</p>
+                <p class="pagina-sub" lang="es">{r.descripcion.clone()}</p>
             </div>
             <div class="insignias">
                 <Etiquetas f=r.clone() />
@@ -496,8 +491,8 @@ const REVELADO: std::time::Duration = std::time::Duration::from_secs(30);
 fn celda_valor(v: Valor, objetivo: Objetivo) -> AnyView {
     match v {
         Valor::Texto(t) if t.is_empty() => view! {
-            <span class="vacia" aria-hidden="true">"(vacío)"</span>
-            <span class="solo-lector">"vacío"</span>
+            <span class="vacia" aria-hidden="true">{t!("biblioteca-vacio-par")}</span>
+            <span class="solo-lector">{t!("biblioteca-vacio")}</span>
         }
         .into_any(),
         Valor::Texto(t) => t.into_any(),
@@ -506,7 +501,7 @@ fn celda_valor(v: Valor, objetivo: Objetivo) -> AnyView {
         }
         Valor::Ausente => view! {
             <span class="vacia" aria-hidden="true">"—"</span>
-            <span class="solo-lector">"sin valor"</span>
+            <span class="solo-lector">{t!("comun-sin-valor")}</span>
         }
         .into_any(),
         Valor::Secreto => view! { <CeldaSecreta objetivo /> }.into_any(),
@@ -527,19 +522,19 @@ fn CeldaSecreta(objetivo: Objetivo) -> impl IntoView {
     move || match revelado() {
         Some(v) => view! {
             <span class="mono revelado">{v}</span>
-            <span class="solo-lector">"(visible durante 30 s)"</span>
+            <span class="solo-lector">{t!("biblioteca-visible-30")}</span>
         }
         .into_any(),
         None => view! {
             <span class="celda-secreta">
                 <span class="secreto">{MASCARA}</span>
-                <span class="solo-lector">"(valor oculto)"</span>
+                <span class="solo-lector">{t!("comun-valor-oculto")}</span>
                 <button
                     class="boton-mini"
                     type="button"
                     on:click=move |_| r.pidiendo.set(Some(o.get_value()))
                 >
-                    "Revelar"
+                    {t!("biblioteca-revelar")}
                     <span class="solo-lector">{o.with_value(|o| format!(" {}", o.campo))}</span>
                 </button>
             </span>
@@ -576,8 +571,8 @@ fn vista_valores(v: Vista, funcion: &str, params: &[(String, String)]) -> impl I
                 <table class="tabla tabla-clave-valor">
                     <thead>
                         <tr>
-                            <th scope="col">"Campo"</th>
-                            <th scope="col">"Valor"</th>
+                            <th scope="col">{t!("biblioteca-col-campo")}</th>
+                            <th scope="col">{t!("biblioteca-col-valor")}</th>
                         </tr>
                     </thead>
                     <tbody>{filas}</tbody>
@@ -608,16 +603,16 @@ fn vista_valores(v: Vista, funcion: &str, params: &[(String, String)]) -> impl I
                     view! { <tr>{celdas}</tr> }
                 })
                 .collect_view();
-            let titulo = if g.total > mostradas {
-                format!(
-                    "{}: {} instancias (se muestran {mostradas})",
-                    g.nombre, g.total
+            let instancias = if g.total > mostradas {
+                t!(
+                    "biblioteca-instancias-parcial",
+                    n = g.total,
+                    mostradas = mostradas
                 )
-            } else if g.total == 1 {
-                format!("{}: 1 instancia", g.nombre)
             } else {
-                format!("{}: {} instancias", g.nombre, g.total)
+                t!("biblioteca-instancias", n = g.total)
             };
+            let titulo = format!("{}: {instancias}", g.nombre);
             view! {
                 <div class="tabla-scroll">
                     <table class="tabla">
@@ -634,13 +629,13 @@ fn vista_valores(v: Vista, funcion: &str, params: &[(String, String)]) -> impl I
     let crudo = v.crudo.map(|x| {
         view! {
             <details class="crudo">
-                <summary>"XML de la respuesta (enmascarado)"</summary>
+                <summary>{t!("biblioteca-xml")}</summary>
                 <pre class="mono">{x}</pre>
             </details>
         }
     });
     view! {
-        {vacia.then(|| view! { <p class="estado-espera">"La respuesta no trae datos."</p> })}
+        {vacia.then(|| view! { <p class="estado-espera">{t!("biblioteca-sin-datos")}</p> })}
         {pares}
         {grupos}
         {crudo}
@@ -698,7 +693,7 @@ fn VistaLectura(detalle: FuncionDetalle) -> impl IntoView {
             view! {
                 <p class="campo">
                     <label for=id.clone()>
-                        {p.etiqueta.clone()}
+                        <span lang="es">{p.etiqueta.clone()}</span>
                         <span class="mono campo-nombre">{p.nombre.clone()}</span>
                     </label>
                     <input
@@ -775,18 +770,18 @@ fn VistaLectura(detalle: FuncionDetalle) -> impl IntoView {
     view! {
         <section class="seccion" aria-labelledby="titulo-lectura">
             <div class="seccion-cabecera">
-                <h2 id="titulo-lectura" class="titulo-seccion">"Lectura"</h2>
+                <h2 id="titulo-lectura" class="titulo-seccion">{t!("biblioteca-lectura")}</h2>
             </div>
             <form class="formulario formulario-lectura" on:submit=leer_de_nuevo>
                 {hay_params.then(|| view! { <div class="rejilla-campos">{entradas}</div> })}
                 <div class="formulario-pie">
                     <button class="boton-sutil" type="submit" disabled=move || leyendo.get()>
-                        {move || if leyendo.get() { "Leyendo…" } else { "Leer de nuevo" }}
+                        {move || if leyendo.get() { t!("biblioteca-leyendo") } else { t!("biblioteca-leer-de-nuevo") }}
                     </button>
                 </div>
             </form>
             <div class="resultado-lectura" aria-live="polite" aria-busy=move || leyendo.get().to_string()>
-                <Transition set_pending=leyendo fallback=|| view! { <p class="estado-espera">"Leyendo…"</p> }>{datos}</Transition>
+                <Transition set_pending=leyendo fallback=|| view! { <p class="estado-espera">{t!("biblioteca-leyendo")}</p> }>{datos}</Transition>
             </div>
         </section>
         {dialogo}

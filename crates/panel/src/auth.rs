@@ -584,7 +584,10 @@ mod server {
 
     fn internal<T>(e: impl fmt::Display) -> Result<T, ServerFnError> {
         eprintln!("panel: error interno en la autenticación: {e}");
-        fail(StatusCode::INTERNAL_SERVER_ERROR, "Error interno del panel")
+        fail(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &crate::t!("comun-error-interno"),
+        )
     }
 
     fn set_cookie(value: &str) {
@@ -614,11 +617,12 @@ mod server {
             }
             Err(LoginError::Throttled(secs)) => fail(
                 StatusCode::TOO_MANY_REQUESTS,
-                &format!("Demasiados intentos, espera {secs} s"),
+                &crate::t!("login-error-intentos", s = secs),
             ),
-            Err(LoginError::BadCredentials) => {
-                fail(StatusCode::UNAUTHORIZED, "Usuario o contraseña incorrectos")
-            }
+            Err(LoginError::BadCredentials) => fail(
+                StatusCode::UNAUTHORIZED,
+                &crate::t!("login-error-credenciales"),
+            ),
             Err(LoginError::Internal(e)) => internal(e),
         }
     }
@@ -654,7 +658,7 @@ mod server {
         let headers: HeaderMap = leptos_axum::extract().await?;
         match user_from_headers(&state.db, &headers).await {
             Ok(Some(user)) => Ok(user),
-            Ok(None) => fail(StatusCode::UNAUTHORIZED, "Sesión no iniciada o caducada"),
+            Ok(None) => fail(StatusCode::UNAUTHORIZED, &crate::t!("comun-error-sesion")),
             Err(e) => internal(e),
         }
     }

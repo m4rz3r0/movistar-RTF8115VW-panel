@@ -6,6 +6,7 @@ use super::{
     geometria::{Serie, geometria, indice_mas_cercano, lectura, resumen, valor_en},
     tiempo::formato_fecha_hora,
 };
+use crate::t;
 use crate::ui::table::{Celda, Columna, Tabla};
 use leptos::{ev, html, prelude::*, svg};
 
@@ -267,7 +268,7 @@ pub fn SerieTemporal(
                         y=(g.arriba + g.abajo) / 2.0
                         text-anchor="middle"
                     >
-                        "Sin datos en este intervalo"
+                        {t!("comun-sin-datos-intervalo")}
                     </text>
                 }
             });
@@ -306,7 +307,7 @@ pub fn SerieTemporal(
         tabla_abierta.get().then(|| {
             let g = geo.get_untracked();
             let (columnas, filas) = series.with_untracked(|s| {
-                let mut columnas = vec![Columna::new("Hora")];
+                let mut columnas = vec![Columna::new(t!("comun-col-hora"))];
                 columnas.extend(
                     s.iter()
                         .map(|serie| Columna::numerica(serie.nombre.clone())),
@@ -368,7 +369,7 @@ pub fn SerieTemporal(
                     }
                 }
             >
-                <summary>"Ver los datos en una tabla"</summary>
+                <summary>{t!("comun-ver-datos-tabla")}</summary>
                 {tabla}
             </details>
         </figure>

@@ -16,6 +16,8 @@ leptos_meta.workspace = true
 leptos_router.workspace = true
 # Datos de las server functions (servidor y navegador).
 serde.workspace = true
+# Textos de la interfaz en español e inglés.
+i18n = { path = "../i18n" }
 # Posición del puntero en los gráficos (`getBoundingClientRect`); ya la trae
 # Leptos, aquí solo se activa `DomRect`.
 web-sys = { workspace = true, features = ["DomRect", "HtmlDetailsElement"] }
@@ -66,6 +68,7 @@ ssr = [
     "dep:chacha20poly1305",
     "dep:tracing",
     "dep:tracing-subscriber",
+    "i18n/tracing",
     "leptos/ssr",
     "leptos_meta/ssr",
     "leptos_router/ssr",
@@ -101,4 +104,8 @@ required-features = ["ssr"]
 
 [[test]]
 name = "instancia"
+required-features = ["ssr"]
+
+[[test]]
+name = "idioma"
 required-features = ["ssr"]

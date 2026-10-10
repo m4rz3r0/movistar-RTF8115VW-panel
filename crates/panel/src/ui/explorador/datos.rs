@@ -11,6 +11,7 @@
 //! (`AppState::cambios`): `preparar_cambio` y `confirmar_cambio` son sus
 //! dos pasos, y `estado_cambio` sigue el resultado.
 
+use crate::t;
 use leptos::prelude::*;
 use leptos::server_fn::codec::Json;
 use serde::{Deserialize, Serialize};
@@ -32,11 +33,20 @@ pub enum TipoFuncion {
 }
 
 impl TipoFuncion {
-    pub fn etiqueta(self) -> &'static str {
+    pub fn etiqueta(self) -> String {
         match self {
-            TipoFuncion::Lectura => "Lectura",
-            TipoFuncion::Escritura => "Escritura",
-            TipoFuncion::Accion => "Acción",
+            TipoFuncion::Lectura => t!("biblioteca-tipo-lectura"),
+            TipoFuncion::Escritura => t!("biblioteca-tipo-escritura"),
+            TipoFuncion::Accion => t!("biblioteca-tipo-accion"),
+        }
+    }
+
+    /// Sufijo de la clase CSS `chip-…` (no depende del idioma).
+    pub fn clase(self) -> &'static str {
+        match self {
+            TipoFuncion::Lectura => "lectura",
+            TipoFuncion::Escritura => "escritura",
+            TipoFuncion::Accion => "accion",
         }
     }
 }
@@ -51,22 +61,22 @@ pub enum OrigenFuncion {
 }
 
 impl OrigenFuncion {
-    pub fn etiqueta(self) -> &'static str {
+    pub fn etiqueta(self) -> String {
         match self {
-            OrigenFuncion::Basica => "Básica",
-            OrigenFuncion::Avanzada => "Avanzada",
-            OrigenFuncion::Oculta => "Oculta",
-            OrigenFuncion::Incompleta => "Incompleta",
+            OrigenFuncion::Basica => t!("biblioteca-origen-basica"),
+            OrigenFuncion::Avanzada => t!("biblioteca-origen-avanzada"),
+            OrigenFuncion::Oculta => t!("biblioteca-origen-oculta"),
+            OrigenFuncion::Incompleta => t!("biblioteca-origen-incompleta"),
         }
     }
 
     /// Explicación para el `title` de la etiqueta.
-    pub fn ayuda(self) -> &'static str {
+    pub fn ayuda(self) -> String {
         match self {
-            OrigenFuncion::Basica => "De la web básica del router",
-            OrigenFuncion::Avanzada => "De la web avanzada, enlazada desde su menú",
-            OrigenFuncion::Oculta => "Funciona, pero ningún menú del router la enlaza",
-            OrigenFuncion::Incompleta => "Restos sin terminar: puede no responder",
+            OrigenFuncion::Basica => t!("biblioteca-origen-basica-ayuda"),
+            OrigenFuncion::Avanzada => t!("biblioteca-origen-avanzada-ayuda"),
+            OrigenFuncion::Oculta => t!("biblioteca-origen-oculta-ayuda"),
+            OrigenFuncion::Incompleta => t!("biblioteca-origen-incompleta-ayuda"),
         }
     }
 }
@@ -80,11 +90,11 @@ pub enum RiesgoCambio {
 }
 
 impl RiesgoCambio {
-    pub fn etiqueta(self) -> &'static str {
+    pub fn etiqueta(self) -> String {
         match self {
-            RiesgoCambio::Bajo => "Riesgo bajo",
-            RiesgoCambio::Medio => "Riesgo medio",
-            RiesgoCambio::Alto => "Riesgo alto",
+            RiesgoCambio::Bajo => t!("biblioteca-riesgo-bajo"),
+            RiesgoCambio::Medio => t!("biblioteca-riesgo-medio"),
+            RiesgoCambio::Alto => t!("biblioteca-riesgo-alto"),
         }
     }
 
@@ -110,15 +120,15 @@ pub enum TipoCampo {
 }
 
 impl TipoCampo {
-    pub fn etiqueta(self) -> &'static str {
+    pub fn etiqueta(self) -> String {
         match self {
-            TipoCampo::Ip => "IPv4",
-            TipoCampo::Mac => "MAC",
-            TipoCampo::Bool => "Sí/no",
-            TipoCampo::Enum => "Opción",
-            TipoCampo::Int => "Entero",
-            TipoCampo::Text => "Texto",
-            TipoCampo::Secret => "Secreto",
+            TipoCampo::Ip => "IPv4".to_owned(),
+            TipoCampo::Mac => "MAC".to_owned(),
+            TipoCampo::Bool => t!("biblioteca-campo-bool"),
+            TipoCampo::Enum => t!("biblioteca-campo-enum"),
+            TipoCampo::Int => t!("biblioteca-campo-int"),
+            TipoCampo::Text => t!("biblioteca-campo-texto"),
+            TipoCampo::Secret => t!("biblioteca-campo-secreto"),
         }
     }
 }
@@ -206,7 +216,7 @@ impl Valor {
     pub fn texto_opcion(valor: &str, etiqueta: Option<&str>) -> String {
         match etiqueta {
             Some(e) => format!("{e} ({valor})"),
-            None => format!("(valor desconocido: {valor})"),
+            None => t!("biblioteca-valor-desconocido", valor = valor),
         }
     }
 }
@@ -329,14 +339,14 @@ pub enum EstadoDeCambio {
 }
 
 impl EstadoDeCambio {
-    pub fn etiqueta(self) -> &'static str {
+    pub fn etiqueta(self) -> String {
         match self {
-            EstadoDeCambio::Preparado => "preparado",
-            EstadoDeCambio::Aplicando => "aplicando",
-            EstadoDeCambio::Vigilando => "vigilando",
-            EstadoDeCambio::Aplicado => "aplicado",
-            EstadoDeCambio::Revertido => "revertido",
-            EstadoDeCambio::Fallido => "fallido",
+            EstadoDeCambio::Preparado => t!("biblioteca-cambio-preparado"),
+            EstadoDeCambio::Aplicando => t!("biblioteca-cambio-aplicando"),
+            EstadoDeCambio::Vigilando => t!("biblioteca-cambio-vigilando"),
+            EstadoDeCambio::Aplicado => t!("biblioteca-cambio-aplicado"),
+            EstadoDeCambio::Revertido => t!("biblioteca-cambio-revertido"),
+            EstadoDeCambio::Fallido => t!("biblioteca-cambio-fallido"),
         }
     }
 
@@ -380,19 +390,15 @@ pub fn validar_campo(
 ) -> Result<(), String> {
     let t = v.trim();
     match tipo {
-        TipoCampo::Ip if t.parse::<Ipv4Addr>().is_err() => {
-            Err("no es una dirección IPv4 (p. ej. 192.168.1.60)".into())
-        }
-        TipoCampo::Mac if !es_mac(t) => {
-            Err("no es una MAC (seis pares hexadecimales con «:»)".into())
-        }
-        TipoCampo::Bool if !matches!(t, "0" | "1") => Err("debe ser 0 o 1".into()),
+        TipoCampo::Ip if t.parse::<Ipv4Addr>().is_err() => Err(t!("biblioteca-validar-ip")),
+        TipoCampo::Mac if !es_mac(t) => Err(t!("biblioteca-validar-mac")),
+        TipoCampo::Bool if !matches!(t, "0" | "1") => Err(t!("biblioteca-validar-bool")),
         TipoCampo::Enum if !opciones.iter().any(|(o, _)| o == t) => {
-            Err("no es una de las opciones".into())
+            Err(t!("biblioteca-validar-enum"))
         }
-        TipoCampo::Int if t.parse::<i64>().is_err() => Err("debe ser un número entero".into()),
+        TipoCampo::Int if t.parse::<i64>().is_err() => Err(t!("biblioteca-validar-int")),
         TipoCampo::Text | TipoCampo::Secret if v.chars().any(char::is_control) => {
-            Err("contiene caracteres no válidos".into())
+            Err(t!("biblioteca-validar-control"))
         }
         _ => Ok(()),
     }

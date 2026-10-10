@@ -9,6 +9,7 @@ use super::{
     CambioVista, CampoCambio, EstadoDeCambio, MASCARA, PreparadoVista, Valor, confirmar_cambio,
     duracion, estado_cambio, revelar, texto_error,
 };
+use crate::t;
 use crate::ui::{Estado, Insignia};
 use leptos::{ev::SubmitEvent, html, prelude::*, task::spawn_local};
 use std::time::Duration;
@@ -32,16 +33,16 @@ fn valor(v: &Valor) -> AnyView {
         Valor::Texto(t) => view! { <span class="mono">{t.clone()}</span> }.into_any(),
         Valor::Secreto => view! {
             <span class="secreto">{MASCARA}</span>
-            <span class="solo-lector">"(valor oculto)"</span>
+            <span class="solo-lector">{t!("comun-valor-oculto")}</span>
         }
         .into_any(),
         Valor::Opcion { valor, etiqueta } => {
             let texto = Valor::texto_opcion(valor, etiqueta.as_deref());
-            view! { <span>{texto}</span> }.into_any()
+            view! { <span lang="es">{texto}</span> }.into_any()
         }
         Valor::Ausente => view! {
             <span class="vacia" aria-hidden="true">"—"</span>
-            <span class="solo-lector">"sin valor"</span>
+            <span class="solo-lector">{t!("comun-sin-valor")}</span>
         }
         .into_any(),
     }
@@ -52,7 +53,7 @@ fn valor(v: &Valor) -> AnyView {
 #[component]
 pub fn TablaDiff(campos: Vec<CampoCambio>) -> impl IntoView {
     if campos.is_empty() {
-        return view! { <p class="pagina-sub">"Sin campos que comparar."</p> }.into_any();
+        return view! { <p class="pagina-sub">{t!("biblioteca-diff-vacio")}</p> }.into_any();
     }
     let filas = campos
         .iter()
@@ -60,7 +61,7 @@ pub fn TablaDiff(campos: Vec<CampoCambio>) -> impl IntoView {
             view! {
                 <tr>
                     <th scope="row">
-                        {c.etiqueta.clone()}
+                        <span lang="es">{c.etiqueta.clone()}</span>
                         <span class="mono campo-nombre">{c.nombre.clone()}</span>
                     </th>
                     <td>{valor(&c.antes)}</td>
@@ -74,9 +75,9 @@ pub fn TablaDiff(campos: Vec<CampoCambio>) -> impl IntoView {
             <table class="tabla">
                 <thead>
                     <tr>
-                        <th scope="col">"Campo"</th>
-                        <th scope="col">"Antes"</th>
-                        <th scope="col">"Después"</th>
+                        <th scope="col">{t!("biblioteca-col-campo")}</th>
+                        <th scope="col">{t!("biblioteca-col-antes")}</th>
+                        <th scope="col">{t!("biblioteca-col-despues")}</th>
                     </tr>
                 </thead>
                 <tbody>{filas}</tbody>
@@ -184,33 +185,37 @@ pub fn DialogoCambio(
     };
 
     let titulo = match (deshace, preparado.borrar, preparado.palabra.is_some()) {
-        (Some(n), ..) => format!("Deshacer el cambio nº {n}"),
-        (_, true, _) => "Borrar la instancia".to_owned(),
-        (_, _, true) => "Ejecutar la acción".to_owned(),
-        _ => "Revisar cambios".to_owned(),
+        (Some(n), ..) => t!("biblioteca-dialogo-deshacer", n = n),
+        (_, true, _) => t!("biblioteca-dialogo-borrar"),
+        (_, _, true) => t!("biblioteca-dialogo-accion"),
+        _ => t!("biblioteca-dialogo-revisar"),
     };
     let instancia = preparado
         .instancia
         .clone()
-        .map(|i| format!(", instancia {i}"))
+        .map(|i| t!("biblioteca-dialogo-instancia", i = i))
         .unwrap_or_default();
     let vigilancia = duracion(preparado.vigilancia_s);
     let nota = if preparado.palabra.is_some() {
-        format!(
-            "Una acción no se puede revertir. Tras ejecutarla, el panel comprueba el router durante {vigilancia}."
-        )
+        t!("biblioteca-nota-accion", vigilancia = vigilancia.as_str())
     } else {
-        format!(
-            "Tras aplicarlo, el panel vigila el router durante {vigilancia}: si deja de responder o se cae internet, vuelve a los valores anteriores."
-        )
+        t!("biblioteca-nota-cambio", vigilancia = vigilancia.as_str())
     };
-    let riesgo = format!("{} · vigilancia {vigilancia}", preparado.riesgo.etiqueta());
+    let riesgo = t!(
+        "biblioteca-riesgo-vigilancia",
+        riesgo = preparado.riesgo.etiqueta(),
+        vigilancia = vigilancia.as_str()
+    );
     let campo_palabra = preparado.palabra.clone().map(|w| {
         let w2 = w.clone();
         view! {
             <p class="campo">
                 <label for="dialogo-palabra">
-                    "Escribe " <strong class="mono">{w}</strong> " para confirmar"
+                    {t!("biblioteca-escribe")}
+                    " "
+                    <strong class="mono">{w}</strong>
+                    " "
+                    {t!("biblioteca-para-confirmar")}
                 </label>
                 <input
                     id="dialogo-palabra"
@@ -225,7 +230,7 @@ pub fn DialogoCambio(
                     aria-describedby="dialogo-palabra-ayuda"
                 />
                 <span class="solo-lector" id="dialogo-palabra-ayuda">
-                    {format!("Escribe {w2} en mayúsculas")}
+                    {t!("biblioteca-escribe-mayusculas", palabra = w2)}
                 </span>
             </p>
         }
@@ -235,25 +240,29 @@ pub fn DialogoCambio(
         let texto = match (fase.get(), cambio.get()) {
             (Fase::Revisar, _) => return None,
             (Fase::Confirmando, _) => view! {
-                <p class="estado-cambio">"Aplicando el cambio y comprobando que el router lo muestra…"</p>
+                <p class="estado-cambio">{t!("biblioteca-aplicando-comprobando")}</p>
             }
             .into_any(),
             (Fase::Seguimiento(id), None) => view! {
-                <p class="estado-cambio">{format!("Cambio nº {id}: comprobando…")}</p>
+                <p class="estado-cambio">{t!("biblioteca-cambio-comprobando", id = id)}</p>
             }
             .into_any(),
             (Fase::Seguimiento(id), Some(c)) => {
                 let detalle = match c.estado {
                     EstadoDeCambio::Vigilando => Some(match c.restante_s {
-                        Some(s) => format!("Vigilando el router: quedan {}.", duracion(s as u64)),
-                        None => "Vigilando el router…".to_owned(),
+                        Some(s) => t!("biblioteca-vigilando-quedan", resto = duracion(s as u64)),
+                        None => t!("biblioteca-vigilando"),
                     }),
                     EstadoDeCambio::Aplicado => Some(
                         c.nota
                             .clone()
-                            .map_or("Aplicado y verificado.".to_owned(), |n| format!("Aplicado ({n}).")),
+                            .map_or(t!("biblioteca-aplicado-verificado"), |n| {
+                                t!("biblioteca-aplicado-nota", nota = n)
+                            }),
                     ),
-                    EstadoDeCambio::Revertido | EstadoDeCambio::Fallido => c.error.clone().or(c.nota.clone()),
+                    EstadoDeCambio::Revertido | EstadoDeCambio::Fallido => {
+                        c.error.clone().or(c.nota.clone())
+                    }
                     _ => None,
                 };
                 let estado = match c.estado {
@@ -262,7 +271,7 @@ pub fn DialogoCambio(
                 };
                 view! {
                     <div class="estado-cambio">
-                        <Insignia estado texto=format!("Cambio nº {id}: {}", c.estado.etiqueta()) />
+                        <Insignia estado texto=t!("biblioteca-cambio-estado", id = id, estado = c.estado.etiqueta()) />
                         {detalle.map(|d| view! { <p>{d}</p> })}
                     </div>
                 }
@@ -275,7 +284,7 @@ pub fn DialogoCambio(
     let pie = move || match fase.get() {
         Fase::Seguimiento(_) => view! {
             <button class="boton" type="button" on:click=move |_| cerrar()>
-                "Cerrar"
+                {t!("biblioteca-cerrar")}
             </button>
         }
         .into_any(),
@@ -286,17 +295,17 @@ pub fn DialogoCambio(
                 disabled=f == Fase::Confirmando
                 on:click=move |_| cerrar()
             >
-                "Cancelar"
+                {t!("biblioteca-cancelar")}
             </button>
             <button class="boton" type="submit" disabled=f == Fase::Confirmando>
                 {if f == Fase::Confirmando {
-                    "Aplicando…"
+                    t!("biblioteca-aplicando")
                 } else if deshace.is_some() {
-                    "Deshacer"
+                    t!("biblioteca-deshacer")
                 } else if p.with_value(|p| p.borrar) {
-                    "Borrar"
+                    t!("biblioteca-borrar")
                 } else {
-                    "Aplicar"
+                    t!("biblioteca-aplicar")
                 }}
             </button>
         }
@@ -399,14 +408,17 @@ pub(super) fn DialogoRevelar(
         >
             <form class="dialogo-cuerpo" on:submit=enviar>
                 <header class="dialogo-cabecera">
-                    <h2 id="revelar-titulo">"Revelar un secreto"</h2>
+                    <h2 id="revelar-titulo">{t!("biblioteca-revelar-titulo")}</h2>
                 </header>
                 <p>
-                    "Para ver " <span class="mono">{campo}</span>
-                    " escribe la contraseña del panel. Se mostrará 30 s y quedará anotado en el historial (sin el valor)."
+                    {t!("biblioteca-revelar-para-ver")}
+                    " "
+                    <span class="mono">{campo}</span>
+                    " "
+                    {t!("biblioteca-revelar-texto")}
                 </p>
                 <p class="campo">
-                    <label for="revelar-contrasena">"Contraseña del panel"</label>
+                    <label for="revelar-contrasena">{t!("biblioteca-contrasena-panel")}</label>
                     <input
                         id="revelar-contrasena"
                         type="password"
@@ -422,10 +434,10 @@ pub(super) fn DialogoRevelar(
                 </p>
                 <div class="dialogo-pie">
                     <button class="boton-sutil" type="button" on:click=cerrar>
-                        "Cancelar"
+                        {t!("biblioteca-cancelar")}
                     </button>
                     <button class="boton" type="submit" disabled=move || pidiendo.get()>
-                        {move || if pidiendo.get() { "Comprobando…" } else { "Revelar" }}
+                        {move || if pidiendo.get() { t!("biblioteca-comprobando") } else { t!("biblioteca-revelar") }}
                     </button>
                 </div>
             </form>

@@ -4,6 +4,7 @@ use super::{
     escalas::{Unidad, eje_y, escala, formato_valor},
     tiempo::{formato_fecha_hora, ticks_tiempo},
 };
+use crate::t;
 
 // ---------------------------------------------------------------------------
 // Huecos y trazados
@@ -444,7 +445,7 @@ pub(super) fn lectura(
         }
         filas.push((
             s.tono.clase(),
-            v.map_or_else(|| "sin datos".to_owned(), |v| formato_valor(unidad, v)),
+            v.map_or_else(|| t!("comun-sin-datos-min"), |v| formato_valor(unidad, v)),
             s.nombre.clone(),
         ));
     }
@@ -461,13 +462,13 @@ pub(super) fn resumen(titulo: &str, series: &[Serie], unidad: Unidad) -> String 
     let partes: Vec<String> = series
         .iter()
         .map(|s| match (s.ultimo(), s.maximo()) {
-            (Some((_, u)), Some(m)) => format!(
-                "{}: última {}, máxima {}",
-                s.nombre,
-                formato_valor(unidad, u),
-                formato_valor(unidad, m)
+            (Some((_, u)), Some(m)) => t!(
+                "comun-serie-resumen",
+                serie = s.nombre.as_str(),
+                ultima = formato_valor(unidad, u),
+                maxima = formato_valor(unidad, m)
             ),
-            _ => format!("{}: sin datos", s.nombre),
+            _ => t!("comun-serie-sin-datos", serie = s.nombre.as_str()),
         })
         .collect();
     format!("{titulo}. {}", partes.join("; "))

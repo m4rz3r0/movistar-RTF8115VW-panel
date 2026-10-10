@@ -1,0 +1,101 @@
+# Status page and polling warnings.
+estado-titulo = Status
+estado-sub = { $modelo } · firmware { $firmware } · data from { $hora }
+estado-error-actualizar = Cannot refresh the data: { $error }
+estado-volver-a-entrar = Sign in again
+estado-sin-configurar = Router not configured
+estado-sin-configurar-sub = Set it up in the panel settings.
+estado-sin-conexion-router = No connection to the router
+estado-sin-datos-aun = The panel has not been able to read the router yet: no data so far.
+estado-reintenta = It retries on its own; this page refreshes every 10 s.
+estado-esperando = Waiting for the first data from the router…
+estado-esperando-sub = The first poll takes a few seconds.
+estado-avisos = Warnings
+estado-indicadores = Indicators
+
+## Indicators
+estado-internet = Internet
+estado-desconocido = Unknown
+estado-ultimo-dato = Last data: { $valor } at { $hora }
+estado-ip-publica = Public IP { $ip }
+estado-sin-ip-publica = No public IP
+estado-sin-conexion-desde = Disconnected for
+estado-tiempo-conexion = Connected for
+estado-router-encendido = Router up for
+estado-desde = since { $desde }
+estado-desde-hasta-ultimo = since { $desde } until the last data ({ $hora })
+estado-sin-dato = no data
+estado-sin-datos-router = No data from the router
+estado-max-1h = 1 h peak: { $valor }
+estado-ram-de = of { $total } MB
+estado-clientes-sub = { $wifi } on WiFi · { $cable } wired
+estado-bajada = Download
+estado-subida = Upload
+estado-carga = Load
+estado-carga-1min = Load (1 min)
+estado-ram-usada = RAM used
+estado-clientes = Clients
+
+## Charts
+estado-historico = History
+estado-intervalo = Chart range
+estado-trafico = Device traffic
+estado-trafico-nota = What the devices on the wired and WiFi network send and receive. Includes traffic between devices plugged into different router ports.
+estado-disponibilidad = Internet availability · { $rango }
+estado-carga-router = Router load
+estado-clientes-conectados = Connected clients
+estado-rango-hora = last hour
+estado-rango-dia = last 24 h
+estado-rango-semana = last 7 days
+
+## Tables
+estado-clientes-lan = LAN clients
+estado-resumen-hosts = { $conectados } connected · { $desconectados } disconnected
+estado-lentos = Data from { $hora } · read every minute
+estado-lentos-sin-leer = Not read yet: read every minute
+estado-col-nombre = Name
+estado-col-estado = Status
+estado-col-lease-fijo = Fixed lease
+estado-col-interfaz = Interface
+estado-col-tipo = Type
+estado-col-caduca = Expires in
+estado-col-banda = Band
+estado-col-seguridad = Security
+estado-col-clave = Key
+estado-col-asociados = Associated
+estado-sin-equipos = The router has not returned any device
+estado-desconectado = Disconnected
+estado-cable = Wired
+estado-concesiones = DHCP leases
+estado-concesiones-sub = Dynamic leases and fixed reservations by MAC
+estado-sin-concesiones = No leases
+estado-lease-fija = Fixed
+estado-lease-fija-desactivada = Fixed, disabled
+estado-lease-dinamica = Dynamic
+estado-sin-caducidad = Never expires
+estado-caducada = Expired
+estado-redes-wifi = WiFi networks
+estado-redes-wifi-sub = Keys never leave the server
+estado-sin-redes = No WiFi networks
+estado-wifi-activa = Active
+estado-wifi-radio-apagado = Radio off
+estado-wifi-desactivada = Disabled
+estado-wifi-abierta = Open
+estado-canal-auto = automatic channel
+estado-canal = channel { $canal }
+estado-sin-clave = No key
+estado-wps-activo = Active
+estado-wps-red-apagada = Enabled (network off)
+estado-wps-activo-insignia = WPS active
+estado-codigo = code { $codigo }
+
+## Warnings
+estado-cuando-hora = { $hora }
+estado-cuando-fecha = { $fecha }
+estado-aviso-sin-router = No connection to the router: { $error }
+estado-aviso-sin-router-desde = No connection to the router since { $cuando }. The data shown is from that time.
+estado-aviso-sin-router-desde-error = No connection to the router since { $cuando }: { $error }. The data shown is from that time.
+estado-aviso-lentos = Client and WiFi data may be out of date.
+estado-aviso-lentos-desde = Client and WiFi data may be out of date (last data: { $cuando }).
+estado-aviso-wps = WPS active on { $redes }: turn it off if you do not use it (the WPS PIN can be brute-forced).
+estado-aviso-tr69 = Telefónica can manage the router remotely (TR-069).

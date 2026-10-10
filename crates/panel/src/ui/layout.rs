@@ -1,9 +1,12 @@
 //! Marco de las páginas con sesión: barra lateral (Estado, Explorador,
-//! Historial, usuario y «Salir») que en pantallas estrechas pasa a ser una
-//! barra superior con el menú plegable.
+//! Historial, usuario, idioma y «Salir») que en pantallas estrechas pasa a
+//! ser una barra superior con el menú plegable.
 
 use crate::auth::{Logout, quien_soy};
-use leptos::prelude::*;
+use crate::t;
+use crate::ui::i18n::{cambiar_idioma, use_idioma};
+use ::i18n::Idioma;
+use leptos::{prelude::*, task::spawn_local};
 use leptos_router::{components::A, components::Outlet, hooks::use_navigate};
 
 /// Icono de trazo de 20 px; `d` es el trazado.
@@ -60,12 +63,12 @@ pub fn Layout() -> impl IntoView {
 
     view! {
         <a class="saltar" href="#contenido">
-            "Saltar al contenido"
+            {t!("comun-saltar")}
         </a>
         <div class="marco">
             <header class="barra" class:abierta=abierto>
                 <div class="barra-cabeza">
-                    <a class="marca" href="/" aria-label="RTF8115VW, inicio">
+                    <a class="marca" href="/" aria-label=t!("comun-marca-inicio")>
                         <svg
                             class="marca-logo"
                             viewBox="0 0 24 24"
@@ -83,7 +86,7 @@ pub fn Layout() -> impl IntoView {
                         </svg>
                         <span class="marca-texto">
                             <span class="marca-nombre">"RTF8115VW"</span>
-                            <span class="marca-sub">"Panel del router"</span>
+                            <span class="marca-sub">{t!("comun-marca-sub")}</span>
                         </span>
                     </a>
                     <button
@@ -94,22 +97,22 @@ pub fn Layout() -> impl IntoView {
                         on:click=move |_| set_abierto.update(|a| *a = !*a)
                     >
                         {icono(ICONO_MENU)}
-                        <span class="solo-lector">"Menú"</span>
+                        <span class="solo-lector">{t!("comun-menu")}</span>
                     </button>
                 </div>
                 <div class="barra-cuerpo" id="barra-cuerpo">
-                    <nav class="nav" aria-label="Principal" on:click=cerrar>
+                    <nav class="nav" aria-label=t!("comun-nav-principal") on:click=cerrar>
                         <A href="/" exact=true>
                             {icono(ICONO_ESTADO)}
-                            <span>"Estado"</span>
+                            <span>{t!("comun-nav-estado")}</span>
                         </A>
                         <A href="/explorador">
                             {icono(ICONO_EXPLORADOR)}
-                            <span>"Explorador"</span>
+                            <span>{t!("comun-nav-explorador")}</span>
                         </A>
                         <A href="/historial">
                             {icono(ICONO_HISTORIAL)}
-                            <span>"Historial"</span>
+                            <span>{t!("comun-nav-historial")}</span>
                         </A>
                     </nav>
                     <div class="sesion">
@@ -121,6 +124,7 @@ pub fn Layout() -> impl IntoView {
                                 })}
                             </Suspense>
                         </span>
+                        <SelectorIdioma />
                         <button
                             class="boton-sutil salir"
                             type="button"
@@ -130,7 +134,7 @@ pub fn Layout() -> impl IntoView {
                             }
                         >
                             {icono(ICONO_SALIR)}
-                            <span>"Salir"</span>
+                            <span>{t!("comun-salir")}</span>
                         </button>
                     </div>
                 </div>
@@ -141,4 +145,46 @@ pub fn Layout() -> impl IntoView {
         </div>
     }
     .into_any()
+}
+
+/// Nombre de un idioma en ese mismo idioma.
+fn nombre_idioma(i: Idioma) -> String {
+    match i {
+        Idioma::Es => t!("comun-idioma-es"),
+        Idioma::En => t!("comun-idioma-en"),
+    }
+}
+
+/// Selector de idioma: fija la cookie en el servidor y recarga la página.
+#[component]
+fn SelectorIdioma() -> impl IntoView {
+    let idioma = use_idioma();
+    let cambiar = move |ev| {
+        let Some(nuevo) = Idioma::from_codigo(&event_target_value(&ev)) else {
+            return;
+        };
+        spawn_local(async move {
+            if cambiar_idioma(nuevo).await.is_ok() {
+                let _ = window().location().reload();
+            }
+        });
+    };
+    let opciones = Idioma::TODOS
+        .into_iter()
+        .map(|i| {
+            view! {
+                <option value=i.codigo() lang=i.codigo() selected=move || idioma.get() == i>
+                    {nombre_idioma(i)}
+                </option>
+            }
+        })
+        .collect_view();
+    view! {
+        <label class="idioma">
+            <span class="solo-lector">{t!("comun-idioma")}</span>
+            <select class="idioma-selector" on:change=cambiar>
+                {opciones}
+            </select>
+        </label>
+    }
 }

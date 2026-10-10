@@ -1,9 +1,11 @@
 //! Aplicación Leptos: documento HTML y rutas de la interfaz.
 
+use crate::t;
 use crate::ui::{
     estado::PaginaEstado,
     explorador::{Explorador, InicioExplorador, PaginaArea, PaginaFuncion},
     historial::PaginaHistorial,
+    i18n::{idioma_inicial, provide_idioma},
     layout::Layout,
     login::PaginaLogin,
 };
@@ -17,13 +19,15 @@ use leptos_router::{
 /// Documento HTML que envuelve la aplicación en el servidor.
 ///
 /// En el servidor fija la CSP de la página con el nonce que Leptos pone en sus
-/// scripts en línea (carga de la hidratación y datos serializados).
+/// scripts en línea (carga de la hidratación y datos serializados) y el
+/// idioma de `<html lang>`, que el navegador lee al hidratar.
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     #[cfg(feature = "ssr")]
     csp_con_nonce();
+    let idioma = idioma_inicial();
     view! {
         <!DOCTYPE html>
-        <html lang="es">
+        <html lang=idioma.codigo()>
             <head>
                 <meta charset="utf-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -56,6 +60,7 @@ fn csp_con_nonce() {
 #[component]
 pub fn App() -> impl IntoView {
     provide_meta_context();
+    provide_idioma(idioma_inicial());
     view! {
         <Stylesheet id="leptos" href="/pkg/panel.css" />
         // Las fuentes de títulos y texto, antes de que las pida la hoja.
@@ -88,9 +93,9 @@ fn NoEncontrada() -> impl IntoView {
     view! {
         <main class="acceso">
             <section class="acceso-tarjeta">
-                <h1>"Página no encontrada"</h1>
+                <h1>{t!("comun-no-encontrada")}</h1>
                 <p>
-                    <a href="/">"Volver al estado"</a>
+                    <a href="/">{t!("comun-volver-al-estado")}</a>
                 </p>
             </section>
         </main>

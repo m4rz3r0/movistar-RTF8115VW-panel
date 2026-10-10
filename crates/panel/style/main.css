@@ -407,6 +407,32 @@ button {
   justify-content: flex-start;
 }
 
+.idioma {
+  display: flex;
+}
+
+.idioma-selector {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 var(--esp-3);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: transparent;
+  color: var(--texto-2);
+  font: inherit;
+  cursor: pointer;
+}
+
+.idioma-selector:hover {
+  color: var(--texto-1);
+  border-color: var(--texto-2);
+}
+
+.idioma-selector option {
+  background: var(--fondo);
+  color: var(--texto-1);
+}
+
 .contenido {
   display: flex;
   flex-direction: column;

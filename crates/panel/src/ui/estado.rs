@@ -11,6 +11,7 @@ mod datos;
 
 pub use datos::*;
 
+use crate::t;
 use crate::ui::{
     Estado, IconoEstado, Insignia,
     charts::{
@@ -41,7 +42,7 @@ impl Nivel {
 fn texto_error(e: &ServerFnError) -> String {
     match e {
         ServerFnError::ServerError(msg) => msg.clone(),
-        _ => "No se puede contactar con el panel".to_owned(),
+        _ => t!("comun-error-conexion"),
     }
 }
 
@@ -85,9 +86,9 @@ pub fn PaginaEstado() -> impl IntoView {
         <Transition fallback=|| {
             view! {
                 <header class="pagina-cabecera">
-                    <h1>"Estado"</h1>
+                    <h1>{t!("estado-titulo")}</h1>
                 </header>
-                <p class="estado-espera">"Cargando…"</p>
+                <p class="estado-espera">{t!("comun-cargando")}</p>
             }
         }>
             <Contenido estado historico cortes_r hora rango set_rango />
@@ -176,27 +177,27 @@ fn cabecera(vista: Memo<Option<EstadoVista>>, error_panel: Memo<Option<String>>)
         vista.with(|v| {
             let v = v.as_ref()?;
             let at = v.at?;
-            Some(format!(
-                "{} · firmware {} · datos de las {}",
-                v.modelo,
-                v.firmware,
-                formato_hora(at, true)
+            Some(t!(
+                "estado-sub",
+                modelo = v.modelo.as_str(),
+                firmware = v.firmware.as_str(),
+                hora = formato_hora(at, true)
             ))
         })
     };
     let error = move || {
         error_panel.get().map(|e| {
-            let sesion = e.contains("Sesión");
+            let sesion = e == t!("comun-error-sesion");
             view! {
                 <p class="aviso estado-error" role="alert">
                     <IconoEstado estado=Estado::Error />
                     <span>
-                        "No se pueden actualizar los datos: " {e}
+                        {t!("estado-error-actualizar", error = e)}
                         {sesion
                             .then(|| {
                                 view! {
                                     " "
-                                    <a href="/login?next=%2F">"Volver a entrar"</a>
+                                    <a href="/login?next=%2F">{t!("estado-volver-a-entrar")}</a>
                                 }
                             })}
                     </span>
@@ -207,7 +208,7 @@ fn cabecera(vista: Memo<Option<EstadoVista>>, error_panel: Memo<Option<String>>)
     view! {
         <header class="pagina-cabecera">
             <div>
-                <h1>"Estado"</h1>
+                <h1>{t!("estado-titulo")}</h1>
                 <p class="pagina-sub">{sub}</p>
             </div>
         </header>
@@ -220,8 +221,8 @@ fn sin_datos(v: &EstadoVista) -> impl IntoView {
     if v.sin_configurar {
         return view! {
             <section class="tarjeta estado-espera" role="status">
-                <h2>"Router sin configurar"</h2>
-                <p class="pagina-sub">"Configúralo en Ajustes del panel."</p>
+                <h2>{t!("estado-sin-configurar")}</h2>
+                <p class="pagina-sub">{t!("estado-sin-configurar-sub")}</p>
             </section>
         }
         .into_any();
@@ -231,18 +232,18 @@ fn sin_datos(v: &EstadoVista) -> impl IntoView {
             <section class="tarjeta estado-espera estado-error" role="status">
                 <h2>
                     <IconoEstado estado=Estado::Error />
-                    "Sin conexión con el router"
+                    {t!("estado-sin-conexion-router")}
                 </h2>
-                <p>"El panel aún no ha podido leer el router: sin datos todavía."</p>
+                <p>{t!("estado-sin-datos-aun")}</p>
                 <p class="estado-espera-detalle mono">{e.clone()}</p>
-                <p class="pagina-sub">"Se reintenta solo; esta página se actualiza cada 10 s."</p>
+                <p class="pagina-sub">{t!("estado-reintenta")}</p>
             </section>
         }
         .into_any(),
         None => view! {
             <section class="tarjeta estado-espera" role="status">
-                <h2>"Esperando el primer dato del router…"</h2>
-                <p class="pagina-sub">"El primer sondeo tarda unos segundos."</p>
+                <h2>{t!("estado-esperando")}</h2>
+                <p class="pagina-sub">{t!("estado-esperando-sub")}</p>
             </section>
         }
         .into_any(),
@@ -269,7 +270,7 @@ fn Avisos(vista: Memo<Option<EstadoVista>>) -> impl IntoView {
                 })
                 .collect_view();
             view! {
-                <ul class="avisos" aria-label="Avisos">
+                <ul class="avisos" aria-label=t!("estado-avisos")>
                     {items}
                 </ul>
             }
@@ -301,31 +302,29 @@ fn Indicadores(
             })
         })
     });
-    let internet_valor = campo(|v| {
-        match (v.router_ok, v.internet_up) {
-            (false, _) => "Desconocido",
-            (true, true) => "Conectado",
-            (true, false) => "Sin conexión",
-        }
-        .to_owned()
+    let internet_valor = campo(|v| match (v.router_ok, v.internet_up) {
+        (false, _) => t!("estado-desconocido"),
+        (true, true) => t!("comun-conectado"),
+        (true, false) => t!("comun-sin-conexion"),
     });
     let internet_sub = Signal::derive(move || {
         vista.with(|v| {
             let v = v.as_ref()?;
             if !v.router_ok {
                 let antes = if v.internet_up {
-                    "conectado"
+                    t!("comun-conectado-min")
                 } else {
-                    "sin conexión"
+                    t!("comun-sin-conexion-min")
                 };
-                return Some(format!(
-                    "Último dato: {antes} a las {}",
-                    formato_hora(v.at?, false)
+                return Some(t!(
+                    "estado-ultimo-dato",
+                    valor = antes,
+                    hora = formato_hora(v.at?, false)
                 ));
             }
             Some(match &v.ip_publica {
-                Some(ip) => format!("IP pública {ip}"),
-                None => "Sin IP pública".to_owned(),
+                Some(ip) => t!("estado-ip-publica", ip = ip.as_str()),
+                None => t!("estado-sin-ip-publica"),
             })
         })
     });
@@ -336,29 +335,30 @@ fn Indicadores(
         vista.with(|v| {
             let v = v.as_ref()?;
             let (titulo, desde, estado) = match (v.internet_up, v.conexion_desde, v.caida_desde) {
-                (false, _, desde) => ("Sin conexión desde hace", desde, Some(Estado::Error)),
-                (true, Some(d), _) => ("Tiempo de conexión", Some(d), None),
-                (true, None, _) => ("Router encendido", v.encendido_desde, None),
+                (false, _, desde) => (t!("estado-sin-conexion-desde"), desde, Some(Estado::Error)),
+                (true, Some(d), _) => (t!("estado-tiempo-conexion"), Some(d), None),
+                (true, None, _) => (t!("estado-router-encendido"), v.encendido_desde, None),
             };
             // Sin conexión con el router, hasta el último dato: no sigue
             // creciendo como si se estuviera midiendo.
             let valor =
                 desde.map_or_else(|| "—".to_owned(), |d| formato_duracion(v.medido_hasta - d));
             let sub = desde.map(|d| {
-                let desde = format!("desde el {}", formato_fecha_hora(d, false));
+                let desde = formato_fecha_hora(d, false);
                 if v.router_ok {
-                    desde
+                    t!("estado-desde", desde = desde)
                 } else {
-                    format!(
-                        "{desde} hasta el último dato ({})",
-                        formato_hora(v.medido_hasta, false)
+                    t!(
+                        "estado-desde-hasta-ultimo",
+                        desde = desde,
+                        hora = formato_hora(v.medido_hasta, false)
                     )
                 }
             });
             Some((titulo, valor, sub, estado))
         })
     });
-    let titulo_conexion = Memo::new(move |_| conexion.with(|c| c.as_ref().map(|c| c.0)));
+    let titulo_conexion = Memo::new(move |_| conexion.with(|c| c.as_ref().map(|c| c.0.clone())));
     let indicador_conexion = move || {
         titulo_conexion.get().map(|titulo| {
             let valor = Signal::derive(move || {
@@ -385,12 +385,14 @@ fn Indicadores(
         Signal::derive(move || {
             let caido = vista.with(|v| {
                 v.as_ref().filter(|v| !v.router_ok).map(|v| {
-                    let valor = f(v).map_or_else(|| "sin dato".to_owned(), formato_bps);
+                    let valor = f(v).map_or_else(|| t!("estado-sin-dato"), formato_bps);
                     match v.at {
-                        Some(at) => {
-                            format!("Último dato: {valor} a las {}", formato_hora(at, false))
-                        }
-                        None => "Sin datos del router".to_owned(),
+                        Some(at) => t!(
+                            "estado-ultimo-dato",
+                            valor = valor,
+                            hora = formato_hora(at, false)
+                        ),
+                        None => t!("estado-sin-datos-router"),
                     }
                 })
             });
@@ -399,7 +401,7 @@ fn Indicadores(
                     m.iter()
                         .filter_map(g)
                         .reduce(f64::max)
-                        .map(|x| format!("máx. 1 h: {}", formato_bps(x)))
+                        .map(|x| t!("estado-max-1h", valor = formato_bps(x)))
                 })
             })
         })
@@ -415,53 +417,53 @@ fn Indicadores(
         )
     });
     let ram_sub = campo(|v| {
-        format!(
-            "de {} MB",
-            formato_decimal(v.ram_total_kb as f64 / 1024.0, 0)
+        t!(
+            "estado-ram-de",
+            total = formato_decimal(v.ram_total_kb as f64 / 1024.0, 0)
         )
     });
     let clientes_sub = campo(|v| {
         let cable = v.clientes.saturating_sub(v.clientes_wifi);
-        format!("{} por WiFi · {cable} por cable", v.clientes_wifi)
+        t!("estado-clientes-sub", wifi = v.clientes_wifi, cable = cable)
     });
 
     view! {
-        <section class="rejilla-indicadores" aria-label="Indicadores">
+        <section class="rejilla-indicadores" aria-label=t!("estado-indicadores")>
             <Indicador
-                titulo="Internet"
+                titulo=t!("estado-internet")
                 valor=internet_valor
                 sub=internet_sub
                 estado=internet_estado
             />
             {indicador_conexion}
             <Indicador
-                titulo="Bajada"
+                titulo=t!("estado-bajada")
                 valor=tasa(|v| v.bajada_bps)
                 sub=tasa_sub(|v| v.bajada_bps, |s| s.rx_bps)
                 minigrafica=mini(|s| s.rx_bps)
                 tono=Tono::Primario
             />
             <Indicador
-                titulo="Subida"
+                titulo=t!("estado-subida")
                 valor=tasa(|v| v.subida_bps)
                 sub=tasa_sub(|v| v.subida_bps, |s| s.tx_bps)
                 minigrafica=mini(|s| s.tx_bps)
                 tono=Tono::Secundario
             />
             <Indicador
-                titulo="Carga"
+                titulo=t!("estado-carga")
                 valor=campo(|v| formato_decimal(f64::from(v.load.0), 2))
                 sub=carga_sub
                 minigrafica=mini(|s| Some(f64::from(s.load1)))
             />
             <Indicador
-                titulo="RAM usada"
+                titulo=t!("estado-ram-usada")
                 valor=campo(|v| format!("{} %", formato_decimal(f64::from(v.ram_pct), 1)))
                 sub=ram_sub
                 minigrafica=mini(|s| Some(f64::from(s.ram_used_pct)))
             />
             <Indicador
-                titulo="Clientes"
+                titulo=t!("estado-clientes")
                 valor=campo(|v| v.clientes.to_string())
                 sub=clientes_sub
                 minigrafica=mini(|s| s.clients.map(f64::from))
@@ -502,22 +504,22 @@ fn Graficas(
         let subida = serie(|s| s.tx_bps);
         move || {
             vec![
-                Serie::new("Bajada", Tono::Primario, bajada()).con_area(),
-                Serie::new("Subida", Tono::Secundario, subida()).con_area(),
+                Serie::new(t!("estado-bajada"), Tono::Primario, bajada()).con_area(),
+                Serie::new(t!("estado-subida"), Tono::Secundario, subida()).con_area(),
             ]
         }
     });
     let carga = Signal::derive({
         let f = serie(|s| Some(f64::from(s.load1)));
-        move || vec![Serie::new("Carga (1 min)", Tono::Primario, f())]
+        move || vec![Serie::new(t!("estado-carga-1min"), Tono::Primario, f())]
     });
     let ram = Signal::derive({
         let f = serie(|s| Some(f64::from(s.ram_used_pct)));
-        move || vec![Serie::new("RAM usada", Tono::Primario, f()).con_area()]
+        move || vec![Serie::new(t!("estado-ram-usada"), Tono::Primario, f()).con_area()]
     });
     let clientes = Signal::derive({
         let f = serie(|s| s.clients.map(f64::from));
-        move || vec![Serie::new("Clientes", Tono::Primario, f())]
+        move || vec![Serie::new(t!("estado-clientes"), Tono::Primario, f())]
     });
     let eventos = Signal::derive(move || {
         cortes.with(|c| {
@@ -547,24 +549,19 @@ fn Graficas(
             }
         })
         .collect_view();
-    let titulo_franja = move || {
-        format!(
-            "Disponibilidad de internet · {}",
-            rango_datos().descripcion()
-        )
-    };
+    let titulo_franja = move || t!("estado-disponibilidad", rango = rango_datos().descripcion());
 
     view! {
         <section class="seccion graficas" aria-labelledby="graficas-titulo">
             <div class="seccion-cabecera">
-                <h2 id="graficas-titulo">"Histórico"</h2>
-                <div class="selector" role="group" aria-label="Intervalo de los gráficos">
+                <h2 id="graficas-titulo">{t!("estado-historico")}</h2>
+                <div class="selector" role="group" aria-label=t!("estado-intervalo")>
                     {botones}
                 </div>
             </div>
             <SerieTemporal
-                titulo="Tráfico de los dispositivos"
-                nota="Lo que envían y reciben los equipos de la red por cable y WiFi. Incluye el tráfico entre equipos conectados a puertos distintos del router."
+                titulo=t!("estado-trafico")
+                nota=t!("estado-trafico-nota")
                 series=trafico
                 unidad=Unidad::Bps
                 alto=280
@@ -576,19 +573,19 @@ fn Graficas(
             </section>
             <div class="rejilla-estado">
                 <SerieTemporal
-                    titulo="Carga del router"
+                    titulo=t!("estado-carga-router")
                     series=carga
                     unidad=Unidad::Decimal
                     ventana=ventana
                 />
                 <SerieTemporal
-                    titulo="RAM usada"
+                    titulo=t!("estado-ram-usada")
                     series=ram
                     unidad=Unidad::Porcentaje
                     ventana=ventana
                 />
                 <SerieTemporal
-                    titulo="Clientes conectados"
+                    titulo=t!("estado-clientes-conectados")
                     series=clientes
                     unidad=Unidad::Entero
                     ventana=ventana
@@ -613,11 +610,15 @@ fn filas_hosts(v: &EstadoVista) -> Vec<Vec<Celda>> {
                     Celda::Texto(h.nombre.clone())
                 },
                 if h.activo {
-                    Celda::Estado(Estado::Ok, "Conectado".into())
+                    Celda::Estado(Estado::Ok, t!("comun-conectado"))
                 } else {
-                    Celda::Estado(Estado::Neutro, "Desconectado".into())
+                    Celda::Estado(Estado::Neutro, t!("estado-desconectado"))
                 },
-                Celda::Texto(if h.fijo { "Sí" } else { "No" }.into()),
+                Celda::Texto(if h.fijo {
+                    t!("comun-si")
+                } else {
+                    t!("comun-no")
+                }),
                 h.interfaz.clone().map_or(Celda::Vacia, Celda::Texto),
             ]
         })
@@ -636,9 +637,9 @@ fn filas_leases(v: &EstadoVista) -> Vec<Vec<Celda>> {
         .iter()
         .map(|l| {
             let tipo = match (l.fijo, l.activa) {
-                (true, true) => Celda::Estado(Estado::Neutro, "Fija".into()),
-                (true, false) => Celda::Estado(Estado::Aviso, "Fija, desactivada".into()),
-                (false, _) => Celda::Texto("Dinámica".into()),
+                (true, true) => Celda::Estado(Estado::Neutro, t!("estado-lease-fija")),
+                (true, false) => Celda::Estado(Estado::Aviso, t!("estado-lease-fija-desactivada")),
+                (false, _) => Celda::Texto(t!("estado-lease-dinamica")),
             };
             vec![
                 Celda::Mono(l.ip.clone()),
@@ -653,8 +654,8 @@ fn filas_leases(v: &EstadoVista) -> Vec<Vec<Celda>> {
                     None => Celda::Vacia,
                     // El router da el tiempo restante como un entero de 32
                     // bits: una concesión vencida aparece como ~49 710 días.
-                    Some(SIN_CADUCIDAD) => Celda::Texto("Sin caducidad".into()),
-                    Some(s) if s >= CADUCADA_DESDE => Celda::Texto("Caducada".into()),
+                    Some(SIN_CADUCIDAD) => Celda::Texto(t!("estado-sin-caducidad")),
+                    Some(s) if s >= CADUCADA_DESDE => Celda::Texto(t!("estado-caducada")),
                     Some(s) => {
                         Celda::Numero(formato_duracion(i64::try_from(s).unwrap_or(i64::MAX)))
                     }
@@ -670,16 +671,16 @@ fn filas_wifi(v: &EstadoVista) -> Vec<Vec<Celda>> {
         .iter()
         .map(|r| {
             let estado = if r.activa {
-                Celda::Estado(Estado::Ok, "Activa".into())
+                Celda::Estado(Estado::Ok, t!("estado-wifi-activa"))
             } else if r.radio_apagado {
-                Celda::Estado(Estado::Neutro, "Radio apagado".into())
+                Celda::Estado(Estado::Neutro, t!("estado-wifi-radio-apagado"))
             } else {
-                Celda::Estado(Estado::Neutro, "Desactivada".into())
+                Celda::Estado(Estado::Neutro, t!("estado-wifi-desactivada"))
             };
             let canal = if r.canal == "auto" {
-                "canal automático".to_owned()
+                t!("estado-canal-auto")
             } else {
-                format!("canal {}", r.canal)
+                t!("estado-canal", canal = r.canal.as_str())
             };
             vec![
                 Celda::Texto(r.ssid.clone()),
@@ -689,12 +690,12 @@ fn filas_wifi(v: &EstadoVista) -> Vec<Vec<Celda>> {
                 if r.con_clave {
                     Celda::Secreto
                 } else {
-                    Celda::Texto("Sin clave".into())
+                    Celda::Texto(t!("estado-sin-clave"))
                 },
                 match (r.wps, r.activa) {
-                    (true, true) => Celda::Estado(Estado::Aviso, "Activo".into()),
-                    (true, false) => Celda::Texto("Activado (red apagada)".into()),
-                    (false, _) => Celda::Texto("No".into()),
+                    (true, true) => Celda::Estado(Estado::Aviso, t!("estado-wps-activo")),
+                    (true, false) => Celda::Texto(t!("estado-wps-red-apagada")),
+                    (false, _) => Celda::Texto(t!("comun-no")),
                 },
                 Celda::Numero(r.asociados.to_string()),
             ]
@@ -712,11 +713,8 @@ fn Tablas(vista: Memo<Option<EstadoVista>>) -> impl IntoView {
         vista.with(|v| {
             let v = v.as_ref()?;
             Some(match v.lentos_at {
-                Some(t) => format!(
-                    "Datos de las {} · se leen cada minuto",
-                    formato_hora(t, false)
-                ),
-                None => "Aún sin leer: se leen cada minuto".to_owned(),
+                Some(t) => t!("estado-lentos", hora = formato_hora(t, false)),
+                None => t!("estado-lentos-sin-leer"),
             })
         })
     };
@@ -724,7 +722,11 @@ fn Tablas(vista: Memo<Option<EstadoVista>>) -> impl IntoView {
         vista.with(|v| {
             v.as_ref().map(|v| {
                 let inactivos = v.hosts.len().saturating_sub(v.clientes as usize);
-                format!("{} conectados · {inactivos} desconectados", v.clientes)
+                t!(
+                    "estado-resumen-hosts",
+                    conectados = v.clientes,
+                    desconectados = inactivos
+                )
             })
         })
     };
@@ -732,7 +734,7 @@ fn Tablas(vista: Memo<Option<EstadoVista>>) -> impl IntoView {
         vista.with(|v| {
             v.as_ref()
                 .is_some_and(|v| v.wifi.iter().any(|r| r.wps && r.activa))
-                .then(|| view! { <Insignia estado=Estado::Aviso texto="WPS activo" /> })
+                .then(|| view! { <Insignia estado=Estado::Aviso texto=t!("estado-wps-activo-insignia") /> })
         })
     };
 
@@ -740,7 +742,7 @@ fn Tablas(vista: Memo<Option<EstadoVista>>) -> impl IntoView {
         <section class="seccion tarjeta" aria-labelledby="clientes-titulo">
             <div class="seccion-cabecera">
                 <div>
-                    <h2 id="clientes-titulo">"Clientes LAN"</h2>
+                    <h2 id="clientes-titulo">{t!("estado-clientes-lan")}</h2>
                     <p class="pagina-sub">{resumen_hosts} " · " {lentos}</p>
                 </div>
             </div>
@@ -748,54 +750,54 @@ fn Tablas(vista: Memo<Option<EstadoVista>>) -> impl IntoView {
                 columnas=vec![
                     Columna::new("IP"),
                     Columna::new("MAC"),
-                    Columna::new("Nombre"),
-                    Columna::new("Estado"),
-                    Columna::new("Lease fijo"),
-                    Columna::new("Interfaz"),
+                    Columna::new(t!("estado-col-nombre")),
+                    Columna::new(t!("estado-col-estado")),
+                    Columna::new(t!("estado-col-lease-fijo")),
+                    Columna::new(t!("estado-col-interfaz")),
                 ]
                 filas=filas(filas_hosts)
-                vacia="El router no ha devuelto ningún equipo"
+                vacia=t!("estado-sin-equipos")
             />
         </section>
         <section class="seccion tarjeta" aria-labelledby="leases-titulo">
             <div class="seccion-cabecera">
                 <div>
-                    <h2 id="leases-titulo">"Concesiones DHCP"</h2>
-                    <p class="pagina-sub">"Dinámicas y reservas fijas por MAC"</p>
+                    <h2 id="leases-titulo">{t!("estado-concesiones")}</h2>
+                    <p class="pagina-sub">{t!("estado-concesiones-sub")}</p>
                 </div>
             </div>
             <Tabla
                 columnas=vec![
                     Columna::new("IP"),
                     Columna::new("MAC"),
-                    Columna::new("Nombre"),
-                    Columna::new("Tipo"),
-                    Columna::numerica("Caduca en"),
+                    Columna::new(t!("estado-col-nombre")),
+                    Columna::new(t!("estado-col-tipo")),
+                    Columna::numerica(t!("estado-col-caduca")),
                 ]
                 filas=filas(filas_leases)
-                vacia="Sin concesiones"
+                vacia=t!("estado-sin-concesiones")
             />
         </section>
         <section class="seccion tarjeta" aria-labelledby="wifi-titulo">
             <div class="seccion-cabecera">
                 <div>
-                    <h2 id="wifi-titulo">"Redes WiFi"</h2>
-                    <p class="pagina-sub">"Las claves no salen del servidor"</p>
+                    <h2 id="wifi-titulo">{t!("estado-redes-wifi")}</h2>
+                    <p class="pagina-sub">{t!("estado-redes-wifi-sub")}</p>
                 </div>
                 {con_wps}
             </div>
             <Tabla
                 columnas=vec![
                     Columna::new("SSID"),
-                    Columna::new("Banda"),
-                    Columna::new("Estado"),
-                    Columna::new("Seguridad"),
-                    Columna::new("Clave"),
+                    Columna::new(t!("estado-col-banda")),
+                    Columna::new(t!("estado-col-estado")),
+                    Columna::new(t!("estado-col-seguridad")),
+                    Columna::new(t!("estado-col-clave")),
                     Columna::new("WPS"),
-                    Columna::numerica("Asociados"),
+                    Columna::numerica(t!("estado-col-asociados")),
                 ]
                 filas=filas(filas_wifi)
-                vacia="Sin redes WiFi"
+                vacia=t!("estado-sin-redes")
             />
         </section>
     }

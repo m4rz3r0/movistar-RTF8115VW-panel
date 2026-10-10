@@ -7,6 +7,7 @@ use super::{
     Operacion, ParamVista, Peticion, PreparadoVista, TipoCampo, TipoFuncion, Valor, formulario,
     instancias, preparar_cambio, texto_error, validar_campo,
 };
+use crate::t;
 use crate::ui::{Estado, IconoEstado};
 use leptos::{ev::SubmitEvent, prelude::*, task::spawn_local};
 
@@ -68,7 +69,7 @@ pub(super) fn Escritura(detalle: FuncionDetalle) -> impl IntoView {
                 view! {
                     <p class="campo">
                         <label for=id.clone()>
-                            {p.etiqueta.clone()}
+                            <span lang="es">{p.etiqueta.clone()}</span>
                             <span class="mono campo-nombre">{p.nombre.clone()}</span>
                         </label>
                         <input
@@ -95,10 +96,10 @@ pub(super) fn Escritura(detalle: FuncionDetalle) -> impl IntoView {
         };
         view! {
             <form class="formulario formulario-claves" on:submit=cargar>
-                <p class="pagina-sub">"Instancia sobre la que trabajar:"</p>
+                <p class="pagina-sub">{t!("biblioteca-instancia-trabajar")}</p>
                 <div class="rejilla-campos">{entradas}</div>
                 <div class="formulario-pie">
-                    <button class="boton-sutil" type="submit">"Cargar"</button>
+                    <button class="boton-sutil" type="submit">{t!("biblioteca-cargar")}</button>
                 </div>
             </form>
         }
@@ -136,7 +137,7 @@ pub(super) fn Escritura(detalle: FuncionDetalle) -> impl IntoView {
         view! {
             <section class="seccion" aria-labelledby="titulo-instancias">
                 <div class="seccion-cabecera">
-                    <h2 id="titulo-instancias" class="titulo-seccion">"Instancias"</h2>
+                    <h2 id="titulo-instancias" class="titulo-seccion">{t!("biblioteca-instancias-titulo")}</h2>
                     <button
                         class="boton-sutil"
                         type="button"
@@ -145,10 +146,10 @@ pub(super) fn Escritura(detalle: FuncionDetalle) -> impl IntoView {
                             modo.set(Modo::Form(None));
                         }
                     >
-                        "Añadir"
+                        {t!("biblioteca-anadir")}
                     </button>
                 </div>
-                <Transition fallback=|| view! { <p class="estado-espera">"Leyendo…"</p> }>
+                <Transition fallback=|| view! { <p class="estado-espera">{t!("biblioteca-leyendo")}</p> }>
                     {tabla}
                 </Transition>
             </section>
@@ -169,10 +170,10 @@ pub(super) fn Escritura(detalle: FuncionDetalle) -> impl IntoView {
         },
     );
     let titulo = move || match (detalle.resumen.tipo, modo.get()) {
-        (TipoFuncion::Accion, _) => "Ejecutar".to_owned(),
-        (_, Modo::Form(Some(i))) => format!("Editar la instancia {i}"),
-        (_, Modo::Form(None)) if es_lista => "Nueva instancia".to_owned(),
-        _ => "Editar".to_owned(),
+        (TipoFuncion::Accion, _) => t!("biblioteca-ejecutar"),
+        (_, Modo::Form(Some(i))) => t!("biblioteca-editar-instancia", i = i),
+        (_, Modo::Form(None)) if es_lista => t!("biblioteca-nueva-instancia"),
+        _ => t!("biblioteca-editar"),
     };
     let form = move || {
         Suspend::new(async move {
@@ -189,7 +190,7 @@ pub(super) fn Escritura(detalle: FuncionDetalle) -> impl IntoView {
                                     type="button"
                                     on:click=move |_| modo.set(Modo::Ninguno)
                                 >
-                                    "Cancelar"
+                                    {t!("biblioteca-cancelar")}
                                 </button>
                             })}
                         </div>
@@ -222,7 +223,7 @@ pub(super) fn Escritura(detalle: FuncionDetalle) -> impl IntoView {
         {form_claves}
         {move || error.get().map(aviso_error)}
         {lista}
-        <Transition fallback=|| view! { <p class="estado-espera">"Leyendo los valores actuales…"</p> }>
+        <Transition fallback=|| view! { <p class="estado-espera">{t!("biblioteca-leyendo-actuales")}</p> }>
             {form}
         </Transition>
         {dialogo}
@@ -245,7 +246,7 @@ fn tabla_instancias(
     let vacia = (mostradas == 0).then(|| {
         view! {
             <tr class="fila-vacia">
-                <td colspan=i.columnas.len() + 1>"No hay instancias"</td>
+                <td colspan=i.columnas.len() + 1>{t!("biblioteca-sin-instancias")}</td>
             </tr>
         }
     });
@@ -261,7 +262,7 @@ fn tabla_instancias(
                         Valor::Texto(t) => t.into_any(),
                         Valor::Secreto => view! {
                             <span class="secreto">{MASCARA}</span>
-                            <span class="solo-lector">"(valor oculto)"</span>
+                            <span class="solo-lector">{t!("comun-valor-oculto")}</span>
                         }
                         .into_any(),
                         Valor::Ausente => view! { <span class="vacia">"—"</span> }.into_any(),
@@ -286,8 +287,8 @@ fn tabla_instancias(
                                 type="button"
                                 on:click=move |_| modo.set(Modo::Form(Some(id_editar.clone())))
                             >
-                                "Editar"
-                                <span class="solo-lector">{format!(" la instancia {etiqueta}")}</span>
+                                {t!("biblioteca-editar")}
+                                <span class="solo-lector">{t!("biblioteca-la-instancia", i = etiqueta)}</span>
                             </button>
                         })}
                         {(con_id && se_borra).then(|| view! {
@@ -296,8 +297,8 @@ fn tabla_instancias(
                                 type="button"
                                 on:click=move |_| borrar(id_borrar.clone())
                             >
-                                "Borrar"
-                                <span class="solo-lector">{format!(" la instancia {}", f.id)}</span>
+                                {t!("biblioteca-borrar")}
+                                <span class="solo-lector">{t!("biblioteca-la-instancia", i = f.id.as_str())}</span>
                             </button>
                         })}
                     </td>
@@ -307,9 +308,13 @@ fn tabla_instancias(
         })
         .collect_view();
     let titulo = if i.total > mostradas {
-        format!("{} instancias (se muestran {mostradas})", i.total)
+        t!(
+            "biblioteca-instancias-parcial",
+            n = i.total,
+            mostradas = mostradas
+        )
     } else {
-        format!("{} instancias", i.total)
+        t!("biblioteca-instancias", n = i.total)
     };
     view! {
         <div class="tabla-scroll">
@@ -318,7 +323,7 @@ fn tabla_instancias(
                 <thead>
                     <tr>
                         <th scope="col">
-                            <span class="solo-lector">"Acciones"</span>
+                            <span class="solo-lector">{t!("biblioteca-acciones")}</span>
                         </th>
                         {cabecera}
                     </tr>
@@ -350,15 +355,15 @@ fn control(i: usize, c: &CampoForm, s: RwSignal<String>, op: Operacion) -> impl 
     let p = &c.param;
     let etiqueta = view! {
         <label for=id.clone()>
-            {p.etiqueta.clone()}
+            <span lang="es">{p.etiqueta.clone()}</span>
             <span class="mono campo-nombre">{p.nombre.clone()}</span>
         </label>
     };
     let ayuda = match (p.tipo, op) {
-        (TipoCampo::Secret, Operacion::Editar) => Some("Déjalo como está para no cambiarlo."),
-        (TipoCampo::Secret, _) => Some("Vacío: no se envía."),
-        (TipoCampo::Ip, _) => Some("Dirección IPv4, p. ej. 192.168.1.60."),
-        (TipoCampo::Mac, _) => Some("Seis pares hexadecimales separados por «:»."),
+        (TipoCampo::Secret, Operacion::Editar) => Some(t!("biblioteca-ayuda-secreto-editar")),
+        (TipoCampo::Secret, _) => Some(t!("biblioteca-ayuda-secreto")),
+        (TipoCampo::Ip, _) => Some(t!("biblioteca-ayuda-ip")),
+        (TipoCampo::Mac, _) => Some(t!("biblioteca-ayuda-mac")),
         _ => None,
     };
     let describe = format!(
@@ -389,7 +394,10 @@ fn control(i: usize, c: &CampoForm, s: RwSignal<String>, op: Operacion) -> impl 
         TipoCampo::Enum => {
             let mut opciones = p.opciones.clone();
             if !c.valor.is_empty() && !opciones.iter().any(|(v, _)| *v == c.valor) {
-                opciones.push((c.valor.clone(), format!("{} (valor actual)", c.valor)));
+                opciones.push((
+                    c.valor.clone(),
+                    t!("biblioteca-valor-actual", valor = c.valor.as_str()),
+                ));
             }
             let vacia = c.valor.is_empty().then(|| {
                 view! {
@@ -403,7 +411,7 @@ fn control(i: usize, c: &CampoForm, s: RwSignal<String>, op: Operacion) -> impl 
                 .map(|(v, e)| {
                     let v2 = v.clone();
                     view! {
-                        <option value=v selected=move || s.with(|x| *x == v2)>
+                        <option value=v lang="es" selected=move || s.with(|x| *x == v2)>
                             {e}
                         </option>
                     }
@@ -468,7 +476,7 @@ fn control(i: usize, c: &CampoForm, s: RwSignal<String>, op: Operacion) -> impl 
                     {es_secreto.then(|| view! {
                         " "
                         <span class="sin-cambios">
-                            {move || if s.with(|v| v == MASCARA) { "Sin cambios." } else { "Se cambiará." }}
+                            {move || if s.with(|v| v == MASCARA) { t!("biblioteca-sin-cambios") } else { t!("biblioteca-se-cambiara") }}
                         </span>
                     })}
                 </p>
@@ -509,7 +517,8 @@ fn Formulario(
         (!f.omitidos.is_empty()).then(|| {
             view! {
                 <p class="pagina-sub">
-                    "No editables (la lectura del router no los muestra y sin valor anterior no se podría deshacer): "
+                    {t!("biblioteca-no-editables")}
+                    " "
                     <span class="mono">{f.omitidos.join(", ")}</span>
                 </p>
             }
@@ -526,11 +535,7 @@ fn Formulario(
                 .count()
         });
         if malos > 0 {
-            error.set(Some(format!(
-                "Corrige {} marcado{} antes de revisar.",
-                if malos == 1 { "el campo" } else { "los campos" },
-                if malos == 1 { "" } else { "s" }
-            )));
+            error.set(Some(t!("biblioteca-corrige-campos", n = malos)));
             return;
         }
         let (funcion, instancia, mut valores) =
@@ -566,9 +571,7 @@ fn Formulario(
             {sin_campos.then(|| view! {
                 <p class="aviso estado-neutro">
                     <IconoEstado estado=Estado::Neutro />
-                    <span>
-                        "La lectura del router no muestra ninguno de los campos de esta función: no se puede editar sin poder deshacer."
-                    </span>
+                    <span>{t!("biblioteca-sin-campos-editables")}</span>
                 </p>
             })}
             <div class="rejilla-campos">{controles}</div>
@@ -578,7 +581,7 @@ fn Formulario(
             </p>
             <div class="formulario-pie">
                 <button class="boton" type="submit" disabled=move || enviando.get() || sin_campos>
-                    {move || if enviando.get() { "Revisando…" } else { "Revisar cambios" }}
+                    {move || if enviando.get() { t!("biblioteca-revisando") } else { t!("biblioteca-revisar-cambios") }}
                 </button>
             </div>
         </form>

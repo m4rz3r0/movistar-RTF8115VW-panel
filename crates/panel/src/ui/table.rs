@@ -4,6 +4,7 @@
 //! Los secretos no llegan nunca a la tabla: [`Celda::Secreto`] no lleva valor
 //! y se pinta como `<span class="secreto">••••••</span>`.
 
+use crate::t;
 use crate::ui::{Estado, Insignia};
 use leptos::prelude::*;
 
@@ -57,13 +58,13 @@ fn celda(c: Celda) -> AnyView {
         Celda::Numero(t) => view! { <span class="cifras">{t}</span> }.into_any(),
         Celda::Secreto => view! {
             <span class="secreto">{MASCARA}</span>
-            <span class="solo-lector">"(valor oculto)"</span>
+            <span class="solo-lector">{t!("comun-valor-oculto")}</span>
         }
         .into_any(),
         Celda::Estado(estado, texto) => view! { <Insignia estado texto /> }.into_any(),
         Celda::Vacia => view! {
             <span class="vacia" aria-hidden="true">"—"</span>
-            <span class="solo-lector">"sin valor"</span>
+            <span class="solo-lector">{t!("comun-sin-valor")}</span>
         }
         .into_any(),
     }
@@ -96,7 +97,7 @@ pub fn Tabla(
         let numericas: Vec<bool> = columnas.with(|c| c.iter().map(|c| c.numerica).collect());
         let filas = filas.get();
         if filas.is_empty() {
-            let texto = vacia.get().unwrap_or_else(|| "Sin datos".to_owned());
+            let texto = vacia.get().unwrap_or_else(|| t!("comun-sin-datos"));
             return view! {
                 <tr class="fila-vacia">
                     <td colspan=numericas.len().max(1)>{texto}</td>

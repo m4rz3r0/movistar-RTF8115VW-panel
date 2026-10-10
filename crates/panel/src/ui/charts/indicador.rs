@@ -144,8 +144,8 @@ mod tests {
         let html = Owner::new().with(|| {
             view! {
                 <Indicador
-                    titulo="Subida"
-                    valor="1,2 Mbit/s"
+                    titulo=crate::t!("estado-subida")
+                    valor="1"
                     minigrafica=vec![Some(1.0), Some(2.0)]
                     tono=Tono::Secundario
                 />

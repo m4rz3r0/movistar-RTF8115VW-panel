@@ -160,7 +160,7 @@ pub async fn deshacer(state: &AppState, change_id: i64) -> Result<PreparadoVista
         Ok(p) => Ok(vista_preparado(state, &g, p)),
         Err(CambioError::Invalida(m)) => Err(con_estado(
             StatusCode::BAD_REQUEST,
-            format!("No se puede deshacer: {m}."),
+            crate::t!("historial-error-deshacer", motivo = m),
         )),
         Err(e) => Err(error_cambio(e)),
     }

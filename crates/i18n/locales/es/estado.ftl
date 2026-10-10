@@ -1,0 +1,101 @@
+# Página de estado y avisos del sondeo.
+estado-titulo = Estado
+estado-sub = { $modelo } · firmware { $firmware } · datos de las { $hora }
+estado-error-actualizar = No se pueden actualizar los datos: { $error }
+estado-volver-a-entrar = Volver a entrar
+estado-sin-configurar = Router sin configurar
+estado-sin-configurar-sub = Configúralo en Ajustes del panel.
+estado-sin-conexion-router = Sin conexión con el router
+estado-sin-datos-aun = El panel aún no ha podido leer el router: sin datos todavía.
+estado-reintenta = Se reintenta solo; esta página se actualiza cada 10 s.
+estado-esperando = Esperando el primer dato del router…
+estado-esperando-sub = El primer sondeo tarda unos segundos.
+estado-avisos = Avisos
+estado-indicadores = Indicadores
+
+## Indicadores
+estado-internet = Internet
+estado-desconocido = Desconocido
+estado-ultimo-dato = Último dato: { $valor } a las { $hora }
+estado-ip-publica = IP pública { $ip }
+estado-sin-ip-publica = Sin IP pública
+estado-sin-conexion-desde = Sin conexión desde hace
+estado-tiempo-conexion = Tiempo de conexión
+estado-router-encendido = Router encendido
+estado-desde = desde el { $desde }
+estado-desde-hasta-ultimo = desde el { $desde } hasta el último dato ({ $hora })
+estado-sin-dato = sin dato
+estado-sin-datos-router = Sin datos del router
+estado-max-1h = máx. 1 h: { $valor }
+estado-ram-de = de { $total } MB
+estado-clientes-sub = { $wifi } por WiFi · { $cable } por cable
+estado-bajada = Bajada
+estado-subida = Subida
+estado-carga = Carga
+estado-carga-1min = Carga (1 min)
+estado-ram-usada = RAM usada
+estado-clientes = Clientes
+
+## Gráficos
+estado-historico = Histórico
+estado-intervalo = Intervalo de los gráficos
+estado-trafico = Tráfico de los dispositivos
+estado-trafico-nota = Lo que envían y reciben los equipos de la red por cable y WiFi. Incluye el tráfico entre equipos conectados a puertos distintos del router.
+estado-disponibilidad = Disponibilidad de internet · { $rango }
+estado-carga-router = Carga del router
+estado-clientes-conectados = Clientes conectados
+estado-rango-hora = última hora
+estado-rango-dia = últimas 24 h
+estado-rango-semana = últimos 7 días
+
+## Tablas
+estado-clientes-lan = Clientes LAN
+estado-resumen-hosts = { $conectados } conectados · { $desconectados } desconectados
+estado-lentos = Datos de las { $hora } · se leen cada minuto
+estado-lentos-sin-leer = Aún sin leer: se leen cada minuto
+estado-col-nombre = Nombre
+estado-col-estado = Estado
+estado-col-lease-fijo = Lease fijo
+estado-col-interfaz = Interfaz
+estado-col-tipo = Tipo
+estado-col-caduca = Caduca en
+estado-col-banda = Banda
+estado-col-seguridad = Seguridad
+estado-col-clave = Clave
+estado-col-asociados = Asociados
+estado-sin-equipos = El router no ha devuelto ningún equipo
+estado-desconectado = Desconectado
+estado-cable = Cable
+estado-concesiones = Concesiones DHCP
+estado-concesiones-sub = Dinámicas y reservas fijas por MAC
+estado-sin-concesiones = Sin concesiones
+estado-lease-fija = Fija
+estado-lease-fija-desactivada = Fija, desactivada
+estado-lease-dinamica = Dinámica
+estado-sin-caducidad = Sin caducidad
+estado-caducada = Caducada
+estado-redes-wifi = Redes WiFi
+estado-redes-wifi-sub = Las claves no salen del servidor
+estado-sin-redes = Sin redes WiFi
+estado-wifi-activa = Activa
+estado-wifi-radio-apagado = Radio apagado
+estado-wifi-desactivada = Desactivada
+estado-wifi-abierta = Abierta
+estado-canal-auto = canal automático
+estado-canal = canal { $canal }
+estado-sin-clave = Sin clave
+estado-wps-activo = Activo
+estado-wps-red-apagada = Activado (red apagada)
+estado-wps-activo-insignia = WPS activo
+estado-codigo = código { $codigo }
+
+## Avisos
+estado-cuando-hora = las { $hora }
+estado-cuando-fecha = el { $fecha }
+estado-aviso-sin-router = Sin conexión con el router: { $error }
+estado-aviso-sin-router-desde = Sin conexión con el router desde { $cuando }. Los datos mostrados son de esa hora.
+estado-aviso-sin-router-desde-error = Sin conexión con el router desde { $cuando }: { $error }. Los datos mostrados son de esa hora.
+estado-aviso-lentos = Los datos de clientes y WiFi pueden estar desactualizados.
+estado-aviso-lentos-desde = Los datos de clientes y WiFi pueden estar desactualizados (último dato: { $cuando }).
+estado-aviso-wps = WPS activo en { $redes }: desactívalo si no lo usas (el PIN de WPS se puede adivinar por fuerza bruta).
+estado-aviso-tr69 = Telefónica puede gestionar el router en remoto (TR-069).

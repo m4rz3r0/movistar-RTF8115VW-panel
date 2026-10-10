@@ -6,6 +6,7 @@
 //! nunca llevan secretos: de las redes WiFi solo se envía si tienen clave, no
 //! la clave.
 
+use crate::t;
 use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -33,7 +34,7 @@ impl Rango {
         }
     }
 
-    /// Texto del selector.
+    /// Texto del selector (unidades, iguales en los dos idiomas).
     pub fn etiqueta(self) -> &'static str {
         match self {
             Rango::Hora => "1 h",
@@ -43,11 +44,11 @@ impl Rango {
     }
 
     /// Texto largo («última hora», …).
-    pub fn descripcion(self) -> &'static str {
+    pub fn descripcion(self) -> String {
         match self {
-            Rango::Hora => "última hora",
-            Rango::Dia => "últimas 24 h",
-            Rango::Semana => "últimos 7 días",
+            Rango::Hora => t!("estado-rango-hora"),
+            Rango::Dia => t!("estado-rango-dia"),
+            Rango::Semana => t!("estado-rango-semana"),
         }
     }
 }
@@ -259,7 +260,7 @@ pub(crate) mod servidor {
         poller::Snapshot,
         series::{Sample, WanEvento},
         state::AppState,
-        ui::charts::{formato_fecha_hora, formato_hora},
+        ui::charts::{formato_decimal, formato_fecha_hora, formato_hora},
     };
     use catalogo::Catalogo;
     use hgu::models::WifiStatus;
@@ -288,7 +289,7 @@ pub(crate) mod servidor {
         if let Some(resp) = use_context::<leptos_axum::ResponseOptions>() {
             resp.set_status(axum::http::StatusCode::INTERNAL_SERVER_ERROR);
         }
-        ServerFnError::new(format!("Error interno del panel (id {id})"))
+        ServerFnError::new(t!("comun-error-interno-id", id = id))
     }
 
     pub fn rango(r: Rango) -> crate::series::Rango {
@@ -302,9 +303,9 @@ pub(crate) mod servidor {
     /// «las 14:05» si `ts` es de las últimas 20 h; «el 08/10 14:05» si no.
     fn cuando(ts: i64, ahora: i64) -> String {
         if ahora - ts < 20 * 3600 {
-            format!("las {}", formato_hora(ts, false))
+            t!("estado-cuando-hora", hora = formato_hora(ts, false))
         } else {
-            format!("el {}", formato_fecha_hora(ts, false))
+            t!("estado-cuando-fecha", fecha = formato_fecha_hora(ts, false))
         }
     }
 
@@ -314,7 +315,7 @@ pub(crate) mod servidor {
         cat.funcion("cbSetWifiAccPt")
             .and_then(|f| f.parametro(param))
             .and_then(|p| p.opciones.iter().find(|(v, _)| v == codigo))
-            .map_or_else(|| format!("código {codigo}"), |(_, e)| e.clone())
+            .map_or_else(|| t!("estado-codigo", codigo = codigo), |(_, e)| e.clone())
     }
 
     /// Seguridad legible (`"3/4"` ⇒ «WPA2-PSK · AES») y si la red tiene clave
@@ -323,7 +324,7 @@ pub(crate) mod servidor {
         let (auth, enc) = codigos.split_once('/').unwrap_or((codigos, ""));
         let wep = matches!(enc, "1" | "2");
         if auth == "0" && !wep {
-            return ("Abierta".to_owned(), false);
+            return (t!("estado-wifi-abierta"), false);
         }
         let mut texto = opcion(cat, "authentication", auth);
         if !enc.is_empty() && enc != "0" {
@@ -332,9 +333,12 @@ pub(crate) mod servidor {
         (texto, true)
     }
 
-    /// «2.4GHz» ⇒ «2,4 GHz».
+    /// «2.4GHz» ⇒ «2,4 GHz» (separador decimal del idioma).
     fn banda(b: &str) -> String {
-        b.replace("GHz", " GHz").replace('.', ",")
+        match b.strip_suffix("GHz").and_then(|n| n.parse::<f64>().ok()) {
+            Some(n) => format!("{} GHz", formato_decimal(n, usize::from(n.fract() != 0.0))),
+            None => b.replace("GHz", " GHz"),
+        }
     }
 
     fn misma_mac(a: &str, b: &str) -> bool {
@@ -384,7 +388,7 @@ pub(crate) mod servidor {
             if let Some(e) = &error {
                 avisos.push(Aviso {
                     nivel: Nivel::Error,
-                    texto: format!("Sin conexión con el router: {e}"),
+                    texto: t!("estado-aviso-sin-router", error = e.as_str()),
                 });
             }
             return EstadoVista {
@@ -417,26 +421,30 @@ pub(crate) mod servidor {
         };
 
         if !sano {
-            let detalle = error
-                .as_deref()
-                .map(|e| format!(": {e}"))
-                .unwrap_or_default();
+            let texto = match error.as_deref() {
+                Some(e) => t!(
+                    "estado-aviso-sin-router-desde-error",
+                    cuando = cuando(s.at, ahora),
+                    error = e
+                ),
+                None => t!(
+                    "estado-aviso-sin-router-desde",
+                    cuando = cuando(s.at, ahora)
+                ),
+            };
             avisos.push(Aviso {
                 nivel: Nivel::Error,
-                texto: format!(
-                    "Sin conexión con el router desde {}{detalle}. Los datos mostrados son de esa hora.",
-                    cuando(s.at, ahora)
-                ),
+                texto,
             });
         }
         if s.slow_error.is_some() {
-            let desde = s
-                .slow_at
-                .map(|t| format!(" (último dato: {})", cuando(t, ahora)))
-                .unwrap_or_default();
+            let texto = match s.slow_at {
+                Some(t) => t!("estado-aviso-lentos-desde", cuando = cuando(t, ahora)),
+                None => t!("estado-aviso-lentos"),
+            };
             avisos.push(Aviso {
                 nivel: Nivel::Aviso,
-                texto: format!("Los datos de clientes y WiFi pueden estar desactualizados{desde}."),
+                texto,
             });
         }
 
@@ -482,7 +490,7 @@ pub(crate) mod servidor {
                 fijo: fija(&h.mac),
                 interfaz: h
                     .active
-                    .then(|| interfaz_wifi(&s.wifi, &h.mac).unwrap_or_else(|| "Cable".into())),
+                    .then(|| interfaz_wifi(&s.wifi, &h.mac).unwrap_or_else(|| t!("estado-cable"))),
             })
             .collect();
         hosts.sort_by_key(|h| (!h.activo, orden_ip(&h.ip)));
@@ -560,16 +568,13 @@ pub(crate) mod servidor {
         if !con_wps.is_empty() {
             avisos.push(Aviso {
                 nivel: Nivel::Aviso,
-                texto: format!(
-                    "WPS activo en {}: desactívalo si no lo usas (el PIN de WPS se puede adivinar por fuerza bruta).",
-                    con_wps.join(", ")
-                ),
+                texto: t!("estado-aviso-wps", redes = con_wps.join(", ")),
             });
         }
         if s.tr69_activo == Some(true) {
             avisos.push(Aviso {
                 nivel: Nivel::Info,
-                texto: "Telefónica puede gestionar el router en remoto (TR-069).".to_owned(),
+                texto: t!("estado-aviso-tr69"),
             });
         }
 

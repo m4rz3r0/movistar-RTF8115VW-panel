@@ -1,0 +1,3 @@
+# Textos que pueden ir sueltos en una vista (prueba `sin_texto_literal_en_vistas`):
+# no se traducen porque son marcas, siglas o unidades. Uno por línea.
+RTF8115VW
