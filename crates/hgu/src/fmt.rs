@@ -65,6 +65,7 @@ mod tests {
 
     #[test]
     fn mac_split_y_join() {
+        // MAC del rango de documentación (RFC 7042), no de un equipo real.
         let p = split_mac("02:00:5e:10:00:01").unwrap();
         assert_eq!(p, ["02", "00", "5e", "10", "00", "01"]);
         assert_eq!(

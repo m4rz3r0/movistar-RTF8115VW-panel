@@ -41,7 +41,7 @@ crates/catalogo/funciones.toml. No editar a mano. -->
 | [QoS](#qos) | 7 | 4 | 3 | 0 | 0 |
 | [VoIP](#voip) | 7 | 4 | 3 | 0 | 0 |
 | [TR-069](#tr-069) | 2 | 1 | 1 | 0 | 0 |
-| [Usuarios](#usuarios) | 11 | 2 | 2 | 7 | 6 |
+| [Usuarios](#usuarios) | 11 | 2 | 2 | 7 | 7 |
 | [Sistema](#sistema) | 30 | 10 | 4 | 16 | 10 |
 | [Ocultas](#ocultas) | 8 | 8 | 0 | 0 | 0 |
 
@@ -1847,6 +1847,8 @@ Cambia la contraseña del usuario con sesión iniciada (contraseña actual y nue
 *acción* · UI avanzada · riesgo medio · página `user_profile.asp`
 
 Cambia la contraseña y el grupo de otro usuario (ventana user_profile_modifyOthers.asp). No se puede comprobar después: acción.
+
+**Bloqueada:** puede cambiar la contraseña del usuario con el que el propio panel inicia sesión (RP_ROUTER_USER): la vigilancia no podría volver a entrar ni revertir; se cambia desde el router
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|

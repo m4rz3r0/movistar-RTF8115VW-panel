@@ -4010,6 +4010,7 @@ tipo = "accion"
 pagina = "user_profile.asp"
 descripcion = "Cambia la contraseña y el grupo de otro usuario (ventana user_profile_modifyOthers.asp). No se puede comprobar después: acción."
 riesgo = "medio"
+bloqueada = "puede cambiar la contraseña del usuario con el que el propio panel inicia sesión (RP_ROUTER_USER): la vigilancia no podría volver a entrar ni revertir; se cambia desde el router"
 
 [[funcion.parametro]]
 nombre = "rqUser"

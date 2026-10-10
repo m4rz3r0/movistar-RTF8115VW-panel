@@ -270,6 +270,8 @@ riesgo = "bajo"
             "te_uploadinfo.asp",
             "syslog.asp",
             "backup_restore.asp",
+            "cbModifyPwd",
+            "cbModifyPwdOther",
         ] {
             let f = c.funcion(n).unwrap_or_else(|| panic!("falta {n}"));
             let m = f
