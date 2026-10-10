@@ -309,9 +309,13 @@ async fn firmware_confirmado_no_bloquea() {
     p.sim
         .control
         .set_firmware("ES_g99.00_RTF_TEF001_V99.00_V001");
-    instancia::escribir(&p.state.db, claves::FIRMWARE_CONFIRMADO, &json!(true))
-        .await
-        .unwrap();
+    instancia::escribir(
+        &p.state.db,
+        claves::FIRMWARE_CONFIRMADO,
+        &json!("ES_g99.00_RTF_TEF001_V99.00_V001"),
+    )
+    .await
+    .unwrap();
     let cookie = crear_admin(&p).await;
     let (status, body) = llamar(&p, "guardar_router", router(&p), Some(&cookie)).await;
     assert_eq!(status, 200, "{body}");
@@ -501,4 +505,18 @@ async fn tras_el_proxy_cuenta_la_ip_del_cliente() {
     let bueno = common::login_body(PANEL_USER, PANEL_PASS);
     let (status, body) = por_el_proxy(&p, "/api/login", &bueno, false, PUBLICA).await;
     assert_eq!(status, 429, "en espera: {body}");
+}
+
+#[tokio::test]
+async fn lectura_inicial_sin_resumen_no_decide_el_modo() {
+    let p = recien_instalado().await;
+    let cookie = crear_admin(&p).await;
+    let (status, _) = llamar(&p, "guardar_router", router(&p), Some(&cookie)).await;
+    assert_eq!(status, 200);
+    assert!(!instancia::solo_lectura(&p.state.db).await);
+    // El resumen no se puede leer (ni al reintentar): no se adivina.
+    p.sim.control.fail_reads("cbGetSummary", true);
+    let (status, body) = llamar(&p, "lectura_inicial", json!({ "token": "" }), Some(&cookie)).await;
+    assert_eq!(status, 200, "{body}");
+    assert!(!instancia::solo_lectura(&p.state.db).await);
 }

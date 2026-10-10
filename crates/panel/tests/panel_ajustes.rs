@@ -205,7 +205,7 @@ async fn confirmar_firmware_quita_solo_lectura() {
     assert!(!instancia::solo_lectura(&p.state.db).await);
     assert_eq!(
         instancia::leer(&p.state.db, claves::FIRMWARE_CONFIRMADO).await,
-        Some(json!(true))
+        Some(json!(instancia::FIRMWARES_PROBADOS[0]))
     );
     assert_eq!(
         ok(&p, "leer_panel", json!({}), &cookie).await["solo_lectura"],
@@ -433,4 +433,175 @@ async fn leer_panel_no_devuelve_contrasena() {
     let html = body_text(resp).await;
     assert!(!html.contains(PASS));
     assert!(html.contains("Ajustes del panel"), "{html}");
+}
+
+// ---- Ronda de correcciones 1
+
+/// Sondeo rápido sobre un cliente del router rápido (la página se rehace
+/// con él).
+fn sondeo_rapido(p: &mut Panel) {
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, USER, PASS);
+    cfg.timeout = Duration::from_millis(300);
+    cfg.min_gap = Duration::from_millis(1);
+    p.state.hgu = hgu::Client::new(cfg);
+    p.app = panel::build_router(p.state.clone());
+    panel::poller::Poller::spawn_with(
+        p.state.clone(),
+        panel::poller::PollerConfig {
+            fast: Duration::from_millis(50),
+            slow: Duration::from_millis(200),
+            backoff_max: Duration::from_millis(200),
+            ..panel::poller::PollerConfig::default()
+        },
+    );
+}
+
+async fn esperar_solo_lectura(p: &Panel, valor: bool) {
+    let start = Instant::now();
+    while instancia::solo_lectura(&p.state.db).await != valor {
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "solo lectura no pasa a {valor}"
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+}
+
+const SIN_PROBAR_A: &str = "ES_g99.00_RTF_TEF001_V99.00_V001";
+const SIN_PROBAR_B: &str = "ES_g99.01_RTF_TEF001_V99.01_V001";
+
+#[tokio::test]
+async fn firmware_confirmado_solo_vale_para_esa_version() {
+    let mut p = panel().await;
+    p.sim.control.set_firmware(SIN_PROBAR_A);
+    sondeo_rapido(&mut p);
+    let cookie = sesion(&p).await;
+    // El sondeo aplica la regla al leer el firmware.
+    esperar_solo_lectura(&p, true).await;
+    reautenticar(&p, &cookie).await;
+    ok(&p, "confirmar_firmware", json!({}), &cookie).await;
+    assert!(!instancia::solo_lectura(&p.state.db).await);
+    assert_eq!(
+        instancia::leer(&p.state.db, claves::FIRMWARE_CONFIRMADO).await,
+        Some(json!(SIN_PROBAR_A))
+    );
+    // Una actualización a otro firmware sin probar vuelve a solo lectura.
+    p.sim.control.set_firmware(SIN_PROBAR_B);
+    esperar_solo_lectura(&p, true).await;
+    // Y uno probado la quita.
+    p.sim
+        .control
+        .set_firmware(panel::instancia::FIRMWARES_PROBADOS[0]);
+    esperar_solo_lectura(&p, false).await;
+}
+
+/// Falla algún login del usuario del panel desde otra IP: el freno por
+/// usuario queda activo.
+async fn frenar_usuario(p: &Panel) {
+    let resp = send(
+        &p.app,
+        post_form(
+            "/api/login",
+            &login_body(PANEL_USER, "no es la buena"),
+            "192.168.1.60",
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), 401);
+}
+
+#[tokio::test]
+async fn cambiar_contrasena_propia_con_usuario_frenado() {
+    let p = panel().await;
+    let cookie = sesion(&p).await;
+    reautenticar(&p, &cookie).await;
+    frenar_usuario(&p).await;
+    let nueva = json!({ "usuario": PANEL_USER, "contrasena": "contraseña nueva y larga" });
+    let mut req = post_json("/api/cambiar_contrasena", &nueva.to_string(), "127.0.0.1");
+    req.headers_mut().insert("cookie", cookie.parse().unwrap());
+    let resp = send(&p.app, req).await;
+    assert_eq!(resp.status(), 200);
+    let nueva_cookie = set_cookie(&resp).split(';').next().unwrap().to_owned();
+    ok(&p, "leer_panel", json!({}), &nueva_cookie).await;
+}
+
+#[tokio::test]
+async fn contrasena_demasiado_larga() {
+    let p = panel().await;
+    let cookie = sesion(&p).await;
+    reautenticar(&p, &cookie).await;
+    let larga = "x".repeat(1025);
+    let (status, body) = llamar(
+        &p,
+        "crear_usuario",
+        json!({ "usuario": "otro", "contrasena": larga }),
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(status, 400, "{body}");
+    assert_eq!(usuarios(&p, &cookie).await, [PANEL_USER]);
+    let (status, body) = llamar(
+        &p,
+        "cambiar_contrasena",
+        json!({ "usuario": PANEL_USER, "contrasena": larga }),
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(status, 400, "{body}");
+    // Sigue entrando con la de antes, y con 1024 bytes justos se puede.
+    ok(&p, "leer_panel", json!({}), &cookie).await;
+    ok(
+        &p,
+        "crear_usuario",
+        json!({ "usuario": "otro", "contrasena": "x".repeat(1024) }),
+        &cookie,
+    )
+    .await;
+    let resp = send(
+        &p.app,
+        post_form(
+            "/api/login",
+            &login_body("otro", &"x".repeat(1024)),
+            "127.0.0.1",
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+}
+
+#[tokio::test]
+async fn cada_seccion_guarda_solo_lo_suyo() {
+    let p = panel().await;
+    let cookie = sesion(&p).await;
+    ok(
+        &p,
+        "guardar_instancia",
+        json!({ "campos": campos() }),
+        &cookie,
+    )
+    .await;
+    // «Privacidad e instancia» no manda la zona ni el idioma.
+    ok(
+        &p,
+        "guardar_instancia",
+        json!({ "campos": { "dns_preferidos": ["9.9.9.9"], "dispositivos_confianza": [],
+            "mantenimiento": "", "servidor_propio": "" } }),
+        &cookie,
+    )
+    .await;
+    let v = ok(&p, "leer_panel", json!({}), &cookie).await;
+    assert_eq!(v["zona_horaria"], "UTC+01:00");
+    assert_eq!(v["dns_preferidos"], json!(["9.9.9.9"]));
+    // «Panel» no manda los DNS.
+    ok(
+        &p,
+        "guardar_instancia",
+        json!({ "campos": { "idioma": "En", "zona_horaria": "UTC-03:00" } }),
+        &cookie,
+    )
+    .await;
+    let v = ok(&p, "leer_panel", json!({}), &cookie).await;
+    assert_eq!(v["zona_horaria"], "UTC-03:00");
+    assert_eq!(v["idioma"], "En");
+    assert_eq!(v["dns_preferidos"], json!(["9.9.9.9"]));
 }

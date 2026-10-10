@@ -84,15 +84,7 @@ pub fn PaginaPanel() -> impl IntoView {
 
 #[component]
 fn Ajustes(a: AjustesPanel) -> impl IntoView {
-    let campos = CamposInstancia {
-        idioma: a.idioma,
-        zona_horaria: a.zona_horaria.clone(),
-        dns_preferidos: a.dns_preferidos.clone(),
-        dispositivos_confianza: a.dispositivos_confianza.clone(),
-        mantenimiento: a.mantenimiento.clone(),
-        servidor_propio: a.servidor_propio.clone(),
-    };
-    let instancia = Instancia::new(campos);
+    let instancia = Instancia::new(&a);
     view! {
         <div class="ajustes-panel">
             <SeccionRouter
@@ -315,8 +307,8 @@ fn SeccionRouter(
 
 // ---- Parámetros de la instancia
 
-/// Parámetros de la instancia en edición: los guardan juntas las secciones
-/// «Panel» y «Privacidad e instancia».
+/// Parámetros de la instancia en edición. Cada sección guarda solo los
+/// suyos ([`Seccion`]): lo que se esté editando en la otra no se envía.
 #[derive(Clone, Copy)]
 struct Instancia {
     idioma: RwSignal<Idioma>,
@@ -325,7 +317,15 @@ struct Instancia {
     confianza: RwSignal<String>,
     mantenimiento: RwSignal<String>,
     servidor: RwSignal<String>,
-    pendiente: RwSignal<bool>,
+}
+
+/// Sección de la página que guarda parámetros de la instancia.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Seccion {
+    /// Idioma y zona horaria.
+    Panel,
+    /// DNS, dispositivos de confianza, mantenimiento y servidor propio.
+    Privacidad,
 }
 
 /// Lista escrita a mano: separada por comas, espacios o saltos de línea.
@@ -337,46 +337,70 @@ fn trocear(s: &str) -> Vec<String> {
 }
 
 impl Instancia {
-    fn new(c: CamposInstancia) -> Self {
+    fn new(a: &AjustesPanel) -> Self {
         Instancia {
-            idioma: RwSignal::new(c.idioma),
-            zona: RwSignal::new(c.zona_horaria),
-            dns: RwSignal::new(c.dns_preferidos.join(", ")),
-            confianza: RwSignal::new(c.dispositivos_confianza.join(", ")),
-            mantenimiento: RwSignal::new(c.mantenimiento.unwrap_or_default()),
-            servidor: RwSignal::new(c.servidor_propio.unwrap_or_default()),
-            pendiente: RwSignal::new(false),
+            idioma: RwSignal::new(a.idioma),
+            zona: RwSignal::new(a.zona_horaria.clone()),
+            dns: RwSignal::new(a.dns_preferidos.join(", ")),
+            confianza: RwSignal::new(a.dispositivos_confianza.join(", ")),
+            mantenimiento: RwSignal::new(a.mantenimiento.clone().unwrap_or_default()),
+            servidor: RwSignal::new(a.servidor_propio.clone().unwrap_or_default()),
         }
     }
 
+    /// Pone los valores ya normalizados que devolvió el servidor (solo los
+    /// que guardó).
     fn fijar(self, c: CamposInstancia) {
-        let n = Instancia::new(c);
-        self.idioma.set(n.idioma.get_untracked());
-        self.zona.set(n.zona.get_untracked());
-        self.dns.set(n.dns.get_untracked());
-        self.confianza.set(n.confianza.get_untracked());
-        self.mantenimiento.set(n.mantenimiento.get_untracked());
-        self.servidor.set(n.servidor.get_untracked());
-    }
-
-    fn campos(self) -> CamposInstancia {
-        let opcional = |s: String| Some(s).filter(|s| !s.trim().is_empty());
-        CamposInstancia {
-            idioma: self.idioma.get_untracked(),
-            zona_horaria: self.zona.get_untracked(),
-            dns_preferidos: trocear(&self.dns.get_untracked()),
-            dispositivos_confianza: trocear(&self.confianza.get_untracked()),
-            mantenimiento: opcional(self.mantenimiento.get_untracked()),
-            servidor_propio: opcional(self.servidor.get_untracked()),
+        if let Some(i) = c.idioma {
+            self.idioma.set(i);
+        }
+        if let Some(z) = c.zona_horaria {
+            self.zona.set(z);
+        }
+        if let Some(d) = c.dns_preferidos {
+            self.dns.set(d.join(", "));
+        }
+        if let Some(m) = c.dispositivos_confianza {
+            self.confianza.set(m.join(", "));
+        }
+        if let Some(m) = c.mantenimiento {
+            self.mantenimiento.set(m);
+        }
+        if let Some(v) = c.servidor_propio {
+            self.servidor.set(v);
         }
     }
 
-    /// Guarda todos los parámetros; el resultado, en `error` o `aviso`.
-    fn guardar(self, error: RwSignal<Option<String>>, aviso: RwSignal<Option<String>>) {
+    fn campos(self, seccion: Seccion) -> CamposInstancia {
+        match seccion {
+            Seccion::Panel => CamposInstancia {
+                idioma: Some(self.idioma.get_untracked()),
+                zona_horaria: Some(self.zona.get_untracked()),
+                ..CamposInstancia::default()
+            },
+            Seccion::Privacidad => CamposInstancia {
+                dns_preferidos: Some(trocear(&self.dns.get_untracked())),
+                dispositivos_confianza: Some(trocear(&self.confianza.get_untracked())),
+                mantenimiento: Some(self.mantenimiento.get_untracked()),
+                servidor_propio: Some(self.servidor.get_untracked()),
+                ..CamposInstancia::default()
+            },
+        }
+    }
+
+    /// Guarda los parámetros de `seccion`; el resultado, en `error` o
+    /// `aviso`.
+    fn guardar(
+        self,
+        seccion: Seccion,
+        pendiente: RwSignal<bool>,
+        error: RwSignal<Option<String>>,
+        aviso: RwSignal<Option<String>>,
+    ) {
         error.set(None);
         aviso.set(None);
-        self.pendiente.set(true);
-        let campos = self.campos();
+        pendiente.set(true);
+        let campos = self.campos(seccion);
         spawn_local(async move {
             match guardar_instancia(campos).await {
                 Ok(c) => {
@@ -385,7 +409,7 @@ impl Instancia {
                 }
                 Err(e) => error.set(Some(texto_error(&e))),
             }
-            self.pendiente.set(false);
+            pendiente.set(false);
         });
     }
 }
@@ -394,9 +418,10 @@ impl Instancia {
 fn SeccionPanel(instancia: Instancia) -> impl IntoView {
     let error = RwSignal::new(None::<String>);
     let aviso = RwSignal::new(None::<String>);
+    let pendiente = RwSignal::new(false);
     let enviar = move |ev: SubmitEvent| {
         ev.prevent_default();
-        instancia.guardar(error, aviso);
+        instancia.guardar(Seccion::Panel, pendiente, error, aviso);
     };
     let idiomas = Idioma::TODOS
         .into_iter()
@@ -449,7 +474,7 @@ fn SeccionPanel(instancia: Instancia) -> impl IntoView {
                 </p>
                 {mensajes(error, aviso)}
                 <div class="botones">
-                    <button class="boton" type="submit" disabled=move || instancia.pendiente.get()>
+                    <button class="boton" type="submit" disabled=move || pendiente.get()>
                         {t!("panel-guardar")}
                     </button>
                 </div>
@@ -484,9 +509,10 @@ fn sugerencias_dns() -> [(String, String, String); 3] {
 fn SeccionPrivacidad(instancia: Instancia, equipos: Vec<EquipoLan>) -> impl IntoView {
     let error = RwSignal::new(None::<String>);
     let aviso = RwSignal::new(None::<String>);
+    let pendiente = RwSignal::new(false);
     let enviar = move |ev: SubmitEvent| {
         ev.prevent_default();
-        instancia.guardar(error, aviso);
+        instancia.guardar(Seccion::Privacidad, pendiente, error, aviso);
     };
     let sugerencias = sugerencias_dns()
         .into_iter()
@@ -593,7 +619,7 @@ fn SeccionPrivacidad(instancia: Instancia, equipos: Vec<EquipoLan>) -> impl Into
                 )}
                 {mensajes(error, aviso)}
                 <div class="botones">
-                    <button class="boton" type="submit" disabled=move || instancia.pendiente.get()>
+                    <button class="boton" type="submit" disabled=move || pendiente.get()>
                         {t!("panel-guardar")}
                     </button>
                 </div>
@@ -869,7 +895,10 @@ fn DialogoReautenticar() -> impl IntoView {
             node_ref=dlg
             aria-labelledby="reautenticar-titulo"
             aria-modal="true"
-            on:close=move |_| reauth.abierto.set(false)
+            on:close=move |_| {
+                reauth.abierto.set(false);
+                reauth.pendiente.set_value(None);
+            }
         >
             <form class="dialogo-cuerpo" on:submit=enviar>
                 <header class="dialogo-cabecera">

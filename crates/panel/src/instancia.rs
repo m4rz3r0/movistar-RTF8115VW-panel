@@ -15,6 +15,8 @@ pub mod claves {
     pub const DISPOSITIVOS_CONFIANZA: &str = "dispositivos_confianza";
     pub const MANTENIMIENTO: &str = "mantenimiento";
     pub const SERVIDOR_PROPIO: &str = "servidor_propio";
+    /// Versión de firmware (`SWVersion`) que el usuario confirmó aunque no
+    /// esté probada.
     pub const FIRMWARE_CONFIRMADO: &str = "firmware_confirmado";
 }
 
@@ -165,12 +167,20 @@ pub fn firmware_probado(firmware: &str) -> bool {
     FIRMWARES_PROBADOS.contains(&firmware)
 }
 
-/// Fija el modo de escritura según el firmware del router: con uno no
-/// probado y sin [`claves::FIRMWARE_CONFIRMADO`], solo lectura; si no, se
-/// quita. Devuelve si el firmware está probado.
+/// Fija el modo de escritura según el firmware del router: solo lectura si
+/// no es uno de [`FIRMWARES_PROBADOS`] ni el confirmado
+/// ([`claves::FIRMWARE_CONFIRMADO`] guarda la versión que se confirmó: otra
+/// sin probar vuelve a solo lectura). Devuelve si el firmware está probado.
+/// La aplican el asistente al guardar el router y el sondeo cada vez que lee
+/// un firmware distinto.
 pub async fn fijar_modo_firmware(db: &SqlitePool, firmware: &str) -> Result<bool, String> {
     let probado = firmware_probado(firmware);
-    let confirmado = leer(db, claves::FIRMWARE_CONFIRMADO).await == Some(Value::Bool(true));
+    let confirmado = !firmware.is_empty()
+        && leer(db, claves::FIRMWARE_CONFIRMADO)
+            .await
+            .as_ref()
+            .and_then(Value::as_str)
+            == Some(firmware);
     escribir(
         db,
         claves::SOLO_LECTURA,

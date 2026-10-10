@@ -53,6 +53,7 @@ instalar-error-terminada = La instalación ya está hecha
 instalar-error-red = El asistente de instalación solo responde desde la red local
 instalar-error-usuario = Nombre de usuario no válido: de 1 a 64 caracteres, sin espacios
 instalar-error-contrasena-corta = La contraseña debe tener al menos { $n } caracteres
+instalar-error-contrasena-larga = La contraseña es demasiado larga: como mucho { $n } bytes
 instalar-error-url = Dirección no válida: escribe algo como http://192.168.1.1
 instalar-error-faltan = Faltan el usuario o la contraseña del router
 instalar-error-router = No se puede entrar en el router: { $error }

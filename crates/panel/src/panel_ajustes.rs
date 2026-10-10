@@ -56,14 +56,22 @@ pub struct AjustesPanel {
     pub yo: String,
 }
 
-/// Parámetros de la instancia que se editan juntos.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// Parámetros de la instancia que se guardan: solo los presentes (`Some`);
+/// cada sección de la página manda los suyos. En `mantenimiento` y
+/// `servidor_propio`, vacío quita el valor.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CamposInstancia {
-    pub idioma: Idioma,
-    pub zona_horaria: String,
-    pub dns_preferidos: Vec<String>,
-    pub dispositivos_confianza: Vec<String>,
+    #[serde(default)]
+    pub idioma: Option<Idioma>,
+    #[serde(default)]
+    pub zona_horaria: Option<String>,
+    #[serde(default)]
+    pub dns_preferidos: Option<Vec<String>>,
+    #[serde(default)]
+    pub dispositivos_confianza: Option<Vec<String>>,
+    #[serde(default)]
     pub mantenimiento: Option<String>,
+    #[serde(default)]
     pub servidor_propio: Option<String>,
 }
 
@@ -78,18 +86,48 @@ pub enum ErrorInstancia {
     ServidorPropio,
 }
 
-/// Valida y normaliza los parámetros: DNS como direcciones IPv4/IPv6 (como
-/// mucho [`MAX_DNS`]), MACs en minúsculas `aa:bb:cc:dd:ee:ff`, mantenimiento
-/// `HH:MM-HH:MM`, zona horaria `UTC` o `UTC±HH:MM` y servidor propio IP o
-/// nombre. Quita espacios y repetidos; vacío es «sin valor».
+/// Valida y normaliza los parámetros presentes: DNS como direcciones
+/// IPv4/IPv6 (como mucho [`MAX_DNS`]), MACs en minúsculas
+/// `aa:bb:cc:dd:ee:ff`, mantenimiento `HH:MM-HH:MM`, zona horaria `UTC` o
+/// `UTC±HH:MM` y servidor propio IP o nombre. Quita espacios y repetidos;
+/// vacío es «sin valor» (en la zona, `UTC`).
 pub fn normalizar(c: CamposInstancia) -> Result<CamposInstancia, ErrorInstancia> {
+    Ok(CamposInstancia {
+        idioma: c.idioma,
+        zona_horaria: c.zona_horaria.map(|z| normalizar_zona(&z)).transpose()?,
+        dns_preferidos: c.dns_preferidos.map(|d| normalizar_dns(&d)).transpose()?,
+        dispositivos_confianza: c
+            .dispositivos_confianza
+            .map(|m| normalizar_macs(&m))
+            .transpose()?,
+        mantenimiento: c
+            .mantenimiento
+            .map(|m| {
+                let m = m.trim();
+                if m.is_empty() || franja_valida(m) {
+                    Ok(m.to_owned())
+                } else {
+                    Err(ErrorInstancia::Mantenimiento)
+                }
+            })
+            .transpose()?,
+        servidor_propio: c
+            .servidor_propio
+            .map(|v| {
+                let v = v.trim();
+                if v.is_empty() || v.parse::<IpAddr>().is_ok() || nombre_valido(v) {
+                    Ok(v.to_owned())
+                } else {
+                    Err(ErrorInstancia::ServidorPropio)
+                }
+            })
+            .transpose()?,
+    })
+}
+
+fn normalizar_dns(l: &[String]) -> Result<Vec<String>, ErrorInstancia> {
     let mut dns: Vec<String> = Vec::new();
-    for d in c
-        .dns_preferidos
-        .iter()
-        .map(|d| d.trim())
-        .filter(|d| !d.is_empty())
-    {
+    for d in l.iter().map(|d| d.trim()).filter(|d| !d.is_empty()) {
         let ip: IpAddr = d.parse().map_err(|_| ErrorInstancia::Dns(d.to_owned()))?;
         let ip = ip.to_string();
         if !dns.contains(&ip) {
@@ -99,49 +137,29 @@ pub fn normalizar(c: CamposInstancia) -> Result<CamposInstancia, ErrorInstancia>
     if dns.len() > MAX_DNS {
         return Err(ErrorInstancia::DemasiadosDns);
     }
+    Ok(dns)
+}
+
+fn normalizar_macs(l: &[String]) -> Result<Vec<String>, ErrorInstancia> {
     let mut macs: Vec<String> = Vec::new();
-    for m in c
-        .dispositivos_confianza
-        .iter()
-        .map(|m| m.trim())
-        .filter(|m| !m.is_empty())
-    {
+    for m in l.iter().map(|m| m.trim()).filter(|m| !m.is_empty()) {
         let mac = normalizar_mac(m).ok_or_else(|| ErrorInstancia::Mac(m.to_owned()))?;
         if !macs.contains(&mac) {
             macs.push(mac);
         }
     }
-    let mantenimiento = no_vacio(c.mantenimiento);
-    if mantenimiento.as_deref().is_some_and(|m| !franja_valida(m)) {
-        return Err(ErrorInstancia::Mantenimiento);
-    }
-    let zona = c.zona_horaria.trim();
-    let zona = if zona.is_empty() {
-        ZONA_POR_DEFECTO.to_owned()
-    } else if zona_valida(zona) {
-        zona.to_owned()
-    } else {
-        return Err(ErrorInstancia::ZonaHoraria);
-    };
-    let servidor_propio = no_vacio(c.servidor_propio);
-    if servidor_propio
-        .as_deref()
-        .is_some_and(|s| s.parse::<IpAddr>().is_err() && !nombre_valido(s))
-    {
-        return Err(ErrorInstancia::ServidorPropio);
-    }
-    Ok(CamposInstancia {
-        idioma: c.idioma,
-        zona_horaria: zona,
-        dns_preferidos: dns,
-        dispositivos_confianza: macs,
-        mantenimiento,
-        servidor_propio,
-    })
+    Ok(macs)
 }
 
-fn no_vacio(s: Option<String>) -> Option<String> {
-    s.map(|s| s.trim().to_owned()).filter(|s| !s.is_empty())
+fn normalizar_zona(z: &str) -> Result<String, ErrorInstancia> {
+    let z = z.trim();
+    if z.is_empty() {
+        Ok(ZONA_POR_DEFECTO.to_owned())
+    } else if zona_valida(z) {
+        Ok(z.to_owned())
+    } else {
+        Err(ErrorInstancia::ZonaHoraria)
+    }
 }
 
 /// MAC con `:`, `-`, `.` o sin separadores, en minúsculas y con `:`.
@@ -419,21 +437,33 @@ mod servidor {
             };
             fallo(StatusCode::BAD_REQUEST, msg)
         })?;
-        let opcional = |v: &Option<String>| v.clone().map_or(Value::Null, Value::String);
-        let valores = [
-            (
-                claves::IDIOMA,
-                serde_json::to_value(c.idioma).map_err(interno)?,
-            ),
-            (claves::ZONA_HORARIA, Value::String(c.zona_horaria.clone())),
-            (claves::DNS_PREFERIDOS, serde_json::json!(c.dns_preferidos)),
-            (
-                claves::DISPOSITIVOS_CONFIANZA,
-                serde_json::json!(c.dispositivos_confianza),
-            ),
-            (claves::MANTENIMIENTO, opcional(&c.mantenimiento)),
-            (claves::SERVIDOR_PROPIO, opcional(&c.servidor_propio)),
-        ];
+        // Solo lo que llegó: lo que no, queda como estaba.
+        let texto = |v: &str| {
+            if v.is_empty() {
+                Value::Null
+            } else {
+                Value::String(v.to_owned())
+            }
+        };
+        let mut valores: Vec<(&str, Value)> = Vec::new();
+        if let Some(i) = c.idioma {
+            valores.push((claves::IDIOMA, serde_json::to_value(i).map_err(interno)?));
+        }
+        if let Some(z) = &c.zona_horaria {
+            valores.push((claves::ZONA_HORARIA, Value::String(z.clone())));
+        }
+        if let Some(d) = &c.dns_preferidos {
+            valores.push((claves::DNS_PREFERIDOS, serde_json::json!(d)));
+        }
+        if let Some(m) = &c.dispositivos_confianza {
+            valores.push((claves::DISPOSITIVOS_CONFIANZA, serde_json::json!(m)));
+        }
+        if let Some(m) = &c.mantenimiento {
+            valores.push((claves::MANTENIMIENTO, texto(m)));
+        }
+        if let Some(v) = &c.servidor_propio {
+            valores.push((claves::SERVIDOR_PROPIO, texto(v)));
+        }
         instancia::escribir_varios(&state.db, &valores)
             .await
             .map_err(interno)?;
@@ -443,16 +473,32 @@ mod servidor {
 
     pub(super) async fn confirmar_firmware() -> Result<(), ServerFnError> {
         let (state, _) = preparar_delicada().await?;
+        // La versión que tiene ahora el router: solo esa queda confirmada.
+        let firmware = hgu::read::summary(&state.hgu)
+            .await
+            .map_err(|e| {
+                fallo(
+                    StatusCode::BAD_GATEWAY,
+                    t!("instalar-error-router", error = e.to_string()),
+                )
+            })?
+            .firmware;
+        if firmware.is_empty() {
+            return Err(fallo(
+                StatusCode::BAD_GATEWAY,
+                t!("instalar-error-router", error = "SWVersion"),
+            ));
+        }
         instancia::escribir_varios(
             &state.db,
             &[
-                (claves::FIRMWARE_CONFIRMADO, Value::Bool(true)),
+                (claves::FIRMWARE_CONFIRMADO, Value::String(firmware.clone())),
                 (claves::SOLO_LECTURA, Value::Bool(false)),
             ],
         )
         .await
         .map_err(interno)?;
-        tracing::info!("firmware del router confirmado: fuera el modo solo lectura");
+        tracing::info!("firmware del router {firmware} confirmado: fuera el modo solo lectura");
         Ok(())
     }
 
@@ -466,6 +512,13 @@ mod servidor {
                 t!(
                     "instalar-error-contrasena-corta",
                     n = auth::MIN_PASSWORD_CHARS
+                ),
+            ),
+            UserError::PasswordTooLong => fallo(
+                StatusCode::BAD_REQUEST,
+                t!(
+                    "instalar-error-contrasena-larga",
+                    n = auth::MAX_PASSWORD_BYTES
                 ),
             ),
             UserError::Exists => fallo(StatusCode::CONFLICT, t!("panel-error-usuario-existe")),
@@ -503,26 +556,22 @@ mod servidor {
         usuario: String,
         contrasena: String,
     ) -> Result<(), ServerFnError> {
-        use axum::extract::ConnectInfo;
-        use std::net::SocketAddr;
         let (state, yo) = preparar_delicada().await?;
-        auth::set_password(&state.db, &usuario, &contrasena)
-            .await
-            .map_err(error_usuario)?;
+        if usuario == yo.username {
+            // Ya autenticado: sesión nueva sin pasar por el freno del login
+            // (un usuario frenado por otros no se queda fuera).
+            let id = auth::change_own_password(&state.db, &yo, &contrasena)
+                .await
+                .map_err(error_usuario)?;
+            auth::poner_cookie_de_sesion(&id);
+        } else {
+            auth::set_password(&state.db, &usuario, &contrasena)
+                .await
+                .map_err(error_usuario)?;
+        }
         tracing::info!(
             "contraseña del usuario del panel {usuario} cambiada; sus sesiones, cerradas"
         );
-        if usuario == yo.username {
-            // Su propia sesión se acaba de cerrar: otra nueva, con la
-            // contraseña nueva (pasa por el freno como un login).
-            let ConnectInfo(peer) = leptos_axum::extract::<ConnectInfo<SocketAddr>>().await?;
-            let headers: axum::http::HeaderMap = leptos_axum::extract().await?;
-            let ip = auth::client_ip(peer.ip(), &headers, state.cfg.trusted_proxy);
-            let id = auth::attempt_login(&state, ip, &usuario, &contrasena)
-                .await
-                .map_err(|e| interno(format!("{e:?}")))?;
-            auth::poner_cookie_de_sesion(&id);
-        }
         Ok(())
     }
 }
@@ -532,14 +581,7 @@ mod tests {
     use super::*;
 
     fn campos() -> CamposInstancia {
-        CamposInstancia {
-            idioma: Idioma::Es,
-            zona_horaria: String::new(),
-            dns_preferidos: Vec::new(),
-            dispositivos_confianza: Vec::new(),
-            mantenimiento: None,
-            servidor_propio: None,
-        }
+        CamposInstancia::default()
     }
 
     #[test]
@@ -615,37 +657,57 @@ mod tests {
 
     #[test]
     fn normaliza_y_valida() {
-        let mut c = campos();
-        c.dns_preferidos = vec![
-            " 9.9.9.9 ".into(),
-            "".into(),
-            "9.9.9.9".into(),
-            "2620:FE::FE".into(),
-        ];
-        c.servidor_propio = Some(" nas.lan ".into());
-        c.mantenimiento = Some(" ".into());
+        let c = CamposInstancia {
+            zona_horaria: Some(" ".into()),
+            dns_preferidos: Some(vec![
+                " 9.9.9.9 ".into(),
+                "".into(),
+                "9.9.9.9".into(),
+                "2620:FE::FE".into(),
+            ]),
+            servidor_propio: Some(" nas.lan ".into()),
+            mantenimiento: Some(" ".into()),
+            ..campos()
+        };
         let n = normalizar(c).unwrap();
-        assert_eq!(n.dns_preferidos, ["9.9.9.9", "2620:fe::fe"]);
-        assert_eq!(n.zona_horaria, "UTC");
+        assert_eq!(
+            n.dns_preferidos.as_deref(),
+            Some(&["9.9.9.9".to_owned(), "2620:fe::fe".to_owned()][..])
+        );
+        assert_eq!(n.zona_horaria.as_deref(), Some("UTC"));
         assert_eq!(n.servidor_propio.as_deref(), Some("nas.lan"));
-        assert_eq!(n.mantenimiento, None);
+        assert_eq!(n.mantenimiento.as_deref(), Some(""), "vacío: quitar");
+        // Lo que no llega sigue sin llegar.
+        assert_eq!(n.idioma, None);
+        assert_eq!(n.dispositivos_confianza, None);
+        assert_eq!(normalizar(campos()), Ok(campos()));
 
-        let mut c = campos();
-        c.dns_preferidos = vec![
-            "1.1.1.1".into(),
-            "1.0.0.1".into(),
-            "9.9.9.9".into(),
-            "149.112.112.112".into(),
-            "194.242.2.2".into(),
-        ];
+        let c = CamposInstancia {
+            dns_preferidos: Some(
+                [
+                    "1.1.1.1",
+                    "1.0.0.1",
+                    "9.9.9.9",
+                    "149.112.112.112",
+                    "194.242.2.2",
+                ]
+                .map(String::from)
+                .to_vec(),
+            ),
+            ..campos()
+        };
         assert_eq!(normalizar(c), Err(ErrorInstancia::DemasiadosDns));
         for s in ["-nas.lan", "nas..lan", "http://nas", "nas lan"] {
-            let mut c = campos();
-            c.servidor_propio = Some(s.into());
+            let c = CamposInstancia {
+                servidor_propio: Some(s.into()),
+                ..campos()
+            };
             assert_eq!(normalizar(c), Err(ErrorInstancia::ServidorPropio), "{s}");
         }
-        let mut c = campos();
-        c.servidor_propio = Some("192.0.2.10".into());
+        let c = CamposInstancia {
+            servidor_propio: Some("192.0.2.10".into()),
+            ..campos()
+        };
         assert!(normalizar(c).is_ok());
     }
 }

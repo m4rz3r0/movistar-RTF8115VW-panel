@@ -26,6 +26,7 @@
 //! [`PauseGuard`] devuelta, el sondeo no hace peticiones al router.
 
 use crate::{
+    instancia,
     series::{self, Sample},
     state::AppState,
 };
@@ -318,6 +319,8 @@ pub struct Poller {
     prev: Option<LanBytes>,
     last_slow: Option<Instant>,
     last_compact: Option<Instant>,
+    /// Firmware con el que se fijó el modo solo lectura por última vez.
+    firmware: Option<String>,
 }
 
 /// Espera hasta el siguiente ciclo.
@@ -392,6 +395,7 @@ impl Poller {
             prev: None,
             last_slow: None,
             last_compact: None,
+            firmware: None,
         }
     }
 
@@ -535,7 +539,33 @@ impl Poller {
     }
 
     /// Actualiza la instantánea y guarda la muestra y el estado de la WAN.
+    /// El modo solo lectura sigue al firmware que se lee: se fija con la
+    /// primera lectura y cada vez que cambia (actualización del router), con
+    /// la misma regla que el asistente ([`instancia::fijar_modo_firmware`]).
+    async fn seguir_firmware(&mut self, firmware: &str) {
+        if firmware.is_empty() || self.firmware.as_deref() == Some(firmware) {
+            return;
+        }
+        match instancia::fijar_modo_firmware(&self.state.db, firmware).await {
+            Ok(probado) => {
+                if self.firmware.is_some() || !probado {
+                    tracing::info!(
+                        "firmware del router: {firmware}{}",
+                        if probado {
+                            " (probado)"
+                        } else {
+                            " (sin probar)"
+                        }
+                    );
+                }
+                self.firmware = Some(firmware.to_owned());
+            }
+            Err(e) => tracing::error!("no se puede fijar el modo según el firmware: {e}"),
+        }
+    }
+
     async fn store(&mut self, now: i64, r: Reading) {
+        self.seguir_firmware(&r.summary.firmware).await;
         let wan_up = r.wan.iter().any(|w| w.name == WAN && w.up);
         let bytes = lan_bytes(r.counters_ms, &r.counters);
         // Tras un hueco (pausa larga) no se promedia sobre él.

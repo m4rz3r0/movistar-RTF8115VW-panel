@@ -351,6 +351,13 @@ pub(crate) mod servidor {
                             n = auth::MIN_PASSWORD_CHARS
                         ),
                     ),
+                    auth::UserError::PasswordTooLong => fallo(
+                        StatusCode::BAD_REQUEST,
+                        t!(
+                            "instalar-error-contrasena-larga",
+                            n = auth::MAX_PASSWORD_BYTES
+                        ),
+                    ),
                     e => interno(e),
                 })?;
             fase.token = None;
@@ -541,11 +548,23 @@ pub(crate) mod servidor {
             return Ok(resumen);
         }
         // El modo según el firmware que se acaba de leer: el router pudo
-        // configurarse sin pasar por `guardar` (importado del entorno). Sin
-        // resumen, el firmware es desconocido: como uno no probado.
-        instancia::fijar_modo_firmware(&state.db, &firmware)
-            .await
-            .map_err(interno)?;
+        // configurarse sin pasar por `guardar` (importado del entorno). Si el
+        // resumen no llegó, se reintenta una vez; si tampoco, no se adivina:
+        // lo decide el sondeo en cuanto lo lea (misma regla).
+        if firmware.is_empty() {
+            match hgu::read::summary(&state.hgu).await {
+                Ok(s) => firmware = s.firmware,
+                Err(e) => tracing::warn!(
+                    "lectura inicial: sin resumen del router ({e}); el modo solo lectura lo \
+                     fijará el sondeo"
+                ),
+            }
+        }
+        if !firmware.is_empty() {
+            instancia::fijar_modo_firmware(&state.db, &firmware)
+                .await
+                .map_err(interno)?;
+        }
         let id = fotos::guardar(&state.db, &state.history_key, TipoFoto::Partida, &foto)
             .await
             .map_err(interno)?;

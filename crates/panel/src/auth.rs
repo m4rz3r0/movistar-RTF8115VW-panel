@@ -10,10 +10,10 @@ use leptos::prelude::*;
 
 #[cfg(feature = "ssr")]
 pub use server::{
-    AuthUser, LoginError, MIN_PASSWORD_CHARS, REAUTH_SECS, SESSION_COOKIE, User, UserError,
-    attempt_login, client_ip, create_user, delay_secs, delete_user, hash_password,
-    poner_cookie_de_sesion, reautenticar_sesion, reauthenticate, require_page_session,
-    require_reauth, require_user, set_password, verify, warm_up,
+    AuthUser, LoginError, MAX_PASSWORD_BYTES, MIN_PASSWORD_CHARS, REAUTH_SECS, SESSION_COOKIE,
+    User, UserError, attempt_login, change_own_password, client_ip, create_user, delay_secs,
+    delete_user, hash_password, poner_cookie_de_sesion, reautenticar_sesion, reauthenticate,
+    require_page_session, require_reauth, require_user, set_password, verify, warm_up,
 };
 
 /// Mensaje de error de las server functions sin sesión vigente (con estado
@@ -93,9 +93,10 @@ mod server {
     pub const SESSION_COOKIE: &str = "__Host-rp_session";
     /// Longitud mínima de la contraseña del panel, en caracteres.
     pub const MIN_PASSWORD_CHARS: usize = 12;
-    /// Longitud máxima de la contraseña en el login, en bytes: más larga es un
-    /// fallo normal, sin gastar Argon2.
-    const MAX_LOGIN_PASSWORD_BYTES: usize = 1024;
+    /// Longitud máxima de la contraseña, en bytes: no se admite al darla de
+    /// alta o cambiarla, y en el login más larga es un fallo normal, sin
+    /// gastar Argon2.
+    pub const MAX_PASSWORD_BYTES: usize = 1024;
     /// Longitud máxima del nombre de usuario, en caracteres.
     const MAX_USERNAME_CHARS: usize = 64;
     /// Caducidad por inactividad.
@@ -176,6 +177,8 @@ mod server {
     pub enum UserError {
         InvalidUsername,
         PasswordTooShort,
+        /// Más de [`MAX_PASSWORD_BYTES`] bytes: el login no la aceptaría.
+        PasswordTooLong,
         Exists,
         NotFound,
         /// No se borra el último usuario.
@@ -195,6 +198,10 @@ mod server {
                 UserError::PasswordTooShort => write!(
                     f,
                     "la contraseña debe tener al menos {MIN_PASSWORD_CHARS} caracteres"
+                ),
+                UserError::PasswordTooLong => write!(
+                    f,
+                    "la contraseña puede tener como mucho {MAX_PASSWORD_BYTES} bytes"
                 ),
                 UserError::Exists => write!(f, "el usuario ya existe"),
                 UserError::NotFound => write!(f, "el usuario no existe"),
@@ -230,6 +237,9 @@ mod server {
         if password.chars().count() < MIN_PASSWORD_CHARS {
             return Err(UserError::PasswordTooShort);
         }
+        if password.len() > MAX_PASSWORD_BYTES {
+            return Err(UserError::PasswordTooLong);
+        }
         Ok(())
     }
 
@@ -262,6 +272,31 @@ mod server {
         username: &str,
         password: &str,
     ) -> Result<(), UserError> {
+        change_password(db, username, password, false)
+            .await
+            .map(drop)
+    }
+
+    /// Cambia la contraseña del propio usuario `user` (ya autenticado), cierra
+    /// todas sus sesiones y abre otra nueva, todo en una transacción y sin
+    /// pasar por el freno del login. Devuelve el id de la sesión nueva (para
+    /// [`poner_cookie_de_sesion`]).
+    pub async fn change_own_password(
+        db: &SqlitePool,
+        user: &User,
+        password: &str,
+    ) -> Result<String, UserError> {
+        change_password(db, &user.username, password, true)
+            .await
+            .map(|id| id.expect("se pidió una sesión nueva"))
+    }
+
+    async fn change_password(
+        db: &SqlitePool,
+        username: &str,
+        password: &str,
+        new_session: bool,
+    ) -> Result<Option<String>, UserError> {
         check_password(password)?;
         let hash = hash_blocking(password).await;
         let mut tx = db.begin().await?;
@@ -277,8 +312,24 @@ mod server {
             .bind(id)
             .execute(&mut *tx)
             .await?;
+        let session = if new_session {
+            let sid = new_session_id();
+            let now = now_secs();
+            sqlx::query(
+                "INSERT INTO sessions (id, user_id, created, last_seen) VALUES (?, ?, ?, ?)",
+            )
+            .bind(session_key(&sid))
+            .bind(id)
+            .bind(now)
+            .bind(now)
+            .execute(&mut *tx)
+            .await?;
+            Some(sid)
+        } else {
+            None
+        };
         tx.commit().await?;
-        Ok(())
+        Ok(session)
     }
 
     /// Borra `username` (y con él sus sesiones), salvo que sea `actual` (el
@@ -583,7 +634,7 @@ mod server {
             return Err(LoginError::Throttled((wait + 999) / 1000));
         }
 
-        if password.len() > MAX_LOGIN_PASSWORD_BYTES {
+        if password.len() > MAX_PASSWORD_BYTES {
             record_failure(db, &ip_key, &user_key).await?;
             return Err(LoginError::BadCredentials);
         }

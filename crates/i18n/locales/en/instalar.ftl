@@ -53,6 +53,7 @@ instalar-error-terminada = Setup is already done
 instalar-error-red = The setup wizard only answers from the local network
 instalar-error-usuario = Invalid username: 1 to 64 characters, no spaces
 instalar-error-contrasena-corta = The password must be at least { $n } characters long
+instalar-error-contrasena-larga = The password is too long: at most { $n } bytes
 instalar-error-url = Invalid address: type something like http://192.168.1.1
 instalar-error-faltan = The router username or password is missing
 instalar-error-router = Cannot sign in to the router: { $error }
