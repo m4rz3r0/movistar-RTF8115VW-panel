@@ -32,6 +32,10 @@ struct Fake {
     always_logout: std::sync::atomic::AtomicBool,
     valid_sid: Mutex<Option<String>>,
     last_write: Mutex<Option<HashMap<String, String>>>,
+    /// Con esto, cada inicio de sesión avanzado cambia el `sessionKey` de las
+    /// páginas (como el router: la clave vieja deja de valer).
+    rotate_key_on_login: std::sync::atomic::AtomicBool,
+    key: Mutex<Option<String>>,
     cookies_seen: Mutex<Vec<String>>,
 }
 
@@ -95,6 +99,9 @@ async fn adv_login(State(s): State<S>, body: Bytes) -> String {
     if f["rqUsername"] == mess_userpass(USER) && f["rqPasswd"] == mess_userpass(PASS) {
         let sid = format!("sid{n}");
         *s.valid_sid.lock().unwrap() = Some(sid.clone());
+        if s.rotate_key_on_login.load(Ordering::SeqCst) {
+            *s.key.lock().unwrap() = Some(format!("k{n}"));
+        }
         format!(
             "<Response><cbCheckLogin><Result>0</Result><SessionID>{sid}</SessionID></cbCheckLogin></Response>"
         )
@@ -142,7 +149,8 @@ async fn api(
                 .into()
         }
         "cbSet" => {
-            if f.get("sessionKey").map(String::as_str) != Some("42") {
+            let key = s.key.lock().unwrap().clone().unwrap_or_else(|| "42".into());
+            if f.get("sessionKey") != Some(&key) {
                 return "<Response><cbSet><Result>1</Result><ErrorString>clave</ErrorString></cbSet></Response>"
                     .into();
             }
@@ -163,8 +171,9 @@ async fn basic_cgi(Path(name): Path<String>) -> axum::response::Response {
     }
 }
 
-async fn dhcp_page() -> &'static str {
-    "<html><script>\nvar sessionKey='42';\n</script></html>"
+async fn dhcp_page(State(s): State<S>) -> String {
+    let key = s.key.lock().unwrap().clone().unwrap_or_else(|| "42".into());
+    format!("<html><script>\nvar sessionKey='{key}';\n</script></html>")
 }
 
 async fn start() -> (String, S) {
@@ -270,6 +279,25 @@ async fn write_sends_session_key_from_page() {
     let w = s.last_write.lock().unwrap().clone().unwrap();
     assert_eq!(w["sessionKey"], "42");
     assert_eq!(w["x"], "1");
+}
+
+#[tokio::test]
+async fn write_after_session_expired_uses_a_fresh_session_key() {
+    let (url, s) = start().await;
+    s.rotate_key_on_login.store(true, Ordering::SeqCst);
+    let c = client(&url, PASS);
+    c.write("dhcp.asp", "cbSet", &[("x", "1")]).await.unwrap();
+    assert_eq!(
+        s.last_write.lock().unwrap().as_ref().unwrap()["sessionKey"],
+        "k1"
+    );
+    // Alguien entra en la web del router: la sesión avanzada del cliente
+    // caduca y, al volver a entrar, la clave de la página es otra.
+    *s.valid_sid.lock().unwrap() = None;
+    c.write("dhcp.asp", "cbSet", &[("x", "2")]).await.unwrap();
+    let w = s.last_write.lock().unwrap().clone().unwrap();
+    assert_eq!((w["sessionKey"].as_str(), w["x"].as_str()), ("k2", "2"));
+    assert_eq!(s.adv_logins.load(Ordering::SeqCst), 2);
 }
 
 #[tokio::test]

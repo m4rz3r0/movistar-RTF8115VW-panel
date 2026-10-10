@@ -138,7 +138,10 @@ impl Client {
         self.session_key_locked(&mut st, page).await
     }
 
-    /// Escritura: obtiene el `sessionKey` de `page` y llama a `name` con él.
+    /// Escritura: obtiene el `sessionKey` de `page` (ya con la sesión
+    /// avanzada abierta) y llama a `name` con él. Si la sesión había
+    /// caducado, entra de nuevo y repite una vez con un `sessionKey` nuevo:
+    /// el de antes no vale en la sesión nueva.
     pub async fn write(
         &self,
         page: &str,
@@ -146,10 +149,22 @@ impl Client {
         params: &[(&str, &str)],
     ) -> Result<XmlNode, Error> {
         let mut st = self.shared.state.lock().await;
-        let key = self.session_key_locked(&mut st, page).await?;
-        let mut all: Vec<(&str, &str)> = params.to_vec();
-        all.push(("sessionKey", &key));
-        self.call_locked(&mut st, name, &all).await
+        for attempt in 0..2 {
+            if !self.ensure_advanced(&mut st).await? {
+                tracing::debug!("{name}: sesión básica caducada (intento {attempt})");
+                continue;
+            }
+            let key = self.session_key_locked(&mut st, page).await?;
+            let mut all: Vec<(&str, &str)> = params.to_vec();
+            all.push(("sessionKey", &key));
+            if let Some(node) = self.call_once(&mut st, name, &all).await? {
+                return Ok(node);
+            }
+            tracing::debug!("{name}: sesión caducada (intento {attempt})");
+        }
+        Err(Error::SessionExpired(format!(
+            "{name}: el router sigue pidiendo iniciar sesión"
+        )))
     }
 
     /// Escritura de la UI básica: obtiene el `sessionKey` de `page` y hace
@@ -223,40 +238,50 @@ impl Client {
         name: &str,
         params: &[(&str, &str)],
     ) -> Result<XmlNode, Error> {
-        let path = format!("/cgi-bin/{name}.xml");
-        let body = form_body(params);
         for attempt in 0..2 {
             if !self.ensure_advanced(st).await? {
                 tracing::debug!("{name}: sesión básica caducada (intento {attempt})");
                 continue;
             }
-            let raw = self
-                .send(st, Method::POST, &path, Some(body.clone()))
-                .await?;
-            if looks_logged_out(&raw) {
-                tracing::debug!("{name}: sesión caducada (intento {attempt})");
-                Self::invalidate(st);
-                continue;
+            if let Some(node) = self.call_once(st, name, params).await? {
+                return Ok(node);
             }
-            match parse_response(name, &raw) {
-                Ok(node) if node.result_ok() => return Ok(node),
-                Ok(node) => {
-                    return Err(Error::CallFailed {
-                        name: name.to_owned(),
-                        result: node.text_of("Result").unwrap_or("").to_owned(),
-                        error: node.text_of("ErrorString").unwrap_or("").to_owned(),
-                    });
-                }
-                Err(XmlError::NotResponse) => {
-                    tracing::debug!("{name}: sesión caducada (intento {attempt})");
-                    Self::invalidate(st);
-                }
-                Err(e) => return Err(Error::Unexpected(format!("{name}: {e}"))),
-            }
+            tracing::debug!("{name}: sesión caducada (intento {attempt})");
         }
         Err(Error::SessionExpired(format!(
             "{name}: el router sigue pidiendo iniciar sesión"
         )))
+    }
+
+    /// Una llamada con la sesión avanzada ya abierta. `Ok(None)` si el router
+    /// pide iniciar sesión otra vez (la sesión queda invalidada).
+    async fn call_once(
+        &self,
+        st: &mut State,
+        name: &str,
+        params: &[(&str, &str)],
+    ) -> Result<Option<XmlNode>, Error> {
+        let path = format!("/cgi-bin/{name}.xml");
+        let raw = self
+            .send(st, Method::POST, &path, Some(form_body(params)))
+            .await?;
+        if looks_logged_out(&raw) {
+            Self::invalidate(st);
+            return Ok(None);
+        }
+        match parse_response(name, &raw) {
+            Ok(node) if node.result_ok() => Ok(Some(node)),
+            Ok(node) => Err(Error::CallFailed {
+                name: name.to_owned(),
+                result: node.text_of("Result").unwrap_or("").to_owned(),
+                error: node.text_of("ErrorString").unwrap_or("").to_owned(),
+            }),
+            Err(XmlError::NotResponse) => {
+                Self::invalidate(st);
+                Ok(None)
+            }
+            Err(e) => Err(Error::Unexpected(format!("{name}: {e}"))),
+        }
     }
 
     async fn page_locked(&self, st: &mut State, path: &str) -> Result<String, Error> {
