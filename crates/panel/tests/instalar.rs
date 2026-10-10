@@ -386,3 +386,119 @@ async fn pagina_del_asistente_traducida_y_sin_cache() {
     let resp = send(&p.app, req).await;
     assert_eq!(resp.headers()["cache-control"], "no-store");
 }
+
+#[tokio::test]
+async fn asistente_no_cambia_credenciales_con_cambio_activo() {
+    let p = recien_instalado().await;
+    let cookie = crear_admin(&p).await;
+    let gestor = ChangeManager::instalar(&p.state, Tiempos::default());
+    // Mientras el gestor esté ocupado (como con un cambio aplicándose), no.
+    let ocupado = gestor.excluir_cambios().unwrap();
+    let (status, body) = llamar(&p, "guardar_router", router(&p), Some(&cookie)).await;
+    assert_eq!(status, 409, "{body}");
+    assert!(!p.state.hgu.configurado());
+    assert!(
+        instancia::leer_credenciales(&p.state.db, &p.state.history_key)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    drop(ocupado);
+    let (status, body) = llamar(&p, "guardar_router", router(&p), Some(&cookie)).await;
+    assert_eq!(status, 200, "{body}");
+}
+
+#[tokio::test]
+async fn lectura_inicial_fija_solo_lectura_con_el_firmware_que_lee() {
+    let p = recien_instalado().await;
+    p.sim
+        .control
+        .set_firmware("ES_g99.00_RTF_TEF001_V99.00_V001");
+    let cookie = crear_admin(&p).await;
+    // Router configurado sin pasar por el paso del router (importado del
+    // entorno, o una recarga del asistente tras guardarlo).
+    instancia::guardar_credenciales(
+        &p.state.db,
+        &p.state.history_key,
+        &instancia::CredencialesRouter {
+            url: p.sim.base_url.clone(),
+            usuario: USER.into(),
+            contrasena: PASS.into(),
+        },
+    )
+    .await
+    .unwrap();
+    instancia::arrancar_router(&p.state).await.unwrap();
+    assert!(!instancia::solo_lectura(&p.state.db).await);
+    let (status, body) = llamar(&p, "lectura_inicial", json!({ "token": "" }), Some(&cookie)).await;
+    assert_eq!(status, 200, "{body}");
+    assert!(instancia::solo_lectura(&p.state.db).await);
+}
+
+#[tokio::test]
+async fn lectura_inicial_con_firmware_probado_no_bloquea() {
+    let p = recien_instalado().await;
+    let cookie = crear_admin(&p).await;
+    let (status, _) = llamar(&p, "guardar_router", router(&p), Some(&cookie)).await;
+    assert_eq!(status, 200);
+    // Quedó en solo lectura de antes (otro router): la lectura lo corrige.
+    instancia::escribir(&p.state.db, claves::SOLO_LECTURA, &json!(true))
+        .await
+        .unwrap();
+    let (status, body) = llamar(&p, "lectura_inicial", json!({ "token": "" }), Some(&cookie)).await;
+    assert_eq!(status, 200, "{body}");
+    assert!(!instancia::solo_lectura(&p.state.db).await);
+}
+
+/// Petición desde el proxy de confianza (127.0.0.1) por cuenta de `cliente`.
+async fn por_el_proxy(
+    p: &Panel,
+    uri: &str,
+    cuerpo: &str,
+    json: bool,
+    cliente: &str,
+) -> (u16, String) {
+    let mut req = if json {
+        post_json(uri, cuerpo, "127.0.0.1")
+    } else {
+        common::post_form(uri, cuerpo, "127.0.0.1")
+    };
+    req.headers_mut()
+        .insert("x-forwarded-for", cliente.parse().unwrap());
+    let resp = send(&p.app, req).await;
+    let status = resp.status().as_u16();
+    (status, body_text(resp).await)
+}
+
+async fn fallos_de_ip(p: &Panel, ip: &str) -> Option<i64> {
+    sqlx::query_scalar("SELECT failures FROM login_attempts WHERE kind = 'ip' AND key = ?")
+        .bind(ip)
+        .fetch_optional(&p.state.db)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn tras_el_proxy_cuenta_la_ip_del_cliente() {
+    const PUBLICA: &str = "203.0.113.9";
+    let p = recien_instalado().await;
+    let token = std::fs::read_to_string(fichero_token(&p)).unwrap();
+    let admin = json!({ "token": token.trim(), "usuario": PANEL_USER, "contrasena": PANEL_PASS })
+        .to_string();
+    // El proxy es local, pero el cliente que trae no: el asistente lo rechaza.
+    let (status, body) = por_el_proxy(&p, "/api/crear_admin", &admin, true, PUBLICA).await;
+    assert_eq!(status, 403, "{body}");
+    assert_eq!(usuarios(&p).await, 0);
+    let (status, body) = por_el_proxy(&p, "/api/crear_admin", &admin, true, "192.168.1.69").await;
+    assert_eq!(status, 200, "{body}");
+
+    // El login y su freno cuentan la IP del cliente, no la del proxy.
+    let malo = common::login_body(PANEL_USER, "no es la buena");
+    let (status, _) = por_el_proxy(&p, "/api/login", &malo, false, PUBLICA).await;
+    assert_eq!(status, 401);
+    assert_eq!(fallos_de_ip(&p, PUBLICA).await, Some(1));
+    assert_eq!(fallos_de_ip(&p, "127.0.0.1").await, None);
+    let bueno = common::login_body(PANEL_USER, PANEL_PASS);
+    let (status, body) = por_el_proxy(&p, "/api/login", &bueno, false, PUBLICA).await;
+    assert_eq!(status, 429, "en espera: {body}");
+}

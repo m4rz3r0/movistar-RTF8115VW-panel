@@ -82,7 +82,7 @@ impl Sim {
         let leases = initial_leases(&fixtures);
         let inner = Arc::new(Inner {
             user: cfg.user,
-            password: cfg.password,
+            password: Mutex::new(cfg.password),
             fixtures,
             unresponsive: AtomicBool::new(false),
             state: Mutex::new(SimState {
@@ -227,6 +227,16 @@ impl SimControl {
         e.1 = e.1.saturating_add(tx);
     }
 
+    /// Cambia la contraseña que acepta el login (las sesiones abiertas
+    /// siguen valiendo).
+    pub fn set_password(&self, password: &str) {
+        *self
+            .inner
+            .password
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()) = password.to_owned();
+    }
+
     /// Cambia la versión de firmware (`SWVersion`) que da `cbGetSummary`.
     pub fn set_firmware(&self, firmware: &str) {
         self.inner.state().firmware = Some(firmware.to_owned());
@@ -246,13 +256,21 @@ type FixtureKey = (String, Params);
 
 struct Inner {
     user: String,
-    password: String,
+    /// Contraseña aceptada (cambiable con [`SimControl::set_password`]).
+    password: Mutex<String>,
     fixtures: HashMap<FixtureKey, String>,
     unresponsive: AtomicBool,
     state: Mutex<SimState>,
 }
 
 impl Inner {
+    fn password(&self) -> String {
+        self.password
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+    }
+
     fn state(&self) -> MutexGuard<'_, SimState> {
         self.state.lock().unwrap_or_else(|e| e.into_inner())
     }
@@ -532,7 +550,7 @@ async fn root(State(s): State<Arc<Inner>>) -> Response {
 async fn basic_login(State(s): State<Arc<Inner>>, headers: HeaderMap, body: Bytes) -> Response {
     let f = form(&body);
     let good = param(&f, "loginUsername") == Some(mess_userpass(&s.user).as_str())
-        && param(&f, "loginPassword") == Some(mess_userpass(&s.password).as_str());
+        && param(&f, "loginPassword") == Some(mess_userpass(&s.password()).as_str());
     if !good {
         return "<script>location.href = \"/te_acceso_router.asp\"</script>".into_response();
     }
@@ -696,7 +714,7 @@ fn advanced_login(
         return LOGGED_OUT.into();
     }
     let good = param(params, "rqUsername") == Some(mess_userpass(&s.user).as_str())
-        && param(params, "rqPasswd") == Some(mess_userpass(&s.password).as_str());
+        && param(params, "rqPasswd") == Some(mess_userpass(&s.password()).as_str());
     if !good {
         return failure("cbCheckLogin", "login");
     }

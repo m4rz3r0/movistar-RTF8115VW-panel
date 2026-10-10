@@ -9,6 +9,7 @@ use crate::ui::{
     instalar::PaginaInstalar,
     layout::Layout,
     login::PaginaLogin,
+    panel_ajustes::PaginaPanel,
 };
 use leptos::prelude::*;
 use leptos_meta::{Link, MetaTags, Stylesheet, Title, provide_meta_context};
@@ -75,6 +76,7 @@ pub fn App() -> impl IntoView {
                 <ParentRoute path=StaticSegment("") view=Layout>
                     <Route path=StaticSegment("") view=PaginaEstado />
                     <Route path=StaticSegment("historial") view=PaginaHistorial />
+                    <Route path=StaticSegment("panel") view=PaginaPanel />
                     <ParentRoute path=StaticSegment("explorador") view=Explorador>
                         <Route path=StaticSegment("") view=InicioExplorador />
                         <Route path=ParamSegment("area") view=PaginaArea />

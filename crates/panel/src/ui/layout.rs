@@ -1,6 +1,7 @@
 //! Marco de las páginas con sesión: barra lateral (Estado, Explorador,
-//! Historial, usuario, idioma y «Salir») que en pantallas estrechas pasa a
-//! ser una barra superior con el menú plegable.
+//! Historial; menú del usuario con «Ajustes del panel», idioma y «Salir»)
+//! que en pantallas estrechas pasa a ser una barra superior con el menú
+//! plegable.
 
 use crate::auth::{Logout, quien_soy};
 use crate::t;
@@ -43,6 +44,8 @@ const ICONO_SALIR: &str =
 /// Persona (usuario).
 const ICONO_USUARIO: &str =
     "M10 3a3.25 3.25 0 1 1 0 6.5A3.25 3.25 0 0 1 10 3zM3.75 17c.6-3.1 3.1-5 6.25-5s5.65 1.9 6.25 5";
+/// Controles deslizantes (Ajustes del panel).
+const ICONO_AJUSTES: &str = "M3 5.5h8M15 5.5h2M3 14.5h2M9 14.5h8M13 3.5v4M7 12.5v4";
 /// Tres rayas (menú).
 const ICONO_MENU: &str = "M3 5.5h14M3 10h14M3 14.5h14";
 
@@ -123,6 +126,12 @@ pub fn Layout() -> impl IntoView {
                                 })}
                             </Suspense>
                         </span>
+                        <nav class="nav" aria-label=t!("comun-nav-usuario") on:click=cerrar>
+                            <A href="/panel">
+                                {icono(ICONO_AJUSTES)}
+                                <span>{t!("panel-titulo")}</span>
+                            </A>
+                        </nav>
                         <SelectorIdioma />
                         <button
                             class="boton-sutil salir"

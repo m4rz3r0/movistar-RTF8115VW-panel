@@ -11,6 +11,7 @@
 pub mod app;
 pub mod auth;
 pub mod instalar;
+pub mod panel_ajustes;
 pub mod ui;
 
 #[cfg(feature = "ssr")]

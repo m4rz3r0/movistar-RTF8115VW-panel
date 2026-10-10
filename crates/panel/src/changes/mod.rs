@@ -313,8 +313,9 @@ const BLOQUEO_IP_LAN: &str = "bloqueada en v1: cambiar la IP del router corta la
 const BLOQUEO_SECRETOS_BASICA: &str = "bloqueada en v1: falta validar con el router real el \
                                        formato de los secretos de la web básica";
 
-/// Mientras viva, el gestor está ocupado con un cambio.
-struct Reserva {
+/// Mientras viva, el gestor está ocupado con un cambio (o lo tiene apartado
+/// con [`ChangeManager::excluir_cambios`]): no empieza ninguno.
+pub struct Reserva {
     m: Arc<ChangeManager>,
 }
 
@@ -387,6 +388,14 @@ impl ChangeManager {
     /// Id del cambio en curso (aplicándose o vigilándose).
     pub fn activo(&self) -> Option<i64> {
         lock(&self.activo).flatten()
+    }
+
+    /// Aparta el gestor para algo que no puede coincidir con un cambio
+    /// (sustituir las credenciales del router): [`CambioError::EnCurso`] si
+    /// hay uno aplicándose o vigilándose; mientras viva lo devuelto, no
+    /// empieza ninguno.
+    pub fn excluir_cambios(self: &Arc<Self>) -> Result<Reserva, CambioError> {
+        self.reservar()
     }
 
     /// Detiene la vigilancia en curso sin cerrar el cambio (queda como al

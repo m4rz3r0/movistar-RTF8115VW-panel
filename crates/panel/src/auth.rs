@@ -10,15 +10,21 @@ use leptos::prelude::*;
 
 #[cfg(feature = "ssr")]
 pub use server::{
-    AuthUser, LoginError, MIN_PASSWORD_CHARS, SESSION_COOKIE, User, UserError, attempt_login,
-    client_ip, create_user, delay_secs, hash_password, poner_cookie_de_sesion, reauthenticate,
-    require_page_session, require_user, set_password, verify, warm_up,
+    AuthUser, LoginError, MIN_PASSWORD_CHARS, REAUTH_SECS, SESSION_COOKIE, User, UserError,
+    attempt_login, client_ip, create_user, delay_secs, delete_user, hash_password,
+    poner_cookie_de_sesion, reautenticar_sesion, reauthenticate, require_page_session,
+    require_reauth, require_user, set_password, verify, warm_up,
 };
 
 /// Mensaje de error de las server functions sin sesión vigente (con estado
 /// 401). Es un código fijo, no un texto: la interfaz lo reconoce y lo
 /// traduce en el idioma de la página (ver `ui::texto_error`).
 pub const ERROR_SESION: &str = "sesion-caducada";
+
+/// Mensaje de error (con estado 401) de las server functions que exigen
+/// haber vuelto a escribir la contraseña del panel hace poco (ver
+/// `reautenticar_sesion`). Código fijo: la interfaz pide la contraseña y repite.
+pub const ERROR_REAUTENTICACION: &str = "reautenticacion-necesaria";
 
 /// Destino tras el login: `next` solo si es una ruta local (empieza por una
 /// sola `/`); si no, la portada. Evita redirecciones abiertas a otro sitio
@@ -96,6 +102,9 @@ mod server {
     const SESSION_IDLE_SECS: i64 = 30 * 60;
     /// Caducidad absoluta.
     const SESSION_MAX_SECS: i64 = 12 * 60 * 60;
+    /// Ventana de reautenticación: tras volver a escribir la contraseña, las
+    /// operaciones delicadas no la piden de nuevo durante este tiempo.
+    pub const REAUTH_SECS: i64 = 5 * 60;
     /// `last_seen` se actualiza como mucho una vez por minuto.
     const TOUCH_EVERY_SECS: i64 = 60;
     /// Retardo máximo del freno de fuerza bruta.
@@ -169,6 +178,10 @@ mod server {
         PasswordTooShort,
         Exists,
         NotFound,
+        /// No se borra el último usuario.
+        LastUser,
+        /// Nadie se borra a sí mismo.
+        OwnUser,
         Db(sqlx::Error),
     }
 
@@ -185,6 +198,8 @@ mod server {
                 ),
                 UserError::Exists => write!(f, "el usuario ya existe"),
                 UserError::NotFound => write!(f, "el usuario no existe"),
+                UserError::LastUser => write!(f, "no se puede borrar el último usuario"),
+                UserError::OwnUser => write!(f, "no se puede borrar el usuario propio"),
                 UserError::Db(e) => write!(f, "error de la base de datos: {e}"),
             }
         }
@@ -264,6 +279,40 @@ mod server {
             .await?;
         tx.commit().await?;
         Ok(())
+    }
+
+    /// Borra `username` (y con él sus sesiones), salvo que sea `actual` (el
+    /// usuario que lo pide) o el último que queda. Una sola sentencia: dos
+    /// borrados a la vez no dejan el panel sin usuarios.
+    pub async fn delete_user(
+        db: &SqlitePool,
+        username: &str,
+        actual: i64,
+    ) -> Result<(), UserError> {
+        let borrado: Option<i64> = sqlx::query_scalar(
+            "DELETE FROM users
+             WHERE username = ? AND id != ? AND (SELECT COUNT(*) FROM users) > 1
+             RETURNING id",
+        )
+        .bind(username)
+        .bind(actual)
+        .fetch_optional(db)
+        .await?;
+        if borrado.is_some() {
+            return Ok(());
+        }
+        let id: Option<i64> = sqlx::query_scalar("SELECT id FROM users WHERE username = ?")
+            .bind(username)
+            .fetch_optional(db)
+            .await?;
+        let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
+            .fetch_one(db)
+            .await?;
+        Err(match id {
+            None => UserError::NotFound,
+            Some(_) if total <= 1 => UserError::LastUser,
+            Some(_) => UserError::OwnUser,
+        })
     }
 
     // ---- Sesiones ----
@@ -671,6 +720,72 @@ mod server {
             Ok(Some(user)) => Ok(user),
             Ok(None) => fail(StatusCode::UNAUTHORIZED, super::ERROR_SESION),
             Err(e) => internal(e),
+        }
+    }
+
+    /// Vuelve a pedir la contraseña al usuario de la sesión (con el freno
+    /// del login, por la IP del cliente) y, si es buena, abre la ventana de
+    /// reautenticación de esta sesión durante [`REAUTH_SECS`].
+    pub async fn reautenticar_sesion(contrasena: &str) -> Result<(), ServerFnError> {
+        let state = app_state()?;
+        let user = require_user().await?;
+        let ConnectInfo(peer) = leptos_axum::extract::<ConnectInfo<SocketAddr>>().await?;
+        let headers: HeaderMap = leptos_axum::extract().await?;
+        let ip = client_ip(peer.ip(), &headers, state.cfg.trusted_proxy);
+        match reauthenticate(&state, ip, &user, contrasena).await {
+            Ok(()) => {}
+            Err(LoginError::Throttled(secs)) => {
+                return fail(
+                    StatusCode::TOO_MANY_REQUESTS,
+                    &crate::t!("login-error-intentos", s = secs),
+                );
+            }
+            Err(LoginError::BadCredentials) => {
+                return fail(StatusCode::FORBIDDEN, &crate::t!("panel-error-contrasena"));
+            }
+            Err(LoginError::Internal(e)) => return internal(e),
+        }
+        let Some(id) = cookie_session_id(&headers) else {
+            return fail(StatusCode::UNAUTHORIZED, super::ERROR_SESION);
+        };
+        if let Err(e) = sqlx::query("UPDATE sessions SET reautenticado_hasta = ? WHERE id = ?")
+            .bind(now_secs() + REAUTH_SECS)
+            .bind(session_key(id))
+            .execute(&state.db)
+            .await
+        {
+            return internal(e);
+        }
+        tracing::info!(usuario = %user.username, "reautenticación en Ajustes del panel");
+        Ok(())
+    }
+
+    /// Como [`require_user`], y además la sesión tiene abierta la ventana de
+    /// reautenticación ([`reautenticar_sesion`]); si no, 401 con
+    /// [`super::ERROR_REAUTENTICACION`].
+    pub async fn require_reauth() -> Result<User, ServerFnError> {
+        let state = app_state()?;
+        let user = require_user().await?;
+        let headers: HeaderMap = leptos_axum::extract().await?;
+        let hasta: Option<i64> = match cookie_session_id(&headers) {
+            Some(id) => {
+                match sqlx::query_scalar::<_, Option<i64>>(
+                    "SELECT reautenticado_hasta FROM sessions WHERE id = ?",
+                )
+                .bind(session_key(id))
+                .fetch_optional(&state.db)
+                .await
+                {
+                    Ok(h) => h.flatten(),
+                    Err(e) => return internal(e),
+                }
+            }
+            None => None,
+        };
+        if hasta.is_some_and(|h| h > now_secs()) {
+            Ok(user)
+        } else {
+            fail(StatusCode::UNAUTHORIZED, super::ERROR_REAUTENTICACION)
         }
     }
 

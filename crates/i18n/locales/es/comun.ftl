@@ -6,6 +6,7 @@ comun-marca-inicio = RTF8115VW, inicio
 comun-marca-sub = Panel del router
 comun-menu = Menú
 comun-nav-principal = Principal
+comun-nav-usuario = Usuario
 comun-nav-estado = Estado
 comun-nav-explorador = Explorador
 comun-nav-historial = Historial

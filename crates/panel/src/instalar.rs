@@ -100,7 +100,7 @@ pub async fn fase_instalacion() -> Result<EstadoInstalacion, ServerFnError> {
 }
 
 #[cfg(feature = "ssr")]
-mod servidor {
+pub(crate) mod servidor {
     use super::{EstadoInstalacion, InfoRouter, ResumenFoto};
     use crate::{
         auth,
@@ -136,8 +136,8 @@ mod servidor {
     #[derive(Default)]
     pub struct Instalacion {
         fase: Mutex<Fase>,
-        /// Ya se ha visto algún usuario: no vuelve a `false` (no se borran
-        /// usuarios), así que no hace falta preguntar más a la base de datos.
+        /// Ya se ha visto algún usuario: no vuelve a `false` (nunca se borra
+        /// el último), así que no hace falta preguntar más a la base de datos.
         hay_usuarios: AtomicBool,
     }
 
@@ -259,7 +259,7 @@ mod servidor {
         }
     }
 
-    fn fallo(status: StatusCode, msg: impl Into<String>) -> ServerFnError {
+    pub(crate) fn fallo(status: StatusCode, msg: impl Into<String>) -> ServerFnError {
         if let Some(resp) = use_context::<ResponseOptions>() {
             resp.set_status(status);
         }
@@ -274,8 +274,8 @@ mod servidor {
         fallo(StatusCode::FORBIDDEN, t!("instalar-error-token"))
     }
 
-    fn interno(e: impl std::fmt::Display) -> ServerFnError {
-        tracing::error!("error interno en la instalación: {e}");
+    pub(crate) fn interno(e: impl std::fmt::Display) -> ServerFnError {
+        tracing::error!("error interno en la instalación o en Ajustes del panel: {e}");
         fallo(StatusCode::INTERNAL_SERVER_ERROR, t!("comun-error-interno"))
     }
 
@@ -380,7 +380,7 @@ mod servidor {
     }
 
     /// Entra en el router con esas credenciales, lee `cbGetSummary` y sale.
-    pub(super) async fn probar(
+    pub(crate) async fn probar(
         _state: &AppState,
         url: &str,
         usuario: &str,
@@ -413,12 +413,22 @@ mod servidor {
         Ok((info, c))
     }
 
-    pub(super) async fn guardar(
+    /// Prueba las credenciales del router y, si entran, las guarda, las pasa
+    /// al cliente del panel y fija el modo según el firmware. La usan el
+    /// asistente y «Ajustes del panel». Con un cambio aplicándose o
+    /// vigilándose, 409 sin tocar nada: el vigilante seguiría con otro
+    /// router; mientras dura, el gestor no empieza ningún cambio.
+    pub(crate) async fn guardar(
         state: &AppState,
         url: &str,
         usuario: &str,
         contrasena: &str,
     ) -> Result<InfoRouter, ServerFnError> {
+        let _sin_cambios = state
+            .cambios()
+            .map(|m| m.excluir_cambios())
+            .transpose()
+            .map_err(|_| fallo(StatusCode::CONFLICT, t!("panel-error-cambio-en-curso")))?;
         let (info, c) = probar(state, url, usuario, contrasena).await?;
         instancia::guardar_credenciales(&state.db, &state.history_key, &c)
             .await
@@ -429,7 +439,7 @@ mod servidor {
             .await
             .map_err(interno)?;
         tracing::info!(
-            "instalación: router {} ({}, firmware {}{})",
+            "credenciales del router guardadas: {} ({}, firmware {}{})",
             c.url,
             info.modelo,
             info.firmware,
@@ -503,12 +513,16 @@ mod servidor {
         }
         let mut foto = BTreeMap::new();
         let mut fallidas = Vec::new();
+        let mut firmware = String::new();
         {
             // Sin el sondeo en medio: la lectura es una sola foto.
             let _pausa = state.poller.pause().await;
             for (nombre, params) in lecturas_de_partida(&state.catalogo) {
                 match state.hgu.call(nombre, &params).await {
                     Ok(n) => {
+                        if nombre == "cbGetSummary" {
+                            firmware = hgu::models::Summary::from_node(&n).firmware;
+                        }
                         foto.insert(nombre.to_owned(), n.to_xml());
                     }
                     Err(e) => {
@@ -526,6 +540,12 @@ mod servidor {
             // Nada que guardar: se puede repetir.
             return Ok(resumen);
         }
+        // El modo según el firmware que se acaba de leer: el router pudo
+        // configurarse sin pasar por `guardar` (importado del entorno). Sin
+        // resumen, el firmware es desconocido: como uno no probado.
+        instancia::fijar_modo_firmware(&state.db, &firmware)
+            .await
+            .map_err(interno)?;
         let id = fotos::guardar(&state.db, &state.history_key, TipoFoto::Partida, &foto)
             .await
             .map_err(interno)?;

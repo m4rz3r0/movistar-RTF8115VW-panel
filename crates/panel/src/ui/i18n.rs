@@ -142,7 +142,7 @@ pub async fn cambiar_idioma(idioma: Idioma) -> Result<(), ServerFnError> {
 }
 
 /// Nombre de un idioma en ese mismo idioma.
-fn nombre_idioma(i: Idioma) -> String {
+pub(crate) fn nombre_idioma(i: Idioma) -> String {
     match i {
         Idioma::Es => crate::t!("comun-idioma-es"),
         Idioma::En => crate::t!("comun-idioma-en"),

@@ -141,6 +141,25 @@ pub async fn escribir(db: &SqlitePool, clave: &str, valor: &Value) -> Result<(),
     .map_err(|e| format!("no se puede guardar el ajuste {clave} de la instancia: {e}"))
 }
 
+/// Guarda (o sustituye) varios parámetros de la instancia a la vez: todos o
+/// ninguno.
+pub async fn escribir_varios(db: &SqlitePool, valores: &[(&str, Value)]) -> Result<(), String> {
+    let error = |e: sqlx::Error| format!("no se pueden guardar los ajustes de la instancia: {e}");
+    let mut tx = db.begin().await.map_err(error)?;
+    for (clave, valor) in valores {
+        sqlx::query(
+            "INSERT INTO ajustes_instancia (clave, valor) VALUES (?, ?)
+             ON CONFLICT (clave) DO UPDATE SET valor = excluded.valor",
+        )
+        .bind(clave)
+        .bind(valor.to_string())
+        .execute(&mut *tx)
+        .await
+        .map_err(error)?;
+    }
+    tx.commit().await.map_err(error)
+}
+
 /// ¿Se ha probado el panel con esta versión de firmware?
 pub fn firmware_probado(firmware: &str) -> bool {
     FIRMWARES_PROBADOS.contains(&firmware)

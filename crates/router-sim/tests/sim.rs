@@ -654,3 +654,16 @@ async fn firmware_del_resumen_cambiable() {
         "ES_g14.18_RTF_TEF001_V9.18_V001"
     );
 }
+
+#[tokio::test]
+async fn contrasena_cambiable() {
+    let sim = start().await;
+    sim.control.set_password("otra-clave-del-router");
+    let r = client(&sim, Duration::from_secs(2))
+        .call("cbGetSummary", &[])
+        .await;
+    assert!(matches!(r, Err(Error::Auth(_))), "{r:?}");
+    let mut cfg = ClientConfig::new(&sim.base_url, USER, "otra-clave-del-router");
+    cfg.min_gap = Duration::from_millis(1);
+    Client::new(cfg).call("cbGetSummary", &[]).await.unwrap();
+}

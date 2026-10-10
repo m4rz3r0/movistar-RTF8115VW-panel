@@ -13,6 +13,7 @@ pub mod i18n;
 pub mod instalar;
 pub mod layout;
 pub mod login;
+pub mod panel_ajustes;
 pub mod table;
 
 use crate::t;
@@ -24,6 +25,8 @@ use leptos::prelude::*;
 pub(crate) fn mensaje_del_servidor(msg: &str) -> String {
     if msg == crate::auth::ERROR_SESION {
         t!("comun-error-sesion")
+    } else if msg == crate::auth::ERROR_REAUTENTICACION {
+        t!("panel-reautenticar-texto")
     } else {
         msg.to_owned()
     }
@@ -33,6 +36,11 @@ pub(crate) fn mensaje_del_servidor(msg: &str) -> String {
 /// no por el texto, que depende del idioma.
 pub(crate) fn es_error_de_sesion(e: &ServerFnError) -> bool {
     matches!(e, ServerFnError::ServerError(m) if m == crate::auth::ERROR_SESION)
+}
+
+/// ¿Falta volver a escribir la contraseña del panel? Por el código fijo.
+pub(crate) fn es_error_de_reautenticacion(e: &ServerFnError) -> bool {
+    matches!(e, ServerFnError::ServerError(m) if m == crate::auth::ERROR_REAUTENTICACION)
 }
 
 /// Estado con significado (bien, aviso, error) o neutro.
