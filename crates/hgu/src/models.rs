@@ -134,15 +134,41 @@ impl IfaceCounters {
     }
 }
 
+/// Bit de `opr_app_mask` de la conexión de televisión (IPTV).
+pub const MASCARA_IPTV: u32 = 4;
+/// Bit de `opr_app_mask` de la conexión de telefonía (VoIP).
+pub const MASCARA_VOIP: u32 = 8;
+
+/// Tipo de una conexión WAN (`wan_type` de `cbGetWanIPIntf`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TipoConexion {
+    /// `0`.
+    Pppoe,
+    /// `1`.
+    Dhcp,
+    /// `2`: IP estática.
+    Estatica,
+    /// Cualquier otro valor.
+    Otro,
+}
+
 /// Conexión WAN. Correspondencia con `mll_wanconn_data` de `cbGetWanIPIntf`:
-/// `name`, `opr_status`, `adm_state`, `wan_type`, `dis_ipv4_addr` (`None` si
-/// vale `0.0.0.0` o no es una IPv4).
+/// `name`, `ip_intf_id`, `opr_status`, `adm_state`, `wan_type`,
+/// `opr_app_mask` (`app_mask`), `dis_ipv4_addr` (`None` si vale `0.0.0.0` o
+/// no es una IPv4).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct WanConn {
     pub name: String,
+    /// Interfaz IP a la que apuntan las rutas (`ip_intf_id`).
+    #[serde(default)]
+    pub ip_intf_id: String,
     pub up: bool,
     pub enabled: bool,
     pub wan_type: String,
+    /// Servicios de la conexión (`opr_app_mask`): ver [`MASCARA_IPTV`] y
+    /// [`MASCARA_VOIP`].
+    #[serde(default)]
+    pub app_mask: u32,
     pub ipv4: Option<Ipv4Addr>,
 }
 
@@ -153,15 +179,32 @@ impl WanConn {
             .into_iter()
             .map(|c| WanConn {
                 name: text(c, "name"),
+                ip_intf_id: text(c, "ip_intf_id"),
                 up: flag(c, "opr_status"),
                 enabled: flag(c, "adm_state"),
                 wan_type: text(c, "wan_type"),
+                app_mask: int(c, "opr_app_mask"),
                 ipv4: c
                     .text_of("dis_ipv4_addr")
                     .and_then(|s| s.parse::<Ipv4Addr>().ok())
                     .filter(|ip| !ip.is_unspecified()),
             })
             .collect()
+    }
+
+    /// Tipo de conexión según `wan_type`.
+    pub fn tipo(&self) -> TipoConexion {
+        match self.wan_type.trim() {
+            "0" => TipoConexion::Pppoe,
+            "1" => TipoConexion::Dhcp,
+            "2" => TipoConexion::Estatica,
+            _ => TipoConexion::Otro,
+        }
+    }
+
+    /// ¿Es una conexión de datos (ni televisión ni telefonía)?
+    pub fn es_de_datos(&self) -> bool {
+        self.app_mask & (MASCARA_IPTV | MASCARA_VOIP) == 0
     }
 }
 
@@ -450,6 +493,15 @@ mod tests {
         assert!(ip2.up && ip2.enabled);
         assert_eq!(ip2.ipv4, Some("203.0.113.6".parse().unwrap()));
         assert_eq!(ip2.wan_type, "0");
+        assert_eq!(ip2.ip_intf_id, "2");
+        assert_eq!(ip2.tipo(), TipoConexion::Pppoe);
+        assert!(ip2.es_de_datos());
+        let voip = w.iter().find(|w| w.name == "ip3").expect("ip3");
+        assert_eq!(voip.tipo(), TipoConexion::Dhcp);
+        assert!(!voip.es_de_datos());
+        let iptv = w.iter().find(|w| w.name == "ip4").expect("ip4");
+        assert_eq!(iptv.tipo(), TipoConexion::Estatica);
+        assert!(!iptv.es_de_datos());
     }
 
     #[test]

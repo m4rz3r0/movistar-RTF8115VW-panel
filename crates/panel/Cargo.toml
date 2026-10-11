@@ -128,3 +128,7 @@ required-features = ["ssr"]
 [[test]]
 name = "grupos"
 required-features = ["ssr"]
+
+[[test]]
+name = "red"
+required-features = ["ssr"]

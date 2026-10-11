@@ -1,13 +1,15 @@
 //! Router simulado para desarrollo.
 //!
 //! Uso: `router-sim [--listen 127.0.0.1:8081] [--fixtures crates/hgu/fixtures]
-//! [--user U] [--password P]` (por defecto usuario y contraseña `sim`).
+//! [--capa DIR] [--user U] [--password P]` (por defecto usuario y contraseña
+//! `sim`). `--capa` añade fixtures que sustituyen a las de `--fixtures` (p.
+//! ej. `crates/hgu/fixtures-variantes/dhcp-sin-voip`).
 
 use router_sim::{Sim, SimConfig};
 use std::process::ExitCode;
 
 const USAGE: &str =
-    "uso: router-sim [--listen DIR:PUERTO] [--fixtures DIR] [--user U] [--password P]";
+    "uso: router-sim [--listen DIR:PUERTO] [--fixtures DIR] [--capa DIR] [--user U] [--password P]";
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -22,6 +24,7 @@ async fn main() -> ExitCode {
         match flag.as_str() {
             "--listen" => listen = value,
             "--fixtures" => cfg.fixtures_dir = value.into(),
+            "--capa" => cfg.capa = Some(value.into()),
             "--user" => cfg.user = value,
             "--password" => cfg.password = value,
             _ => {

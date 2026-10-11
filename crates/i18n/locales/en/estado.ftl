@@ -97,5 +97,6 @@ estado-aviso-sin-router-desde = No connection to the router since { $cuando }. T
 estado-aviso-sin-router-desde-error = No connection to the router since { $cuando }: { $error }. The data shown is from that time.
 estado-aviso-lentos = Client and WiFi data may be out of date.
 estado-aviso-lentos-desde = Client and WiFi data may be out of date (last data: { $cuando }).
+estado-internet-sin-detectar = Internet connection not detected · Choose it in Panel settings
 estado-aviso-wps = WPS enabled on { $redes }: turn it off if you do not use it (the WPS PIN can be brute-forced).
 estado-aviso-tr69 = Telefónica can manage the router remotely (TR-069).

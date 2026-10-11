@@ -266,8 +266,6 @@ pub(crate) mod servidor {
     use hgu::models::WifiStatus;
     use std::{collections::HashSet, fmt, net::Ipv4Addr};
 
-    /// Conexión PPP principal.
-    const WAN: &str = "ip2";
     /// Distancia máxima entre la última muestra y la instantánea (3
     /// intervalos de 10 s).
     const MUESTRA_VIGENTE_S: i64 = 30;
@@ -448,8 +446,20 @@ pub(crate) mod servidor {
             });
         }
 
-        let wan = s.wan.iter().find(|w| w.name == WAN);
-        let internet_up = wan.is_some_and(|w| w.up);
+        // La conexión a internet con la que leyó el sondeo; sin detectar,
+        // basta cualquier conexión de datos arriba (como el gestor de
+        // cambios), sin IP pública que mostrar.
+        let wan = s
+            .wan_intf
+            .as_deref()
+            .and_then(|n| s.wan.iter().find(|w| w.name == n));
+        let internet_up = crate::changes::plan::wan_arriba(&s.wan, s.wan_intf.as_deref());
+        if s.wan_intf.is_none() {
+            avisos.push(Aviso {
+                nivel: Nivel::Aviso,
+                texto: t!("estado-internet-sin-detectar"),
+            });
+        }
         let encendido_desde = s.at - i64::try_from(s.summary.uptime_s).unwrap_or(i64::MAX);
         let (conexion_desde, caida_desde) = match ultimo_corte {
             Some(c) if !internet_up => (None, c.hasta.is_none().then_some(c.desde)),
@@ -655,11 +665,14 @@ mod tests {
             },
             wan: vec![WanConn {
                 name: "ip2".into(),
+                ip_intf_id: "2".into(),
                 up: true,
                 enabled: true,
                 wan_type: "0".into(),
+                app_mask: 3,
                 ipv4: Some("203.0.113.6".parse().unwrap()),
             }],
+            wan_intf: Some("ip2".into()),
             counters: Vec::new(),
             hosts: vec![
                 host("192.168.1.100", "02:00:00:00:00:0B", true),
@@ -768,6 +781,29 @@ mod tests {
         assert!(!v.wifi[1].con_clave);
         assert!(v.wifi[1].radio_apagado && !v.wifi[1].activa);
         assert_eq!(v.wifi[1].banda, "5 GHz");
+    }
+
+    #[test]
+    fn internet_sin_detectar_avisa_y_usa_cualquier_conexion_de_datos() {
+        let v = vista(Some(snapshot()), None, true, None, None, &cat(), AHORA);
+        assert!(v.internet_up);
+        assert_eq!(v.ip_publica.as_deref(), Some("203.0.113.6"));
+        assert!(!v.avisos.iter().any(|a| a.texto.contains("sin detectar")));
+
+        let mut s = snapshot();
+        s.wan_intf = None;
+        let v = vista(Some(s.clone()), None, true, None, None, &cat(), AHORA);
+        assert!(v.internet_up, "la conexión de datos está arriba");
+        assert_eq!(v.ip_publica, None);
+        let aviso = v
+            .avisos
+            .iter()
+            .find(|a| a.texto.contains("Conexión a internet sin detectar"))
+            .expect("aviso");
+        assert_eq!(aviso.nivel, Nivel::Aviso);
+        s.wan[0].up = false;
+        let v = vista(Some(s), None, true, None, None, &cat(), AHORA);
+        assert!(!v.internet_up);
     }
 
     #[test]

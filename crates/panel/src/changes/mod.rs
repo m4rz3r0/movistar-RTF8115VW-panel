@@ -15,7 +15,9 @@
 //!    router no muestra lo escrito, `fallido` (no se revierte lo que el
 //!    router no aceptó).
 //! 3. Vigilancia (`vigilando`), ya sin pausar el sondeo: cada `intervalo`, el
-//!    router deja iniciar sesión y la WAN `ip2` sigue arriba. Tras
+//!    router deja iniciar sesión y la conexión a internet sigue arriba (la
+//!    detectada o elegida a mano; sin ninguna, cualquier conexión de datos:
+//!    [`plan::wan_arriba`]). Tras
 //!    `fallos_para_revertir` fallos seguidos se escriben los valores
 //!    anteriores, se verifica y queda `revertido`; si no, `aplicado`.
 //!    `cbReboot` (palabra `REINICIAR`) espera la vuelta del router sin
@@ -40,7 +42,7 @@
 //! registros (`tracing`) y el historial solo muestran secretos enmascarados.
 
 mod grupo;
-mod plan;
+pub mod plan;
 
 use grupo::{Ejecucion, PasoGuardado};
 pub use grupo::{EstadoPaso, GrupoRequest, Paso, PasoCambio, PasoPreparado, PreparadoGrupo};
@@ -50,7 +52,12 @@ pub use plan::{PALABRA_ACCION, PALABRA_REINICIO};
 /// instancia y cómo se busca un campo en una lectura): una sola copia.
 pub(crate) use plan::{buscar, identidad};
 
-use crate::{crypto::HistoryKey, poller::PollerHandle, series, state::AppState};
+use crate::{
+    crypto::HistoryKey,
+    poller::PollerHandle,
+    series,
+    state::{AppState, RedActual},
+};
 use catalogo::{Catalogo, mask::Mascara};
 use catalogo::{Funcion, Riesgo, Tipo, mask::MASCARA};
 use hgu::{
@@ -320,6 +327,17 @@ struct Recursos {
     mascara: Arc<Mascara>,
     poller: PollerHandle,
     history_key: Arc<HistoryKey>,
+    /// Conexión a internet que vigila la red de seguridad WAN.
+    red: RedActual,
+}
+
+impl Recursos {
+    /// ¿Hay internet? (ver [`plan::wan_arriba`]). Error si el router no
+    /// responde.
+    async fn wan_arriba(&self) -> Result<bool, hgu::Error> {
+        let conns = read::wan(&self.hgu).await?;
+        Ok(wan_arriba(&conns, self.red.wan().as_deref()))
+    }
 }
 
 /// Fallo de un intento de reversión.
@@ -391,8 +409,10 @@ impl ChangeManager {
     /// Crea un gestor. `confirmar` no acepta cambios hasta que se haya
     /// llamado a [`ChangeManager::reanudar_pendientes`].
     pub fn new(state: AppState, tiempos: Tiempos) -> Arc<ChangeManager> {
+        let red = state.red_actual();
         Arc::new(ChangeManager {
             state: Recursos {
+                red,
                 db: state.db,
                 hgu: state.hgu,
                 catalogo: state.catalogo,
@@ -1322,13 +1342,17 @@ impl ChangeManager {
         }
     }
 
-    /// El router deja iniciar sesión y (si `wan`) la WAN `ip2` está arriba.
+    /// El router deja iniciar sesión y (si `wan`) la conexión a internet
+    /// está arriba.
     async fn salud(&self, wan: bool) -> Result<(), String> {
         let c = &self.state.hgu;
         let no_responde = |e: hgu::Error| format!("el router no responde: {e}");
         read::summary(c).await.map_err(no_responde)?;
-        if wan && !wan_arriba(&read::wan(c).await.map_err(no_responde)?) {
-            return Err(format!("la WAN ({WAN}) está caída"));
+        if wan && !self.state.wan_arriba().await.map_err(no_responde)? {
+            return Err(match self.state.red.wan() {
+                Some(n) => format!("la WAN ({n}) está caída"),
+                None => "la WAN está caída (ninguna conexión de datos arriba)".to_owned(),
+            });
         }
         Ok(())
     }

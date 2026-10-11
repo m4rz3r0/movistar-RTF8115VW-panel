@@ -11,6 +11,13 @@ fn fixtures_dir() -> PathBuf {
     PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../hgu/fixtures"))
 }
 
+fn variantes_dir() -> PathBuf {
+    PathBuf::from(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../hgu/fixtures-variantes"
+    ))
+}
+
 async fn start() -> SimHandle {
     Sim::start(SimConfig::new(USER, PASS, fixtures_dir())).await
 }
@@ -117,20 +124,35 @@ fn check_value(file: &str, tag: &str, value: &str, secrets: &HashSet<String>) {
 #[test]
 fn fixtures_have_no_secrets() {
     let secrets = real_secrets();
-    let mut files = 0;
-    for entry in std::fs::read_dir(fixtures_dir()).expect("directorio de fixtures") {
+    // Las de serie y las de cada variante (`fixtures-variantes/*/`).
+    let mut dirs = vec![fixtures_dir()];
+    let variantes = variantes_dir();
+    for entry in std::fs::read_dir(&variantes).expect("directorio de variantes") {
         let path = entry.unwrap().path();
-        let name = path.file_name().unwrap().to_string_lossy().into_owned();
-        let Some(stem) = name.strip_suffix(".xml") else {
-            continue;
-        };
-        files += 1;
-        for (k, v) in sanitize::split_fixture_name(stem).1 {
-            check_value(&name, &k, &v, &secrets);
-        }
-        let raw = std::fs::read_to_string(&path).unwrap();
-        for (tag, value) in leaves(&raw) {
-            check_value(&name, &tag, &value, &secrets);
+        assert!(
+            path.is_dir(),
+            "{}: se esperaba un directorio",
+            path.display()
+        );
+        dirs.push(path);
+    }
+    assert!(dirs.len() > 1, "faltan las variantes");
+    let mut files = 0;
+    for dir in dirs {
+        for entry in std::fs::read_dir(&dir).expect("directorio de fixtures") {
+            let path = entry.unwrap().path();
+            let name = path.file_name().unwrap().to_string_lossy().into_owned();
+            let Some(stem) = name.strip_suffix(".xml") else {
+                continue;
+            };
+            files += 1;
+            for (k, v) in sanitize::split_fixture_name(stem).1 {
+                check_value(&name, &k, &v, &secrets);
+            }
+            let raw = std::fs::read_to_string(&path).unwrap();
+            for (tag, value) in leaves(&raw) {
+                check_value(&name, &tag, &value, &secrets);
+            }
         }
     }
     assert!(files > 50, "faltan fixtures ({files})");
@@ -298,6 +320,33 @@ async fn wan_down_reflected() {
     assert_eq!(wan(c.call("cbGetWanIPIntf", &[]).await.unwrap()), "0");
     sim.control.set_wan_up(true);
     assert_eq!(wan(c.call("cbGetWanIPIntf", &[]).await.unwrap()), "1");
+}
+
+#[tokio::test]
+async fn capa_sustituye_fixtures_y_mueve_su_wan() {
+    let sim = Sim::start(
+        SimConfig::new(USER, PASS, fixtures_dir()).con_capa(variantes_dir().join("dhcp-sin-voip")),
+    )
+    .await;
+    let c = client(&sim, Duration::from_secs(5));
+    let estado = |n: XmlNode| -> Vec<(String, String)> {
+        n.all("mll_wanconn_data")
+            .iter()
+            .map(|w| {
+                (
+                    w.text_of("name").unwrap().to_owned(),
+                    w.text_of("opr_status").unwrap().to_owned(),
+                )
+            })
+            .collect()
+    };
+    let wan = c.call("cbGetWanIPIntf", &[]).await.unwrap();
+    assert_eq!(estado(wan), [("ip5".to_owned(), "1".to_owned())]);
+    // Lo que no está en la capa sale de las fixtures de serie.
+    assert!(c.call("cbGetSummary", &[]).await.is_ok());
+    sim.control.set_wan_up(false);
+    let wan = c.call("cbGetWanIPIntf", &[]).await.unwrap();
+    assert_eq!(estado(wan), [("ip5".to_owned(), "0".to_owned())]);
 }
 
 #[tokio::test]

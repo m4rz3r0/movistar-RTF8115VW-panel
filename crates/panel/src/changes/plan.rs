@@ -16,8 +16,6 @@ use std::{
 pub const PALABRA_REINICIO: &str = "REINICIAR";
 /// Palabra para las demás acciones.
 pub const PALABRA_ACCION: &str = "CONFIRMAR";
-/// Interfaz de la conexión PPP principal.
-pub(super) const WAN: &str = "ip2";
 pub(super) const REBOOT: &str = "cbReboot";
 
 // ------------------------------------------------------------- planes
@@ -440,8 +438,17 @@ pub(super) fn comparar(
     }
 }
 
-pub(super) fn wan_arriba(w: &[hgu::models::WanConn]) -> bool {
-    w.iter().any(|c| c.name == WAN && c.up)
+/// ¿Hay internet? Con `Some(n)` (la conexión a internet detectada o elegida
+/// a mano), la conexión `n` está arriba. Con `None` (sin detectar), alguna
+/// conexión de datos (ni televisión ni telefonía) está arriba con IPv4: la
+/// red de seguridad del gestor nunca se apaga por no saber cuál es.
+pub fn wan_arriba(conns: &[hgu::models::WanConn], wan: Option<&str>) -> bool {
+    match wan {
+        Some(n) => conns.iter().any(|c| c.name == n && c.up),
+        None => conns
+            .iter()
+            .any(|c| c.es_de_datos() && c.up && c.ipv4.is_some()),
+    }
 }
 
 pub(super) fn palabra_requerida(f: &Funcion) -> Option<&'static str> {

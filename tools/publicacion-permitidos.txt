@@ -37,6 +37,7 @@ dominio config.local — nombre del fichero deploy/config.local, no un dominio
 
 # Código que la expresión de dominios confunde con un nombre.
 valor p.app — acceso a un campo en las pruebas de Rust
+valor red.lan — acceso al campo lan de la red detectada (hgu::deteccion) en Rust
 valor profile.dev — perfil de compilación de Cargo
 
 # MACs de las pruebas (administradas localmente).

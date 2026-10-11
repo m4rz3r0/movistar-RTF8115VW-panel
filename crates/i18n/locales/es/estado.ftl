@@ -97,5 +97,6 @@ estado-aviso-sin-router-desde = Sin conexión con el router desde { $cuando }. L
 estado-aviso-sin-router-desde-error = Sin conexión con el router desde { $cuando }: { $error }. Los datos mostrados son de esa hora.
 estado-aviso-lentos = Los datos de clientes y WiFi pueden estar desactualizados.
 estado-aviso-lentos-desde = Los datos de clientes y WiFi pueden estar desactualizados (último dato: { $cuando }).
+estado-internet-sin-detectar = Conexión a internet sin detectar · Elígela en Ajustes del panel
 estado-aviso-wps = WPS activo en { $redes }: desactívalo si no lo usas (el PIN de WPS se puede adivinar por fuerza bruta).
 estado-aviso-tr69 = Telefónica puede gestionar el router en remoto (TR-069).

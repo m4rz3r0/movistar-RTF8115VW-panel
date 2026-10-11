@@ -441,6 +441,8 @@ pub(crate) mod servidor {
             .await
             .map_err(interno)?;
         state.hgu.reconfigurar(c.client_config()).await;
+        // Otro router puede tener otra conexión a internet.
+        instancia::detectar_sin_esperar_mucho(state, instancia::ESPERA_DETECCION).await;
         state.poller.despertar();
         instancia::fijar_modo_firmware(&state.db, &info.firmware)
             .await

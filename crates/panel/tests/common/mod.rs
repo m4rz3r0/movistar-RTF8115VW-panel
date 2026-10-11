@@ -48,7 +48,30 @@ pub async fn panel() -> Panel {
 }
 
 pub async fn panel_con_proxy(trusted_proxy: IpAddr) -> Panel {
-    let p = panel_sin_router(trusted_proxy).await;
+    panel_con_sim(trusted_proxy, sim_config()).await
+}
+
+/// Panel contra un simulador con la capa de fixtures `capa` (una variante de
+/// línea, ver [`variante`]).
+pub async fn panel_con_capa(capa: &Path) -> Panel {
+    panel_con_sim("127.0.0.1".parse().unwrap(), sim_config().con_capa(capa)).await
+}
+
+/// Directorio de la variante de fixtures `nombre` (`fixtures-variantes/`).
+pub fn variante(nombre: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../hgu/fixtures-variantes")
+        .join(nombre)
+}
+
+/// Configuración del simulador con las fixtures de serie.
+pub fn sim_config() -> SimConfig {
+    let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../hgu/fixtures");
+    SimConfig::new(USER, PASS, fixtures)
+}
+
+async fn panel_con_sim(trusted_proxy: IpAddr, sim: SimConfig) -> Panel {
+    let p = panel_sin_router_con(trusted_proxy, sim).await;
     let (sim, state, dir) = (p.sim, p.state, p._dir);
     // Las credenciales del simulador, como las dejaría el asistente.
     instancia::guardar_credenciales(
@@ -74,8 +97,11 @@ pub async fn panel_con_proxy(trusted_proxy: IpAddr) -> Panel {
 /// Panel recién instalado: sin variables del router y con la base de datos
 /// vacía (el simulador arranca, pero el panel no lo conoce).
 pub async fn panel_sin_router(trusted_proxy: IpAddr) -> Panel {
-    let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../hgu/fixtures");
-    let sim = Sim::start(SimConfig::new(USER, PASS, fixtures)).await;
+    panel_sin_router_con(trusted_proxy, sim_config()).await
+}
+
+async fn panel_sin_router_con(trusted_proxy: IpAddr, sim: SimConfig) -> Panel {
+    let sim = Sim::start(sim).await;
     let dir = tempfile::tempdir().unwrap();
     let state = estado(config_en(dir.path(), trusted_proxy), dir.path()).await;
     instancia::arrancar_router(&state).await.unwrap();
@@ -217,7 +243,15 @@ pub async fn body_text(resp: Response<Body>) -> String {
 /// Panel con un cliente del router rápido y el gestor de cambios instalado
 /// (vigilancia de 300 ms), más la cookie de una sesión.
 pub async fn panel_con_gestor() -> (Panel, String) {
-    let mut p = panel().await;
+    gestor_y_sesion(panel().await).await
+}
+
+/// Como [`panel_con_gestor`], contra un simulador con la capa `capa`.
+pub async fn panel_con_gestor_y_capa(capa: &Path) -> (Panel, String) {
+    gestor_y_sesion(panel_con_capa(capa).await).await
+}
+
+async fn gestor_y_sesion(mut p: Panel) -> (Panel, String) {
     let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, USER, PASS);
     cfg.timeout = Duration::from_millis(500);
     cfg.min_gap = Duration::from_millis(1);

@@ -30,8 +30,6 @@ use std::{
 /// Cuerpo que devuelve el router cuando la sesión no es válida.
 const LOGGED_OUT: &str = "<script>top.location.href='te_acceso_router.asp';</script>";
 const XML_HEADER: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\r\n";
-/// Interfaz WAN principal (Internet).
-const WAN: &str = "ip2";
 /// Puerto LAN del equipo de `counters_bump`.
 const LAN_PORT: &str = "eth0.4";
 
@@ -44,6 +42,9 @@ pub struct SimConfig {
     pub password: String,
     /// Directorio con las fixtures `<name>[__<params>].xml`.
     pub fixtures_dir: PathBuf,
+    /// Directorio con fixtures que sustituyen a las de `fixtures_dir` (una
+    /// variante de línea, p. ej. `fixtures-variantes/dhcp-sin-voip`).
+    pub capa: Option<PathBuf>,
     /// Dirección de escucha; `None` = `127.0.0.1` en un puerto libre.
     pub listen: Option<SocketAddr>,
 }
@@ -55,8 +56,17 @@ impl SimConfig {
             user: user.to_owned(),
             password: password.to_owned(),
             fixtures_dir: fixtures_dir.into(),
+            capa: None,
             listen: None,
         }
+    }
+
+    /// La misma configuración con una capa de fixtures: cada fixture se busca
+    /// primero en `dir` y, si no está, en `fixtures_dir`.
+    #[must_use]
+    pub fn con_capa(mut self, dir: impl Into<PathBuf>) -> SimConfig {
+        self.capa = Some(dir.into());
+        self
     }
 }
 
@@ -77,13 +87,20 @@ impl Sim {
     /// # Panics
     /// Si las fixtures no se pueden leer o no se puede abrir el puerto.
     pub async fn start(cfg: SimConfig) -> SimHandle {
-        let fixtures = load_fixtures(&cfg.fixtures_dir)
-            .unwrap_or_else(|e| panic!("fixtures en {}: {e}", cfg.fixtures_dir.display()));
+        let cargar = |dir: &FsPath| {
+            load_fixtures(dir).unwrap_or_else(|e| panic!("fixtures en {}: {e}", dir.display()))
+        };
+        let mut fixtures = cargar(&cfg.fixtures_dir);
+        if let Some(capa) = &cfg.capa {
+            fixtures.extend(cargar(capa));
+        }
         let leases = initial_leases(&fixtures);
+        let wan = wan_de_las_fixtures(&fixtures);
         let inner = Arc::new(Inner {
             user: cfg.user,
             password: Mutex::new(cfg.password),
             fixtures,
+            wan,
             unresponsive: AtomicBool::new(false),
             state: Mutex::new(SimState {
                 seed: SystemTime::now()
@@ -142,7 +159,9 @@ impl SimControl {
         self.inner.state().invalidate_sessions();
     }
 
-    /// Cambia el `opr_status` de `ip2` en `cbGetWanIPIntf` (1 arriba, 0 abajo).
+    /// Cambia el `opr_status` en `cbGetWanIPIntf` de la conexión a internet
+    /// de las fixtures (la de la ruta por defecto; `ip2` en las de serie): 1
+    /// arriba, 0 abajo.
     pub fn set_wan_up(&self, up: bool) {
         self.inner.state().wan_up = up;
     }
@@ -225,12 +244,15 @@ impl SimControl {
     }
 
     /// Tráfico de internet de un equipo en el puerto LAN 4: `rx` bytes de
-    /// bajada y `tx` de subida. En `cbGetStatistic` suben `ip2` (rx, tx) y,
-    /// del lado LAN, `eth0.4` al revés (lo que baja sale por el puerto: tx).
-    /// El router real apenas los cuenta en `ip2` (reenvío por hardware); el
-    /// panel mide en los puertos LAN.
+    /// bajada y `tx` de subida. En `cbGetStatistic` suben la conexión a
+    /// internet (rx, tx; `ip2` en las fixtures de serie) y, del lado LAN,
+    /// `eth0.4` al revés (lo que baja sale por el puerto: tx). El router real
+    /// apenas los cuenta en la WAN (reenvío por hardware); el panel mide en
+    /// los puertos LAN.
     pub fn counters_bump(&self, rx: u64, tx: u64) {
-        self.counters_bump_iface(WAN, rx, tx);
+        if let Some(wan) = &self.inner.wan {
+            self.counters_bump_iface(wan, rx, tx);
+        }
         self.counters_bump_iface(LAN_PORT, tx, rx);
     }
 
@@ -275,6 +297,8 @@ struct Inner {
     /// Contraseña aceptada (cambiable con [`SimControl::set_password`]).
     password: Mutex<String>,
     fixtures: HashMap<FixtureKey, String>,
+    /// Conexión a internet de las fixtures (ver [`wan_de_las_fixtures`]).
+    wan: Option<String>,
     unresponsive: AtomicBool,
     state: Mutex<SimState>,
 }
@@ -393,6 +417,24 @@ fn load_fixtures(dir: &FsPath) -> std::io::Result<HashMap<FixtureKey, String>> {
         map.insert(fixture_key(name, &params), std::fs::read_to_string(&path)?);
     }
     Ok(map)
+}
+
+/// Conexión a internet de las fixtures: la de la ruta por defecto
+/// (`cbGetRoutingV4Rule` con `all=ALL` y `desc=Default`) o, sin ella, la
+/// única de datos con IPv4 de internet (la misma regla que el panel).
+fn wan_de_las_fixtures(fixtures: &HashMap<FixtureKey, String>) -> Option<String> {
+    let leer = |name: &str, params: &[(&str, &str)]| {
+        let params: Params = params
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+            .collect();
+        let raw = fixtures.get(&fixture_key(name, &params))?;
+        hgu::xml::parse_response(name, raw).ok()
+    };
+    let conns = hgu::models::WanConn::parse_all(&leer("cbGetWanIPIntf", &[])?);
+    let ruta = leer("cbGetRoutingV4Rule", &[("all", "ALL"), ("desc", "Default")])
+        .and_then(|n| hgu::read::regla_por_defecto(&n));
+    hgu::deteccion::elegir_wan(&conns, ruta.as_deref()).map(|w| w.name.clone())
 }
 
 fn initial_leases(fixtures: &HashMap<FixtureKey, String>) -> Vec<Lease> {
@@ -777,7 +819,7 @@ fn read(s: &Inner, st: &SimState, name: &str, params: &[(String, String)]) -> St
         },
         None => return failure(name, "no fixture"),
     };
-    patch(st, name, &mut node);
+    patch(s, st, name, &mut node);
     response(&node)
 }
 
@@ -838,7 +880,7 @@ fn read_leases(st: &SimState, params: &[(String, String)]) -> String {
 }
 
 /// Refleja el estado en memoria sobre la respuesta de la fixture.
-fn patch(st: &SimState, name: &str, node: &mut XmlNode) {
+fn patch(s: &Inner, st: &SimState, name: &str, node: &mut XmlNode) {
     match name {
         "cbGetUpnpCfg" => {
             if let Some(v) = &st.upnp_adm_state {
@@ -867,7 +909,10 @@ fn patch(st: &SimState, name: &str, node: &mut XmlNode) {
             }
         }
         "cbGetWanIPIntf" if !st.wan_up => for_each_node(node, &mut |n| {
-            if n.text_of("name") == Some(WAN) {
+            if s.wan
+                .as_deref()
+                .is_some_and(|w| n.text_of("name") == Some(w))
+            {
                 set_child(n, "opr_status", "0");
             }
         }),

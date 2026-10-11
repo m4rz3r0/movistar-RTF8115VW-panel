@@ -3,8 +3,14 @@
 //! Una sola tarea lee el estado cada 10 s (`cbGetSummary`, `cbGetStatistic`,
 //! `cbGetWanIPIntf`) y cada 60 s los hosts, concesiones DHCP, WiFi y el
 //! estado de TR-069. Guarda la última instantánea para las páginas, una
-//! muestra por lectura en `samples_raw`, los cortes de `ip2` en `wan_events`,
-//! y compacta las series cada 10 min.
+//! muestra por lectura en `samples_raw`, los cortes de la conexión a internet
+//! ([`AppState::wan`]) en `wan_events`, y compacta las series cada 10 min.
+//!
+//! Vuelve a detectar la red del router ([`instancia::detectar_y_guardar`])
+//! cada [`DETECCION_CADA`] o en cuanto la conexión a internet deja de
+//! aparecer en `cbGetWanIPIntf`, salvo con un cambio aplicándose o
+//! vigilándose (la red de seguridad del gestor no cambia de conexión a
+//! mitad).
 //!
 //! Ante errores de las lecturas de 10 s reintenta con espera creciente hasta
 //! 60 s; si el router rechaza la contraseña, cada 5 min. Esas muestras no se
@@ -26,6 +32,7 @@
 //! [`PauseGuard`] devuelta, el sondeo no hace peticiones al router.
 
 use crate::{
+    changes::plan::wan_arriba,
     instancia,
     series::{self, Sample},
     state::AppState,
@@ -42,9 +49,8 @@ use std::{
 };
 use tokio::sync::watch;
 
-/// Interfaz de la conexión PPP principal (sólo para saber si hay internet: sus
-/// contadores no ven el tráfico reenviado por hardware).
-const WAN: &str = "ip2";
+/// Cada cuánto se vuelve a detectar la red del router.
+pub const DETECCION_CADA: Duration = Duration::from_secs(3600);
 
 /// Lectura de los contadores del lado LAN: `(ts_ms, nombre → (rx, tx))` de
 /// los puertos físicos y los puntos de acceso WiFi.
@@ -144,6 +150,9 @@ pub struct Snapshot {
     pub at: i64,
     pub summary: Summary,
     pub wan: Vec<WanConn>,
+    /// Conexión a internet con la que se leyó ([`AppState::wan`]); `None` si
+    /// está sin detectar.
+    pub wan_intf: Option<String>,
     pub counters: Vec<IfaceCounters>,
     /// Datos de 60 s: se conservan entre lecturas.
     pub hosts: Vec<LanHost>,
@@ -321,6 +330,8 @@ pub struct Poller {
     last_compact: Option<Instant>,
     /// Firmware con el que se fijó el modo solo lectura por última vez.
     firmware: Option<String>,
+    /// Último intento de detectar la red desde el sondeo.
+    deteccion: Option<Instant>,
 }
 
 /// Espera hasta el siguiente ciclo.
@@ -396,6 +407,7 @@ impl Poller {
             last_slow: None,
             last_compact: None,
             firmware: None,
+            deteccion: None,
         }
     }
 
@@ -524,11 +536,17 @@ impl Poller {
 
     async fn read_slow(&self) -> Result<Slow, Error> {
         let c = &self.state.hgu;
+        let radios = self
+            .state
+            .red()
+            .map(|r| r.radios)
+            .filter(|r| !r.is_empty())
+            .unwrap_or_else(|| read::RADIOS_POR_DEFECTO.map(String::from).to_vec());
         Ok(Slow {
             hosts: read::lan_hosts(c).await?,
             leases: read::dhcp_leases(c).await?,
             statics: read::static_leases(c).await?,
-            wifi: read::wifi(c).await?,
+            wifi: read::wifi(c, &radios).await?,
             tr69_activo: c
                 .call("cbGetTr69Config", &[])
                 .await?
@@ -564,9 +582,34 @@ impl Poller {
         }
     }
 
+    /// Vuelve a detectar la red si toca (ver el comentario del módulo). Tras
+    /// un intento, el siguiente espera al menos un intervalo de 60 s.
+    async fn seguir_red(&mut self, now: i64, wan: &[WanConn]) {
+        let cada = i64::try_from(DETECCION_CADA.as_secs()).unwrap_or(i64::MAX);
+        let vieja = self
+            .state
+            .red()
+            .is_none_or(|r| now.saturating_sub(r.momento) >= cada);
+        let falta = self
+            .state
+            .wan()
+            .is_some_and(|n| !wan.iter().any(|w| w.name == n));
+        let reciente = self.deteccion.is_some_and(|t| t.elapsed() < self.cfg.slow);
+        let cambio_en_curso = self.state.cambios().is_some_and(|m| m.activo().is_some());
+        if !(vieja || falta) || reciente || cambio_en_curso {
+            return;
+        }
+        self.deteccion = Some(Instant::now());
+        if let Err(e) = instancia::detectar_y_guardar(&self.state).await {
+            tracing::warn!("{e}");
+        }
+    }
+
     async fn store(&mut self, now: i64, r: Reading) {
         self.seguir_firmware(&r.summary.firmware).await;
-        let wan_up = r.wan.iter().any(|w| w.name == WAN && w.up);
+        self.seguir_red(now, &r.wan).await;
+        let wan_intf = self.state.wan();
+        let wan_up = wan_arriba(&r.wan, wan_intf.as_deref());
         let bytes = lan_bytes(r.counters_ms, &r.counters);
         // Tras un hueco (pausa larga) no se promedia sobre él.
         let gap_ms = i64::try_from((self.cfg.fast * 3).as_millis()).unwrap_or(i64::MAX);
@@ -582,6 +625,7 @@ impl Poller {
                 Some(mut s) => {
                     s.summary = r.summary;
                     s.wan = r.wan;
+                    s.wan_intf = wan_intf;
                     s.counters = r.counters;
                     s
                 }
@@ -589,6 +633,7 @@ impl Poller {
                     at: now,
                     summary: r.summary,
                     wan: r.wan,
+                    wan_intf,
                     counters: r.counters,
                     hosts: Vec::new(),
                     leases: Vec::new(),
