@@ -44,6 +44,7 @@ valor aa:bb:cc:00:11:22 — MAC inventada de las pruebas
 valor aa:bb:cc:00:11:33 — MAC inventada de las pruebas
 valor aa:bb:cc:00:11:44 — MAC inventada de las pruebas
 valor aa:bb:cc:dd:ee:ff — MAC inventada de las pruebas
+valor 00:5e:10:00:01:00 — cola de una MAC de prueba de siete grupos (split_mac en crates/hgu/src/fmt.rs)
 
 # Tipografías (revisadas: sin metadatos personales).
 binario crates/panel/public/fonts/chakra-petch-500.woff2 2939dc743e44b4a4fb1fa671da826b7c806c4a4714251b82f6f4a493fd00f29b — tipografía Chakra Petch (OFL)

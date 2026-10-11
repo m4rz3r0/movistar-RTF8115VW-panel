@@ -181,7 +181,7 @@ fn normalizar(raiz: &Path, s: &Path) -> String {
 }
 
 /// Patrón de ruta prohibida que cumple `ruta`, si alguno.
-fn prohibida(ruta: &str) -> Option<&'static str> {
+pub(crate) fn prohibida(ruta: &str) -> Option<&'static str> {
     let partes: Vec<&str> = ruta.split('/').collect();
     let nombre = partes.last().copied().unwrap_or("");
     let directorios = &partes[..partes.len().saturating_sub(1)];
@@ -238,22 +238,39 @@ fn revisar_fichero(camino: &Path, ruta: &str, p: &Permitidos, l: &ListasLocales)
     let Ok(bytes) = fs::read(camino) else {
         return ilegible();
     };
+    revisar_contenido(ruta, &bytes, p, l)
+}
+
+/// `true` si la extensión de `ruta` es de las que siempre son binarios.
+pub(crate) fn binario_por_extension(ruta: &str) -> bool {
     let extension = ruta
         .rsplit_once('.')
         .map(|(_, e)| e.to_ascii_lowercase())
         .unwrap_or_default();
-    if EXTENSIONES_BINARIAS.contains(&extension.as_str()) {
-        return revisar_binario(ruta, &bytes, p);
+    EXTENSIONES_BINARIAS.contains(&extension.as_str())
+}
+
+/// Revisa el contenido de un fichero (o de un blob de git) según su tipo:
+/// los binarios conocidos por la extensión, como binarios; el texto UTF-8,
+/// como texto; y lo demás, como binario **y** como el texto que se pueda leer.
+pub(crate) fn revisar_contenido(
+    ruta: &str,
+    bytes: &[u8],
+    p: &Permitidos,
+    l: &ListasLocales,
+) -> Vec<Hallazgo> {
+    if binario_por_extension(ruta) {
+        return revisar_binario(ruta, bytes, p);
     }
     if !bytes.contains(&0)
-        && let Ok(texto) = std::str::from_utf8(&bytes)
+        && let Ok(texto) = std::str::from_utf8(bytes)
     {
         return revisar_texto(ruta, texto, p, l);
     }
     // Ni texto UTF-8 ni binario conocido: se exige la revisión del binario y
     // además se revisa el texto que se pueda leer en él.
-    let mut h = revisar_binario(ruta, &bytes, p);
-    h.extend(revisar_texto(ruta, &texto_legible(&bytes), p, l));
+    let mut h = revisar_binario(ruta, bytes, p);
+    h.extend(revisar_texto(ruta, &texto_legible(bytes), p, l));
     h
 }
 

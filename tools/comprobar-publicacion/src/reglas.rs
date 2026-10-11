@@ -250,22 +250,23 @@ static MAC: LazyLock<Regex> = LazyLock::new(|| {
 /// MAC).
 pub(crate) fn regla_mac(linea: &str, p: &Permitidos) -> Vec<&'static str> {
     let b = linea.as_bytes();
+    // Todos los filtros van en `acepta`: una coincidencia descartada, también
+    // la de una MAC permitida, no debe tapar una real que la solape
+    // (`ff 00 1a …`, `aa:00:1a:…`).
     coincidencias(&MAC, linea, |m| {
         let alnum = |c: Option<&u8>| c.is_some_and(u8::is_ascii_alphanumeric);
         let t = m.as_str();
         let antes = &b[..m.start()];
         // Con grupos de una cifra, detrás de un grupo IPv6 es una cola de IPv6.
         let grupo_corto = t.contains(':') && t.split(':').any(|g| g.len() == 1);
-        !alnum(antes.last()) && !alnum(b.get(m.end())) && !(grupo_corto && tras_grupo_ipv6(antes))
+        let solo_cifras = t.bytes().all(|c| c.is_ascii_digit() || c == b' ');
+        !alnum(antes.last())
+            && !alnum(b.get(m.end()))
+            && !(grupo_corto && tras_grupo_ipv6(antes))
+            && !(solo_cifras && (t.len() == 12 || t.contains(' ')))
+            && mac_normalizada(t).is_some_and(|n| !mac_permitida(&n, p))
     })
     .into_iter()
-    .filter(|m| {
-        let t = m.as_str();
-        let solo_cifras = t.bytes().all(|c| c.is_ascii_digit() || c == b' ');
-        !(solo_cifras && (t.len() == 12 || t.contains(' ')))
-    })
-    .filter_map(|m| mac_normalizada(m.as_str()))
-    .filter(|n| !mac_permitida(n, p))
     .map(|_| "oui real")
     .collect()
 }
@@ -348,7 +349,9 @@ pub(crate) fn regla_dominio(linea: &str, p: &Permitidos) -> Vec<&'static str> {
 
 fn dominio_permitido(d: &str, p: &Permitidos) -> bool {
     let bajo = |padre: &str| d == padre || d.ends_with(&format!(".{padre}"));
+    // El dominio de los correos anónimos de GitHub, que `regla_correo` acepta.
     bajo("home.arpa")
+        || bajo("users.noreply.github.com")
         || ["example.com", "example.net", "example.org"]
             .into_iter()
             .any(bajo)
@@ -399,54 +402,134 @@ pub(crate) fn regla_clave(linea: &str, p: &Permitidos) -> Vec<&'static str> {
     }
     for m in CADENA.find_iter(linea) {
         let t = m.as_str();
-        if p.valor_permitido(t) {
-            continue;
-        }
-        // Si el token entero no parece una clave, se prueban también sus
-        // finales tras cada separador: un prefijo de identificador
-        // (`x_y_z_…_<clave>`) no debe ocultar la clave.
-        let finales = std::iter::once(t).chain(
-            t.match_indices(['_', '-', '/', '+'])
-                .map(|(i, _)| &t[i + 1..])
-                .filter(|f| f.len() >= 32),
-        );
-        for f in finales {
-            if es_cadena_hex(f) {
-                out.push("cadena hex larga");
-                break;
-            } else if es_cadena_base64(f) {
-                out.push("cadena base64 larga");
-                break;
-            }
+        if !p.valor_permitido(t)
+            && let Some(detalle) = clave_en_token(t)
+        {
+            out.push(detalle);
         }
     }
     out
 }
 
-fn separadores(t: &str) -> usize {
-    t.bytes().filter(|c| matches!(c, b'_' | b'-')).count()
-}
-
-fn es_cadena_hex(t: &str) -> bool {
-    t.len() - separadores(t) >= 32
-        && t.bytes()
-            .all(|c| c.is_ascii_hexdigit() || matches!(c, b'_' | b'-'))
-}
-
-/// Una cadena base64 o base64url aleatoria. Si mezcla los dos alfabetos
-/// (`/` o `+` con `_` o `-`) no es un único valor sino una ruta o un
-/// identificador, y se revisa cada tramo entre `/`.
-fn es_cadena_base64(t: &str) -> bool {
-    let sep = separadores(t);
-    if t.contains(['/', '+']) && sep > 0 {
-        return t
-            .split('/')
-            .any(|tramo| tramo.len() >= 32 && es_cadena_base64(tramo));
+/// Si `t` (un token de `[A-Za-z0-9+/_-]`) o alguno de sus finales tras un
+/// `_`, `-`, `/` o `+` parece una clave: un prefijo de identificador
+/// (`x_y_z_…_<clave>`) no debe ocultarla.
+///
+/// Cada final se evalúa en tiempo constante con recuentos acumulados, así que
+/// el coste es lineal en la longitud del token (un token enorme de
+/// identificadores no cuelga el gancho).
+///
+/// Un final es una cadena hexadecimal si solo tiene hexadecimales, `_` y `-`
+/// y 32 o más cifras. Es base64 si tiene mayúsculas, minúsculas y cifras y
+/// como mucho un `_`/`-` cada diez caracteres; si mezcla `/` o `+` con `_` o
+/// `-` no es un único valor, y se revisa cada tramo entre `/` (y, dentro de un
+/// tramo que mezcla `+` con `_`/`-`, cada pieza entre `+`).
+fn clave_en_token(t: &str) -> Option<&'static str> {
+    let b = t.as_bytes();
+    let n = b.len();
+    // Recuentos acumulados: separador (`_`/`-`), cifra, mayúscula, minúscula,
+    // `/` o `+`, y lo que no es hexadecimal ni separador.
+    const SEP: usize = 0;
+    const CIFRA: usize = 1;
+    const MAYUS: usize = 2;
+    const MINUS: usize = 3;
+    const BARRA_O_MAS: usize = 4;
+    const NO_HEX: usize = 5;
+    let mut acc = Vec::with_capacity(n + 1);
+    acc.push([0u32; 6]);
+    for &c in b {
+        let mut r = *acc.last().expect("no vacío");
+        match c {
+            b'_' | b'-' => r[SEP] += 1,
+            b'0'..=b'9' => r[CIFRA] += 1,
+            b'A'..=b'Z' => r[MAYUS] += 1,
+            b'a'..=b'z' => r[MINUS] += 1,
+            _ => {}
+        }
+        if c == b'/' || c == b'+' {
+            r[BARRA_O_MAS] += 1;
+        }
+        if !c.is_ascii_hexdigit() && c != b'_' && c != b'-' {
+            r[NO_HEX] += 1;
+        }
+        acc.push(r);
     }
-    sep * 10 <= t.len()
-        && t.bytes().any(|c| c.is_ascii_digit())
-        && t.bytes().any(|c| c.is_ascii_uppercase())
-        && t.bytes().any(|c| c.is_ascii_lowercase())
+    let cuenta = |a: usize, z: usize, k: usize| (acc[z][k] - acc[a][k]) as usize;
+    let simple = |a: usize, z: usize| {
+        cuenta(a, z, SEP) * 10 <= z - a
+            && cuenta(a, z, CIFRA) > 0
+            && cuenta(a, z, MAYUS) > 0
+            && cuenta(a, z, MINUS) > 0
+    };
+
+    // Tramos entre `/` y piezas entre `/` o `+`. Un separador pertenece al
+    // tramo (o pieza) que termina en él.
+    let mut fin_tramo = Vec::new();
+    let mut tramo_de = Vec::with_capacity(n);
+    let mut fin_pieza = Vec::new();
+    let mut pieza_de = Vec::with_capacity(n);
+    for (i, &c) in b.iter().enumerate() {
+        tramo_de.push(fin_tramo.len());
+        pieza_de.push(fin_pieza.len());
+        if c == b'/' {
+            fin_tramo.push(i);
+        }
+        if c == b'/' || c == b'+' {
+            fin_pieza.push(i);
+        }
+    }
+    fin_tramo.push(n);
+    fin_pieza.push(n);
+    let inicio = |fines: &[usize], k: usize| if k == 0 { 0 } else { fines[k - 1] + 1 };
+    let sigue_en_el_tramo = |j: usize| b.get(fin_pieza[j]) == Some(&b'+');
+
+    // `suf_pieza[j]`: alguna pieza completa desde la `j` hasta el final de su
+    // tramo es base64 de 32 o más.
+    let mut suf_pieza = vec![false; fin_pieza.len() + 1];
+    for j in (0..fin_pieza.len()).rev() {
+        let (a, z) = (inicio(&fin_pieza, j), fin_pieza[j]);
+        let ok = z - a >= 32 && simple(a, z);
+        suf_pieza[j] = ok || (sigue_en_el_tramo(j) && suf_pieza[j + 1]);
+    }
+    // Un tramo (sin `/`) desde `a` hasta su final `z`.
+    let base64_tramo = |a: usize, z: usize| {
+        if cuenta(a, z, BARRA_O_MAS) > 0 && cuenta(a, z, SEP) > 0 {
+            let j = pieza_de.get(a).copied().unwrap_or(fin_pieza.len() - 1);
+            let fin = fin_pieza[j];
+            (fin - a >= 32 && simple(a, fin)) || (sigue_en_el_tramo(j) && suf_pieza[j + 1])
+        } else {
+            simple(a, z)
+        }
+    };
+    // `suf_tramo[k]`: algún tramo completo desde el `k` es base64.
+    let mut suf_tramo = vec![false; fin_tramo.len() + 1];
+    for k in (0..fin_tramo.len()).rev() {
+        let (a, z) = (inicio(&fin_tramo, k), fin_tramo[k]);
+        suf_tramo[k] = (z - a >= 32 && base64_tramo(a, z)) || suf_tramo[k + 1];
+    }
+
+    let finales = std::iter::once(0).chain(
+        b.iter()
+            .enumerate()
+            .filter(|&(_, c)| matches!(c, b'_' | b'-' | b'/' | b'+'))
+            .map(|(i, _)| i + 1),
+    );
+    for a in finales.filter(|&a| n - a >= 32) {
+        if cuenta(a, n, NO_HEX) == 0 && (n - a) - cuenta(a, n, SEP) >= 32 {
+            return Some("cadena hex larga");
+        }
+        let base64 = if cuenta(a, n, BARRA_O_MAS) > 0 && cuenta(a, n, SEP) > 0 {
+            let k = tramo_de[a];
+            let z = fin_tramo[k];
+            (z - a >= 32 && base64_tramo(a, z)) || suf_tramo[k + 1]
+        } else {
+            simple(a, n)
+        };
+        if base64 {
+            return Some("cadena base64 larga");
+        }
+    }
+    None
 }
 
 // --- Identificadores personales ---------------------------------------------

@@ -1,0 +1,82 @@
+#!/bin/sh
+# Gancho pre-push: nada sale del repositorio sin pasar por
+# comprobar-publicacion. Se instala con:
+#
+#     git config core.hooksPath tools/hooks
+#
+# Por cada ref que se sube (git la pasa por la entrada estándar como
+# «<ref local> <sha local> <ref remota> <sha remoto>»):
+#
+# - si .git/routerpanel-raices-privadas (un hash por línea) contiene un
+#   ancestro del commit local, la rechaza: «esta rama contiene el historial
+#   privado»;
+# - si la ref remota no existe o no es ancestro de la local, o si lo que se
+#   sube no es un commit (una etiqueta anotada), revisa todo lo alcanzable
+#   desde la local (--historial --rev); si no, solo lo nuevo
+#   (--diff remota..local). Así nunca depende del árbol de trabajo: lee los
+#   objetos que se suben, y un fichero borrado no es un error;
+# - borrar una ref remota no sube nada y no se revisa.
+#
+# Sale con 1 ante cualquier hallazgo o error. Nunca imprime nombres de ref:
+# pueden contener un dato.
+#
+# El comprobador es $RP_COMPROBAR_PUBLICACION si está definido; si no,
+# `cargo run -q -p comprobar-publicacion` en la raíz del repositorio.
+set -u
+
+raiz=$(git rev-parse --show-toplevel) || exit 1
+comun=$(git rev-parse --git-common-dir) || exit 1
+raices="$comun/routerpanel-raices-privadas"
+
+comprobar() {
+    if [ -n "${RP_COMPROBAR_PUBLICACION:-}" ]; then
+        "$RP_COMPROBAR_PUBLICACION" "$@" </dev/null
+    else
+        (cd "$raiz" && cargo run -q -p comprobar-publicacion -- "$@" </dev/null)
+    fi
+}
+
+# Un sha de solo ceros: la ref no existe (en el remoto) o se borra (en local).
+es_cero() {
+    case $1 in
+    *[!0]*) return 1 ;;
+    *) return 0 ;;
+    esac
+}
+
+fallo=0
+while read -r ref_local sha_local ref_remota sha_remoto; do
+    if es_cero "$sha_local"; then
+        continue
+    fi
+    if [ -f "$raices" ]; then
+        while read -r raiz_privada; do
+            [ -n "$raiz_privada" ] || continue
+            if git merge-base --is-ancestor "$raiz_privada" "$sha_local" 2>/dev/null; then
+                echo "pre-push: esta rama contiene el historial privado; no se sube" >&2
+                exit 1
+            fi
+        done <"$raices"
+    fi
+    # --diff solo recorre commits: una etiqueta anotada (u otro objeto que no
+    # sea un commit) se revisa siempre con --historial.
+    if ! es_cero "$sha_remoto" &&
+        [ "$(git cat-file -t "$sha_local" 2>/dev/null)" = commit ] &&
+        git cat-file -e "$sha_remoto^{commit}" 2>/dev/null &&
+        git merge-base --is-ancestor "$sha_remoto" "$sha_local" 2>/dev/null; then
+        comprobar --diff "$sha_remoto..$sha_local" "$raiz" \
+            --nombre-ref "$ref_local" --nombre-ref "$ref_remota"
+    else
+        comprobar --historial "$raiz" --rev "$sha_local" \
+            --nombre-ref "$ref_local" --nombre-ref "$ref_remota"
+    fi
+    if [ $? -ne 0 ]; then
+        fallo=1
+    fi
+done
+
+if [ "$fallo" -ne 0 ]; then
+    echo "pre-push: comprobar-publicacion encontró algo (o falló); no se sube" >&2
+    exit 1
+fi
+exit 0

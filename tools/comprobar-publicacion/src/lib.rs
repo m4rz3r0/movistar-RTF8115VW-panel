@@ -11,12 +11,16 @@
 //! del dueño ([`ListasLocales`]) solo existen en su máquina.
 
 mod arbol;
+mod git;
+mod locales;
 mod permitidos;
 mod reglas;
 
 use std::fmt;
 
 pub use arbol::arbol;
+pub use git::{diff, historial, revisar_refs};
+pub use locales::ListasLocales;
 pub use permitidos::Permitidos;
 
 /// Regla que produce un hallazgo.
@@ -106,24 +110,6 @@ impl fmt::Display for Hallazgo {
             "{}:{}  {}  [{}]",
             self.ruta, self.linea, self.regla, self.detalle
         )
-    }
-}
-
-/// Listas con valores del dueño (solo en su máquina). En esta versión siempre
-/// está vacía; las reglas `lista-secretos`, `lista-prohibidos` y
-/// `config-local` se conectan a través de [`ListasLocales::revisar_linea`].
-#[derive(Clone, Debug, Default)]
-pub struct ListasLocales {}
-
-impl ListasLocales {
-    /// Sin listas locales (CI, o máquina sin datos del dueño).
-    pub fn vacia() -> Self {
-        Self::default()
-    }
-
-    /// Coincidencias de las listas en una línea, como `(regla, detalle)`.
-    pub(crate) fn revisar_linea(&self, _linea: &str, _p: &Permitidos) -> Vec<(Regla, String)> {
-        Vec::new()
     }
 }
 

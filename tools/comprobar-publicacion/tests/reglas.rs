@@ -446,3 +446,51 @@ fn gpon_sin_falso_positivo_de_fecha() {
     let serie = format!("{}{}", "HWTC", "12345678");
     assert_eq!(reglas("a", &serie), [Regla::Identificador]);
 }
+
+// --- Tarea 3: arrastrados de la Tarea 2 --------------------------------------
+
+#[test]
+fn mac_permitida_no_tapa_una_real_que_la_solapa() {
+    let real = mac(MAC_REAL, " ", false);
+    // `ff 00 1a 2b 3c 4d` (con el bit local) solapa la MAC real que empieza
+    // un grupo después.
+    let volcado = format!("ff {real} 6f");
+    assert_eq!(reglas("a", &volcado), [Regla::Mac], "{volcado}");
+    let tras_local = format!("pkt aa:{}", mac(MAC_REAL, ":", false));
+    assert_eq!(reglas("a", &tras_local), [Regla::Mac], "{tras_local}");
+}
+
+#[test]
+fn clave_con_token_enorme_es_rapida() {
+    let token = "Zz_".repeat(40_000);
+    let inicio = std::time::Instant::now();
+    let h = revisar("a", &token);
+    let tiempo = inicio.elapsed();
+    assert!(h.is_empty(), "{h:?}");
+    assert!(tiempo.as_millis() < 500, "{tiempo:?}");
+    // La clave al final de un token así se sigue viendo.
+    let con_clave = format!("{token}{}", azar_url(40));
+    assert_eq!(reglas("a", &con_clave), [Regla::Clave]);
+}
+
+#[test]
+fn clave_con_mas_y_guion_bajo_no_revienta() {
+    // `+` y `_` sin `/`: antes se revisaba a sí misma sin fin.
+    let token = format!("{}+{}_{}", azar_url(20), azar_url(20), azar_url(20));
+    let inicio = std::time::Instant::now();
+    let _ = reglas("a", &token);
+    assert!(inicio.elapsed().as_millis() < 500);
+    let largo = format!("abc+def_{}", azar_url(40));
+    assert_eq!(reglas("a", &largo), [Regla::Clave]);
+}
+
+/// Como [`azar`], sin `/` ni `+` (base64url sin separadores).
+fn azar_url(n: usize) -> String {
+    azar(n).replace(['/', '+'], "Q")
+}
+
+#[test]
+fn correo_anonimo_de_github_no_da_dominio() {
+    assert!(reglas("a", "Ana <123+ana@users.noreply.github.com>").is_empty());
+    assert_eq!(reglas("a", "visita github.com"), [Regla::Dominio]);
+}
