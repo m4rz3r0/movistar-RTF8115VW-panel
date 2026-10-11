@@ -29,3 +29,15 @@ historial-deshace-a = Undoes
 historial-deshacer = Undo
 historial-deshacer-lector = { " " }change #{ $id }
 historial-error-deshacer = Cannot undo: { $motivo }.
+historial-pasos = { " · " }{ $n ->
+    [one] { $n } step
+   *[other] { $n } steps
+}
+historial-pasos-lista = Steps of the change
+historial-paso-num = Step { $n }
+historial-paso-pendiente = not applied
+historial-paso-omitido = skipped
+historial-paso-aplicando = applying
+historial-paso-aplicado = applied
+historial-paso-fallido = failed
+historial-paso-revertido = reverted

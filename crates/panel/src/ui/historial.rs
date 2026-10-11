@@ -8,6 +8,9 @@
 //! explorador, con la inversa. Los cambios en `aplicando` o `vigilando` se
 //! refrescan cada 2 s hasta que terminan; si no, no se sondea.
 //!
+//! Un cambio de varios pasos (un grupo) es una sola fila; su detalle lista
+//! los pasos con su resumen humano, su estado y su diff.
+//!
 //! Los revelados no llevan el valor: solo quién, cuándo y qué campo.
 
 #[cfg(feature = "ssr")]
@@ -68,6 +71,57 @@ pub struct CambioFila {
     pub deshace: Option<Vinculo>,
     /// El gestor aceptaría deshacerlo ahora.
     pub puede_deshacer: bool,
+    /// Resumen humano del grupo, si lo tiene.
+    pub titulo: Option<String>,
+    /// Pasos del grupo (vacío si es de un solo paso).
+    pub pasos: Vec<PasoFila>,
+}
+
+/// Estado de un paso de un grupo.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EstadoPasoVista {
+    Pendiente,
+    Omitido,
+    Aplicando,
+    Aplicado,
+    Fallido,
+    Revertido,
+}
+
+impl EstadoPasoVista {
+    pub fn etiqueta(self) -> String {
+        match self {
+            EstadoPasoVista::Pendiente => t!("historial-paso-pendiente"),
+            EstadoPasoVista::Omitido => t!("historial-paso-omitido"),
+            EstadoPasoVista::Aplicando => t!("historial-paso-aplicando"),
+            EstadoPasoVista::Aplicado => t!("historial-paso-aplicado"),
+            EstadoPasoVista::Fallido => t!("historial-paso-fallido"),
+            EstadoPasoVista::Revertido => t!("historial-paso-revertido"),
+        }
+    }
+
+    pub fn estado(self) -> Estado {
+        match self {
+            EstadoPasoVista::Aplicado => Estado::Ok,
+            EstadoPasoVista::Revertido => Estado::Aviso,
+            EstadoPasoVista::Fallido => Estado::Error,
+            _ => Estado::Neutro,
+        }
+    }
+}
+
+/// Un paso de un grupo del historial (secretos enmascarados).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PasoFila {
+    /// Posición en el grupo (desde 1).
+    pub numero: i64,
+    /// Resumen humano (o el nombre de la función).
+    pub etiqueta: String,
+    pub funcion: String,
+    pub instancia: Option<String>,
+    pub estado: EstadoPasoVista,
+    pub campos: Vec<CampoCambio>,
+    pub error: Option<String>,
 }
 
 /// Un secreto revelado (sin su valor).
@@ -246,6 +300,45 @@ fn FilaRevelado(r: ReveladoFila) -> impl IntoView {
     }
 }
 
+/// Lista desplegable de los pasos de un grupo.
+fn lista_pasos(pasos: Vec<PasoFila>) -> impl IntoView {
+    let filas = pasos
+        .into_iter()
+        .map(|p| {
+            let instancia = p
+                .instancia
+                .map(|i| view! { <span class="hist-instancia">{t!("historial-instancia-sep", i = i)}</span> });
+            let error = p.error.map(|e| view! { <p class="hist-error">{e}</p> });
+            view! {
+                <li class="hist-paso">
+                    <details>
+                        <summary class="hist-paso-cabeza">
+                            <span class="hist-paso-n cifras">
+                                {t!("historial-paso-num", n = p.numero)}
+                            </span>
+                            <span>{p.etiqueta}</span>
+                            <span class="mono hist-instancia">{p.funcion}</span>
+                            {instancia}
+                            <span class="hist-paso-estado">
+                                <Insignia estado=p.estado.estado() texto=p.estado.etiqueta() />
+                            </span>
+                        </summary>
+                        <div class="hist-paso-cuerpo">
+                            <TablaDiff campos=p.campos />
+                            {error}
+                        </div>
+                    </details>
+                </li>
+            }
+        })
+        .collect_view();
+    view! {
+        <ol class="hist-pasos" aria-label=t!("historial-pasos-lista")>
+            {filas}
+        </ol>
+    }
+}
+
 #[component]
 fn FilaCambio(
     c: CambioFila,
@@ -290,6 +383,26 @@ fn FilaCambio(
             </p>
         }
     });
+    // Un grupo: su resumen y el número de pasos; el detalle, los pasos.
+    let n_pasos = c.pasos.len();
+    let que = if n_pasos > 0 {
+        let titulo = c.titulo.clone().unwrap_or_else(|| c.funcion.clone());
+        view! {
+            <span>
+                {titulo}
+                <span class="hist-instancia">{t!("historial-pasos", n = n_pasos)}</span>
+            </span>
+        }
+        .into_any()
+    } else {
+        view! { <span>{funcion_enlazada(c.funcion.clone(), c.ruta, c.instancia.clone())}</span> }
+            .into_any()
+    };
+    let detalle = if n_pasos > 0 {
+        lista_pasos(c.pasos).into_any()
+    } else {
+        view! { <TablaDiff campos=c.campos /> }.into_any()
+    };
     let boton = c.puede_deshacer.then(|| {
         view! {
             <button
@@ -324,9 +437,7 @@ fn FilaCambio(
                     <span class="hist-quien">{c.usuario.unwrap_or_else(|| "—".to_owned())}</span>
                     <span class="hist-que">
                         <span class="hist-id cifras">{format!("#{id}")}</span>
-                        <span>
-                            {funcion_enlazada(c.funcion.clone(), c.ruta, c.instancia.clone())}
-                        </span>
+                        {que}
                     </span>
                     <span class="hist-diff">{c.resumen}</span>
                     <span class="hist-insignias">
@@ -335,7 +446,7 @@ fn FilaCambio(
                     </span>
                 </summary>
                 <div class="hist-detalle">
-                    <TablaDiff campos=c.campos />
+                    {detalle}
                     <dl class="hist-tiempos">{tiempos}</dl>
                     {enlaces}
                 </div>

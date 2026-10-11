@@ -260,9 +260,9 @@ pub fn DialogoCambio(
                                 t!("biblioteca-aplicado-nota", nota = n)
                             }),
                     ),
-                    EstadoDeCambio::Revertido | EstadoDeCambio::Fallido => {
-                        c.error.clone().or(c.nota.clone())
-                    }
+                    EstadoDeCambio::Revertido
+                    | EstadoDeCambio::Fallido
+                    | EstadoDeCambio::RevertidoParcial => c.error.clone().or(c.nota.clone()),
                     _ => None,
                 };
                 let estado = match c.estado {

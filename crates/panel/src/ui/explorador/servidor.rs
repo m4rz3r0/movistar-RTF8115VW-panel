@@ -793,18 +793,26 @@ pub(crate) fn vista_preparado(
     prep: crate::changes::Preparado,
 ) -> PreparadoVista {
     let o = Ocultar::new(state);
-    let f = state.catalogo.funcion(&prep.funcion);
+    // Cada campo con las etiquetas de la función de su paso (deshacer un
+    // grupo junta varios).
+    let campos = prep
+        .pasos
+        .into_iter()
+        .flat_map(|p| {
+            let f = state.catalogo.funcion(&p.funcion);
+            p.diff
+                .campos
+                .into_iter()
+                .map(|c| campo_cambio(f, &o, c))
+                .collect::<Vec<_>>()
+        })
+        .collect();
     PreparadoVista {
         token: prep.token,
         funcion: prep.funcion,
         instancia: prep.instancia,
         borrar: prep.borrar,
-        campos: prep
-            .diff
-            .campos
-            .into_iter()
-            .map(|c| campo_cambio(f, &o, c))
-            .collect(),
+        campos,
         riesgo: riesgo(prep.riesgo),
         vigilancia_s: g.tiempos().vigilancia(prep.riesgo).as_secs(),
         palabra: prep.palabra,
@@ -832,6 +840,7 @@ pub(crate) fn estado(e: Estado) -> EstadoDeCambio {
         Estado::Aplicado => EstadoDeCambio::Aplicado,
         Estado::Revertido => EstadoDeCambio::Revertido,
         Estado::Fallido => EstadoDeCambio::Fallido,
+        Estado::RevertidoParcial => EstadoDeCambio::RevertidoParcial,
     }
 }
 

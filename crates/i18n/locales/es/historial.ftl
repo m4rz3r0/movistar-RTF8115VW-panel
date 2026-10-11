@@ -29,3 +29,15 @@ historial-deshace-a = Deshace a
 historial-deshacer = Deshacer
 historial-deshacer-lector = { " " }el cambio nº { $id }
 historial-error-deshacer = No se puede deshacer: { $motivo }.
+historial-pasos = { " · " }{ $n ->
+    [one] { $n } paso
+   *[other] { $n } pasos
+}
+historial-pasos-lista = Pasos del cambio
+historial-paso-num = Paso { $n }
+historial-paso-pendiente = sin aplicar
+historial-paso-omitido = omitido
+historial-paso-aplicando = aplicando
+historial-paso-aplicado = aplicado
+historial-paso-fallido = fallido
+historial-paso-revertido = revertido

@@ -57,6 +57,7 @@ biblioteca-cambio-vigilando = vigilando
 biblioteca-cambio-aplicado = aplicado
 biblioteca-cambio-revertido = revertido
 biblioteca-cambio-fallido = fallido
+biblioteca-cambio-revertido-parcial = revertido en parte
 
 ## Ficha
 biblioteca-pagina-router = Página del router

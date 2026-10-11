@@ -317,3 +317,81 @@ async fn exige_sesion_y_sirve_la_pagina() {
     assert!(html.contains("Historial"), "{html}");
     assert_eq!(common::get(&p.app, "/historial").await.status(), 303);
 }
+
+/// Un grupo es una sola fila con la lista de sus pasos: resumen humano
+/// (traducido; sin etiqueta, la función), estado y diff de cada uno.
+#[tokio::test]
+async fn grupo_es_una_fila_con_sus_pasos() {
+    use panel::changes::{ChangeManager, ChangeRequest, Estado, GrupoRequest, Paso, Tiempos};
+    let (p, cookie) = historial_panel().await;
+    let solo = alta_reserva(&p, &cookie, "192.168.1.93", "02:00:00:00:00:93").await;
+    let m = ChangeManager::instalar(&p.state, Tiempos::default());
+    let paso = |funcion: &str, instancia: Option<&str>, v: &[(&str, &str)], e: Option<&str>| Paso {
+        req: ChangeRequest {
+            funcion: funcion.into(),
+            instancia: instancia.map(str::to_owned),
+            valores: v
+                .iter()
+                .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+                .collect(),
+            borrar: false,
+        },
+        etiqueta: e.map(str::to_owned),
+    };
+    let prep = m
+        .preparar_grupo(GrupoRequest {
+            pasos: vec![
+                paso(
+                    "cbSetUpnpCfg",
+                    None,
+                    &[("adm_state", "1")],
+                    Some("historial-deshacer"),
+                ),
+                paso(
+                    LEASES,
+                    Some("0"),
+                    &[(POOL, "0"), ("ipv4_addr", "192.168.1.84")],
+                    None,
+                ),
+            ],
+            titulo: Some("historial-titulo".into()),
+        })
+        .await
+        .unwrap();
+    let id = m.confirmar_grupo(&prep.token, &[], "admin").await.unwrap();
+    let inicio = std::time::Instant::now();
+    while m.cambio(id).await.unwrap().estado != Estado::Aplicado {
+        assert!(inicio.elapsed() < Duration::from_secs(10));
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    let pag = pagina(&p, &cookie, 1).await;
+    let c = cambios(&pag);
+    assert_eq!(c.len(), 2, "una fila por grupo");
+    let g = c[0];
+    assert_eq!(g["id"], id);
+    assert_eq!(g["titulo"], "Historial");
+    let pasos = g["pasos"].as_array().unwrap();
+    assert_eq!(pasos.len(), 2);
+    assert_eq!(pasos[0]["numero"], 1);
+    assert_eq!(pasos[0]["etiqueta"], "Deshacer");
+    assert_eq!(pasos[0]["funcion"], "cbSetUpnpCfg");
+    assert_eq!(pasos[0]["estado"], "Aplicado");
+    assert_eq!(pasos[1]["etiqueta"], LEASES);
+    assert_eq!(pasos[1]["instancia"], "0");
+    assert_eq!(pasos[1]["campos"][0]["nombre"], "ipv4_addr");
+    assert_eq!(g["campos"].as_array().unwrap().len(), 2);
+    assert_eq!(g["puede_deshacer"], true);
+    // Un cambio de un paso sigue como siempre, sin lista de pasos.
+    assert_eq!(c[1]["id"], solo);
+    assert_eq!(c[1]["pasos"], json!([]));
+
+    // Deshacer el grupo: un solo diálogo con los campos de los dos pasos.
+    let d = ok(&p, "deshacer", json!({ "change_id": id }), &cookie).await;
+    let campos: Vec<&str> = d["campos"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["nombre"].as_str().unwrap())
+        .collect();
+    assert_eq!(campos, ["ipv4_addr", "adm_state"], "en orden inverso");
+}

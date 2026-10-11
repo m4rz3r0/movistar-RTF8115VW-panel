@@ -336,6 +336,8 @@ pub enum EstadoDeCambio {
     Aplicado,
     Revertido,
     Fallido,
+    /// Un grupo que falló y no se pudo revertir entero.
+    RevertidoParcial,
 }
 
 impl EstadoDeCambio {
@@ -347,6 +349,7 @@ impl EstadoDeCambio {
             EstadoDeCambio::Aplicado => t!("biblioteca-cambio-aplicado"),
             EstadoDeCambio::Revertido => t!("biblioteca-cambio-revertido"),
             EstadoDeCambio::Fallido => t!("biblioteca-cambio-fallido"),
+            EstadoDeCambio::RevertidoParcial => t!("biblioteca-cambio-revertido-parcial"),
         }
     }
 
@@ -354,7 +357,10 @@ impl EstadoDeCambio {
     pub fn final_(self) -> bool {
         matches!(
             self,
-            EstadoDeCambio::Aplicado | EstadoDeCambio::Revertido | EstadoDeCambio::Fallido
+            EstadoDeCambio::Aplicado
+                | EstadoDeCambio::Revertido
+                | EstadoDeCambio::Fallido
+                | EstadoDeCambio::RevertidoParcial
         )
     }
 
@@ -362,7 +368,7 @@ impl EstadoDeCambio {
         match self {
             EstadoDeCambio::Aplicado => crate::ui::Estado::Ok,
             EstadoDeCambio::Revertido => crate::ui::Estado::Aviso,
-            EstadoDeCambio::Fallido => crate::ui::Estado::Error,
+            EstadoDeCambio::Fallido | EstadoDeCambio::RevertidoParcial => crate::ui::Estado::Error,
             _ => crate::ui::Estado::Neutro,
         }
     }

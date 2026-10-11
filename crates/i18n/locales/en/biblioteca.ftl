@@ -57,6 +57,7 @@ biblioteca-cambio-vigilando = watching
 biblioteca-cambio-aplicado = applied
 biblioteca-cambio-revertido = reverted
 biblioteca-cambio-fallido = failed
+biblioteca-cambio-revertido-parcial = partly reverted
 
 ## Function page
 biblioteca-pagina-router = Router page

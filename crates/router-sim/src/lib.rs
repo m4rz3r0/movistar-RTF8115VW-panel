@@ -208,6 +208,22 @@ impl SimControl {
         self.inner.state().hang_after_write = HangAfterWrite::Armed;
     }
 
+    /// La escritura real (no de solo validación) número `n` contando desde
+    /// ahora (1: la próxima) responde `Result=1` y no se aplica. Se puede
+    /// armar varias veces para que fallen varias.
+    pub fn fail_write_n(&self, n: usize) {
+        let mut st = self.inner.state();
+        let objetivo = st.real_writes + n;
+        st.fail_write_at.insert(objetivo);
+    }
+
+    /// Como [`SimControl::hang_after_next_write`], pero con la escritura real
+    /// número `n` contando desde ahora (1: la próxima).
+    pub fn hang_after_write_n(&self, n: usize) {
+        let mut st = self.inner.state();
+        st.hang_at_write = Some(st.real_writes + n);
+    }
+
     /// Tráfico de internet de un equipo en el puerto LAN 4: `rx` bytes de
     /// bajada y `tx` de subida. En `cbGetStatistic` suben `ip2` (rx, tx) y,
     /// del lado LAN, `eth0.4` al revés (lo que baja sale por el puerto: tx).
@@ -315,6 +331,12 @@ struct SimState {
     no_answer_next: bool,
     /// `create_twice_next_write`.
     create_twice: bool,
+    /// Escrituras reales recibidas (para `fail_write_n`/`hang_after_write_n`).
+    real_writes: usize,
+    /// Números de escritura real que fallan (`fail_write_n`).
+    fail_write_at: HashSet<usize>,
+    /// Número de escritura real tras la que se cuelga (`hang_after_write_n`).
+    hang_at_write: Option<usize>,
     /// Bytes sumados a cada interfaz de `cbGetStatistic`: nombre → (rx, tx).
     counters_extra: HashMap<String, (u64, u64)>,
     writes: Vec<(String, Params)>,
@@ -880,7 +902,15 @@ fn write(st: &mut SimState, name: &str, params: &[(String, String)]) -> String {
     // Validación previa (página WiFi): nunca aplica nada ni se registra;
     // puede consumir `fail_next`, pero no `ignore_next`.
     let validation_only = param(&clean, "validation_only") == Some("1");
+    let mut fail_n = false;
     if !validation_only {
+        st.real_writes += 1;
+        let n = st.real_writes;
+        fail_n = st.fail_write_at.remove(&n);
+        if st.hang_at_write == Some(n) {
+            st.hang_at_write = None;
+            st.hang_after_write = HangAfterWrite::Armed;
+        }
         st.writes.push((name.to_owned(), clean.clone()));
         if let Some(r) = st.fail_reads_after_write.take() {
             st.failing_reads.insert(r);
@@ -891,6 +921,9 @@ fn write(st: &mut SimState, name: &str, params: &[(String, String)]) -> String {
     }
     if let Some(err) = st.fail_next.take() {
         return failure(name, &err);
+    }
+    if fail_n {
+        return failure(name, "escritura rechazada (simulado)");
     }
     if validation_only {
         return ok(name);
