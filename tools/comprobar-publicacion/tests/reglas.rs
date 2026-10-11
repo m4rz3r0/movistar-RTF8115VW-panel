@@ -402,3 +402,47 @@ fn ruta_no_desactiva_reglas_de_seguridad() {
     }
     assert!(Permitidos::leer("ruta docs/** ipv4 — ejemplos").is_ok());
 }
+
+// --- Ronda de correcciones 2 ------------------------------------------------
+
+#[test]
+fn mac_tras_palabra_hexadecimal() {
+    for forma in [
+        format!("MAC {}", mac(MAC_REAL, " ", true)),
+        format!("mac:{}", mac(MAC_REAL, ":", false)),
+        format!("mac-{}", mac(MAC_REAL, "-", false)),
+        format!("mac_{}", mac(MAC_REAL, "_", false)),
+        format!("mac:0:{}", mac(MAC_REAL, ":", false).split_at(3).1),
+    ] {
+        assert_eq!(reglas("a", &forma), [Regla::Mac], "{forma}");
+    }
+    // Una cola de IPv6 con grupos de una cifra no es una MAC.
+    assert!(reglas("a", "fe80::1:2:3:4:5:6").is_empty());
+}
+
+#[test]
+fn mac_formas_hp_y_cisco() {
+    let plano = mac(MAC_REAL, "", false);
+    let hp = format!("{}-{}", &plano[..6], &plano[6..]);
+    let cisco = format!("{}.{}.{}", &plano[..4], &plano[4..8], &plano[8..]);
+    for forma in [hp, cisco] {
+        assert_eq!(
+            reglas("a", &format!("eth {forma} up")),
+            [Regla::Mac],
+            "{forma}"
+        );
+    }
+}
+
+#[test]
+fn clave_tras_identificador_con_separadores() {
+    let texto = format!("{}_{}", "x_y_z_w_v_u_t_s", azar(35));
+    assert_eq!(reglas("a", &texto), [Regla::Clave]);
+}
+
+#[test]
+fn gpon_sin_falso_positivo_de_fecha() {
+    assert!(reglas("a", &format!("{}{}", "data", "20261011")).is_empty());
+    let serie = format!("{}{}", "HWTC", "12345678");
+    assert_eq!(reglas("a", &serie), [Regla::Identificador]);
+}

@@ -235,38 +235,86 @@ static MAC: LazyLock<Regex> = LazyLock::new(|| {
         r"|[0-9a-f]{2}(?:_[0-9a-f]{2}){5}",
         r"|[0-9a-f]{2}(?: [0-9a-f]{2}){5}",
         r"|[0-9a-f]{4}\.[0-9a-f]{4}\.[0-9a-f]{4}",
+        r"|[0-9a-f]{6}-[0-9a-f]{6}",
         r"|[0-9a-f]{12}",
     ))
 });
 
 /// MAC con OUI real, escrita con `:` (también con grupos de una cifra, como
 /// la muestra `arp` en BSD y macOS), `-`, `_`, espacios, `.` cada cuatro
-/// cifras o sin separador, en mayúsculas o minúsculas. Valen las especiales,
+/// cifras (Cisco), `-` entre dos mitades (HP) o sin separador, en mayúsculas o
+/// minúsculas. Valen las especiales,
 /// las administradas localmente, el rango de documentación `00:00:5e:00:53:xx`
 /// y las de `permitidos`. Sin separador o con espacios solo cuenta si tiene
 /// alguna letra (un contador de 12 cifras o una lista de números no es una
 /// MAC).
 pub(crate) fn regla_mac(linea: &str, p: &Permitidos) -> Vec<&'static str> {
     let b = linea.as_bytes();
-    MAC.find_iter(linea)
-        .filter(|m| {
-            let alnum = |c: Option<&u8>| c.is_some_and(u8::is_ascii_alphanumeric);
-            let t = m.as_str();
-            // Con grupos de una cifra, un `:` delante indica una IPv6.
-            let grupo_corto = t.contains(':') && t.split(':').any(|g| g.len() == 1);
-            !alnum(b[..m.start()].last())
-                && !alnum(b.get(m.end()))
-                && !(grupo_corto && b[..m.start()].last() == Some(&b':'))
-        })
-        .filter(|m| {
-            let t = m.as_str();
-            let solo_cifras = t.bytes().all(|c| c.is_ascii_digit() || c == b' ');
-            !(solo_cifras && (t.len() == 12 || t.contains(' ')))
-        })
-        .filter_map(|m| mac_normalizada(m.as_str()))
-        .filter(|n| !mac_permitida(n, p))
-        .map(|_| "oui real")
-        .collect()
+    coincidencias(&MAC, linea, |m| {
+        let alnum = |c: Option<&u8>| c.is_some_and(u8::is_ascii_alphanumeric);
+        let t = m.as_str();
+        let antes = &b[..m.start()];
+        // Con grupos de una cifra, detrás de un grupo IPv6 es una cola de IPv6.
+        let grupo_corto = t.contains(':') && t.split(':').any(|g| g.len() == 1);
+        !alnum(antes.last()) && !alnum(b.get(m.end())) && !(grupo_corto && tras_grupo_ipv6(antes))
+    })
+    .into_iter()
+    .filter(|m| {
+        let t = m.as_str();
+        let solo_cifras = t.bytes().all(|c| c.is_ascii_digit() || c == b' ');
+        !(solo_cifras && (t.len() == 12 || t.contains(' ')))
+    })
+    .filter_map(|m| mac_normalizada(m.as_str()))
+    .filter(|n| !mac_permitida(n, p))
+    .map(|_| "oui real")
+    .collect()
+}
+
+/// `true` si `antes` acaba en `:` precedido de otro `:` o de un grupo de 1-4
+/// hexadecimales que es una palabra entera (`fe80:`), no de una palabra como
+/// `mac:`.
+fn tras_grupo_ipv6(antes: &[u8]) -> bool {
+    let Some((&b':', resto)) = antes.split_last() else {
+        return false;
+    };
+    if resto.last() == Some(&b':') {
+        return true;
+    }
+    let largo = resto
+        .iter()
+        .rev()
+        .take_while(|c| c.is_ascii_alphanumeric())
+        .count();
+    let palabra = &resto[resto.len() - largo..];
+    (1..=4).contains(&largo) && palabra.iter().all(u8::is_ascii_hexdigit)
+}
+
+/// Coincidencias de `re` que `acepta` da por buenas. Si rechaza una, se
+/// vuelve a buscar desde el carácter siguiente a su **inicio**, no tras su
+/// final: una coincidencia que empieza dentro de la palabra anterior (`ac` de
+/// `mac:`) no debe ocultar la buena que la solapa.
+fn coincidencias<'a>(
+    re: &Regex,
+    texto: &'a str,
+    acepta: impl Fn(&regex::Match<'a>) -> bool,
+) -> Vec<regex::Match<'a>> {
+    let mut out = Vec::new();
+    let mut desde = 0;
+    while let Some(m) = re.find_at(texto, desde) {
+        if acepta(&m) {
+            out.push(m);
+            desde = m.end().max(m.start() + 1);
+        } else {
+            desde = m.start() + texto[m.start()..].chars().next().map_or(1, char::len_utf8);
+        }
+        while !texto.is_char_boundary(desde) {
+            desde += 1;
+        }
+        if desde > texto.len() {
+            break;
+        }
+    }
+    out
 }
 
 fn mac_permitida(n: &str, p: &Permitidos) -> bool {
@@ -354,10 +402,22 @@ pub(crate) fn regla_clave(linea: &str, p: &Permitidos) -> Vec<&'static str> {
         if p.valor_permitido(t) {
             continue;
         }
-        if es_cadena_hex(t) {
-            out.push("cadena hex larga");
-        } else if es_cadena_base64(t) {
-            out.push("cadena base64 larga");
+        // Si el token entero no parece una clave, se prueban también sus
+        // finales tras cada separador: un prefijo de identificador
+        // (`x_y_z_…_<clave>`) no debe ocultar la clave.
+        let finales = std::iter::once(t).chain(
+            t.match_indices(['_', '-', '/', '+'])
+                .map(|(i, _)| &t[i + 1..])
+                .filter(|f| f.len() >= 32),
+        );
+        for f in finales {
+            if es_cadena_hex(f) {
+                out.push("cadena hex larga");
+                break;
+            } else if es_cadena_base64(f) {
+                out.push("cadena base64 larga");
+                break;
+            }
         }
     }
     out
@@ -411,9 +471,17 @@ static NIE: LazyLock<Regex> =
 pub(crate) fn regla_identificador(linea: &str, p: &Permitidos) -> Vec<&'static str> {
     let linea = separar_guiones_bajos(linea);
     let mut out = Vec::new();
-    // `ffffffffffff` tiene la forma de una serie GPON en minúsculas.
+    // `ffffffffffff` tiene la forma de una serie GPON en minúsculas, y
+    // `data20261011` también: si el fabricante no va en mayúsculas, la parte
+    // hexadecimal debe tener alguna letra. Como la expresión va entre `\b`,
+    // una coincidencia descartada no puede solapar otra buena.
     out.extend(
         GPON.find_iter(&linea)
+            .filter(|m| {
+                let t = m.as_str();
+                t[..4].bytes().all(|c| c.is_ascii_uppercase())
+                    || t[4..].bytes().any(|c| c.is_ascii_alphabetic())
+            })
             .filter(|m| !sanitize::is_fake_mac(&m.as_str().to_ascii_lowercase()))
             .filter(|m| !p.valor_permitido(m.as_str()))
             .map(|_| "serie gpon"),

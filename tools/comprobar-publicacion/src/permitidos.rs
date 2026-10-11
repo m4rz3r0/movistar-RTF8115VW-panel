@@ -137,8 +137,8 @@ impl Permitidos {
 }
 
 /// MAC en cualquier escritura (seis grupos de una o dos cifras separados por
-/// `:`, `-`, `_` o espacios; tres grupos de cuatro separados por `.`; o 12
-/// cifras seguidas) como 12 hexadecimales en minúsculas.
+/// `:`, `-`, `_` o espacios; tres grupos de cuatro separados por `.`; dos de
+/// seis separados por `-`; o 12 cifras seguidas) como 12 hexadecimales en minúsculas.
 pub(crate) fn mac_normalizada(v: &str) -> Option<String> {
     let grupos: Vec<&str> = v.split([':', '-', '_', ' ', '.']).collect();
     let hex = |g: &str| !g.is_empty() && g.bytes().all(|b| b.is_ascii_hexdigit());
@@ -147,6 +147,7 @@ pub(crate) fn mac_normalizada(v: &str) -> Option<String> {
             grupos.iter().map(|g| format!("{g:0>2}")).collect()
         }
         3 if grupos.iter().all(|g| hex(g) && g.len() == 4) => grupos.concat(),
+        2 if grupos.iter().all(|g| hex(g) && g.len() == 6) => grupos.concat(),
         1 if hex(v) && v.len() == 12 => v.to_owned(),
         _ => return None,
     };
