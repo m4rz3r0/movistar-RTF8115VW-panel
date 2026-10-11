@@ -487,6 +487,38 @@ struct Revelados {
 /// Tiempo que se muestra un secreto revelado.
 const REVELADO: std::time::Duration = std::time::Duration::from_secs(30);
 
+impl Revelados {
+    /// Muestra `valor` en la celda de `o` durante [`REVELADO`].
+    fn mostrar(self, o: Objetivo, valor: String) {
+        self.valores.update(|v| v.push((o.clone(), valor)));
+        self.pidiendo.set(None);
+        set_timeout(
+            move || self.valores.update(|v| v.retain(|(k, _)| *k != o)),
+            REVELADO,
+        );
+    }
+
+    /// «Revelar»: sin pedir la contraseña si la sesión tiene abierta la
+    /// ventana de reautenticación; si no (o si falla), con el diálogo, que
+    /// la pide y muestra el error.
+    fn pedir(self, o: Objetivo) {
+        leptos::task::spawn_local(async move {
+            let r = revelar(
+                o.funcion.clone(),
+                o.campo.clone(),
+                o.instancia.clone(),
+                o.params.clone(),
+                String::new(),
+            )
+            .await;
+            match r {
+                Ok(valor) => self.mostrar(o, valor),
+                Err(_) => self.pidiendo.set(Some(o)),
+            }
+        });
+    }
+}
+
 /// Celda de un valor de lectura; los secretos, con «Revelar».
 fn celda_valor(v: Valor, objetivo: Objetivo) -> AnyView {
     match v {
@@ -532,7 +564,7 @@ fn CeldaSecreta(objetivo: Objetivo) -> impl IntoView {
                 <button
                     class="boton-mini"
                     type="button"
-                    on:click=move |_| r.pidiendo.set(Some(o.get_value()))
+                    on:click=move |_| r.pedir(o.get_value())
                 >
                     {t!("biblioteca-revelar")}
                     <span class="solo-lector">{o.with_value(|o| format!(" {}", o.campo))}</span>
@@ -751,17 +783,7 @@ fn VistaLectura(detalle: FuncionDetalle) -> impl IntoView {
                     instancia=o.instancia.clone()
                     params=o.params.clone()
                     on_cerrar=move |_| revelados.pidiendo.set(None)
-                    on_revelado=move |valor: String| {
-                        let o = o2.clone();
-                        revelados.valores.update(|v| v.push((o.clone(), valor)));
-                        revelados.pidiendo.set(None);
-                        set_timeout(
-                            move || {
-                                revelados.valores.update(|v| v.retain(|(k, _)| *k != o));
-                            },
-                            REVELADO,
-                        );
-                    }
+                    on_revelado=move |valor: String| revelados.mostrar(o2.clone(), valor)
                 />
             }
         })

@@ -11,9 +11,10 @@ use leptos::prelude::*;
 #[cfg(feature = "ssr")]
 pub use server::{
     AuthUser, LoginError, MAX_PASSWORD_BYTES, MIN_PASSWORD_CHARS, REAUTH_SECS, SESSION_COOKIE,
-    User, UserError, attempt_login, change_own_password, client_ip, create_user, delay_secs,
-    delete_user, hash_password, poner_cookie_de_sesion, reautenticar_sesion, reauthenticate,
-    require_page_session, require_reauth, require_user, set_password, verify, warm_up,
+    User, UserError, abrir_ventana_de_reautenticacion, attempt_login, change_own_password,
+    client_ip, create_user, delay_secs, delete_user, hash_password, poner_cookie_de_sesion,
+    reautenticar_sesion, reauthenticate, require_page_session, require_reauth, require_user,
+    set_password, verify, warm_up,
 };
 
 /// Mensaje de error de las server functions sin sesión vigente (con estado
@@ -796,6 +797,17 @@ mod server {
             }
             Err(LoginError::Internal(e)) => return internal(e),
         }
+        abrir_ventana_de_reautenticacion().await?;
+        tracing::info!(usuario = %user.username, "reautenticación en Ajustes del panel");
+        Ok(())
+    }
+
+    /// Abre la ventana de reautenticación de la sesión de la petición durante
+    /// [`REAUTH_SECS`]. Solo tras comprobar la contraseña
+    /// ([`reauthenticate`]).
+    pub async fn abrir_ventana_de_reautenticacion() -> Result<(), ServerFnError> {
+        let state = app_state()?;
+        let headers: HeaderMap = leptos_axum::extract().await?;
         let Some(id) = cookie_session_id(&headers) else {
             return fail(StatusCode::UNAUTHORIZED, super::ERROR_SESION);
         };
@@ -807,13 +819,12 @@ mod server {
         {
             return internal(e);
         }
-        tracing::info!(usuario = %user.username, "reautenticación en Ajustes del panel");
         Ok(())
     }
 
     /// Como [`require_user`], y además la sesión tiene abierta la ventana de
-    /// reautenticación ([`reautenticar_sesion`]); si no, 401 con
-    /// [`super::ERROR_REAUTENTICACION`].
+    /// reautenticación ([`reautenticar_sesion`], o «Revelar» con la
+    /// contraseña); si no, 401 con [`super::ERROR_REAUTENTICACION`].
     pub async fn require_reauth() -> Result<User, ServerFnError> {
         let state = app_state()?;
         let user = require_user().await?;

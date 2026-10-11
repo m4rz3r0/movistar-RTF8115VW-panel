@@ -441,10 +441,19 @@ impl ChangeManager {
 
     /// Espera a que el hueco quede libre y lo reserva (al retomar: lo que
     /// lo ocupe, p. ej. un cambio de credenciales, termina pronto).
-    async fn esperar_hueco(self: &Arc<Self>) -> Reserva {
+    /// `id`: el cambio que se va a retomar (para el registro).
+    async fn esperar_hueco(self: &Arc<Self>, id: i64) -> Reserva {
+        let mut avisado = false;
         loop {
             if let Ok(r) = self.reservar() {
                 return r;
+            }
+            if !avisado {
+                tracing::info!(
+                    "retomar el cambio {id}: espera a que quede libre el gestor de cambios \
+                     (p. ej. un cambio de credenciales del router en curso)"
+                );
+                avisado = true;
             }
             tokio::time::sleep(self.tiempos.intervalo).await;
         }
@@ -753,7 +762,7 @@ impl ChangeManager {
             // cambio de credenciales que empezó antes, o el cambio anterior
             // de esta lista) termina antes de seguir. Así ningún grupo se da
             // por cerrado sin intentar revertirlo.
-            let reserva = self.esperar_hueco().await;
+            let reserva = self.esperar_hueco(id).await;
             reserva.fijar(id);
             let aplicando = fila.get::<String, _>("estado") == Estado::Aplicando.as_str();
             // La WAN como estaba antes del cambio (nunca la de ahora).

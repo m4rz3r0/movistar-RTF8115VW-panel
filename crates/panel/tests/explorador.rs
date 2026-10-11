@@ -348,6 +348,58 @@ async fn revelar_exige_contrasena_y_registra() {
     assert_eq!(status, 401);
 }
 
+/// «Revelar» comparte la ventana de reautenticación de cinco minutos de
+/// «Ajustes del panel»: con ella abierta no vuelve a pedir la contraseña.
+#[tokio::test]
+async fn revelar_usa_la_ventana_de_reautenticacion() {
+    let (p, cookie) = explorador().await;
+    let revelar = |contrasena: &str| {
+        json!({ "funcion": "te_wifi.asp", "campo": "wlWpaPsk", "instancia": null,
+                "params": [], "contrasena": contrasena })
+    };
+    let revelados = || async {
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM reveals")
+            .fetch_one(&p.state.db)
+            .await
+            .unwrap()
+    };
+    // Sin ventana ni contraseña: hay que reautenticarse.
+    let (status, body) = llamar(&p, "revelar", revelar(""), Some(&cookie)).await;
+    assert_eq!(status, 401, "{body}");
+    assert!(body.contains(panel::auth::ERROR_REAUTENTICACION), "{body}");
+    assert!(!body.contains("psk-sim-secreta"));
+    assert_eq!(revelados().await, 0);
+
+    // Con la contraseña se abre la ventana: el siguiente ya no la pide.
+    let v = ok(&p, "revelar", revelar(common::PANEL_PASS), &cookie).await;
+    assert_eq!(v, "psk-sim-secreta");
+    let v = ok(&p, "revelar", revelar(""), &cookie).await;
+    assert_eq!(v, "psk-sim-secreta");
+    assert_eq!(revelados().await, 2, "cada revelado queda registrado");
+
+    // Cerrada la ventana, vuelve a pedirla.
+    sqlx::query("UPDATE sessions SET reautenticado_hasta = reautenticado_hasta - 301")
+        .execute(&p.state.db)
+        .await
+        .unwrap();
+    let (status, body) = llamar(&p, "revelar", revelar(""), Some(&cookie)).await;
+    assert_eq!(status, 401, "{body}");
+    // La ventana abierta en «Ajustes del panel» también vale.
+    ok(
+        &p,
+        "reautenticar",
+        json!({ "contrasena": common::PANEL_PASS }),
+        &cookie,
+    )
+    .await;
+    let v = ok(&p, "revelar", revelar(""), &cookie).await;
+    assert_eq!(v, "psk-sim-secreta");
+    // Otra sesión del mismo usuario no la hereda.
+    let otra = common::sesion_de(&p).await;
+    let (status, _) = llamar(&p, "revelar", revelar(""), Some(&otra)).await;
+    assert_eq!(status, 401);
+}
+
 #[tokio::test]
 async fn bloqueada_sin_formulario() {
     let (p, cookie) = explorador().await;

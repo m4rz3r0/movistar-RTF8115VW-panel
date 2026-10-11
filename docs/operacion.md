@@ -17,6 +17,64 @@ Todas las órdenes se lanzan en el servidor (`ssh admin@192.0.2.10`) con
 > doas tail -f /var/log/routerpanel-update.log
 > ```
 
+## Primera instalación: el asistente
+
+Un panel sin usuarios sólo sirve el asistente de instalación
+(`https://panel.home.arpa/instalar`; cualquier otra página lleva allí):
+
+1. **Token.** Al arrancar sin usuarios, el panel genera un token de un solo
+   uso, lo escribe en su registro («token de instalación: …») y en
+   `/var/db/routerpanel/instalar.token` (600, junto a la base de datos). En el
+   host:
+
+   ```sh
+   doas cat /usr/local/jails/containers/routerpanel/var/db/routerpanel/instalar.token
+   ```
+
+   `deploy/install.sh` dice dónde está si el panel aún no tiene usuarios. El
+   asistente sólo responde desde la red local y sin el token no hace nada.
+2. **Administrador.** Con el token, usuario y contraseña (mínimo 12
+   caracteres) del primer usuario del panel. Al crearlo se borra el token y
+   queda la sesión abierta.
+3. **Router.** Dirección (`http://192.168.1.1`), usuario (`1234`) y
+   contraseña de la web del router. «Probar» entra, lee modelo y firmware y
+   sale sin guardar; «Guardar y seguir» las guarda **cifradas** en la base de
+   datos (con `history.key`) sólo si entran. Con un firmware que no es uno de
+   los probados el panel queda en **solo lectura** hasta confirmarlo en
+   «Ajustes del panel».
+4. **Lectura inicial.** Lee todas las funciones de lectura y guarda la «foto
+   de partida» cifrada. Con eso la instalación termina: `/instalar` responde
+   404 y el panel se usa como siempre.
+
+Si el proceso se reinicia a medias, el asistente sigue donde se quedó (con un
+token nuevo si aún no había administrador).
+
+## Ajustes del panel (`/panel`)
+
+En el menú del usuario. Secciones:
+
+- **Router**: credenciales (la contraseña guardada nunca se muestra; para
+  cambiar algo se escribe la del router y el panel prueba a entrar antes de
+  guardar), firmware y modo solo lectura (con «Confirmar el firmware»).
+- **Panel**: idioma por defecto de la instancia y zona horaria.
+- **Privacidad e instancia**: DNS preferidos, dispositivos de confianza,
+  ventana de mantenimiento y servidor propio (opcionales).
+- **Usuarios**: alta, baja y cambio de contraseña.
+
+Las operaciones delicadas (credenciales del router, confirmar el firmware y
+todo lo de usuarios) piden volver a escribir la contraseña del panel; durante
+5 minutos no se vuelve a pedir en esa sesión. «Revelar» un secreto en el
+Explorador usa la misma ventana. Con un cambio aplicándose o vigilándose, las
+credenciales del router no se pueden cambiar (se pide esperar).
+
+## Idioma
+
+Español e inglés. El selector está en la cabecera (en el menú en el móvil),
+en el acceso y en el asistente; la elección se guarda en el navegador (cookie
+`rp_lang`, un año) y recarga la página. Sin elección, manda el idioma por
+defecto de la instancia («Ajustes del panel» → Panel) si se ha fijado; si no,
+el idioma del navegador (`Accept-Language`); si no, español.
+
 ## Acceso y usuarios
 
 - Se entra por `https://panel.home.arpa`, sólo desde la LAN (Caddy
@@ -24,12 +82,13 @@ Todas las órdenes se lanzan en el servidor (`ssh admin@192.0.2.10`) con
 - La sesión caduca a los 30 minutos sin uso y, como mucho, a las 12 horas.
 - Tras varios intentos fallidos el panel hace esperar (hasta 60 s) por IP y por
   usuario; la respuesta no dice si el usuario existe.
-- La contraseña inicial de `admin` está en `/root/routerpanel-admin-password.txt`
-  (600). Cámbiala la primera vez y borra el fichero.
+- Si queda de antes `/root/routerpanel-admin-password.txt` (la contraseña
+  inicial que creaba `install.sh` antes del asistente), cambia esa contraseña
+  y borra el fichero.
 
-Los usuarios se gestionan con el propio binario, dentro de la jail y como el
-usuario del servicio (la base de datos es suya). Pide la contraseña dos veces,
-sin eco; mínimo 12 caracteres:
+Los usuarios se gestionan en «Ajustes del panel» o con el propio binario,
+dentro de la jail y como el usuario del servicio (la base de datos es suya).
+Pide la contraseña dos veces, sin eco; mínimo 12 caracteres:
 
 ```sh
 # Alta
@@ -41,50 +100,67 @@ doas jexec -U routerpanel routerpanel env RP_DB=/var/db/routerpanel/panel.db \
     /usr/local/routerpanel/current/panel user passwd <usuario>
 ```
 
-No hace falta reiniciar el servicio. En esta versión no hay orden para borrar
-usuarios.
+No hace falta reiniciar el servicio. Borrar usuarios, sólo desde «Ajustes del
+panel» (nunca el último).
 
 ## Cambiar la contraseña del router
 
-El panel entra en la web del router como el usuario `1234` con la contraseña de
-`/usr/local/etc/routerpanel/router.secret` (dentro de la jail; 600, del usuario
-`routerpanel`, sin salto de línea al final). Para cambiarla:
+Las credenciales del router están en la base de datos del panel, con la
+contraseña cifrada con `history.key`. Para cambiarla:
 
-1. Para el panel, para que no siga probando la contraseña vieja contra el
-   router mientras tanto:
-
-   ```sh
-   doas jexec routerpanel service routerpanel stop
-   ```
-
-2. Cambia la contraseña **en el router** (su web, `http://192.168.1.1`).
-3. Escribe la nueva en `router.secret`, como el usuario `routerpanel` y sin eco
-   (escríbela y pulsa Intro):
+1. Cambia la contraseña **en el router** (su web, `http://192.168.1.1`).
+   Hasta el paso siguiente el sondeo del panel fallará («router: error» en
+   `/salud`).
+2. En «Ajustes del panel» → Router, escribe la nueva (y la dirección y el
+   usuario si cambian), «Probar la conexión» y «Guardar las credenciales». El
+   panel prueba a entrar antes de guardar y desde ese momento usa las nuevas;
+   no hace falta reiniciar nada.
+3. Comprueba `/salud`:
 
    ```sh
-   doas jexec -U routerpanel routerpanel /bin/sh -c '
-       umask 077
-       stty -echo; IFS= read -r p; stty echo
-       printf %s "$p" >/usr/local/etc/routerpanel/router.secret.nuevo &&
-       mv /usr/local/etc/routerpanel/router.secret.nuevo /usr/local/etc/routerpanel/router.secret'
-   doas ls -l /usr/local/jails/containers/routerpanel/usr/local/etc/routerpanel/
-   ```
-
-   Debe quedar `-rw-------  routerpanel  routerpanel  router.secret`.
-
-4. Arranca y comprueba:
-
-   ```sh
-   doas jexec routerpanel service routerpanel start
    doas jexec routerpanel-build fetch -qo - http://192.0.2.20:3000/salud
    ```
 
-   `/salud` da `"ok":true` cuando el último sondeo del router (cada 10 s) ha
-   ido bien. Si da error, mira el registro del panel (abajo).
+   Da `"ok":true` y `"router":"ok"` cuando el último sondeo del router (cada
+   10 s) ha ido bien; `"router":"sin_configurar"` si el panel aún no tiene
+   credenciales (asistente sin terminar). Si da error, mira el registro del
+   panel (abajo).
 
-`history.key` (misma carpeta) es la clave con la que el historial guarda los
-valores anteriores de los campos secretos. No tiene que ver con la contraseña
-del router: no la borres, o no se podrán deshacer los cambios ya guardados.
+`history.key` (`/usr/local/etc/routerpanel/`, dentro de la jail) es la clave
+maestra del panel: cifra las credenciales del router, los valores secretos
+del historial y la foto de partida. No la borres ni la cambies: sin ella el
+panel no arranca con las credenciales guardadas (habría que volver a pasar por
+el asistente) y no se podrán deshacer los cambios ya guardados.
+
+## Actualizar desde una versión anterior al asistente (v0.1.x)
+
+Las instalaciones de antes guardaban la contraseña del router en
+`/usr/local/etc/routerpanel/router.secret` y el servicio la pasaba con
+`RP_ROUTER_URL`, `RP_ROUTER_USER` y `RP_ROUTER_SECRET`. Al arrancar la versión
+nueva:
+
+- Con usuarios en la base de datos, el asistente no aparece nunca.
+- Si la base de datos aún no tiene credenciales del router, el panel las
+  importa **una vez** de esas variables (cifradas) y sigue sondeando; queda en
+  el registro («router: credenciales importadas del entorno…»). Desde
+  entonces usa las de la base de datos y ya no lee el fichero.
+- Las tres variables van juntas o ninguna: con una o dos, el panel no arranca
+  (error claro en el registro).
+
+El actualizador sólo despliega el panel, así que el servicio sigue con su
+`routerpanel.rc` de antes (que pasa las variables) hasta repetir
+`deploy/install.sh`; el nuevo sólo las pasa si existe `router.secret`. Una vez
+importadas (ver el registro, o «Ajustes del panel» → Router), **se pueden
+quitar**:
+
+```sh
+doas jexec -U routerpanel routerpanel rm /usr/local/etc/routerpanel/router.secret
+doas jexec routerpanel service routerpanel restart
+```
+
+Con el `routerpanel.rc` de antes las variables se siguen pasando, pero con
+credenciales en la base de datos el panel ni las mira ni lee el fichero;
+`deploy/install.sh` instala el nuevo, que ya no las pasa.
 
 ## Registros
 

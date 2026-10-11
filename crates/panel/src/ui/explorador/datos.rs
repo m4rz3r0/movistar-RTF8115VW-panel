@@ -517,18 +517,24 @@ pub async fn estado_cambio(id: i64) -> Result<CambioVista, ServerFnError> {
 }
 
 /// Valor de un secreto de la lectura `funcion` (con `params`): campo `campo`
-/// de la instancia `instancia` (id de la fila) o suelto. Exige la contraseña
-/// del panel, con el mismo freno que el login, y queda registrado (sin el
-/// valor) en `reveals`.
+/// de la instancia `instancia` (id de la fila) o suelto. Con `contrasena`
+/// vacía, solo si la sesión tiene abierta la ventana de reautenticación (si
+/// no, 401 con [`crate::auth::ERROR_REAUTENTICACION`]); con la contraseña del
+/// panel, la comprueba con el mismo freno que el login y abre la ventana.
+/// Queda registrado (sin el valor) en `reveals`.
 #[server(endpoint = "revelar", input = Json)]
 pub async fn revelar(
     funcion: String,
     campo: String,
     instancia: Option<String>,
     params: Vec<(String, String)>,
-    contrasena: String,
+    #[server(default)] contrasena: String,
 ) -> Result<String, ServerFnError> {
-    let user = crate::auth::require_user().await?;
+    let (user, contrasena) = if contrasena.is_empty() {
+        (crate::auth::require_reauth().await?, None)
+    } else {
+        (crate::auth::require_user().await?, Some(contrasena))
+    };
     let state = super::servidor::app_state()?;
     super::servidor::revelar(
         &state,
@@ -537,7 +543,7 @@ pub async fn revelar(
         &campo,
         instancia.as_deref(),
         &params,
-        &contrasena,
+        contrasena.as_deref(),
     )
     .await
 }

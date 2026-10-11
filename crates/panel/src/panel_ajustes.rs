@@ -467,6 +467,9 @@ mod servidor {
         instancia::escribir_varios(&state.db, &valores)
             .await
             .map_err(interno)?;
+        if let Some(i) = c.idioma {
+            state.fijar_idioma_por_defecto(i);
+        }
         tracing::info!("parámetros de la instancia guardados");
         Ok(c)
     }

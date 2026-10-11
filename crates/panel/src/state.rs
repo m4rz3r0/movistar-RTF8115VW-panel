@@ -3,6 +3,7 @@
 use crate::{changes, config::Config, crypto::HistoryKey, db, poller::PollerHandle};
 use axum::extract::FromRef;
 use catalogo::{Catalogo, mask::Mascara};
+use i18n::Idioma;
 use leptos::prelude::LeptosOptions;
 use sqlx::SqlitePool;
 use std::sync::Arc;
@@ -31,12 +32,33 @@ pub struct AppState {
     pub cambios: changes::Ranura,
     /// Asistente de instalación: token y fase (ver `instalar`).
     pub instalacion: Arc<crate::instalar::Instalacion>,
+    /// Idioma por defecto de la instancia (`claves::IDIOMA`), si se ha fijado:
+    /// copia en memoria para decidir el idioma de cada página sin ir a la
+    /// base de datos. Lo carga [`AppState::new`] y lo cambia
+    /// [`AppState::fijar_idioma_por_defecto`].
+    idioma_por_defecto: Arc<std::sync::RwLock<Option<Idioma>>>,
 }
 
 impl AppState {
     /// Gestor de cambios del servidor, si ya se instaló.
     pub fn cambios(&self) -> Option<Arc<changes::ChangeManager>> {
         self.cambios.get().cloned()
+    }
+
+    /// Idioma por defecto de la instancia, si se ha fijado.
+    pub fn idioma_por_defecto(&self) -> Option<Idioma> {
+        *self
+            .idioma_por_defecto
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Anota el idioma por defecto recién guardado en la base de datos.
+    pub fn fijar_idioma_por_defecto(&self, idioma: Idioma) {
+        *self
+            .idioma_por_defecto
+            .write()
+            .unwrap_or_else(|e| e.into_inner()) = Some(idioma);
     }
 }
 
@@ -59,6 +81,9 @@ impl AppState {
                 cfg.db_path.display()
             )
         })?;
+        let idioma_por_defecto = crate::instancia::leer(&db, crate::instancia::claves::IDIOMA)
+            .await
+            .and_then(|v| serde_json::from_value(v).ok());
         Ok(AppState {
             cfg: Arc::new(cfg),
             db,
@@ -71,6 +96,7 @@ impl AppState {
             history_key: Arc::new(history_key),
             cambios: changes::Ranura::default(),
             instalacion: Arc::default(),
+            idioma_por_defecto: Arc::new(std::sync::RwLock::new(idioma_por_defecto)),
         })
     }
 }

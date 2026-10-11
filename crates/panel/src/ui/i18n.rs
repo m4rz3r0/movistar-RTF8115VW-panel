@@ -1,8 +1,9 @@
 //! Idioma de la interfaz en Leptos: contexto, macro [`t!`](crate::t) y
 //! cambio de idioma.
 //!
-//! El servidor decide el idioma de cada petición (cookie `rp_lang`, si no
-//! `Accept-Language`, si no español), lo pone en `<html lang>` y en el
+//! El servidor decide el idioma de cada petición (cookie `rp_lang`, si no el
+//! idioma por defecto de la instancia, si no `Accept-Language`, si no
+//! español), lo pone en `<html lang>` y en el
 //! contexto. Al hidratar, el navegador lo lee de `<html lang>`: los dos
 //! pintan lo mismo. Cambiar de idioma fija la cookie y recarga la página, así
 //! que el idioma no cambia mientras la página vive.
@@ -82,12 +83,14 @@ pub fn idioma_inicial() -> Idioma {
 /// Idioma de la petición en curso, si hay una.
 #[cfg(feature = "ssr")]
 pub fn idioma_de_peticion() -> Option<Idioma> {
-    use_context::<axum::http::request::Parts>().map(|p| idioma_de_cabeceras(&p.headers))
+    let defecto = use_context::<crate::state::AppState>().and_then(|s| s.idioma_por_defecto());
+    use_context::<axum::http::request::Parts>().map(|p| idioma_de_cabeceras(&p.headers, defecto))
 }
 
-/// Cookie `rp_lang` válida; si no, `Accept-Language`; si no, español.
+/// Cookie `rp_lang` válida; si no, `defecto` (el idioma por defecto de la
+/// instancia, si se ha fijado); si no, `Accept-Language`; si no, español.
 #[cfg(feature = "ssr")]
-pub fn idioma_de_cabeceras(h: &axum::http::HeaderMap) -> Idioma {
+pub fn idioma_de_cabeceras(h: &axum::http::HeaderMap, defecto: Option<Idioma>) -> Idioma {
     use axum::http::header;
     let cookie = h
         .get_all(header::COOKIE)
@@ -97,7 +100,7 @@ pub fn idioma_de_cabeceras(h: &axum::http::HeaderMap) -> Idioma {
         .filter_map(|c| c.trim().split_once('='))
         .find(|(k, _)| *k == COOKIE)
         .and_then(|(_, v)| Idioma::from_cookie(v));
-    cookie.unwrap_or_else(|| {
+    cookie.or(defecto).unwrap_or_else(|| {
         h.get(header::ACCEPT_LANGUAGE)
             .and_then(|v| v.to_str().ok())
             .map_or(Idioma::Es, Idioma::from_accept_language)
@@ -226,7 +229,7 @@ mod tests {
             for (k, v) in pares {
                 m.append(*k, v.parse().unwrap());
             }
-            idioma_de_cabeceras(&m)
+            idioma_de_cabeceras(&m, None)
         };
         assert_eq!(h(&[]), Idioma::Es);
         assert_eq!(h(&[("cookie", "a=b; rp_lang=en")]), Idioma::En);
@@ -238,5 +241,16 @@ mod tests {
             h(&[("cookie", "rp_lang=es"), ("accept-language", "en")]),
             Idioma::Es
         );
+        // El idioma de la instancia, entre la cookie y `Accept-Language`.
+        let con_defecto = |pares: &[(&'static str, &'static str)]| {
+            let mut m = HeaderMap::new();
+            for (k, v) in pares {
+                m.append(*k, v.parse().unwrap());
+            }
+            idioma_de_cabeceras(&m, Some(Idioma::En))
+        };
+        assert_eq!(con_defecto(&[("accept-language", "es")]), Idioma::En);
+        assert_eq!(con_defecto(&[("cookie", "rp_lang=es")]), Idioma::Es);
+        assert_eq!(con_defecto(&[("cookie", "rp_lang=xx")]), Idioma::En);
     }
 }

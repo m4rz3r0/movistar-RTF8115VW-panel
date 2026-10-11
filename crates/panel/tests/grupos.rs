@@ -765,6 +765,14 @@ async fn credenciales_durante_la_reanudacion_no_cierran_el_grupo() {
     let id = a.historial(1).await.remove(0).id;
     p.sim.control.set_unresponsive(false);
 
+    // Lo que se anota mientras se retoma (las tareas de este hilo).
+    let registro = Registro::default();
+    let _registro = tracing::subscriber::set_default(
+        tracing_subscriber::fmt()
+            .with_writer(registro.clone())
+            .with_ansi(false)
+            .finish(),
+    );
     let b = ChangeManager::new(p.state.clone(), tiempos());
     // Guardar credenciales ganó la carrera: tiene el hueco.
     let credenciales = b.excluir_cambios().unwrap();
@@ -781,6 +789,12 @@ async fn credenciales_durante_la_reanudacion_no_cierran_el_grupo() {
         c.error
     );
     assert_eq!(escritas(&p), [UPNP]);
+    // La espera queda anotada, una vez.
+    let esperas = registro
+        .texto()
+        .matches("espera a que quede libre el gestor de cambios")
+        .count();
+    assert_eq!(esperas, 1, "{}", registro.texto());
     drop(credenciales);
     retomar.await.unwrap();
     let c = esperar_final(&b, id).await;
@@ -924,4 +938,33 @@ async fn reversion_fallida_sigue_pendiente_al_retomar() {
     assert_eq!(upnp_actual(&p).await, "0");
     assert_eq!(ip_de_lease0(&p).await, "192.168.1.68", "el paso 2 también");
     esperar_libre(&b).await;
+}
+
+/// Destino del registro en memoria, para comprobar lo que se anota.
+#[derive(Clone, Default)]
+struct Registro(Arc<std::sync::Mutex<Vec<u8>>>);
+
+impl Registro {
+    fn texto(&self) -> String {
+        String::from_utf8_lossy(&self.0.lock().unwrap()).into_owned()
+    }
+}
+
+impl std::io::Write for Registro {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0.lock().unwrap().extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Registro {
+    type Writer = Registro;
+
+    fn make_writer(&'a self) -> Registro {
+        self.clone()
+    }
 }

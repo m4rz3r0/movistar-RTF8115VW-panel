@@ -1,10 +1,11 @@
-//! Idioma de la interfaz: cookie `rp_lang`, `Accept-Language` y español por
-//! defecto.
+//! Idioma de la interfaz: cookie `rp_lang`, idioma por defecto de la
+//! instancia, `Accept-Language` y español.
 
 mod common;
 
 use axum::{body::Body, http::Request};
-use common::{body_text, panel, post_form, send, sesion};
+use common::{body_text, ok, panel, post_form, send, sesion};
+use serde_json::json;
 
 /// HTML de `/login` con las cabeceras dadas.
 async fn login_con(p: &common::Panel, cabeceras: &[(&str, &str)]) -> String {
@@ -94,4 +95,40 @@ async fn login_con_selector_de_idioma() {
         html.contains(r#"lang="es""#) && html.contains("Español"),
         "{html}"
     );
+}
+
+/// `<html lang>` de `/login` sin cookie ni cabeceras, más con
+/// `Accept-Language: es` y con la cookie `rp_lang=es`.
+async fn idiomas_de_login(p: &common::Panel) -> [bool; 3] {
+    let en = |html: String| html.contains(r#"<html lang="en""#);
+    [
+        en(login_con(p, &[]).await),
+        en(login_con(p, &[("accept-language", "es-ES,es;q=0.9")]).await),
+        en(login_con(p, &[("cookie", "rp_lang=es"), ("accept-language", "en")]).await),
+    ]
+}
+
+#[tokio::test]
+async fn idioma_por_defecto_de_la_instancia() {
+    let mut p = panel().await;
+    let cookie = sesion(&p).await;
+    // Sin fijar: manda `Accept-Language` (y sin nada, español).
+    assert_eq!(idiomas_de_login(&p).await, [false, false, false]);
+    ok(
+        &p,
+        "guardar_instancia",
+        json!({ "campos": { "idioma": "En" } }),
+        &cookie,
+    )
+    .await;
+    // Fijado en inglés: va antes que `Accept-Language`; la cookie, antes aún.
+    assert_eq!(idiomas_de_login(&p).await, [true, true, false]);
+
+    // Tras reiniciar el panel (otro estado sobre la misma base de datos),
+    // sigue igual.
+    let dir = p.state.cfg.db_path.parent().unwrap().to_path_buf();
+    let state = common::estado(common::config_en(&dir, "127.0.0.1".parse().unwrap()), &dir).await;
+    p.app = panel::build_router(state.clone());
+    p.state = state;
+    assert_eq!(idiomas_de_login(&p).await, [true, true, false]);
 }

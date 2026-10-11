@@ -911,6 +911,28 @@ fn valor_de(f: &Funcion, r: &Respuesta, campo: &str, instancia: Option<&str>) ->
     }
 }
 
+/// Comprueba la contraseña del panel del usuario de la sesión antes de
+/// revelar, con el freno del login.
+async fn comprobar_contrasena(
+    state: &AppState,
+    user: &User,
+    contrasena: &str,
+) -> Result<(), ServerFnError> {
+    let ip = ip_cliente(state).await?;
+    match crate::auth::reauthenticate(state, ip, user, contrasena).await {
+        Ok(()) => Ok(()),
+        Err(LoginError::Throttled(s)) => Err(con_estado(
+            StatusCode::TOO_MANY_REQUESTS,
+            crate::t!("biblioteca-error-intentos", s = s),
+        )),
+        Err(LoginError::BadCredentials) => Err(con_estado(
+            StatusCode::FORBIDDEN,
+            crate::t!("biblioteca-error-contrasena"),
+        )),
+        Err(LoginError::Internal(e)) => Err(interno(e)),
+    }
+}
+
 pub async fn revelar(
     state: &AppState,
     user: &User,
@@ -918,25 +940,12 @@ pub async fn revelar(
     campo: &str,
     instancia: Option<&str>,
     params: &[(String, String)],
-    contrasena: &str,
+    contrasena: Option<&str>,
 ) -> Result<String, ServerFnError> {
     let f = funcion(state, nombre)?;
-    let ip = ip_cliente(state).await?;
-    match crate::auth::reauthenticate(state, ip, user, contrasena).await {
-        Ok(()) => {}
-        Err(LoginError::Throttled(s)) => {
-            return Err(con_estado(
-                StatusCode::TOO_MANY_REQUESTS,
-                crate::t!("biblioteca-error-intentos", s = s),
-            ));
-        }
-        Err(LoginError::BadCredentials) => {
-            return Err(con_estado(
-                StatusCode::FORBIDDEN,
-                crate::t!("biblioteca-error-contrasena"),
-            ));
-        }
-        Err(LoginError::Internal(e)) => return Err(interno(e)),
+    if let Some(contrasena) = contrasena {
+        comprobar_contrasena(state, user, contrasena).await?;
+        crate::auth::abrir_ventana_de_reautenticacion().await?;
     }
     let r = ejecutar(state, f, params).await?;
     let valor = valor_de(f, &r, campo, instancia).ok_or_else(|| {

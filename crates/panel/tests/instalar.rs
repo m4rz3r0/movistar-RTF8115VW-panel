@@ -520,3 +520,42 @@ async fn lectura_inicial_sin_resumen_no_decide_el_modo() {
     assert_eq!(status, 200, "{body}");
     assert!(!instancia::solo_lectura(&p.state.db).await);
 }
+
+/// Construir el router de otro panel del mismo proceso no deja colgada la
+/// página de uno que ya sirve. Leptos genera la lista de rutas renderizando la
+/// aplicación con la carga de recursos suspendida mediante un indicador
+/// global; si se repetía en cada `build_router`, un recurso que empezaba a
+/// cargar en ese momento (la fase del asistente) se quedaba esperando para
+/// siempre y la respuesta no terminaba.
+#[tokio::test]
+async fn construir_otro_router_no_cuelga_la_pagina() {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    };
+    use std::time::Duration;
+    let p = recien_instalado().await;
+    let parar = Arc::new(AtomicBool::new(false));
+    let constructor = std::thread::spawn({
+        let (state, parar) = (p.state.clone(), parar.clone());
+        move || {
+            while !parar.load(Ordering::Relaxed) {
+                drop(panel::build_router(state.clone()));
+            }
+        }
+    });
+    for i in 0..200 {
+        let pagina = async {
+            let resp = get(&p.app, "/instalar").await;
+            assert_eq!(resp.status(), 200);
+            body_text(resp).await
+        };
+        let r = tokio::time::timeout(Duration::from_secs(5), pagina).await;
+        if r.is_err() {
+            parar.store(true, Ordering::Relaxed);
+            panic!("la página {i} no terminó");
+        }
+    }
+    parar.store(true, Ordering::Relaxed);
+    constructor.join().unwrap();
+}

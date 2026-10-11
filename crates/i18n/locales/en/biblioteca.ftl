@@ -154,7 +154,7 @@ biblioteca-borrar = Delete
 biblioteca-aplicar = Apply
 biblioteca-revelar-titulo = Reveal a secret
 biblioteca-revelar-para-ver = To see
-biblioteca-revelar-texto = {", "}type the panel password. It will be shown for 30 s and logged in the history (without the value).
+biblioteca-revelar-texto = {", "}type the panel password (it won't be asked again for 5 minutes). It will be shown for 30 s and logged in the history (without the value).
 biblioteca-contrasena-panel = Panel password
 biblioteca-comprobando = Checking…
 
