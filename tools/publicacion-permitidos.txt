@@ -1,0 +1,53 @@
+# Excepciones revisadas a mano de `comprobar-publicacion`.
+# Formato (el motivo tras «—» es obligatorio):
+#   valor <v> — <motivo>
+#   red <cidr> — <motivo>
+#   dominio <d> — <motivo>            (también sus subdominios)
+#   ruta <glob> <regla> — <motivo>
+#   binario <ruta> <sha256> — <motivo>
+
+# DNS públicos de las sugerencias de Ajustes.
+valor 9.9.9.9 — DNS público (Quad9) de las sugerencias
+valor 149.112.112.112 — DNS público (Quad9) de las sugerencias
+valor 2620:fe::fe — DNS público IPv6 (Quad9) de las sugerencias
+valor 194.242.2.2 — DNS público (Mullvad) de las sugerencias
+valor 1.1.1.1 — DNS público (Cloudflare) de las sugerencias
+valor 1.0.0.1 — DNS público (Cloudflare) de las sugerencias
+
+# Valores de fábrica del operador, iguales en todas las líneas.
+valor 192.168.144.1 — puerta de enlace WAN de fábrica del operador
+dominio hora.ngn.rima-tde.net — servidor NTP de fábrica del operador
+
+# Valores de fábrica del modelo (A-18).
+valor 1234 — valor de fábrica público del modelo (usuario web)
+valor telefonica — valor de fábrica público del modelo (usuario oculto)
+
+# Dominios de dependencias, documentación y créditos.
+dominio crates.io — registro de paquetes de Rust
+dominio github.com — alojamiento de dependencias y del repositorio
+dominio rust-lang.org — documentación de Rust
+dominio npmjs.org — registro de paquetes de las pruebas e2e
+dominio sil.org — licencia OFL de las tipografías
+dominio quad9.net — proveedor de DNS de las sugerencias
+dominio mullvad.net — proveedor de DNS de las sugerencias
+dominio cloudflare.com — proveedor de DNS de las sugerencias
+dominio playwright.dev — documentación de las pruebas e2e
+dominio anthropic.com — créditos de los commits
+dominio config.local — nombre del fichero deploy/config.local, no un dominio
+
+# Código que la expresión de dominios confunde con un nombre.
+valor p.app — acceso a un campo en las pruebas de Rust
+valor profile.dev — perfil de compilación de Cargo
+
+# MACs de las pruebas (administradas localmente).
+valor aa:bb:cc:00:11:22 — MAC inventada de las pruebas
+valor aa:bb:cc:00:11:33 — MAC inventada de las pruebas
+valor aa:bb:cc:00:11:44 — MAC inventada de las pruebas
+valor aa:bb:cc:dd:ee:ff — MAC inventada de las pruebas
+
+# Tipografías (revisadas: sin metadatos personales).
+binario crates/panel/public/fonts/chakra-petch-500.woff2 2939dc743e44b4a4fb1fa671da826b7c806c4a4714251b82f6f4a493fd00f29b — tipografía Chakra Petch (OFL)
+binario crates/panel/public/fonts/chakra-petch-600.woff2 b73f412be378a9c3ed47af1f95bf45c1c44d15035692f0efa0197e8e0d2b8d20 — tipografía Chakra Petch (OFL)
+binario crates/panel/public/fonts/inter-var.woff2 3608d227888eef8316fe6a8bd2a9932ae1d9639a1cfbe73225d812fa08043cdd — tipografía Inter (OFL)
+binario crates/panel/public/fonts/jetbrains-mono-var.woff2 dcd6beb73c8ef3a35048ec30dca6209e662957e64507b7c7529788b072796dd2 — tipografía JetBrains Mono (OFL)
+ruta tools/publicacion-permitidos.txt clave — las sumas sha256 de los binarios revisados

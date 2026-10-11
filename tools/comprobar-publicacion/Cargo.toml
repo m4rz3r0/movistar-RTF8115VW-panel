@@ -1,0 +1,17 @@
+[package]
+name = "comprobar-publicacion"
+version = "0.1.0"
+description = "Comprueba que el árbol que se publica no lleva datos personales ni de la red del dueño"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+regex.workspace = true
+router-sim = { path = "../../crates/router-sim" }
+sha2.workspace = true
+
+[dev-dependencies]
+png = "0.18"
+tempfile.workspace = true
