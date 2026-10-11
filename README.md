@@ -19,7 +19,7 @@ Rust: Leptos 0.8 + Axum, SQLite. Corre en servidor-casa detrás de Caddy en
 | `tools/gen-catalogo` | genera el borrador del catálogo y `docs/api.md` |
 | `e2e/` | pruebas de navegador (Playwright) contra el simulador |
 | `deploy/` | jails, servicio, pf y actualizador del servidor ([`deploy/README.md`](deploy/README.md)) |
-| `docs/` | [`api.md`](docs/api.md) (API del router), [`operacion.md`](docs/operacion.md) (día a día), diseño en `superpowers/specs/` |
+| `docs/` | [`api.md`](docs/api.md) (API del router), [`operacion.md`](docs/operacion.md) (día a día) |
 
 ## Desarrollo
 

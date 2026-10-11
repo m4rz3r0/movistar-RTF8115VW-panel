@@ -3,3 +3,12 @@
 node_modules/
 /e2e/test-results/
 /e2e/capturas/
+/deploy/config.local
+*.secret
+*.key
+*.db
+*.db-shm
+*.db-wal
+instalar.token
+real-secrets*.txt
+/docs/superpowers/
