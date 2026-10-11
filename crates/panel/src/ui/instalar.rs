@@ -5,10 +5,11 @@
 use super::{Estado, Insignia, mensaje_del_servidor};
 use crate::instalar::{
     EstadoInstalacion, InfoRouter, ResumenFoto, crear_admin, fase_instalacion, guardar_router,
-    lectura_inicial, probar_router,
+    lectura_inicial, probar_router, url_sugerida,
 };
 use crate::t;
 use crate::ui::i18n::SelectorIdioma;
+use crate::ui::router::resumen_red;
 use leptos::{ev::SubmitEvent, prelude::*, task::spawn_local};
 
 /// Longitud mínima de la contraseña del panel (la misma que comprueba el
@@ -104,13 +105,14 @@ fn Asistente(inicial: Paso) -> impl IntoView {
     }
 }
 
-/// Campo de texto ligado a `valor`.
+/// Campo de texto ligado a `valor`, con un ejemplo opcional.
 fn campo(
     id: &'static str,
     etiqueta: String,
     tipo: &'static str,
     autocompletar: &'static str,
     valor: RwSignal<String>,
+    ejemplo: Option<String>,
 ) -> impl IntoView {
     view! {
         <p class="campo">
@@ -123,6 +125,7 @@ fn campo(
                 autocapitalize="none"
                 spellcheck="false"
                 required
+                placeholder=ejemplo
                 prop:value=valor
                 on:input=move |ev| valor.set(event_target_value(&ev))
             />
@@ -165,17 +168,25 @@ fn PasoAdmin(paso: RwSignal<Paso>, token: RwSignal<String>) -> impl IntoView {
     view! {
         <form on:submit=enviar>
             <p class="pagina-sub">{t!("instalar-admin-texto")}</p>
-            {campo("instalar-token", t!("instalar-token"), "text", "off", token)}
+            {campo("instalar-token", t!("instalar-token"), "text", "off", token, None)}
             <p class="nota">{t!("instalar-token-ayuda")}</p>
-            {campo("instalar-usuario", t!("instalar-usuario"), "text", "username", usuario)}
+            {campo("instalar-usuario", t!("instalar-usuario"), "text", "username", usuario, None)}
             {campo(
                 "instalar-contrasena",
                 t!("instalar-contrasena", n = MIN_CONTRASENA),
                 "password",
                 "new-password",
                 contrasena,
+                None,
             )}
-            {campo("instalar-repetir", t!("instalar-repetir"), "password", "new-password", repetir)}
+            {campo(
+                "instalar-repetir",
+                t!("instalar-repetir"),
+                "password",
+                "new-password",
+                repetir,
+                None,
+            )}
             {error_de(error)}
             <button class="boton" type="submit" disabled=move || pendiente.get()>
                 {t!("instalar-crear-admin")}
@@ -214,6 +225,20 @@ fn PasoRouter(
     let contrasena = RwSignal::new(String::new());
     let error = RwSignal::new(None::<String>);
     let pendiente = RwSignal::new(false);
+    // Dirección sugerida (la puerta de enlace de este equipo), solo en el
+    // navegador y si aún no se ha escrito ninguna.
+    let sugerida = RwSignal::new(false);
+    Effect::new(move |_| {
+        let t = token.get_untracked().trim().to_owned();
+        spawn_local(async move {
+            if let Ok(Some(u)) = url_sugerida(t).await
+                && url.get_untracked().is_empty()
+            {
+                url.set(u);
+                sugerida.set(true);
+            }
+        });
+    });
     let llamar = move |guardar: bool| {
         error.set(None);
         pendiente.set(true);
@@ -260,9 +285,16 @@ fn PasoRouter(
                     spellcheck="false"
                     required
                     placeholder=t!("instalar-router-url-ejemplo")
+                    aria-describedby="instalar-router-url-sugerida"
                     prop:value=url
-                    on:input=move |ev| url.set(event_target_value(&ev))
+                    on:input=move |ev| {
+                        url.set(event_target_value(&ev));
+                        sugerida.set(false);
+                    }
                 />
+                <span class="nota" id="instalar-router-url-sugerida">
+                    {move || sugerida.get().then(|| t!("instalar-router-url-sugerida"))}
+                </span>
             </p>
             {campo(
                 "instalar-router-usuario",
@@ -270,6 +302,7 @@ fn PasoRouter(
                 "text",
                 "off",
                 usuario,
+                Some(t!("instalar-router-usuario-ejemplo")),
             )}
             {campo(
                 "instalar-router-contrasena",
@@ -277,6 +310,7 @@ fn PasoRouter(
                 "password",
                 "off",
                 contrasena,
+                None,
             )}
             {move || info.get().map(|i| detectado(&i))}
             {error_de(error)}
@@ -344,9 +378,18 @@ fn PasoFin(resumen: RwSignal<Option<ResumenFoto>>) -> impl IntoView {
                     />
                 }
             });
+            let red = match &r.red {
+                Some(red) => view! {
+                    <p>{t!("instalar-red")}</p>
+                    {resumen_red(red)}
+                }
+                .into_any(),
+                None => view! { <p>{t!("instalar-red-sin-detectar")}</p> }.into_any(),
+            };
             view! {
                 <p>{t!("instalar-leidas", n = r.funciones_leidas)}</p>
                 {fallidas}
+                {red}
             }
         })
     };

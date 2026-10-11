@@ -16,7 +16,7 @@ use panel::{
     instancia::{self, claves},
 };
 use serde_json::{Value, json};
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{collections::BTreeMap, net::Ipv4Addr, path::PathBuf};
 
 /// SSID de una de las redes de las fixtures.
 const SSID: &str = "RED-1";
@@ -558,4 +558,93 @@ async fn construir_otro_router_no_cuelga_la_pagina() {
     }
     parar.store(true, Ordering::Relaxed);
     constructor.join().unwrap();
+}
+
+/// La lectura inicial devuelve la red detectada del router.
+#[tokio::test]
+async fn lectura_inicial_incluye_red() {
+    let p = recien_instalado().await;
+    let cookie = crear_admin(&p).await;
+    let (status, body) = llamar(&p, "guardar_router", router(&p), Some(&cookie)).await;
+    assert_eq!(status, 200, "{body}");
+    let (status, body) = llamar(&p, "lectura_inicial", json!({ "token": "" }), Some(&cookie)).await;
+    assert_eq!(status, 200, "{body}");
+    let red = &json_de(&body)["red"];
+    assert_eq!(red["wan"], "ip2", "{body}");
+    assert_eq!(red["tipo"], "Pppoe", "{body}");
+    assert_eq!(red["voip"], true, "{body}");
+    assert_eq!(red["iptv"], true, "{body}");
+    assert!(red["lan"].is_string(), "{body}");
+}
+
+/// La puerta de enlace por defecto del equipo, de `/proc/net/route` (Linux)
+/// y de `route -n get default` (FreeBSD).
+#[test]
+fn gw_de_proc_net_route_y_route_get() {
+    let linux = "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT\n\
+                 eth0\t0002000A\t00000000\t0001\t0\t0\t0\t00FFFFFF\t0\t0\t0\n\
+                 eth0\t00000000\t0101A8C0\t0003\t0\t0\t100\t00000000\t0\t0\t0\n";
+    assert_eq!(
+        instalar::gw_de_proc_net_route(linux),
+        Some("192.168.1.1".parse().unwrap())
+    );
+    let docker = "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT\n\
+                  eth0\t00000000\t010010AC\t0003\t0\t0\t0\t00000000\t0\t0\t0\n";
+    assert_eq!(
+        instalar::gw_de_proc_net_route(docker),
+        Some("172.16.0.1".parse().unwrap())
+    );
+    // Sin ruta por defecto, o sin pasarela (sin el bit RTF_GATEWAY).
+    assert_eq!(instalar::gw_de_proc_net_route(""), None);
+    let sin_gw = "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT\n\
+                  eth0\t00000000\t00000000\t0001\t0\t0\t0\t00000000\t0\t0\t0\n";
+    assert_eq!(instalar::gw_de_proc_net_route(sin_gw), None);
+
+    let freebsd = "   route to: default\ndestination: default\n       mask: default\n\
+                   \x20   gateway: 192.168.1.1\n        fib: 0\n  interface: em0\n\
+                   \x20     flags: <UP,GATEWAY,DONE,STATIC>\n";
+    assert_eq!(
+        instalar::gw_de_route_get(freebsd),
+        Some("192.168.1.1".parse().unwrap())
+    );
+    let jaula = "   route to: default\n    gateway: 172.16.0.1\n";
+    assert_eq!(
+        instalar::gw_de_route_get(jaula),
+        Some("172.16.0.1".parse().unwrap())
+    );
+    assert_eq!(
+        instalar::gw_de_route_get("route: route has not been found\n"),
+        None
+    );
+}
+
+/// Solo se sugiere una pasarela de red privada que no sea 172.16/12 (la de
+/// Docker y otros contenedores; en las pruebas, `172.16.0.1`).
+#[test]
+fn url_sugerida_ignora_redes_docker() {
+    for si in ["192.168.1.1", "10.255.0.1"] {
+        assert!(instalar::sugerible(si.parse().unwrap()), "{si}");
+    }
+    for no in ["172.16.0.1", "203.0.113.1", "127.0.0.1", "0.0.0.0"] {
+        assert!(!instalar::sugerible(no.parse().unwrap()), "{no}");
+    }
+    // El final de 172.16/12 (172.16 a 172.31), fuera.
+    assert!(!instalar::sugerible(Ipv4Addr::new(172, 31, 255, 1)));
+}
+
+/// La sugerencia de dirección del router es parte del asistente: con token
+/// (o la sesión del administrador mientras dura la instalación).
+#[tokio::test]
+async fn url_sugerida_exige_token() {
+    let p = recien_instalado().await;
+    let (status, _) = llamar(&p, "url_sugerida", json!({ "token": "malo" }), None).await;
+    assert_eq!(status, 403);
+    let cookie = crear_admin(&p).await;
+    let (status, body) = llamar(&p, "url_sugerida", json!({ "token": "" }), Some(&cookie)).await;
+    assert_eq!(status, 200, "{body}");
+    let v = json_de(&body);
+    assert!(
+        v.is_null() || v.as_str().is_some_and(|u| u.starts_with("http://")),
+        "{v}"
+    );
 }

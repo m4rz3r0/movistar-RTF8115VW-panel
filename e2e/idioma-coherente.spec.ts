@@ -134,7 +134,7 @@ test.describe("idioma coherente", () => {
       await page.goto("/router/conexion");
       await asentar(page);
       await page.locator("#panel-router-contrasena").fill("sim");
-      await page.locator("form.ajustes-formulario button[type=submit]").click();
+      await page.locator("section[aria-labelledby=router-credenciales] button[type=submit]").click();
       const dialogo = page.locator("dialog[open]");
       await expect(dialogo).toBeVisible();
       await sinIngles(page, "diálogo de reautenticación");

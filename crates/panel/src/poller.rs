@@ -10,7 +10,8 @@
 //! cada [`DETECCION_CADA`] o en cuanto la conexión a internet deja de
 //! aparecer en `cbGetWanIPIntf`, salvo con un cambio aplicándose o
 //! vigilándose (la red de seguridad del gestor no cambia de conexión a
-//! mitad).
+//! mitad). Una conexión elegida a mano que ya no existe no cuenta: vale la
+//! detectada ([`AppState::wan_en`]) y no se vuelve a detectar por ella.
 //!
 //! Ante errores de las lecturas de 10 s reintenta con espera creciente hasta
 //! 60 s; si el router rechaza la contraseña, cada 5 min. Esas muestras no se
@@ -590,12 +591,14 @@ impl Poller {
             .state
             .red()
             .is_none_or(|r| now.saturating_sub(r.momento) >= cada);
+        // La que vale entre las del router: una elegida a mano que ya no
+        // existe no cuenta (volver a detectar no la traería).
         let falta = self
             .state
-            .wan()
+            .wan_en(wan)
             .is_some_and(|n| !wan.iter().any(|w| w.name == n));
         let reciente = self.deteccion.is_some_and(|t| t.elapsed() < self.cfg.slow);
-        let cambio_en_curso = self.state.cambios().is_some_and(|m| m.activo().is_some());
+        let cambio_en_curso = self.state.cambios().is_some_and(|m| m.ocupado());
         if !(vieja || falta) || reciente || cambio_en_curso {
             return;
         }
@@ -608,7 +611,7 @@ impl Poller {
     async fn store(&mut self, now: i64, r: Reading) {
         self.seguir_firmware(&r.summary.firmware).await;
         self.seguir_red(now, &r.wan).await;
-        let wan_intf = self.state.wan();
+        let wan_intf = self.state.wan_en(&r.wan);
         let wan_up = wan_arriba(&r.wan, wan_intf.as_deref());
         let bytes = lan_bytes(r.counters_ms, &r.counters);
         // Tras un hueco (pausa larga) no se promedia sobre él.

@@ -22,6 +22,8 @@ instalar-router-url = Dirección del router
 instalar-router-url-ejemplo = http://192.168.1.1
 instalar-router-usuario = Usuario del router
 instalar-router-contrasena = Contraseña del router
+instalar-router-usuario-ejemplo = 1234
+instalar-router-url-sugerida = Sugerida a partir de la red de este equipo: compruébala.
 instalar-probar = Probar
 instalar-guardar = Guardar y seguir
 instalar-detectado = { $modelo } con el firmware { $firmware }
@@ -43,6 +45,8 @@ instalar-fallidas = { $n ->
 
 ## Fin
 instalar-fin-texto = El panel ya está configurado.
+instalar-red = Red del router detectada:
+instalar-red-sin-detectar = No se pudo detectar la red del router: puedes volver a intentarlo en Router → Conexión con el router.
 instalar-fin-opcional = Puedes ajustar ahora los parámetros opcionales de la instancia o hacerlo más tarde desde Ajustes del panel.
 instalar-ir-ajustes = Ajustes del panel
 instalar-ir-estado = Ir al estado

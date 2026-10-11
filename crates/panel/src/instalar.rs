@@ -16,7 +16,8 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "ssr")]
 pub use servidor::{
-    Instalacion, en_curso, hay_usuarios, lecturas_de_partida, ruta_token, token_inicial,
+    Instalacion, en_curso, gw_de_proc_net_route, gw_de_route_get, hay_usuarios,
+    lecturas_de_partida, ruta_token, sugerible, token_inicial,
 };
 
 /// Lo que se sabe del router al probar sus credenciales.
@@ -28,12 +29,58 @@ pub struct InfoRouter {
     pub probado: bool,
 }
 
+/// Tipo de la conexión a internet (como `hgu::models::TipoConexion`, que
+/// solo existe en el servidor).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TipoRed {
+    Pppoe,
+    Dhcp,
+    Estatica,
+    Otro,
+}
+
+/// Red del router detectada, para mostrarla: lo de
+/// `hgu::deteccion::RedDetectada` (que solo existe en el servidor) que ve la
+/// interfaz, con los mismos nombres de campo.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResumenRed {
+    /// Nombre de la conexión a internet (p. ej. `ip2`); `None` si no se pudo
+    /// decidir.
+    pub wan: Option<String>,
+    pub tipo: Option<TipoRed>,
+    /// Subred LAN, `"a.b.c.0/24"`.
+    pub lan: Option<String>,
+    pub voip: bool,
+    pub iptv: bool,
+}
+
+#[cfg(feature = "ssr")]
+impl From<&hgu::deteccion::RedDetectada> for ResumenRed {
+    fn from(red: &hgu::deteccion::RedDetectada) -> Self {
+        use hgu::models::TipoConexion;
+        ResumenRed {
+            wan: red.wan.clone(),
+            tipo: red.tipo.map(|t| match t {
+                TipoConexion::Pppoe => TipoRed::Pppoe,
+                TipoConexion::Dhcp => TipoRed::Dhcp,
+                TipoConexion::Estatica => TipoRed::Estatica,
+                TipoConexion::Otro => TipoRed::Otro,
+            }),
+            lan: red.lan.clone(),
+            voip: red.voip,
+            iptv: red.iptv,
+        }
+    }
+}
+
 /// Resultado de la lectura inicial.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResumenFoto {
     pub funciones_leidas: u32,
     /// Funciones cuya lectura falló.
     pub fallidas: Vec<String>,
+    /// Red del router detectada; `None` si no se pudo detectar.
+    pub red: Option<ResumenRed>,
 }
 
 /// En qué punto está la instalación, para retomar el asistente.
@@ -53,6 +100,18 @@ pub async fn crear_admin(
     contrasena: String,
 ) -> Result<(), ServerFnError> {
     servidor::crear_admin(token, usuario, contrasena).await
+}
+
+/// Paso 2: dirección del router que se sugiere: `http://` y la puerta de
+/// enlace por defecto de este equipo si está en una red privada que no es
+/// 172.16/12 (la de Docker y otros contenedores, donde la puerta de
+/// enlace no es el router); si no, `None`.
+#[server(endpoint = "url_sugerida", input = Json)]
+pub async fn url_sugerida(
+    #[server(default)] token: String,
+) -> Result<Option<String>, ServerFnError> {
+    servidor::autorizar(&token).await?;
+    Ok(servidor::url_sugerida().await)
 }
 
 /// Paso 2: prueba las credenciales del router (sin guardarlas) y dice el
@@ -101,7 +160,7 @@ pub async fn fase_instalacion() -> Result<EstadoInstalacion, ServerFnError> {
 
 #[cfg(feature = "ssr")]
 pub(crate) mod servidor {
-    use super::{EstadoInstalacion, InfoRouter, ResumenFoto};
+    use super::{EstadoInstalacion, InfoRouter, ResumenFoto, ResumenRed};
     use crate::{
         auth,
         config::Config,
@@ -122,7 +181,7 @@ pub(crate) mod servidor {
     use std::{
         collections::BTreeMap,
         io::Write,
-        net::{IpAddr, SocketAddr},
+        net::{IpAddr, Ipv4Addr, SocketAddr},
         path::{Path, PathBuf},
         sync::atomic::{AtomicBool, Ordering},
     };
@@ -386,6 +445,72 @@ pub(crate) mod servidor {
         valido.then(|| url.to_owned())
     }
 
+    /// Puerta de enlace por defecto de `/proc/net/route` (Linux): la línea
+    /// con destino y máscara `00000000` y el bit de pasarela (`RTF_GATEWAY`)
+    /// en las banderas; la dirección va en hexadecimal little-endian.
+    pub fn gw_de_proc_net_route(texto: &str) -> Option<Ipv4Addr> {
+        const RTF_UP: u32 = 0x1;
+        const RTF_GATEWAY: u32 = 0x2;
+        texto.lines().skip(1).find_map(|l| {
+            let c: Vec<&str> = l.split_whitespace().collect();
+            let (destino, gw, banderas, mascara) = (c.get(1)?, c.get(2)?, c.get(3)?, c.get(7)?);
+            let banderas = u32::from_str_radix(banderas, 16).ok()?;
+            let gw = u32::from_str_radix(gw, 16).ok()?;
+            (*destino == "00000000"
+                && *mascara == "00000000"
+                && banderas & (RTF_UP | RTF_GATEWAY) == RTF_UP | RTF_GATEWAY
+                && gw != 0)
+                .then(|| Ipv4Addr::from(gw.to_le_bytes()))
+        })
+    }
+
+    /// Puerta de enlace por defecto de la salida de `route -n get default`
+    /// (FreeBSD): la línea `gateway: a.b.c.d`.
+    pub fn gw_de_route_get(texto: &str) -> Option<Ipv4Addr> {
+        texto.lines().find_map(|l| {
+            l.trim()
+                .strip_prefix("gateway:")
+                .and_then(|g| g.trim().parse().ok())
+        })
+    }
+
+    /// ¿Se puede sugerir `gw` como dirección del router? Solo en una red
+    /// privada que no sea 172.16/12.
+    pub fn sugerible(gw: Ipv4Addr) -> bool {
+        let [a, b, ..] = gw.octets();
+        gw.is_private() && !(a == 172 && (16..32).contains(&b))
+    }
+
+    /// Puerta de enlace por defecto de este equipo, si se sabe leer en este
+    /// sistema.
+    async fn puerta_de_enlace() -> Option<Ipv4Addr> {
+        tokio::task::spawn_blocking(|| {
+            if cfg!(target_os = "linux") {
+                std::fs::read_to_string("/proc/net/route")
+                    .ok()
+                    .and_then(|t| gw_de_proc_net_route(&t))
+            } else if cfg!(target_os = "freebsd") {
+                std::process::Command::new("route")
+                    .args(["-n", "get", "default"])
+                    .output()
+                    .ok()
+                    .and_then(|o| gw_de_route_get(&String::from_utf8_lossy(&o.stdout)))
+            } else {
+                None
+            }
+        })
+        .await
+        .ok()
+        .flatten()
+    }
+
+    pub(super) async fn url_sugerida() -> Option<String> {
+        puerta_de_enlace()
+            .await
+            .filter(|gw| sugerible(*gw))
+            .map(|gw| format!("http://{gw}"))
+    }
+
     /// Entra en el router con esas credenciales, lee `cbGetSummary` y sale.
     pub(crate) async fn probar(
         _state: &AppState,
@@ -541,9 +666,19 @@ pub(crate) mod servidor {
                 }
             }
         }
+        // La red ya se detectó al guardar las credenciales; si aquello no
+        // llegó a tiempo (o falló), se intenta ahora.
+        let red = match state.red() {
+            Some(r) => Some(r),
+            None => instancia::detectar_y_guardar(state)
+                .await
+                .inspect_err(|e| tracing::warn!("lectura inicial: {e}"))
+                .ok(),
+        };
         let resumen = ResumenFoto {
             funciones_leidas: u32::try_from(foto.len()).unwrap_or(u32::MAX),
             fallidas,
+            red: red.as_ref().map(ResumenRed::from),
         };
         if foto.is_empty() {
             // Nada que guardar: se puede repetir.

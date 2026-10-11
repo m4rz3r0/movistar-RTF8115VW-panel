@@ -332,11 +332,14 @@ struct Recursos {
 }
 
 impl Recursos {
-    /// ¿Hay internet? (ver [`plan::wan_arriba`]). Error si el router no
+    /// ¿Hay internet? (ver [`plan::wan_arriba`]): la conexión que vigila
+    /// ([`RedActual::wan_en`]) y si está arriba. Error si el router no
     /// responde.
-    async fn wan_arriba(&self) -> Result<bool, hgu::Error> {
+    async fn wan_vigilada(&self) -> Result<(Option<String>, bool), hgu::Error> {
         let conns = read::wan(&self.hgu).await?;
-        Ok(wan_arriba(&conns, self.red.wan().as_deref()))
+        let wan = self.red.wan_en(&conns);
+        let arriba = wan_arriba(&conns, wan.as_deref());
+        Ok((wan, arriba))
     }
 }
 
@@ -441,6 +444,14 @@ impl ChangeManager {
     /// Id del cambio en curso (aplicándose o vigilándose).
     pub fn activo(&self) -> Option<i64> {
         lock(&self.activo).flatten()
+    }
+
+    /// ¿Hay un cambio aplicándose o vigilándose, o se están retomando los
+    /// del arranque (ver [`ChangeManager::reanudar_pendientes`])? Mientras,
+    /// la red de seguridad no debe cambiar de conexión a internet.
+    pub fn ocupado(&self) -> bool {
+        let reanudando = self.reanudando.load(std::sync::atomic::Ordering::SeqCst);
+        self.activo().is_some() || (reanudando && !*self.listo.borrow())
     }
 
     /// Aparta el gestor para algo que no puede coincidir con un cambio
@@ -1348,8 +1359,12 @@ impl ChangeManager {
         let c = &self.state.hgu;
         let no_responde = |e: hgu::Error| format!("el router no responde: {e}");
         read::summary(c).await.map_err(no_responde)?;
-        if wan && !self.state.wan_arriba().await.map_err(no_responde)? {
-            return Err(match self.state.red.wan() {
+        if !wan {
+            return Ok(());
+        }
+        let (vigilada, arriba) = self.state.wan_vigilada().await.map_err(no_responde)?;
+        if !arriba {
+            return Err(match vigilada {
                 Some(n) => format!("la WAN ({n}) está caída"),
                 None => "la WAN está caída (ninguna conexión de datos arriba)".to_owned(),
             });

@@ -3,7 +3,7 @@
 use crate::{changes, config::Config, crypto::HistoryKey, db, poller::PollerHandle};
 use axum::extract::FromRef;
 use catalogo::{Catalogo, mask::Mascara};
-use hgu::deteccion::RedDetectada;
+use hgu::{deteccion::RedDetectada, models::WanConn};
 use i18n::Idioma;
 use leptos::prelude::LeptosOptions;
 use sqlx::SqlitePool;
@@ -26,6 +26,22 @@ impl RedActual {
             .or_else(|| g.0.as_ref().and_then(|r| r.wan.clone()))
     }
 
+    /// La conexión a internet que vale entre las que tiene el router
+    /// (`conns`): la elegida a mano si sigue existiendo; si no, la detectada.
+    /// Así una elegida que ya no existe no deja la red de seguridad mirando
+    /// una conexión que nunca estará arriba.
+    pub fn wan_en(&self, conns: &[WanConn]) -> Option<String> {
+        let g = self.0.read().unwrap_or_else(|e| e.into_inner());
+        g.1.clone()
+            .filter(|m| conns.iter().any(|c| &c.name == m))
+            .or_else(|| g.0.as_ref().and_then(|r| r.wan.clone()))
+    }
+
+    /// La conexión a internet elegida a mano, exista o no en el router.
+    pub fn manual(&self) -> Option<String> {
+        self.0.read().unwrap_or_else(|e| e.into_inner()).1.clone()
+    }
+
     /// La última detección.
     pub fn red(&self) -> Option<RedDetectada> {
         self.0.read().unwrap_or_else(|e| e.into_inner()).0.clone()
@@ -39,6 +55,11 @@ impl RedActual {
     /// Sustituye solo la detección (la elegida a mano no cambia).
     pub fn fijar_detectada(&self, red: RedDetectada) {
         self.0.write().unwrap_or_else(|e| e.into_inner()).0 = Some(red);
+    }
+
+    /// Sustituye solo la conexión elegida a mano.
+    pub fn fijar_manual(&self, manual: Option<String>) {
+        self.0.write().unwrap_or_else(|e| e.into_inner()).1 = manual;
     }
 }
 
@@ -93,6 +114,18 @@ impl AppState {
     /// (`claves::WAN_MANUAL`) si existe; si no, la detectada.
     pub fn wan(&self) -> Option<String> {
         self.red.wan()
+    }
+
+    /// La conexión a internet que vale entre las del router (ver
+    /// [`RedActual::wan_en`]).
+    pub fn wan_en(&self, conns: &[WanConn]) -> Option<String> {
+        self.red.wan_en(conns)
+    }
+
+    /// La conexión a internet elegida a mano (`claves::WAN_MANUAL`), exista
+    /// o no en el router.
+    pub fn wan_manual(&self) -> Option<String> {
+        self.red.manual()
     }
 
     /// La última detección de la red del router.

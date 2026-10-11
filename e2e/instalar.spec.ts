@@ -18,6 +18,8 @@ const textos = {
     guardar: "Guardar y seguir",
     leer: "Leer la configuración",
     fin: "El panel ya está configurado.",
+    red: "Red del router detectada:",
+    telefonia: "Telefonía: sí",
     irEstado: "Ir al estado",
     estado: "Estado",
     esperando: "Esperando el primer dato",
@@ -28,6 +30,8 @@ const textos = {
     guardar: "Save and continue",
     leer: "Read the configuration",
     fin: "The panel is set up.",
+    red: "Router network detected:",
+    telefonia: "Phone: yes",
     irEstado: "Go to Status",
     estado: "Status",
     esperando: "Waiting for the first data",
@@ -76,7 +80,12 @@ for (const { idioma, locale, ancho } of pasadas) {
 
       await page.getByRole("button", { name: t.leer }).click();
       await expect(page.getByText(t.fin)).toBeVisible({ timeout: 30_000 });
+      // La red detectada del router, resumida.
+      await expect(page.getByText(t.red)).toBeVisible();
+      await expect(page.locator(".red-resumen")).toContainText("Internet: ip2 (PPPoE)");
+      await expect(page.locator(".red-resumen")).toContainText(t.telefonia);
       await sinDesbordamiento(page, "fin del asistente");
+      await page.screenshot({ path: `capturas/instalar-fin-${idioma}-${ancho}.png`, fullPage: true });
 
       await page.getByRole("link", { name: t.irEstado }).click();
       await page.waitForURL((url) => url.pathname === "/");

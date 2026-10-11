@@ -1,10 +1,11 @@
 //! Server functions de «Ajustes del panel» (`/panel`: parámetros de la
 //! instancia y usuarios del panel) y de «Router → Conexión con el router»
-//! (`/router/conexion`: credenciales del router y confirmación del
-//! firmware).
+//! (`/router/conexion`: credenciales del router, confirmación del firmware y
+//! red detectada, con la conexión a internet elegida a mano).
 //!
 //! Todas exigen sesión. Las delicadas (cambiar las credenciales del router,
-//! confirmar el firmware y todo lo de usuarios) exigen además haber vuelto a
+//! confirmar el firmware, elegir la conexión a internet, volver a detectar la
+//! red y todo lo de usuarios) exigen además haber vuelto a
 //! escribir la contraseña del panel en los últimos 5 minutos
 //! ([`reautenticar`]); sin eso responden 401 con
 //! [`crate::auth::ERROR_REAUTENTICACION`]. La contraseña del router nunca
@@ -16,7 +17,7 @@ use leptos::server_fn::codec::Json;
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
 
-pub use crate::instalar::InfoRouter;
+pub use crate::instalar::{InfoRouter, ResumenRed};
 
 /// Máximo de servidores DNS preferidos.
 pub const MAX_DNS: usize = 4;
@@ -76,6 +77,14 @@ pub struct AjustesPanel {
     pub equipos: Vec<EquipoLan>,
     /// Usuario de la sesión.
     pub yo: String,
+    /// Red del router detectada.
+    pub red: Option<ResumenRed>,
+    /// Conexión a internet elegida a mano (manda sobre la detectada mientras
+    /// exista en el router).
+    pub wan_manual: Option<String>,
+    /// Conexiones WAN del router (`name` de `cbGetWanIPIntf`), para elegir la
+    /// de internet a mano.
+    pub conexiones: Vec<String>,
 }
 
 /// Parámetros de la instancia que se guardan: solo los presentes (`Some`);
@@ -302,6 +311,22 @@ pub async fn guardar_router(
     crate::instalar::servidor::guardar(&state, &url, &usuario, &contrasena).await
 }
 
+/// Elige a mano la conexión a internet (una de [`AjustesPanel::conexiones`])
+/// o, con `None`, vuelve a la detectada. Cambia la conexión que vigila la red
+/// de seguridad del gestor de cambios: no con un cambio en curso. Exige
+/// reautenticación.
+#[server(endpoint = "guardar_wan", input = Json)]
+pub async fn guardar_wan(manual: Option<String>) -> Result<(), ServerFnError> {
+    servidor::guardar_wan(manual).await
+}
+
+/// Vuelve a detectar la red del router ahora y devuelve lo detectado. No con
+/// un cambio en curso. Exige reautenticación.
+#[server(endpoint = "redetectar", input = Json)]
+pub async fn redetectar() -> Result<ResumenRed, ServerFnError> {
+    servidor::redetectar().await
+}
+
 /// Guarda los parámetros de la instancia (validados).
 #[server(endpoint = "guardar_instancia", input = Json)]
 pub async fn guardar_instancia(campos: CamposInstancia) -> Result<CamposInstancia, ServerFnError> {
@@ -348,6 +373,7 @@ mod servidor {
     use super::*;
     use crate::{
         auth::{self, UserError},
+        changes::Reserva,
         instalar::servidor::{fallo, interno},
         instancia::{self, claves},
         state::AppState,
@@ -421,6 +447,17 @@ mod servidor {
                 });
             }
         }
+        // Las conexiones de la última lectura; sin ninguna aún, se preguntan
+        // al router (sin él, ninguna).
+        let mut conexiones: Vec<String> = match &foto {
+            Some(s) => s.wan.iter().map(|w| w.name.clone()).collect(),
+            None if state.hgu.configurado() => hgu::read::wan(&state.hgu)
+                .await
+                .map(|c| c.into_iter().map(|w| w.name).collect())
+                .unwrap_or_default(),
+            None => Vec::new(),
+        };
+        conexiones.dedup();
         // Sin fijar (o quitado), el del navegador: nunca «español» por omisión,
         // que la página no seguiría.
         let idioma = instancia::leer(db, claves::IDIOMA)
@@ -443,7 +480,66 @@ mod servidor {
             usuarios,
             equipos,
             yo,
+            red: state.red().as_ref().map(ResumenRed::from),
+            wan_manual: state.wan_manual(),
+            conexiones,
         })
+    }
+
+    /// Estado del panel (con reautenticación) y el gestor de cambios
+    /// apartado: 409 con un cambio en curso o mientras se retoman los del
+    /// arranque. Para lo que cambia la conexión que vigila su red de
+    /// seguridad.
+    async fn preparar_red() -> Result<(AppState, Option<Reserva>), ServerFnError> {
+        let (state, _) = preparar_delicada().await?;
+        let reserva = state
+            .cambios()
+            .map(|m| m.excluir_cambios())
+            .transpose()
+            .map_err(|_| fallo(StatusCode::CONFLICT, t!("router-error-cambio-en-curso")))?;
+        Ok((state, reserva))
+    }
+
+    pub(super) async fn guardar_wan(manual: Option<String>) -> Result<(), ServerFnError> {
+        let (state, _reserva) = preparar_red().await?;
+        let manual = manual
+            .map(|m| m.trim().to_owned())
+            .filter(|m| !m.is_empty());
+        if let Some(m) = &manual {
+            let conns = hgu::read::wan(&state.hgu).await.map_err(|e| {
+                fallo(
+                    StatusCode::BAD_GATEWAY,
+                    t!("instalar-error-router", error = e.to_string()),
+                )
+            })?;
+            if !conns.iter().any(|c| &c.name == m) {
+                return Err(fallo(
+                    StatusCode::BAD_REQUEST,
+                    t!("router-error-conexion-no-existe", nombre = m.clone()),
+                ));
+            }
+        }
+        let valor = manual.clone().map_or(Value::Null, Value::String);
+        instancia::escribir(&state.db, claves::WAN_MANUAL, &valor)
+            .await
+            .map_err(interno)?;
+        state.red_actual().fijar_manual(manual.clone());
+        match &manual {
+            Some(m) => tracing::info!("conexión a internet elegida a mano: {m}"),
+            None => tracing::info!("conexión a internet: la detectada"),
+        }
+        Ok(())
+    }
+
+    pub(super) async fn redetectar() -> Result<ResumenRed, ServerFnError> {
+        let (state, _reserva) = preparar_red().await?;
+        let red = instancia::detectar_y_guardar(&state).await.map_err(|e| {
+            fallo(
+                StatusCode::BAD_GATEWAY,
+                t!("instalar-error-router", error = e),
+            )
+        })?;
+        Ok(ResumenRed::from(&red))
     }
 
     pub(super) async fn guardar_instancia(

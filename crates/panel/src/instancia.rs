@@ -205,11 +205,23 @@ pub async fn solo_lectura(db: &SqlitePool) -> bool {
 /// Detecta la red del router ([`hgu::deteccion::detectar`]), la anota en
 /// [`AppState`] (la conexión elegida a mano sigue mandando) y la guarda en
 /// [`claves::RED_DETECTADA`]. Registra qué cambió respecto a la anterior,
-/// nunca direcciones. Error (sin tocar lo anterior) si el router no responde.
+/// nunca direcciones. Error (sin tocar lo anterior) si el router no responde
+/// o si, al terminar, hay un cambio aplicándose o vigilándose
+/// (`ChangeManager::ocupado`): la detección se descarta para que su red de
+/// seguridad no cambie de conexión a mitad (el sondeo vuelve a detectar
+/// después). Pasa con las detecciones que siguen en segundo plano (la del
+/// arranque, la de guardar las credenciales).
 pub async fn detectar_y_guardar(state: &AppState) -> Result<RedDetectada, String> {
     let red = hgu::deteccion::detectar(&state.hgu, crate::series::now())
         .await
         .map_err(|e| format!("no se puede detectar la red del router: {e}"))?;
+    if state.cambios().is_some_and(|m| m.ocupado()) {
+        return Err(
+            "red del router: se descarta la detección, hay un cambio en curso (se volverá a \
+             detectar después)"
+                .to_owned(),
+        );
+    }
     let anterior = state.red();
     for cambio in cambios_de_red(anterior.as_ref(), &red) {
         tracing::info!("red del router: {cambio}");

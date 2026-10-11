@@ -303,3 +303,92 @@ async fn sondeo_redetecta_si_falta_la_wan() {
     })
     .await;
 }
+
+/// Con un cambio vigilándose, una detección nueva (la del arranque o la de
+/// guardar las credenciales, que pueden acabar en segundo plano) no se
+/// anota: la red de seguridad del cambio sigue con su conexión.
+#[tokio::test]
+async fn deteccion_no_se_anota_con_cambio_activo() {
+    let mut p = common::panel().await;
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, common::USER, common::PASS);
+    cfg.timeout = Duration::from_millis(500);
+    cfg.min_gap = Duration::from_millis(1);
+    p.state.hgu = hgu::Client::new(cfg);
+    // Vigilancia larga: el cambio sigue activo mientras dura la prueba.
+    let m = ChangeManager::instalar(
+        &p.state,
+        Tiempos {
+            bajo: Duration::from_secs(60),
+            medio: Duration::from_secs(60),
+            alto: Duration::from_secs(60),
+            intervalo: Duration::from_millis(30),
+            fallos_para_revertir: 3,
+            pausa_max: Duration::from_secs(2),
+        },
+    );
+    m.reanudar_pendientes().await;
+    let mut anterior = p.state.red().unwrap();
+    anterior.wan = Some("ip4".into());
+    p.state.fijar_red(Some(anterior.clone()), None);
+    instancia::escribir(&p.state.db, claves::RED_DETECTADA, &json!(anterior))
+        .await
+        .unwrap();
+    let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
+    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    let start = Instant::now();
+    while m.cambio(id).await.unwrap().estado != Estado::Vigilando {
+        assert!(start.elapsed() < Duration::from_secs(5), "sin vigilancia");
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert!(instancia::detectar_y_guardar(&p.state).await.is_err());
+    assert_eq!(p.state.wan().as_deref(), Some("ip4"), "no cambia a mitad");
+    assert_eq!(p.state.red(), Some(anterior.clone()));
+    assert_eq!(
+        instancia::leer(&p.state.db, claves::RED_DETECTADA).await,
+        Some(json!(anterior))
+    );
+}
+
+/// Una conexión elegida a mano que ya no existe en el router: la red de
+/// seguridad y Estado usan la detectada, y el sondeo no vuelve a detectar en
+/// cada vuelta (no serviría de nada).
+#[tokio::test]
+async fn wan_manual_inexistente_usa_la_detectada() {
+    let conns = conexiones();
+    let mut p = common::panel().await;
+    let mut red = p.state.red().unwrap();
+    // Una marca que una detección nueva borraría.
+    red.radios = vec!["9".into()];
+    red.momento = panel::series::now();
+    p.state.fijar_red(Some(red.clone()), Some("ip9".into()));
+    assert_eq!(p.state.wan().as_deref(), Some("ip9"));
+    assert_eq!(p.state.wan_en(&conns).as_deref(), Some("ip2"));
+    assert!(wan_arriba(&conns, p.state.wan_en(&conns).as_deref()));
+    // Con la manual presente, manda la manual.
+    p.state.fijar_red(Some(red.clone()), Some("ip4".into()));
+    assert_eq!(p.state.wan_en(&conns).as_deref(), Some("ip4"));
+    p.state.fijar_red(Some(red.clone()), Some("ip9".into()));
+
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, common::USER, common::PASS);
+    cfg.timeout = Duration::from_millis(200);
+    cfg.min_gap = Duration::from_millis(1);
+    p.state.hgu = hgu::Client::new(cfg);
+    let h = Poller::spawn_with(
+        p.state.clone(),
+        PollerConfig {
+            fast: Duration::from_millis(50),
+            slow: Duration::from_millis(100),
+            backoff_max: Duration::from_millis(200),
+            ..PollerConfig::default()
+        },
+    );
+    esperar("instantánea con ip2", || {
+        h.latest()
+            .is_some_and(|s| s.wan_intf.as_deref() == Some("ip2"))
+    })
+    .await;
+    // Varias vueltas lentas sin volver a detectar.
+    tokio::time::sleep(Duration::from_millis(600)).await;
+    assert_eq!(p.state.red().unwrap().radios, ["9"], "no re-detecta");
+    assert_eq!(p.state.wan_manual().as_deref(), Some("ip9"));
+}

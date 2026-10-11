@@ -414,7 +414,7 @@ impl ChangeManager {
         let base = if plan0.funcion.name == REBOOT {
             Base::Uptime(read::summary(c).await.map_err(no_responde)?.uptime_s)
         } else {
-            Base::Wan(self.state.wan_arriba().await.map_err(no_responde)?)
+            Base::Wan(self.state.wan_vigilada().await.map_err(no_responde)?.1)
         };
         if plan0.operacion == Operacion::Crear && matches!(plan0.lectura, Lectura::Xml { .. }) {
             plan0.ids_antes = Some(self.ids_de_la_lista(&plan0).await.map_err(no_responde)?);

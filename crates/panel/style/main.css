@@ -2359,3 +2359,23 @@ summary.hist-cabeza:hover {
 .aviso-formulario:empty {
   display: none;
 }
+
+/* ------------------------------------------------- Red del router */
+
+.red-resumen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-1) var(--esp-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-wrap: anywhere;
+}
+
+/* El separador cierra cada elemento: al partirse la línea, ninguna empieza
+   por él. */
+.red-resumen li:not(:last-child)::after {
+  content: "·";
+  margin-left: var(--esp-3);
+  color: var(--texto-2);
+}

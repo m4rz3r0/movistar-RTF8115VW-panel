@@ -617,6 +617,10 @@ async fn conexion_con_el_router_en_su_seccion() {
     let html = body_text(resp).await;
     assert!(html.contains("Conexión con el router"), "{html}");
     assert!(html.contains(r#"id="panel-router-url""#), "{html}");
+    // La red detectada, en la misma página.
+    assert!(html.contains("Red del router"), "{html}");
+    assert!(html.contains("Internet: ip2 (PPPoE)"), "{html}");
+    assert!(html.contains(r#"id="router-red-conexion""#), "{html}");
     assert!(
         html.contains(r#"href="/router/conexion""#),
         "enlace de la navegación: {html}"
@@ -646,4 +650,111 @@ async fn conexion_con_el_router_en_su_seccion() {
     .await;
     assert!(resp.status().is_redirection(), "{}", resp.status());
     assert_eq!(resp.headers()["location"], "/router/conexion");
+}
+
+/// La red detectada y las conexiones del router llegan a la página; elegir
+/// la conexión a internet a mano exige reautenticación y un nombre que el
+/// router tenga. Volver a detectar, también reautenticación.
+#[tokio::test]
+async fn guardar_wan_exige_reautenticacion_y_nombre_valido() {
+    let p = panel().await;
+    let cookie = sesion(&p).await;
+    let v = ok(&p, "leer_panel", json!({}), &cookie).await;
+    assert_eq!(v["red"]["wan"], "ip2", "{v}");
+    assert_eq!(v["wan_manual"], Value::Null, "{v}");
+    assert_eq!(v["conexiones"], json!(["ip2", "ip3", "ip4"]), "{v}");
+
+    let (status, body) = llamar(&p, "guardar_wan", json!({ "manual": "ip4" }), Some(&cookie)).await;
+    assert_eq!(status, 401, "{body}");
+    assert!(body.contains(panel::auth::ERROR_REAUTENTICACION), "{body}");
+    let (status, body) = llamar(&p, "redetectar", json!({}), Some(&cookie)).await;
+    assert_eq!(status, 401, "{body}");
+    assert_eq!(p.state.wan().as_deref(), Some("ip2"));
+
+    reautenticar(&p, &cookie).await;
+    let (status, body) = llamar(&p, "guardar_wan", json!({ "manual": "ip9" }), Some(&cookie)).await;
+    assert_eq!(status, 400, "{body}");
+    assert!(body.contains("ip9"), "{body}");
+    assert_eq!(p.state.wan().as_deref(), Some("ip2"));
+    assert_eq!(instancia::leer(&p.state.db, claves::WAN_MANUAL).await, None);
+
+    ok(&p, "guardar_wan", json!({ "manual": "ip4" }), &cookie).await;
+    assert_eq!(p.state.wan().as_deref(), Some("ip4"));
+    assert_eq!(
+        instancia::leer(&p.state.db, claves::WAN_MANUAL).await,
+        Some(json!("ip4"))
+    );
+    let v = ok(&p, "leer_panel", json!({}), &cookie).await;
+    assert_eq!(v["wan_manual"], "ip4", "{v}");
+
+    // Sin la manual, vuelve la detectada.
+    ok(&p, "guardar_wan", json!({ "manual": null }), &cookie).await;
+    assert_eq!(p.state.wan().as_deref(), Some("ip2"));
+    assert!(
+        instancia::leer(&p.state.db, claves::WAN_MANUAL)
+            .await
+            .is_none_or(|v| v.is_null())
+    );
+
+    // Volver a detectar devuelve la red y la anota.
+    p.state.fijar_red(None, None);
+    let red = ok(&p, "redetectar", json!({}), &cookie).await;
+    assert_eq!(red["wan"], "ip2", "{red}");
+    assert_eq!(p.state.wan().as_deref(), Some("ip2"));
+}
+
+/// Con un cambio aplicándose o vigilándose, ni se elige la conexión a
+/// internet ni se vuelve a detectar: la red de seguridad del cambio no
+/// cambia de conexión a mitad.
+#[tokio::test]
+async fn guardar_wan_rechazada_con_cambio_activo() {
+    let (p, cookie) = panel_con_gestor().await;
+    reautenticar(&p, &cookie).await;
+    let prep = ok(
+        &p,
+        "preparar_cambio",
+        json!({ "peticion": { "funcion": "cbSetUpnpCfg", "instancia": null,
+            "valores": [["adm_state", "1"]], "borrar": false } }),
+        &cookie,
+    )
+    .await;
+    p.sim.control.hang_after_next_write();
+    let cambio = {
+        let app = p.app.clone();
+        let mut req = post_json(
+            "/api/confirmar_cambio",
+            &json!({ "token": prep["token"], "palabra": null }).to_string(),
+            "127.0.0.1",
+        );
+        req.headers_mut().insert("cookie", cookie.parse().unwrap());
+        tokio::spawn(async move { send(&app, req).await.status() })
+    };
+    let gestor = p.state.cambios().unwrap();
+    let start = Instant::now();
+    while gestor.activo().is_none() || p.sim.control.writes().is_empty() {
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "sin cambio activo"
+        );
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    let (status, body) = llamar(&p, "guardar_wan", json!({ "manual": "ip4" }), Some(&cookie)).await;
+    assert_eq!(status, 409, "{body}");
+    let (status, body) = llamar(&p, "redetectar", json!({}), Some(&cookie)).await;
+    assert_eq!(status, 409, "{body}");
+    assert_eq!(p.state.wan().as_deref(), Some("ip2"));
+    assert_eq!(instancia::leer(&p.state.db, claves::WAN_MANUAL).await, None);
+
+    p.sim.control.set_unresponsive(false);
+    let _ = cambio.await;
+    let start = Instant::now();
+    while gestor.activo().is_some() {
+        assert!(
+            start.elapsed() < Duration::from_secs(10),
+            "el cambio no acaba"
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    ok(&p, "guardar_wan", json!({ "manual": "ip4" }), &cookie).await;
+    assert_eq!(p.state.wan().as_deref(), Some("ip4"));
 }
