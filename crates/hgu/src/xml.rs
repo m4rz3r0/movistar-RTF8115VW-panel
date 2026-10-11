@@ -65,6 +65,36 @@ impl XmlNode {
     pub fn result_ok(&self) -> bool {
         self.text_of("Result").is_none_or(|t| t == "0")
     }
+
+    /// El nodo como XML compacto (`<tag>texto</tag>` en las hojas), con `&`,
+    /// `<` y `>` escapados. Vuelve a dar el mismo nodo con [`parse_response`]
+    /// dentro de un `<Response>`.
+    pub fn to_xml(&self) -> String {
+        let mut out = String::new();
+        self.escribir(&mut out);
+        out
+    }
+
+    fn escribir(&self, out: &mut String) {
+        out.push('<');
+        out.push_str(&self.tag);
+        out.push('>');
+        if self.children.is_empty() {
+            out.push_str(
+                &self
+                    .text
+                    .replace('&', "&amp;")
+                    .replace('<', "&lt;")
+                    .replace('>', "&gt;"),
+            );
+        }
+        for c in &self.children {
+            c.escribir(out);
+        }
+        out.push_str("</");
+        out.push_str(&self.tag);
+        out.push('>');
+    }
 }
 
 /// Interpreta `<Response><name>...</name></Response>` y devuelve el nodo `<name>`.
@@ -115,6 +145,22 @@ mod tests {
     fn sesion_caducada_no_es_respuesta() {
         let r = parse_response("cbX", "<script>location = 'te_acceso_router.asp'</script>");
         assert!(matches!(r, Err(XmlError::NotResponse)));
+    }
+
+    #[test]
+    fn a_xml_y_vuelta() {
+        let n = parse_response(
+            "cbX",
+            "<Response><cbX><a>1 &amp; 2 &lt;3&gt;</a><s><id>0</id></s><Result>0</Result></cbX></Response>",
+        )
+        .unwrap();
+        let xml = n.to_xml();
+        assert_eq!(
+            xml,
+            "<cbX><a>1 &amp; 2 &lt;3&gt;</a><s><id>0</id></s><Result>0</Result></cbX>"
+        );
+        let otra = parse_response("cbX", &format!("<Response>{xml}</Response>")).unwrap();
+        assert_eq!(otra, n);
     }
 
     #[test]

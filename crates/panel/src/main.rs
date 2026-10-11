@@ -32,6 +32,7 @@ async fn serve() -> std::process::ExitCode {
         build_router,
         changes::{ChangeManager, Tiempos},
         config::Config,
+        instancia,
         poller::Poller,
         state::AppState,
     };
@@ -68,6 +69,12 @@ async fn serve() -> std::process::ExitCode {
             return ExitCode::FAILURE;
         }
     };
+    if let Err(e) = instancia::arrancar_router(&state).await {
+        eprintln!("panel: no se puede arrancar: {e}");
+        return ExitCode::FAILURE;
+    }
+    // Sin usuarios: token del asistente de instalación (registro y fichero).
+    panel::instalar::token_inicial(&state).await;
     Poller::spawn(state.clone());
     // Retoma los cambios que quedaron a medias si el proceso se cortó (en
     // segundo plano: si el router no responde, no retrasa el arranque).

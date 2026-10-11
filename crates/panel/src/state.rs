@@ -1,14 +1,9 @@
 //! Estado compartido del servidor.
 
-use crate::{
-    changes,
-    config::{self, Config},
-    crypto::HistoryKey,
-    db,
-    poller::PollerHandle,
-};
+use crate::{changes, config::Config, crypto::HistoryKey, db, poller::PollerHandle};
 use axum::extract::FromRef;
 use catalogo::{Catalogo, mask::Mascara};
+use i18n::Idioma;
 use leptos::prelude::LeptosOptions;
 use sqlx::SqlitePool;
 use std::sync::Arc;
@@ -35,6 +30,13 @@ pub struct AppState {
     /// Gestor de cambios del servidor (vacío hasta
     /// `ChangeManager::instalar`). Toda escritura al router pasa por él.
     pub cambios: changes::Ranura,
+    /// Asistente de instalación: token y fase (ver `instalar`).
+    pub instalacion: Arc<crate::instalar::Instalacion>,
+    /// Idioma por defecto de la instancia (`claves::IDIOMA`), si se ha fijado:
+    /// copia en memoria para decidir el idioma de cada página sin ir a la
+    /// base de datos. Lo carga [`AppState::new`] y lo cambia
+    /// [`AppState::fijar_idioma_por_defecto`].
+    idioma_por_defecto: Arc<std::sync::RwLock<Option<Idioma>>>,
 }
 
 impl AppState {
@@ -42,31 +44,46 @@ impl AppState {
     pub fn cambios(&self) -> Option<Arc<changes::ChangeManager>> {
         self.cambios.get().cloned()
     }
+
+    /// Idioma por defecto de la instancia, si se ha fijado.
+    pub fn idioma_por_defecto(&self) -> Option<Idioma> {
+        *self
+            .idioma_por_defecto
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Anota el idioma por defecto recién guardado en la base de datos.
+    pub fn fijar_idioma_por_defecto(&self, idioma: Idioma) {
+        *self
+            .idioma_por_defecto
+            .write()
+            .unwrap_or_else(|e| e.into_inner()) = Some(idioma);
+    }
 }
 
 impl AppState {
-    /// Carga el catálogo, lee la contraseña del router y la clave del
-    /// historial (la crea si no existe) y abre la base de datos. Cualquier fallo impide arrancar; el mensaje nunca incluye
-    /// secretos.
+    /// Carga el catálogo, lee la clave maestra (la crea si no existe) y abre
+    /// la base de datos. El cliente del router empieza sin configurar: lo
+    /// configura `instancia::arrancar_router`. Cualquier fallo impide
+    /// arrancar; el mensaje nunca incluye secretos.
     pub async fn new(cfg: Config, leptos: LeptosOptions) -> Result<AppState, String> {
         tokio::task::spawn_blocking(crate::auth::warm_up)
             .await
             .map_err(|e| e.to_string())?;
         let catalogo = Catalogo::load().map_err(|e| e.to_string())?;
         let mascara = Mascara::load().map_err(|e| e.to_string())?;
-        let password = config::read_router_secret(&cfg.router_secret_file)?;
         let history_key = HistoryKey::load_or_create(&cfg.history_key_file)?;
-        let hgu = hgu::Client::new(hgu::ClientConfig::new(
-            &cfg.router_url,
-            &cfg.router_user,
-            &password,
-        ));
+        let hgu = hgu::Client::sin_configurar();
         let db = db::open(&cfg.db_path).await.map_err(|e| {
             format!(
                 "no se puede abrir la base de datos {}: {e}",
                 cfg.db_path.display()
             )
         })?;
+        let idioma_por_defecto = crate::instancia::leer(&db, crate::instancia::claves::IDIOMA)
+            .await
+            .and_then(|v| serde_json::from_value(v).ok());
         Ok(AppState {
             cfg: Arc::new(cfg),
             db,
@@ -78,6 +95,8 @@ impl AppState {
             poller: PollerHandle::default(),
             history_key: Arc::new(history_key),
             cambios: changes::Ranura::default(),
+            instalacion: Arc::default(),
+            idioma_por_defecto: Arc::new(std::sync::RwLock::new(idioma_por_defecto)),
         })
     }
 }

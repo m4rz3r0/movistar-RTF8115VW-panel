@@ -233,3 +233,21 @@ async fn sigue_sano_durante_una_pausa() {
     pausa.resume();
     assert!(h.healthy(), "deja de estar sano justo al reanudar");
 }
+
+#[tokio::test]
+async fn despertar_lee_sin_esperar_al_intervalo() {
+    let p = common::panel_sin_router("127.0.0.1".parse().unwrap()).await;
+    let h = Poller::spawn_with(
+        p.state.clone(),
+        PollerConfig {
+            fast: Duration::from_secs(60),
+            ..config()
+        },
+    );
+    esperar("primer ciclo sin router", || h.sin_configurar()).await;
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, common::USER, common::PASS);
+    cfg.min_gap = Duration::from_millis(1);
+    p.state.hgu.reconfigurar(cfg).await;
+    h.despertar();
+    esperar("lectura tras despertar", || h.latest().is_some()).await;
+}

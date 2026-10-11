@@ -141,15 +141,29 @@ async fn login_mal_incrementa_retardo() {
 #[tokio::test]
 async fn retardo_maximo_60_s() {
     let p = panel().await;
-    sqlx::query(
-        "INSERT INTO login_attempts VALUES ('user', 'x', 40, strftime('%s', 'now') * 1000)",
-    )
-    .execute(&p.state.db)
-    .await
-    .unwrap();
+    // El último fallo, ahora mismo (en milisegundos: `strftime('%s')`
+    // redondeaba al segundo y, con la máquina cargada, la espera que quedaba
+    // ya era de 59 s).
+    let ahora_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as i64;
+    sqlx::query("INSERT INTO login_attempts VALUES ('user', 'x', 40, ?)")
+        .bind(ahora_ms)
+        .execute(&p.state.db)
+        .await
+        .unwrap();
     let (status, body) = login_desde(&p, "x", "lo que sea", "127.0.0.1").await;
     assert_eq!(status, 429);
-    assert!(body.contains("espera 60 s"), "{body}");
+    // 40 fallos esperan lo máximo, 60 s, menos lo que haya tardado la
+    // petición: nunca más de 60.
+    let segundos: i64 = body
+        .split("espera ")
+        .nth(1)
+        .and_then(|r| r.split(' ').next())
+        .and_then(|n| n.parse().ok())
+        .unwrap_or_else(|| panic!("{body}"));
+    assert!((55..=60).contains(&segundos), "{body}");
 }
 
 #[tokio::test]
@@ -240,6 +254,7 @@ async fn actividad_renueva_la_sesion_como_mucho_cada_minuto() {
 #[tokio::test]
 async fn pagina_sin_sesion_redirige_a_login() {
     let p = panel().await;
+    crear_usuario(&p).await;
     let resp = get(&p.app, "/?a=1&b=2").await;
     assert_eq!(resp.status(), 303);
     assert_eq!(
@@ -253,6 +268,7 @@ async fn pagina_sin_sesion_redirige_a_login() {
 #[tokio::test]
 async fn pagina_de_login_es_publica() {
     let p = panel().await;
+    crear_usuario(&p).await;
     let resp = get(&p.app, "/login?next=%2F").await;
     assert_eq!(resp.status(), 200);
     let html = body_text(resp).await;

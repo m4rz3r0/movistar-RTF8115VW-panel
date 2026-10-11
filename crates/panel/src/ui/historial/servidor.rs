@@ -3,7 +3,7 @@
 
 use super::*;
 use crate::{
-    changes::{Cambio, CambioError},
+    changes::{Cambio, CambioError, EstadoPaso},
     state::AppState,
     ui::explorador::{
         PreparadoVista, ruta_funcion,
@@ -57,13 +57,37 @@ async fn fila_cambio(
     c: Cambio,
 ) -> Result<CambioFila, ServerFnError> {
     let g = gestor(state)?;
-    let f = state.catalogo.funcion(&c.funcion);
-    let campos: Vec<CampoCambio> = c
-        .diff
-        .campos
-        .into_iter()
-        .map(|d| campo_cambio(f, o, d))
-        .collect();
+    // Cada campo con las etiquetas de la función de su paso.
+    let campos_de = |funcion: &str, diff: crate::changes::Diff| -> Vec<CampoCambio> {
+        let f = state.catalogo.funcion(funcion);
+        diff.campos
+            .into_iter()
+            .map(|d| campo_cambio(f, o, d))
+            .collect()
+    };
+    let traducir = |clave: &str| crate::ui::i18n::traducir(clave, None);
+    let (campos, pasos) = if c.pasos.len() > 1 {
+        let pasos: Vec<PasoFila> = c
+            .pasos
+            .into_iter()
+            .map(|p| PasoFila {
+                numero: p.orden + 1,
+                etiqueta: p
+                    .etiqueta
+                    .as_deref()
+                    .map_or_else(|| p.funcion.clone(), traducir),
+                campos: campos_de(&p.funcion, p.diff),
+                funcion: p.funcion,
+                instancia: p.instancia,
+                estado: estado_paso(p.estado),
+                error: p.error,
+            })
+            .collect();
+        let campos = pasos.iter().flat_map(|p| p.campos.clone()).collect();
+        (campos, pasos)
+    } else {
+        (campos_de(&c.funcion, c.diff), Vec::new())
+    };
     let (por, deshace) = g.enlaces_deshacer(c.id).await;
     let enlace = |id: Option<i64>| async move {
         match id {
@@ -88,7 +112,20 @@ async fn fila_cambio(
         deshecho_por: enlace(por).await?,
         deshace: enlace(deshace).await?,
         puede_deshacer: g.se_puede_deshacer(c.id).await,
+        titulo: c.titulo.as_deref().map(traducir),
+        pasos,
     })
+}
+
+fn estado_paso(e: EstadoPaso) -> EstadoPasoVista {
+    match e {
+        EstadoPaso::Pendiente => EstadoPasoVista::Pendiente,
+        EstadoPaso::Omitido => EstadoPasoVista::Omitido,
+        EstadoPaso::Aplicando => EstadoPasoVista::Aplicando,
+        EstadoPaso::Aplicado => EstadoPasoVista::Aplicado,
+        EstadoPaso::Fallido => EstadoPasoVista::Fallido,
+        EstadoPaso::Revertido => EstadoPasoVista::Revertido,
+    }
 }
 
 async fn fila_revelado(state: &AppState, id: i64) -> Result<Option<ReveladoFila>, ServerFnError> {
@@ -160,7 +197,7 @@ pub async fn deshacer(state: &AppState, change_id: i64) -> Result<PreparadoVista
         Ok(p) => Ok(vista_preparado(state, &g, p)),
         Err(CambioError::Invalida(m)) => Err(con_estado(
             StatusCode::BAD_REQUEST,
-            format!("No se puede deshacer: {m}."),
+            crate::t!("historial-error-deshacer", motivo = m),
         )),
         Err(e) => Err(error_cambio(e)),
     }

@@ -16,6 +16,8 @@ leptos_meta.workspace = true
 leptos_router.workspace = true
 # Datos de las server functions (servidor y navegador).
 serde.workspace = true
+# Textos de la interfaz en español e inglés.
+i18n = { path = "../i18n" }
 # Posición del puntero en los gráficos (`getBoundingClientRect`); ya la trae
 # Leptos, aquí solo se activa `DomRect`.
 web-sys = { workspace = true, features = ["DomRect", "HtmlDetailsElement"] }
@@ -45,6 +47,9 @@ console_error_panic_hook = { workspace = true, optional = true }
 router-sim = { path = "../router-sim" }
 tempfile.workspace = true
 tower = { workspace = true, features = ["util"] }
+# Registro capturado en las pruebas que comprueban lo que se anota.
+tracing.workspace = true
+tracing-subscriber.workspace = true
 
 [features]
 hydrate = ["leptos/hydrate", "dep:wasm-bindgen", "dep:console_error_panic_hook"]
@@ -66,10 +71,15 @@ ssr = [
     "dep:chacha20poly1305",
     "dep:tracing",
     "dep:tracing-subscriber",
+    "i18n/tracing",
     "leptos/ssr",
     "leptos_meta/ssr",
     "leptos_router/ssr",
 ]
+
+[[example]]
+name = "e2e_grupo"
+required-features = ["ssr"]
 
 [[test]]
 name = "http"
@@ -97,4 +107,24 @@ required-features = ["ssr"]
 
 [[test]]
 name = "historial"
+required-features = ["ssr"]
+
+[[test]]
+name = "instancia"
+required-features = ["ssr"]
+
+[[test]]
+name = "idioma"
+required-features = ["ssr"]
+
+[[test]]
+name = "instalar"
+required-features = ["ssr"]
+
+[[test]]
+name = "panel_ajustes"
+required-features = ["ssr"]
+
+[[test]]
+name = "grupos"
 required-features = ["ssr"]

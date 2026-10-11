@@ -47,7 +47,7 @@ pub(crate) fn interno(e: impl fmt::Display) -> ServerFnError {
     tracing::error!(id, "error interno en el explorador: {e}");
     con_estado(
         StatusCode::INTERNAL_SERVER_ERROR,
-        format!("Error interno del panel (id {id})"),
+        crate::t!("comun-error-interno-id", id = id),
     )
 }
 
@@ -57,42 +57,39 @@ pub(crate) fn gestor(state: &AppState) -> Result<Arc<ChangeManager>, ServerFnErr
         .ok_or_else(|| interno("el gestor de cambios no está instalado"))
 }
 
-/// Error del gestor en español y con qué hacer.
+/// Error del gestor en el idioma de la petición y con qué hacer. El detalle
+/// que trae el gestor (`m`) está en español.
 pub(crate) fn error_cambio(e: CambioError) -> ServerFnError {
     use CambioError as E;
     let (status, msg) = match e {
-        E::Bloqueada(m) => (StatusCode::FORBIDDEN, format!("Función bloqueada: {m}.")),
+        E::Bloqueada(m) if m == crate::changes::BLOQUEO_SOLO_LECTURA => {
+            (StatusCode::FORBIDDEN, crate::t!("panel-solo-lectura"))
+        }
+        E::Bloqueada(m) => (
+            StatusCode::FORBIDDEN,
+            crate::t!("biblioteca-error-bloqueada", motivo = m),
+        ),
         E::SinCambios => (
             StatusCode::BAD_REQUEST,
-            "No hay nada que cambiar: los valores coinciden con los del router.".into(),
+            crate::t!("biblioteca-error-sin-cambios"),
         ),
-        E::EnCurso => (
-            StatusCode::CONFLICT,
-            "Hay otro cambio en curso; espera a que termine y vuelve a intentarlo.".into(),
-        ),
+        E::EnCurso => (StatusCode::CONFLICT, crate::t!("biblioteca-error-en-curso")),
         E::Router(m) => (
             StatusCode::BAD_GATEWAY,
-            format!("{m}. Comprueba la conexión con el router y vuelve a intentarlo."),
+            crate::t!("biblioteca-error-router", detalle = m),
         ),
         E::Verificacion(v) => (
             StatusCode::BAD_GATEWAY,
-            format!(
-                "El router no muestra el cambio ({}). No se ha revertido nada: revisa los \
-                 valores en su página.",
-                v.join("; ")
-            ),
+            crate::t!("biblioteca-error-verificacion", detalle = v.join("; ")),
         ),
         E::PalabraIncorrecta => (
             StatusCode::BAD_REQUEST,
-            "La palabra de confirmación no coincide: escríbela exactamente como se indica.".into(),
+            crate::t!("biblioteca-error-palabra"),
         ),
-        E::TokenInvalido => (
-            StatusCode::BAD_REQUEST,
-            "El cambio preparado ha caducado o ya se usó: pulsa «Revisar cambios» de nuevo.".into(),
-        ),
+        E::TokenInvalido => (StatusCode::BAD_REQUEST, crate::t!("biblioteca-error-token")),
         E::Invalida(m) => (
             StatusCode::BAD_REQUEST,
-            format!("Petición no válida: {m}. Corrige el valor y revisa de nuevo."),
+            crate::t!("biblioteca-error-invalida", detalle = m),
         ),
     };
     con_estado(status, msg)
@@ -102,7 +99,7 @@ pub(crate) fn funcion<'a>(state: &'a AppState, nombre: &str) -> Result<&'a Funci
     state.catalogo.funcion(nombre).ok_or_else(|| {
         con_estado(
             StatusCode::NOT_FOUND,
-            format!("No existe la función {nombre}"),
+            crate::t!("biblioteca-error-no-existe-funcion", nombre = nombre),
         )
     })
 }
@@ -312,13 +309,16 @@ enum ModoLectura {
 /// no bloqueadas, y nunca las páginas que disparan acciones.
 fn modo_lectura(f: &Funcion) -> Result<ModoLectura, String> {
     if let Some(m) = &f.bloqueada {
-        return Err(format!("Función bloqueada: {m}."));
+        return Err(crate::t!("biblioteca-error-bloqueada", motivo = m.as_str()));
     }
     if PAGINAS_PROHIBIDAS.contains(&f.name.as_str()) {
-        return Err("Esta página dispara una acción al cargarse: el panel no la carga.".into());
+        return Err(crate::t!("biblioteca-error-pagina-accion"));
     }
     if f.tipo != Tipo::Lectura {
-        return Err(format!("{} no es una lectura.", f.name));
+        return Err(crate::t!(
+            "biblioteca-error-no-lectura",
+            nombre = f.name.as_str()
+        ));
     }
     if f.name.starts_with("cb") {
         Ok(ModoLectura::Xml)
@@ -472,17 +472,24 @@ async fn ejecutar(
     let modo = modo_lectura(f).map_err(|m| con_estado(StatusCode::FORBIDDEN, m))?;
     for (k, v) in params {
         if f.parametro(k).is_none() {
-            return Err(invalida(format!("{}: parámetro desconocido {k}", f.name)));
+            return Err(invalida(crate::t!(
+                "biblioteca-error-param-desconocido",
+                funcion = f.name.as_str(),
+                param = k.as_str()
+            )));
         }
         if v.chars().any(char::is_control) {
-            return Err(invalida(format!("{k}: contiene caracteres no válidos")));
+            return Err(invalida(format!(
+                "{k}: {}",
+                crate::t!("biblioteca-validar-control")
+            )));
         }
     }
     let c = &state.hgu;
     let sin_router = |e: hgu::Error| {
         con_estado(
             StatusCode::BAD_GATEWAY,
-            format!("El router no ha respondido a la lectura: {e}"),
+            crate::t!("biblioteca-error-lectura-router", error = e.to_string()),
         )
     };
     match modo {
@@ -543,9 +550,10 @@ fn claves_validas(
     let id = id_lista(f);
     for (k, v) in &claves {
         if !ident.contains(k) || Some(k.as_str()) == id {
-            return Err(invalida(format!(
-                "{k} no identifica instancias de {}",
-                f.name
+            return Err(invalida(crate::t!(
+                "biblioteca-error-no-identifica",
+                param = k.as_str(),
+                funcion = f.name.as_str()
             )));
         }
         if let Some(p) = f.parametro(k) {
@@ -564,8 +572,9 @@ pub async fn formulario(
 ) -> Result<FormVista, ServerFnError> {
     let f = funcion(state, nombre)?;
     if f.tipo == Tipo::Lectura {
-        return Err(invalida(format!(
-            "{nombre} es una lectura: no tiene formulario"
+        return Err(invalida(crate::t!(
+            "biblioteca-error-lectura-sin-formulario",
+            nombre = nombre
         )));
     }
     let g = gestor(state)?;
@@ -754,7 +763,11 @@ pub async fn preparar(state: &AppState, p: Peticion) -> Result<PreparadoVista, S
     // lo que cambia): un MASCARA o un secreto vacío es "sin tocar".
     for (k, v) in &p.valores {
         let Some(param) = f.parametro(k) else {
-            return Err(invalida(format!("{}: parámetro desconocido {k}", f.name)));
+            return Err(invalida(crate::t!(
+                "biblioteca-error-param-desconocido",
+                funcion = f.name.as_str(),
+                param = k.as_str()
+            )));
         };
         let sin_tocar = v == MASCARA || (param.tipo == TipoParam::Secret && v.is_empty());
         if !sin_tocar && !v.trim().is_empty() {
@@ -780,18 +793,26 @@ pub(crate) fn vista_preparado(
     prep: crate::changes::Preparado,
 ) -> PreparadoVista {
     let o = Ocultar::new(state);
-    let f = state.catalogo.funcion(&prep.funcion);
+    // Cada campo con las etiquetas de la función de su paso (deshacer un
+    // grupo junta varios).
+    let campos = prep
+        .pasos
+        .into_iter()
+        .flat_map(|p| {
+            let f = state.catalogo.funcion(&p.funcion);
+            p.diff
+                .campos
+                .into_iter()
+                .map(|c| campo_cambio(f, &o, c))
+                .collect::<Vec<_>>()
+        })
+        .collect();
     PreparadoVista {
         token: prep.token,
         funcion: prep.funcion,
         instancia: prep.instancia,
         borrar: prep.borrar,
-        campos: prep
-            .diff
-            .campos
-            .into_iter()
-            .map(|c| campo_cambio(f, &o, c))
-            .collect(),
+        campos,
         riesgo: riesgo(prep.riesgo),
         vigilancia_s: g.tiempos().vigilancia(prep.riesgo).as_secs(),
         palabra: prep.palabra,
@@ -819,15 +840,18 @@ pub(crate) fn estado(e: Estado) -> EstadoDeCambio {
         Estado::Aplicado => EstadoDeCambio::Aplicado,
         Estado::Revertido => EstadoDeCambio::Revertido,
         Estado::Fallido => EstadoDeCambio::Fallido,
+        Estado::RevertidoParcial => EstadoDeCambio::RevertidoParcial,
     }
 }
 
 pub async fn estado_cambio(state: &AppState, id: i64) -> Result<CambioVista, ServerFnError> {
     let g = gestor(state)?;
-    let c = g
-        .cambio(id)
-        .await
-        .ok_or_else(|| con_estado(StatusCode::NOT_FOUND, format!("No existe el cambio {id}")))?;
+    let c = g.cambio(id).await.ok_or_else(|| {
+        con_estado(
+            StatusCode::NOT_FOUND,
+            crate::t!("biblioteca-error-no-existe-cambio", id = id),
+        )
+    })?;
     let restante_s = (c.estado == Estado::Vigilando).then(|| {
         let fin = c.updated + g.tiempos().vigilancia(c.riesgo).as_secs() as i64;
         (fin - crate::series::now()).max(0)
@@ -887,6 +911,28 @@ fn valor_de(f: &Funcion, r: &Respuesta, campo: &str, instancia: Option<&str>) ->
     }
 }
 
+/// Comprueba la contraseña del panel del usuario de la sesión antes de
+/// revelar, con el freno del login.
+async fn comprobar_contrasena(
+    state: &AppState,
+    user: &User,
+    contrasena: &str,
+) -> Result<(), ServerFnError> {
+    let ip = ip_cliente(state).await?;
+    match crate::auth::reauthenticate(state, ip, user, contrasena).await {
+        Ok(()) => Ok(()),
+        Err(LoginError::Throttled(s)) => Err(con_estado(
+            StatusCode::TOO_MANY_REQUESTS,
+            crate::t!("biblioteca-error-intentos", s = s),
+        )),
+        Err(LoginError::BadCredentials) => Err(con_estado(
+            StatusCode::FORBIDDEN,
+            crate::t!("biblioteca-error-contrasena"),
+        )),
+        Err(LoginError::Internal(e)) => Err(interno(e)),
+    }
+}
+
 pub async fn revelar(
     state: &AppState,
     user: &User,
@@ -894,31 +940,18 @@ pub async fn revelar(
     campo: &str,
     instancia: Option<&str>,
     params: &[(String, String)],
-    contrasena: &str,
+    contrasena: Option<&str>,
 ) -> Result<String, ServerFnError> {
     let f = funcion(state, nombre)?;
-    let ip = ip_cliente(state).await?;
-    match crate::auth::reauthenticate(state, ip, user, contrasena).await {
-        Ok(()) => {}
-        Err(LoginError::Throttled(s)) => {
-            return Err(con_estado(
-                StatusCode::TOO_MANY_REQUESTS,
-                format!("Demasiados intentos: espera {s} s y vuelve a probar."),
-            ));
-        }
-        Err(LoginError::BadCredentials) => {
-            return Err(con_estado(
-                StatusCode::FORBIDDEN,
-                "Contraseña del panel incorrecta.",
-            ));
-        }
-        Err(LoginError::Internal(e)) => return Err(interno(e)),
+    if let Some(contrasena) = contrasena {
+        comprobar_contrasena(state, user, contrasena).await?;
+        crate::auth::abrir_ventana_de_reautenticacion().await?;
     }
     let r = ejecutar(state, f, params).await?;
     let valor = valor_de(f, &r, campo, instancia).ok_or_else(|| {
         con_estado(
             StatusCode::NOT_FOUND,
-            format!("La lectura ya no muestra el campo {campo}; vuelve a leer."),
+            crate::t!("biblioteca-error-campo-desaparecido", campo = campo),
         )
     })?;
     sqlx::query(

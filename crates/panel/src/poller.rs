@@ -16,11 +16,17 @@
 //! Cada ciclo se ejecuta en su propia tarea: si una entra en pánico, se
 //! registra, cuenta como un fallo y el sondeo continúa.
 //!
+//! Mientras el router no esté configurado (sin credenciales), no se hace
+//! ninguna petición: el estado es «sin configurar»
+//! ([`PollerHandle::sin_configurar`]), no cuenta como fallo y se vuelve a
+//! mirar cada 10 s.
+//!
 //! El gestor de cambios llama a [`PollerHandle::pause`] antes de escribir:
 //! espera a que termine el ciclo en curso y, mientras viva la
 //! [`PauseGuard`] devuelta, el sondeo no hace peticiones al router.
 
 use crate::{
+    instancia,
     series::{self, Sample},
     state::AppState,
 };
@@ -162,6 +168,8 @@ struct Status {
     error: Option<String>,
     slow_error: Option<String>,
     failures: u32,
+    /// El router no está configurado: no se ha intentado leer.
+    sin_configurar: bool,
     /// Cuándo terminó la última lectura correcta.
     last_ok: Option<Instant>,
     /// Cuándo se soltó la última pausa: el plazo de `healthy` cuenta desde
@@ -176,6 +184,8 @@ struct Shared {
     pauses: watch::Sender<u32>,
     /// Lo tiene el sondeo durante cada ciclo.
     cycle: tokio::sync::Mutex<()>,
+    /// Adelanta el siguiente ciclo ([`PollerHandle::despertar`]).
+    despertar: tokio::sync::Notify,
 }
 
 /// Acceso al sondeo. Barato de clonar; vive en `AppState` desde el arranque,
@@ -193,6 +203,7 @@ impl Default for PollerHandle {
                 status: Mutex::new(Status::default()),
                 pauses: watch::Sender::new(0),
                 cycle: tokio::sync::Mutex::new(()),
+                despertar: tokio::sync::Notify::new(),
             }),
         }
     }
@@ -225,6 +236,11 @@ impl PollerHandle {
         self.status().slow_error.clone()
     }
 
+    /// `true` si el último ciclo no leyó porque el router no está configurado.
+    pub fn sin_configurar(&self) -> bool {
+        self.status().sin_configurar
+    }
+
     /// Ciclos fallidos seguidos.
     pub fn failures(&self) -> u32 {
         self.status().failures
@@ -244,6 +260,13 @@ impl PollerHandle {
         };
         let since = st.resumed.map_or(last_ok, |r| r.max(last_ok));
         st.error.is_none() && (paused || since.elapsed() < cfg.fast * 3)
+    }
+
+    /// Adelanta el siguiente ciclo: el sondeo deja de esperar y lee ya (p.
+    /// ej. nada más configurar el router). Si llega durante un ciclo, el
+    /// siguiente empieza sin esperar.
+    pub fn despertar(&self) {
+        self.shared.despertar.notify_one();
     }
 
     /// Detiene el sondeo: espera a que acabe el ciclo en curso (si lo hay)
@@ -296,6 +319,8 @@ pub struct Poller {
     prev: Option<LanBytes>,
     last_slow: Option<Instant>,
     last_compact: Option<Instant>,
+    /// Firmware con el que se fijó el modo solo lectura por última vez.
+    firmware: Option<String>,
 }
 
 /// Espera hasta el siguiente ciclo.
@@ -370,6 +395,7 @@ impl Poller {
             prev: None,
             last_slow: None,
             last_compact: None,
+            firmware: None,
         }
     }
 
@@ -426,9 +452,13 @@ impl Poller {
                     poller.last_compact = Some(Instant::now());
                 }
             }
-            match next {
-                Next::Interval(d) => tokio::time::sleep_until(start + d).await,
-                Next::Backoff(d) => tokio::time::sleep(d).await,
+            let espera = match next {
+                Next::Interval(d) => start + d,
+                Next::Backoff(d) => tokio::time::Instant::now() + d,
+            };
+            tokio::select! {
+                () = tokio::time::sleep_until(espera) => {}
+                () = shared.despertar.notified() => {}
             }
         }
     }
@@ -437,14 +467,32 @@ impl Poller {
     async fn cycle(&mut self) -> Next {
         let now = series::now();
         let slow_due = self.last_slow.is_none_or(|t| t.elapsed() >= self.cfg.slow);
-        match self.read(slow_due).await {
+        let leido = if self.state.hgu.configurado() {
+            self.read(slow_due).await
+        } else {
+            Err(Error::NoConfigurado)
+        };
+        match leido {
             Ok(r) => {
                 self.store(now, r).await;
+                Next::Interval(self.cfg.delay(0, None))
+            }
+            // Sin credenciales no hay nada que leer ni que contar como fallo;
+            // los datos de otro router (si los había) ya no valen.
+            Err(Error::NoConfigurado) => {
+                self.prev = None;
+                self.last_slow = None;
+                let mut st = self.handle.status();
+                *st = Status {
+                    sin_configurar: true,
+                    ..Status::default()
+                };
                 Next::Interval(self.cfg.delay(0, None))
             }
             Err(e) => {
                 self.prev = None;
                 let mut st = self.handle.status();
+                st.sin_configurar = false;
                 st.failures = st.failures.saturating_add(1);
                 st.error = Some(e.to_string());
                 Next::Backoff(self.cfg.delay(st.failures, Some(&e)))
@@ -491,7 +539,33 @@ impl Poller {
     }
 
     /// Actualiza la instantánea y guarda la muestra y el estado de la WAN.
+    /// El modo solo lectura sigue al firmware que se lee: se fija con la
+    /// primera lectura y cada vez que cambia (actualización del router), con
+    /// la misma regla que el asistente ([`instancia::fijar_modo_firmware`]).
+    async fn seguir_firmware(&mut self, firmware: &str) {
+        if firmware.is_empty() || self.firmware.as_deref() == Some(firmware) {
+            return;
+        }
+        match instancia::fijar_modo_firmware(&self.state.db, firmware).await {
+            Ok(probado) => {
+                if self.firmware.is_some() || !probado {
+                    tracing::info!(
+                        "firmware del router: {firmware}{}",
+                        if probado {
+                            " (probado)"
+                        } else {
+                            " (sin probar)"
+                        }
+                    );
+                }
+                self.firmware = Some(firmware.to_owned());
+            }
+            Err(e) => tracing::error!("no se puede fijar el modo según el firmware: {e}"),
+        }
+    }
+
     async fn store(&mut self, now: i64, r: Reading) {
+        self.seguir_firmware(&r.summary.firmware).await;
         let wan_up = r.wan.iter().any(|w| w.name == WAN && w.up);
         let bytes = lan_bytes(r.counters_ms, &r.counters);
         // Tras un hueco (pausa larga) no se promedia sobre él.
@@ -564,6 +638,7 @@ impl Poller {
             st.snapshot = Some(snap);
             st.error = None;
             st.failures = 0;
+            st.sin_configurar = false;
             st.last_ok = Some(Instant::now());
             sample
         };

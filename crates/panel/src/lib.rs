@@ -10,6 +10,8 @@
 
 pub mod app;
 pub mod auth;
+pub mod instalar;
+pub mod panel_ajustes;
 pub mod ui;
 
 #[cfg(feature = "ssr")]
@@ -22,6 +24,10 @@ pub mod config;
 pub mod crypto;
 #[cfg(feature = "ssr")]
 pub mod db;
+#[cfg(feature = "ssr")]
+pub mod fotos;
+#[cfg(feature = "ssr")]
+pub mod instancia;
 #[cfg(feature = "ssr")]
 pub mod poller;
 #[cfg(feature = "ssr")]
@@ -42,15 +48,28 @@ mod server {
         state::AppState,
     };
     use axum::{Json, Router, extract::State, middleware, routing::get};
-    use leptos_axum::{LeptosRoutes, generate_route_list};
+    use leptos_axum::{AxumRouteListing, LeptosRoutes, generate_route_list};
     use serde_json::{Value, json};
+    use std::sync::OnceLock;
+
+    /// Rutas de la aplicación, generadas una sola vez por proceso. Leptos las
+    /// saca renderizando `App` con la carga de recursos suspendida mediante un
+    /// indicador global: si se generasen con el panel ya sirviendo (otro
+    /// `build_router` en el mismo proceso, como en las pruebas), un recurso
+    /// que empezase a cargar en ese momento esperaría para siempre y su
+    /// página no terminaría. Todo render va después de construir algún
+    /// router, así que tras la primera vez el indicador ya no se toca.
+    fn rutas() -> Vec<AxumRouteListing> {
+        static RUTAS: OnceLock<Vec<AxumRouteListing>> = OnceLock::new();
+        RUTAS.get_or_init(|| generate_route_list(App)).clone()
+    }
 
     /// Construye el router Axum completo: rutas Leptos (páginas con sesión
     /// obligatoria salvo `/login`; server functions en `/api/*`, que la
     /// comprueban ellas mismas), `/salud`, ficheros estáticos, freno de CSRF
     /// en `/api/*` y cabeceras de seguridad en todas las respuestas.
     pub fn build_router(state: AppState) -> Router {
-        let routes = generate_route_list(App);
+        let routes = rutas();
         Router::new()
             .leptos_routes(&state, routes, {
                 let options = state.leptos.clone();
@@ -74,9 +93,12 @@ mod server {
 
     /// Comprobación de vida para el actualizador (sin login). No consulta al
     /// router: `router` es `"ok"` si el sondeo tiene datos recientes y sin
-    /// error.
+    /// error, `"sin_configurar"` si el panel aún no tiene las credenciales
+    /// del router (`ok` sigue siendo `true`: el panel funciona).
     async fn salud(State(state): State<AppState>) -> Json<Value> {
-        let router = if state.poller.healthy() {
+        let router = if !state.hgu.configurado() {
+            "sin_configurar"
+        } else if state.poller.healthy() {
             "ok"
         } else {
             "error"

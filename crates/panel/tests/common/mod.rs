@@ -1,5 +1,5 @@
 //! Arnés común de las pruebas HTTP: panel en proceso contra `router-sim`, con
-//! base de datos y secreto en un directorio temporal.
+//! base de datos y clave en un directorio temporal.
 
 // Cada binario de pruebas usa solo parte del arnés.
 #![allow(dead_code)]
@@ -12,12 +12,16 @@ use axum::{
 };
 use leptos::prelude::LeptosOptions;
 use panel::changes::{ChangeManager, Tiempos};
-use panel::{config::Config, state::AppState};
+use panel::{
+    config::Config,
+    instancia::{self, CredencialesRouter},
+    state::AppState,
+};
 use router_sim::{Sim, SimConfig, SimHandle};
 use serde_json::{Value, json};
 use std::{
     net::{IpAddr, SocketAddr},
-    path::PathBuf,
+    path::{Path, PathBuf},
     time::{Duration, Instant},
 };
 use tempfile::TempDir;
@@ -44,39 +48,71 @@ pub async fn panel() -> Panel {
 }
 
 pub async fn panel_con_proxy(trusted_proxy: IpAddr) -> Panel {
-    let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../hgu/fixtures");
-    let sim = Sim::start(SimConfig::new(USER, PASS, fixtures)).await;
-    let dir = tempfile::tempdir().unwrap();
-    let secret = dir.path().join("router.secret");
-    std::fs::write(&secret, format!("{PASS}\n")).unwrap();
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&secret, std::fs::Permissions::from_mode(0o600)).unwrap();
-    }
-    let cfg = Config {
-        listen: "127.0.0.1:0".parse().unwrap(),
-        db_path: dir.path().join("panel.db"),
-        router_url: sim.base_url.clone(),
-        router_user: USER.into(),
-        router_secret_file: secret,
-        history_key_file: dir.path().join("history.key"),
-        trusted_proxy,
-        public_origin: ORIGIN.into(),
-    };
-    let site = dir.path().join("site");
-    std::fs::create_dir_all(site.join("pkg")).unwrap();
-    std::fs::write(site.join("pkg/panel.css"), "main { padding: 0 }\n").unwrap();
-    let leptos = LeptosOptions::builder()
-        .output_name("panel")
-        .site_root(site.to_str().unwrap())
-        .build();
-    let state = AppState::new(cfg, leptos).await.unwrap();
+    let p = panel_sin_router(trusted_proxy).await;
+    let (sim, state, dir) = (p.sim, p.state, p._dir);
+    // Las credenciales del simulador, como las dejaría el asistente.
+    instancia::guardar_credenciales(
+        &state.db,
+        &state.history_key,
+        &CredencialesRouter {
+            url: sim.base_url.clone(),
+            usuario: USER.into(),
+            contrasena: PASS.into(),
+        },
+    )
+    .await
+    .unwrap();
+    instancia::arrancar_router(&state).await.unwrap();
     Panel {
         app: panel::build_router(state.clone()),
         sim,
         state,
         _dir: dir,
     }
+}
+
+/// Panel recién instalado: sin variables del router y con la base de datos
+/// vacía (el simulador arranca, pero el panel no lo conoce).
+pub async fn panel_sin_router(trusted_proxy: IpAddr) -> Panel {
+    let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../hgu/fixtures");
+    let sim = Sim::start(SimConfig::new(USER, PASS, fixtures)).await;
+    let dir = tempfile::tempdir().unwrap();
+    let state = estado(config_en(dir.path(), trusted_proxy), dir.path()).await;
+    instancia::arrancar_router(&state).await.unwrap();
+    Panel {
+        app: panel::build_router(state.clone()),
+        sim,
+        state,
+        _dir: dir,
+    }
+}
+
+/// Configuración del panel con la base de datos y la clave en `dir`, sin
+/// variables del router.
+pub fn config_en(dir: &Path, trusted_proxy: IpAddr) -> Config {
+    Config {
+        listen: "127.0.0.1:0".parse().unwrap(),
+        db_path: dir.join("panel.db"),
+        router_url: None,
+        router_user: None,
+        router_secret_file: None,
+        history_key_file: dir.join("history.key"),
+        trusted_proxy,
+        public_origin: ORIGIN.into(),
+    }
+}
+
+/// Estado del servidor con `cfg` y los ficheros estáticos en `dir/site`
+/// (sin arrancar el router).
+pub async fn estado(cfg: Config, dir: &Path) -> AppState {
+    let site = dir.join("site");
+    std::fs::create_dir_all(site.join("pkg")).unwrap();
+    std::fs::write(site.join("pkg/panel.css"), "main { padding: 0 }\n").unwrap();
+    let leptos = LeptosOptions::builder()
+        .output_name("panel")
+        .site_root(site.to_str().unwrap())
+        .build();
+    AppState::new(cfg, leptos).await.unwrap()
 }
 
 pub async fn send(app: &Router, req: Request<Body>) -> Response<Body> {
@@ -134,6 +170,21 @@ pub async fn sesion(p: &Panel) -> String {
     panel::auth::create_user(&p.state.db, PANEL_USER, PANEL_PASS)
         .await
         .unwrap();
+    sesion_de(p).await
+}
+
+/// Panel ya instalado: con el usuario del panel (si no estaba). Sin
+/// usuarios, toda página redirige al asistente de instalación.
+pub async fn con_usuario(p: &Panel) {
+    match panel::auth::create_user(&p.state.db, PANEL_USER, PANEL_PASS).await {
+        Ok(()) | Err(panel::auth::UserError::Exists) => {}
+        Err(e) => panic!("{e}"),
+    }
+}
+
+/// Inicia sesión desde 127.0.0.1 con el usuario del panel (ya creado) y
+/// devuelve la cookie lista para la cabecera `Cookie`.
+pub async fn sesion_de(p: &Panel) -> String {
     let resp = send(
         &p.app,
         post_form(

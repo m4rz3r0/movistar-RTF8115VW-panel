@@ -10,10 +10,22 @@ use leptos::prelude::*;
 
 #[cfg(feature = "ssr")]
 pub use server::{
-    AuthUser, LoginError, MIN_PASSWORD_CHARS, SESSION_COOKIE, User, UserError, attempt_login,
-    client_ip, create_user, delay_secs, hash_password, reauthenticate, require_page_session,
-    require_user, set_password, verify, warm_up,
+    AuthUser, LoginError, MAX_PASSWORD_BYTES, MIN_PASSWORD_CHARS, REAUTH_SECS, SESSION_COOKIE,
+    User, UserError, abrir_ventana_de_reautenticacion, attempt_login, change_own_password,
+    client_ip, create_user, delay_secs, delete_user, hash_password, poner_cookie_de_sesion,
+    reautenticar_sesion, reauthenticate, require_page_session, require_reauth, require_user,
+    set_password, verify, warm_up,
 };
+
+/// Mensaje de error de las server functions sin sesión vigente (con estado
+/// 401). Es un código fijo, no un texto: la interfaz lo reconoce y lo
+/// traduce en el idioma de la página (ver `ui::texto_error`).
+pub const ERROR_SESION: &str = "sesion-caducada";
+
+/// Mensaje de error (con estado 401) de las server functions que exigen
+/// haber vuelto a escribir la contraseña del panel hace poco (ver
+/// `reautenticar_sesion`). Código fijo: la interfaz pide la contraseña y repite.
+pub const ERROR_REAUTENTICACION: &str = "reautenticacion-necesaria";
 
 /// Destino tras el login: `next` solo si es una ruta local (empieza por una
 /// sola `/`); si no, la portada. Evita redirecciones abiertas a otro sitio
@@ -82,15 +94,19 @@ mod server {
     pub const SESSION_COOKIE: &str = "__Host-rp_session";
     /// Longitud mínima de la contraseña del panel, en caracteres.
     pub const MIN_PASSWORD_CHARS: usize = 12;
-    /// Longitud máxima de la contraseña en el login, en bytes: más larga es un
-    /// fallo normal, sin gastar Argon2.
-    const MAX_LOGIN_PASSWORD_BYTES: usize = 1024;
+    /// Longitud máxima de la contraseña, en bytes: no se admite al darla de
+    /// alta o cambiarla, y en el login más larga es un fallo normal, sin
+    /// gastar Argon2.
+    pub const MAX_PASSWORD_BYTES: usize = 1024;
     /// Longitud máxima del nombre de usuario, en caracteres.
     const MAX_USERNAME_CHARS: usize = 64;
     /// Caducidad por inactividad.
     const SESSION_IDLE_SECS: i64 = 30 * 60;
     /// Caducidad absoluta.
     const SESSION_MAX_SECS: i64 = 12 * 60 * 60;
+    /// Ventana de reautenticación: tras volver a escribir la contraseña, las
+    /// operaciones delicadas no la piden de nuevo durante este tiempo.
+    pub const REAUTH_SECS: i64 = 5 * 60;
     /// `last_seen` se actualiza como mucho una vez por minuto.
     const TOUCH_EVERY_SECS: i64 = 60;
     /// Retardo máximo del freno de fuerza bruta.
@@ -162,8 +178,14 @@ mod server {
     pub enum UserError {
         InvalidUsername,
         PasswordTooShort,
+        /// Más de [`MAX_PASSWORD_BYTES`] bytes: el login no la aceptaría.
+        PasswordTooLong,
         Exists,
         NotFound,
+        /// No se borra el último usuario.
+        LastUser,
+        /// Nadie se borra a sí mismo.
+        OwnUser,
         Db(sqlx::Error),
     }
 
@@ -178,8 +200,14 @@ mod server {
                     f,
                     "la contraseña debe tener al menos {MIN_PASSWORD_CHARS} caracteres"
                 ),
+                UserError::PasswordTooLong => write!(
+                    f,
+                    "la contraseña puede tener como mucho {MAX_PASSWORD_BYTES} bytes"
+                ),
                 UserError::Exists => write!(f, "el usuario ya existe"),
                 UserError::NotFound => write!(f, "el usuario no existe"),
+                UserError::LastUser => write!(f, "no se puede borrar el último usuario"),
+                UserError::OwnUser => write!(f, "no se puede borrar el usuario propio"),
                 UserError::Db(e) => write!(f, "error de la base de datos: {e}"),
             }
         }
@@ -209,6 +237,9 @@ mod server {
     fn check_password(password: &str) -> Result<(), UserError> {
         if password.chars().count() < MIN_PASSWORD_CHARS {
             return Err(UserError::PasswordTooShort);
+        }
+        if password.len() > MAX_PASSWORD_BYTES {
+            return Err(UserError::PasswordTooLong);
         }
         Ok(())
     }
@@ -242,6 +273,31 @@ mod server {
         username: &str,
         password: &str,
     ) -> Result<(), UserError> {
+        change_password(db, username, password, false)
+            .await
+            .map(drop)
+    }
+
+    /// Cambia la contraseña del propio usuario `user` (ya autenticado), cierra
+    /// todas sus sesiones y abre otra nueva, todo en una transacción y sin
+    /// pasar por el freno del login. Devuelve el id de la sesión nueva (para
+    /// [`poner_cookie_de_sesion`]).
+    pub async fn change_own_password(
+        db: &SqlitePool,
+        user: &User,
+        password: &str,
+    ) -> Result<String, UserError> {
+        change_password(db, &user.username, password, true)
+            .await
+            .map(|id| id.expect("se pidió una sesión nueva"))
+    }
+
+    async fn change_password(
+        db: &SqlitePool,
+        username: &str,
+        password: &str,
+        new_session: bool,
+    ) -> Result<Option<String>, UserError> {
         check_password(password)?;
         let hash = hash_blocking(password).await;
         let mut tx = db.begin().await?;
@@ -257,8 +313,58 @@ mod server {
             .bind(id)
             .execute(&mut *tx)
             .await?;
+        let session = if new_session {
+            let sid = new_session_id();
+            let now = now_secs();
+            sqlx::query(
+                "INSERT INTO sessions (id, user_id, created, last_seen) VALUES (?, ?, ?, ?)",
+            )
+            .bind(session_key(&sid))
+            .bind(id)
+            .bind(now)
+            .bind(now)
+            .execute(&mut *tx)
+            .await?;
+            Some(sid)
+        } else {
+            None
+        };
         tx.commit().await?;
-        Ok(())
+        Ok(session)
+    }
+
+    /// Borra `username` (y con él sus sesiones), salvo que sea `actual` (el
+    /// usuario que lo pide) o el último que queda. Una sola sentencia: dos
+    /// borrados a la vez no dejan el panel sin usuarios.
+    pub async fn delete_user(
+        db: &SqlitePool,
+        username: &str,
+        actual: i64,
+    ) -> Result<(), UserError> {
+        let borrado: Option<i64> = sqlx::query_scalar(
+            "DELETE FROM users
+             WHERE username = ? AND id != ? AND (SELECT COUNT(*) FROM users) > 1
+             RETURNING id",
+        )
+        .bind(username)
+        .bind(actual)
+        .fetch_optional(db)
+        .await?;
+        if borrado.is_some() {
+            return Ok(());
+        }
+        let id: Option<i64> = sqlx::query_scalar("SELECT id FROM users WHERE username = ?")
+            .bind(username)
+            .fetch_optional(db)
+            .await?;
+        let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
+            .fetch_one(db)
+            .await?;
+        Err(match id {
+            None => UserError::NotFound,
+            Some(_) if total <= 1 => UserError::LastUser,
+            Some(_) => UserError::OwnUser,
+        })
     }
 
     // ---- Sesiones ----
@@ -529,7 +635,7 @@ mod server {
             return Err(LoginError::Throttled((wait + 999) / 1000));
         }
 
-        if password.len() > MAX_LOGIN_PASSWORD_BYTES {
+        if password.len() > MAX_PASSWORD_BYTES {
             record_failure(db, &ip_key, &user_key).await?;
             return Err(LoginError::BadCredentials);
         }
@@ -584,7 +690,16 @@ mod server {
 
     fn internal<T>(e: impl fmt::Display) -> Result<T, ServerFnError> {
         eprintln!("panel: error interno en la autenticación: {e}");
-        fail(StatusCode::INTERNAL_SERVER_ERROR, "Error interno del panel")
+        fail(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &crate::t!("comun-error-interno"),
+        )
+    }
+
+    /// Pone en la respuesta la cookie de la sesión `id` (de
+    /// [`attempt_login`]).
+    pub fn poner_cookie_de_sesion(id: &str) {
+        set_cookie(&session_cookie(id));
     }
 
     fn set_cookie(value: &str) {
@@ -614,11 +729,12 @@ mod server {
             }
             Err(LoginError::Throttled(secs)) => fail(
                 StatusCode::TOO_MANY_REQUESTS,
-                &format!("Demasiados intentos, espera {secs} s"),
+                &crate::t!("login-error-intentos", s = secs),
             ),
-            Err(LoginError::BadCredentials) => {
-                fail(StatusCode::UNAUTHORIZED, "Usuario o contraseña incorrectos")
-            }
+            Err(LoginError::BadCredentials) => fail(
+                StatusCode::UNAUTHORIZED,
+                &crate::t!("login-error-credenciales"),
+            ),
             Err(LoginError::Internal(e)) => internal(e),
         }
     }
@@ -654,8 +770,84 @@ mod server {
         let headers: HeaderMap = leptos_axum::extract().await?;
         match user_from_headers(&state.db, &headers).await {
             Ok(Some(user)) => Ok(user),
-            Ok(None) => fail(StatusCode::UNAUTHORIZED, "Sesión no iniciada o caducada"),
+            Ok(None) => fail(StatusCode::UNAUTHORIZED, super::ERROR_SESION),
             Err(e) => internal(e),
+        }
+    }
+
+    /// Vuelve a pedir la contraseña al usuario de la sesión (con el freno
+    /// del login, por la IP del cliente) y, si es buena, abre la ventana de
+    /// reautenticación de esta sesión durante [`REAUTH_SECS`].
+    pub async fn reautenticar_sesion(contrasena: &str) -> Result<(), ServerFnError> {
+        let state = app_state()?;
+        let user = require_user().await?;
+        let ConnectInfo(peer) = leptos_axum::extract::<ConnectInfo<SocketAddr>>().await?;
+        let headers: HeaderMap = leptos_axum::extract().await?;
+        let ip = client_ip(peer.ip(), &headers, state.cfg.trusted_proxy);
+        match reauthenticate(&state, ip, &user, contrasena).await {
+            Ok(()) => {}
+            Err(LoginError::Throttled(secs)) => {
+                return fail(
+                    StatusCode::TOO_MANY_REQUESTS,
+                    &crate::t!("login-error-intentos", s = secs),
+                );
+            }
+            Err(LoginError::BadCredentials) => {
+                return fail(StatusCode::FORBIDDEN, &crate::t!("panel-error-contrasena"));
+            }
+            Err(LoginError::Internal(e)) => return internal(e),
+        }
+        abrir_ventana_de_reautenticacion().await?;
+        tracing::info!(usuario = %user.username, "reautenticación en Ajustes del panel");
+        Ok(())
+    }
+
+    /// Abre la ventana de reautenticación de la sesión de la petición durante
+    /// [`REAUTH_SECS`]. Solo tras comprobar la contraseña
+    /// ([`reauthenticate`]).
+    pub async fn abrir_ventana_de_reautenticacion() -> Result<(), ServerFnError> {
+        let state = app_state()?;
+        let headers: HeaderMap = leptos_axum::extract().await?;
+        let Some(id) = cookie_session_id(&headers) else {
+            return fail(StatusCode::UNAUTHORIZED, super::ERROR_SESION);
+        };
+        if let Err(e) = sqlx::query("UPDATE sessions SET reautenticado_hasta = ? WHERE id = ?")
+            .bind(now_secs() + REAUTH_SECS)
+            .bind(session_key(id))
+            .execute(&state.db)
+            .await
+        {
+            return internal(e);
+        }
+        Ok(())
+    }
+
+    /// Como [`require_user`], y además la sesión tiene abierta la ventana de
+    /// reautenticación ([`reautenticar_sesion`], o «Revelar» con la
+    /// contraseña); si no, 401 con [`super::ERROR_REAUTENTICACION`].
+    pub async fn require_reauth() -> Result<User, ServerFnError> {
+        let state = app_state()?;
+        let user = require_user().await?;
+        let headers: HeaderMap = leptos_axum::extract().await?;
+        let hasta: Option<i64> = match cookie_session_id(&headers) {
+            Some(id) => {
+                match sqlx::query_scalar::<_, Option<i64>>(
+                    "SELECT reautenticado_hasta FROM sessions WHERE id = ?",
+                )
+                .bind(session_key(id))
+                .fetch_optional(&state.db)
+                .await
+                {
+                    Ok(h) => h.flatten(),
+                    Err(e) => return internal(e),
+                }
+            }
+            None => None,
+        };
+        if hasta.is_some_and(|h| h > now_secs()) {
+            Ok(user)
+        } else {
+            fail(StatusCode::UNAUTHORIZED, super::ERROR_REAUTENTICACION)
         }
     }
 
@@ -690,13 +882,33 @@ mod server {
 
     /// Middleware de las rutas de páginas: exige sesión salvo en `/login` y en
     /// las server functions (`/api/*`), que se protegen con [`require_user`].
+    ///
+    /// Sin usuarios (panel recién instalado), toda página salvo `/instalar`
+    /// redirige a `/instalar`. Con usuarios, `/instalar` solo existe mientras
+    /// la instalación sigue en curso (y con sesión); si no, 404.
     pub async fn require_page_session(
         State(state): State<AppState>,
         req: Request,
         next: Next,
     ) -> Response {
         let path = req.uri().path();
-        if path == "/login" || path.starts_with("/api/") {
+        if path.starts_with("/api/") {
+            return next.run(req).await;
+        }
+        let instalar = path == "/instalar";
+        match crate::instalar::hay_usuarios(&state).await {
+            Ok(false) if instalar => return next.run(req).await,
+            Ok(false) => return Redirect::to("/instalar").into_response(),
+            Ok(true) if instalar && !crate::instalar::en_curso(&state).await => {
+                return StatusCode::NOT_FOUND.into_response();
+            }
+            Ok(true) => {}
+            Err(e) => {
+                eprintln!("panel: error interno en la autenticación: {e}");
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+        }
+        if path == "/login" {
             return next.run(req).await;
         }
         let (mut parts, body) = req.into_parts();

@@ -82,7 +82,7 @@ impl Sim {
         let leases = initial_leases(&fixtures);
         let inner = Arc::new(Inner {
             user: cfg.user,
-            password: cfg.password,
+            password: Mutex::new(cfg.password),
             fixtures,
             unresponsive: AtomicBool::new(false),
             state: Mutex::new(SimState {
@@ -208,6 +208,22 @@ impl SimControl {
         self.inner.state().hang_after_write = HangAfterWrite::Armed;
     }
 
+    /// La escritura real (no de solo validación) número `n` contando desde
+    /// ahora (1: la próxima) responde `Result=1` y no se aplica. Se puede
+    /// armar varias veces para que fallen varias.
+    pub fn fail_write_n(&self, n: usize) {
+        let mut st = self.inner.state();
+        let objetivo = st.real_writes + n;
+        st.fail_write_at.insert(objetivo);
+    }
+
+    /// Como [`SimControl::hang_after_next_write`], pero con la escritura real
+    /// número `n` contando desde ahora (1: la próxima).
+    pub fn hang_after_write_n(&self, n: usize) {
+        let mut st = self.inner.state();
+        st.hang_at_write = Some(st.real_writes + n);
+    }
+
     /// Tráfico de internet de un equipo en el puerto LAN 4: `rx` bytes de
     /// bajada y `tx` de subida. En `cbGetStatistic` suben `ip2` (rx, tx) y,
     /// del lado LAN, `eth0.4` al revés (lo que baja sale por el puerto: tx).
@@ -227,6 +243,21 @@ impl SimControl {
         e.1 = e.1.saturating_add(tx);
     }
 
+    /// Cambia la contraseña que acepta el login (las sesiones abiertas
+    /// siguen valiendo).
+    pub fn set_password(&self, password: &str) {
+        *self
+            .inner
+            .password
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()) = password.to_owned();
+    }
+
+    /// Cambia la versión de firmware (`SWVersion`) que da `cbGetSummary`.
+    pub fn set_firmware(&self, firmware: &str) {
+        self.inner.state().firmware = Some(firmware.to_owned());
+    }
+
     /// Escrituras recibidas con `sessionKey` válido (sin él), en orden. No
     /// incluye las llamadas de solo validación (`validation_only=1`). Las de
     /// la UI básica (`GET /cgi-bin/<x>.cmd|.cgi|.wl?…`) aparecen con el
@@ -241,13 +272,21 @@ type FixtureKey = (String, Params);
 
 struct Inner {
     user: String,
-    password: String,
+    /// Contraseña aceptada (cambiable con [`SimControl::set_password`]).
+    password: Mutex<String>,
     fixtures: HashMap<FixtureKey, String>,
     unresponsive: AtomicBool,
     state: Mutex<SimState>,
 }
 
 impl Inner {
+    fn password(&self) -> String {
+        self.password
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+    }
+
     fn state(&self) -> MutexGuard<'_, SimState> {
         self.state.lock().unwrap_or_else(|e| e.into_inner())
     }
@@ -292,6 +331,12 @@ struct SimState {
     no_answer_next: bool,
     /// `create_twice_next_write`.
     create_twice: bool,
+    /// Escrituras reales recibidas (para `fail_write_n`/`hang_after_write_n`).
+    real_writes: usize,
+    /// Números de escritura real que fallan (`fail_write_n`).
+    fail_write_at: HashSet<usize>,
+    /// Número de escritura real tras la que se cuelga (`hang_after_write_n`).
+    hang_at_write: Option<usize>,
     /// Bytes sumados a cada interfaz de `cbGetStatistic`: nombre → (rx, tx).
     counters_extra: HashMap<String, (u64, u64)>,
     writes: Vec<(String, Params)>,
@@ -301,6 +346,8 @@ struct SimState {
     wifi: BTreeMap<String, BTreeMap<String, String>>,
     /// Último `cbReboot`: `SysUptime` cuenta desde aquí.
     rebooted: Option<Instant>,
+    /// `SWVersion` de `cbGetSummary` (`set_firmware`).
+    firmware: Option<String>,
 }
 
 impl SimState {
@@ -377,28 +424,8 @@ fn initial_leases(fixtures: &HashMap<FixtureKey, String>) -> Vec<Lease> {
 
 // ---------------------------------------------------------------- XML
 
-fn escape(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-}
-
-fn write_node(n: &XmlNode, out: &mut String) {
-    out.push_str(&format!("<{}>", n.tag));
-    if n.children.is_empty() {
-        out.push_str(&escape(&n.text));
-    }
-    for c in &n.children {
-        write_node(c, out);
-    }
-    out.push_str(&format!("</{}>", n.tag));
-}
-
 fn response(node: &XmlNode) -> String {
-    let mut out = format!("{XML_HEADER}<Response>");
-    write_node(node, &mut out);
-    out.push_str("</Response>");
-    out
+    format!("{XML_HEADER}<Response>{}</Response>", node.to_xml())
 }
 
 fn leaf(tag: &str, text: &str) -> XmlNode {
@@ -545,7 +572,7 @@ async fn root(State(s): State<Arc<Inner>>) -> Response {
 async fn basic_login(State(s): State<Arc<Inner>>, headers: HeaderMap, body: Bytes) -> Response {
     let f = form(&body);
     let good = param(&f, "loginUsername") == Some(mess_userpass(&s.user).as_str())
-        && param(&f, "loginPassword") == Some(mess_userpass(&s.password).as_str());
+        && param(&f, "loginPassword") == Some(mess_userpass(&s.password()).as_str());
     if !good {
         return "<script>location.href = \"/te_acceso_router.asp\"</script>".into_response();
     }
@@ -709,7 +736,7 @@ fn advanced_login(
         return LOGGED_OUT.into();
     }
     let good = param(params, "rqUsername") == Some(mess_userpass(&s.user).as_str())
-        && param(params, "rqPasswd") == Some(mess_userpass(&s.password).as_str());
+        && param(params, "rqPasswd") == Some(mess_userpass(&s.password()).as_str());
     if !good {
         return failure("cbCheckLogin", "login");
     }
@@ -739,15 +766,46 @@ fn read(s: &Inner, st: &SimState, name: &str, params: &[(String, String)]) -> St
         .fixtures
         .get(&fixture_key(name, params))
         .or_else(|| s.fixtures.get(&(name.to_owned(), Vec::new())));
-    let Some(raw) = raw else {
-        return failure(name, "no fixture");
-    };
-    let mut node = match hgu::xml::parse_response(name, raw) {
-        Ok(n) => n,
-        Err(e) => return failure(name, &format!("fixture no válida: {e}")),
+    let mut node = match raw {
+        Some(raw) => match hgu::xml::parse_response(name, raw) {
+            Ok(n) => n,
+            Err(e) => return failure(name, &format!("fixture no válida: {e}")),
+        },
+        None if params.is_empty() => match all_instances(s, name) {
+            Some(n) => n,
+            None => return failure(name, "no fixture"),
+        },
+        None => return failure(name, "no fixture"),
     };
     patch(st, name, &mut node);
     response(&node)
+}
+
+/// Lista leída sin elegir instancia y sin `<name>.xml`: el router devuelve
+/// todas las instancias (así responden las listas de las que hay fixture sin
+/// parámetros, como `cbGetWanIPIntf`). Junta las de las fixtures de `name`
+/// que eligen la instancia con el mismo parámetro (el que más fixtures
+/// tenga; a igualdad, el primero por nombre), en orden de valor.
+fn all_instances(s: &Inner, name: &str) -> Option<XmlNode> {
+    let mut groups: BTreeMap<Vec<&str>, Vec<(&Params, &String)>> = BTreeMap::new();
+    for ((n, p), raw) in &s.fixtures {
+        if n == name && !p.is_empty() {
+            let names = p.iter().map(|(k, _)| k.as_str()).collect();
+            groups.entry(names).or_default().push((p, raw));
+        }
+    }
+    let (_, mut group) = groups.into_iter().rev().max_by_key(|(_, g)| g.len())?;
+    group.sort();
+    let mut children = Vec::new();
+    for (_, raw) in group {
+        let n = hgu::xml::parse_response(name, raw).ok()?;
+        children.extend(
+            n.children
+                .into_iter()
+                .filter(|c| c.tag != "Result" && c.tag != "ErrorString"),
+        );
+    }
+    Some(result_node(name, children, "0", ""))
 }
 
 fn read_leases(st: &SimState, params: &[(String, String)]) -> String {
@@ -804,6 +862,9 @@ fn patch(st: &SimState, name: &str, node: &mut XmlNode) {
             if let Some(t) = st.rebooted {
                 set_child(node, "SysUptime", &t.elapsed().as_secs().to_string());
             }
+            if let Some(fw) = &st.firmware {
+                set_child(node, "SWVersion", fw);
+            }
         }
         "cbGetWanIPIntf" if !st.wan_up => for_each_node(node, &mut |n| {
             if n.text_of("name") == Some(WAN) {
@@ -841,7 +902,15 @@ fn write(st: &mut SimState, name: &str, params: &[(String, String)]) -> String {
     // Validación previa (página WiFi): nunca aplica nada ni se registra;
     // puede consumir `fail_next`, pero no `ignore_next`.
     let validation_only = param(&clean, "validation_only") == Some("1");
+    let mut fail_n = false;
     if !validation_only {
+        st.real_writes += 1;
+        let n = st.real_writes;
+        fail_n = st.fail_write_at.remove(&n);
+        if st.hang_at_write == Some(n) {
+            st.hang_at_write = None;
+            st.hang_after_write = HangAfterWrite::Armed;
+        }
         st.writes.push((name.to_owned(), clean.clone()));
         if let Some(r) = st.fail_reads_after_write.take() {
             st.failing_reads.insert(r);
@@ -852,6 +921,9 @@ fn write(st: &mut SimState, name: &str, params: &[(String, String)]) -> String {
     }
     if let Some(err) = st.fail_next.take() {
         return failure(name, &err);
+    }
+    if fail_n {
+        return failure(name, "escritura rechazada (simulado)");
     }
     if validation_only {
         return ok(name);

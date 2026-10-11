@@ -1,5 +1,8 @@
 //! Fechas en hora peninsular (calculada aquí para que servidor y navegador
-//! pinten lo mismo al hidratar), ticks de tiempo y duraciones.
+//! pinten lo mismo al hidratar), ticks de tiempo y duraciones. El día y el
+//! mes se escriben según el idioma («08/10» o «8 Oct»).
+
+use crate::t;
 
 // ---------------------------------------------------------------------------
 // Fechas en hora peninsular (Europe/Madrid)
@@ -89,13 +92,34 @@ pub fn formato_hora(ts: i64, con_segundos: bool) -> String {
     }
 }
 
-/// `"08/10 14:05"` (con segundos si se piden).
+/// Día y mes: `"08/10"` en español, `"8 Oct"` en inglés.
+pub fn formato_dia_mes(h: &HoraLocal) -> String {
+    t!(
+        "comun-fecha-dia-mes",
+        dia = format!("{:02}", h.dia),
+        mes = format!("{:02}", h.mes),
+        n_dia = h.dia,
+        n_mes = h.mes
+    )
+}
+
+/// Día, mes y año: `"09/10/2026"` en español, `"9 Oct 2026"` en inglés.
+pub fn formato_fecha(h: &HoraLocal) -> String {
+    t!(
+        "comun-fecha-dia-mes-anio",
+        dia = format!("{:02}", h.dia),
+        mes = format!("{:02}", h.mes),
+        anio = h.anio.to_string(),
+        n_dia = h.dia,
+        n_mes = h.mes
+    )
+}
+
+/// `"08/10 14:05"` (con segundos si se piden; `"8 Oct 14:05"` en inglés).
 pub fn formato_fecha_hora(ts: i64, con_segundos: bool) -> String {
-    let h = hora_local(ts);
     format!(
-        "{:02}/{:02} {}",
-        h.dia,
-        h.mes,
+        "{} {}",
+        formato_dia_mes(&hora_local(ts)),
         formato_hora(ts, con_segundos)
     )
 }
@@ -145,7 +169,7 @@ pub fn ticks_tiempo(desde: i64, hasta: i64, max_ticks: usize) -> Vec<(i64, Strin
         if t >= desde && ticks.last().is_none_or(|u: &(i64, String)| u.0 != t) {
             let h = hora_local(t);
             let texto = if paso >= 86_400 || (h.hora == 0 && h.minuto == 0) {
-                format!("{:02}/{:02}", h.dia, h.mes)
+                formato_dia_mes(&h)
             } else {
                 format!("{:02}:{:02}", h.hora, h.minuto)
             };
@@ -214,6 +238,21 @@ mod tests {
         assert_eq!(textos, ["29/03", "01:00", "03:00", "04:00", "05:00"]);
         assert!(ticks.windows(2).all(|w| w[1].0 > w[0].0), "{ticks:?}");
         assert!(ticks.len() <= 6);
+    }
+
+    #[test]
+    fn fechas_en_ingles() {
+        use crate::ui::i18n::provide_idioma;
+        use leptos::reactive::owner::Owner;
+        Owner::new().with(|| {
+            provide_idioma(::i18n::Idioma::En);
+            assert_eq!(
+                formato_fecha_hora(D2026_10_08 + 12 * 3600 + 5, true),
+                "8 Oct 14:00:05"
+            );
+            assert_eq!(formato_fecha(&hora_local(D2026_10_08)), "8 Oct 2026");
+        });
+        assert_eq!(formato_fecha(&hora_local(D2026_10_08)), "08/10/2026");
     }
 
     #[test]

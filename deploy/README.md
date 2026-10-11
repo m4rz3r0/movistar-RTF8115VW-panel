@@ -37,26 +37,37 @@ En el host:
   veces seguidas (no compiló o no arrancó); no se reintenta hasta que haya
   otra. `intentos` (etiqueta y número) lleva la cuenta del primer fallo. Los
   `--ref` no tocan ninguno de los dos.
-- `/root/routerpanel-admin-password.txt` (600) — contraseña inicial del usuario
-  `admin` del panel.
+- `/root/routerpanel-admin-password.txt` (600) — sólo en instalaciones
+  anteriores al asistente: contraseña inicial del usuario `admin`
+  (cámbiala y borra el fichero). `install.sh` ya no lo crea.
 
 En la jail `routerpanel`:
 
 - `/usr/local/routerpanel/current` → `releases/<versión>` (enlace relativo; lo
   cambia el actualizador).
 - `/var/db/routerpanel/panel.db` — SQLite (directorio 700 del usuario
-  `routerpanel`).
-- `/usr/local/etc/routerpanel/router.secret` (600, `routerpanel`) — contraseña
-  del router, sin salto de línea; `history.key` lo crea el panel al arrancar
-  (600) en el mismo directorio (700, `routerpanel`).
+  `routerpanel`): usuarios, credenciales del router (contraseña cifrada),
+  historial, parámetros de la instancia. Mientras el panel no tiene usuarios,
+  ahí mismo está `instalar.token` (600), el token del asistente.
+- `/usr/local/etc/routerpanel/history.key` (600) — clave maestra; la crea el
+  panel al arrancar en ese directorio (700, `routerpanel`). Cifra las
+  credenciales del router y los secretos del historial: no se borra.
+- `/usr/local/etc/routerpanel/router.secret` (600, `routerpanel`) — sólo en
+  instalaciones anteriores al asistente: contraseña del router que el panel
+  importa una vez a la base de datos. Después se puede borrar
+  ([`docs/operacion.md`](../docs/operacion.md#actualizar-desde-una-versión-anterior-al-asistente-v01x)).
 - `/var/log/routerpanel.log` — salida del panel; la escribe `daemon(8)` y la
   rota newsyslog (`/etc/newsyslog.conf.d/routerpanel.conf`, SIGHUP a `daemon -H`).
 
-El servicio arranca con `RP_LISTEN=0.0.0.0:3000`, `RP_DB`, `RP_ROUTER_URL=http://192.168.1.1`,
-`RP_ROUTER_USER=1234`, `RP_ROUTER_SECRET`, `RP_HISTORY_KEY`,
-`RP_TRUSTED_PROXY=192.0.2.11`, `RP_ORIGIN=https://panel.home.arpa`,
+El servicio arranca con `RP_LISTEN=0.0.0.0:3000`, `RP_DB`, `RP_HISTORY_KEY`,
+`RP_TRUSTED_PROXY=192.0.2.11`, `RP_ORIGIN` (obligatoria;
+`routerpanel_origin` en `rc.conf`, por defecto `https://panel.home.arpa`),
 `RP_LOG=info` y `LEPTOS_OUTPUT_NAME=panel`, `LEPTOS_SITE_ROOT=<versión>/site`,
 `LEPTOS_SITE_ADDR=0.0.0.0:3000`, `LEPTOS_ENV=PROD` (ver `routerpanel.rc`).
+Sólo si existe `router.secret` (instalaciones anteriores al asistente) añade
+`RP_ROUTER_URL`, `RP_ROUTER_USER` y `RP_ROUTER_SECRET` (`routerpanel_router_url`,
+`_user`, `_secret`; por defecto `http://192.168.1.1`, `1234` y ese fichero)
+para que el panel importe las credenciales.
 
 ## Instalar
 
@@ -64,8 +75,12 @@ Desde el portátil, en la raíz del repositorio (con `~/servidor-casa` al lado,
 de donde sale el Caddyfile; otra ruta con `CADDYFILE=...`):
 
 ```sh
-deploy/install.sh            # pide la contraseña del router si aún no está
+deploy/install.sh
 ```
+
+Ya no pide la contraseña del router ni crea usuarios: eso lo hace el
+asistente de instalación del panel (`/instalar`, ver
+[`docs/operacion.md`](../docs/operacion.md#primera-instalación-el-asistente)).
 
 Es idempotente: se puede repetir y sólo hace lo que falta. Pasos:
 
@@ -74,17 +89,19 @@ Es idempotente: se puede repetir y sólo hace lo que falta. Pasos:
 2. `--servidor` (root): valida los guiones y el Caddyfile (con el binario y el
    entorno del servicio de Caddy: `caddy_command`, `caddy_env`); crea las jails
    (dataset ZFS, `pkg --rootdir … -r FreeBSD-base install FreeBSD-set-…`), el
-   usuario `routerpanel` (uid 3159, distinto de cualquiera del host), rutas, nullfs, `router.secret`, rc.d, newsyslog
-   (lo que va en directorios de un usuario de jail —`router.secret`,
-   `~rpbuild/.ssh/config`, `known_hosts`, el bundle— se escribe como ese
-   usuario desde dentro de la jail, nunca como root desde el host);
+   usuario `routerpanel` (uid 3159, distinto de cualquiera del host), rutas, nullfs, rc.d, newsyslog
+   (lo que va en directorios de un usuario de jail —`~rpbuild/.ssh/config`,
+   `known_hosts`, el bundle, los permisos de un `router.secret` de antes— se
+   hace como ese usuario desde dentro de la jail, nunca como root desde el
+   host);
    paquetes, `rustup`, `cargo-leptos`, clave de despliegue y clon en la jail
    de compilación (si Forgejo aún no acepta la clave, clona del bundle); el
    actualizador y su cron en el host; `panel.home.arpa` en unbound
    (`local-unbound-checkconf` y `service local_unbound reload`); el Caddyfile
-   (sólo si cambia; `service caddy reload`); y, si ya hay versión desplegada,
-   el usuario `admin` del panel. Al final imprime la clave pública de
-   despliegue.
+   (sólo si cambia; `service caddy reload`). Si el panel ya está desplegado y
+   aún no tiene usuarios, dice dónde está el token del asistente
+   (`/var/db/routerpanel/instalar.token` en la jail; no lo imprime). Al final
+   imprime la clave pública de despliegue.
 3. `--pf-cargar`: inserta `pf.conf.snippet` en `/etc/pf.conf`, lo comprueba con
    `pfctl -nf`, guarda la copia en `/etc/pf.conf.bak-routerpanel`, arma un
    interruptor de hombre muerto (`daemon`, 180 s: restaura la copia en el
@@ -119,8 +136,11 @@ desplegar. La primera vez se compila a mano la rama con el mismo guion:
 
 ```sh
 ssh admin@192.0.2.10 doas routerpanel-actualizar --ref nucleo
-deploy/install.sh            # otra vez: ahora crea el usuario del panel
+deploy/install.sh            # otra vez: dice dónde está el token del asistente
 ```
+
+Después, `https://panel.home.arpa/instalar` con ese token: crea el
+administrador, guarda las credenciales del router y hace la lectura inicial.
 
 `--ref` acepta una rama o un commit; la versión se llama `<ref>-<sha corto>`.
 Si no hay acceso al repositorio, compila lo que ya tenga el clon.
@@ -143,7 +163,9 @@ Si no hay acceso al repositorio, compila lo que ya tenga el clon.
 3. `cargo leptos build --release`, `cargo test --workspace` y
    `cargo test --workspace --features panel/ssr` (como `rpbuild`; si el
    `Cargo.lock` pide otra versión de `wasm-bindgen`, instala antes
-   `wasm-bindgen-cli` de esa versión).
+   `wasm-bindgen-cli` de esa versión). Cada `cargo test` tiene una hora como
+   mucho (`timeout`): una prueba colgada cuenta como fallo y no bloquea las
+   ejecuciones siguientes.
 4. Saca `target/release/panel` y `target/site/` como un `tar` generado
    **dentro** de la jail (`jexec -U rpbuild … tar -cf -`) y lo extrae en el
    host con `--no-same-owner --no-same-permissions` en
@@ -238,7 +260,7 @@ doas jexec routerpanel service routerpanel status|restart
 doas tail /usr/local/jails/containers/routerpanel/var/log/routerpanel.log
 doas tail /var/log/routerpanel-update.log
 doas jexec -U routerpanel routerpanel env RP_DB=/var/db/routerpanel/panel.db \
-    /usr/local/routerpanel/current/panel user passwd admin
+    /usr/local/routerpanel/current/panel user passwd <usuario>
 ```
 
 Volver a mano a otra versión: `ln -sfh releases/<versión>` sobre

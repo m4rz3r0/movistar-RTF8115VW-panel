@@ -8,14 +8,18 @@
 //! explorador, con la inversa. Los cambios en `aplicando` o `vigilando` se
 //! refrescan cada 2 s hasta que terminan; si no, no se sondea.
 //!
+//! Un cambio de varios pasos (un grupo) es una sola fila; su detalle lista
+//! los pasos con su resumen humano, su estado y su diff.
+//!
 //! Los revelados no llevan el valor: solo quién, cuándo y qué campo.
 
 #[cfg(feature = "ssr")]
 pub(crate) mod servidor;
 
+use crate::t;
 use crate::ui::{
     Estado, Insignia,
-    charts::hora_local,
+    charts::{formato_fecha, hora_local},
     explorador::{
         CampoCambio, DialogoCambio, EstadoDeCambio, PreparadoVista, RiesgoCambio, TablaDiff,
         texto_error,
@@ -67,6 +71,57 @@ pub struct CambioFila {
     pub deshace: Option<Vinculo>,
     /// El gestor aceptaría deshacerlo ahora.
     pub puede_deshacer: bool,
+    /// Resumen humano del grupo, si lo tiene.
+    pub titulo: Option<String>,
+    /// Pasos del grupo (vacío si es de un solo paso).
+    pub pasos: Vec<PasoFila>,
+}
+
+/// Estado de un paso de un grupo.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EstadoPasoVista {
+    Pendiente,
+    Omitido,
+    Aplicando,
+    Aplicado,
+    Fallido,
+    Revertido,
+}
+
+impl EstadoPasoVista {
+    pub fn etiqueta(self) -> String {
+        match self {
+            EstadoPasoVista::Pendiente => t!("historial-paso-pendiente"),
+            EstadoPasoVista::Omitido => t!("historial-paso-omitido"),
+            EstadoPasoVista::Aplicando => t!("historial-paso-aplicando"),
+            EstadoPasoVista::Aplicado => t!("historial-paso-aplicado"),
+            EstadoPasoVista::Fallido => t!("historial-paso-fallido"),
+            EstadoPasoVista::Revertido => t!("historial-paso-revertido"),
+        }
+    }
+
+    pub fn estado(self) -> Estado {
+        match self {
+            EstadoPasoVista::Aplicado => Estado::Ok,
+            EstadoPasoVista::Revertido => Estado::Aviso,
+            EstadoPasoVista::Fallido => Estado::Error,
+            _ => Estado::Neutro,
+        }
+    }
+}
+
+/// Un paso de un grupo del historial (secretos enmascarados).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PasoFila {
+    /// Posición en el grupo (desde 1).
+    pub numero: i64,
+    /// Resumen humano (o el nombre de la función).
+    pub etiqueta: String,
+    pub funcion: String,
+    pub instancia: Option<String>,
+    pub estado: EstadoPasoVista,
+    pub campos: Vec<CampoCambio>,
+    pub error: Option<String>,
 }
 
 /// Un secreto revelado (sin su valor).
@@ -126,31 +181,25 @@ pub fn resumen(campos: &[CampoCambio]) -> String {
     const MOSTRADOS: usize = 3;
     let n = campos.len();
     if n == 0 {
-        return "Sin campos".to_owned();
+        return t!("historial-sin-campos");
     }
     let nombres: Vec<&str> = campos
         .iter()
         .take(MOSTRADOS)
         .map(|c| c.etiqueta.as_str())
         .collect();
-    let mut texto = format!(
-        "{n} {}: {}",
-        if n == 1 { "campo" } else { "campos" },
-        nombres.join(", ")
-    );
+    let mut texto = t!("historial-campos", n = n, nombres = nombres.join(", "));
     if n > MOSTRADOS {
         texto.push_str(", …");
     }
     texto
 }
 
-/// «09/10/2026 14:05» o, con segundos, «09/10/2026 14:05:09» (hora peninsular).
+/// «09/10/2026 14:05» o, con segundos, «09/10/2026 14:05:09» (hora
+/// peninsular; la fecha, según el idioma).
 pub fn fecha_hora(ts: i64, con_segundos: bool) -> String {
     let h = hora_local(ts);
-    let base = format!(
-        "{:02}/{:02}/{} {:02}:{:02}",
-        h.dia, h.mes, h.anio, h.hora, h.minuto
-    );
+    let base = format!("{} {:02}:{:02}", formato_fecha(&h), h.hora, h.minuto);
     if con_segundos {
         format!("{base}:{:02}", h.segundo)
     } else {
@@ -203,7 +252,7 @@ fn IconoOjo() -> impl IntoView {
     }
 }
 
-fn enlace_vinculo(texto: &'static str, v: Vinculo) -> impl IntoView {
+fn enlace_vinculo(texto: String, v: Vinculo) -> impl IntoView {
     view! {
         <A href=format!("/historial?pagina={}#cambio-{}", v.pagina, v.id)>
             {format!("{texto} #{}", v.id)}
@@ -219,14 +268,14 @@ fn funcion_enlazada(funcion: String, ruta: Option<String>, instancia: Option<Str
     };
     view! {
         {nombre}
-        {instancia.map(|i| view! { <span class="hist-instancia">{format!(" · instancia {i}")}</span> })}
+        {instancia.map(|i| view! { <span class="hist-instancia">{t!("historial-instancia-sep", i = i)}</span> })}
     }
     .into_any()
 }
 
 #[component]
 fn FilaRevelado(r: ReveladoFila) -> impl IntoView {
-    let instancia = r.instancia.as_deref().map(|i| format!(" (instancia {i})"));
+    let instancia = r.instancia.map(|i| t!("historial-instancia-par", i = i));
     view! {
         <li class="hist-entrada hist-revelado" id=format!("revelado-{}", r.id)>
             <div class="hist-cabeza">
@@ -235,14 +284,58 @@ fn FilaRevelado(r: ReveladoFila) -> impl IntoView {
                 <span class="hist-que">
                     <IconoOjo />
                     <span>
-                        "Revelado " <span class="mono">{r.campo}</span> " de "
+                        {t!("historial-revelado")}
+                        " "
+                        <span class="mono">{r.campo}</span>
+                        " "
+                        {t!("historial-revelado-de")}
+                        " "
                         {funcion_enlazada(r.funcion, r.ruta, None)}
                         {instancia}
                     </span>
                 </span>
-                <span class="chip">"Secreto"</span>
+                <span class="chip">{t!("historial-secreto")}</span>
             </div>
         </li>
+    }
+}
+
+/// Lista desplegable de los pasos de un grupo.
+fn lista_pasos(pasos: Vec<PasoFila>) -> impl IntoView {
+    let filas = pasos
+        .into_iter()
+        .map(|p| {
+            let instancia = p
+                .instancia
+                .map(|i| view! { <span class="hist-instancia">{t!("historial-instancia-sep", i = i)}</span> });
+            let error = p.error.map(|e| view! { <p class="hist-error">{e}</p> });
+            view! {
+                <li class="hist-paso">
+                    <details>
+                        <summary class="hist-paso-cabeza">
+                            <span class="hist-paso-n cifras">
+                                {t!("historial-paso-num", n = p.numero)}
+                            </span>
+                            <span>{p.etiqueta}</span>
+                            <span class="mono hist-instancia">{p.funcion}</span>
+                            {instancia}
+                            <span class="hist-paso-estado">
+                                <Insignia estado=p.estado.estado() texto=p.estado.etiqueta() />
+                            </span>
+                        </summary>
+                        <div class="hist-paso-cuerpo">
+                            <TablaDiff campos=p.campos />
+                            {error}
+                        </div>
+                    </details>
+                </li>
+            }
+        })
+        .collect_view();
+    view! {
+        <ol class="hist-pasos" aria-label=t!("historial-pasos-lista")>
+            {filas}
+        </ol>
     }
 }
 
@@ -267,9 +360,9 @@ fn FilaCambio(
         "hist-nota"
     };
     let tiempos = {
-        let mut t = vec![("Creado", fecha_hora(c.ts, true))];
+        let mut t = vec![(t!("historial-creado"), fecha_hora(c.ts, true))];
         if c.updated != c.ts {
-            t.push(("Último cambio de estado", fecha_hora(c.updated, true)));
+            t.push((t!("historial-ultimo-estado"), fecha_hora(c.updated, true)));
         }
         t.into_iter()
             .map(|(k, v)| {
@@ -285,11 +378,31 @@ fn FilaCambio(
     let enlaces = (c.deshecho_por.is_some() || c.deshace.is_some()).then(|| {
         view! {
             <p class="hist-enlaces">
-                {c.deshecho_por.map(|v| enlace_vinculo("Deshecho por", v))}
-                {c.deshace.map(|v| enlace_vinculo("Deshace a", v))}
+                {c.deshecho_por.map(|v| enlace_vinculo(t!("historial-deshecho-por"), v))}
+                {c.deshace.map(|v| enlace_vinculo(t!("historial-deshace-a"), v))}
             </p>
         }
     });
+    // Un grupo: su resumen y el número de pasos; el detalle, los pasos.
+    let n_pasos = c.pasos.len();
+    let que = if n_pasos > 0 {
+        let titulo = c.titulo.clone().unwrap_or_else(|| c.funcion.clone());
+        view! {
+            <span>
+                {titulo}
+                <span class="hist-instancia">{t!("historial-pasos", n = n_pasos)}</span>
+            </span>
+        }
+        .into_any()
+    } else {
+        view! { <span>{funcion_enlazada(c.funcion.clone(), c.ruta, c.instancia.clone())}</span> }
+            .into_any()
+    };
+    let detalle = if n_pasos > 0 {
+        lista_pasos(c.pasos).into_any()
+    } else {
+        view! { <TablaDiff campos=c.campos /> }.into_any()
+    };
     let boton = c.puede_deshacer.then(|| {
         view! {
             <button
@@ -298,8 +411,8 @@ fn FilaCambio(
                 disabled=move || ocupado.get()
                 on:click=move |_| on_deshacer.run(id)
             >
-                "Deshacer"
-                <span class="solo-lector">{format!(" el cambio nº {id}")}</span>
+                {t!("historial-deshacer")}
+                <span class="solo-lector">{t!("historial-deshacer-lector", id = id)}</span>
             </button>
         }
     });
@@ -324,9 +437,7 @@ fn FilaCambio(
                     <span class="hist-quien">{c.usuario.unwrap_or_else(|| "—".to_owned())}</span>
                     <span class="hist-que">
                         <span class="hist-id cifras">{format!("#{id}")}</span>
-                        <span>
-                            {funcion_enlazada(c.funcion.clone(), c.ruta, c.instancia.clone())}
-                        </span>
+                        {que}
                     </span>
                     <span class="hist-diff">{c.resumen}</span>
                     <span class="hist-insignias">
@@ -335,7 +446,7 @@ fn FilaCambio(
                     </span>
                 </summary>
                 <div class="hist-detalle">
-                    <TablaDiff campos=c.campos />
+                    {detalle}
                     <dl class="hist-tiempos">{tiempos}</dl>
                     {enlaces}
                 </div>
@@ -350,16 +461,16 @@ fn FilaCambio(
 #[component]
 fn Paginacion(pagina: u32, paginas: u32, hay_mas: bool, total: u32) -> impl IntoView {
     let reciente = (pagina > 1).then(|| {
-        view! { <A href=format!("/historial?pagina={}", pagina - 1)>"← Más recientes"</A> }
+        view! { <A href=format!("/historial?pagina={}", pagina - 1)>{t!("historial-mas-recientes")}</A> }
     });
     let antiguo = hay_mas.then(|| {
-        view! { <A href=format!("/historial?pagina={}", pagina + 1)>"Más antiguos →"</A> }
+        view! { <A href=format!("/historial?pagina={}", pagina + 1)>{t!("historial-mas-antiguos")}</A> }
     });
     view! {
-        <nav class="paginacion" aria-label="Páginas del historial">
+        <nav class="paginacion" aria-label=t!("historial-paginas")>
             <span class="paginacion-lado">{reciente}</span>
             <span class="pagina-sub cifras">
-                {format!("Página {pagina} de {paginas} · {total} entradas")}
+                {t!("historial-pagina-de", pagina = pagina, paginas = paginas, total = total)}
             </span>
             <span class="paginacion-lado paginacion-fin">{antiguo}</span>
         </nav>
@@ -442,14 +553,13 @@ pub fn PaginaHistorial() -> impl IntoView {
 
     let contenido = move || {
         datos.get().map(|r| match r {
-            Err(e) => view! { <p class="error-formulario" role="alert">{texto_error(&e)}</p> }
-                .into_any(),
+            Err(e) => {
+                view! { <p class="error-formulario" role="alert">{texto_error(&e)}</p> }.into_any()
+            }
             Ok(p) if p.total == 0 => view! {
                 <section class="tarjeta hist-vacio">
-                    <p>"Todavía no hay cambios"</p>
-                    <p class="pagina-sub">
-                        "Aquí aparecerán los cambios que hagas desde el panel y los secretos que reveles."
-                    </p>
+                    <p>{t!("historial-vacio")}</p>
+                    <p class="pagina-sub">{t!("historial-vacio-sub")}</p>
                 </section>
             }
             .into_any(),
@@ -465,8 +575,9 @@ pub fn PaginaHistorial() -> impl IntoView {
                 let lista = if p.entradas.is_empty() {
                     view! {
                         <p class="pagina-sub">
-                            "No hay entradas en esta página. "
-                            <A href="/historial">"Volver a las más recientes"</A>
+                            {t!("historial-pagina-vacia")}
+                            " "
+                            <A href="/historial">{t!("historial-volver-recientes")}</A>
                         </p>
                     }
                     .into_any()
@@ -497,16 +608,14 @@ pub fn PaginaHistorial() -> impl IntoView {
     view! {
         <header class="pagina-cabecera">
             <div>
-                <h1>"Historial"</h1>
-                <p class="pagina-sub">
-                    "Cambios hechos desde el panel y secretos revelados, del más reciente al más antiguo."
-                </p>
+                <h1>{t!("historial-titulo")}</h1>
+                <p class="pagina-sub">{t!("historial-sub")}</p>
             </div>
         </header>
         <p class="error-formulario" role="alert">
             {move || error.get()}
         </p>
-        <Transition fallback=|| view! { <p class="pagina-sub">"Cargando…"</p> }>
+        <Transition fallback=|| view! { <p class="pagina-sub">{t!("comun-cargando")}</p> }>
             {contenido}
         </Transition>
         {dialogo}

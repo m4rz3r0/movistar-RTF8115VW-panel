@@ -6,6 +6,7 @@ use super::{
     serie::{recuadro, usar_ancho, x_del_puntero},
     tiempo::{formato_duracion, formato_fecha_hora, formato_hora, ticks_tiempo},
 };
+use crate::t;
 use crate::ui::{
     Estado, Insignia,
     table::{Celda, Columna, Tabla},
@@ -50,7 +51,7 @@ pub fn tramos_caidos(eventos: &[Corte], desde: i64, hasta: i64) -> Vec<Tramo> {
 /// `"… → ahora"` si su corte sigue abierto.
 fn cabecera_tramo(t: &Tramo) -> String {
     let fin = if t.en_curso {
-        "ahora".to_owned()
+        t!("comun-ahora")
     } else {
         formato_hora(t.hasta, false)
     };
@@ -59,14 +60,11 @@ fn cabecera_tramo(t: &Tramo) -> String {
 
 /// Resumen para lectores de pantalla.
 fn texto_aria(r: &ResumenCortes) -> String {
-    let cortes = match r.cortes {
-        1 => "1 corte".to_owned(),
-        n => format!("{n} cortes"),
-    };
-    format!(
-        "Disponibilidad de internet: {}, {cortes}, {} sin conexión",
-        formato_disponibilidad(r),
-        formato_duracion(r.segundos_caido)
+    t!(
+        "comun-franja-aria",
+        disponible = formato_disponibilidad(r),
+        cortes = r.cortes,
+        caido = formato_duracion(r.segundos_caido)
     )
 }
 
@@ -132,17 +130,16 @@ pub fn FranjaDisponibilidad(
     let cabecera = move || {
         let r = resumen.get();
         let (estado, texto) = match r.cortes {
-            0 => (Estado::Ok, "Sin cortes".to_owned()),
-            1 => (Estado::Error, "1 corte".to_owned()),
-            n => (Estado::Error, format!("{n} cortes")),
+            0 => (Estado::Ok, t!("comun-sin-cortes")),
+            n => (Estado::Error, t!("comun-cortes", n = n)),
         };
         let detalle = if r.cortes == 0 {
-            format!("{} disponible", formato_disponibilidad(&r))
+            t!("comun-disponible", disponible = formato_disponibilidad(&r))
         } else {
-            format!(
-                "{} disponible · {} sin conexión",
-                formato_disponibilidad(&r),
-                formato_duracion(r.segundos_caido)
+            t!(
+                "comun-disponible-caido",
+                disponible = formato_disponibilidad(&r),
+                caido = formato_duracion(r.segundos_caido)
             )
         };
         view! {
@@ -219,14 +216,14 @@ pub fn FranjaDisponibilidad(
                     vec![(
                         "franja-clave-corte",
                         formato_duracion(tramo.hasta - tramo.desde),
-                        "sin conexión".to_owned(),
+                        t!("comun-sin-conexion-min"),
                     )],
                     Some((xa, (s(tramo.hasta as f64) - xa).max(2.0))),
                 )
             }
             None => (
                 formato_fecha_hora(t.min(h), false),
-                vec![("franja-clave-ok", "Conectado".to_owned(), String::new())],
+                vec![("franja-clave-ok", t!("comun-conectado"), String::new())],
                 None,
             ),
         };
@@ -289,9 +286,9 @@ pub fn FranjaDisponibilidad(
     let tabla = move || {
         tabla_abierta.get().then(|| {
             let columnas = vec![
-                Columna::new("Inicio"),
-                Columna::new("Fin"),
-                Columna::numerica("Duración"),
+                Columna::new(t!("comun-col-inicio")),
+                Columna::new(t!("comun-col-fin")),
+                Columna::numerica(t!("comun-col-duracion")),
             ];
             let (d, h) = (desde.get_untracked(), hasta.get_untracked());
             let filas: Vec<Vec<Celda>> = eventos.with_untracked(|e| {
@@ -300,7 +297,7 @@ pub fn FranjaDisponibilidad(
                     .map(|c| {
                         vec![
                             Celda::Numero(formato_fecha_hora(c.desde, false)),
-                            c.hasta.map_or(Celda::Texto("en curso".to_owned()), |t| {
+                            c.hasta.map_or(Celda::Texto(t!("comun-en-curso")), |t| {
                                 Celda::Numero(formato_fecha_hora(t, false))
                             }),
                             Celda::Numero(formato_duracion(c.hasta.unwrap_or(h) - c.desde)),
@@ -308,7 +305,7 @@ pub fn FranjaDisponibilidad(
                     })
                     .collect()
             });
-            view! { <Tabla columnas filas vacia="Sin cortes en este intervalo" /> }
+            view! { <Tabla columnas filas vacia=t!("comun-sin-cortes-intervalo") /> }
         })
     };
 
@@ -341,11 +338,11 @@ pub fn FranjaDisponibilidad(
             <ul class="leyenda leyenda-franja">
                 <li>
                     <span class="clave-bloque franja-clave-ok" aria-hidden="true"></span>
-                    "Conectado"
+                    {t!("comun-conectado")}
                 </li>
                 <li>
                     <span class="clave-bloque franja-clave-corte" aria-hidden="true"></span>
-                    "Sin conexión"
+                    {t!("comun-sin-conexion")}
                 </li>
             </ul>
             <details
@@ -357,7 +354,7 @@ pub fn FranjaDisponibilidad(
                     }
                 }
             >
-                <summary>"Ver los cortes en una tabla"</summary>
+                <summary>{t!("comun-ver-cortes-tabla")}</summary>
                 {tabla}
             </details>
         </figure>

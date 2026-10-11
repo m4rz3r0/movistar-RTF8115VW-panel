@@ -1,6 +1,8 @@
 //! Página de inicio de sesión.
 
 use crate::auth::{Login, safe_next};
+use crate::t;
+use crate::ui::i18n::SelectorIdioma;
 use leptos::prelude::*;
 use leptos_router::hooks::{use_navigate, use_query_map};
 
@@ -17,18 +19,21 @@ pub fn PaginaLogin() -> impl IntoView {
         }
     });
     let error = move || match action.value().get() {
-        Some(Err(ServerFnError::ServerError(msg))) => Some(msg),
-        Some(Err(_)) => Some("No se puede contactar con el panel".to_owned()),
+        Some(Err(ServerFnError::ServerError(msg))) => Some(super::mensaje_del_servidor(&msg)),
+        Some(Err(_)) => Some(t!("comun-error-conexion")),
         _ => None,
     };
     view! {
         <main class="acceso">
             <section class="acceso-tarjeta login" aria-labelledby="login-titulo">
-                <p class="acceso-marca">"RTF8115VW"</p>
-                <h1 id="login-titulo">"Acceso al panel"</h1>
+                <div class="acceso-cabeza">
+                    <p class="acceso-marca">"RTF8115VW"</p>
+                    <SelectorIdioma />
+                </div>
+                <h1 id="login-titulo">{t!("login-titulo")}</h1>
                 <ActionForm action>
                     <p class="campo">
-                        <label for="usuario">"Usuario"</label>
+                        <label for="usuario">{t!("login-usuario")}</label>
                         <input
                             id="usuario"
                             name="usuario"
@@ -41,7 +46,7 @@ pub fn PaginaLogin() -> impl IntoView {
                         />
                     </p>
                     <p class="campo">
-                        <label for="contrasena">"Contraseña"</label>
+                        <label for="contrasena">{t!("login-contrasena")}</label>
                         <input
                             id="contrasena"
                             name="contrasena"
@@ -54,7 +59,7 @@ pub fn PaginaLogin() -> impl IntoView {
                         {error}
                     </p>
                     <button class="boton" type="submit" disabled=move || action.pending().get()>
-                        "Entrar"
+                        {t!("login-entrar")}
                     </button>
                 </ActionForm>
             </section>
