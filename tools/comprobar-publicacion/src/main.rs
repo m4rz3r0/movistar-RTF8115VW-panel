@@ -7,7 +7,9 @@
 //! si el uso es incorrecto o la lista de permitidos no es válida.
 //!
 //! Con `--solo` revisa solo esas rutas (relativas a `DIR`) y no comprueba los
-//! ficheros obligatorios.
+//! ficheros obligatorios; una ruta que no existe es un error de uso.
+//!
+//! Nunca repite sus argumentos en la salida: una ruta puede contener un dato.
 
 use comprobar_publicacion::{ListasLocales, Permitidos, arbol};
 use std::{ffi::OsString, path::PathBuf, process::ExitCode};
@@ -49,18 +51,21 @@ fn main() -> ExitCode {
             return uso();
         }
     }
+    // Los argumentos nunca se repiten en la salida: pueden contener un dato
+    // (por ejemplo, un fichero borrado cuyo nombre lo lleva).
     if !raiz.is_dir() {
-        eprintln!("no es un directorio: {}", raiz.display());
+        eprintln!("error: el directorio indicado no existe o no es un directorio");
         return ExitCode::from(2);
     }
-    for s in &solo {
+    for (k, s) in solo.iter().enumerate() {
         let camino = if s.is_absolute() {
             s.clone()
         } else {
             raiz.join(s)
         };
         if camino.symlink_metadata().is_err() {
-            eprintln!("aviso: --solo {} no existe", s.display());
+            eprintln!("error: la ruta n.º {} de --solo no existe", k + 1);
+            return ExitCode::from(2);
         }
     }
 

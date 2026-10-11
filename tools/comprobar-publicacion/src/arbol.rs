@@ -1,6 +1,9 @@
 //! Modo `--arbol`: revisa los ficheros que se publicarían.
 
-use crate::{Hallazgo, ListasLocales, Permitidos, Regla, reglas, revisar_binario, revisar_texto};
+use crate::{
+    Hallazgo, ListasLocales, Permitidos, Regla, ocultar_ruta, revisar_binario, revisar_nombre,
+    revisar_texto,
+};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -50,7 +53,8 @@ pub fn arbol(raiz: &Path, solo: &[PathBuf], p: &Permitidos, l: &ListasLocales) -
         if !incluido(ruta) {
             continue;
         }
-        let nombre = revisar_nombre(ruta, p);
+        // Cualquier hallazgo sobre el nombre (de cualquier regla) oculta la ruta.
+        let nombre = revisar_nombre(ruta, p, l);
         let nombre_con_dato = !nombre.is_empty();
         let mut h: Vec<Hallazgo> = prohibida(ruta)
             .filter(|_| !p.ruta_permitida(ruta, Regla::RutaProhibida))
@@ -65,9 +69,7 @@ pub fn arbol(raiz: &Path, solo: &[PathBuf], p: &Permitidos, l: &ListasLocales) -
             .collect();
         h.extend(revisar_fichero(&raiz.join(ruta), ruta, p, l));
         if nombre_con_dato {
-            for x in &mut h {
-                x.ruta = format!("[fichero n.º {} del árbol]", k + 1);
-            }
+            ocultar_ruta(&mut h, k + 1);
         }
         out.extend(h);
     }
@@ -214,22 +216,6 @@ fn prohibida(ruta: &str) -> Option<&'static str> {
     }
 }
 
-/// Reglas genéricas sobre cada componente de la ruta (un nombre de fichero
-/// también se publica). Por componentes, para que `a/b/c` no parezca una
-/// cadena base64.
-fn revisar_nombre(ruta: &str, p: &Permitidos) -> Vec<Hallazgo> {
-    ruta.split('/')
-        .flat_map(|componente| reglas::genericas(componente, p))
-        .filter(|(regla, _)| !p.ruta_permitida(ruta, *regla))
-        .map(|(regla, detalle)| Hallazgo {
-            ruta: ruta.to_owned(),
-            linea: 0,
-            regla,
-            detalle: format!("nombre: {detalle}"),
-        })
-        .collect()
-}
-
 fn revisar_fichero(camino: &Path, ruta: &str, p: &Permitidos, l: &ListasLocales) -> Vec<Hallazgo> {
     let ilegible = || {
         vec![Hallazgo {
@@ -256,12 +242,46 @@ fn revisar_fichero(camino: &Path, ruta: &str, p: &Permitidos, l: &ListasLocales)
         .rsplit_once('.')
         .map(|(_, e)| e.to_ascii_lowercase())
         .unwrap_or_default();
-    if EXTENSIONES_BINARIAS.contains(&extension.as_str()) || bytes.contains(&0) {
+    if EXTENSIONES_BINARIAS.contains(&extension.as_str()) {
         return revisar_binario(ruta, &bytes, p);
     }
-    match String::from_utf8(bytes) {
-        Ok(texto) => revisar_texto(ruta, &texto, p, l),
-        Err(e) => revisar_binario(ruta, e.as_bytes(), p),
+    if !bytes.contains(&0)
+        && let Ok(texto) = std::str::from_utf8(&bytes)
+    {
+        return revisar_texto(ruta, texto, p, l);
+    }
+    // Ni texto UTF-8 ni binario conocido: se exige la revisión del binario y
+    // además se revisa el texto que se pueda leer en él.
+    let mut h = revisar_binario(ruta, &bytes, p);
+    h.extend(revisar_texto(ruta, &texto_legible(&bytes), p, l));
+    h
+}
+
+/// Texto de un fichero que no es UTF-8: UTF-16 si lleva BOM; si no, los
+/// bytes sin NUL (UTF-16 sin BOM queda en ASCII) leídos con sustitución.
+fn texto_legible(bytes: &[u8]) -> String {
+    let utf16 = |resto: &[u8], le: bool| {
+        let unidades: Vec<u16> = resto
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|&c| {
+                if le {
+                    u16::from_le_bytes(c)
+                } else {
+                    u16::from_be_bytes(c)
+                }
+            })
+            .collect();
+        String::from_utf16_lossy(&unidades)
+    };
+    match bytes {
+        [0xff, 0xfe, resto @ ..] => utf16(resto, true),
+        [0xfe, 0xff, resto @ ..] => utf16(resto, false),
+        _ => {
+            let sin_nul: Vec<u8> = bytes.iter().copied().filter(|&b| b != 0).collect();
+            String::from_utf8_lossy(&sin_nul).into_owned()
+        }
     }
 }
 

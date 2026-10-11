@@ -183,3 +183,71 @@ fn salidas_del_binario() {
         .unwrap();
     assert_eq!(roto.status.code(), Some(2));
 }
+
+// --- Ronda de correcciones 1 ------------------------------------------------
+
+#[test]
+fn nombre_de_fixture_sin_sanear_no_se_imprime() {
+    let dir = tempfile::tempdir().unwrap();
+    let ssid = format!("Casa{}", "Secreta");
+    escribir(
+        dir.path(),
+        &format!("crates/hgu/fixtures/cbX__ssid={ssid}.xml"),
+        "<R></R>\n",
+    );
+    let h = arbol_de(dir.path(), &[]);
+    assert!(h.iter().any(|h| h.regla == Regla::Fixture), "{h:?}");
+    for x in &h {
+        assert!(!x.to_string().contains(&ssid), "{x}");
+    }
+}
+
+#[test]
+fn texto_no_utf8_tambien_se_revisa() {
+    let dir = tempfile::tempdir().unwrap();
+    obligatorios(dir.path());
+    let privada = ["10", "6", "6", "6"].join(".");
+    let mut latin1 = b"caf\xe9 ".to_vec();
+    latin1.extend(privada.as_bytes());
+    fs::write(dir.path().join("latin1.txt"), latin1).unwrap();
+    let mut utf16 = vec![0xff, 0xfe];
+    for u in format!("ip {privada}").encode_utf16() {
+        utf16.extend(u.to_le_bytes());
+    }
+    fs::write(dir.path().join("utf16.txt"), utf16).unwrap();
+    let h = arbol_de(dir.path(), &[]);
+    for f in ["latin1.txt", "utf16.txt"] {
+        let reglas: Vec<Regla> = h.iter().filter(|h| h.ruta == f).map(|h| h.regla).collect();
+        assert!(reglas.contains(&Regla::Ipv4), "{f}: {h:?}");
+        assert!(reglas.contains(&Regla::Binario), "{f}: {h:?}");
+    }
+}
+
+#[test]
+fn argumentos_nunca_se_repiten() {
+    let dir = tempfile::tempdir().unwrap();
+    obligatorios(dir.path());
+    let privada = ["10", "4", "3", "2"].join(".");
+    let bin = env!("CARGO_BIN_EXE_comprobar-publicacion");
+    let sin_solo = Command::new(bin)
+        .arg("--arbol")
+        .arg(dir.path())
+        .arg("--solo")
+        .arg(format!("borrado-{privada}.txt"))
+        .output()
+        .unwrap();
+    let sin_dir = Command::new(bin)
+        .arg("--arbol")
+        .arg(dir.path().join(format!("no-{privada}")))
+        .output()
+        .unwrap();
+    for out in [sin_solo, sin_dir] {
+        assert_eq!(out.status.code(), Some(2));
+        let todo = format!(
+            "{}{}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+        assert!(!todo.contains(&privada), "{todo}");
+    }
+}

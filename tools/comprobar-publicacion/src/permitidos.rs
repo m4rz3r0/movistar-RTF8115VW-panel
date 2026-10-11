@@ -17,6 +17,15 @@ use std::{
     net::IpAddr,
 };
 
+/// Reglas que una entrada `ruta` no puede desactivar: las redes de seguridad
+/// con datos del dueño y las rutas que nunca deben publicarse.
+const NO_DESACTIVABLES: [Regla; 4] = [
+    Regla::ListaSecretos,
+    Regla::ListaProhibidos,
+    Regla::ConfigLocal,
+    Regla::RutaProhibida,
+];
+
 #[derive(Clone, Debug, Default)]
 pub struct Permitidos {
     valores: HashSet<String>,
@@ -60,6 +69,11 @@ impl Permitidos {
                 ["ruta", glob, regla] => {
                     let regla = Regla::desde_nombre(regla)
                         .ok_or(format!("línea {n}: regla desconocida"))?;
+                    if NO_DESACTIVABLES.contains(&regla) {
+                        return Err(format!(
+                            "línea {n}: la regla {regla} no se puede desactivar por ruta"
+                        ));
+                    }
                     p.rutas.push(((*glob).to_owned(), regla));
                 }
                 ["binario", ruta, sha] => {
@@ -122,15 +136,21 @@ impl Permitidos {
     }
 }
 
-/// MAC en cualquier escritura (`:`, `-`, `.` o sin separador) como 12
-/// hexadecimales en minúsculas.
+/// MAC en cualquier escritura (seis grupos de una o dos cifras separados por
+/// `:`, `-`, `_` o espacios; tres grupos de cuatro separados por `.`; o 12
+/// cifras seguidas) como 12 hexadecimales en minúsculas.
 pub(crate) fn mac_normalizada(v: &str) -> Option<String> {
-    let plano: String = v
-        .chars()
-        .filter(|c| !matches!(c, ':' | '-' | '.'))
-        .collect();
-    (plano.len() == 12 && plano.bytes().all(|b| b.is_ascii_hexdigit()))
-        .then(|| plano.to_ascii_lowercase())
+    let grupos: Vec<&str> = v.split([':', '-', '_', ' ', '.']).collect();
+    let hex = |g: &str| !g.is_empty() && g.bytes().all(|b| b.is_ascii_hexdigit());
+    let plano = match grupos.len() {
+        6 if grupos.iter().all(|g| hex(g) && g.len() <= 2) => {
+            grupos.iter().map(|g| format!("{g:0>2}")).collect()
+        }
+        3 if grupos.iter().all(|g| hex(g) && g.len() == 4) => grupos.concat(),
+        1 if hex(v) && v.len() == 12 => v.to_owned(),
+        _ => return None,
+    };
+    Some(plano.to_ascii_lowercase())
 }
 
 fn leer_red(cidr: &str) -> Option<(IpAddr, u8)> {
@@ -223,5 +243,11 @@ mod pruebas {
         let p = Permitidos::leer("valor aa:bb:cc:00:11:22 — m").unwrap();
         assert!(p.mac_permitida("aabbcc001122"));
         assert!(p.valor_permitido("AA-BB-CC-00-11-22"));
+        assert!(p.valor_permitido("aa_bb_cc_0_11_22"));
+        assert_eq!(
+            mac_normalizada("aabb.cc00.1122").as_deref(),
+            Some("aabbcc001122")
+        );
+        assert_eq!(mac_normalizada("1:2:3"), None);
     }
 }

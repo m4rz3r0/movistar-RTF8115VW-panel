@@ -307,3 +307,98 @@ fn display_sin_valor() {
         assert!(!s.contains("1a"), "{s}");
     }
 }
+
+// --- Ronda de correcciones 1 ------------------------------------------------
+
+/// IPv6 global sintética (no de documentación).
+fn v6_global() -> String {
+    format!("{}:{}:1:2::3", "2a01", "4f8")
+}
+
+#[test]
+fn ipv6_tras_cualquier_prefijo() {
+    for prefijo in ["v=spf1 ip6:", "ipv6:", "face:", "6:"] {
+        let texto = format!("{prefijo}{} -all", v6_global());
+        assert_eq!(reglas("a", &texto), [Regla::Ipv6], "{prefijo}");
+    }
+}
+
+#[test]
+fn mac_con_mas_separadores() {
+    for forma in [
+        mac(MAC_REAL, "_", true),
+        mac(MAC_REAL, " ", false),
+        // `arp` de BSD y macOS: grupos de una cifra.
+        format!("0:{}", mac(MAC_REAL, ":", false).split_at(3).1),
+        // Solo cifras, pero con separadores: sigue siendo una MAC.
+        mac([0x00, 0x11, 0x22, 0x33, 0x44, 0x55], ":", false),
+    ] {
+        assert_eq!(
+            reglas("a", &format!("x {forma} y")),
+            [Regla::Mac],
+            "{forma}"
+        );
+    }
+    // Una lista de números separados por espacios no es una MAC.
+    assert!(reglas("a", "10 20 30 40 50 60").is_empty());
+}
+
+#[test]
+fn identificadores_con_separadores() {
+    let n8 = "12345678";
+    let n7 = "1234567";
+    let casos = [
+        format!("{n8}-Z"),
+        format!("{}.{}.{}-Z", &n8[..2], &n8[2..5], &n8[5..]),
+        format!("X-{n7}-L"),
+        format!("{}-{}-{}", "612", "345", "678"),
+        format!("{}.{}.{}", "612", "345", "678"),
+        format!("{} {}", "612", "345678"),
+        format!("{}-{}-{}-{}", "612", "34", "56", "78"),
+        format!("00{}{}{}", "34", "6123", "45678"),
+        format!("{}{}", "asky", "0123abcd"),
+        // Serie GPON en hexadecimal: el fabricante en ASCII («ASKY»).
+        format!("{}{}", "41534B59", "0123ABCD"),
+    ];
+    // Las MAC especiales sin separador no son series GPON.
+    assert!(reglas("a", &"f".repeat(12)).is_empty());
+    for caso in casos {
+        assert_eq!(
+            reglas("a", &format!("dato {caso} fin")),
+            [Regla::Identificador],
+            "{caso}"
+        );
+    }
+}
+
+#[test]
+fn codificaciones_y_cifras_unicode() {
+    let casos = [
+        format!("ip 10{0}1{0}2{0}3", "%2E"),
+        format!("ip 10{0}1{0}2{0}3", "&#46;"),
+        format!("ip 10{0}1{0}2{0}3", "&#x2e;"),
+        // Cifras de ancho completo.
+        "ip \u{FF11}\u{FF10}.\u{FF11}.\u{FF12}.\u{FF13}".to_owned(),
+        // Cifras arábigo-índicas.
+        "ip \u{0661}\u{0660}.\u{0661}.\u{0662}.\u{0663}".to_owned(),
+    ];
+    for caso in casos {
+        assert_eq!(reglas("a", &caso), [Regla::Ipv4], "{caso}");
+    }
+    let dominio = format!("mi{0}dominio{0}net", "&#46;");
+    assert_eq!(reglas("a", &dominio), [Regla::Dominio]);
+}
+
+#[test]
+fn ruta_no_desactiva_reglas_de_seguridad() {
+    for regla in [
+        "lista-secretos",
+        "lista-prohibidos",
+        "config-local",
+        "ruta-prohibida",
+    ] {
+        let linea = format!("ruta ** {regla} — no");
+        assert!(Permitidos::leer(&linea).is_err(), "{regla}");
+    }
+    assert!(Permitidos::leer("ruta docs/** ipv4 — ejemplos").is_ok());
+}

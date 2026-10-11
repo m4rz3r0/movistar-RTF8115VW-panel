@@ -151,8 +151,53 @@ fn clase(ruta: &str) -> Clase {
     }
 }
 
-/// Revisa un fichero de texto. `ruta` es relativa a la raíz del árbol, con
-/// `/`, y decide qué reglas se aplican y qué excepciones de `p` valen.
+/// Revisa el nombre de un fichero (cada componente de `ruta`): las reglas
+/// genéricas, las listas locales y, en las fixtures, los parámetros del
+/// nombre. Los hallazgos tienen línea 0 y el detalle empieza por `nombre:`.
+///
+/// **Si devuelve algo, la ruta contiene un dato**: quien imprima hallazgos de
+/// ese fichero no debe mostrar `ruta` (ver [`ocultar_ruta`]).
+pub fn revisar_nombre(ruta: &str, p: &Permitidos, l: &ListasLocales) -> Vec<Hallazgo> {
+    let mut detalles: Vec<(Regla, String)> = Vec::new();
+    for componente in ruta.split('/') {
+        detalles.extend(
+            reglas::genericas(componente, p)
+                .into_iter()
+                .map(|(r, d)| (r, d.to_owned())),
+        );
+        detalles.extend(l.revisar_linea(componente, p));
+    }
+    if clase(ruta) == Clase::Fixture {
+        detalles.extend(
+            reglas::regla_nombre_fixture(ruta)
+                .into_iter()
+                .map(|d| (Regla::Fixture, d.to_owned())),
+        );
+    }
+    detalles
+        .into_iter()
+        .filter(|(regla, _)| !p.ruta_permitida(ruta, *regla))
+        .map(|(regla, detalle)| Hallazgo {
+            ruta: ruta.to_owned(),
+            linea: 0,
+            regla,
+            detalle: format!("nombre: {detalle}"),
+        })
+        .collect()
+}
+
+/// Sustituye la ruta de los hallazgos por una referencia sin datos
+/// (`[fichero n.º K del árbol]`, con `K` desde 1) cuando el nombre del fichero
+/// contiene un dato.
+pub fn ocultar_ruta(hallazgos: &mut [Hallazgo], numero: usize) {
+    for h in hallazgos {
+        h.ruta = format!("[fichero n.º {numero} del árbol]");
+    }
+}
+
+/// Revisa el contenido de un fichero de texto (no su nombre: ver
+/// [`revisar_nombre`]). `ruta` es relativa a la raíz del árbol, con `/`, y
+/// decide qué reglas se aplican y qué excepciones de `p` valen.
 pub fn revisar_texto(ruta: &str, texto: &str, p: &Permitidos, l: &ListasLocales) -> Vec<Hallazgo> {
     let clase = clase(ruta);
     let mut out = Vec::new();
@@ -166,11 +211,6 @@ pub fn revisar_texto(ruta: &str, texto: &str, p: &Permitidos, l: &ListasLocales)
             });
         }
     };
-    if clase == Clase::Fixture {
-        for detalle in reglas::regla_nombre_fixture(ruta) {
-            anotar(0, Regla::Fixture, detalle.to_owned());
-        }
-    }
     for (i, linea) in texto.lines().enumerate() {
         let n = i + 1;
         if clase == Clase::Bloqueo {

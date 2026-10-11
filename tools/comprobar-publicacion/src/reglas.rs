@@ -14,6 +14,7 @@ use regex::Regex;
 use router_sim::sanitize::{self, TagClass};
 use sha2::{Digest, Sha256};
 use std::{
+    borrow::Cow,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     sync::LazyLock,
 };
@@ -35,12 +36,52 @@ const GENERICAS: [(Regla, ReglaDeLinea); 7] = [
     (Regla::Identificador, regla_identificador),
 ];
 
-/// Todas las reglas genéricas de texto sobre una línea.
+/// Todas las reglas genéricas de texto sobre una línea, después de
+/// [`normalizar`]la.
 pub(crate) fn genericas(linea: &str, p: &Permitidos) -> Vec<(Regla, &'static str)> {
+    let linea = normalizar(linea);
     GENERICAS
         .iter()
-        .flat_map(|&(regla, f)| f(linea, p).into_iter().map(move |d| (regla, d)))
+        .flat_map(|&(regla, f)| f(&linea, p).into_iter().map(move |d| (regla, d)))
         .collect()
+}
+
+static PUNTO_CODIFICADO: LazyLock<Regex> = LazyLock::new(|| re(r"(?i)%2e|&#0*46;|&#x0*2e;"));
+static DOS_PUNTOS_CODIFICADOS: LazyLock<Regex> = LazyLock::new(|| re(r"(?i)%3a|&#0*58;|&#x0*3a;"));
+
+/// Cero de cada bloque de cifras decimales Unicode (categoría Nd).
+const CEROS_UNICODE: [u32; 40] = [
+    0x0660, 0x06F0, 0x07C0, 0x0966, 0x09E6, 0x0A66, 0x0AE6, 0x0B66, 0x0BE6, 0x0C66, 0x0CE6, 0x0D66,
+    0x0DE6, 0x0E50, 0x0ED0, 0x0F20, 0x1040, 0x1090, 0x17E0, 0x1810, 0x1946, 0x19D0, 0x1A80, 0x1A90,
+    0x1B50, 0x1BB0, 0x1C40, 0x1C50, 0xA620, 0xA8D0, 0xA900, 0xA9D0, 0xA9F0, 0xAA50, 0xABF0,
+    0x1D7CE, 0x1D7D8, 0x1D7E2, 0x1D7EC, 0x1D7F6,
+];
+
+/// Deshace las escrituras que esconderían un valor a las expresiones
+/// regulares: `.` y `:` codificados en URL o como entidad HTML, caracteres de
+/// ancho completo y cifras de otros sistemas de escritura.
+pub(crate) fn normalizar(linea: &str) -> Cow<'_, str> {
+    if linea.is_ascii() && !linea.contains(['%', '&']) {
+        return Cow::Borrowed(linea);
+    }
+    let ascii: String = linea
+        .chars()
+        .map(|c| {
+            let u = u32::from(c);
+            if (0xFF01..=0xFF5E).contains(&u) {
+                // Ancho completo: misma forma ASCII.
+                char::from_u32(u - 0xFEE0).unwrap_or(c)
+            } else if u == 0x3002 {
+                '.'
+            } else if let Some(cero) = CEROS_UNICODE.iter().find(|&&z| (z..z + 10).contains(&u)) {
+                char::from(b'0' + (u - cero) as u8)
+            } else {
+                c
+            }
+        })
+        .collect();
+    let s = PUNTO_CODIFICADO.replace_all(&ascii, ".");
+    Cow::Owned(DOS_PUNTOS_CODIFICADOS.replace_all(&s, ":").into_owned())
 }
 
 /// La línea con `_` cambiado por espacio, para que `\b` separe también en
@@ -154,54 +195,75 @@ fn clasificar_ipv4(ip: Ipv4Addr, p: &Permitidos) -> Option<&'static str> {
 
 static IPV6: LazyLock<Regex> = LazyLock::new(|| re(r"[0-9A-Fa-f:]*:[0-9A-Fa-f:]*:[0-9A-Fa-f:]*"));
 
-/// IPv6 globales fuera de `2001:db8::/32` y de `permitidos`. Si el tramo de
-/// hexadecimales y `:` no es una dirección (p. ej. `addr:` delante), se
-/// prueban sus sufijos.
+/// IPv6 globales fuera de `2001:db8::/32` y de `permitidos`. Dentro de cada
+/// tramo de hexadecimales y `:` se prueban todos los subtramos que empiezan y
+/// acaban en un límite de grupo, para que un prefijo (`ip6:`, `face:`) no
+/// oculte la dirección. Un hallazgo por tramo.
 pub(crate) fn regla_ipv6(linea: &str, p: &Permitidos) -> Vec<&'static str> {
     IPV6.find_iter(linea)
-        .filter_map(|m| primera_ipv6(m.as_str()))
-        .filter(|&ip| sanitize::is_global_ipv6(ip) && !p.ip_permitida(IpAddr::V6(ip)))
+        .filter(|m| {
+            ipv6_en_tramo(m.as_str())
+                .any(|ip| sanitize::is_global_ipv6(ip) && !p.ip_permitida(IpAddr::V6(ip)))
+        })
         .map(|_| "ipv6 global")
         .collect()
 }
 
-fn primera_ipv6(tramo: &str) -> Option<Ipv6Addr> {
+/// Longitud máxima de una IPv6 escrita (8 grupos de 4 y 7 `:`).
+const IPV6_MAX: usize = 39;
+
+/// Para cada inicio de grupo de `tramo`, la dirección más larga que se puede
+/// leer desde ahí: la más larga, para que el principio de una dirección
+/// permitida (`<prefijo>::` dentro de `<prefijo>::fe`) no cuente aparte.
+fn ipv6_en_tramo(tramo: &str) -> impl Iterator<Item = Ipv6Addr> + '_ {
     let b = tramo.as_bytes();
-    (0..b.len())
-        .filter(|&i| i == 0 || b[i - 1] == b':' || tramo[i..].starts_with("::"))
-        .find_map(|i| {
-            let t = &tramo[i..];
-            t.parse().ok().or_else(|| {
-                t.strip_suffix(':')
-                    .filter(|s| !s.ends_with(':'))
-                    .and_then(|s| s.parse().ok())
-            })
-        })
+    let inicios = (0..b.len()).filter(move |&i| i == 0 || b[i - 1] == b':' || b[i] == b':');
+    inicios.filter_map(move |i| {
+        (i + 2..=b.len().min(i + IPV6_MAX))
+            .rev()
+            .filter(|&j| j == b.len() || b[j] == b':' || b[j - 1] == b':')
+            .find_map(|j| tramo[i..j].parse().ok())
+    })
 }
 
 // --- MAC --------------------------------------------------------------------
 
 static MAC: LazyLock<Regex> = LazyLock::new(|| {
-    re(
-        r"(?i)[0-9a-f]{2}(?::[0-9a-f]{2}){5}|[0-9a-f]{2}(?:-[0-9a-f]{2}){5}|[0-9a-f]{4}\.[0-9a-f]{4}\.[0-9a-f]{4}|[0-9a-f]{12}",
-    )
+    re(concat!(
+        r"(?i)[0-9a-f]{1,2}(?::[0-9a-f]{1,2}){5}",
+        r"|[0-9a-f]{2}(?:-[0-9a-f]{2}){5}",
+        r"|[0-9a-f]{2}(?:_[0-9a-f]{2}){5}",
+        r"|[0-9a-f]{2}(?: [0-9a-f]{2}){5}",
+        r"|[0-9a-f]{4}\.[0-9a-f]{4}\.[0-9a-f]{4}",
+        r"|[0-9a-f]{12}",
+    ))
 });
 
-/// MAC con OUI real (`:`, `-`, `.` o sin separador; mayúsculas o
-/// minúsculas). Valen las especiales, las administradas localmente, el rango
-/// de documentación `00:00:5e:00:53:xx` y las de `permitidos`. La forma sin
-/// separador solo cuenta si tiene alguna letra (un contador de 12 cifras no es
-/// una MAC).
+/// MAC con OUI real, escrita con `:` (también con grupos de una cifra, como
+/// la muestra `arp` en BSD y macOS), `-`, `_`, espacios, `.` cada cuatro
+/// cifras o sin separador, en mayúsculas o minúsculas. Valen las especiales,
+/// las administradas localmente, el rango de documentación `00:00:5e:00:53:xx`
+/// y las de `permitidos`. Sin separador o con espacios solo cuenta si tiene
+/// alguna letra (un contador de 12 cifras o una lista de números no es una
+/// MAC).
 pub(crate) fn regla_mac(linea: &str, p: &Permitidos) -> Vec<&'static str> {
-    let linea = separar_guiones_bajos(linea);
     let b = linea.as_bytes();
-    MAC.find_iter(&linea)
+    MAC.find_iter(linea)
         .filter(|m| {
             let alnum = |c: Option<&u8>| c.is_some_and(u8::is_ascii_alphanumeric);
-            !alnum(b[..m.start()].last()) && !alnum(b.get(m.end()))
+            let t = m.as_str();
+            // Con grupos de una cifra, un `:` delante indica una IPv6.
+            let grupo_corto = t.contains(':') && t.split(':').any(|g| g.len() == 1);
+            !alnum(b[..m.start()].last())
+                && !alnum(b.get(m.end()))
+                && !(grupo_corto && b[..m.start()].last() == Some(&b':'))
+        })
+        .filter(|m| {
+            let t = m.as_str();
+            let solo_cifras = t.bytes().all(|c| c.is_ascii_digit() || c == b' ');
+            !(solo_cifras && (t.len() == 12 || t.contains(' ')))
         })
         .filter_map(|m| mac_normalizada(m.as_str()))
-        .filter(|n| !n.bytes().all(|c| c.is_ascii_digit()))
         .filter(|n| !mac_permitida(n, p))
         .map(|_| "oui real")
         .collect()
@@ -329,30 +391,55 @@ fn es_cadena_base64(t: &str) -> bool {
 
 // --- Identificadores personales ---------------------------------------------
 
-static GPON: LazyLock<Regex> = LazyLock::new(|| re(r"\b[A-Z]{4}[0-9A-F]{8}\b"));
+static GPON: LazyLock<Regex> = LazyLock::new(|| re(r"(?i)\b[A-Z]{4}[0-9A-F]{8}\b"));
+static GPON_HEX: LazyLock<Regex> = LazyLock::new(|| re(r"(?i)\b[0-9A-F]{16}\b"));
 static TELEFONO: LazyLock<Regex> = LazyLock::new(|| {
-    re(r"(?:\+34|\b)[6789]\d{8}\b|\b[6789]\d{2} \d{3} \d{3}\b|\b[6789]\d{2} \d{2} \d{2} \d{2}\b")
+    re(concat!(
+        r"(?:(?:\+|\b00)34[\s.-]?|\b)[6789]\d{2}(?:[\s.-]?\d{3}){2}\b",
+        r"|(?:(?:\+|\b00)34[\s.-]?|\b)[6789]\d{2}(?:[\s.-]?\d{2}){3}\b",
+    ))
 });
-static DNI: LazyLock<Regex> = LazyLock::new(|| re(r"(?i)\b\d{8}[A-HJ-NP-TV-Z]\b"));
-static NIE: LazyLock<Regex> = LazyLock::new(|| re(r"(?i)\b[XYZ]\d{7}[A-HJ-NP-TV-Z]\b"));
+static DNI: LazyLock<Regex> =
+    LazyLock::new(|| re(r"(?i)\b(?:\d{8}|\d{2}\.\d{3}\.\d{3})[\s.-]?[A-HJ-NP-TV-Z]\b"));
+static NIE: LazyLock<Regex> =
+    LazyLock::new(|| re(r"(?i)\b[XYZ][\s.-]?\d{7}[\s.-]?[A-HJ-NP-TV-Z]\b"));
 
-/// Número de serie GPON, teléfonos españoles, DNI y NIE.
+/// Número de serie GPON (en mayúsculas o minúsculas, o en hexadecimal con el
+/// fabricante en ASCII: `41534B59…`), teléfonos españoles (con `+34` o
+/// `0034` y separados por espacios, puntos o guiones), DNI y NIE (también con
+/// separadores).
 pub(crate) fn regla_identificador(linea: &str, p: &Permitidos) -> Vec<&'static str> {
     let linea = separar_guiones_bajos(linea);
     let mut out = Vec::new();
-    for (re, detalle) in [
-        (&*GPON, "serie gpon"),
-        (&*TELEFONO, "teléfono"),
-        (&*DNI, "dni"),
-        (&*NIE, "nie"),
-    ] {
+    // `ffffffffffff` tiene la forma de una serie GPON en minúsculas.
+    out.extend(
+        GPON.find_iter(&linea)
+            .filter(|m| !sanitize::is_fake_mac(&m.as_str().to_ascii_lowercase()))
+            .filter(|m| !p.valor_permitido(m.as_str()))
+            .map(|_| "serie gpon"),
+    );
+    for (re, detalle) in [(&*TELEFONO, "teléfono"), (&*DNI, "dni"), (&*NIE, "nie")] {
         out.extend(
             re.find_iter(&linea)
                 .filter(|m| !p.valor_permitido(m.as_str()))
                 .map(|_| detalle),
         );
     }
+    out.extend(
+        GPON_HEX
+            .find_iter(&linea)
+            .filter(|m| fabricante_ascii(m.as_str()) && !p.valor_permitido(m.as_str()))
+            .map(|_| "serie gpon"),
+    );
     out
+}
+
+/// `true` si los 8 primeros hexadecimales son 4 letras mayúsculas en ASCII,
+/// como el código de fabricante de un número de serie GPON.
+fn fabricante_ascii(hex: &str) -> bool {
+    (0..4).all(|i| {
+        u8::from_str_radix(&hex[2 * i..2 * i + 2], 16).is_ok_and(|b| b.is_ascii_uppercase())
+    })
 }
 
 // --- Fixtures del router ----------------------------------------------------
@@ -521,7 +608,7 @@ mod pruebas {
 
     #[test]
     fn ipv6_con_prefijo() {
-        assert!(primera_ipv6("addr:2001:db8::1").is_some());
-        assert!(primera_ipv6("12:30:45").is_none());
+        assert!(ipv6_en_tramo("addr:2001:db8::1").next().is_some());
+        assert!(ipv6_en_tramo("12:30:45").next().is_none());
     }
 }
