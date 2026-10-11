@@ -119,7 +119,7 @@ pub fn Layout() -> impl IntoView {
                             {icono(ICONO_HISTORIAL)}
                             <span>{t!("comun-nav-historial")}</span>
                         </A>
-                        <A href="/router">
+                        <A href=crate::ui::router::RUTA_CONEXION>
                             {icono(ICONO_ROUTER)}
                             <span>{t!("comun-nav-router")}</span>
                         </A>

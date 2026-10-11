@@ -3,7 +3,9 @@ panel-solo-lectura = El panel está en solo lectura: el firmware del router no s
 
 ## Página
 panel-titulo = Ajustes del panel
-panel-sub = Idioma y zona horaria, privacidad e instancia y usuarios del panel. Se guardan en la base de datos del panel. La conexión con el router está en Router.
+panel-sub = Idioma y zona horaria, privacidad e instancia y usuarios del panel. Se guardan en la base de datos del panel.
+panel-sub-router = La conexión con el router está en
+panel-sub-router-enlace = Router → Conexión con el router
 panel-guardado = Guardado.
 
 ## Panel

@@ -16,7 +16,10 @@ use crate::panel_ajustes::{
 };
 use crate::t;
 use leptos::{ev::SubmitEvent, prelude::*, task::spawn_local};
-use leptos_router::components::{Outlet, Redirect};
+use leptos_router::{
+    NavigateOptions,
+    components::{Outlet, Redirect},
+};
 
 /// Primera página de la sección.
 pub const RUTA_CONEXION: &str = "/router/conexion";
@@ -27,10 +30,16 @@ pub fn SeccionRouter() -> impl IntoView {
     view! { <Outlet /> }
 }
 
-/// `/router`: lleva a la primera página de la sección.
+/// `/router`: lleva a la primera página de la sección. En el navegador
+/// sustituye la entrada del historial: «Atrás» no vuelve a `/router` (que
+/// redirigiría otra vez), sino a la página de antes.
 #[component]
 pub fn InicioRouter() -> impl IntoView {
-    view! { <Redirect path=RUTA_CONEXION /> }
+    let options = NavigateOptions {
+        replace: true,
+        ..NavigateOptions::default()
+    };
+    view! { <Redirect path=RUTA_CONEXION options /> }
 }
 
 /// Página «Conexión con el router».

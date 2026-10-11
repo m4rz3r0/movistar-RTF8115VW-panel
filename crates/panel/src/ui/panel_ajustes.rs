@@ -17,6 +17,7 @@ use crate::t;
 use crate::ui::i18n::nombre_idioma;
 use ::i18n::Idioma;
 use leptos::{ev::SubmitEvent, html, prelude::*, task::spawn_local};
+use leptos_router::components::A;
 
 /// Longitud mínima de la contraseña del panel (la misma que comprueba el
 /// servidor).
@@ -81,7 +82,11 @@ pub fn PaginaPanel() -> impl IntoView {
         <header class="pagina-cabecera">
             <div>
                 <h1>{t!("panel-titulo")}</h1>
-                <p class="pagina-sub">{t!("panel-sub")}</p>
+                <p class="pagina-sub">
+                    {t!("panel-sub")} " " {t!("panel-sub-router")} " "
+                    <A href=super::router::RUTA_CONEXION>{t!("panel-sub-router-enlace")}</A>
+                    "."
+                </p>
             </div>
         </header>
         <Suspense fallback=|| view! { <p>{t!("comun-cargando")}</p> }>

@@ -134,7 +134,7 @@ async fn idioma_por_defecto_de_la_instancia() {
 }
 
 /// Sin idioma por defecto fijado, «Ajustes del panel» no dice «Español»
-/// (la página sigue al navegador): dice «Según el navegador». Y se puede
+/// (la página sigue al navegador): dice «El del navegador». Y se puede
 /// volver a eso después de fijar uno.
 #[tokio::test]
 async fn idioma_por_defecto_sin_fijar_es_el_del_navegador() {

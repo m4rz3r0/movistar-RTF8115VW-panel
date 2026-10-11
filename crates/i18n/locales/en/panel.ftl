@@ -3,7 +3,9 @@ panel-solo-lectura = The panel is read-only: the router's firmware has not been 
 
 ## Page
 panel-titulo = Panel settings
-panel-sub = Language and time zone, privacy and instance, and panel users. They are stored in the panel's database. The connection to the router is under Router.
+panel-sub = Language and time zone, privacy and instance, and panel users. They are stored in the panel's database.
+panel-sub-router = The connection to the router is under
+panel-sub-router-enlace = Router → Router connection
 panel-guardado = Saved.
 
 ## Panel

@@ -618,7 +618,7 @@ async fn conexion_con_el_router_en_su_seccion() {
     assert!(html.contains("Conexión con el router"), "{html}");
     assert!(html.contains(r#"id="panel-router-url""#), "{html}");
     assert!(
-        html.contains(r#"href="/router""#),
+        html.contains(r#"href="/router/conexion""#),
         "enlace de la navegación: {html}"
     );
     assert!(!html.contains(PASS));
@@ -627,6 +627,12 @@ async fn conexion_con_el_router_en_su_seccion() {
     assert!(html.contains("Ajustes del panel"), "{html}");
     assert!(!html.contains(r#"id="panel-router-url""#), "{html}");
     assert!(html.contains(r#"id="panel-idioma""#), "{html}");
+    // Y lleva a la conexión con el router (además de la navegación).
+    assert_eq!(
+        html.matches(r#"href="/router/conexion""#).count(),
+        2,
+        "{html}"
+    );
 
     // Como la pide el navegador.
     let resp = send(
