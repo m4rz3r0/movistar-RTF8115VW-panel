@@ -117,7 +117,7 @@ async fn idioma_por_defecto_de_la_instancia() {
     ok(
         &p,
         "guardar_instancia",
-        json!({ "campos": { "idioma": "En" } }),
+        json!({ "campos": { "idioma": { "Fijo": "En" } } }),
         &cookie,
     )
     .await;
@@ -131,4 +131,39 @@ async fn idioma_por_defecto_de_la_instancia() {
     p.app = panel::build_router(state.clone());
     p.state = state;
     assert_eq!(idiomas_de_login(&p).await, [true, true, false]);
+}
+
+/// Sin idioma por defecto fijado, «Ajustes del panel» no dice «Español»
+/// (la página sigue al navegador): dice «El del navegador». Y se puede
+/// volver a eso después de fijar uno.
+#[tokio::test]
+async fn idioma_por_defecto_sin_fijar_es_el_del_navegador() {
+    let p = panel().await;
+    let cookie = sesion(&p).await;
+    let v = ok(&p, "leer_panel", json!({}), &cookie).await;
+    assert_eq!(v["idioma"], "Navegador", "{v}");
+
+    ok(
+        &p,
+        "guardar_instancia",
+        json!({ "campos": { "idioma": { "Fijo": "En" } } }),
+        &cookie,
+    )
+    .await;
+    let v = ok(&p, "leer_panel", json!({}), &cookie).await;
+    assert_eq!(v["idioma"], json!({ "Fijo": "En" }), "{v}");
+    assert_eq!(idiomas_de_login(&p).await, [true, true, false]);
+
+    // De vuelta al del navegador: `Accept-Language` vuelve a mandar.
+    ok(
+        &p,
+        "guardar_instancia",
+        json!({ "campos": { "idioma": "Navegador" } }),
+        &cookie,
+    )
+    .await;
+    let v = ok(&p, "leer_panel", json!({}), &cookie).await;
+    assert_eq!(v["idioma"], "Navegador", "{v}");
+    assert_eq!(idiomas_de_login(&p).await, [false, false, false]);
+    assert_eq!(p.state.idioma_por_defecto(), None);
 }

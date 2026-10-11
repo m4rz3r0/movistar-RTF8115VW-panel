@@ -19,6 +19,8 @@ export async function entrar(page: Page) {
 export function recogerErrores(page: Page): string[] {
   const errores: string[] = [];
   page.on("console", (m) => {
+    // El panel no tiene favicon: el 404 que pide Chromium no es de la página.
+    if (m.location().url.endsWith("/favicon.ico")) return;
     if (m.type() === "error" || m.type() === "warning") errores.push(m.text());
   });
   page.on("pageerror", (e) => errores.push(String(e)));

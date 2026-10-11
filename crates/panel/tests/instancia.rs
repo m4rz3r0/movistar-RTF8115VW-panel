@@ -274,5 +274,8 @@ async fn estado_muestra_router_sin_configurar() {
 
     let html = body_text(get_con_cookie(&p.app, "/", &cookie).await).await;
     assert!(html.contains("Router sin configurar"), "{html}");
-    assert!(html.contains("Configúralo en Ajustes del panel"), "{html}");
+    assert!(
+        html.contains("Configúralo en Router → Conexión con el router"),
+        "{html}"
+    );
 }

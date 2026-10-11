@@ -1,5 +1,5 @@
 //! Marco de las páginas con sesión: barra lateral (Estado, Explorador,
-//! Historial; menú del usuario con «Ajustes del panel», idioma y «Salir»)
+//! Historial, Router; menú del usuario con «Ajustes del panel», idioma y «Salir»)
 //! que en pantallas estrechas pasa a ser una barra superior con el menú
 //! plegable.
 
@@ -38,6 +38,9 @@ const ICONO_EXPLORADOR: &str =
 /// Reloj (Historial).
 const ICONO_HISTORIAL: &str =
     "M10 2.75a7.25 7.25 0 1 1 0 14.5 7.25 7.25 0 0 1 0-14.5zM10 6v4l2.75 1.75";
+/// Router con antenas (sección Router).
+const ICONO_ROUTER: &str =
+    "M3 11.5h14v5H3zM6 14h.01M9 14h.01M5 11.5 4 6M15 11.5l1-5.5M8 8.25a3 3 0 0 1 4 0";
 /// Puerta con flecha (Salir).
 const ICONO_SALIR: &str =
     "M8 3H4.5A1.5 1.5 0 0 0 3 4.5v11A1.5 1.5 0 0 0 4.5 17H8M12.5 6.5 16 10l-3.5 3.5M16 10H7.5";
@@ -115,6 +118,10 @@ pub fn Layout() -> impl IntoView {
                         <A href="/historial">
                             {icono(ICONO_HISTORIAL)}
                             <span>{t!("comun-nav-historial")}</span>
+                        </A>
+                        <A href=crate::ui::router::RUTA_CONEXION>
+                            {icono(ICONO_ROUTER)}
+                            <span>{t!("comun-nav-router")}</span>
                         </A>
                     </nav>
                     <div class="sesion">

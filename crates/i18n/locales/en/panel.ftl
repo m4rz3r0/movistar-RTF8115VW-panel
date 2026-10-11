@@ -1,31 +1,18 @@
 # Panel settings.
-panel-solo-lectura = The panel is read-only: the router's firmware has not been tested with the panel. Confirm it in Settings to make changes.
+panel-solo-lectura = The panel is read-only: the router's firmware has not been tested with the panel. Confirm it in Router → Router connection to make changes.
 
 ## Page
 panel-titulo = Panel settings
-panel-sub = Router, settings for this installation and panel users. They are stored in the panel's database.
+panel-sub = Language and time zone, privacy and instance, and panel users. They are stored in the panel's database.
+panel-sub-router = The connection to the router is under
+panel-sub-router-enlace = Router → Router connection
 panel-guardado = Saved.
-
-## Router
-panel-router = Router
-panel-router-texto = Address of the router's web interface and its configuration user. The saved password is never shown: to change anything, type the router password; the panel tries to log in before saving.
-panel-router-sin-configurar = The router is not configured yet.
-panel-router-url = Router address
-panel-router-usuario = Router username
-panel-router-contrasena = Router password
-panel-router-probar = Test the connection
-panel-router-guardar = Save the credentials
-panel-router-guardadas = Credentials saved: the panel now uses the new ones.
-panel-firmware = Firmware: { $firmware }
-panel-firmware-desconocido = Firmware: not read yet
-panel-modo-solo-lectura = Read-only: the firmware has not been tested with the panel
-panel-modo-escritura = Changes are allowed
-panel-confirmar-texto = If you know this firmware behaves like the tested one, confirm it to make changes. The change manager still verifies and reverts whatever fails.
-panel-confirmar = Confirm the firmware
 
 ## Panel
 panel-panel = Panel
 panel-idioma = Default language
+panel-idioma-navegador = The browser's
+panel-idioma-ayuda = For anyone who hasn't picked a language with the menu selector, which is where you change yours.
 panel-zona = Time zone
 panel-zona-ayuda = Fixed offset from UTC: it does not follow daylight saving time.
 

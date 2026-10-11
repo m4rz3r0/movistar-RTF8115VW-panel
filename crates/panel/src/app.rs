@@ -10,6 +10,7 @@ use crate::ui::{
     layout::Layout,
     login::PaginaLogin,
     panel_ajustes::PaginaPanel,
+    router::{InicioRouter, PaginaConexion, SeccionRouter},
 };
 use leptos::prelude::*;
 use leptos_meta::{Link, MetaTags, Stylesheet, Title, provide_meta_context};
@@ -63,6 +64,9 @@ fn csp_con_nonce() {
 pub fn App() -> impl IntoView {
     provide_meta_context();
     provide_idioma(idioma_inicial());
+    // `<Redirect>` en el servidor: 302 con `Location` (`/router`).
+    #[cfg(feature = "ssr")]
+    leptos_router::components::provide_server_redirect(leptos_axum::redirect);
     view! {
         <Stylesheet id="leptos" href="/pkg/panel.css" />
         // Las fuentes de títulos y texto, antes de que las pida la hoja.
@@ -77,6 +81,10 @@ pub fn App() -> impl IntoView {
                     <Route path=StaticSegment("") view=PaginaEstado />
                     <Route path=StaticSegment("historial") view=PaginaHistorial />
                     <Route path=StaticSegment("panel") view=PaginaPanel />
+                    <ParentRoute path=StaticSegment("router") view=SeccionRouter>
+                        <Route path=StaticSegment("") view=InicioRouter />
+                        <Route path=StaticSegment("conexion") view=PaginaConexion />
+                    </ParentRoute>
                     <ParentRoute path=StaticSegment("explorador") view=Explorador>
                         <Route path=StaticSegment("") view=InicioExplorador />
                         <Route path=ParamSegment("area") view=PaginaArea />

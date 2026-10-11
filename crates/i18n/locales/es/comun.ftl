@@ -10,6 +10,7 @@ comun-nav-usuario = Usuario
 comun-nav-estado = Estado
 comun-nav-explorador = Explorador
 comun-nav-historial = Historial
+comun-nav-router = Router
 comun-salir = Salir
 comun-idioma = Idioma
 # Cada idioma, con su propio nombre (igual en todos los ficheros).

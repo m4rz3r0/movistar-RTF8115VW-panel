@@ -26,7 +26,7 @@ instalar-probar = Probar
 instalar-guardar = Guardar y seguir
 instalar-detectado = { $modelo } con el firmware { $firmware }
 instalar-firmware-probado = Firmware probado con el panel
-instalar-firmware-no-probado = Firmware sin probar: el panel quedará en solo lectura hasta que lo confirmes en Ajustes del panel
+instalar-firmware-no-probado = Firmware sin probar: el panel quedará en solo lectura hasta que lo confirmes en Router → Conexión con el router
 
 ## Lectura inicial
 instalar-lectura-texto = El panel lee ahora toda la configuración del router y la guarda cifrada como foto de partida, para poder compararla y volver a ella más adelante. Puede tardar un minuto.

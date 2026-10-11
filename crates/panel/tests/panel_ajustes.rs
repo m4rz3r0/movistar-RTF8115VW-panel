@@ -37,7 +37,7 @@ async fn credenciales(p: &Panel) -> instancia::CredencialesRouter {
 
 fn campos() -> Value {
     json!({
-        "idioma": "Es",
+        "idioma": { "Fijo": "Es" },
         "zona_horaria": "UTC+01:00",
         "dns_preferidos": [],
         "dispositivos_confianza": [],
@@ -339,7 +339,7 @@ async fn instancia_valida_dns_y_macs() {
         json!(["AA-BB-CC-00-11-22", "aabb.cc00.1133", "AA:BB:CC:00:11:44"]);
     c["mantenimiento"] = json!("03:00-05:30");
     c["servidor_propio"] = json!("servidor.home.arpa");
-    c["idioma"] = json!("En");
+    c["idioma"] = json!({ "Fijo": "En" });
     ok(&p, "guardar_instancia", json!({ "campos": c }), &cookie).await;
     let v = ok(&p, "leer_panel", json!({}), &cookie).await;
     assert_eq!(
@@ -357,7 +357,7 @@ async fn instancia_valida_dns_y_macs() {
     assert_eq!(v["mantenimiento"], "03:00-05:30");
     assert_eq!(v["servidor_propio"], "servidor.home.arpa");
     assert_eq!(v["zona_horaria"], "UTC+01:00");
-    assert_eq!(v["idioma"], "En");
+    assert_eq!(v["idioma"], json!({ "Fijo": "En" }));
 
     let malos: Vec<(&str, Value)> = vec![
         ("dns_preferidos", json!(["9.9.9.9x"])),
@@ -596,12 +596,54 @@ async fn cada_seccion_guarda_solo_lo_suyo() {
     ok(
         &p,
         "guardar_instancia",
-        json!({ "campos": { "idioma": "En", "zona_horaria": "UTC-03:00" } }),
+        json!({ "campos": { "idioma": { "Fijo": "En" }, "zona_horaria": "UTC-03:00" } }),
         &cookie,
     )
     .await;
     let v = ok(&p, "leer_panel", json!({}), &cookie).await;
     assert_eq!(v["zona_horaria"], "UTC-03:00");
-    assert_eq!(v["idioma"], "En");
+    assert_eq!(v["idioma"], json!({ "Fijo": "En" }));
     assert_eq!(v["dns_preferidos"], json!(["9.9.9.9"]));
+}
+
+/// La conexión con el router vive en «Router → Conexión con el router»
+/// (`/router/conexion`), no en «Ajustes del panel»; `/router` lleva allí.
+#[tokio::test]
+async fn conexion_con_el_router_en_su_seccion() {
+    let p = panel().await;
+    let cookie = sesion(&p).await;
+    let resp = get_con_cookie(&p.app, "/router/conexion", &cookie).await;
+    assert_eq!(resp.status(), 200);
+    let html = body_text(resp).await;
+    assert!(html.contains("Conexión con el router"), "{html}");
+    assert!(html.contains(r#"id="panel-router-url""#), "{html}");
+    assert!(
+        html.contains(r#"href="/router/conexion""#),
+        "enlace de la navegación: {html}"
+    );
+    assert!(!html.contains(PASS));
+
+    let html = body_text(get_con_cookie(&p.app, "/panel", &cookie).await).await;
+    assert!(html.contains("Ajustes del panel"), "{html}");
+    assert!(!html.contains(r#"id="panel-router-url""#), "{html}");
+    assert!(html.contains(r#"id="panel-idioma""#), "{html}");
+    // Y lleva a la conexión con el router (además de la navegación).
+    assert_eq!(
+        html.matches(r#"href="/router/conexion""#).count(),
+        2,
+        "{html}"
+    );
+
+    // Como la pide el navegador.
+    let resp = send(
+        &p.app,
+        axum::http::Request::get("/router")
+            .header("cookie", &cookie)
+            .header("accept", "text/html")
+            .body(axum::body::Body::empty())
+            .unwrap(),
+    )
+    .await;
+    assert!(resp.status().is_redirection(), "{}", resp.status());
+    assert_eq!(resp.headers()["location"], "/router/conexion");
 }
