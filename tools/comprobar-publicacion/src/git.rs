@@ -652,46 +652,114 @@ fn revisar_etiqueta(
             )),
         }
     }
-    let sin_firma = sin_firma_final(mensaje);
-    out.extend(
-        revisar_texto(ruta, sin_firma, p, l)
-            .into_iter()
-            .map(|mut h| {
-                if !prefijo.is_empty() {
-                    h.detalle = format!("{prefijo}{}", h.detalle);
-                }
-                h
-            }),
-    );
+    let (cuerpo, firma) = separar_firma_final(mensaje);
+    let mut h = revisar_texto(ruta, cuerpo, p, l);
+    if let Some(firma) = firma {
+        // En el bloque de firma, las líneas de armadura y base64 solo pasan
+        // por las listas locales (las reglas genéricas verían una clave); las
+        // cabeceras de armadura, por todas las reglas.
+        let antes = cuerpo.lines().count();
+        for (i, linea) in firma.lines().enumerate() {
+            let n = antes + i + 1;
+            if es_cabecera_de_armadura(linea) {
+                h.extend(revisar_texto(ruta, linea, p, l).into_iter().map(|mut x| {
+                    x.linea = n;
+                    x
+                }));
+            } else {
+                h.extend(
+                    l.revisar_linea(linea, p)
+                        .into_iter()
+                        .map(|(regla, detalle)| Hallazgo {
+                            ruta: ruta.to_owned(),
+                            linea: n,
+                            regla,
+                            detalle,
+                        }),
+                );
+            }
+        }
+    }
+    out.extend(h.into_iter().map(|mut h| {
+        if !prefijo.is_empty() {
+            h.detalle = format!("{prefijo}{}", h.detalle);
+        }
+        h
+    }));
     out
 }
 
-/// El mensaje sin el bloque de firma (PGP o SSH) que cierra el objeto. Un
-/// marcador en medio del mensaje, o sin su final, no oculta nada.
-fn sin_firma_final(mensaje: &str) -> &str {
+/// Separa el bloque de firma (PGP o SSH) que cierra el mensaje: `(cuerpo,
+/// Some(bloque))`. Solo se reconoce si el bloque es una armadura de verdad:
+/// los dos marcadores, cabeceras de armadura (`Clave: valor`, solo en PGP y
+/// antes de la primera línea vacía), líneas vacías y al menos una línea de
+/// base64. Un bloque falsificado que envuelve texto normal no se separa.
+fn separar_firma_final(mensaje: &str) -> (&str, Option<&str>) {
     // Partidas para que este fichero no parezca un bloque PEM.
     let tipos = [
         (
             concat!("-----", "BEGIN PGP SIGNATURE-----"),
             concat!("-----", "END PGP SIGNATURE-----"),
+            true,
         ),
         (
             concat!("-----", "BEGIN SSH SIGNATURE-----"),
             concat!("-----", "END SSH SIGNATURE-----"),
+            false,
         ),
     ];
-    for (inicio, fin) in tipos {
-        if let Some(i) = mensaje.rfind(inicio)
-            && (i == 0 || mensaje[..i].ends_with('\n'))
-            && mensaje[i..]
-                .trim_end()
-                .strip_suffix(fin)
-                .is_some_and(|cuerpo| !cuerpo[inicio.len()..].contains("-----"))
-        {
-            return &mensaje[..i];
+    for (inicio, fin, con_cabeceras) in tipos {
+        let Some(i) = mensaje.rfind(inicio) else {
+            continue;
+        };
+        if i != 0 && !mensaje[..i].ends_with('\n') {
+            continue;
+        }
+        let Some(cuerpo) = mensaje[i..].trim_end().strip_suffix(fin) else {
+            continue;
+        };
+        let lineas: Vec<&str> = cuerpo[inicio.len()..].lines().collect();
+        let mut en_cabeceras = con_cabeceras;
+        let mut base64 = 0;
+        let valido = lineas.iter().all(|linea| {
+            let linea = linea.trim_end_matches('\r');
+            if linea.is_empty() {
+                en_cabeceras = false;
+                true
+            } else if en_cabeceras && es_cabecera_de_armadura(linea) {
+                true
+            } else if es_linea_base64(linea) {
+                en_cabeceras = false;
+                base64 += 1;
+                true
+            } else {
+                false
+            }
+        });
+        if valido && base64 > 0 {
+            return (&mensaje[..i], Some(&mensaje[i..]));
         }
     }
-    mensaje
+    (mensaje, None)
+}
+
+/// `Clave: valor` de una armadura PGP (`Version`, `Comment`, `Hash`…).
+fn es_cabecera_de_armadura(linea: &str) -> bool {
+    linea.split_once(": ").is_some_and(|(clave, _)| {
+        clave
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_alphabetic())
+            && clave.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+    })
+}
+
+/// Una línea de base64 (o la suma `=XXXX` de una armadura PGP).
+fn es_linea_base64(linea: &str) -> bool {
+    !linea.is_empty()
+        && linea
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'/' | b'='))
 }
 
 fn padres(commit: &str) -> Vec<String> {

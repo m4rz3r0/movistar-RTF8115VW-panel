@@ -98,12 +98,15 @@ impl ListasLocales {
         }
 
         match ruta_de_prohibidos() {
-            None => avisos.push(
-                "aviso: no se sabe dónde buscar la lista de prohibidos (ni \
-                 RP_PUBLICACION_PROHIBIDOS, ni XDG_CONFIG_HOME, ni HOME): se omite la regla \
-                 lista-prohibidos"
-                    .to_owned(),
-            ),
+            None => {
+                avisos.push(
+                    "aviso: no se sabe dónde buscar la lista de prohibidos (ni \
+                     RP_PUBLICACION_PROHIBIDOS, ni XDG_CONFIG_HOME, ni HOME): se omite la \
+                     regla lista-prohibidos"
+                        .to_owned(),
+                );
+                faltan.push(Regla::ListaProhibidos);
+            }
             Some(ruta) => match fs::read_to_string(&ruta) {
                 Ok(texto) => {
                     for (i, linea) in texto.lines().enumerate() {
@@ -116,19 +119,13 @@ impl ListasLocales {
                         }
                     }
                 }
-                Err(e) => {
+                Err(_) => {
                     avisos.push(
                         "aviso: falta la lista de prohibidos o no se puede leer: se omite la \
                          regla lista-prohibidos"
                             .to_owned(),
                     );
-                    // Solo es obligatoria si se indicó a mano o si existe pero
-                    // no se puede leer.
-                    if std::env::var_os("RP_PUBLICACION_PROHIBIDOS").is_some_and(|v| !v.is_empty())
-                        || e.kind() != std::io::ErrorKind::NotFound
-                    {
-                        faltan.push(Regla::ListaProhibidos);
-                    }
+                    faltan.push(Regla::ListaProhibidos);
                 }
             },
         }
@@ -157,10 +154,9 @@ impl ListasLocales {
         (l, avisos)
     }
 
-    /// Las reglas cuya lista falta y que la publicación exige: los secretos
-    /// (al menos un fichero, y todos legibles), `deploy/config.local` y la
-    /// lista de prohibidos si se indicó con `RP_PUBLICACION_PROHIBIDOS` o
-    /// existe pero no se puede leer.
+    /// Las reglas cuya lista falta o no se puede leer, que la publicación
+    /// exige todas: los secretos (al menos un fichero, y todos legibles), la
+    /// lista de prohibidos y `deploy/config.local`.
     pub fn faltan(&self) -> &[Regla] {
         &self.faltan
     }

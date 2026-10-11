@@ -20,7 +20,9 @@ export RP_COMPROBAR_PUBLICACION
 
 ganchos=$(cd "$(dirname "$0")" && pwd)
 tmp=$(mktemp -d)
+# Solo se borra el directorio que crea esta prueba, también si se interrumpe.
 trap 'rm -rf "$tmp"' EXIT
+trap 'exit 1' INT TERM HUP
 
 # Entorno aislado: sin configuración del usuario ni listas del dueño.
 export HOME="$tmp/casa"
@@ -77,6 +79,19 @@ printf 'esto-no-es-un-hash\r\n' >>"$raices"
 if git push -q origin publica 2>"$tmp/err"; then
     fallo "el push con una raíz mal formada pasó"
 fi
+cp "$tmp/raices" "$raices"
+# Una raíz bien formada que no está en el repositorio se salta con un aviso
+# (sin el hash).
+falsa=$(printf "0123456789abcdef%.0s" 1 2 3 | cut -c1-40)
+printf '%s\n' "$falsa" >>"$raices"
+git commit -q --allow-empty -m 'para que el gancho revise algo'
+git push -q origin publica 2>"$tmp/err" || fallo "el push con una raíz ausente falló: $(cat "$tmp/err")"
+grep -q 'no está en el repositorio' "$tmp/err" || fallo "no avisó de la raíz ausente"
+if grep -q "$falsa" "$tmp/err"; then
+    fallo "el aviso repite el hash"
+fi
+git push -q origin :publica 2>/dev/null
+git reset -q --hard HEAD~1
 cp "$tmp/raices" "$raices"
 if [ "$(id -u)" -ne 0 ]; then
     chmod 000 "$raices"

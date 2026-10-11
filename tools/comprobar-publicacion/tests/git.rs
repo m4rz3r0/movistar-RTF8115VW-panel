@@ -363,6 +363,29 @@ fn historial_reglas_genericas_y_firmas() {
 }
 
 #[test]
+fn firma_falsificada_en_una_etiqueta_no_oculta_nada() {
+    let r = Repo::nuevo();
+    r.escribir("a.txt", "neutro\n");
+    r.commit("primero");
+    let inicio = concat!("-----", "BEGIN PGP SIGNATURE-----");
+    let fin = concat!("-----", "END PGP SIGNATURE-----");
+    // Un bloque completo que envuelve texto normal: se revisa.
+    let texto = format!("v1\n\n{inicio}\n\nhola {VALOR} adios\n{fin}\n");
+    r.git(&["tag", "-a", "v1", "-m", &texto]);
+    // Una cabecera de armadura con el valor: se revisa.
+    let cabecera = format!("v2\n\n{inicio}\nComment: {VALOR}\n\niQIzBAABCAAd\n{fin}\n");
+    r.git(&["tag", "-a", "v2", "-m", &cabecera]);
+    let s = r.historial();
+    assert_eq!(s.codigo, Some(1), "{}{}", s.stdout, s.stderr);
+    let listas = s
+        .hallazgos()
+        .into_iter()
+        .filter(|h| h.contains("lista-prohibidos"))
+        .count();
+    assert_eq!(listas, 2, "{}", s.stdout);
+}
+
+#[test]
 fn historial_ignora_replace_y_grafts() {
     let r = Repo::nuevo();
     r.escribir("a.txt", &format!("{VALOR}\n"));

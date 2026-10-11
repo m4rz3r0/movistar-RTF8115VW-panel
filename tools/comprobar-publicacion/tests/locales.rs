@@ -347,6 +347,15 @@ fn exigir_listas_falla_si_falta_alguna() {
     assert_eq!(s.codigo, Some(2), "{}{}", s.stdout, s.stderr);
     assert!(s.stderr.contains("config-local"), "{}", s.stderr);
     escribir(&dir, "deploy/config.local", "CLAVE=jaula-turquesa\n");
+    // Falta la lista de prohibidos en su sitio por defecto: también es un error.
+    let s = exigir(None);
+    assert_eq!(s.codigo, Some(2), "{}{}", s.stdout, s.stderr);
+    assert!(s.stderr.contains("lista-prohibidos"), "{}", s.stderr);
+    escribir(
+        &casa,
+        ".config/routerpanel/publicacion-prohibidos.txt",
+        "zafiro\n",
+    );
     let s = exigir(None);
     assert_eq!(s.codigo, Some(0), "{}{}", s.stdout, s.stderr);
     // Una lista de prohibidos indicada que no se puede leer también falla.

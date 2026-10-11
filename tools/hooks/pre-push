@@ -77,8 +77,12 @@ while read -r ref_local sha_local ref_remota sha_remoto; do
                 exit 1
             fi
             # Una raíz que ya no está en el repositorio (tras el aplastado y
-            # la recolección) no puede estar en lo que se sube.
-            git cat-file -e "$raiz_privada" 2>/dev/null || continue
+            # la recolección) no puede estar en lo que se sube; se avisa (sin
+            # el hash) por si es una errata.
+            if ! git cat-file -e "$raiz_privada" 2>/dev/null; then
+                echo "pre-push: aviso: una raíz de routerpanel-raices-privadas no está en el repositorio; se omite" >&2
+                continue
+            fi
             git merge-base --is-ancestor "$raiz_privada" "$sha_local" 2>/dev/null
             case $? in
             0)
