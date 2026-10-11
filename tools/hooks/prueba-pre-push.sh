@@ -10,6 +10,9 @@
 # 3. Un commit encima con un valor de la lista de prohibidos: el push falla.
 # 4. Un commit limpio que además borra un fichero: el push (por --diff) pasa.
 # 5. Una etiqueta anotada con un valor prohibido en su mensaje: el push falla.
+# Además: un fichero de raíces ilegible o con una línea mal formada, un
+# injerto (git replace --graft), un worktree enlazado (las listas están en el
+# repositorio principal) y una lista que falta hacen fallar el push.
 set -eu
 
 : "${RP_COMPROBAR_PUBLICACION:?falta RP_COMPROBAR_PUBLICACION}"
@@ -39,11 +42,19 @@ git init -q -b main "$tmp/a"
 cd "$tmp/a"
 git config core.hooksPath "$ganchos"
 git remote add origin "$tmp/remoto.git"
+# Listas locales del dueño, ignoradas por git (el gancho las exige).
+printf '.superpowers/\ndeploy/config.local\n' >.gitignore
+mkdir -p .superpowers/sdd/x deploy
+printf 'rubi-escondido\n' >.superpowers/sdd/x/real-secrets.txt
+printf 'CLAVE=jaula-turquesa\n' >deploy/config.local
+mkdir -p tools
+printf 'valor config.local — nombre de fichero, no un dominio\n' >tools/publicacion-permitidos.txt
 echo 'texto neutro' >a.txt
 echo 'otro texto neutro' >b.txt
 git add -A
 git commit -qm 'historial privado'
-git rev-list --max-parents=0 HEAD >"$(git rev-parse --git-common-dir)/routerpanel-raices-privadas"
+raices="$(git rev-parse --git-common-dir)/routerpanel-raices-privadas"
+git rev-list --max-parents=0 HEAD >"$raices"
 
 # 1. El historial privado no sale.
 if git push -q origin main 2>"$tmp/err"; then
@@ -58,6 +69,23 @@ fi
 # 2. Rama huérfana con un árbol limpio.
 git checkout -q --orphan publica
 git commit -qm 'Panel web'
+
+# 1b. Un fichero de raíces con una línea mal formada, o ilegible, falla
+#     cerrado.
+cp "$raices" "$tmp/raices"
+printf 'esto-no-es-un-hash\r\n' >>"$raices"
+if git push -q origin publica 2>"$tmp/err"; then
+    fallo "el push con una raíz mal formada pasó"
+fi
+cp "$tmp/raices" "$raices"
+if [ "$(id -u)" -ne 0 ]; then
+    chmod 000 "$raices"
+    if git push -q origin publica 2>"$tmp/err"; then
+        fallo "el push con el fichero de raíces ilegible pasó"
+    fi
+    chmod 644 "$raices"
+fi
+
 git push -q origin publica 2>"$tmp/err" || fallo "el push limpio falló: $(cat "$tmp/err")"
 
 # 3. Un valor prohibido encima de lo ya publicado.
@@ -71,6 +99,20 @@ if grep -qi zafiro "$tmp/out" "$tmp/err"; then
     fallo "la salida contiene el valor"
 fi
 git reset -q --hard HEAD~1
+
+# 3b. Un injerto que «corta» el historial no engaña al gancho: git push envía
+#     los objetos originales.
+echo 'zafiro-escondido' >c.txt
+git add -A
+git commit -qm 'con un dato'
+git rm -q c.txt
+git commit -qm 'lo quita'
+git replace --graft HEAD
+if git push -q origin publica 2>"$tmp/err" >"$tmp/out"; then
+    fallo "el push con un injerto que oculta un dato pasó"
+fi
+git replace -d HEAD >/dev/null
+git reset -q --hard HEAD~2
 
 # 4. Un commit limpio que borra un fichero: el gancho no falla por el borrado.
 git rm -q b.txt
@@ -87,6 +129,31 @@ fi
 if grep -qi zafiro "$tmp/out" "$tmp/err"; then
     fallo "la salida contiene el valor"
 fi
+
+# 6. Desde un worktree enlazado se usan las listas del repositorio principal.
+git worktree add -q -b desde-wt "$tmp/wt" publica
+(
+    cd "$tmp/wt"
+    echo 'rubi-escondido' >e.txt
+    git add e.txt
+    git commit -qm 'en el worktree'
+    if git push -q origin desde-wt 2>"$tmp/err" >"$tmp/out"; then
+        fallo "el push desde el worktree con un secreto pasó"
+    fi
+)
+grep -q lista-secretos "$tmp/out" || fallo "no se aplicó la lista de secretos: $(cat "$tmp/out")"
+if grep -qi rubi "$tmp/out" "$tmp/err"; then
+    fallo "la salida contiene el valor"
+fi
+
+# 7. Si falta una lista, el gancho no sube nada.
+mv deploy/config.local "$tmp/config.local"
+git checkout -q -b sin-config
+if git push -q origin sin-config 2>"$tmp/err"; then
+    fallo "el push sin deploy/config.local pasó"
+fi
+mv "$tmp/config.local" deploy/config.local
+git push -q origin sin-config 2>"$tmp/err" || fallo "el push con las listas falló: $(cat "$tmp/err")"
 
 # Borrar una rama remota tampoco necesita revisión.
 git push -q origin :publica 2>"$tmp/err" || fallo "el borrado de la rama remota falló: $(cat "$tmp/err")"

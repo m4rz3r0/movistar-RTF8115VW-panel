@@ -287,3 +287,83 @@ fn sin_locales_no_usa_las_listas() {
     let s = ejecutar(c);
     assert_eq!(s.codigo, Some(0), "{}{}", s.stdout, s.stderr);
 }
+
+#[test]
+fn listas_explicitas_por_opcion_y_por_entorno() {
+    let (t, dir, casa) = temporales();
+    let otra = t.path().join("listas");
+    escribir(
+        &otra,
+        ".superpowers/sdd/x/real-secrets.txt",
+        "rubi-escondido\n",
+    );
+    escribir(&dir, "a.md", "rubi-escondido\n");
+    // Sin indicar dónde están, no se encuentran.
+    let s = arbol_solo(&dir, &casa, None, "a.md");
+    assert_eq!(s.codigo, Some(0), "{}{}", s.stdout, s.stderr);
+    let mut c = orden(&casa);
+    c.arg("--arbol")
+        .arg(&dir)
+        .args(["--listas"])
+        .arg(&otra)
+        .args(["--solo", "a.md"]);
+    let s = ejecutar(c);
+    assert_eq!(s.codigo, Some(1), "{}{}", s.stdout, s.stderr);
+    assert!(s.stdout.contains("lista-secretos"), "{}", s.stdout);
+    let mut c = orden(&casa);
+    c.env("RP_PUBLICACION_LISTAS", &otra)
+        .arg("--arbol")
+        .arg(&dir)
+        .args(["--solo", "a.md"]);
+    let s = ejecutar(c);
+    assert_eq!(s.codigo, Some(1), "{}{}", s.stdout, s.stderr);
+    sin_valor(&s, "rubi");
+}
+
+#[test]
+fn exigir_listas_falla_si_falta_alguna() {
+    let (t, dir, casa) = temporales();
+    escribir(&dir, "a.md", "texto neutro\n");
+    let exigir = |prohibidos: Option<&Path>| {
+        let mut c = orden(&casa);
+        if let Some(p) = prohibidos {
+            c.env("RP_PUBLICACION_PROHIBIDOS", p);
+        }
+        c.arg("--arbol")
+            .arg(&dir)
+            .args(["--exigir-listas", "--solo", "a.md"]);
+        ejecutar(c)
+    };
+    // Faltan los secretos y config.local.
+    let s = exigir(None);
+    assert_eq!(s.codigo, Some(2), "{}{}", s.stdout, s.stderr);
+    assert!(s.stderr.contains("lista-secretos"), "{}", s.stderr);
+    escribir(
+        &dir,
+        ".superpowers/sdd/x/real-secrets.txt",
+        "rubi-escondido\n",
+    );
+    let s = exigir(None);
+    assert_eq!(s.codigo, Some(2), "{}{}", s.stdout, s.stderr);
+    assert!(s.stderr.contains("config-local"), "{}", s.stderr);
+    escribir(&dir, "deploy/config.local", "CLAVE=jaula-turquesa\n");
+    let s = exigir(None);
+    assert_eq!(s.codigo, Some(0), "{}{}", s.stdout, s.stderr);
+    // Una lista de prohibidos indicada que no se puede leer también falla.
+    let s = exigir(Some(&t.path().join("no-existe.txt")));
+    assert_eq!(s.codigo, Some(2), "{}{}", s.stdout, s.stderr);
+    assert!(s.stderr.contains("lista-prohibidos"), "{}", s.stderr);
+}
+
+#[test]
+fn entrada_con_barra_se_busca_en_la_ruta_entera() {
+    let (t, dir, casa) = temporales();
+    let lista = t.path().join("prohibidos.txt");
+    fs::write(&lista, "carpeta/zafiro-x\n").unwrap();
+    escribir(&dir, "carpeta/zafiro-x/a.txt", "texto neutro\n");
+    let s = arbol_solo(&dir, &casa, Some(&lista), "carpeta");
+    assert_eq!(s.codigo, Some(1), "{}{}", s.stdout, s.stderr);
+    assert!(s.stdout.contains("lista-prohibidos"), "{}", s.stdout);
+    assert_eq!(s.stdout.lines().count(), 1, "{}", s.stdout);
+    sin_valor(&s, "zafiro");
+}

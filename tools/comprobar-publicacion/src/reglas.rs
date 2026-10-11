@@ -664,10 +664,11 @@ pub(crate) fn regla_binario(ruta: &str, bytes: &[u8], p: &Permitidos) -> Vec<&'s
         .iter()
         .map(|b| format!("{b:02x}"))
         .collect();
-    match p.sha_binario(ruta) {
-        None => out.push("binario sin revisar"),
-        Some(revisado) if revisado != sha => out.push("sha256 distinto del revisado"),
-        Some(_) => {}
+    let revisados = p.shas_binario(ruta);
+    if revisados.is_empty() {
+        out.push("binario sin revisar");
+    } else if !revisados.contains(&sha) {
+        out.push("sha256 distinto del revisado");
     }
     if bytes.starts_with(FIRMA_PNG) {
         out.extend(metadatos_png(bytes));

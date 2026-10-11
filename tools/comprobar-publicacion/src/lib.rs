@@ -19,7 +19,7 @@ mod reglas;
 use std::fmt;
 
 pub use arbol::arbol;
-pub use git::{diff, historial, revisar_refs};
+pub use git::{diff, fichero_en_commit, historial, revisar_refs};
 pub use locales::ListasLocales;
 pub use permitidos::Permitidos;
 
@@ -153,6 +153,11 @@ pub fn revisar_nombre(ruta: &str, p: &Permitidos, l: &ListasLocales) -> Vec<Hall
         );
         detalles.extend(l.revisar_linea(componente, p));
     }
+    // Una entrada de las listas con `/` solo puede coincidir con la ruta
+    // entera.
+    if ruta.contains('/') {
+        detalles.extend(l.revisar_linea(ruta, p));
+    }
     if clase(ruta) == Clase::Fixture {
         detalles.extend(
             reglas::regla_nombre_fixture(ruta)
@@ -160,6 +165,8 @@ pub fn revisar_nombre(ruta: &str, p: &Permitidos, l: &ListasLocales) -> Vec<Hall
                 .map(|d| (Regla::Fixture, d.to_owned())),
         );
     }
+    detalles.sort();
+    detalles.dedup();
     detalles
         .into_iter()
         .filter(|(regla, _)| !p.ruta_permitida(ruta, *regla))

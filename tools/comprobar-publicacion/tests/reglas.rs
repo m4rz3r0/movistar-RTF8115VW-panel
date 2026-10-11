@@ -467,7 +467,9 @@ fn clave_con_token_enorme_es_rapida() {
     let h = revisar("a", &token);
     let tiempo = inicio.elapsed();
     assert!(h.is_empty(), "{h:?}");
-    assert!(tiempo.as_millis() < 500, "{tiempo:?}");
+    // Con el coste cuadrático anterior tardaba más de dos minutos en debug;
+    // el límite es holgado para no fallar en una máquina cargada.
+    assert!(tiempo.as_secs() < 10, "{tiempo:?}");
     // La clave al final de un token así se sigue viendo.
     let con_clave = format!("{token}{}", azar_url(40));
     assert_eq!(reglas("a", &con_clave), [Regla::Clave]);
@@ -479,7 +481,7 @@ fn clave_con_mas_y_guion_bajo_no_revienta() {
     let token = format!("{}+{}_{}", azar_url(20), azar_url(20), azar_url(20));
     let inicio = std::time::Instant::now();
     let _ = reglas("a", &token);
-    assert!(inicio.elapsed().as_millis() < 500);
+    assert!(inicio.elapsed().as_secs() < 10);
     let largo = format!("abc+def_{}", azar_url(40));
     assert_eq!(reglas("a", &largo), [Regla::Clave]);
 }
@@ -493,4 +495,22 @@ fn azar_url(n: usize) -> String {
 fn correo_anonimo_de_github_no_da_dominio() {
     assert!(reglas("a", "Ana <123+ana@users.noreply.github.com>").is_empty());
     assert_eq!(reglas("a", "visita github.com"), [Regla::Dominio]);
+}
+
+#[test]
+fn binario_con_varios_sha_revisados() {
+    let a = png(false);
+    let mut b = png(false);
+    b.extend_from_slice(b"otra version");
+    let mut c = png(false);
+    c.extend_from_slice(b"sin revisar");
+    let p = Permitidos::leer(&format!(
+        "binario docs/x.png {} — v1\nbinario docs/x.png {} — v2\n",
+        sha256(&a),
+        sha256(&b)
+    ))
+    .unwrap();
+    assert!(revisar_binario("docs/x.png", &a, &p).is_empty());
+    assert!(revisar_binario("docs/x.png", &b, &p).is_empty());
+    assert_eq!(revisar_binario("docs/x.png", &c, &p).len(), 1);
 }

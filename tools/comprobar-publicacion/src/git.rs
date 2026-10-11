@@ -68,11 +68,17 @@ pub fn diff(
 }
 
 /// Revisa todo lo alcanzable desde `revs` (todas las refs si está vacío):
-/// cada blob (todas las versiones de todos los ficheros, también de los
-/// borrados), el nombre de cada entrada de cada árbol, las cabeceras (autor,
-/// committer) y el mensaje de cada commit, las etiquetas anotadas y, si
-/// `revs` está vacío, los nombres de las refs. Las notas se revisan como
-/// blobs (son alcanzables desde `refs/notes/*`).
+/// las cabeceras (autor, committer) y el mensaje de cada commit, las
+/// etiquetas anotadas, cada nombre y cada blob **en cada ruta en la que
+/// aparece** en cada revisión (también los ficheros borrados) y, si `revs`
+/// está vacío, los nombres de las refs. Las notas se revisan como blobs (son
+/// alcanzables desde `refs/notes/*`).
+///
+/// Los árboles se recorren desde la raíz de cada commit, del más antiguo al
+/// más nuevo, sin repetir un mismo árbol en una misma ruta: el mismo
+/// contenido en dos rutas se revisa en las dos (una puede estar prohibida o
+/// tener una excepción distinta). Cada hallazgo se atribuye al primer commit
+/// que tiene ese contenido en esa ruta.
 pub fn historial(
     repo: &Path,
     revs: &[String],
@@ -98,83 +104,99 @@ pub fn historial(
         rutas.insert(sha.to_owned(), ruta.to_owned());
         shas.push(sha.to_owned());
     }
+    let tipo = tipos(repo, &shas)?;
+    let es = |sha: &str, t: &str| tipo.get(sha).is_some_and(|x| x == t);
 
+    // Commits, etiquetas y árboles (los blobs se leen al final).
     let mut out = Vec::new();
-    // Hallazgos de blobs y árboles, con la ruta sin prefijo y si se oculta.
-    let mut de_objetos: Vec<(String, Vec<Hallazgo>, bool)> = Vec::new();
-    let mut nombres_vistos: HashSet<(String, Regla, String)> = HashSet::new();
-    por_cada_objeto(repo, &shas, |sha, tipo, datos| {
-        let ruta = rutas.get(sha).map(String::as_str).unwrap_or("");
+    let mut commits: Vec<(String, String)> = Vec::new();
+    let mut arboles: HashMap<String, Vec<(String, String, String)>> = HashMap::new();
+    let no_blobs: Vec<String> = shas.iter().filter(|s| !es(s, "blob")).cloned().collect();
+    por_cada_objeto(repo, &no_blobs, |sha, tipo, datos| {
         match tipo {
-            "commit" => out.extend(revisar_commit(sha, &String::from_utf8_lossy(datos), p, l)),
+            "commit" => {
+                let texto = String::from_utf8_lossy(datos);
+                out.extend(revisar_commit(sha, &texto, p, l));
+                let arbol = partes_de_objeto(&texto)
+                    .0
+                    .into_iter()
+                    .find(|(c, _)| c == "tree")
+                    .map(|(_, v)| v)
+                    .ok_or("un commit no tiene árbol")?;
+                commits.push((sha.to_owned(), arbol));
+            }
             "tag" => {
                 let texto = String::from_utf8_lossy(datos);
-                out.extend(revisar_etiqueta(
-                    &texto,
-                    &format!("etiqueta {}", corto(sha)),
-                    "",
-                    p,
-                    l,
-                ));
+                let ruta = format!("etiqueta {}", corto(sha));
+                out.extend(revisar_etiqueta(&texto, &ruta, "", p, l));
             }
             "tree" => {
-                for (modo, nombre, _) in entradas_de_arbol(datos, sha.len()) {
-                    let ruta = if ruta.is_empty() {
-                        nombre
-                    } else {
-                        format!("{ruta}/{nombre}")
-                    };
-                    let mut h = revisar_nombre_en_git(&ruta, &modo, p, l);
-                    // Un árbol cambia en cada revisión: un mismo nombre se
-                    // informa una vez.
-                    h.retain(|x| nombres_vistos.insert((ruta.clone(), x.regla, x.detalle.clone())));
-                    if !h.is_empty() {
-                        let oculta = !revisar_nombre_sin_notas(&ruta, p, l).is_empty();
-                        de_objetos.push((sha.to_owned(), h, oculta));
-                    }
-                }
-            }
-            "blob" => {
-                let h = revisar_contenido(ruta, datos, p, l);
-                if !h.is_empty() {
-                    let oculta = !revisar_nombre_sin_notas(ruta, p, l).is_empty();
-                    de_objetos.push((sha.to_owned(), h, oculta));
-                }
+                arboles.insert(sha.to_owned(), entradas_de_arbol(datos, sha.len()));
             }
             _ => {}
         }
         Ok(())
     })?;
 
-    if !de_objetos.is_empty() {
-        let introducido = commits_que_introducen(repo, revs)?;
-        let mut arboles = Arboles::default();
-        for (sha, mut h, oculta) in de_objetos {
-            let Some(commit) = introducido.get(&sha) else {
-                // Solo alcanzable sin commit (una etiqueta que apunta a un
-                // blob o a un árbol): se nombra por el objeto.
-                for x in &mut h {
-                    x.ruta = if oculta {
-                        format!("objeto {}", corto(&sha))
-                    } else {
-                        format!("objeto {}:{}", corto(&sha), x.ruta)
-                    };
-                }
-                out.extend(h);
-                continue;
-            };
-            if oculta {
-                // Todos los hallazgos de un objeto comparten la ruta.
-                let ruta = h[0].ruta.clone();
-                let k = arboles.numero(repo, commit, &ruta)?;
-                ocultar_ruta(&mut h, k);
-            }
-            for x in &mut h {
-                x.ruta = format!("{}:{}", corto(commit), x.ruta);
-            }
-            out.extend(h);
+    // Recorrido: cada (árbol, ruta) una vez; cada (blob, ruta) una vez.
+    let mut recorrido = Recorrido::default();
+    // `rev-list` da los commits del más nuevo al más antiguo.
+    for (commit, arbol) in commits.iter().rev() {
+        recorrido.recorrer(&arboles, arbol, "", Some(commit), p, l)?;
+    }
+    // Lo que solo es alcanzable sin commit (una etiqueta que apunta a un
+    // árbol o a un blob) se revisa en la ruta que da `rev-list`.
+    for sha in &shas {
+        let ruta = rutas.get(sha).map(String::as_str).unwrap_or("");
+        if es(sha, "tree") && !recorrido.arboles_vistos.contains(sha) {
+            recorrido.recorrer(&arboles, sha, ruta, None, p, l)?;
+        } else if es(sha, "blob") && !recorrido.colocaciones.contains_key(sha) {
+            recorrido.colocar(sha, ruta, None);
         }
     }
+
+    let Recorrido {
+        colocaciones,
+        orden,
+        nombres,
+        ..
+    } = recorrido;
+    let mut numeradas = Arboles::default();
+    let mut anotar = |commit: Option<&str>, ruta: &str, mut h: Vec<Hallazgo>, objeto: &str| {
+        let oculta = !revisar_nombre_sin_notas(ruta, p, l).is_empty();
+        let prefijo = match commit {
+            Some(c) => {
+                if oculta {
+                    let k = numeradas.numero(repo, c, ruta)?;
+                    ocultar_ruta(&mut h, k);
+                }
+                corto(c).to_owned()
+            }
+            None => {
+                if oculta {
+                    ocultar_ruta(&mut h, 0);
+                }
+                format!("objeto {}", corto(objeto))
+            }
+        };
+        for x in &mut h {
+            x.ruta = format!("{prefijo}:{}", x.ruta);
+        }
+        out.extend(h);
+        Ok::<(), String>(())
+    };
+    for (commit, ruta, h) in nombres {
+        anotar(commit.as_deref(), &ruta, h, "")?;
+    }
+    por_cada_objeto(repo, &orden, |sha, _, datos| {
+        for (ruta, commit) in colocaciones.get(sha).into_iter().flatten() {
+            let h = revisar_contenido(ruta, datos, p, l);
+            if !h.is_empty() {
+                anotar(commit.as_deref(), ruta, h, sha)?;
+            }
+        }
+        Ok(())
+    })?;
 
     if revs.is_empty() {
         let refs = salida(
@@ -185,6 +207,101 @@ pub fn historial(
         out.extend(revisar_refs(&lineas(&refs), p, l));
     }
     Ok(out)
+}
+
+/// Estado del recorrido de los árboles de [`historial`].
+#[derive(Default)]
+struct Recorrido {
+    /// `(árbol, ruta)` ya recorridos.
+    visitados: HashSet<(String, String)>,
+    arboles_vistos: HashSet<String>,
+    /// Cada blob, con las rutas (y el commit) en que aparece.
+    colocaciones: HashMap<String, Vec<(String, Option<String>)>>,
+    /// Los blobs en el orden en que aparecen.
+    orden: Vec<String>,
+    colocados: HashSet<(String, String)>,
+    /// Hallazgos de nombres: `(commit, ruta, hallazgos)`.
+    nombres: Vec<(Option<String>, String, Vec<Hallazgo>)>,
+    nombres_vistos: HashSet<(String, Regla, String)>,
+}
+
+impl Recorrido {
+    fn recorrer(
+        &mut self,
+        arboles: &HashMap<String, Vec<(String, String, String)>>,
+        raiz: &str,
+        prefijo: &str,
+        commit: Option<&String>,
+        p: &Permitidos,
+        l: &ListasLocales,
+    ) -> Result<(), String> {
+        let mut pila = vec![(raiz.to_owned(), prefijo.to_owned())];
+        while let Some((arbol, base)) = pila.pop() {
+            if !self.visitados.insert((arbol.clone(), base.clone())) {
+                continue;
+            }
+            self.arboles_vistos.insert(arbol.clone());
+            let entradas = arboles
+                .get(&arbol)
+                .ok_or("no se pudo leer un árbol del historial")?;
+            for (modo, nombre, sha) in entradas {
+                let ruta = if base.is_empty() {
+                    nombre.clone()
+                } else {
+                    format!("{base}/{nombre}")
+                };
+                let mut h = revisar_nombre_en_git(&ruta, modo, p, l);
+                // Un mismo nombre se informa una vez.
+                h.retain(|x| {
+                    self.nombres_vistos
+                        .insert((ruta.clone(), x.regla, x.detalle.clone()))
+                });
+                if !h.is_empty() {
+                    self.nombres.push((commit.cloned(), ruta.clone(), h));
+                }
+                match modo.as_str() {
+                    "40000" => pila.push((sha.clone(), ruta)),
+                    // Un submódulo no tiene contenido en este repositorio.
+                    "160000" => {}
+                    _ => self.colocar(sha, &ruta, commit),
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn colocar(&mut self, blob: &str, ruta: &str, commit: Option<&String>) {
+        if !self.colocados.insert((blob.to_owned(), ruta.to_owned())) {
+            return;
+        }
+        let v = self.colocaciones.entry(blob.to_owned()).or_default();
+        if v.is_empty() {
+            self.orden.push(blob.to_owned());
+        }
+        v.push((ruta.to_owned(), commit.cloned()));
+    }
+}
+
+/// El contenido de `ruta` en el árbol de `rev`, si existe (por ejemplo, la
+/// lista de permitidos del commit que se sube).
+pub fn fichero_en_commit(repo: &Path, rev: &str, ruta: &str) -> Result<Option<Vec<u8>>, String> {
+    if rev.starts_with('-') {
+        return Err("una revisión no es válida".to_owned());
+    }
+    let objeto = format!("{rev}:{ruta}");
+    let existe = git(repo)
+        .args(["cat-file", "-e", &objeto])
+        .status()
+        .is_ok_and(|e| e.success());
+    if !existe {
+        return Ok(None);
+    }
+    salida(
+        repo,
+        &["cat-file", "blob", &objeto],
+        "no se pudo leer un fichero del commit",
+    )
+    .map(Some)
 }
 
 /// Revisa nombres de refs (ramas, etiquetas). La ruta es `ref n.º K`, con `K`
@@ -212,6 +329,9 @@ fn git(repo: &Path) -> Command {
     c.arg("-C")
         .arg(repo)
         .env("GIT_TERMINAL_PROMPT", "0")
+        // `git push` (pack-objects) no usa `refs/replace/*` ni injertos: el
+        // comprobador debe ver los mismos objetos que se envían.
+        .env("GIT_NO_REPLACE_OBJECTS", "1")
         .stdin(Stdio::null())
         .stderr(Stdio::null());
     c
@@ -243,6 +363,26 @@ fn lineas(bytes: &[u8]) -> Vec<String> {
 fn por_cada_objeto(
     repo: &Path,
     shas: &[String],
+    f: impl FnMut(&str, &str, &[u8]) -> Result<(), String>,
+) -> Result<(), String> {
+    lote(repo, shas, true, f)
+}
+
+/// El tipo de cada objeto (`git cat-file --batch-check`).
+fn tipos(repo: &Path, shas: &[String]) -> Result<HashMap<String, String>, String> {
+    let mut m = HashMap::new();
+    lote(repo, shas, false, |sha, tipo, _| {
+        m.insert(sha.to_owned(), tipo.to_owned());
+        Ok(())
+    })?;
+    Ok(m)
+}
+
+/// `git cat-file --batch` (con el contenido) o `--batch-check` (sin él).
+fn lote(
+    repo: &Path,
+    shas: &[String],
+    con_contenido: bool,
     mut f: impl FnMut(&str, &str, &[u8]) -> Result<(), String>,
 ) -> Result<(), String> {
     const ERROR: &str = "no se pudieron leer los objetos del repositorio";
@@ -250,7 +390,14 @@ fn por_cada_objeto(
         return Ok(());
     }
     let mut hijo = git(repo)
-        .args(["cat-file", "--batch"])
+        .args([
+            "cat-file",
+            if con_contenido {
+                "--batch"
+            } else {
+                "--batch-check"
+            },
+        ])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -282,12 +429,15 @@ fn por_cada_objeto(
             resultado = Err(ERROR.to_owned());
             break;
         };
-        let mut datos = vec![0; tam + 1];
-        if lector.read_exact(&mut datos).is_err() {
-            resultado = Err(ERROR.to_owned());
-            break;
+        let mut datos = Vec::new();
+        if con_contenido {
+            datos = vec![0; tam + 1];
+            if lector.read_exact(&mut datos).is_err() {
+                resultado = Err(ERROR.to_owned());
+                break;
+            }
+            datos.pop();
         }
-        datos.pop();
         if let Err(e) = f(sha, tipo, &datos) {
             resultado = Err(e);
             break;
@@ -502,16 +652,7 @@ fn revisar_etiqueta(
             )),
         }
     }
-    // Partidas para que este fichero no parezca un bloque PEM.
-    let firmas = [
-        concat!("-----", "BEGIN PGP SIGNATURE-----"),
-        concat!("-----", "BEGIN SSH SIGNATURE-----"),
-    ];
-    let sin_firma = firmas
-        .iter()
-        .filter_map(|f| mensaje.find(f))
-        .min()
-        .map_or(mensaje, |i| &mensaje[..i]);
+    let sin_firma = sin_firma_final(mensaje);
     out.extend(
         revisar_texto(ruta, sin_firma, p, l)
             .into_iter()
@@ -525,6 +666,34 @@ fn revisar_etiqueta(
     out
 }
 
+/// El mensaje sin el bloque de firma (PGP o SSH) que cierra el objeto. Un
+/// marcador en medio del mensaje, o sin su final, no oculta nada.
+fn sin_firma_final(mensaje: &str) -> &str {
+    // Partidas para que este fichero no parezca un bloque PEM.
+    let tipos = [
+        (
+            concat!("-----", "BEGIN PGP SIGNATURE-----"),
+            concat!("-----", "END PGP SIGNATURE-----"),
+        ),
+        (
+            concat!("-----", "BEGIN SSH SIGNATURE-----"),
+            concat!("-----", "END SSH SIGNATURE-----"),
+        ),
+    ];
+    for (inicio, fin) in tipos {
+        if let Some(i) = mensaje.rfind(inicio)
+            && (i == 0 || mensaje[..i].ends_with('\n'))
+            && mensaje[i..]
+                .trim_end()
+                .strip_suffix(fin)
+                .is_some_and(|cuerpo| !cuerpo[inicio.len()..].contains("-----"))
+        {
+            return &mensaje[..i];
+        }
+    }
+    mensaje
+}
+
 fn padres(commit: &str) -> Vec<String> {
     partes_de_objeto(commit)
         .0
@@ -532,46 +701,6 @@ fn padres(commit: &str) -> Vec<String> {
         .filter(|(c, _)| c == "parent")
         .map(|(_, v)| v)
         .collect()
-}
-
-/// Cada objeto (blob o árbol) alcanzable desde `revs` (o desde todas las
-/// refs), con el commit más antiguo que lo introduce.
-fn commits_que_introducen(repo: &Path, revs: &[String]) -> Result<HashMap<String, String>, String> {
-    let mut args = vec![
-        "log",
-        "--format=%x01%H %T",
-        "--raw",
-        "--root",
-        "-r",
-        "-t",
-        "-m",
-        "--no-renames",
-        "--no-abbrev",
-    ];
-    if revs.is_empty() {
-        args.push("--all");
-    } else {
-        args.push("--end-of-options");
-        args.extend(revs.iter().map(String::as_str));
-    }
-    let log = salida(repo, &args, "no se pudo leer el historial")?;
-    let mut m = HashMap::new();
-    let mut actual = String::new();
-    // `git log` va del más nuevo al más antiguo: el último que se apunta es
-    // el que lo introduce.
-    for linea in String::from_utf8_lossy(&log).lines() {
-        if let Some(resto) = linea.strip_prefix('\u{1}') {
-            let (commit, arbol) = resto.split_once(' ').unwrap_or((resto, ""));
-            actual = commit.to_owned();
-            m.insert(arbol.to_owned(), actual.clone());
-        } else if let Some(raw) = linea.strip_prefix(':') {
-            let campos: Vec<&str> = raw.split('\t').next().unwrap_or("").split(' ').collect();
-            if let Some(nuevo) = campos.get(3) {
-                m.insert((*nuevo).to_owned(), actual.clone());
-            }
-        }
-    }
-    Ok(m)
 }
 
 /// `(modo, sha)` de cada fichero de un commit, por ruta; y la lista de rutas

@@ -70,6 +70,30 @@ impl Repo {
     }
 
     fn comprobar(&self, args: &[&str]) -> Salida {
+        self.comprobar_en(&self.dir, args)
+    }
+
+    /// `git` con `entrada` por la entrada estándar.
+    fn git_con_entrada(&self, args: &[&str], entrada: &str) -> String {
+        use std::io::Write;
+        let mut hijo = self
+            .git_cmd()
+            .args(args)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        hijo.stdin
+            .take()
+            .unwrap()
+            .write_all(entrada.as_bytes())
+            .unwrap();
+        let o = hijo.wait_with_output().unwrap();
+        assert!(o.status.success(), "git {args:?}");
+        String::from_utf8(o.stdout).unwrap().trim().to_owned()
+    }
+
+    fn comprobar_en(&self, dir: &Path, args: &[&str]) -> Salida {
         let o = Command::new(env!("CARGO_BIN_EXE_comprobar-publicacion"))
             .env("HOME", &self.casa)
             .env_remove("XDG_CONFIG_HOME")
@@ -77,7 +101,7 @@ impl Repo {
             .env("GIT_CONFIG_GLOBAL", "/dev/null")
             .env("GIT_CONFIG_NOSYSTEM", "1")
             .args(args)
-            .arg(&self.dir)
+            .arg(dir)
             .output()
             .unwrap();
         let s = Salida {
@@ -310,12 +334,129 @@ fn historial_reglas_genericas_y_firmas() {
     // Una nota (sus rutas son hashes) y una etiqueta sin datos no dan nada.
     r.git(&["notes", "add", "-m", "nota neutra", &c1]);
     r.git(&["tag", "-a", "v1", "-m", "v1"]);
+    // Una etiqueta firmada: el bloque de firma final (base64) no se revisa.
+    let inicio = concat!("-----", "BEGIN PGP SIGNATURE-----");
+    let fin = concat!("-----", "END PGP SIGNATURE-----");
+    let firma = format!("iQIzBAABCAAdFiEE{}", "Ab3dEf7hIj".repeat(5));
+    let objeto = format!(
+        "object {c1}\ntype commit\ntag v2\ntagger prueba <prueba@users.noreply.github.com> 1700000000 +0000\n\nv2\n{inicio}\n\n{firma}\n{fin}\n"
+    );
+    let v2 = r.git_con_entrada(&["mktag"], &objeto);
+    r.git(&["update-ref", "refs/tags/v2", &v2]);
     let s = r.historial();
     assert_eq!(s.codigo, Some(1), "{}{}", s.stdout, s.stderr);
     assert_eq!(
         s.hallazgos(),
         [format!("{}:a.txt:1  ipv4  [ipv4 privada]", corto(&c1))]
     );
+    // Un marcador de firma que no cierra el objeto no oculta lo que le sigue.
+    let falsa = format!("v3\n\n{inicio}\n{VALOR}\n");
+    r.git(&["tag", "-a", "v3", "-m", &falsa]);
+    let v3 = r.git(&["rev-parse", "v3"]);
+    let s = r.historial();
+    assert!(
+        s.stdout
+            .contains(&format!("etiqueta {}:4  lista-prohibidos", corto(&v3))),
+        "{}",
+        s.stdout
+    );
+}
+
+#[test]
+fn historial_ignora_replace_y_grafts() {
+    let r = Repo::nuevo();
+    r.escribir("a.txt", &format!("{VALOR}\n"));
+    r.commit("primero");
+    fs::remove_file(r.dir.join("a.txt")).unwrap();
+    r.escribir("b.txt", "neutro\n");
+    r.commit("lo borra");
+    // Un injerto «corta» el historial para git log, pero git push envía los
+    // objetos originales: el comprobador debe ver lo mismo que el push.
+    r.git(&["replace", "--graft", "HEAD"]);
+    let s = r.comprobar(&["--historial", "--rev", "main"]);
+    assert_eq!(s.codigo, Some(1), "{}{}", s.stdout, s.stderr);
+    assert!(s.stdout.contains("lista-prohibidos"), "{}", s.stdout);
+}
+
+#[test]
+fn historial_revisa_cada_ruta_de_un_contenido_compartido() {
+    let r = Repo::nuevo();
+    let privada = ["10", "1", "2", "3"].join(".");
+    r.escribir(
+        "tools/publicacion-permitidos.txt",
+        "ruta docs/** ipv4 — ejemplos\n",
+    );
+    // El mismo árbol en una ruta normal y en una prohibida, y el mismo blob
+    // en una ruta con excepción y en otra sin ella.
+    r.escribir("-copia/plan.md", "neutro\n");
+    r.escribir(".superpowers/sdd/x/plan.md", "neutro\n");
+    r.escribir("docs/a.md", &format!("ip {privada}\n"));
+    r.escribir("src/a.md", &format!("ip {privada}\n"));
+    let c1 = r.commit("primero");
+    let s = r.historial();
+    assert_eq!(s.codigo, Some(1), "{}{}", s.stdout, s.stderr);
+    let mut h = s.hallazgos();
+    h.sort();
+    let c = corto(&c1);
+    assert_eq!(
+        h,
+        [
+            format!("{c}:.superpowers/sdd/x/plan.md:0  ruta-prohibida  [.superpowers/]"),
+            format!("{c}:src/a.md:1  ipv4  [ipv4 privada]"),
+        ]
+    );
+}
+
+#[test]
+fn permitidos_del_commit_no_del_arbol_de_trabajo() {
+    let r = Repo::nuevo();
+    r.escribir("a.txt", "neutro\n");
+    let c1 = r.commit("primero");
+    r.escribir("a.txt", &format!("neutro\n{VALOR}\n"));
+    let c2 = r.commit("lo añade");
+    // Una excepción sin confirmar no vale para lo que se sube.
+    r.escribir(
+        "tools/publicacion-permitidos.txt",
+        &format!("valor {VALOR} — prueba\n"),
+    );
+    assert_eq!(r.diff(&c1, &c2).codigo, Some(1));
+    assert_eq!(r.comprobar(&["--historial", "--rev", &c2]).codigo, Some(1));
+    // Confirmada, sí.
+    let c3 = r.commit("excepción");
+    assert_eq!(r.diff(&c1, &c3).codigo, Some(0));
+    assert_eq!(r.comprobar(&["--historial", "--rev", &c3]).codigo, Some(0));
+}
+
+#[test]
+fn listas_del_repositorio_principal_desde_un_worktree() {
+    let r = Repo::nuevo();
+    r.escribir(".gitignore", ".superpowers/\n");
+    r.escribir("a.txt", "neutro\n");
+    r.commit("primero");
+    r.escribir(".superpowers/sdd/x/real-secrets.txt", "rubi-escondido\n");
+    let wt = r.dir.parent().unwrap().join("wt");
+    r.git(&["worktree", "add", "-q", "-b", "otra", wt.to_str().unwrap()]);
+    fs::write(wt.join("b.txt"), "rubi-escondido\n").unwrap();
+    let o = r
+        .git_cmd()
+        .arg("-C")
+        .arg(&wt)
+        .args(["add", "-A"])
+        .output()
+        .unwrap();
+    assert!(o.status.success());
+    let o = r
+        .git_cmd()
+        .arg("-C")
+        .arg(&wt)
+        .args(["commit", "-qm", "en el worktree"])
+        .output()
+        .unwrap();
+    assert!(o.status.success());
+    let s = r.comprobar_en(&wt, &["--historial", "--rev", "otra"]);
+    assert_eq!(s.codigo, Some(1), "{}{}", s.stdout, s.stderr);
+    assert!(s.stdout.contains("lista-secretos"), "{}", s.stdout);
+    assert!(!s.stdout.contains("rubi"), "{}", s.stdout);
 }
 
 #[test]

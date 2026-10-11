@@ -46,6 +46,9 @@ pub struct ListasLocales {
     entradas: Vec<Entrada>,
     /// Un patrón por entrada, en el mismo orden.
     patrones: Option<RegexSet>,
+    /// Reglas cuya lista falta o no se puede leer y que el modo de
+    /// publicación exige (ver [`ListasLocales::faltan`]).
+    faltan: Vec<Regla>,
 }
 
 impl fmt::Debug for ListasLocales {
@@ -66,6 +69,7 @@ impl ListasLocales {
     pub fn cargar(raiz: &Path) -> (ListasLocales, Vec<String>) {
         let mut c = Constructor::default();
         let mut avisos = Vec::new();
+        let mut faltan = Vec::new();
 
         let secretos = ficheros_de_secretos(raiz);
         if secretos.is_empty() {
@@ -74,6 +78,7 @@ impl ListasLocales {
                  se omite la regla lista-secretos"
                     .to_owned(),
             );
+            faltan.push(Regla::ListaSecretos);
         }
         let mut n = 0;
         for (k, f) in secretos.iter().enumerate() {
@@ -83,6 +88,7 @@ impl ListasLocales {
                      (regla lista-secretos)",
                     k + 1
                 ));
+                faltan.push(Regla::ListaSecretos);
                 continue;
             };
             for linea in texto.lines() {
@@ -110,11 +116,20 @@ impl ListasLocales {
                         }
                     }
                 }
-                Err(_) => avisos.push(
-                    "aviso: falta la lista de prohibidos o no se puede leer: se omite la regla \
-                     lista-prohibidos"
-                        .to_owned(),
-                ),
+                Err(e) => {
+                    avisos.push(
+                        "aviso: falta la lista de prohibidos o no se puede leer: se omite la \
+                         regla lista-prohibidos"
+                            .to_owned(),
+                    );
+                    // Solo es obligatoria si se indicó a mano o si existe pero
+                    // no se puede leer.
+                    if std::env::var_os("RP_PUBLICACION_PROHIBIDOS").is_some_and(|v| !v.is_empty())
+                        || e.kind() != std::io::ErrorKind::NotFound
+                    {
+                        faltan.push(Regla::ListaProhibidos);
+                    }
+                }
             },
         }
 
@@ -126,14 +141,28 @@ impl ListasLocales {
                     }
                 }
             }
-            Err(_) => avisos.push(
-                "aviso: no hay deploy/config.local o no se puede leer: se omite la regla \
-                 config-local"
-                    .to_owned(),
-            ),
+            Err(_) => {
+                avisos.push(
+                    "aviso: no hay deploy/config.local o no se puede leer: se omite la regla \
+                     config-local"
+                        .to_owned(),
+                );
+                faltan.push(Regla::ConfigLocal);
+            }
         }
 
-        (c.terminar(), avisos)
+        faltan.dedup();
+        let mut l = c.terminar();
+        l.faltan = faltan;
+        (l, avisos)
+    }
+
+    /// Las reglas cuya lista falta y que la publicación exige: los secretos
+    /// (al menos un fichero, y todos legibles), `deploy/config.local` y la
+    /// lista de prohibidos si se indicó con `RP_PUBLICACION_PROHIBIDOS` o
+    /// existe pero no se puede leer.
+    pub fn faltan(&self) -> &[Regla] {
+        &self.faltan
     }
 
     /// Coincidencias de las listas en una línea, como `(regla, detalle)`.
@@ -191,6 +220,7 @@ impl Constructor {
         ListasLocales {
             entradas: self.entradas,
             patrones,
+            faltan: Vec::new(),
         }
     }
 }

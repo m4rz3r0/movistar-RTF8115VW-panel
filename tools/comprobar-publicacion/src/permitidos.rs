@@ -9,7 +9,8 @@
 //! - `dominio <d> — <motivo>`: el dominio y sus subdominios;
 //! - `ruta <glob> <regla> — <motivo>`: la regla no se aplica a esas rutas
 //!   (`*` no cruza `/`, `**` sí);
-//! - `binario <ruta> <sha256> — <motivo>`: un binario revisado.
+//! - `binario <ruta> <sha256> — <motivo>`: un binario revisado (puede haber
+//!   varias líneas para la misma ruta: cada versión revisada).
 
 use crate::Regla;
 use std::{
@@ -33,7 +34,7 @@ pub struct Permitidos {
     redes: Vec<(IpAddr, u8)>,
     dominios: Vec<String>,
     rutas: Vec<(String, Regla)>,
-    binarios: HashMap<String, String>,
+    binarios: HashMap<String, Vec<String>>,
 }
 
 impl Permitidos {
@@ -81,7 +82,9 @@ impl Permitidos {
                         return Err(format!("línea {n}: sha256 no válido"));
                     }
                     p.binarios
-                        .insert((*ruta).to_owned(), sha.to_ascii_lowercase());
+                        .entry((*ruta).to_owned())
+                        .or_default()
+                        .push(sha.to_ascii_lowercase());
                 }
                 _ => {
                     return Err(format!(
@@ -130,9 +133,9 @@ impl Permitidos {
             .any(|(glob, r)| *r == regla && glob_coincide(glob, ruta))
     }
 
-    /// sha256 revisado del binario en esa ruta.
-    pub fn sha_binario(&self, ruta: &str) -> Option<&str> {
-        self.binarios.get(ruta).map(String::as_str)
+    /// Los sha256 revisados del binario en esa ruta (vacío si ninguno).
+    pub fn shas_binario(&self, ruta: &str) -> &[String] {
+        self.binarios.get(ruta).map_or(&[], Vec::as_slice)
     }
 }
 

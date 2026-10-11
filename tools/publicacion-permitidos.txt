@@ -44,7 +44,6 @@ valor aa:bb:cc:00:11:22 — MAC inventada de las pruebas
 valor aa:bb:cc:00:11:33 — MAC inventada de las pruebas
 valor aa:bb:cc:00:11:44 — MAC inventada de las pruebas
 valor aa:bb:cc:dd:ee:ff — MAC inventada de las pruebas
-valor 00:5e:10:00:01:00 — cola de una MAC de prueba de siete grupos (split_mac en crates/hgu/src/fmt.rs)
 
 # Tipografías (revisadas: sin metadatos personales).
 binario crates/panel/public/fonts/chakra-petch-500.woff2 2939dc743e44b4a4fb1fa671da826b7c806c4a4714251b82f6f4a493fd00f29b — tipografía Chakra Petch (OFL)
@@ -52,3 +51,6 @@ binario crates/panel/public/fonts/chakra-petch-600.woff2 b73f412be378a9c3ed47af1
 binario crates/panel/public/fonts/inter-var.woff2 3608d227888eef8316fe6a8bd2a9932ae1d9639a1cfbe73225d812fa08043cdd — tipografía Inter (OFL)
 binario crates/panel/public/fonts/jetbrains-mono-var.woff2 dcd6beb73c8ef3a35048ec30dca6209e662957e64507b7c7529788b072796dd2 — tipografía JetBrains Mono (OFL)
 ruta tools/publicacion-permitidos.txt clave — las sumas sha256 de los binarios revisados
+
+# Pruebas de split_mac: una MAC sintética de siete grupos cuya cola parece una MAC.
+ruta crates/hgu/src/fmt.rs mac — solo MACs sintéticas en las pruebas de split_mac

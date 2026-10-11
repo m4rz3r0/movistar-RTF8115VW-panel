@@ -9,7 +9,8 @@
 #
 # - si .git/routerpanel-raices-privadas (un hash por línea) contiene un
 #   ancestro del commit local, la rechaza: «esta rama contiene el historial
-#   privado»;
+#   privado». Si ese fichero existe pero no se puede leer, o tiene una línea
+#   que no es un hash, falla cerrado;
 # - si la ref remota no existe o no es ancestro de la local, o si lo que se
 #   sube no es un commit (una etiqueta anotada), revisa todo lo alcanzable
 #   desde la local (--historial --rev); si no, solo lo nuevo
@@ -17,12 +18,17 @@
 #   objetos que se suben, y un fichero borrado no es un error;
 # - borrar una ref remota no sube nada y no se revisa.
 #
+# Las listas locales son obligatorias (--exigir-listas): si falta una, no se
+# sube nada. Los objetos de reemplazo (git replace, injertos) se ignoran,
+# como hace git push: se revisa lo que de verdad se envía.
+#
 # Sale con 1 ante cualquier hallazgo o error. Nunca imprime nombres de ref:
 # pueden contener un dato.
 #
 # El comprobador es $RP_COMPROBAR_PUBLICACION si está definido; si no,
 # `cargo run -q -p comprobar-publicacion` en la raíz del repositorio.
-set -u
+set -uf
+export GIT_NO_REPLACE_OBJECTS=1
 
 raiz=$(git rev-parse --show-toplevel) || exit 1
 comun=$(git rev-parse --git-common-dir) || exit 1
@@ -49,14 +55,43 @@ while read -r ref_local sha_local ref_remota sha_remoto; do
     if es_cero "$sha_local"; then
         continue
     fi
-    if [ -f "$raices" ]; then
-        while read -r raiz_privada; do
-            [ -n "$raiz_privada" ] || continue
-            if git merge-base --is-ancestor "$raiz_privada" "$sha_local" 2>/dev/null; then
-                echo "pre-push: esta rama contiene el historial privado; no se sube" >&2
+    if [ -e "$raices" ]; then
+        if [ ! -f "$raices" ] || [ ! -r "$raices" ]; then
+            echo "pre-push: no se puede leer routerpanel-raices-privadas; no se sube" >&2
+            exit 1
+        fi
+        # Se lee antes del bucle: un error de lectura no se pierde.
+        lista_raices=$(cat "$raices") || {
+            echo "pre-push: no se puede leer routerpanel-raices-privadas; no se sube" >&2
+            exit 1
+        }
+        for raiz_privada in $lista_raices; do
+            case $raiz_privada in
+            *[!0-9a-f]*)
+                echo "pre-push: routerpanel-raices-privadas tiene una línea que no es un hash; no se sube" >&2
+                exit 1
+                ;;
+            esac
+            if [ ${#raiz_privada} -ne 40 ] && [ ${#raiz_privada} -ne 64 ]; then
+                echo "pre-push: routerpanel-raices-privadas tiene una línea que no es un hash; no se sube" >&2
                 exit 1
             fi
-        done <"$raices"
+            # Una raíz que ya no está en el repositorio (tras el aplastado y
+            # la recolección) no puede estar en lo que se sube.
+            git cat-file -e "$raiz_privada" 2>/dev/null || continue
+            git merge-base --is-ancestor "$raiz_privada" "$sha_local" 2>/dev/null
+            case $? in
+            0)
+                echo "pre-push: esta rama contiene el historial privado; no se sube" >&2
+                exit 1
+                ;;
+            1) ;;
+            *)
+                echo "pre-push: no se pudo comprobar el historial privado; no se sube" >&2
+                exit 1
+                ;;
+            esac
+        done
     fi
     # --diff solo recorre commits: una etiqueta anotada (u otro objeto que no
     # sea un commit) se revisa siempre con --historial.
@@ -64,10 +99,10 @@ while read -r ref_local sha_local ref_remota sha_remoto; do
         [ "$(git cat-file -t "$sha_local" 2>/dev/null)" = commit ] &&
         git cat-file -e "$sha_remoto^{commit}" 2>/dev/null &&
         git merge-base --is-ancestor "$sha_remoto" "$sha_local" 2>/dev/null; then
-        comprobar --diff "$sha_remoto..$sha_local" "$raiz" \
+        comprobar --diff "$sha_remoto..$sha_local" "$raiz" --exigir-listas \
             --nombre-ref "$ref_local" --nombre-ref "$ref_remota"
     else
-        comprobar --historial "$raiz" --rev "$sha_local" \
+        comprobar --historial "$raiz" --rev "$sha_local" --exigir-listas \
             --nombre-ref "$ref_local" --nombre-ref "$ref_remota"
     fi
     if [ $? -ne 0 ]; then

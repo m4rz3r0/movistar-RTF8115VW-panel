@@ -10,11 +10,19 @@
 //!
 //! Opciones comunes:
 //! - `--sin-locales`: no lee las listas locales del dueño (CI);
+//! - `--listas DIR` (o `$RP_PUBLICACION_LISTAS`): dónde están `.superpowers/`
+//!   y `deploy/config.local`. Por defecto, la raíz del repositorio principal
+//!   (el padre de `git rev-parse --git-common-dir`), que también vale desde un
+//!   worktree enlazado; fuera de un repositorio, el directorio revisado;
+//! - `--exigir-listas` (el gancho `pre-push`): si falta una lista obligatoria
+//!   ([`ListasLocales::faltan`]), es un error y sale con 2;
 //! - `--nombre-ref NOMBRE` (con `--diff` y `--historial`, repetible): revisa
 //!   también ese nombre de ref (lo usa el gancho `pre-push`).
 //!
-//! Usa las excepciones de `tools/publicacion-permitidos.txt` del directorio
-//! revisado. Imprime un hallazgo por línea, `ruta:linea  regla  [detalle]`,
+//! Usa las excepciones de `tools/publicacion-permitidos.txt`: con `--arbol`,
+//! la del directorio revisado; con `--diff`, la del final del rango; con
+//! `--historial`, la de la primera `--rev` (o de `HEAD`). Así una excepción
+//! sin confirmar no vale para lo que se sube. Imprime un hallazgo por línea, `ruta:linea  regla  [detalle]`,
 //! sin el valor encontrado. Sale con 0 si no hay hallazgos, con 1 si los hay
 //! y con 2 si el uso es incorrecto, la lista de permitidos no es válida o git
 //! falla.
@@ -23,19 +31,20 @@
 //! de ref pueden contener un dato.
 
 use comprobar_publicacion::{
-    Hallazgo, ListasLocales, Permitidos, arbol, diff, historial, revisar_refs,
+    Hallazgo, ListasLocales, Permitidos, arbol, diff, fichero_en_commit, historial, revisar_refs,
 };
 use std::{
     ffi::OsString,
     path::{Path, PathBuf},
-    process::ExitCode,
+    process::{Command, ExitCode},
 };
 
 const PERMITIDOS: &str = "tools/publicacion-permitidos.txt";
 
-const USO: &str = "uso: comprobar-publicacion --arbol [DIR] [--solo RUTA…] [--sin-locales]
-       comprobar-publicacion --diff A..B [REPO] [--nombre-ref NOMBRE…] [--sin-locales]
-       comprobar-publicacion --historial [REPO] [--rev REV…] [--nombre-ref NOMBRE…] [--sin-locales]";
+const USO: &str = "uso: comprobar-publicacion --arbol [DIR] [--solo RUTA…]
+       comprobar-publicacion --diff A..B [REPO] [--nombre-ref NOMBRE…]
+       comprobar-publicacion --historial [REPO] [--rev REV…] [--nombre-ref NOMBRE…]
+opciones comunes: [--sin-locales | --listas DIR] [--exigir-listas]";
 
 fn uso() -> ExitCode {
     eprintln!("{USO}");
@@ -119,20 +128,50 @@ fn interpretar(args: &[OsString]) -> Option<(Modo, PathBuf)> {
     }
 }
 
-fn leer_permitidos(raiz: &Path) -> Result<Permitidos, ExitCode> {
-    match std::fs::read_to_string(raiz.join(PERMITIDOS)) {
-        Ok(texto) => Permitidos::leer(&texto).map_err(|e| {
-            eprintln!("{PERMITIDOS}: {e}");
-            ExitCode::from(2)
-        }),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            eprintln!("aviso: no hay {PERMITIDOS}; no se aplica ninguna excepción");
-            Ok(Permitidos::default())
-        }
-        Err(e) => {
-            eprintln!("{PERMITIDOS}: {e}");
-            Err(ExitCode::from(2))
-        }
+/// La lista de permitidos del directorio (`rev` = `None`) o del commit `rev`.
+fn leer_permitidos(raiz: &Path, rev: Option<&str>) -> Result<Permitidos, ExitCode> {
+    let texto = match rev {
+        None => match std::fs::read(raiz.join(PERMITIDOS)) {
+            Ok(t) => Some(t),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+            Err(e) => {
+                eprintln!("{PERMITIDOS}: {e}");
+                return Err(ExitCode::from(2));
+            }
+        },
+        Some(rev) => fichero_en_commit(raiz, rev, PERMITIDOS).map_err(|e| error(&e))?,
+    };
+    let Some(texto) = texto else {
+        eprintln!("aviso: no hay {PERMITIDOS}; no se aplica ninguna excepción");
+        return Ok(Permitidos::default());
+    };
+    Permitidos::leer(&String::from_utf8_lossy(&texto)).map_err(|e| {
+        eprintln!("{PERMITIDOS}: {e}");
+        ExitCode::from(2)
+    })
+}
+
+/// Dónde buscar las listas locales: `--listas`, `$RP_PUBLICACION_LISTAS`, la
+/// raíz del repositorio principal de `raiz` o `raiz`.
+fn raiz_de_listas(raiz: &Path, opcion: Option<PathBuf>) -> PathBuf {
+    if let Some(d) = opcion {
+        return d;
+    }
+    if let Some(d) = std::env::var_os("RP_PUBLICACION_LISTAS").filter(|v| !v.is_empty()) {
+        return PathBuf::from(d);
+    }
+    let comun = Command::new("git")
+        .arg("-C")
+        .arg(raiz)
+        .args(["rev-parse", "--path-format=absolute", "--git-common-dir"])
+        .stderr(std::process::Stdio::null())
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| PathBuf::from(String::from_utf8_lossy(&o.stdout).trim_end_matches('\n')));
+    match comun.as_deref().and_then(Path::parent) {
+        Some(principal) => principal.to_path_buf(),
+        None => raiz.to_path_buf(),
     }
 }
 
@@ -145,10 +184,28 @@ fn main() -> ExitCode {
         println!("{USO}");
         return ExitCode::SUCCESS;
     }
-    let antes = args.len();
-    args.retain(|a| a != "--sin-locales");
-    let sin_locales = args.len() != antes;
-    let Some((modo, raiz)) = interpretar(&args) else {
+    // Opciones comunes, en cualquier posición.
+    let mut sin_locales = false;
+    let mut exigir_listas = false;
+    let mut listas = None;
+    let mut resto = Vec::new();
+    let mut it = args.drain(..);
+    while let Some(a) = it.next() {
+        match a.to_str() {
+            Some("--sin-locales") => sin_locales = true,
+            Some("--exigir-listas") => exigir_listas = true,
+            Some("--listas") => match it.next() {
+                Some(d) => listas = Some(PathBuf::from(d)),
+                None => return uso(),
+            },
+            _ => resto.push(a),
+        }
+    }
+    drop(it);
+    if sin_locales && (exigir_listas || listas.is_some()) {
+        return uso();
+    }
+    let Some((modo, raiz)) = interpretar(&resto) else {
         return uso();
     };
 
@@ -170,16 +227,37 @@ fn main() -> ExitCode {
         }
     }
 
-    let permitidos = match leer_permitidos(&raiz) {
+    // Lo que se sube lleva su propia lista de permitidos: la del commit.
+    let rev_permitidos = match &modo {
+        Modo::Arbol { .. } => None,
+        Modo::Diff { rango, .. } => Some(
+            rango
+                .rsplit_once("..")
+                .map_or(rango.as_str(), |(_, fin)| fin.trim_start_matches('.'))
+                .to_owned(),
+        )
+        .map(|r| if r.is_empty() { "HEAD".to_owned() } else { r }),
+        Modo::Historial { revs, .. } => {
+            Some(revs.first().cloned().unwrap_or_else(|| "HEAD".to_owned()))
+        }
+    };
+    let permitidos = match leer_permitidos(&raiz, rev_permitidos.as_deref()) {
         Ok(p) => p,
         Err(c) => return c,
     };
     let locales = if sin_locales {
         ListasLocales::vacia()
     } else {
-        let (l, avisos) = ListasLocales::cargar(&raiz);
+        let (l, avisos) = ListasLocales::cargar(&raiz_de_listas(&raiz, listas));
         for a in avisos {
             eprintln!("{a}");
+        }
+        if exigir_listas && !l.faltan().is_empty() {
+            let reglas: Vec<&str> = l.faltan().iter().map(|r| r.as_str()).collect();
+            return error(&format!(
+                "faltan listas locales obligatorias ({}); no se revisa nada",
+                reglas.join(", ")
+            ));
         }
         l
     };
