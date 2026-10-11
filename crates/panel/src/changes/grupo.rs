@@ -585,6 +585,15 @@ impl ChangeManager {
                 SinRespuesta::Fallido(e) => {
                     return Err(FalloPaso::no_aplicado(CambioError::Router(e)));
                 }
+                // En un grupo, lo que pudo crearse se intenta revertir: si no
+                // se sabe qué instancia es, el grupo no puede darse por
+                // revertido entero.
+                SinRespuesta::CreacionIncierta(e) => {
+                    return Err(FalloPaso {
+                        error: CambioError::Router(e),
+                        revertir: multi,
+                    });
+                }
                 SinRespuesta::OtrosValores(e) => {
                     return Err(FalloPaso {
                         error: CambioError::Router(e),
@@ -696,6 +705,7 @@ impl ChangeManager {
             )
         };
         self.marcar(id, estado, Some(&e), None).await;
+        self.cerrar_sin_revertir(id, &escritos, &fallos).await;
         CambioError::Router(e)
     }
 
@@ -714,12 +724,14 @@ impl ChangeManager {
                         .await
                 }
                 Err(e) => {
-                    // Un paso verificado sigue aplicado; uno sin verificar,
-                    // no se sabe.
+                    // Sigue `aplicado` o `aplicando` (con el motivo): si el
+                    // panel se corta antes de cerrar el grupo, al retomar se
+                    // vuelve a intentar. [`Self::cerrar_sin_revertir`] lo
+                    // pasa a `fallido` una vez cerrado, si no se verificó.
                     let estado = if p.verificado {
                         EstadoPaso::Aplicado
                     } else {
-                        EstadoPaso::Fallido
+                        EstadoPaso::Aplicando
                     };
                     self.marcar_paso(id, p.orden, estado, Some(&e.to_string()))
                         .await;
@@ -728,6 +740,23 @@ impl ChangeManager {
             }
         }
         fallos
+    }
+
+    /// Con el grupo ya en su estado final: los pasos sin verificar que no se
+    /// pudieron revertir quedan `fallido` (no se sabe si se aplicaron; el
+    /// detalle del grupo los nombra).
+    pub(super) async fn cerrar_sin_revertir(
+        &self,
+        id: i64,
+        pasos: &[PasoEscrito],
+        fallos: &[(usize, String, ErrorReversion)],
+    ) {
+        for p in pasos {
+            if !p.verificado && fallos.iter().any(|(o, _, _)| *o == p.orden) {
+                self.marcar_paso(id, p.orden, EstadoPaso::Fallido, None)
+                    .await;
+            }
+        }
     }
 
     /// Escribe los valores anteriores de `plan` y verifica. Los fallos
@@ -741,6 +770,9 @@ impl ChangeManager {
                 Operacion::Accion => Err(ErrorReversion::SinInversa),
                 _ => match self.comprobar(plan, Lado::Anterior).await {
                     Comprobacion::Coincide(_) => Ok(()),
+                    _ if plan.operacion == Operacion::Crear => Err(ErrorReversion::Fallo(
+                        "no se sabe qué instancia se creó; revisa la lista en el router".into(),
+                    )),
                     _ => Err(ErrorReversion::SinInversa),
                 },
             };
@@ -825,6 +857,7 @@ impl ChangeManager {
             };
             let e = format!("{motivo}; {}", detalle_reversion(ej.multi, &fallos));
             self.marcar(ej.id, estado, Some(&e), nota).await;
+            self.cerrar_sin_revertir(ej.id, &ej.pasos, &fallos).await;
         }
     }
 
@@ -834,18 +867,24 @@ impl ChangeManager {
     /// vigilancia empieza de cero. Si no (cortado a medias, a mitad de una
     /// reversión, o algún paso no se ve), se revierte lo escrito en orden
     /// inverso, en segundo plano: el router vuelve entero a lo de antes.
+    ///
+    /// `reserva`: el hueco, ya fijado en `id` antes de leer nada.
     pub(super) async fn reanudar_grupo(
         self: &Arc<Self>,
         id: i64,
         pasos: Vec<PasoGuardado>,
         aplicando: bool,
         wan_antes: bool,
+        reserva: Reserva,
     ) {
         const RETOMADA: &str = "vigilancia retomada tras un reinicio del panel";
         let mut escritos = Vec::new();
         let mut sin_plan = Vec::new();
         let mut completo = true;
         for p in pasos {
+            if p.con_error {
+                completo = false;
+            }
             match p.estado {
                 EstadoPaso::Omitido => {}
                 EstadoPaso::Aplicando | EstadoPaso::Aplicado => match p.plan {
@@ -887,12 +926,6 @@ impl ChangeManager {
                 }
             }
         }
-        let Ok(reserva) = self.reservar() else {
-            let e = "interrumpido; había otro cambio en curso al retomarlo";
-            self.marcar(id, Estado::Fallido, Some(e), None).await;
-            return;
-        };
-        reserva.fijar(id);
         let riesgo = escritos
             .iter()
             .map(|p| p.plan.funcion.riesgo)
@@ -920,8 +953,8 @@ impl ChangeManager {
         let m = self.clone();
         let h = tokio::spawn(async move {
             let motivo = "interrumpido por un reinicio del panel antes de terminar";
-            let mut fallos = sin_plan;
-            fallos.extend(m.revertir_pasos(id, &escritos).await);
+            let mut fallos = m.revertir_pasos(id, &escritos).await;
+            fallos.extend(sin_plan);
             if fallos.is_empty() && escritos.is_empty() {
                 let e = format!("{motivo}; no quedó ningún paso aplicado");
                 m.marcar(id, Estado::Fallido, Some(&e), None).await;
@@ -937,6 +970,7 @@ impl ChangeManager {
             } else {
                 let e = format!("{motivo}; {}", detalle_reversion(true, &fallos));
                 m.marcar(id, Estado::RevertidoParcial, Some(&e), None).await;
+                m.cerrar_sin_revertir(id, &escritos, &fallos).await;
             }
             drop(reserva);
         });
@@ -958,6 +992,9 @@ pub(super) struct PasoGuardado {
     pub(super) orden: usize,
     pub(super) funcion: String,
     pub(super) estado: EstadoPaso,
+    /// Tiene un error guardado: falló, o falló su reversión (el grupo se
+    /// estaba revirtiendo y hay que terminar de revertirlo).
+    pub(super) con_error: bool,
     /// Plan (solo de los pasos escritos), o por qué no se puede rehacer.
     pub(super) plan: Result<Plan, String>,
 }

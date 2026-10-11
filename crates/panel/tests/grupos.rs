@@ -679,3 +679,249 @@ async fn migracion_pasa_cambios_antiguos_a_un_paso() {
         .await
         .unwrap();
 }
+
+/// Alta de una reserva nueva (`192.168.1.99`).
+fn nueva_reserva() -> Paso {
+    paso(
+        req(
+            LEASES,
+            None,
+            &[
+                (POOL, "0"),
+                ("adm_state", "1"),
+                ("mac_addr", "02:00:00:00:00:99"),
+                ("ipv4_addr", "192.168.1.99"),
+            ],
+        ),
+        "ajuste-reserva-nueva",
+    )
+}
+
+/// Arranca `confirmar_grupo` en otra tarea (para cortar el panel a medias).
+fn confirmar_en_segundo_plano(
+    m: &Arc<ChangeManager>,
+    token: &str,
+) -> tokio::task::JoinHandle<Result<i64, CambioError>> {
+    let (m, token) = (m.clone(), token.to_owned());
+    tokio::spawn(async move { m.confirmar_grupo(&token, &[], "admin").await })
+}
+
+async fn esperar_escrituras(p: &Panel, n: usize) {
+    let start = Instant::now();
+    while p.sim.control.writes().len() < n {
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "sin escritura {n}"
+        );
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+}
+
+/// En un grupo, una creación sin respuesta tras la que el router no muestra
+/// lo de antes (aquí, dos instancias nuevas) no se da por no aplicada: se
+/// intenta revertir y, sin saber qué instancia es, el grupo queda
+/// `revertido_parcial` nombrando el paso.
+#[tokio::test]
+async fn creacion_incierta_en_grupo_es_revertido_parcial() {
+    let (p, m) = preparado().await;
+    let prep = m
+        .preparar_grupo(grupo(vec![nueva_reserva(), upnp("1")]))
+        .await
+        .unwrap();
+    p.sim.control.create_twice_next_write();
+    p.sim.control.no_answer_next_write(true);
+    let r = m.confirmar_grupo(&prep.token, &[], "admin").await;
+    assert!(r.is_err(), "{r:?}");
+    let c = m.historial(1).await.remove(0);
+    assert_eq!(c.estado, Estado::RevertidoParcial, "{:?}", c.error);
+    let e = c.error.clone().unwrap();
+    assert!(e.contains("paso 1"), "{e}");
+    assert!(!e.contains("revertido a los valores anteriores"), "{e}");
+    assert_eq!(escritas(&p), [LEASES], "no sigue con el paso 2");
+    assert_eq!(
+        estados_pasos(&c),
+        [EstadoPaso::Fallido, EstadoPaso::Pendiente]
+    );
+    assert_eq!(m.activo(), None);
+}
+
+/// Un cambio de credenciales que empezó antes de retomar no hace que el
+/// grupo pendiente se cierre sin revertir: se espera al hueco y se revierte.
+#[tokio::test]
+async fn credenciales_durante_la_reanudacion_no_cierran_el_grupo() {
+    let p = panel_rapido(Duration::from_millis(500)).await;
+    let a = gestor(&p, tiempos()).await;
+    let prep = a
+        .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.84")]))
+        .await
+        .unwrap();
+    // Cortado entre el paso 1 y el 2.
+    p.sim.control.hang_after_write_n(1);
+    let tarea = confirmar_en_segundo_plano(&a, &prep.token);
+    esperar_escrituras(&p, 1).await;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    a.detener();
+    tarea.abort();
+    let id = a.historial(1).await.remove(0).id;
+    p.sim.control.set_unresponsive(false);
+
+    let b = ChangeManager::new(p.state.clone(), tiempos());
+    // Guardar credenciales ganó la carrera: tiene el hueco.
+    let credenciales = b.excluir_cambios().unwrap();
+    let b2 = b.clone();
+    let retomar = tokio::spawn(async move { b2.reanudar_pendientes().await });
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    // Mientras se retoma, nadie más aparta el gestor.
+    assert!(matches!(b.excluir_cambios(), Err(CambioError::EnCurso)));
+    let c = b.cambio(id).await.unwrap();
+    assert_eq!(
+        c.estado,
+        Estado::Aplicando,
+        "espera al hueco: {:?}",
+        c.error
+    );
+    assert_eq!(escritas(&p), [UPNP]);
+    drop(credenciales);
+    retomar.await.unwrap();
+    let c = esperar_final(&b, id).await;
+    assert_eq!(c.estado, Estado::Fallido, "{:?}", c.error);
+    assert_eq!(upnp_actual(&p).await, "0");
+    assert_eq!(escritas(&p), [UPNP, UPNP]);
+    esperar_libre(&b).await;
+    assert!(b.excluir_cambios().is_ok(), "retomado: ya se puede");
+}
+
+/// Un deshacer que queda revertido en parte cuenta como deshecho: el
+/// original no se puede deshacer otra vez.
+#[tokio::test]
+async fn deshacer_revertido_en_parte_no_se_repite() {
+    let (p, m) = preparado().await;
+    let prep = m
+        .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.84")]))
+        .await
+        .unwrap();
+    let id = m.confirmar_grupo(&prep.token, &[], "admin").await.unwrap();
+    esperar_estado(&m, id, Estado::Aplicado).await;
+    esperar_libre(&m).await;
+    let d = m.deshacer(id).await.unwrap();
+    // Falla el paso 2 del deshacer (UPnP) y la reversión de su paso 1.
+    p.sim.control.fail_write_n(2);
+    p.sim.control.fail_write_n(3);
+    let r = m.confirmar(&d.token, None, "admin").await;
+    assert!(r.is_err(), "{r:?}");
+    let u = m.historial(1).await.remove(0);
+    assert_eq!(u.estado, Estado::RevertidoParcial, "{:?}", u.error);
+    assert!(!m.se_puede_deshacer(id).await);
+    assert!(matches!(
+        m.deshacer(id).await,
+        Err(CambioError::Invalida(_))
+    ));
+}
+
+/// Cortado a mitad de revertir un grupo de tres pasos (el router se cuelga
+/// al revertir el paso 2): al retomar se termina la reversión.
+#[tokio::test]
+async fn reanuda_a_mitad_de_revertir() {
+    let p = panel_rapido(Duration::from_millis(500)).await;
+    let a = gestor(&p, tiempos()).await;
+    let prep = a
+        .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.84"), ssid("OTRA")]))
+        .await
+        .unwrap();
+    p.sim.control.fail_write_n(3);
+    p.sim.control.hang_after_write_n(4);
+    let tarea = confirmar_en_segundo_plano(&a, &prep.token);
+    esperar_escrituras(&p, 4).await;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    a.detener();
+    tarea.abort();
+    let id = a.historial(1).await.remove(0).id;
+    assert_eq!(a.cambio(id).await.unwrap().estado, Estado::Aplicando);
+    p.sim.control.set_unresponsive(false);
+
+    let b = ChangeManager::new(p.state.clone(), tiempos());
+    b.reanudar_pendientes().await;
+    let c = esperar_final(&b, id).await;
+    assert_eq!(c.estado, Estado::Fallido, "{:?}", c.error);
+    assert_eq!(upnp_actual(&p).await, "0");
+    assert_eq!(ip_de_lease0(&p).await, "192.168.1.68");
+    assert_eq!(ssid_actual(&p).await, "RED-1");
+    assert_eq!(
+        estados_pasos(&c),
+        [
+            EstadoPaso::Revertido,
+            EstadoPaso::Revertido,
+            EstadoPaso::Fallido
+        ]
+    );
+    esperar_libre(&b).await;
+}
+
+/// Cortado mientras se vigilaba un grupo; al retomar la WAN cae: se
+/// revierte el grupo entero.
+#[tokio::test]
+async fn reanuda_vigilancia_de_grupo_y_revierte_si_cae_la_wan() {
+    let p = panel_rapido(Duration::from_millis(500)).await;
+    let lento = Tiempos {
+        bajo: Duration::from_secs(60),
+        ..tiempos()
+    };
+    let a = gestor(&p, lento).await;
+    let prep = a
+        .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.84")]))
+        .await
+        .unwrap();
+    let id = a.confirmar_grupo(&prep.token, &[], "admin").await.unwrap();
+    assert_eq!(a.cambio(id).await.unwrap().estado, Estado::Vigilando);
+    a.detener();
+
+    let b = ChangeManager::new(p.state.clone(), tiempos());
+    b.reanudar_pendientes().await;
+    assert_eq!(b.activo(), Some(id));
+    p.sim.control.set_wan_up(false);
+    let c = esperar_estado(&b, id, Estado::Revertido).await;
+    assert!(c.error.as_deref().unwrap().contains("WAN"));
+    assert_eq!(upnp_actual(&p).await, "0");
+    assert_eq!(ip_de_lease0(&p).await, "192.168.1.68");
+    assert_eq!(escritas(&p), [UPNP, LEASES, LEASES, UPNP]);
+    esperar_libre(&b).await;
+}
+
+/// Un paso sin verificar cuya reversión falló sigue pendiente de revertir
+/// si el panel se corta antes de cerrar el grupo: al retomar se revierte.
+#[tokio::test]
+async fn reversion_fallida_sigue_pendiente_al_retomar() {
+    let p = panel_rapido(Duration::from_millis(500)).await;
+    let a = gestor(&p, tiempos()).await;
+    let prep = a
+        .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.84")]))
+        .await
+        .unwrap();
+    // El paso 2 se aplica pero el router se cuelga: no se verifica y su
+    // reversión agota los reintentos; el panel muere revirtiendo el 1.
+    p.sim.control.hang_after_write_n(2);
+    let tarea = confirmar_en_segundo_plano(&a, &prep.token);
+    esperar_escrituras(&p, 2).await;
+    let id = a.historial(1).await.remove(0).id;
+    let start = Instant::now();
+    while a.cambio(id).await.unwrap().pasos[1].error.is_none() {
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "sin fallo del paso 2"
+        );
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    a.detener();
+    tarea.abort();
+    assert_eq!(a.cambio(id).await.unwrap().estado, Estado::Aplicando);
+    p.sim.control.set_unresponsive(false);
+
+    let b = ChangeManager::new(p.state.clone(), tiempos());
+    b.reanudar_pendientes().await;
+    let c = esperar_final(&b, id).await;
+    assert_eq!(c.estado, Estado::Fallido, "{:?}", c.error);
+    assert_eq!(upnp_actual(&p).await, "0");
+    assert_eq!(ip_de_lease0(&p).await, "192.168.1.68", "el paso 2 también");
+    esperar_libre(&b).await;
+}

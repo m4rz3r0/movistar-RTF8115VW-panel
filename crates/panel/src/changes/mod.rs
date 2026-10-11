@@ -113,6 +113,9 @@ enum SinRespuesta {
     /// El router no muestra ni lo de antes ni lo nuevo (pudo quedar a
     /// medias): fallido, y hay que revertir (motivo).
     OtrosValores(String),
+    /// Al crear, el router no muestra lo de antes pero tampoco se sabe qué
+    /// instancia es la del cambio: pudo crearse algo (motivo).
+    CreacionIncierta(String),
 }
 
 impl Tiempos {
@@ -424,8 +427,27 @@ impl ChangeManager {
     /// (sustituir las credenciales del router): [`CambioError::EnCurso`] si
     /// hay uno aplicándose o vigilándose; mientras viva lo devuelto, no
     /// empieza ninguno.
+    ///
+    /// Mientras se retoman los cambios pendientes del arranque
+    /// ([`ChangeManager::reanudar_pendientes`]), también `EnCurso`: retomar
+    /// puede tener que revertir con las credenciales de entonces.
     pub fn excluir_cambios(self: &Arc<Self>) -> Result<Reserva, CambioError> {
+        let reanudando = self.reanudando.load(std::sync::atomic::Ordering::SeqCst);
+        if reanudando && !*self.listo.borrow() {
+            return Err(CambioError::EnCurso);
+        }
         self.reservar()
+    }
+
+    /// Espera a que el hueco quede libre y lo reserva (al retomar: lo que
+    /// lo ocupe, p. ej. un cambio de credenciales, termina pronto).
+    async fn esperar_hueco(self: &Arc<Self>) -> Reserva {
+        loop {
+            if let Ok(r) = self.reservar() {
+                return r;
+            }
+            tokio::time::sleep(self.tiempos.intervalo).await;
+        }
     }
 
     /// Detiene la vigilancia en curso sin cerrar el cambio (queda como al
@@ -546,9 +568,9 @@ impl ChangeManager {
                         )),
                         // Al crear, sin saber cuál es la instancia nueva no
                         // se podría revertir ni deshacer: no se toca nada.
-                        _ if plan.operacion == Operacion::Crear => {
-                            SinRespuesta::Fallido(format!("{sin_confirmar}; {}", v.join("; ")))
-                        }
+                        _ if plan.operacion == Operacion::Crear => SinRespuesta::CreacionIncierta(
+                            format!("{sin_confirmar}; {}", v.join("; ")),
+                        ),
                         _ => SinRespuesta::OtrosValores(format!(
                             "{sin_confirmar}; el router muestra otros valores: {}",
                             v.join("; ")
@@ -592,9 +614,16 @@ impl ChangeManager {
             }
         };
         let (d, estado) = r?;
-        let vigente = [Estado::Aplicando, Estado::Vigilando, Estado::Aplicado]
-            .iter()
-            .any(|e| e.as_str() == estado);
+        // Un deshacer que quedó revertido en parte también cuenta: parte de
+        // él sigue aplicada y no se deshace dos veces.
+        let vigente = [
+            Estado::Aplicando,
+            Estado::Vigilando,
+            Estado::Aplicado,
+            Estado::RevertidoParcial,
+        ]
+        .iter()
+        .any(|e| e.as_str() == estado);
         vigente.then(|| format!("el cambio {original} ya se ha deshecho (cambio {d})"))
     }
 
@@ -720,6 +749,12 @@ impl ChangeManager {
         };
         for fila in filas {
             let id: i64 = fila.get("id");
+            // El hueco, antes de leer o tocar nada: lo que lo ocupe (un
+            // cambio de credenciales que empezó antes, o el cambio anterior
+            // de esta lista) termina antes de seguir. Así ningún grupo se da
+            // por cerrado sin intentar revertirlo.
+            let reserva = self.esperar_hueco().await;
+            reserva.fijar(id);
             let aplicando = fila.get::<String, _>("estado") == Estado::Aplicando.as_str();
             // La WAN como estaba antes del cambio (nunca la de ahora).
             let wan_antes = fila.get::<Option<i64>, _>("wan_antes") != Some(0);
@@ -735,6 +770,7 @@ impl ChangeManager {
                         orden: f.get::<i64, _>("orden") as usize,
                         funcion: f.get("funcion"),
                         estado,
+                        con_error: f.get::<Option<String>, _>("error").is_some(),
                         plan: if escrito {
                             self.reconstruir(f)
                         } else {
@@ -757,7 +793,8 @@ impl ChangeManager {
                     let Some(p) = p else { continue };
                     match (p.estado, p.plan) {
                         (EstadoPaso::Aplicando | EstadoPaso::Aplicado, Ok(plan)) => {
-                            self.reanudar(id, p.orden, plan, aplicando, wan_antes).await
+                            self.reanudar(id, p.orden, plan, aplicando, wan_antes, reserva)
+                                .await
                         }
                         (EstadoPaso::Aplicando | EstadoPaso::Aplicado, Err(e)) => {
                             self.marcar_paso(id, p.orden, EstadoPaso::Fallido, Some(&e))
@@ -772,13 +809,16 @@ impl ChangeManager {
                         }
                     }
                 }
-                _ => self.reanudar_grupo(id, pasos, aplicando, wan_antes).await,
+                _ => {
+                    self.reanudar_grupo(id, pasos, aplicando, wan_antes, reserva)
+                        .await
+                }
             }
         }
     }
 
     /// Retoma un cambio de un paso (`orden`); `aplicando`: se cortó antes de
-    /// terminar de escribir y verificar.
+    /// terminar de escribir y verificar. `reserva`: el hueco, ya fijado.
     async fn reanudar(
         self: &Arc<Self>,
         id: i64,
@@ -786,6 +826,7 @@ impl ChangeManager {
         mut plan: Plan,
         aplicando: bool,
         wan_antes: bool,
+        reserva: Reserva,
     ) {
         const RETOMADA: &str = "vigilancia retomada tras un reinicio del panel";
         let fallido = |e: String| async move {
@@ -847,12 +888,6 @@ impl ChangeManager {
                 return;
             }
         };
-        let Ok(reserva) = self.reservar() else {
-            let e = "interrumpido; había otro cambio en curso al retomarlo";
-            self.marcar(id, Estado::Fallido, Some(e), None).await;
-            return;
-        };
-        reserva.fijar(id);
         self.marcar_paso(id, orden, EstadoPaso::Aplicado, None)
             .await;
         self.marcar(id, Estado::Vigilando, None, Some(&nota)).await;
