@@ -813,7 +813,7 @@ mod tests {
     #[test]
     fn caducidad_de_las_concesiones() {
         let lease = |caduca_s| LeaseVista {
-            ip: "192.168.1.2".into(),
+            ip: "192.168.1.62".into(),
             mac: "02:00:00:00:00:01".into(),
             nombre: String::new(),
             fijo: false,

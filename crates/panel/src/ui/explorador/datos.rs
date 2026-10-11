@@ -555,7 +555,7 @@ mod tests {
     #[test]
     fn valida_cada_tipo() {
         let op = vec![("1".to_owned(), "Sí".to_owned())];
-        assert!(validar_campo(TipoCampo::Ip, &[], " 192.168.1.5 ").is_ok());
+        assert!(validar_campo(TipoCampo::Ip, &[], " 192.168.1.65 ").is_ok());
         assert!(validar_campo(TipoCampo::Ip, &[], "192.168.1").is_err());
         assert!(validar_campo(TipoCampo::Mac, &[], "02:00:00:00:00:aB").is_ok());
         assert!(validar_campo(TipoCampo::Mac, &[], "02:00:00:00:00").is_err());

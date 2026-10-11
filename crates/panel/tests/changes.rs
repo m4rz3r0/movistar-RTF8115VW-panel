@@ -166,12 +166,12 @@ async fn aplica_y_verifica_static_lease() {
 #[tokio::test]
 async fn edicion_envia_la_instancia_completa() {
     let (p, m) = preparado().await;
-    let prep = m.preparar(lease0("192.168.1.84")).await.unwrap();
+    let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
     assert_eq!(prep.diff.campos.len(), 1);
     let c = &prep.diff.campos[0];
     assert_eq!(
         (c.nombre.as_str(), c.antes.as_str(), c.despues.as_str()),
-        ("ipv4_addr", "192.168.1.68", "192.168.1.84")
+        ("ipv4_addr", "192.168.1.68", "192.168.1.80")
     );
     let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
     esperar_estado(&m, id, Estado::Aplicado).await;
@@ -183,7 +183,7 @@ async fn edicion_envia_la_instancia_completa() {
     assert_eq!(params["rtm_dhcpv4_svr_pool_static_id"], "0");
     assert_eq!(params[POOL], "0");
     assert!(!params.contains_key("del"));
-    assert_eq!(ip_de_lease(&p, "0").await.as_deref(), Some("192.168.1.84"));
+    assert_eq!(ip_de_lease(&p, "0").await.as_deref(), Some("192.168.1.80"));
 }
 
 #[tokio::test]
@@ -237,7 +237,7 @@ async fn bloqueada_rechazada() {
 #[tokio::test]
 async fn verificacion_falla_si_router_ignora() {
     let (p, m) = preparado().await;
-    let prep = m.preparar(lease0("192.168.1.84")).await.unwrap();
+    let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
     p.sim.control.ignore_next_write();
     let r = m.confirmar(&prep.token, None, "admin").await;
     let Err(CambioError::Verificacion(fallos)) = r else {
@@ -255,7 +255,7 @@ async fn verificacion_falla_si_router_ignora() {
 #[tokio::test]
 async fn error_del_router_deja_fallido() {
     let (p, m) = preparado().await;
-    let prep = m.preparar(lease0("192.168.1.84")).await.unwrap();
+    let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
     p.sim.control.fail_next_write("no se puede");
     let r = m.confirmar(&prep.token, None, "admin").await;
     assert!(
@@ -274,13 +274,13 @@ async fn error_del_router_deja_fallido() {
 #[tokio::test]
 async fn escritura_sin_respuesta_aplicada_se_vigila() {
     let (p, m) = preparado().await;
-    let prep = m.preparar(lease0("192.168.1.84")).await.unwrap();
+    let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
     p.sim.control.no_answer_next_write(true);
     let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
     let c = esperar_estado(&m, id, Estado::Aplicado).await;
     let nota = c.nota.unwrap_or_default();
     assert!(nota.contains("no confirmó"), "{nota}");
-    assert_eq!(ip_de_lease(&p, "0").await.as_deref(), Some("192.168.1.84"));
+    assert_eq!(ip_de_lease(&p, "0").await.as_deref(), Some("192.168.1.80"));
     esperar_libre(&m).await;
     assert!(m.se_puede_deshacer(id).await);
 }
@@ -289,7 +289,7 @@ async fn escritura_sin_respuesta_aplicada_se_vigila() {
 #[tokio::test]
 async fn escritura_sin_respuesta_aplicada_se_revierte_si_cae_la_wan() {
     let (p, m) = preparado().await;
-    let prep = m.preparar(lease0("192.168.1.84")).await.unwrap();
+    let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
     p.sim.control.no_answer_next_write(true);
     let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
     p.sim.control.set_wan_up(false);
@@ -302,7 +302,7 @@ async fn escritura_sin_respuesta_aplicada_se_revierte_si_cae_la_wan() {
 #[tokio::test]
 async fn escritura_sin_respuesta_no_aplicada_queda_fallida() {
     let (p, m) = preparado().await;
-    let prep = m.preparar(lease0("192.168.1.84")).await.unwrap();
+    let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
     p.sim.control.no_answer_next_write(false);
     let r = m.confirmar(&prep.token, None, "admin").await;
     assert!(
@@ -319,7 +319,7 @@ async fn escritura_sin_respuesta_no_aplicada_queda_fallida() {
 #[tokio::test]
 async fn revierte_si_se_pierde_la_wan() {
     let (p, m) = preparado().await;
-    let prep = m.preparar(lease0("192.168.1.84")).await.unwrap();
+    let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
     let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
     p.sim.control.set_wan_up(false);
     let c = esperar_estado(&m, id, Estado::Revertido).await;
@@ -337,18 +337,18 @@ async fn revierte_si_se_pierde_la_wan() {
 async fn wan_ya_caida_no_provoca_reversion() {
     let (p, m) = preparado().await;
     p.sim.control.set_wan_up(false);
-    let prep = m.preparar(lease0("192.168.1.84")).await.unwrap();
+    let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
     let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
     let c = esperar_estado(&m, id, Estado::Aplicado).await;
     assert!(c.nota.unwrap().contains("WAN"));
-    assert_eq!(ip_de_lease(&p, "0").await.as_deref(), Some("192.168.1.84"));
+    assert_eq!(ip_de_lease(&p, "0").await.as_deref(), Some("192.168.1.80"));
 }
 
 #[tokio::test]
 async fn revierte_si_el_router_deja_de_responder() {
     let p = panel_rapido(Duration::from_millis(100)).await;
     let m = gestor(&p, tiempos()).await;
-    let prep = m.preparar(lease0("192.168.1.84")).await.unwrap();
+    let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
     let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
     p.sim.control.set_unresponsive(true);
     // Tres fallos seguidos (100 ms de espera cada uno) y, cuando el router
@@ -450,7 +450,7 @@ async fn secreto_cambiado_se_enmascara_y_se_guarda_cifrado() {
 #[tokio::test]
 async fn cambios_concurrentes_no_se_intercalan() {
     let (p, m) = preparado().await;
-    let a = m.preparar(lease0("192.168.1.84")).await.unwrap();
+    let a = m.preparar(lease0("192.168.1.80")).await.unwrap();
     let b = m
         .preparar(req("cbSetUpnpCfg", None, &[("adm_state", "1")]))
         .await
@@ -480,7 +480,7 @@ async fn cambios_concurrentes_no_se_intercalan() {
 #[tokio::test]
 async fn token_de_un_solo_uso() {
     let (_p, m) = preparado().await;
-    let prep = m.preparar(lease0("192.168.1.84")).await.unwrap();
+    let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
     let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
     esperar_estado(&m, id, Estado::Aplicado).await;
     esperar_libre(&m).await;
@@ -501,7 +501,7 @@ async fn pausa_que_no_llega_no_escribe() {
         },
     )
     .await;
-    let prep = m.preparar(lease0("192.168.1.84")).await.unwrap();
+    let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
     Poller::spawn_with(
         p.state.clone(),
         PollerConfig {
@@ -531,7 +531,7 @@ async fn reanuda_tras_reinicio() {
         ..tiempos()
     };
     let a = gestor(&p, lento).await;
-    let prep = a.preparar(lease0("192.168.1.84")).await.unwrap();
+    let prep = a.preparar(lease0("192.168.1.80")).await.unwrap();
     let id = a.confirmar(&prep.token, None, "admin").await.unwrap();
     assert_eq!(a.cambio(id).await.unwrap().estado, Estado::Vigilando);
     // El proceso muere a mitad de la vigilancia.
@@ -544,7 +544,7 @@ async fn reanuda_tras_reinicio() {
     assert_eq!(b.activo(), Some(id));
     let c = esperar_estado(&b, id, Estado::Aplicado).await;
     assert!(c.nota.unwrap().contains("reinicio"));
-    assert_eq!(ip_de_lease(&p, "0").await.as_deref(), Some("192.168.1.84"));
+    assert_eq!(ip_de_lease(&p, "0").await.as_deref(), Some("192.168.1.80"));
 }
 
 #[tokio::test]
@@ -555,7 +555,7 @@ async fn reanuda_y_marca_fallido_si_no_llego_a_aplicarse() {
         ..tiempos()
     };
     let a = gestor(&p, lento).await;
-    let prep = a.preparar(lease0("192.168.1.84")).await.unwrap();
+    let prep = a.preparar(lease0("192.168.1.80")).await.unwrap();
     let id = a.confirmar(&prep.token, None, "admin").await.unwrap();
     a.detener();
     // El router vuelve a tener el valor anterior (p. ej. no llegó a guardarlo).
@@ -583,7 +583,7 @@ async fn reanuda_y_marca_fallido_si_no_llego_a_aplicarse() {
 #[tokio::test]
 async fn deshacer_restaura_valor_anterior() {
     let (p, m) = preparado().await;
-    let prep = m.preparar(lease0("192.168.1.84")).await.unwrap();
+    let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
     let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
     // Solo se deshace un cambio ya aplicado.
     let r = m.deshacer(id).await;
@@ -595,7 +595,7 @@ async fn deshacer_restaura_valor_anterior() {
     let c = &deshacer.diff.campos[0];
     assert_eq!(
         (c.nombre.as_str(), c.antes.as_str(), c.despues.as_str()),
-        ("ipv4_addr", "192.168.1.84", "192.168.1.68")
+        ("ipv4_addr", "192.168.1.80", "192.168.1.68")
     );
     let id2 = m.confirmar(&deshacer.token, None, "admin").await.unwrap();
     esperar_estado(&m, id2, Estado::Aplicado).await;
@@ -729,7 +729,7 @@ async fn editar_un_campo_ilegible_se_rechaza() {
 async fn historial_en_orden() {
     let (_p, m) = preparado().await;
     let mut ids = Vec::new();
-    for ip in ["192.168.1.84", "192.168.1.85"] {
+    for ip in ["192.168.1.80", "192.168.1.81"] {
         let prep = m.preparar(lease0(ip)).await.unwrap();
         let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
         esperar_estado(&m, id, Estado::Aplicado).await;
@@ -739,7 +739,7 @@ async fn historial_en_orden() {
     let h = m.historial(10).await;
     assert_eq!(h.iter().map(|c| c.id).collect::<Vec<_>>(), [ids[1], ids[0]]);
     assert_eq!(h[0].riesgo, Riesgo::Bajo);
-    assert_eq!(h[0].diff.campos[0].despues, "192.168.1.85");
+    assert_eq!(h[0].diff.campos[0].despues, "192.168.1.81");
     assert!(h[0].updated >= h[0].ts);
     assert_eq!(m.historial(1).await.len(), 1);
 }
@@ -752,7 +752,7 @@ async fn reanuda_con_la_wan_de_antes_del_cambio() {
         ..tiempos()
     };
     let a = gestor(&p, lento).await;
-    let prep = a.preparar(lease0("192.168.1.84")).await.unwrap();
+    let prep = a.preparar(lease0("192.168.1.80")).await.unwrap();
     let id = a.confirmar(&prep.token, None, "admin").await.unwrap();
     a.detener();
     // El cambio tumbó la WAN y el panel se reinició: se vigila con la WAN de
@@ -882,7 +882,7 @@ async fn revierte_un_secreto_que_estaba_vacio() {
 #[tokio::test]
 async fn confirmar_abandonado_termina_igual() {
     let (_p, m) = preparado().await;
-    let prep = m.preparar(lease0("192.168.1.84")).await.unwrap();
+    let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
     // Quien confirma se va (p. ej. se cierra la pestaña) a mitad de camino.
     let r = tokio::time::timeout(
         Duration::from_millis(2),
@@ -905,7 +905,7 @@ async fn confirmar_abandonado_termina_igual() {
 #[tokio::test]
 async fn relectura_fallida_tras_revertir_se_reintenta() {
     let (p, m) = preparado().await;
-    let prep = m.preparar(lease0("192.168.1.84")).await.unwrap();
+    let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
     let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
     p.sim
         .control
@@ -968,7 +968,7 @@ async fn revierte_un_valor_fuera_de_las_opciones() {
 #[tokio::test]
 async fn no_se_deshace_dos_veces() {
     let (p, m) = preparado().await;
-    let prep = m.preparar(lease0("192.168.1.84")).await.unwrap();
+    let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
     let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
     esperar_estado(&m, id, Estado::Aplicado).await;
     esperar_libre(&m).await;
@@ -1002,7 +1002,7 @@ async fn confirmar_espera_a_que_se_retome_lo_pendiente() {
         ..tiempos()
     };
     let a = gestor(&p, lento).await;
-    let prep = a.preparar(lease0("192.168.1.84")).await.unwrap();
+    let prep = a.preparar(lease0("192.168.1.80")).await.unwrap();
     let pendiente = a.confirmar(&prep.token, None, "admin").await.unwrap();
     a.detener();
 
@@ -1113,7 +1113,7 @@ async fn reintento_de_revertir_una_creacion_acepta_que_ya_no_exista() {
 #[tokio::test]
 async fn router_que_rechaza_la_reversion_falla_sin_reintentar() {
     let (p, m) = preparado().await;
-    let prep = m.preparar(lease0("192.168.1.84")).await.unwrap();
+    let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
     let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
     p.sim.control.fail_next_write("valores no admitidos");
     p.sim.control.set_wan_up(false);
@@ -1123,5 +1123,5 @@ async fn router_que_rechaza_la_reversion_falla_sin_reintentar() {
     // Sin reintentos: el cambio y un único intento de reversión.
     tokio::time::sleep(Duration::from_millis(100)).await;
     assert_eq!(p.sim.control.writes().len(), 2);
-    assert_eq!(ip_de_lease(&p, "0").await.as_deref(), Some("192.168.1.84"));
+    assert_eq!(ip_de_lease(&p, "0").await.as_deref(), Some("192.168.1.80"));
 }

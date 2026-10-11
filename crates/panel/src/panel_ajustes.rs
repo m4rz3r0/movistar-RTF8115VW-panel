@@ -668,7 +668,7 @@ mod tests {
                 "9.9.9.9".into(),
                 "2620:FE::FE".into(),
             ]),
-            servidor_propio: Some(" nas.lan ".into()),
+            servidor_propio: Some(" nas.home.arpa ".into()),
             mantenimiento: Some(" ".into()),
             ..campos()
         };
@@ -678,7 +678,7 @@ mod tests {
             Some(&["9.9.9.9".to_owned(), "2620:fe::fe".to_owned()][..])
         );
         assert_eq!(n.zona_horaria.as_deref(), Some("UTC"));
-        assert_eq!(n.servidor_propio.as_deref(), Some("nas.lan"));
+        assert_eq!(n.servidor_propio.as_deref(), Some("nas.home.arpa"));
         assert_eq!(n.mantenimiento.as_deref(), Some(""), "vacío: quitar");
         // Lo que no llega sigue sin llegar.
         assert_eq!(n.idioma, None);
@@ -700,7 +700,7 @@ mod tests {
             ..campos()
         };
         assert_eq!(normalizar(c), Err(ErrorInstancia::DemasiadosDns));
-        for s in ["-nas.lan", "nas..lan", "http://nas", "nas lan"] {
+        for s in ["-nas.home.arpa", "nas..home.arpa", "http://nas", "nas lan"] {
             let c = CamposInstancia {
                 servidor_propio: Some(s.into()),
                 ..campos()
@@ -708,7 +708,7 @@ mod tests {
             assert_eq!(normalizar(c), Err(ErrorInstancia::ServidorPropio), "{s}");
         }
         let c = CamposInstancia {
-            servidor_propio: Some("192.0.2.10".into()),
+            servidor_propio: Some("192.168.1.74".into()),
             ..campos()
         };
         assert!(normalizar(c).is_ok());

@@ -493,7 +493,7 @@ async fn tras_el_proxy_cuenta_la_ip_del_cliente() {
     let (status, body) = por_el_proxy(&p, "/api/crear_admin", &admin, true, PUBLICA).await;
     assert_eq!(status, 403, "{body}");
     assert_eq!(usuarios(&p).await, 0);
-    let (status, body) = por_el_proxy(&p, "/api/crear_admin", &admin, true, "192.168.1.69").await;
+    let (status, body) = por_el_proxy(&p, "/api/crear_admin", &admin, true, "192.168.1.90").await;
     assert_eq!(status, 200, "{body}");
 
     // El login y su freno cuentan la IP del cliente, no la del proxy.

@@ -383,7 +383,7 @@ mod tests {
         assert_eq!(s.uptime_s, 26263);
         assert!(s.load1 > 0.0 && s.load5 > 0.0 && s.load15 > 0.0);
         assert_eq!((s.ram_total_kb, s.ram_free_kb), (255412, 68708));
-        assert_eq!(s.sys_time, 1791407932);
+        assert_eq!(s.sys_time, 1767225600);
     }
 
     #[test]

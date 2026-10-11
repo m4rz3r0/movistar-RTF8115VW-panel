@@ -640,10 +640,10 @@ mod tests {
             valores: mapa(&[
                 ("rtm_cfg_dhcpv4_svr_pool_id", "0"),
                 ("rtm_dhcpv4_svr_pool_static_id", "0"),
-                ("ipv4_addr", "192.168.1.84"),
+                ("ipv4_addr", "192.168.1.80"),
             ]),
             payload: Vec::new(),
-            campos: vec![campo("ipv4_addr", "192.168.1.68", "192.168.1.84", true)],
+            campos: vec![campo("ipv4_addr", "192.168.1.68", "192.168.1.80", true)],
             lectura: Lectura::Ninguna,
             ids_antes: None,
         };
@@ -658,7 +658,7 @@ mod tests {
             ])
         );
         // Sin valores anteriores conocidos no hay inversa.
-        plan.campos = vec![campo("ipv4_addr", "", "192.168.1.84", false)];
+        plan.campos = vec![campo("ipv4_addr", "", "192.168.1.80", false)];
         assert_eq!(inversa(&plan), None);
 
         plan.operacion = Operacion::Crear;
@@ -715,7 +715,7 @@ mod tests {
         let c = cat();
         let f = c.funcion("cbDhcpV4SvrPoolSetStatic").unwrap();
         let p = |n| f.parametro(n).unwrap();
-        assert!(validar(p("ipv4_addr"), "192.168.1.5").is_ok());
+        assert!(validar(p("ipv4_addr"), "192.168.1.65").is_ok());
         assert!(validar(p("ipv4_addr"), "192.168.1.256").is_err());
         assert!(validar(p("mac_addr"), "02:00:00:00:00:aB").is_ok());
         assert!(validar(p("mac_addr"), "02:00:00:00:00").is_err());

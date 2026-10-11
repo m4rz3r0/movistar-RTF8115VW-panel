@@ -167,7 +167,7 @@ mod tests {
             ("RP_ROUTER_USER", "sim"),
             ("RP_ROUTER_SECRET", "/tmp/r.secret"),
             ("RP_HISTORY_KEY", "/tmp/h.key"),
-            ("RP_TRUSTED_PROXY", "10.0.0.2"),
+            ("RP_TRUSTED_PROXY", "192.0.2.100"),
             ("RP_ORIGIN", "https://panel.example"),
         ])
         .unwrap();
@@ -177,7 +177,7 @@ mod tests {
         assert_eq!(c.router_user.as_deref(), Some("sim"));
         assert_eq!(c.router_secret_file, Some(PathBuf::from("/tmp/r.secret")));
         assert_eq!(c.history_key_file, PathBuf::from("/tmp/h.key"));
-        assert_eq!(c.trusted_proxy, "10.0.0.2".parse::<IpAddr>().unwrap());
+        assert_eq!(c.trusted_proxy, "192.0.2.100".parse::<IpAddr>().unwrap());
         assert_eq!(c.public_origin, "https://panel.example");
     }
 

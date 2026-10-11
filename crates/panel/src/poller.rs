@@ -684,8 +684,8 @@ mod tests {
         }
     }
 
-    /// Lectura con los contadores de la medida real del 09/10: (ip2, eth0.1,
-    /// eth0.4, ra0) como (rx, tx).
+    /// Lectura con los contadores de una medida en un router real: (ip2,
+    /// eth0.1, eth0.4, ra0) como (rx, tx).
     fn lectura(ms: i64, v: [(u64, u64); 4]) -> LanBytes {
         let c = [
             iface("ip2", IfaceKind::IpIntf, v[0].0, v[0].1),
@@ -698,7 +698,7 @@ mod tests {
 
     #[test]
     fn la_bajada_sale_de_los_puertos_lan_no_de_ip2() {
-        // Descarga de 1 GiB desde un portátil en eth0.4 durante 40 s: ip2 rx
+        // Descarga de 1 GiB por un puerto LAN (eth0.4) durante 40 s: ip2 rx
         // apenas se mueve (+51 973 B, el resto va reenviado por hardware) y
         // eth0.4 tx sube 1 146 955 629 B; eth0.1 rx +1,9 MB.
         let antes = lectura(

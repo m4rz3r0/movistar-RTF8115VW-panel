@@ -1,6 +1,8 @@
 #!/bin/sh
 # Regenera crates/hgu/fixtures a partir de las respuestas XML capturadas del
-# router real, sustituyendo secretos, MAC, IP públicas, SSID y nombres de equipo.
+# router real, sustituyendo secretos, MAC, IP públicas, SSID y nombres de equipo
+# y neutralizando la topología de la red (direcciones de la LAN y del operador,
+# pool DHCP, reenvíos y hora del resumen).
 #
 # Uso: tools/sanear-fixtures.sh <dir_xml_bruto> [fichero_secretos]
 #

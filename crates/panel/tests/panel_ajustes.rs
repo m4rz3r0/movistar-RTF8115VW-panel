@@ -338,7 +338,7 @@ async fn instancia_valida_dns_y_macs() {
     c["dispositivos_confianza"] =
         json!(["AA-BB-CC-00-11-22", "aabb.cc00.1133", "AA:BB:CC:00:11:44"]);
     c["mantenimiento"] = json!("03:00-05:30");
-    c["servidor_propio"] = json!("servidor.lan");
+    c["servidor_propio"] = json!("servidor.home.arpa");
     c["idioma"] = json!("En");
     ok(&p, "guardar_instancia", json!({ "campos": c }), &cookie).await;
     let v = ok(&p, "leer_panel", json!({}), &cookie).await;
@@ -355,7 +355,7 @@ async fn instancia_valida_dns_y_macs() {
         ])
     );
     assert_eq!(v["mantenimiento"], "03:00-05:30");
-    assert_eq!(v["servidor_propio"], "servidor.lan");
+    assert_eq!(v["servidor_propio"], "servidor.home.arpa");
     assert_eq!(v["zona_horaria"], "UTC+01:00");
     assert_eq!(v["idioma"], "En");
 
@@ -380,7 +380,7 @@ async fn instancia_valida_dns_y_macs() {
         ("zona_horaria", json!("Europe/Madrid")),
         ("zona_horaria", json!("UTC+15:00")),
         ("zona_horaria", json!("UTC+1")),
-        ("servidor_propio", json!("http://servidor.lan/")),
+        ("servidor_propio", json!("http://servidor.home.arpa/")),
     ];
     for (campo, valor) in malos {
         let mut c = campos();

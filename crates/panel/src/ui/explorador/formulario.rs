@@ -443,7 +443,7 @@ fn control(i: usize, c: &CampoForm, s: RwSignal<String>, op: Operacion) -> impl 
         .into_any(),
         t => {
             let (modo_teclado, ejemplo) = match t {
-                TipoCampo::Ip => ("decimal", "192.168.1.60"),
+                TipoCampo::Ip => ("decimal", "192.168.1.100"),
                 TipoCampo::Mac => ("text", "02:00:00:00:00:01"),
                 TipoCampo::Int => ("numeric", ""),
                 _ => ("text", ""),

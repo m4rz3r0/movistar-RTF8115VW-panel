@@ -350,7 +350,7 @@ async fn grupo_es_una_fila_con_sus_pasos() {
                 paso(
                     LEASES,
                     Some("0"),
-                    &[(POOL, "0"), ("ipv4_addr", "192.168.1.84")],
+                    &[(POOL, "0"), ("ipv4_addr", "192.168.1.80")],
                     None,
                 ),
             ],

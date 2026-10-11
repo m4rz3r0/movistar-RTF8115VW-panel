@@ -180,7 +180,7 @@ async fn static_lease_add_then_list() {
         .unwrap()
         + 1;
 
-    let params = add_static("02:00:00:00:aa:01", "192.168.1.201");
+    let params = add_static("02:00:00:00:aa:01", "192.168.1.88");
     c.write("dhcp.asp", "cbDhcpV4SvrPoolSetStatic", &params)
         .await
         .unwrap();
@@ -196,7 +196,7 @@ async fn static_lease_add_then_list() {
         &(
             next_id.to_string(),
             "02:00:00:00:aa:01".to_owned(),
-            "192.168.1.201".to_owned()
+            "192.168.1.88".to_owned()
         )
     );
     let one = c
@@ -358,7 +358,7 @@ async fn ignore_next_write_keeps_state() {
             .unwrap(),
     );
     sim.control.ignore_next_write();
-    let params = add_static("02:00:00:00:aa:02", "192.168.1.202");
+    let params = add_static("02:00:00:00:aa:02", "192.168.1.89");
     c.write("dhcp.asp", "cbDhcpV4SvrPoolSetStatic", &params)
         .await
         .unwrap();

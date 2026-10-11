@@ -176,7 +176,7 @@ pub fn is_public_ipv4(ip: Ipv4Addr) -> bool {
         || (o[0] == 100 && (o[1] & 0xc0) == 64))
 }
 
-/// `true` si la IPv6 es global (2000::/3) y no de documentación (2001:db8::/32).
+/// `true` si la IPv6 es unicast global y no de documentación (2001:db8::/32).
 pub fn is_global_ipv6(ip: Ipv6Addr) -> bool {
     let s = ip.segments();
     (s[0] & 0xe000) == 0x2000 && !(s[0] == 0x2001 && s[1] == 0x0db8)
@@ -417,7 +417,8 @@ impl Sanitizer {
         let out = MAC.replace_all(value, |c: &Captures| {
             let found = &c[0];
             let norm = found.replace([':', '-'], "").to_ascii_lowercase();
-            if !real.contains(&norm) || norm == "000000000000" || norm == "ffffffffffff" {
+            // Los seudónimos (`02:00:00:…`) ya están saneados: no se renumeran.
+            if !real.contains(&norm) || is_fake_mac(&norm) {
                 return found.to_owned();
             }
             self.remember(found);
@@ -466,6 +467,125 @@ impl Sanitizer {
     }
 }
 
+/// Primer equipo de la LAN renumerado (`192.168.1.60`).
+const LAN_PRIMERO: u8 = 60;
+/// Equipos distintos de la LAN que caben en `.60`–`.99`.
+const LAN_MAX: usize = 40;
+/// Pool DHCP neutro y su DNS (el propio router).
+const POOL_INICIO: &str = "192.168.1.100";
+const POOL_FIN: &str = "192.168.1.199";
+const POOL_DNS: &str = "192.168.1.1";
+/// Puerto neutro de los reenvíos.
+const PUERTO_REENVIO: &str = "8080";
+/// Hora fija del resumen (2026-01-01 00:00 UTC), para no fechar la captura.
+const HORA_RESUMEN: &str = "1767225600";
+
+/// Segunda etapa del saneado: retira la topología de la red del dueño.
+///
+/// - Los equipos de la LAN (`192.168.1.x` salvo `.0`, `.1` y `.255`) pasan a
+///   `192.168.1.60`, `.61`… por orden de primera aparición; más de
+///   [`LAN_MAX`] es un error.
+/// - Las direcciones del operador (`10/8`, `172.16/12`, `100.64/10`) pasan a
+///   `10.255.0.N` por orden de aparición. La puerta de enlace WAN de fábrica
+///   (`192.168.144.1`) no cambia.
+/// - El pool DHCP (`cbGetDhcpv4ServerPool*`) pasa a `.100`–`.199` con el router
+///   como DNS; los reenvíos (`cbGetNatPortMapping*`), al puerto 8080; la hora
+///   de `cbGetSummary`, a una fija.
+///
+/// Es determinista si las fixtures se procesan en el mismo orden (por nombre),
+/// e idempotente: aplicarlo sobre fixtures ya neutralizadas no las cambia.
+/// Sus errores nunca incluyen el valor original.
+#[derive(Default)]
+pub struct Neutralizador {
+    equipos: HashMap<Ipv4Addr, usize>,
+    operador: HashMap<Ipv4Addr, usize>,
+}
+
+impl Neutralizador {
+    /// Crea un neutralizador vacío.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Devuelve la fixture `fixture` (su nombre, con o sin `.xml`) con la
+    /// topología neutralizada. Solo toca los valores de los elementos hoja.
+    pub fn neutralizar(&mut self, fixture: &str, xml: &str) -> Result<String, String> {
+        let llamada = split_fixture_name(fixture.trim_end_matches(".xml")).0;
+        let mut out = String::with_capacity(xml.len());
+        let mut last = 0;
+        for (tag, value, range) in leaves(xml) {
+            out.push_str(&xml[last..range.start]);
+            last = range.end;
+            let new = match fijo(llamada, tag, value) {
+                Some(v) => v.to_owned(),
+                None => self.direcciones(value)?,
+            };
+            out.push_str(&format!("<{tag}>{new}</{tag}>"));
+        }
+        out.push_str(&xml[last..]);
+        Ok(out)
+    }
+
+    fn direcciones(&mut self, value: &str) -> Result<String, String> {
+        let mut err = None;
+        let out = IPV4.replace_all(value, |c: &Captures| {
+            let Ok(ip) = c[0].parse::<Ipv4Addr>() else {
+                return c[0].to_owned();
+            };
+            let o = ip.octets();
+            if [o[0], o[1], o[2]] == [192, 168, 1] && ![0, 1, 255].contains(&o[3]) {
+                let n = index_of(&mut self.equipos, ip);
+                if n > LAN_MAX {
+                    err = Some(format!("más de {LAN_MAX} equipos distintos en la LAN"));
+                    return c[0].to_owned();
+                }
+                // n ≤ 40, cabe en un octeto.
+                return format!("192.168.1.{}", LAN_PRIMERO + (n - 1) as u8);
+            }
+            let operador = o[0] == 10
+                || (o[0] == 172 && (o[1] & 0xf0) == 16)
+                || (o[0] == 100 && (o[1] & 0xc0) == 64);
+            if operador {
+                let n = index_of(&mut self.operador, ip);
+                if n > 254 {
+                    err = Some("más de 254 direcciones distintas del operador".to_owned());
+                    return c[0].to_owned();
+                }
+                return format!("10.255.0.{n}");
+            }
+            c[0].to_owned()
+        });
+        err.map_or(Ok(out.into_owned()), Err)
+    }
+}
+
+/// Valor fijo de un campo que se sustituye entero según la llamada.
+fn fijo(llamada: &str, tag: &str, value: &str) -> Option<&'static str> {
+    let es_ip = || {
+        value
+            .parse::<Ipv4Addr>()
+            .is_ok_and(|ip| !ip.is_unspecified())
+    };
+    match llamada {
+        "cbGetDhcpv4ServerPool" => match tag {
+            "ipv4_addr_min" if es_ip() => Some(POOL_INICIO),
+            "ipv4_addr_max" if es_ip() => Some(POOL_FIN),
+            t if t.starts_with("ipv4_dns_addr") && es_ip() => Some(POOL_DNS),
+            _ => None,
+        },
+        "cbGetNatPortMapping" => {
+            let puerto = ["ext", "int"].iter().any(|lado| {
+                tag.strip_prefix(lado)
+                    .and_then(|t| t.strip_prefix("_l4_port_"))
+                    .is_some_and(|t| t == "min_value" || t == "max_value")
+            });
+            (puerto && INTEGER.is_match(value)).then_some(PUERTO_REENVIO)
+        }
+        "cbGetSummary" if tag == "SysTime" && INTEGER.is_match(value) => Some(HORA_RESUMEN),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -487,8 +607,8 @@ mod tests {
             ("acs_password", "x"),
             ("GponSerialNumber", "x"),
             ("wps_device_pin", "55556666"),
-            ("directory_number", "600000000"),
-            ("register_uri", "600000000"),
+            ("directory_number", "555"),
+            ("register_uri", "555"),
             ("connectionRequestURL", "x"),
             ("UserName", "x"),
             ("dhcpv4_opt", "0c 01"),
@@ -527,7 +647,7 @@ mod tests {
         let a = s
             .sanitize(
                 "<R><ssid>Casa</ssid><key_phrase>secreta1</key_phrase><mac_addr>AA:BB:CC:00:11:22</mac_addr>\
-                 <ipaddr>198.51.100.4</ipaddr><gw_addr>192.168.1.5</gw_addr><pre_shared_key></pre_shared_key><desc>LAN</desc></R>",
+                 <ipaddr>9.9.9.9</ipaddr><gw_addr>192.168.1.5</gw_addr><pre_shared_key></pre_shared_key><desc>LAN</desc></R>",
             )
             .unwrap();
         assert_eq!(
@@ -537,8 +657,8 @@ mod tests {
         );
         let b = s
             .sanitize(
-                "<R><bssid>aa:bb:cc:00:11:22</bssid><acs_URL>http://198.51.100.4:7547/</acs_URL>\
-                 <ntp_svr_1>http://198.51.100.4:7547/</ntp_svr_1><desc>nas</desc><HostName>pc</HostName></R>",
+                "<R><bssid>aa:bb:cc:00:11:22</bssid><acs_URL>http://9.9.9.9:7547/</acs_URL>\
+                 <ntp_svr_1>http://9.9.9.9:7547/</ntp_svr_1><desc>nas</desc><HostName>pc</HostName></R>",
             )
             .unwrap();
         assert_eq!(
@@ -547,7 +667,7 @@ mod tests {
              <ntp_svr_1>http://203.0.113.1:7547/</ntp_svr_1><desc>desc-1</desc><HostName>host-1</HostName></R>"
         );
         let removed: Vec<_> = s.removed_values().collect();
-        assert!(removed.contains(&"secreta1") && removed.contains(&"198.51.100.4"));
+        assert!(removed.contains(&"secreta1") && removed.contains(&"9.9.9.9"));
     }
 
     #[test]
@@ -556,8 +676,8 @@ mod tests {
         let out = s
             .sanitize(
                 "<R><hwaddr>AA-BB-CC-00-11-22</hwaddr><mac_addr>aabbcc001122</mac_addr>\
-                 <rx_byte>987654321098</rx_byte><ipv6_addr>2001:db8:1:2::10</ipv6_addr>\
-                 <ss_ipv6_prefix>fd00::</ss_ipv6_prefix><dst_addr>2001:db8:1:2::10/64</dst_addr></R>",
+                 <rx_byte>987654321098</rx_byte><ipv6_addr>2620:fe::fe</ipv6_addr>\
+                 <ss_ipv6_prefix>fd00::</ss_ipv6_prefix><dst_addr>2620:fe::fe/64</dst_addr></R>",
             )
             .unwrap();
         assert_eq!(
@@ -566,6 +686,14 @@ mod tests {
              <rx_byte>987654321098</rx_byte><ipv6_addr>2001:db8::1</ipv6_addr>\
              <ss_ipv6_prefix>fd00::</ss_ipv6_prefix><dst_addr>2001:db8::1/64</dst_addr></R>"
         );
+    }
+
+    #[test]
+    fn seudonimos_de_mac_no_cambian() {
+        // Volver a sanear fixtures ya saneadas no renumera sus MAC.
+        let mut s = Sanitizer::new();
+        let xml = "<R><mac_addr>02:00:00:00:01:01</mac_addr><bssid>02:00:00:00:00:0d</bssid></R>";
+        assert_eq!(s.sanitize(xml).unwrap(), xml);
     }
 
     #[test]
@@ -584,13 +712,13 @@ mod tests {
     fn learned_values_are_scrubbed_inside_other_values() {
         let mut s = Sanitizer::new();
         let status =
-            "<R><wps_status_string>WPS en Casa-Pepe y operadora1.com</wps_status_string></R>";
+            "<R><wps_status_string>WPS en Casa-Pepe y operadora1.example</wps_status_string></R>";
         let ap = "<R><ssid>Casa-Pepe</ssid><UserName>operadora1</UserName></R>";
         s.learn(status);
         s.learn(ap);
         assert_eq!(
             s.sanitize(status).unwrap(),
-            "<R><wps_status_string>WPS en RED-1 y X-REDACTED-X.com</wps_status_string></R>"
+            "<R><wps_status_string>WPS en RED-1 y X-REDACTED-X.example</wps_status_string></R>"
         );
         assert_eq!(
             s.sanitize(ap).unwrap(),
@@ -613,5 +741,148 @@ mod tests {
             )
         );
         assert_eq!(split_fixture_name("cbX"), ("cbX", vec![]));
+    }
+
+    #[test]
+    fn renumera_lan_en_orden_y_conserva_router() {
+        let mut n = Neutralizador::new();
+        let a = n
+            .neutralizar(
+                "cbGetArpCache.xml",
+                "<R><ip>192.168.1.1</ip><ip>192.168.1.77</ip><ip>192.168.1.0</ip></R>",
+            )
+            .unwrap();
+        assert_eq!(
+            a,
+            "<R><ip>192.168.1.1</ip><ip>192.168.1.60</ip><ip>192.168.1.0</ip></R>"
+        );
+        let b = n
+            .neutralizar(
+                "cbGetLanHostList.xml",
+                "<R><ip>192.168.1.5</ip><rango>192.168.1.77-192.168.1.255</rango></R>",
+            )
+            .unwrap();
+        assert_eq!(
+            b,
+            "<R><ip>192.168.1.61</ip><rango>192.168.1.60-192.168.1.255</rango></R>"
+        );
+    }
+
+    #[test]
+    fn renumerar_mas_de_40_equipos_es_error_sin_el_valor() {
+        let mut n = Neutralizador::new();
+        let xml: String = (2..=42)
+            .map(|x| format!("<ip>192.168.1.{x}</ip>"))
+            .collect();
+        let e = n.neutralizar("cbGetArpCache.xml", &xml).unwrap_err();
+        assert!(!e.contains("192.168.1.42"), "{e}");
+    }
+
+    #[test]
+    fn operador_a_10_255() {
+        let mut n = Neutralizador::new();
+        let out = n
+            .neutralizar(
+                "cbGetWanIPIntf.xml",
+                "<R><ip>10.31.0.9</ip><gw>192.168.144.1</gw><r>172.20.1.2</r>\
+                 <c>100.70.0.1</c><ip2>10.31.0.9</ip2><m>255.255.224.0</m></R>",
+            )
+            .unwrap();
+        assert_eq!(
+            out,
+            "<R><ip>10.255.0.1</ip><gw>192.168.144.1</gw><r>10.255.0.2</r>\
+             <c>10.255.0.3</c><ip2>10.255.0.1</ip2><m>255.255.224.0</m></R>"
+        );
+    }
+
+    #[test]
+    fn pool_y_reenvio_neutros() {
+        let mut n = Neutralizador::new();
+        let pool = n
+            .neutralizar(
+                "cbGetDhcpv4ServerPool__rtm_cfg_dhcpv4_svr_pool_0i=0.xml",
+                "<R><ipv4_addr_min>192.168.1.2</ipv4_addr_min><ipv4_addr_max>192.168.1.250</ipv4_addr_max>\
+                 <ipv4_dns_addr_0>192.168.1.10</ipv4_dns_addr_0><ipv4_dns_addr_1>203.0.113.2</ipv4_dns_addr_1>\
+                 <ipv4_dns_addr_2>0.0.0.0</ipv4_dns_addr_2><ipv4_dns_addr_3></ipv4_dns_addr_3>\
+                 <ipv4_gw_addr>192.168.1.1</ipv4_gw_addr></R>",
+            )
+            .unwrap();
+        assert_eq!(
+            pool,
+            "<R><ipv4_addr_min>192.168.1.100</ipv4_addr_min><ipv4_addr_max>192.168.1.199</ipv4_addr_max>\
+             <ipv4_dns_addr_0>192.168.1.1</ipv4_dns_addr_0><ipv4_dns_addr_1>192.168.1.1</ipv4_dns_addr_1>\
+             <ipv4_dns_addr_2>0.0.0.0</ipv4_dns_addr_2><ipv4_dns_addr_3></ipv4_dns_addr_3>\
+             <ipv4_gw_addr>192.168.1.1</ipv4_gw_addr></R>"
+        );
+        let nat = n
+            .neutralizar(
+                "cbGetNatPortMapping.xml",
+                "<R><ext_l4_port_min>1</ext_l4_port_min><ext_l4_port_min_value>2222</ext_l4_port_min_value>\
+                 <ext_l4_port_max_value>2223</ext_l4_port_max_value><int_ip_addr>192.168.1.30</int_ip_addr>\
+                 <int_l4_port_min_value>22</int_l4_port_min_value><int_l4_port_max_value>23</int_l4_port_max_value></R>",
+            )
+            .unwrap();
+        assert_eq!(
+            nat,
+            "<R><ext_l4_port_min>1</ext_l4_port_min><ext_l4_port_min_value>8080</ext_l4_port_min_value>\
+             <ext_l4_port_max_value>8080</ext_l4_port_max_value><int_ip_addr>192.168.1.60</int_ip_addr>\
+             <int_l4_port_min_value>8080</int_l4_port_min_value><int_l4_port_max_value>8080</int_l4_port_max_value></R>"
+        );
+        let resumen = n
+            .neutralizar(
+                "cbGetSummary.xml",
+                "<R><SysUptime>26263</SysUptime><SysTime>1700000000</SysTime></R>",
+            )
+            .unwrap();
+        assert_eq!(
+            resumen,
+            "<R><SysUptime>26263</SysUptime><SysTime>1767225600</SysTime></R>"
+        );
+    }
+
+    #[test]
+    fn neutralizar_es_idempotente() {
+        let fixtures = [
+            (
+                "cbDhcpV4SvrPoolGetStatic.xml",
+                "<R><ip>192.168.1.21</ip><ip>192.168.1.77</ip></R>",
+            ),
+            (
+                "cbGetArpCache.xml",
+                "<R><ip>192.168.1.11</ip><ip>192.168.1.21</ip><gw>10.1.0.1</gw></R>",
+            ),
+            (
+                "cbGetDhcpv4ServerPool.xml",
+                "<R><ipv4_addr_min>192.168.1.2</ipv4_addr_min><ipv4_addr_max>192.168.1.250</ipv4_addr_max>\
+                 <ipv4_dns_addr_0>192.168.1.10</ipv4_dns_addr_0></R>",
+            ),
+            (
+                "cbGetNatPortMapping.xml",
+                "<R><int_ip_addr>192.168.1.30</int_ip_addr><ext_l4_port_min_value>2222</ext_l4_port_min_value></R>",
+            ),
+            ("cbGetSummary.xml", "<R><SysTime>1700000000</SysTime></R>"),
+            (
+                "cbGetWanIPIntf.xml",
+                "<R><ip>172.16.5.5</ip><gw>10.1.0.1</gw></R>",
+            ),
+        ];
+        let pasar = |entrada: &[(&str, String)]| -> Vec<(String, String)> {
+            let mut n = Neutralizador::new();
+            entrada
+                .iter()
+                .map(|(f, x)| ((*f).to_owned(), n.neutralizar(f, x).unwrap()))
+                .collect()
+        };
+        let una: Vec<_> = fixtures
+            .iter()
+            .map(|(f, x)| (*f, (*x).to_owned()))
+            .collect();
+        let primera = pasar(&una);
+        let otra: Vec<_> = primera
+            .iter()
+            .map(|(f, x)| (f.as_str(), x.clone()))
+            .collect();
+        assert_eq!(pasar(&otra), primera);
+        assert_ne!(primera[0].1, fixtures[0].1);
     }
 }

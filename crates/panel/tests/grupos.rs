@@ -189,7 +189,7 @@ fn estados_pasos(c: &Cambio) -> Vec<EstadoPaso> {
 async fn grupo_aplica_en_orden_y_verifica() {
     let (p, m) = preparado().await;
     let prep = m
-        .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.84")]))
+        .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.80")]))
         .await
         .unwrap();
     assert_eq!(prep.riesgo, Riesgo::Bajo);
@@ -198,13 +198,13 @@ async fn grupo_aplica_en_orden_y_verifica() {
     assert_eq!(prep.pasos[0].funcion, UPNP);
     assert_eq!(prep.pasos[0].etiqueta.as_deref(), Some("ajuste-upnp"));
     assert!(prep.pasos.iter().all(|p| !p.sin_cambios));
-    assert_eq!(prep.pasos[1].diff.campos[0].despues, "192.168.1.84");
+    assert_eq!(prep.pasos[1].diff.campos[0].despues, "192.168.1.80");
 
     let id = m.confirmar_grupo(&prep.token, &[], "admin").await.unwrap();
     let c = esperar_estado(&m, id, Estado::Aplicado).await;
     assert_eq!(escritas(&p), [UPNP, LEASES]);
     assert_eq!(upnp_actual(&p).await, "1");
-    assert_eq!(ip_de_lease0(&p).await, "192.168.1.84");
+    assert_eq!(ip_de_lease0(&p).await, "192.168.1.80");
     assert_eq!(
         estados_pasos(&c),
         [EstadoPaso::Aplicado, EstadoPaso::Aplicado]
@@ -223,7 +223,7 @@ async fn grupo_aplica_en_orden_y_verifica() {
 async fn fallo_en_paso_k_revierte_anteriores() {
     let (p, m) = preparado().await;
     let prep = m
-        .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.84"), ssid("OTRA")]))
+        .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.80"), ssid("OTRA")]))
         .await
         .unwrap();
     assert_eq!(prep.riesgo, Riesgo::Medio, "el mayor de los pasos");
@@ -252,7 +252,7 @@ async fn fallo_en_paso_k_revierte_anteriores() {
 async fn fallo_al_revertir_es_revertido_parcial() {
     let (p, m) = preparado().await;
     let prep = m
-        .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.84"), ssid("OTRA")]))
+        .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.80"), ssid("OTRA")]))
         .await
         .unwrap();
     // Falla el paso 3 y, al revertir, la reversión del paso 1 (escritura 5).
@@ -293,7 +293,7 @@ async fn vigilancia_revierte_grupo_entero() {
     };
     let m = gestor(&p, t).await;
     let prep = m
-        .preparar_grupo(grupo(vec![lease0("192.168.1.84"), ssid("OTRA")]))
+        .preparar_grupo(grupo(vec![lease0("192.168.1.80"), ssid("OTRA")]))
         .await
         .unwrap();
     assert_eq!(prep.riesgo, Riesgo::Medio);
@@ -319,7 +319,7 @@ async fn vigilancia_revierte_grupo_entero() {
 async fn deshacer_grupo() {
     let (p, m) = preparado().await;
     let prep = m
-        .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.84")]))
+        .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.80")]))
         .await
         .unwrap();
     let id = m.confirmar_grupo(&prep.token, &[], "admin").await.unwrap();
@@ -352,7 +352,7 @@ async fn reanuda_grupo_a_medias() {
     };
     let a = gestor(&p, lento).await;
     let prep = a
-        .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.84")]))
+        .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.80")]))
         .await
         .unwrap();
     // El router se cuelga tras la escritura del paso 2 y el panel muere
@@ -377,7 +377,7 @@ async fn reanuda_grupo_a_medias() {
     let c = esperar_final(&b, id).await;
     let (upnp, ip) = (upnp_actual(&p).await, ip_de_lease0(&p).await);
     match c.estado {
-        Estado::Aplicado => assert_eq!((upnp.as_str(), ip.as_str()), ("1", "192.168.1.84")),
+        Estado::Aplicado => assert_eq!((upnp.as_str(), ip.as_str()), ("1", "192.168.1.80")),
         Estado::Fallido | Estado::Revertido => {
             assert_eq!((upnp.as_str(), ip.as_str()), ("0", "192.168.1.68"))
         }
@@ -392,7 +392,7 @@ async fn reanuda_grupo_sin_terminar_revierte_lo_escrito() {
     let p = panel_rapido(Duration::from_millis(500)).await;
     let a = gestor(&p, tiempos()).await;
     let prep = a
-        .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.84")]))
+        .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.80")]))
         .await
         .unwrap();
     // El router se cuelga tras el paso 1: su verificación no llega a leer.
@@ -434,7 +434,7 @@ async fn pasos_sin_cambio_y_desmarcados_se_omiten() {
     assert!(matches!(r, Err(CambioError::SinCambios)), "{r:?}");
 
     let prep = m
-        .preparar_grupo(grupo(vec![upnp("0"), lease0("192.168.1.84"), ssid("OTRA")]))
+        .preparar_grupo(grupo(vec![upnp("0"), lease0("192.168.1.80"), ssid("OTRA")]))
         .await
         .unwrap();
     assert_eq!(
@@ -497,7 +497,7 @@ async fn acciones_solo_en_grupos_de_un_paso() {
 #[tokio::test]
 async fn sin_respuesta_con_otros_valores_se_revierte() {
     let (p, m) = preparado().await;
-    let prep = m.preparar(lease0("192.168.1.84").req).await.unwrap();
+    let prep = m.preparar(lease0("192.168.1.80").req).await.unwrap();
     p.sim.control.no_answer_next_write(true);
     let m2 = m.clone();
     let token = prep.token.clone();
@@ -559,7 +559,7 @@ async fn pausa_se_suelta_en_relectura() {
         ..tiempos()
     };
     let m = gestor(&p, lento).await;
-    let prep = m.preparar(lease0("192.168.1.84").req).await.unwrap();
+    let prep = m.preparar(lease0("192.168.1.80").req).await.unwrap();
     p.sim.control.no_answer_next_write(true);
     p.sim.control.hang_after_next_write();
     let m2 = m.clone();
@@ -752,7 +752,7 @@ async fn credenciales_durante_la_reanudacion_no_cierran_el_grupo() {
     let p = panel_rapido(Duration::from_millis(500)).await;
     let a = gestor(&p, tiempos()).await;
     let prep = a
-        .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.84")]))
+        .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.80")]))
         .await
         .unwrap();
     // Cortado entre el paso 1 y el 2.
@@ -811,7 +811,7 @@ async fn credenciales_durante_la_reanudacion_no_cierran_el_grupo() {
 async fn deshacer_revertido_en_parte_no_se_repite() {
     let (p, m) = preparado().await;
     let prep = m
-        .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.84")]))
+        .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.80")]))
         .await
         .unwrap();
     let id = m.confirmar_grupo(&prep.token, &[], "admin").await.unwrap();
@@ -839,7 +839,7 @@ async fn reanuda_a_mitad_de_revertir() {
     let p = panel_rapido(Duration::from_millis(500)).await;
     let a = gestor(&p, tiempos()).await;
     let prep = a
-        .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.84"), ssid("OTRA")]))
+        .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.80"), ssid("OTRA")]))
         .await
         .unwrap();
     p.sim.control.fail_write_n(3);
@@ -882,7 +882,7 @@ async fn reanuda_vigilancia_de_grupo_y_revierte_si_cae_la_wan() {
     };
     let a = gestor(&p, lento).await;
     let prep = a
-        .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.84")]))
+        .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.80")]))
         .await
         .unwrap();
     let id = a.confirmar_grupo(&prep.token, &[], "admin").await.unwrap();
@@ -908,7 +908,7 @@ async fn reversion_fallida_sigue_pendiente_al_retomar() {
     let p = panel_rapido(Duration::from_millis(500)).await;
     let a = gestor(&p, tiempos()).await;
     let prep = a
-        .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.84")]))
+        .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.80")]))
         .await
         .unwrap();
     // El paso 2 se aplica pero el router se cuelga: no se verifica y su

@@ -609,18 +609,18 @@ pub(crate) mod servidor {
         fn solo_red_local() {
             for ip in [
                 "127.0.0.1",
-                "192.168.1.69",
-                "10.0.0.5",
-                "172.16.3.4",
+                "192.168.1.90",
+                "10.255.0.10",
+                "172.16.0.1",
                 "169.254.1.1",
                 "::1",
                 "fd00::1",
                 "fe80::1",
-                "::ffff:192.168.1.9",
+                "::ffff:192.168.1.99",
             ] {
                 assert!(ip_local(ip.parse().unwrap()), "{ip}");
             }
-            for ip in ["203.0.113.9", "8.8.8.8", "2001:db8::1", "::ffff:8.8.8.8"] {
+            for ip in ["203.0.113.9", "9.9.9.9", "2001:db8::1", "::ffff:9.9.9.9"] {
                 assert!(!ip_local(ip.parse().unwrap()), "{ip}");
             }
         }
@@ -632,8 +632,8 @@ pub(crate) mod servidor {
                 Some("http://192.168.1.1")
             );
             assert_eq!(
-                validar_url("https://router.lan:8443").as_deref(),
-                Some("https://router.lan:8443")
+                validar_url("https://router.home.arpa:8443").as_deref(),
+                Some("https://router.home.arpa:8443")
             );
             for mala in [
                 "",

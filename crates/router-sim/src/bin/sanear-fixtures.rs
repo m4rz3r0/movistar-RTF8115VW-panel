@@ -3,13 +3,14 @@
 //! Uso: `sanear-fixtures <dir_bruto> <dir_fixtures> [--secrets <fichero>]`
 //!
 //! Copia las respuestas `cbGet*`, `cbList*` y `cbDhcpV4SvrPool*` que sean un
-//! `<Response>` válido, sustituyendo los valores sensibles. Falla sin tocar
+//! `<Response>` válido, sustituyendo los valores sensibles y neutralizando la
+//! topología de la red (ver [`Neutralizador`]). Falla sin tocar
 //! las fixtures si aparece una etiqueta que no está en `fixtures-tags.txt` o
 //! un nombre de fichero con parámetros sensibles. Con `--secrets` añade (modo
 //! 600) los valores reales retirados al fichero, conservando las líneas que ya
 //! tuviera (p. ej. secretos conocidos por otra vía añadidos a mano).
 
-use router_sim::sanitize::Sanitizer;
+use router_sim::sanitize::{Neutralizador, Sanitizer};
 use std::{
     collections::BTreeSet, fs, io::Write, os::unix::fs::OpenOptionsExt, path::PathBuf,
     process::ExitCode,
@@ -52,8 +53,10 @@ fn run() -> Result<(), String> {
 
     // Dos pasadas: los SSID y secretos aprendidos se retiran también de los
     // ficheros que se procesan antes de encontrarlos. Todo se sanea en memoria
-    // antes de tocar el directorio de salida.
+    // antes de tocar el directorio de salida. El neutralizador numera por
+    // orden de aparición: los ficheros van ordenados por nombre.
     let mut s = Sanitizer::new();
+    let mut n = Neutralizador::new();
     for (_, text) in &docs {
         s.learn(text);
     }
@@ -61,7 +64,11 @@ fn run() -> Result<(), String> {
     for (name, text) in &docs {
         s.check_file_name(name.trim_end_matches(".xml"))
             .map_err(|e| format!("{name}: {e}"))?;
-        clean.push((name, s.sanitize(text).map_err(|e| format!("{name}: {e}"))?));
+        let saneado = s.sanitize(text).map_err(|e| format!("{name}: {e}"))?;
+        let neutro = n
+            .neutralizar(name, &saneado)
+            .map_err(|e| format!("{name}: {e}"))?;
+        clean.push((name, neutro));
     }
 
     fs::create_dir_all(&out).map_err(|e| format!("{}: {e}", out.display()))?;

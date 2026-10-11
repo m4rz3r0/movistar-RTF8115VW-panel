@@ -946,27 +946,30 @@ mod server {
 
         #[test]
         fn ip_del_cliente() {
-            let proxy: IpAddr = "192.0.2.11".parse().unwrap();
-            let otro: IpAddr = "192.168.1.69".parse().unwrap();
+            let proxy: IpAddr = "192.0.2.100".parse().unwrap();
+            let otro: IpAddr = "192.0.2.101".parse().unwrap();
             let ip = |s: &str| s.parse::<IpAddr>().unwrap();
             // Fuera del proxy, X-Forwarded-For no cuenta.
-            assert_eq!(client_ip(otro, &xff(&["1.2.3.4"]), proxy), otro);
+            assert_eq!(client_ip(otro, &xff(&["198.51.100.4"]), proxy), otro);
             // Desde el proxy, el último valor.
             assert_eq!(
-                client_ip(proxy, &xff(&["9.9.9.9, 1.2.3.4"]), proxy),
-                ip("1.2.3.4")
+                client_ip(proxy, &xff(&["9.9.9.9, 198.51.100.4"]), proxy),
+                ip("198.51.100.4")
             );
             assert_eq!(
-                client_ip(proxy, &xff(&["9.9.9.9", "5.6.7.8"]), proxy),
-                ip("5.6.7.8")
+                client_ip(proxy, &xff(&["9.9.9.9", "198.51.100.8"]), proxy),
+                ip("198.51.100.8")
             );
             // Sin cabecera o con basura, la del proxy.
             assert_eq!(client_ip(proxy, &xff(&[]), proxy), proxy);
-            assert_eq!(client_ip(proxy, &xff(&["1.2.3.4, nada"]), proxy), proxy);
+            assert_eq!(
+                client_ip(proxy, &xff(&["198.51.100.4, nada"]), proxy),
+                proxy
+            );
             // IPv4 mapeada en IPv6 se compara como IPv4.
             assert_eq!(
-                client_ip(ip("::ffff:192.0.2.11"), &xff(&["1.2.3.4"]), proxy),
-                ip("1.2.3.4")
+                client_ip(ip("::ffff:192.0.2.100"), &xff(&["198.51.100.4"]), proxy),
+                ip("198.51.100.4")
             );
         }
 

@@ -57,7 +57,7 @@ async fn aplicar() -> Result<i64, String> {
                 Some("0"),
                 &[
                     ("rtm_cfg_dhcpv4_svr_pool_id", "0"),
-                    ("ipv4_addr", "192.168.1.84"),
+                    ("ipv4_addr", "192.168.1.80"),
                 ],
             ),
         ],

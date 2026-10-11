@@ -119,7 +119,7 @@ async fn login_mal_incrementa_retardo() {
     assert_eq!(fallos(&p, "user", PANEL_USER).await, Some(1));
 
     // El freno por usuario se aplica también desde otra IP.
-    let (status, _) = login_desde(&p, PANEL_USER, PANEL_PASS, "10.0.0.7").await;
+    let (status, _) = login_desde(&p, PANEL_USER, PANEL_PASS, "192.0.2.2").await;
     assert_eq!(status, 429);
 
     retrasar_fallos(&p, 1).await;
@@ -178,13 +178,13 @@ async fn usuario_inexistente_mismo_error() {
 
 #[tokio::test]
 async fn xff_ignorado_si_no_viene_del_proxy() {
-    let p = panel_con_proxy("192.0.2.11".parse().unwrap()).await;
+    let p = panel_con_proxy("192.0.2.100".parse().unwrap()).await;
     let mut req = post_form("/api/login", &login_body("x", "mala"), "127.0.0.1");
     req.headers_mut()
-        .insert("x-forwarded-for", "1.2.3.4".parse().unwrap());
+        .insert("x-forwarded-for", "198.51.100.4".parse().unwrap());
     assert_eq!(send(&p.app, req).await.status(), 401);
     assert_eq!(fallos(&p, "ip", "127.0.0.1").await, Some(1));
-    assert_eq!(fallos(&p, "ip", "1.2.3.4").await, None);
+    assert_eq!(fallos(&p, "ip", "198.51.100.4").await, None);
 }
 
 #[tokio::test]
@@ -192,9 +192,9 @@ async fn xff_usado_si_viene_del_proxy() {
     let p = panel().await; // trusted_proxy = 127.0.0.1
     let mut req = post_form("/api/login", &login_body("x", "mala"), "127.0.0.1");
     req.headers_mut()
-        .insert("x-forwarded-for", "9.9.9.9, 1.2.3.4".parse().unwrap());
+        .insert("x-forwarded-for", "9.9.9.9, 198.51.100.4".parse().unwrap());
     assert_eq!(send(&p.app, req).await.status(), 401);
-    assert_eq!(fallos(&p, "ip", "1.2.3.4").await, Some(1));
+    assert_eq!(fallos(&p, "ip", "198.51.100.4").await, Some(1));
     assert_eq!(fallos(&p, "ip", "9.9.9.9").await, None);
     assert_eq!(fallos(&p, "ip", "127.0.0.1").await, None);
 }

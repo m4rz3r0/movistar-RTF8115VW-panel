@@ -175,7 +175,7 @@ async fn formulario_static_lease_rellena_valores() {
     let (status, _) = llamar(
         &p,
         "formulario",
-        json!({ "funcion": LEASES, "instancia": "0", "claves": [["ipv4_addr", "1.2.3.4"]] }),
+        json!({ "funcion": LEASES, "instancia": "0", "claves": [["ipv4_addr", "198.51.100.4"]] }),
         Some(&cookie),
     )
     .await;
@@ -458,7 +458,7 @@ async fn confirmar_a_la_vez_uno_en_curso() {
         &p,
         "preparar_cambio",
         json!({ "peticion": { "funcion": LEASES, "instancia": "0",
-                              "valores": [[POOL, "0"], ["ipv4_addr", "192.168.1.84"]], "borrar": false } }),
+                              "valores": [[POOL, "0"], ["ipv4_addr", "192.168.1.80"]], "borrar": false } }),
         &cookie,
     )
     .await;

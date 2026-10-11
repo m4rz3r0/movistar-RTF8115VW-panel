@@ -663,8 +663,8 @@ mod tests {
             counters: Vec::new(),
             hosts: vec![
                 host("192.168.1.100", "02:00:00:00:00:0B", true),
-                host("192.0.2.10", "02:00:00:00:00:0a", true),
-                host("192.168.1.9", "02:00:00:00:00:0c", false),
+                host("192.168.1.74", "02:00:00:00:00:0a", true),
+                host("192.168.1.99", "02:00:00:00:00:0c", false),
             ],
             leases: vec![
                 DhcpLease {
@@ -674,7 +674,7 @@ mod tests {
                     expires_s: Some(600),
                 },
                 DhcpLease {
-                    ip: "192.0.2.10".into(),
+                    ip: "192.168.1.74".into(),
                     mac: "02:00:00:00:00:0a".into(),
                     hostname: "servidor".into(),
                     expires_s: Some(60),
@@ -683,7 +683,7 @@ mod tests {
             statics: vec![StaticLease {
                 id: "0".into(),
                 mac: "02:00:00:00:00:0A".into(),
-                ip: "192.0.2.10".into(),
+                ip: "192.168.1.74".into(),
                 enabled: true,
             }],
             wifi: WifiStatus {
@@ -744,7 +744,7 @@ mod tests {
         assert_eq!(v.ram_pct, 75.0);
         // Activos primero, por IP numérica.
         let ips: Vec<&str> = v.hosts.iter().map(|h| h.ip.as_str()).collect();
-        assert_eq!(ips, ["192.0.2.10", "192.168.1.100", "192.168.1.9"]);
+        assert_eq!(ips, ["192.168.1.74", "192.168.1.100", "192.168.1.99"]);
         assert!(v.hosts[0].fijo, "la MAC se compara sin mayúsculas");
         assert_eq!(v.hosts[0].nombre, "servidor");
         assert_eq!(v.hosts[0].interfaz.as_deref(), Some("Cable"));

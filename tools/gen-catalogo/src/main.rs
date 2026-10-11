@@ -102,13 +102,11 @@ fn comprobar(dir: &Path) -> Result<(), String> {
 mod tests {
     use super::*;
 
-    /// Directorio de los datos brutos del análisis (`RTF_RAW_DIR` o el de la
-    /// tarea); se borran tras generar el catálogo, así que la prueba se omite
-    /// si no están.
+    /// Directorio de los datos brutos del análisis, obligatorio en
+    /// `RTF_RAW_DIR` (no hay ruta por defecto); sin él, o si no existe, la
+    /// prueba se omite.
     fn dir_bruto() -> Option<std::path::PathBuf> {
-        let d = std::env::var_os("RTF_RAW_DIR")
-            .map(Into::into)
-            .unwrap_or_else(|| raiz().join(".superpowers/sdd/2026-10-08-nucleo/raw"));
+        let d: std::path::PathBuf = std::env::var_os("RTF_RAW_DIR")?.into();
         d.is_dir().then_some(d)
     }
 
