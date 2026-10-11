@@ -40,6 +40,15 @@ fluent-syntax = "0.12"
 unic-langid = "0.9"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "env-filter", "std", "ansi"] }
 
+# Pruebas y desarrollo con información de depuración mínima: enlazar los
+# binarios de pruebas con la completa necesitaba varios GB por enlace y, en
+# paralelo, agotaba la memoria del servidor que compila las versiones.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
 [profile.release]
 codegen-units = 1
 lto = true
