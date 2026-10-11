@@ -53,12 +53,13 @@ impl AppState {
             .unwrap_or_else(|e| e.into_inner())
     }
 
-    /// Anota el idioma por defecto recién guardado en la base de datos.
-    pub fn fijar_idioma_por_defecto(&self, idioma: Idioma) {
+    /// Anota el idioma por defecto recién guardado en la base de datos
+    /// (`None`: el del navegador).
+    pub fn fijar_idioma_por_defecto(&self, idioma: Option<Idioma>) {
         *self
             .idioma_por_defecto
             .write()
-            .unwrap_or_else(|e| e.into_inner()) = Some(idioma);
+            .unwrap_or_else(|e| e.into_inner()) = idioma;
     }
 }
 

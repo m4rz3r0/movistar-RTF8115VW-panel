@@ -798,7 +798,7 @@ mod server {
             Err(LoginError::Internal(e)) => return internal(e),
         }
         abrir_ventana_de_reautenticacion().await?;
-        tracing::info!(usuario = %user.username, "reautenticación en Ajustes del panel");
+        tracing::info!(usuario = %user.username, "reautenticación en los ajustes");
         Ok(())
     }
 

@@ -1,17 +1,17 @@
-//! «Ajustes del panel» (`/panel`): router, panel (idioma y zona horaria),
-//! privacidad e instancia (DNS preferidos, dispositivos de confianza,
-//! mantenimiento, servidor propio) y usuarios del panel.
+//! «Ajustes del panel» (`/panel`): solo lo del panel. Panel (idioma por
+//! defecto y zona horaria), privacidad e instancia (DNS preferidos,
+//! dispositivos de confianza, mantenimiento, servidor propio) y usuarios del
+//! panel. Lo del router está en la sección «Router» ([`super::router`]).
 //!
-//! Lo delicado (credenciales del router, confirmar el firmware, usuarios)
-//! pide la contraseña del panel si no se ha escrito en los últimos 5 minutos:
-//! el servidor responde con [`crate::auth::ERROR_REAUTENTICACION`], la página
-//! la pide en un diálogo y repite la operación.
+//! Lo delicado (usuarios aquí; credenciales y firmware en «Router») pide la
+//! contraseña del panel si no se ha escrito en los últimos 5 minutos: el
+//! servidor responde con [`crate::auth::ERROR_REAUTENTICACION`], la página
+//! la pide en un diálogo ([`DialogoReautenticar`]) y repite la operación.
 
-use super::{Estado, Insignia, es_error_de_reautenticacion, mensaje_del_servidor};
+use super::{es_error_de_reautenticacion, mensaje_del_servidor};
 use crate::panel_ajustes::{
-    AjustesPanel, CamposInstancia, EquipoLan, InfoRouter, MAX_DNS, borrar_usuario,
-    cambiar_contrasena, confirmar_firmware, crear_usuario, guardar_instancia, guardar_router,
-    leer_panel, probar_router, reautenticar, zonas,
+    AjustesPanel, CamposInstancia, EquipoLan, IdiomaPorDefecto, MAX_DNS, borrar_usuario,
+    cambiar_contrasena, crear_usuario, guardar_instancia, leer_panel, reautenticar, zonas,
 };
 use crate::t;
 use crate::ui::i18n::nombre_idioma;
@@ -22,7 +22,7 @@ use leptos::{ev::SubmitEvent, html, prelude::*, task::spawn_local};
 /// servidor).
 const MIN_CONTRASENA: usize = 12;
 
-fn texto_error(e: &ServerFnError) -> String {
+pub(crate) fn texto_error(e: &ServerFnError) -> String {
     match e {
         ServerFnError::ServerError(m) => mensaje_del_servidor(m),
         _ => t!("comun-error-conexion"),
@@ -32,16 +32,37 @@ fn texto_error(e: &ServerFnError) -> String {
 /// Diálogo de reautenticación compartido por las secciones: guarda la
 /// operación que lo pidió para repetirla después.
 #[derive(Clone, Copy)]
-struct Reautenticacion {
+pub(crate) struct Reautenticacion {
     abierto: RwSignal<bool>,
     pendiente: StoredValue<Option<Callback<()>>>,
 }
 
 impl Reautenticacion {
+    /// Pone el diálogo en el contexto de la página; la página pinta
+    /// [`DialogoReautenticar`] mientras [`Reautenticacion::abierto`].
+    pub(crate) fn proveer() -> Self {
+        let r = Reautenticacion {
+            abierto: RwSignal::new(false),
+            pendiente: StoredValue::new(None),
+        };
+        provide_context(r);
+        r
+    }
+
+    /// ¿Hay que pintar el diálogo?
+    pub(crate) fn abierto(self) -> bool {
+        self.abierto.get()
+    }
+
     /// Trata el error de una operación delicada: si falta reautenticarse,
     /// abre el diálogo y repetirá `reintentar`; si no, deja el mensaje en
     /// `error`.
-    fn tratar(self, e: &ServerFnError, error: RwSignal<Option<String>>, reintentar: Callback<()>) {
+    pub(crate) fn tratar(
+        self,
+        e: &ServerFnError,
+        error: RwSignal<Option<String>>,
+        reintentar: Callback<()>,
+    ) {
         if es_error_de_reautenticacion(e) {
             self.pendiente.set_value(Some(reintentar));
             self.abierto.set(true);
@@ -55,11 +76,7 @@ impl Reautenticacion {
 #[component]
 pub fn PaginaPanel() -> impl IntoView {
     let datos = Resource::new(|| (), |_| leer_panel());
-    let reauth = Reautenticacion {
-        abierto: RwSignal::new(false),
-        pendiente: StoredValue::new(None),
-    };
-    provide_context(reauth);
+    let reauth = Reautenticacion::proveer();
     view! {
         <header class="pagina-cabecera">
             <div>
@@ -78,7 +95,7 @@ pub fn PaginaPanel() -> impl IntoView {
                 }
             })}
         </Suspense>
-        {move || reauth.abierto.get().then(|| view! { <DialogoReautenticar /> })}
+        {move || reauth.abierto().then(|| view! { <DialogoReautenticar /> })}
     }
 }
 
@@ -87,12 +104,6 @@ fn Ajustes(a: AjustesPanel) -> impl IntoView {
     let instancia = Instancia::new(&a);
     view! {
         <div class="ajustes-panel">
-            <SeccionRouter
-                url=a.router.url.clone()
-                usuario=a.router.usuario.clone()
-                solo_lectura=a.solo_lectura
-                firmware=a.firmware.clone()
-            />
             <SeccionPanel instancia />
             <SeccionPrivacidad instancia equipos=a.equipos.clone() />
             <SeccionUsuarios usuarios=a.usuarios.clone() yo=a.yo.clone() />
@@ -102,7 +113,7 @@ fn Ajustes(a: AjustesPanel) -> impl IntoView {
 
 /// Operación que, si hay que reautenticarse, se repite a sí misma: `f`
 /// recibe el propio callback para pasárselo a [`Reautenticacion::tratar`].
-fn repetible(f: impl Fn(Callback<()>) + Send + Sync + 'static) -> Callback<()> {
+pub(crate) fn repetible(f: impl Fn(Callback<()>) + Send + Sync + 'static) -> Callback<()> {
     let yo = StoredValue::new(None::<Callback<()>>);
     let cb = Callback::new(move |()| {
         if let Some(cb) = yo.get_value() {
@@ -114,7 +125,10 @@ fn repetible(f: impl Fn(Callback<()>) + Send + Sync + 'static) -> Callback<()> {
 }
 
 /// Mensaje de error y aviso de éxito de un formulario.
-fn mensajes(error: RwSignal<Option<String>>, aviso: RwSignal<Option<String>>) -> impl IntoView {
+pub(crate) fn mensajes(
+    error: RwSignal<Option<String>>,
+    aviso: RwSignal<Option<String>>,
+) -> impl IntoView {
     view! {
         <p class="error-formulario" role="alert">{move || error.get()}</p>
         <p class="aviso-formulario" role="status">{move || aviso.get()}</p>
@@ -122,7 +136,7 @@ fn mensajes(error: RwSignal<Option<String>>, aviso: RwSignal<Option<String>>) ->
 }
 
 /// Campo de texto ligado a `valor`.
-fn campo(
+pub(crate) fn campo(
     id: &'static str,
     etiqueta: String,
     tipo: &'static str,
@@ -151,167 +165,16 @@ fn campo(
     }
 }
 
-// ---- Router
-
-#[component]
-fn SeccionRouter(
-    url: String,
-    usuario: String,
-    solo_lectura: bool,
-    firmware: Option<String>,
-) -> impl IntoView {
-    let reauth = expect_context::<Reautenticacion>();
-    let configurado = !url.is_empty();
-    let url = RwSignal::new(url);
-    let usuario = RwSignal::new(usuario);
-    let contrasena = RwSignal::new(String::new());
-    let info = RwSignal::new(None::<InfoRouter>);
-    let error = RwSignal::new(None::<String>);
-    let aviso = RwSignal::new(None::<String>);
-    let pendiente = RwSignal::new(false);
-    let solo_lectura = RwSignal::new(solo_lectura);
-    let datos = move || {
-        (
-            url.get_untracked(),
-            usuario.get_untracked(),
-            contrasena.get_untracked(),
-        )
-    };
-
-    let probar = move |_| {
-        error.set(None);
-        aviso.set(None);
-        pendiente.set(true);
-        let (u, us, c) = datos();
-        spawn_local(async move {
-            match probar_router(u, us, c).await {
-                Ok(i) => info.set(Some(i)),
-                Err(e) => error.set(Some(texto_error(&e))),
-            }
-            pendiente.set(false);
-        });
-    };
-    let guardar = repetible(move |yo| {
-        error.set(None);
-        aviso.set(None);
-        pendiente.set(true);
-        let (u, us, c) = datos();
-        spawn_local(async move {
-            match guardar_router(u, us, c).await {
-                Ok(i) => {
-                    // Con un firmware probado se quita el solo lectura; con
-                    // uno sin probar, queda como estaba (o confirmado).
-                    if i.probado {
-                        solo_lectura.set(false);
-                    }
-                    info.set(Some(i));
-                    contrasena.set(String::new());
-                    aviso.set(Some(t!("panel-router-guardadas")));
-                }
-                Err(e) => reauth.tratar(&e, error, yo),
-            }
-            pendiente.set(false);
-        });
-    });
-    let enviar = move |ev: SubmitEvent| {
-        ev.prevent_default();
-        guardar.run(());
-    };
-    let confirmar = repetible(move |yo| {
-        error.set(None);
-        spawn_local(async move {
-            match confirmar_firmware().await {
-                Ok(()) => solo_lectura.set(false),
-                Err(e) => reauth.tratar(&e, error, yo),
-            }
-        });
-    });
-
-    let firmware_texto = match &firmware {
-        Some(f) => t!("panel-firmware", firmware = f.clone()),
-        None => t!("panel-firmware-desconocido"),
-    };
-    let modo = move || {
-        if solo_lectura.get() {
-            view! {
-                <Insignia estado=Estado::Aviso texto=t!("panel-modo-solo-lectura") />
-                <p class="nota">{t!("panel-confirmar-texto")}</p>
-                <div class="botones">
-                    <button class="boton" type="button" on:click=move |_| confirmar.run(())>
-                        {t!("panel-confirmar")}
-                    </button>
-                </div>
-            }
-            .into_any()
-        } else {
-            view! { <Insignia estado=Estado::Ok texto=t!("panel-modo-escritura") /> }.into_any()
-        }
-    };
-    let detectado = move || {
-        info.get().map(|i| {
-            view! {
-                <p>
-                    {t!("instalar-detectado", modelo = i.modelo.clone(), firmware = i.firmware.clone())}
-                </p>
-            }
-        })
-    };
-
-    view! {
-        <section class="tarjeta" aria-labelledby="panel-router">
-            <h2 id="panel-router">{t!("panel-router")}</h2>
-            <div class="ajustes-estado">
-                <p>{firmware_texto}</p>
-                {modo}
-            </div>
-            {(!configurado)
-                .then(|| view! { <p class="nota">{t!("panel-router-sin-configurar")}</p> })}
-            <form class="ajustes-formulario" on:submit=enviar>
-                <p class="nota">{t!("panel-router-texto")}</p>
-                {campo("panel-router-url", t!("panel-router-url"), "url", "off", url, None)}
-                {campo(
-                    "panel-router-usuario",
-                    t!("panel-router-usuario"),
-                    "text",
-                    "off",
-                    usuario,
-                    None,
-                )}
-                {campo(
-                    "panel-router-contrasena",
-                    t!("panel-router-contrasena"),
-                    "password",
-                    "new-password",
-                    contrasena,
-                    None,
-                )}
-                {detectado}
-                {mensajes(error, aviso)}
-                <div class="botones">
-                    <button
-                        class="boton-sutil"
-                        type="button"
-                        disabled=move || pendiente.get()
-                        on:click=probar
-                    >
-                        {t!("panel-router-probar")}
-                    </button>
-                    <button class="boton" type="submit" disabled=move || pendiente.get()>
-                        {t!("panel-router-guardar")}
-                    </button>
-                </div>
-            </form>
-        </section>
-    }
-}
-
 // ---- Parámetros de la instancia
 
 /// Parámetros de la instancia en edición. Cada sección guarda solo los
 /// suyos ([`Seccion`]): lo que se esté editando en la otra no se envía.
 #[derive(Clone, Copy)]
 struct Instancia {
-    idioma: RwSignal<Idioma>,
+    idioma: RwSignal<IdiomaPorDefecto>,
+    /// El idioma por defecto que tiene guardado la instancia: si cambia, la
+    /// página se recarga para pintarse con el que le toque ahora.
+    idioma_guardado: StoredValue<IdiomaPorDefecto>,
     zona: RwSignal<String>,
     dns: RwSignal<String>,
     confianza: RwSignal<String>,
@@ -340,6 +203,7 @@ impl Instancia {
     fn new(a: &AjustesPanel) -> Self {
         Instancia {
             idioma: RwSignal::new(a.idioma),
+            idioma_guardado: StoredValue::new(a.idioma),
             zona: RwSignal::new(a.zona_horaria.clone()),
             dns: RwSignal::new(a.dns_preferidos.join(", ")),
             confianza: RwSignal::new(a.dispositivos_confianza.join(", ")),
@@ -404,6 +268,15 @@ impl Instancia {
         spawn_local(async move {
             match guardar_instancia(campos).await {
                 Ok(c) => {
+                    // Otro idioma por defecto puede cambiar el de esta misma
+                    // página (si no se ha elegido uno en el menú): se vuelve a
+                    // pedir, para no quedarse a medias entre dos idiomas.
+                    if let Some(i) = c.idioma
+                        && i != self.idioma_guardado.get_value()
+                    {
+                        self.idioma_guardado.set_value(i);
+                        let _ = window().location().reload();
+                    }
                     self.fijar(c);
                     aviso.set(Some(t!("panel-guardado")));
                 }
@@ -411,6 +284,18 @@ impl Instancia {
             }
             pendiente.set(false);
         });
+    }
+}
+
+/// Valor de la opción «el del navegador» del idioma por defecto.
+const VALOR_NAVEGADOR: &str = "navegador";
+
+/// Idioma por defecto de un valor del selector.
+fn idioma_por_defecto(valor: &str) -> Option<IdiomaPorDefecto> {
+    if valor == VALOR_NAVEGADOR {
+        Some(IdiomaPorDefecto::Navegador)
+    } else {
+        Idioma::from_codigo(valor).map(IdiomaPorDefecto::Fijo)
     }
 }
 
@@ -423,11 +308,23 @@ fn SeccionPanel(instancia: Instancia) -> impl IntoView {
         ev.prevent_default();
         instancia.guardar(Seccion::Panel, pendiente, error, aviso);
     };
+    let navegador = view! {
+        <option
+            value=VALOR_NAVEGADOR
+            selected=move || instancia.idioma.get() == IdiomaPorDefecto::Navegador
+        >
+            {t!("panel-idioma-navegador")}
+        </option>
+    };
     let idiomas = Idioma::TODOS
         .into_iter()
         .map(|i| {
             view! {
-                <option value=i.codigo() lang=i.codigo() selected=move || instancia.idioma.get() == i>
+                <option
+                    value=i.codigo()
+                    lang=i.codigo()
+                    selected=move || instancia.idioma.get() == IdiomaPorDefecto::Fijo(i)
+                >
                     {nombre_idioma(i)}
                 </option>
             }
@@ -452,14 +349,17 @@ fn SeccionPanel(instancia: Instancia) -> impl IntoView {
                     <label for="panel-idioma">{t!("panel-idioma")}</label>
                     <select
                         id="panel-idioma"
+                        aria-describedby="panel-idioma-ayuda"
                         on:change=move |ev| {
-                            if let Some(i) = Idioma::from_codigo(&event_target_value(&ev)) {
+                            if let Some(i) = idioma_por_defecto(&event_target_value(&ev)) {
                                 instancia.idioma.set(i);
                             }
                         }
                     >
+                        {navegador}
                         {idiomas}
                     </select>
+                    <span class="nota" id="panel-idioma-ayuda">{t!("panel-idioma-ayuda")}</span>
                 </p>
                 <p class="campo">
                     <label for="panel-zona">{t!("panel-zona")}</label>
@@ -844,7 +744,7 @@ fn SeccionUsuarios(usuarios: Vec<String>, yo: String) -> impl IntoView {
 /// Pide la contraseña del panel y, si es buena, repite la operación
 /// pendiente.
 #[component]
-fn DialogoReautenticar() -> impl IntoView {
+pub(crate) fn DialogoReautenticar() -> impl IntoView {
     let reauth = expect_context::<Reautenticacion>();
     let dlg = NodeRef::<html::Dialog>::new();
     Effect::new(move |_| {

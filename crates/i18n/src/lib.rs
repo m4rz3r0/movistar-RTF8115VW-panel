@@ -39,7 +39,8 @@ locales!(
     "historial",
     "biblioteca",
     "instalar",
-    "panel"
+    "panel",
+    "router"
 );
 
 /// Idioma de la interfaz.

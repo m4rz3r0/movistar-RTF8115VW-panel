@@ -1,6 +1,7 @@
-//! Server functions de «Ajustes del panel» (`/panel`): credenciales del
-//! router, parámetros de la instancia, confirmación del firmware y usuarios
-//! del panel.
+//! Server functions de «Ajustes del panel» (`/panel`: parámetros de la
+//! instancia y usuarios del panel) y de «Router → Conexión con el router»
+//! (`/router/conexion`: credenciales del router y confirmación del
+//! firmware).
 //!
 //! Todas exigen sesión. Las delicadas (cambiar las credenciales del router,
 //! confirmar el firmware y todo lo de usuarios) exigen además haber vuelto a
@@ -36,14 +37,35 @@ pub struct EquipoLan {
     pub nombre: String,
 }
 
-/// Todo lo que muestra la página. Nunca lleva la contraseña del router.
+/// Idioma por defecto de la instancia: el de quien no ha elegido uno con el
+/// selector del menú. Sin fijar, cada navegador pide el suyo
+/// (`Accept-Language`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum IdiomaPorDefecto {
+    #[default]
+    Navegador,
+    Fijo(Idioma),
+}
+
+impl IdiomaPorDefecto {
+    /// El idioma fijado, si lo hay.
+    pub fn fijo(self) -> Option<Idioma> {
+        match self {
+            IdiomaPorDefecto::Navegador => None,
+            IdiomaPorDefecto::Fijo(i) => Some(i),
+        }
+    }
+}
+
+/// Todo lo que muestran «Ajustes del panel» y «Router → Conexión con el
+/// router». Nunca lleva la contraseña del router.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AjustesPanel {
     pub router: RouterPanel,
     pub solo_lectura: bool,
     /// Firmware de la última lectura del router.
     pub firmware: Option<String>,
-    pub idioma: Idioma,
+    pub idioma: IdiomaPorDefecto,
     pub zona_horaria: String,
     pub dns_preferidos: Vec<String>,
     pub dispositivos_confianza: Vec<String>,
@@ -62,7 +84,7 @@ pub struct AjustesPanel {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CamposInstancia {
     #[serde(default)]
-    pub idioma: Option<Idioma>,
+    pub idioma: Option<IdiomaPorDefecto>,
     #[serde(default)]
     pub zona_horaria: Option<String>,
     #[serde(default)]
@@ -399,10 +421,12 @@ mod servidor {
                 });
             }
         }
+        // Sin fijar (o quitado), el del navegador: nunca «español» por omisión,
+        // que la página no seguiría.
         let idioma = instancia::leer(db, claves::IDIOMA)
             .await
-            .and_then(|v| serde_json::from_value(v).ok())
-            .unwrap_or_default();
+            .and_then(|v| serde_json::from_value::<Idioma>(v).ok())
+            .map_or(IdiomaPorDefecto::Navegador, IdiomaPorDefecto::Fijo);
         Ok(AjustesPanel {
             router,
             solo_lectura: instancia::solo_lectura(db).await,
@@ -447,7 +471,11 @@ mod servidor {
         };
         let mut valores: Vec<(&str, Value)> = Vec::new();
         if let Some(i) = c.idioma {
-            valores.push((claves::IDIOMA, serde_json::to_value(i).map_err(interno)?));
+            let valor = match i.fijo() {
+                Some(i) => serde_json::to_value(i).map_err(interno)?,
+                None => Value::Null,
+            };
+            valores.push((claves::IDIOMA, valor));
         }
         if let Some(z) = &c.zona_horaria {
             valores.push((claves::ZONA_HORARIA, Value::String(z.clone())));
@@ -468,7 +496,7 @@ mod servidor {
             .await
             .map_err(interno)?;
         if let Some(i) = c.idioma {
-            state.fijar_idioma_por_defecto(i);
+            state.fijar_idioma_por_defecto(i.fijo());
         }
         tracing::info!("parámetros de la instancia guardados");
         Ok(c)

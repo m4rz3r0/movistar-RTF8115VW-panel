@@ -13,7 +13,7 @@ Rust: Leptos 0.8 + Axum, SQLite. Corre en servidor-casa detrás de Caddy en
 |---|---|
 | `crates/hgu` | cliente del router: sesión, lecturas y escrituras, un único mutex y 150 ms entre peticiones; capturas saneadas en `fixtures/` |
 | `crates/catalogo` | catálogo revisado de funciones (`funciones.toml`: riesgo, bloqueadas, lecturas pareadas) y secretos que se enmascaran (`secretos.toml`) |
-| `crates/panel` | servidor y web (SSR + hidratación), asistente de instalación, autenticación, sondeo, cambios vigilados (también en grupos de pasos), historial, «Ajustes del panel»; CLI `panel user add|passwd` |
+| `crates/panel` | servidor y web (SSR + hidratación), asistente de instalación, autenticación, sondeo, cambios vigilados (también en grupos de pasos), historial, «Router → Conexión con el router», «Ajustes del panel»; CLI `panel user add|passwd` |
 | `crates/i18n` | textos de la interfaz en español e inglés (Fluent, `locales/{es,en}`) |
 | `crates/router-sim` | router simulado a partir de las capturas, para pruebas y desarrollo; `sanear-fixtures` |
 | `tools/gen-catalogo` | genera el borrador del catálogo y `docs/api.md` |
@@ -79,6 +79,6 @@ real (MAC, IP pública, claves, nombres) debe acabar en el repositorio.
 - Versiones: una etiqueta `v*` en Forgejo; el actualizador del servidor la
   compila, prueba y despliega en menos de 15 minutos, y vuelve atrás solo si
   no responde.
-- Asistente de instalación, «Ajustes del panel» (`/panel`), idioma, usuarios,
+- Asistente de instalación, «Router» (`/router`), «Ajustes del panel» (`/panel`), idioma, usuarios,
   contraseña del router, actualizar desde una versión anterior al asistente,
   registros, vuelta atrás a mano y pf: [`docs/operacion.md`](docs/operacion.md).

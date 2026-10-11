@@ -41,7 +41,7 @@ Un panel sin usuarios sólo sirve el asistente de instalación
    sale sin guardar; «Guardar y seguir» las guarda **cifradas** en la base de
    datos (con `history.key`) sólo si entran. Con un firmware que no es uno de
    los probados el panel queda en **solo lectura** hasta confirmarlo en
-   «Ajustes del panel».
+   «Router → Conexión con el router».
 4. **Lectura inicial.** Lee todas las funciones de lectura y guarda la «foto
    de partida» cifrada. Con eso la instalación termina: `/instalar` responde
    404 y el panel se usa como siempre.
@@ -49,14 +49,23 @@ Un panel sin usuarios sólo sirve el asistente de instalación
 Si el proceso se reinicia a medias, el asistente sigue donde se quedó (con un
 token nuevo si aún no había administrador).
 
+## Router (`/router`)
+
+Sección de la navegación principal con los ajustes del router, cada uno en su
+página; `/router` lleva a la primera:
+
+- **Conexión con el router** (`/router/conexion`): credenciales (la
+  contraseña guardada nunca se muestra; para cambiar algo se escribe la del
+  router y el panel prueba a entrar antes de guardar), firmware y modo solo
+  lectura (con «Confirmar el firmware»).
+
 ## Ajustes del panel (`/panel`)
 
-En el menú del usuario. Secciones:
+En el menú del usuario; sólo lo del panel. Secciones:
 
-- **Router**: credenciales (la contraseña guardada nunca se muestra; para
-  cambiar algo se escribe la del router y el panel prueba a entrar antes de
-  guardar), firmware y modo solo lectura (con «Confirmar el firmware»).
-- **Panel**: idioma por defecto de la instancia y zona horaria.
+- **Panel**: idioma por defecto de la instancia («El del navegador» si no se
+  fija ninguno) y zona horaria. Al cambiar el idioma por defecto la página se
+  recarga para pintarse con el que le toque.
 - **Privacidad e instancia**: DNS preferidos, dispositivos de confianza,
   ventana de mantenimiento y servidor propio (opcionales).
 - **Usuarios**: alta, baja y cambio de contraseña.
@@ -111,7 +120,7 @@ contraseña cifrada con `history.key`. Para cambiarla:
 1. Cambia la contraseña **en el router** (su web, `http://192.168.1.1`).
    Hasta el paso siguiente el sondeo del panel fallará («router: error» en
    `/salud`).
-2. En «Ajustes del panel» → Router, escribe la nueva (y la dirección y el
+2. En «Router → Conexión con el router», escribe la nueva (y la dirección y el
    usuario si cambian), «Probar la conexión» y «Guardar las credenciales». El
    panel prueba a entrar antes de guardar y desde ese momento usa las nuevas;
    no hace falta reiniciar nada.
@@ -150,7 +159,7 @@ nueva:
 El actualizador sólo despliega el panel, así que el servicio sigue con su
 `routerpanel.rc` de antes (que pasa las variables) hasta repetir
 `deploy/install.sh`; el nuevo sólo las pasa si existe `router.secret`. Una vez
-importadas (ver el registro, o «Ajustes del panel» → Router), **se pueden
+importadas (ver el registro, o «Router → Conexión con el router»), **se pueden
 quitar**:
 
 ```sh

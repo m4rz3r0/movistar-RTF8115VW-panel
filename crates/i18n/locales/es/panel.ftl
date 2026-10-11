@@ -1,31 +1,16 @@
 # Ajustes del panel.
-panel-solo-lectura = El panel está en solo lectura: el firmware del router no se ha probado con el panel. Confírmalo en Ajustes del panel para poder hacer cambios.
+panel-solo-lectura = El panel está en solo lectura: el firmware del router no se ha probado con el panel. Confírmalo en Router → Conexión con el router para poder hacer cambios.
 
 ## Página
 panel-titulo = Ajustes del panel
-panel-sub = Router, parámetros de esta instalación y usuarios del panel. Se guardan en la base de datos del panel.
+panel-sub = Idioma y zona horaria, privacidad e instancia y usuarios del panel. Se guardan en la base de datos del panel. La conexión con el router está en Router.
 panel-guardado = Guardado.
-
-## Router
-panel-router = Router
-panel-router-texto = Dirección de la web del router y su usuario de configuración. La contraseña guardada no se muestra: para cambiar algo, escribe la contraseña del router; el panel prueba a entrar antes de guardar.
-panel-router-sin-configurar = El router aún no está configurado.
-panel-router-url = Dirección del router
-panel-router-usuario = Usuario del router
-panel-router-contrasena = Contraseña del router
-panel-router-probar = Probar la conexión
-panel-router-guardar = Guardar las credenciales
-panel-router-guardadas = Credenciales guardadas: el panel ya usa las nuevas.
-panel-firmware = Firmware: { $firmware }
-panel-firmware-desconocido = Firmware: aún sin leer
-panel-modo-solo-lectura = Solo lectura: el firmware no se ha probado con el panel
-panel-modo-escritura = Se pueden hacer cambios
-panel-confirmar-texto = Si sabes que este firmware se comporta como el probado, confírmalo para poder hacer cambios. El gestor de cambios sigue verificando y deshaciendo lo que falle.
-panel-confirmar = Confirmar el firmware
 
 ## Panel
 panel-panel = Panel
 panel-idioma = Idioma por defecto
+panel-idioma-navegador = El del navegador
+panel-idioma-ayuda = Para quien no ha elegido idioma con el selector del menú, que es donde se cambia el tuyo.
 panel-zona = Zona horaria
 panel-zona-ayuda = Desfase fijo respecto a UTC: no cambia solo con el horario de verano.
 
