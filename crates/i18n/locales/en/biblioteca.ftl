@@ -1,6 +1,6 @@
-# Explorer (library of router functions): the interface. What comes from the
+# Library of router functions (route /explorador): the interface. What comes from the
 # catalogue (areas, descriptions, labels) is not translated.
-biblioteca-titulo = Explorer
+biblioteca-titulo = Library
 biblioteca-inicio-texto = Reads run when you open them, with secrets masked. Writes go through the change manager: you see the before and after, and the panel watches the router after applying them and reverts if it stops responding.
 biblioteca-inicio-total = { $n } router functions, from the basic web interface, the advanced web interface and those no menu links to.
 biblioteca-buscar = Find a function

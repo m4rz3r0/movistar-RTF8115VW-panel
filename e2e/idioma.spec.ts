@@ -18,7 +18,7 @@ async function enIngles(page: Page) {
 const paginas = [
   { ruta: "/", titulo: "Status" },
   { ruta: "/historial", titulo: "History" },
-  { ruta: "/explorador", titulo: "Explorer" },
+  { ruta: "/explorador", titulo: "Library" },
 ];
 
 test.describe("idioma", () => {
@@ -42,7 +42,7 @@ test.describe("idioma", () => {
     }
     await page.reload();
     await enIngles(page);
-    await expect(page.locator("main h1").first()).toHaveText("Explorer");
+    await expect(page.locator("main h1").first()).toHaveText("Library");
     expect(errores, "errores o avisos en la consola").toEqual([]);
   });
 

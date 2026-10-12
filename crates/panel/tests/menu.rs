@@ -4,7 +4,7 @@
 
 mod common;
 
-use common::{PANEL_USER, body_text, get_con_cookie, panel, send, sesion};
+use common::{PANEL_USER, body_text, get_con_cookie, panel, panel_con_gestor, send, sesion};
 
 /// El elemento `<etiqueta …>` que contiene `marca` en su apertura, hasta su
 /// cierre (sin anidar la misma etiqueta).
@@ -39,10 +39,10 @@ fn atributo<'a>(apertura: &'a str, nombre: &str) -> Option<&'a str> {
     Some(&apertura[i..i + apertura[i..].find('"')?])
 }
 
-/// La navegación principal de la página `ruta`.
+/// El HTML de la página `ruta`. Con el gestor de cambios: el Historial lo
+/// necesita.
 async fn pagina(ruta: &str) -> String {
-    let p = panel().await;
-    let cookie = sesion(&p).await;
+    let (p, cookie) = panel_con_gestor().await;
     let resp = get_con_cookie(&p.app, ruta, &cookie).await;
     assert_eq!(resp.status(), 200, "{ruta}");
     body_text(resp).await
@@ -99,6 +99,9 @@ async fn nombre_de_usuario_abre_ajustes_del_panel() {
 async fn seccion_marcada_en_subrutas() {
     let actual = |a: &str| atributo(a, "aria-current") == Some("page");
     for (ruta, href) in [
+        ("/", "/"),
+        ("/historial", "/historial"),
+        ("/explorador/lan_dhcp", "/explorador"),
         ("/router/conexion", "/router/conexion"),
         (
             "/recomendaciones/preferencias",
