@@ -16,7 +16,13 @@
 #   6. un archivo con «../» o que escribe a través de un enlace simbólico se
 #      rechaza sin escribir fuera;
 #   7. una versión anterior a la desplegada no se despliega, salvo con
-#      --forzar.
+#      --forzar;
+#   8. una publicada con sufijo (vX.Y.Z-rc1) tampoco, salvo con --forzar; y
+#      la vX.Y.Z final sí se despliega encima de su -rc1 (sort -V las
+#      ordenaría al revés); se conservan las 3 últimas, la de vuelta atrás
+#      incluida.
+# Cada ejecución del actualizador tiene que dejar vacío su TMPDIR (aquí,
+# dentro de la carpeta temporal de la prueba).
 #
 # Uso: deploy/pruebas/linux.sh (desde cualquier sitio).
 
@@ -164,6 +170,7 @@ PY
 
 actualizar()
 {
+	_rc=0
 	CURL_CA_BUNDLE=$TMP/cert.pem \
 		RP_ACTUALIZAR_CONF=$TMP/no-existe \
 		RP_RELEASES_URL=${URL:-"https://127.0.0.1:$PUERTO"} \
@@ -173,7 +180,13 @@ actualizar()
 		RP_ENV_PANEL=$TMP/env \
 		RP_SALUD_URL=${SALUD:-"https://127.0.0.1:$PUERTO/salud"} \
 		RP_SALUD_ESPERA=4 \
-		sh "$ACTUALIZAR" "$@" >"$TMP/salida" 2>&1
+		sh "$ACTUALIZAR" "$@" >"$TMP/salida" 2>&1 || _rc=$?
+	_restos=$(find "$TMPDIR" -mindepth 1 -maxdepth 1 -exec basename {} \; | tr '\n' ' ')
+	if [ -n "$_restos" ]; then
+		fallo "el actualizador ($*) deja ficheros en TMPDIR: $_restos"
+		rm -rf "${TMPDIR:?}"/* "${TMPDIR:?}"/.[!.]* 2>/dev/null || true
+	fi
+	return "$_rc"
 }
 
 actual()
@@ -182,7 +195,9 @@ actual()
 }
 
 if command -v python3 >/dev/null 2>&1 && command -v openssl >/dev/null 2>&1; then
-	mkdir -p "$TMP/fuera"
+	mkdir -p "$TMP/fuera" "$TMP/tmpdir"
+	TMPDIR=$TMP/tmpdir
+	export TMPDIR
 	openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
 		-days 1 -subj /CN=127.0.0.1 -addext subjectAltName=IP:127.0.0.1 \
 		-keyout "$TMP/clave.pem" -out "$TMP/cert.pem" 2>"$TMP/openssl.log" || {
@@ -298,6 +313,30 @@ PY
 		fallo "--forzar no despliega la versión anterior"
 	fi
 	[ "$(actual)" = releases/v0.9.5 ] || fallo "--forzar no cambia current a v0.9.5 ($(actual))"
+
+	# 8. Sufijos: v1.2.0-rc1 no se despliega sola; v1.2.0 sí, encima de ella.
+	publicar v1.2.0-rc1
+	if actualizar; then
+		fallo "se despliega una versión con sufijo sin --forzar"
+	fi
+	grep -q 'no es una versión final' "$TMP/salida" ||
+		fallo "el rechazo de una versión con sufijo no dice que no es final"
+	[ "$(actual)" = releases/v0.9.5 ] || fallo "una versión con sufijo ha cambiado current ($(actual))"
+	if ! actualizar --forzar; then
+		cat "$TMP/salida" >&2
+		fallo "--forzar no despliega v1.2.0-rc1"
+	fi
+	[ "$(actual)" = releases/v1.2.0-rc1 ] || fallo "--forzar no cambia current a v1.2.0-rc1 ($(actual))"
+	publicar v1.2.0
+	if ! actualizar; then
+		cat "$TMP/salida" >&2
+		fallo "v1.2.0 no se despliega encima de v1.2.0-rc1"
+	fi
+	[ "$(actual)" = releases/v1.2.0 ] || fallo "current no apunta a v1.2.0 ($(actual))"
+	[ -d "$PREFIJO/releases/v1.2.0-rc1" ] || fallo "se ha borrado la versión de vuelta atrás (v1.2.0-rc1)"
+	[ ! -e "$PREFIJO/releases/v0.9.0" ] || fallo "no se borran las versiones antiguas (quedan más de 3)"
+	[ "$(find "$PREFIJO/releases" -mindepth 1 -maxdepth 1 | wc -l)" -eq 3 ] ||
+		fallo "no quedan exactamente 3 versiones"
 else
 	echo "aviso: no hay python3 u openssl; no se prueba el actualizador" >&2
 fi

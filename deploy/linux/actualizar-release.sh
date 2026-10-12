@@ -21,8 +21,12 @@
 # Pasos:
 # 1. Lee la última versión de <base>/latest/download/SHA256SUMS (la línea de
 #    routerpanel-<versión>-<objetivo>.tar.gz) y, si es posterior a la
-#    desplegada (sort -V; con --forzar, basta con que sea otra), descarga de <base>/download/<versión>/ el archivo y su SHA256SUMS (y la
-#    firma si hay clave).
+#    desplegada, descarga de <base>/download/<versión>/ el archivo y su
+#    SHA256SUMS (y la firma si hay clave). Versiones: solo se despliegan
+#    solas las finales, vX.Y.Z (cifras, sin sufijo), comparadas con sort -V.
+#    Una desplegada con sufijo (vX.Y.Z-rc1, una prueba) cuenta como anterior
+#    a su vX.Y.Z. Una publicada con sufijo, una anterior o la misma solo se
+#    despliegan con --forzar.
 # 2. Comprueba la firma (con clave) y el sha256; si algo no cuadra, se para
 #    sin tocar nada.
 # 3. Lo desempaqueta en /opt/routerpanel/releases/<versión>; para el
@@ -127,12 +131,34 @@ descargar()
 	curl -fsSL --proto "$_proto" --proto-redir "$_proto" --max-time 600 -o "$2" "$1"
 }
 
-# ¿Es $1 posterior a $2 según sort -V? (Con $2 vacía, sí.)
+# ¿Es $1 una versión final, vX.Y.Z (solo cifras, sin sufijo)?
+version_final()
+{
+	case $1 in
+	v[0-9]*.[0-9]*.[0-9]*) ;;
+	*) return 1 ;;
+	esac
+	case ${1#v} in
+	*[!0-9.]* | *..* | *.) return 1 ;;
+	esac
+	[ "$(printf '%s' "$1" | tr -cd . | wc -c)" -eq 2 ]
+}
+
+# ¿Se puede desplegar $1 sin --forzar estando desplegada $2 (vacía: ninguna)?
+# $1 tiene que ser final y posterior a $2 según sort -V; si $2 lleva sufijo
+# (vX.Y.Z-algo), se compara con su vX.Y.Z, del que es una versión previa.
+# Si $2 no empieza por vX.Y.Z, no hay con qué comparar: no.
 posterior()
 {
+	version_final "$1" || return 1
 	[ -n "$2" ] || return 0
-	[ "$1" != "$2" ] &&
-		[ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n 1)" = "$1" ]
+	[ "$1" != "$2" ] || return 1
+	_vbase=$(printf '%s' "$2" | sed -n 's/^\(v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p')
+	[ -n "$_vbase" ] || return 1
+	if [ "$1" = "$_vbase" ]; then
+		return 0
+	fi
+	[ "$(printf '%s\n%s\n' "$1" "$_vbase" | sort -V | tail -n 1)" = "$1" ]
 }
 
 # /salud responde 200 con "ok":true en $ESPERA segundos.
@@ -190,36 +216,43 @@ desempaquetar()
 {
 	_arch=$1
 	_dest=$RELEASES/$2
-	_tmp=$RELEASES/.$2.tmp
-	rm -rf "$_tmp"
-	mkdir -p "$_tmp/x" || return 1
+	_trabajo=$RELEASES/.$2.tmp
+	rm -rf "$_trabajo"
+	mkdir -p "$_trabajo/x" || return 1
 	# Como root, tar conservaría dueños y modos del archivo (setuid incluido).
-	if ! tar -xzf "$_arch" -C "$_tmp/x" --no-same-owner --no-same-permissions; then
+	if ! tar -xzf "$_arch" -C "$_trabajo/x" --no-same-owner --no-same-permissions; then
 		error "no se puede desempaquetar $(basename "$_arch")"
-		rm -rf "$_tmp"
+		rm -rf "$_trabajo"
 		return 1
 	fi
-	if [ -n "$(find "$_tmp/x" ! -type f ! -type d)" ]; then
+	if [ -n "$(find "$_trabajo/x" ! -type f ! -type d)" ]; then
 		error "el archivo trae algo que no es fichero ni directorio"
-		rm -rf "$_tmp"
+		rm -rf "$_trabajo"
 		return 1
 	fi
-	_raiz=$_tmp/x
+	_raiz=$_trabajo/x
 	if [ ! -f "$_raiz/panel" ]; then
-		set -- "$_tmp"/x/*
+		set -- "$_trabajo"/x/*
 		if [ "$#" -eq 1 ] && [ -f "$1/panel" ]; then
 			_raiz=$1
 		fi
 	fi
 	if [ ! -f "$_raiz/panel" ] || [ ! -d "$_raiz/site" ]; then
 		error "al archivo le faltan panel o site/"
-		rm -rf "$_tmp"
+		rm -rf "$_trabajo"
 		return 1
 	fi
-	# touch: podar ordena por fecha, y tar deja la del archivo (con builds
-	# reproducibles, la misma en todas las versiones).
-	mv "$_raiz" "$_dest" && chmod -R go-w,a-s "$_dest" && chmod 755 "$_dest/panel" &&
-		touch "$_dest" && rm -rf "$_tmp"
+	# Todo antes del mv: si algo falla, no queda un releases/<versión> a
+	# medias que otra ejecución desplegaría tal cual. touch: podar ordena por
+	# fecha, y tar deja la del archivo (con builds reproducibles, la misma en
+	# todas las versiones).
+	if ! chmod -R go-w,a-s "$_raiz" || ! chmod 755 "$_raiz/panel" ||
+		! touch "$_raiz" || ! mv "$_raiz" "$_dest"; then
+		error "no se puede preparar releases/$2"
+		rm -rf "$_trabajo"
+		return 1
+	fi
+	rm -rf "$_trabajo"
 }
 
 # Borra las versiones más antiguas; nunca la desplegada.
@@ -331,15 +364,17 @@ main()
 		exit 1
 	fi
 
-	_tmp=$(mktemp -d) || exit 1
-	trap 'rm -rf "$_tmp"' EXIT
+	# Global con nombre propio: ninguna función la reutiliza, así que el trap
+	# borra siempre esta carpeta.
+	DESCARGAS=$(mktemp -d) || exit 1
+	trap 'rm -rf "$DESCARGAS"' EXIT
 	trap 'exit 143' INT TERM
 
-	if ! descargar "$_base/latest/download/SHA256SUMS" "$_tmp/ultima"; then
+	if ! descargar "$_base/latest/download/SHA256SUMS" "$DESCARGAS/ultima"; then
 		error "no se puede descargar $_base/latest/download/SHA256SUMS"
 		exit 1
 	fi
-	_ver=$(sed -n "s/^[0-9a-f]\{64\} [ *]routerpanel-\(.*\)-$RP_OBJETIVO\.tar\.gz\$/\1/p" "$_tmp/ultima" | head -n 1)
+	_ver=$(sed -n "s/^[0-9a-f]\{64\} [ *]routerpanel-\(.*\)-$RP_OBJETIVO\.tar\.gz\$/\1/p" "$DESCARGAS/ultima" | head -n 1)
 	if ! nombre_valido "$_ver"; then
 		error "la última release no trae un archivo válido para $RP_OBJETIVO"
 		exit 1
@@ -352,15 +387,20 @@ main()
 	# La versión «última» no va firmada: sin esto, quien controle la descarga
 	# podría hacer volver a una versión antigua (aunque esté firmada).
 	if ! posterior "$_ver" "$_hay"; then
+		if version_final "$_ver"; then
+			_porque="no es posterior a la desplegada ($_hay)"
+		else
+			_porque="no es una versión final vX.Y.Z"
+		fi
 		if [ -n "$_comprobar" ]; then
-			log "la última publicada ($_ver) no es posterior a la desplegada ($_hay)"
+			log "la última publicada ($_ver) $_porque"
 			exit 0
 		fi
 		if [ -z "$_forzar" ]; then
-			error "la última publicada ($_ver) no es posterior a la desplegada ($_hay); no se despliega (--forzar para hacerlo igualmente)"
+			error "la última publicada ($_ver) $_porque; no se despliega (--forzar para hacerlo igualmente)"
 			exit 1
 		fi
-		log "se despliega $_ver, anterior a $_hay, por --forzar"
+		log "se despliega $_ver, que $_porque, por --forzar"
 	fi
 	if [ -n "$_comprobar" ]; then
 		log "hay una versión nueva: $_ver (desplegada: ${_hay:-ninguna})"
@@ -381,27 +421,27 @@ main()
 	_archivo=routerpanel-$_ver-$RP_OBJETIVO.tar.gz
 	_url=$_base/download/$_ver
 	log "descargando $_ver"
-	if ! descargar "$_url/SHA256SUMS" "$_tmp/SHA256SUMS" ||
-		! descargar "$_url/$_archivo" "$_tmp/$_archivo"; then
+	if ! descargar "$_url/SHA256SUMS" "$DESCARGAS/SHA256SUMS" ||
+		! descargar "$_url/$_archivo" "$DESCARGAS/$_archivo"; then
 		error "no se puede descargar $_url/$_archivo o su SHA256SUMS"
 		exit 1
 	fi
 	if [ -n "$RP_MINISIGN_CLAVE" ]; then
-		if ! descargar "$_url/SHA256SUMS.minisig" "$_tmp/SHA256SUMS.minisig" ||
-			! minisign -Vq -P "$RP_MINISIGN_CLAVE" -m "$_tmp/SHA256SUMS" \
-				-x "$_tmp/SHA256SUMS.minisig"; then
+		if ! descargar "$_url/SHA256SUMS.minisig" "$DESCARGAS/SHA256SUMS.minisig" ||
+			! minisign -Vq -P "$RP_MINISIGN_CLAVE" -m "$DESCARGAS/SHA256SUMS" \
+				-x "$DESCARGAS/SHA256SUMS.minisig"; then
 			error "la firma de SHA256SUMS de $_ver no es válida; no se toca nada"
 			exit 1
 		fi
 	fi
-	grep " [ *]$_archivo\$" "$_tmp/SHA256SUMS" | head -n 1 |
-		sed 's/ \*/  /' >"$_tmp/suma"
-	if [ ! -s "$_tmp/suma" ] || ! (cd "$_tmp" && sha256sum -c --status suma); then
+	grep " [ *]$_archivo\$" "$DESCARGAS/SHA256SUMS" | head -n 1 |
+		sed 's/ \*/  /' >"$DESCARGAS/suma"
+	if [ ! -s "$DESCARGAS/suma" ] || ! (cd "$DESCARGAS" && sha256sum -c --status suma); then
 		error "el sha256 de $_archivo no coincide con SHA256SUMS; no se toca nada"
 		exit 1
 	fi
 
-	if [ ! -d "$RELEASES/$_ver" ] && ! desempaquetar "$_tmp/$_archivo" "$_ver"; then
+	if [ ! -d "$RELEASES/$_ver" ] && ! desempaquetar "$DESCARGAS/$_archivo" "$_ver"; then
 		exit 1
 	fi
 	desplegar "$_ver" || exit 1
