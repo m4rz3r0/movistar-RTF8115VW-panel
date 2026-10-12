@@ -173,7 +173,8 @@ generar_plantillas()
 		echo "routerpanel_trusted_proxy=$PROXIES_CONFIANZA"
 	} >"$_dst/rc.conf"
 	echo "nameserver $DNS_IP" >"$_dst/resolv.conf"
-	volcar_config JAILS_RAIZ JAIL_PANEL JAIL_COMPILAR REPO_URL >"$_dst/actualizador.conf"
+	volcar_config JAILS_RAIZ JAIL_PANEL JAIL_COMPILAR REPO_URL TRABAJOS_COMPILACION \
+		>"$_dst/actualizador.conf"
 	# SSH del usuario que compila: sólo su clave de despliegue, y la clave del
 	# servidor git fijada (la de REPO_HOST_CLAVE o, sin ella, la primera que
 	# presente).

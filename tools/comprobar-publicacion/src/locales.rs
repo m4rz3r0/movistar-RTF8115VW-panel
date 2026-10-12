@@ -13,7 +13,8 @@
 //!    publicacion-prohibidos.txt` (`lista-prohibidos`): una entrada por línea;
 //!    `#` empieza un comentario de línea entera; `N` es el número de línea.
 //! 3. Los valores no vacíos de las líneas `CLAVE=valor` de
-//!    `<raiz>/deploy/config.local` (`config-local`).
+//!    `<raiz>/deploy/config.local` (`config-local`), salvo las claves de
+//!    ajuste ([`CLAVES_DE_AJUSTE`]).
 //!
 //! Comparación: sin distinguir mayúsculas; una entrada de menos de 6
 //! caracteres solo cuenta como palabra completa (letras y cifras; `_` separa);
@@ -28,6 +29,11 @@ use std::{
     fmt, fs,
     path::{Path, PathBuf},
 };
+
+/// Claves de `deploy/config.local` que son ajustes y no datos de nadie (un
+/// número de trabajos): no se buscan, porque un valor corto como «4» daría
+/// hallazgo en cualquier línea con ese número.
+const CLAVES_DE_AJUSTE: [&str; 1] = ["TRABAJOS_COMPILACION"];
 
 /// Una entrada de menos de estos caracteres solo cuenta como palabra completa.
 const MINIMO_SUBCADENA: usize = 6;
@@ -133,7 +139,9 @@ impl ListasLocales {
         match fs::read_to_string(raiz.join("deploy/config.local")) {
             Ok(texto) => {
                 for linea in texto.lines() {
-                    if let Some((clave, valor)) = asignacion(linea) {
+                    if let Some((clave, valor)) = asignacion(linea)
+                        && !CLAVES_DE_AJUSTE.contains(&clave)
+                    {
                         c.anadir(Regla::ConfigLocal, format!("config:{clave}"), valor);
                     }
                 }

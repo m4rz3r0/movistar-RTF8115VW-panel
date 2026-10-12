@@ -191,12 +191,19 @@ git config core.hooksPath tools/hooks
 ```
 
 `pre-push` pasa `comprobar-publicacion` por todo lo que sale: MACs, IPs y
-dominios que no son de documentación, y tus listas locales de datos propios
-(`deploy/config.local`, una lista de palabras prohibidas en
-`~/.config/routerpanel/publicacion-prohibidos.txt` y tus secretos en
-`.superpowers/sdd/*/real-secrets.txt`; ver `tools/comprobar-publicacion`).
-Usa direcciones de documentación en ejemplos y pruebas (`192.0.2.x`,
-`*.example`, `*.home.arpa`) y sanea las capturas del router con
+dominios que no son de documentación y, además, las listas locales del
+mantenedor con sus propios datos (que no están en el repositorio). Por
+defecto el gancho exige esas listas y no sube nada sin ellas; si no eres el
+mantenedor, desactívalas en tu clon (solo vale en su `.git/config`, y el
+gancho avisa en cada push):
+
+```sh
+git config routerpanel.sinListas true
+```
+
+Las comprobaciones genéricas siguen activas. Usa direcciones de
+documentación en ejemplos y pruebas (`192.0.2.x`, `*.example`,
+`*.home.arpa`) y sanea las capturas del router con
 `tools/sanear-fixtures.sh`.
 
 ## Licencia

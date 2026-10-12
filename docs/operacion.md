@@ -172,9 +172,11 @@ Para una copia de seguridad, guarda **las dos cosas**:
 systemctl stop routerpanel
 cp -p /var/lib/routerpanel/panel.db* /ruta/de/la/copia/
 systemctl start routerpanel
-# Docker (con el contenedor parado también se puede copiar)
+# Docker (con el contenedor parado también se puede copiar; un fichero
+# -wal o -shm que no exista da error y se puede ignorar)
 compose stop panel
-compose cp panel:/data/panel.db ./copia/
+mkdir -p ./copia
+for f in panel.db panel.db-wal panel.db-shm; do compose cp panel:/data/$f ./copia/; done
 compose start panel
 # FreeBSD
 doas jexec <JAIL_PANEL> service routerpanel stop

@@ -19,8 +19,12 @@
 # - borrar una ref remota no sube nada y no se revisa.
 #
 # Las listas locales son obligatorias (--exigir-listas): si falta una, no se
-# sube nada. Los objetos de reemplazo (git replace, injertos) se ignoran,
-# como hace git push: se revisa lo que de verdad se envía.
+# sube nada. Quien no es el dueño y no las tiene puede desactivarlas en su
+# clon con `git config routerpanel.sinListas true`: solo cuenta si está en el
+# .git/config del propio clon (no en la configuración global ni del
+# sistema), y entonces se revisa con --sin-locales y se avisa en cada push.
+# Los objetos de reemplazo (git replace, injertos) se ignoran, como hace
+# git push: se revisa lo que de verdad se envía.
 #
 # Sale con 1 ante cualquier hallazgo o error. Nunca imprime nombres de ref:
 # pueden contener un dato.
@@ -49,6 +53,14 @@ es_cero() {
     *) return 0 ;;
     esac
 }
+
+# Sin listas locales solo con la opción en el .git/config del clon; un valor
+# que no es booleano cuenta como no puesta.
+listas=--exigir-listas
+if [ "$(git config --local --bool routerpanel.sinListas 2>/dev/null)" = true ]; then
+    listas=--sin-locales
+    echo "pre-push: aviso: routerpanel.sinListas está activo; se revisa sin las listas locales del dueño" >&2
+fi
 
 fallo=0
 while read -r ref_local sha_local ref_remota sha_remoto; do
@@ -103,10 +115,10 @@ while read -r ref_local sha_local ref_remota sha_remoto; do
         [ "$(git cat-file -t "$sha_local" 2>/dev/null)" = commit ] &&
         git cat-file -e "$sha_remoto^{commit}" 2>/dev/null &&
         git merge-base --is-ancestor "$sha_remoto" "$sha_local" 2>/dev/null; then
-        comprobar --diff "$sha_remoto..$sha_local" "$raiz" --exigir-listas \
+        comprobar --diff "$sha_remoto..$sha_local" "$raiz" "$listas" \
             --nombre-ref "$ref_local" --nombre-ref "$ref_remota"
     else
-        comprobar --historial "$raiz" --rev "$sha_local" --exigir-listas \
+        comprobar --historial "$raiz" --rev "$sha_local" "$listas" \
             --nombre-ref "$ref_local" --nombre-ref "$ref_remota"
     fi
     if [ $? -ne 0 ]; then

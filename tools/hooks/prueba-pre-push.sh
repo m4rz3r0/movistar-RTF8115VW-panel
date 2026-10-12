@@ -13,6 +13,9 @@
 # Además: un fichero de raíces ilegible o con una línea mal formada, un
 # injerto (git replace --graft), un worktree enlazado (las listas están en el
 # repositorio principal) y una lista que falta hacen fallar el push.
+# 8. Con routerpanel.sinListas en el .git/config del clon (no en el global),
+#    sin listas: un push limpio pasa con un aviso y uno con una IP que no es
+#    de documentación falla.
 set -eu
 
 : "${RP_COMPROBAR_PUBLICACION:?falta RP_COMPROBAR_PUBLICACION}"
@@ -169,6 +172,33 @@ if git push -q origin sin-config 2>"$tmp/err"; then
 fi
 mv "$tmp/config.local" deploy/config.local
 git push -q origin sin-config 2>"$tmp/err" || fallo "el push con las listas falló: $(cat "$tmp/err")"
+
+# 8. Sin las listas del dueño (quien contribuye desde fuera): con
+#    routerpanel.sinListas en el .git/config del clon, el gancho revisa sin
+#    listas locales y avisa; lo genérico (una IP que no es de
+#    documentación) se sigue rechazando. En la configuración global no vale.
+mv deploy/config.local "$tmp/config.local"
+mv .superpowers "$tmp/superpowers"
+git checkout -q -b sin-listas
+git commit -q --allow-empty -m 'limpio, sin listas'
+printf '[routerpanel]\n\tsinListas = true\n' >"$tmp/global"
+if GIT_CONFIG_GLOBAL="$tmp/global" git push -q origin sin-listas 2>"$tmp/err"; then
+    fallo "el push sin listas pasó con la opción solo en la configuración global"
+fi
+git config routerpanel.sinListas true
+git push -q origin sin-listas 2>"$tmp/err" || fallo "el push limpio sin listas falló: $(cat "$tmp/err")"
+grep -q 'sin las listas locales' "$tmp/err" || fallo "no avisó de que revisa sin listas: $(cat "$tmp/err")"
+printf 'equipo en 192.168.%s.5\n' 77 >f.txt
+git add f.txt
+git commit -qm 'con una IP propia'
+if git push -q origin sin-listas 2>"$tmp/err" >"$tmp/out"; then
+    fallo "el push sin listas con una IP que no es de documentación pasó"
+fi
+grep -q ipv4 "$tmp/out" || fallo "no encontró la IP: $(cat "$tmp/out")"
+git reset -q --hard HEAD~1
+git config --unset routerpanel.sinListas
+mv "$tmp/config.local" deploy/config.local
+mv "$tmp/superpowers" .superpowers
 
 # Borrar una rama remota tampoco necesita revisión.
 git push -q origin :publica 2>"$tmp/err" || fallo "el borrado de la rama remota falló: $(cat "$tmp/err")"

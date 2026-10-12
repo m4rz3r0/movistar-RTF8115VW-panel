@@ -5,7 +5,9 @@
 # - sintaxis (sh -n) de todos los guiones de deploy/ y shellcheck si está;
 # - install.sh --plantillas con config.example no deja ninguna @CLAVE@;
 # - comprobar-publicacion no encuentra nada en deploy/ (sin listas locales);
-# - una configuración sin ROUTER_IP falla y el mensaje nombra la clave.
+# - una configuración sin ROUTER_IP falla y el mensaje nombra la clave;
+# - TRABAJOS_COMPILACION (opcional) llega a actualizador.conf y un valor que
+#   no es un entero positivo falla nombrando la clave.
 #
 # Uso: deploy/pruebas/plantillas.sh (desde cualquier sitio). El comprobador
 # se toma de $COMPROBAR (ruta al binario) o, si no, de «cargo run».
@@ -72,6 +74,31 @@ elif ! grep -q 'ROUTER_IP' "$TMP/salida"; then
 	cat "$TMP/salida" >&2
 	fallo "el error de una configuración sin ROUTER_IP no nombra la clave"
 fi
+
+# --- trabajos de compilación -----------------------------------------------
+# Vacía por defecto (cargo decide); un número llega a actualizador.conf; lo
+# que no es un número entero positivo falla y nombra la clave.
+grep -q "^TRABAJOS_COMPILACION=''" "$TMP/plantillas/actualizador.conf" 2>/dev/null ||
+	fallo "actualizador.conf no lleva TRABAJOS_COMPILACION vacía con el ejemplo"
+{ cat "$DEPLOY/config.example"; echo 'TRABAJOS_COMPILACION=3'; } >"$TMP/trabajos.conf"
+if sh "$DEPLOY/freebsd-jail/install.sh" --config "$TMP/trabajos.conf" \
+	--plantillas "$TMP/trabajos" >"$TMP/salida" 2>&1; then
+	grep -q "^TRABAJOS_COMPILACION='3'" "$TMP/trabajos/actualizador.conf" ||
+		fallo "TRABAJOS_COMPILACION no llega a actualizador.conf"
+else
+	cat "$TMP/salida" >&2
+	fallo "install.sh --plantillas con TRABAJOS_COMPILACION=3"
+fi
+for malo in x 0 -2; do
+	{ cat "$DEPLOY/config.example"; echo "TRABAJOS_COMPILACION=$malo"; } >"$TMP/trabajos.conf"
+	if sh "$DEPLOY/freebsd-jail/install.sh" --config "$TMP/trabajos.conf" \
+		--plantillas "$TMP/trabajos-malo" >"$TMP/salida" 2>&1; then
+		fallo "TRABAJOS_COMPILACION=$malo no falla"
+	elif ! grep -q TRABAJOS_COMPILACION "$TMP/salida"; then
+		cat "$TMP/salida" >&2
+		fallo "el error de TRABAJOS_COMPILACION=$malo no nombra la clave"
+	fi
+done
 
 if [ "$fallos" -ne 0 ]; then
 	echo "$fallos fallos" >&2

@@ -259,7 +259,15 @@ mod tests {
         let toml =
             std::fs::read_to_string(crate::raiz().join("crates/catalogo/funciones.toml")).unwrap();
         for (nombre, texto) in [("docs/api.md", &md), ("funciones.toml", &toml)] {
-            for fragmento in ["function(", "function (", "<div", "var ", "$("] {
+            for fragmento in [
+                "function(",
+                "function (",
+                "<div",
+                "<script",
+                "var ",
+                "$(",
+                "document.",
+            ] {
                 assert!(
                     !texto.contains(fragmento),
                     "{nombre} contiene «{fragmento}», código literal del firmware"

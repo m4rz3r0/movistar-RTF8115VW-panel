@@ -198,12 +198,19 @@ git config core.hooksPath tools/hooks
 ```
 
 `pre-push` runs `comprobar-publicacion` over everything that goes out: MACs,
-IPs and domains that are not documentation ones, and your local lists of
-your own data (`deploy/config.local`, a list of forbidden words in
-`~/.config/routerpanel/publicacion-prohibidos.txt` and your secrets in
-`.superpowers/sdd/*/real-secrets.txt`; see `tools/comprobar-publicacion`).
-Use documentation addresses in examples and tests (`192.0.2.x`, `*.example`,
-`*.home.arpa`) and sanitise router captures with `tools/sanear-fixtures.sh`.
+IPs and domains that are not documentation ones and, besides, the
+maintainer's local lists of their own data (which are not in the
+repository). By default the hook requires those lists and pushes nothing
+without them; if you are not the maintainer, turn them off in your clone (it
+only counts in its `.git/config`, and the hook warns on every push):
+
+```sh
+git config routerpanel.sinListas true
+```
+
+The generic checks stay on. Use documentation addresses in examples and
+tests (`192.0.2.x`, `*.example`, `*.home.arpa`) and sanitise router captures
+with `tools/sanear-fixtures.sh`.
 
 ## Licence
 

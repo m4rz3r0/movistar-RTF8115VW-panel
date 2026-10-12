@@ -170,6 +170,28 @@ fn config_local_da_clave_no_valor() {
     assert_eq!(s.codigo, Some(0), "{}{}", s.stdout, s.stderr);
 }
 
+/// Las claves de ajuste que no son datos de nadie (`TRABAJOS_COMPILACION`,
+/// un número de trabajos) no cuentan: si no, un «4» daría hallazgo en
+/// cualquier línea con ese número. Las demás claves sí, aunque sean cortas.
+#[test]
+fn config_local_sin_claves_de_ajuste() {
+    let (_t, dir, casa) = temporales();
+    escribir(
+        &dir,
+        "deploy/config.local",
+        "TRABAJOS_COMPILACION=4\nUID_COMPILAR=4\n",
+    );
+    escribir(&dir, "a.md", "con 4 trabajos\n");
+    let s = arbol_solo(&dir, &casa, None, "a.md");
+    assert!(
+        !s.stdout.contains("[config:TRABAJOS_COMPILACION]"),
+        "{}",
+        s.stdout
+    );
+    // El mismo valor en otra clave sigue contando.
+    assert!(s.stdout.contains("[config:UID_COMPILAR]"), "{}", s.stdout);
+}
+
 #[test]
 fn lista_de_secretos_por_numero_de_entrada() {
     let (_t, dir, casa) = temporales();

@@ -49,6 +49,8 @@ JAILS_RAIZ=/usr/local/jails/containers
 JAIL_PANEL=routerpanel
 JAIL_COMPILAR=routerpanel-build
 REPO_URL=
+# Trabajos de cargo a la vez; vacía, los que cargo decida (uno por núcleo).
+TRABAJOS_COMPILACION=
 if [ -f "$CONF" ]; then
 	# shellcheck source=/dev/null
 	. "$CONF"
@@ -253,12 +255,17 @@ build_release()
 			echo "instalando wasm-bindgen-cli $want (había: ${have:-ninguno})"
 			cargo install --locked wasm-bindgen-cli --version "$want" || exit 1
 		fi
-		# Memoria: con los 8 núcleos a la vez (compilación con LTO y enlaces de
-		# los binarios de pruebas) el servidor se quedaba sin memoria hasta el
-		# punto de que el cifrado del disco fallaba escrituras (GEOM_ELI ENOMEM).
-		# Con 4 trabajos y prioridad baja el resto de servicios no lo nota.
-		CARGO_BUILD_JOBS=4
-		export CARGO_BUILD_JOBS
+		# Trabajos a la vez (TRABAJOS_COMPILACION, si se fijó; menos trabajos,
+		# menos memoria) y prioridad baja, para que el resto de servicios del
+		# servidor no lo note.
+		case $1 in
+		"") ;;
+		*[!0-9]* | 0*) echo "TRABAJOS_COMPILACION no es válida; se usa el valor de cargo" ;;
+		*)
+			CARGO_BUILD_JOBS=$1
+			export CARGO_BUILD_JOBS
+			;;
+		esac
 		renice -n 15 $$ >/dev/null 2>&1
 		cargo leptos build --release &&
 		# Red de seguridad: una prueba colgada no deja el actualizador
@@ -266,7 +273,7 @@ build_release()
 		# Falla como cualquier prueba; cargo deja en el registro cuál llevaba
 		# más de 60 s («has been running for over 60 seconds»).
 		timeout -k 60 3600 cargo test --workspace &&
-		timeout -k 60 3600 cargo test --workspace --features panel/ssr' >>"$BUILD_LOG" 2>&1; then
+		timeout -k 60 3600 cargo test --workspace --features panel/ssr' "$TRABAJOS_COMPILACION" >>"$BUILD_LOG" 2>&1; then
 		log "ERROR: falló la compilación o las pruebas de $_name (ver $BUILD_LOG)"
 		return 1
 	fi

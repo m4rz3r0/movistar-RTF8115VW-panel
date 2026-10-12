@@ -66,6 +66,11 @@ REPO_HOST_CLAVE=
 # en el unbound del host).
 MODULOS="pf rc actualizador"
 
+# Trabajos de compilación a la vez en la jail de compilación (opcional).
+# Vacía: los que decida cargo, uno por núcleo. Un número menor gasta menos
+# memoria; útil si la compilación deja al servidor sin ella.
+TRABAJOS_COMPILACION=
+
 # Webs que tienen que seguir respondiendo al cargar las reglas de pf,
 # separadas por espacios (opcional; si alguna falla, pf vuelve atrás solo).
 COMPROBAR_URLS=

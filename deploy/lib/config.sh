@@ -9,7 +9,7 @@
 CLAVES_OBLIGATORIAS="SERVIDOR_SSH JAILS_RAIZ ZFS_DATASET JAIL_PANEL JAIL_PANEL_IP
 	JAIL_COMPILAR JAIL_COMPILAR_IP UID_COMPILAR INTERFAZ_EXT RED_LAN ROUTER_IP DNS_IP
 	PANEL_ORIGEN PANEL_ESCUCHA PROXIES_CONFIANZA REPO_URL MODULOS"
-CLAVES_OPCIONALES="RED_VPN REPO_HOST_CLAVE COMPROBAR_URLS"
+CLAVES_OPCIONALES="RED_VPN REPO_HOST_CLAVE COMPROBAR_URLS TRABAJOS_COMPILACION"
 MODULOS_CONOCIDOS="pf rc actualizador caddyfile unbound"
 
 # ¿Es $1 una IPv4 escrita como cuatro números de 0 a 255?
@@ -61,6 +61,11 @@ cargar_config()
 	done
 	case $UID_COMPILAR in
 	*[!0-9]*) _malas="$_malas UID_COMPILAR" ;;
+	esac
+	# Vacía (cargo decide) o un entero positivo.
+	case ${TRABAJOS_COMPILACION-} in
+	'') ;;
+	*[!0-9]* | 0*) _malas="$_malas TRABAJOS_COMPILACION" ;;
 	esac
 	case $PANEL_ORIGEN in
 	http://?* | https://?*) ;;

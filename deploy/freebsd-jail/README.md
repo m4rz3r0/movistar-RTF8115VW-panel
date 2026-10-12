@@ -5,7 +5,7 @@ El panel corre en un servidor FreeBSD (probado en 15.x) en dos jails PkgBase:
 | Jail (`config.local`) | Contenido |
 |---|---|
 | `JAIL_PANEL` (`JAIL_PANEL_IP`) | base mínima (`FreeBSD-set-minimal-jail`), el binario y su web; servicio `routerpanel` en `PANEL_ESCUCHA` |
-| `JAIL_COMPILAR` (`JAIL_COMPILAR_IP`) | base completa, `rustup` (la versión de Rust de `rust-toolchain.toml`, con `wasm32-unknown-unknown`, que instala al compilar), `cargo-leptos` 0.3.11, `wasm-bindgen-cli` (la versión del `Cargo.lock`), `binaryen` (`wasm-opt`), `git`; usuario sin privilegios `rpbuild` (uid `UID_COMPILAR`) con el clon en `/home/rpbuild/panel` |
+| `JAIL_COMPILAR` (`JAIL_COMPILAR_IP`) | base completa, `rustup` 1.28.1 o posterior (instala solo, al compilar, la versión de Rust de `rust-toolchain.toml` con `wasm32-unknown-unknown`; la 1.28.0 no lo hace), `cargo-leptos` 0.3.11, `wasm-bindgen-cli` (la versión del `Cargo.lock`), `binaryen` (`wasm-opt`), `git`; usuario sin privilegios `rpbuild` (uid `UID_COMPILAR`) con el clon en `/home/rpbuild/panel` |
 
 Se entra por un proxy inverso con HTTPS (`PROXIES_CONFIANZA`) en
 `PANEL_ORIGEN`. Con el módulo `caddyfile`, `install.sh` imprime el sitio para el
@@ -48,7 +48,7 @@ En el host:
 - `/usr/local/routerpanel/releases/<versión>/{panel,site/,COMMIT}` — versiones
   compiladas (root, sólo lectura para los demás). Se monta por nullfs `ro,late`
   (`/etc/fstab`) en `/usr/local/routerpanel/releases` de la jail del panel.
-- `/usr/local/etc/routerpanel-actualizar.conf` (600) — jails y `REPO_URL` del
+- `/usr/local/etc/routerpanel-actualizar.conf` (600) — jails, `REPO_URL` y `TRABAJOS_COMPILACION` del
   actualizador.
 - `/usr/local/etc/cron.d/routerpanel` — el actualizador cada 15 minutos.
 - `/var/log/routerpanel-update.log` (rotado por
@@ -194,7 +194,9 @@ Si no hay acceso al repositorio, compila lo que ya tenga el clon.
 3. `cargo leptos build --release`, `cargo test --workspace` y
    `cargo test --workspace --features panel/ssr` (como `rpbuild`; si el
    `Cargo.lock` pide otra versión de `wasm-bindgen`, instala antes
-   `wasm-bindgen-cli` de esa versión). Cada `cargo test` tiene una hora como
+   `wasm-bindgen-cli` de esa versión), con prioridad baja y, si se fijó
+   `TRABAJOS_COMPILACION` en la configuración, ese número de trabajos de
+   cargo a la vez (menos memoria). Cada `cargo test` tiene una hora como
    mucho (`timeout`): una prueba colgada cuenta como fallo y no bloquea las
    ejecuciones siguientes.
 4. Saca `target/release/panel` y `target/site/` como un `tar` generado
