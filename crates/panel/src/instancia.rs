@@ -25,6 +25,9 @@ pub mod claves {
     /// Conexión a internet elegida a mano (nombre, p. ej. `ip2`): manda sobre
     /// la detectada.
     pub const WAN_MANUAL: &str = "wan_manual";
+    /// Marca de la migración [`super::migrar_zona_utc_por_defecto`] (ya
+    /// hecha).
+    pub const MIGRACION_ZONA_UTC: &str = "migracion.zona_utc_por_defecto";
 }
 
 /// Versiones de firmware con las que se ha probado el panel (`SWVersion` de
@@ -167,6 +170,46 @@ pub async fn escribir_varios(db: &SqlitePool, valores: &[(&str, Value)]) -> Resu
         .map_err(error)?;
     }
     tx.commit().await.map_err(error)
+}
+
+/// Migración de una sola vez (al arrancar): antes, «Ajustes del panel»
+/// mostraba `UTC` como zona por defecto y guardarlo (p. ej. al cambiar el
+/// idioma) lo dejaba en la base de datos aunque las gráficas iban en hora
+/// peninsular. Si aún no se ha hecho ([`claves::MIGRACION_ZONA_UTC`]) y la
+/// zona guardada es exactamente `UTC`, se quita (sin guardar es la
+/// peninsular). La marca se escribe en la misma transacción, se haya quitado
+/// algo o no: un `UTC` elegido después se respeta. Devuelve si quitó la zona.
+pub async fn migrar_zona_utc_por_defecto(db: &SqlitePool) -> Result<bool, String> {
+    let error = |e: sqlx::Error| format!("no se puede migrar la zona horaria: {e}");
+    let mut tx = db.begin().await.map_err(error)?;
+    let hecha: Option<String> =
+        sqlx::query_scalar("SELECT valor FROM ajustes_instancia WHERE clave = ?")
+            .bind(claves::MIGRACION_ZONA_UTC)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(error)?;
+    if hecha.is_some() {
+        return Ok(false);
+    }
+    let quitada = sqlx::query("DELETE FROM ajustes_instancia WHERE clave = ? AND valor = ?")
+        .bind(claves::ZONA_HORARIA)
+        .bind(Value::String("UTC".into()).to_string())
+        .execute(&mut *tx)
+        .await
+        .map_err(error)?
+        .rows_affected()
+        > 0;
+    sqlx::query("INSERT INTO ajustes_instancia (clave, valor) VALUES (?, ?)")
+        .bind(claves::MIGRACION_ZONA_UTC)
+        .bind(Value::Bool(true).to_string())
+        .execute(&mut *tx)
+        .await
+        .map_err(error)?;
+    tx.commit().await.map_err(error)?;
+    if quitada {
+        tracing::info!("zona horaria UTC de la versión anterior quitada: hora peninsular");
+    }
+    Ok(quitada)
 }
 
 /// ¿Se ha probado el panel con esta versión de firmware?

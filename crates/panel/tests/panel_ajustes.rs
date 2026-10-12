@@ -998,3 +998,64 @@ async fn html_lleva_data_zona() {
         "{html}"
     );
 }
+
+/// Migración al arrancar: un `UTC` guardado por la versión anterior (era lo
+/// que mostraba el selector por defecto) se quita una sola vez; un `UTC`
+/// elegido después se respeta y cualquier otra zona no se toca.
+#[tokio::test]
+async fn migracion_zona_utc_por_defecto() {
+    use panel::ui::charts::Zona;
+    let p = panel().await;
+    let db = &p.state.db;
+    let dir = p.state.cfg.db_path.parent().unwrap();
+    let arrancar = || common::estado((*p.state.cfg).clone(), dir);
+    // Base de datos de la versión anterior: sin la marca de la migración.
+    let anterior = |zona: &'static str| async move {
+        sqlx::query("DELETE FROM ajustes_instancia WHERE clave = ?")
+            .bind(claves::MIGRACION_ZONA_UTC)
+            .execute(db)
+            .await
+            .unwrap();
+        instancia::escribir(db, claves::ZONA_HORARIA, &json!(zona))
+            .await
+            .unwrap();
+    };
+
+    // `UTC` sin la marca: se quita (la peninsular) y queda la marca.
+    anterior("UTC").await;
+    let s = arrancar().await;
+    assert_eq!(s.zona(), Zona::Peninsular);
+    assert_eq!(instancia::leer(db, claves::ZONA_HORARIA).await, None);
+    assert!(
+        instancia::leer(db, claves::MIGRACION_ZONA_UTC)
+            .await
+            .is_some()
+    );
+
+    // Un `UTC` guardado después sobrevive a otro arranque.
+    instancia::escribir(db, claves::ZONA_HORARIA, &json!("UTC"))
+        .await
+        .unwrap();
+    let s = arrancar().await;
+    assert_eq!(s.zona(), Zona::Fija(0));
+    assert_eq!(
+        instancia::leer(db, claves::ZONA_HORARIA).await,
+        Some(json!("UTC"))
+    );
+
+    // Otra zona sin la marca: no se toca.
+    for zona in ["Atlantic/Canary", "UTC+01:00", "Europe/Madrid"] {
+        anterior(zona).await;
+        arrancar().await;
+        assert_eq!(
+            instancia::leer(db, claves::ZONA_HORARIA).await,
+            Some(json!(zona)),
+            "{zona}"
+        );
+        assert!(
+            instancia::leer(db, claves::MIGRACION_ZONA_UTC)
+                .await
+                .is_some()
+        );
+    }
+}

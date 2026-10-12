@@ -192,6 +192,7 @@ impl AppState {
         let idioma_por_defecto = crate::instancia::leer(&db, crate::instancia::claves::IDIOMA)
             .await
             .and_then(|v| serde_json::from_value(v).ok());
+        crate::instancia::migrar_zona_utc_por_defecto(&db).await?;
         let zona = crate::instancia::leer(&db, crate::instancia::claves::ZONA_HORARIA)
             .await
             .and_then(|v| v.as_str().and_then(Zona::desde_texto))
