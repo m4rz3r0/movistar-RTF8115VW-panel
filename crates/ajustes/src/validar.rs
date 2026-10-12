@@ -6,7 +6,7 @@ use std::collections::HashSet;
 
 use crate::carga::CatalogoAjustes;
 use crate::modelo::{Ajuste, Campo, TipoCampo};
-use crate::valores::a_router;
+use crate::valores::{admite_opcional, traducir};
 
 /// Prefijo de las claves de traducción de un ajuste: `ajuste-` más el id con
 /// `.` → `-` (`wifi.red_5` → `ajuste-wifi-red_5`).
@@ -46,12 +46,13 @@ pub fn claves_requeridas(a: &Ajuste) -> Vec<String> {
     claves
 }
 
-/// Riesgo de aplicar un ajuste: el mayor de sus funciones de escritura
-/// (bajo si no escribe nada).
+/// Riesgo de aplicar un ajuste: el mayor de las funciones de escritura de sus
+/// campos editables (bajo si no escribe nada).
 pub fn riesgo(a: &Ajuste, f: &Catalogo) -> Riesgo {
     a.campos
         .iter()
-        .filter_map(|c| f.funcion(&c.escribe.funcion))
+        .filter_map(Campo::escribible)
+        .filter_map(|e| f.funcion(&e.funcion))
         .map(|func| func.riesgo)
         .max()
         .unwrap_or(Riesgo::Bajo)
@@ -80,6 +81,16 @@ fn es_nombre(s: &str) -> bool {
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
 }
 
+/// Ids de campo que darían las claves del propio ajuste (`<p>-titulo`…).
+const CAMPOS_RESERVADOS: [&str; 3] = ["titulo", "desc", "ayuda"];
+/// Claves de opción que darían las del propio campo (`<p>-<campo>-desc`…).
+const OPCIONES_RESERVADAS: [&str; 2] = ["desc", "recomendado"];
+
+/// El parámetro es secreto por su tipo o por la máscara.
+fn es_secreto(p: &Parametro, m: &Mascara) -> bool {
+    p.tipo == TipoParam::Secret || m.es_secreto(&p.nombre)
+}
+
 fn comprobar_ajuste(a: &Ajuste, f: &Catalogo, m: &Mascara, fallos: &mut Vec<String>) {
     let id = &a.id;
     // 1. Forma del id.
@@ -96,14 +107,33 @@ fn comprobar_ajuste(a: &Ajuste, f: &Catalogo, m: &Mascara, fallos: &mut Vec<Stri
             "{id}: el id debe tener la forma <tema>.<nombre> (minúsculas, cifras y _)"
         )),
     }
-    // 2. La lectura.
+    if a.efecto.as_deref().is_some_and(|e| !es_nombre(e)) {
+        fallos.push(format!(
+            "{id}: el efecto solo admite minúsculas, cifras y _"
+        ));
+    }
+    // 2. La lectura y sus parámetros.
     match f.funcion(&a.leer.funcion) {
         None => fallos.push(format!("{id}: la lectura {} no existe", a.leer.funcion)),
         Some(l) if l.tipo != Tipo::Lectura => {
             fallos.push(format!("{id}: {} no es una lectura", a.leer.funcion));
         }
-        Some(_) => {}
+        Some(l) => {
+            for (k, _) in &a.leer.params {
+                match l.parametro(k) {
+                    None => fallos.push(format!(
+                        "{id}: la lectura {} no tiene el parámetro {k}",
+                        l.name
+                    )),
+                    Some(p) if es_secreto(p, m) => {
+                        fallos.push(format!("{id}: el parámetro de lectura {k} es secreto"));
+                    }
+                    Some(_) => {}
+                }
+            }
+        }
     }
+    comprobar_fijos(a, f, m, fallos);
     let mut campos = HashSet::new();
     for campo in &a.campos {
         if !campos.insert(campo.id.as_str()) {
@@ -113,19 +143,81 @@ fn comprobar_ajuste(a: &Ajuste, f: &Catalogo, m: &Mascara, fallos: &mut Vec<Stri
     }
 }
 
+/// Los fijos son parámetros de cada función de escritura del ajuste, no son
+/// secretos ni los escribe también un campo.
+fn comprobar_fijos(a: &Ajuste, f: &Catalogo, m: &Mascara, fallos: &mut Vec<String>) {
+    if a.fijos.is_empty() {
+        return;
+    }
+    let id = &a.id;
+    let mut funciones: Vec<&str> = a
+        .campos
+        .iter()
+        .filter_map(Campo::escribible)
+        .map(|e| e.funcion.as_str())
+        .collect();
+    funciones.sort_unstable();
+    funciones.dedup();
+    if funciones.is_empty() {
+        fallos.push(format!("{id}: fijos en un ajuste que no escribe"));
+    }
+    for k in a.fijos.keys() {
+        if m.es_secreto(k) {
+            fallos.push(format!("{id}: el fijo {k} es secreto"));
+        }
+        if a.campos
+            .iter()
+            .filter_map(Campo::escribible)
+            .any(|e| e.parametro == *k)
+        {
+            fallos.push(format!("{id}: el fijo {k} también lo escribe un campo"));
+        }
+        // Las funciones que no existen ya las señala su campo (regla 3).
+        for func in funciones.iter().filter_map(|n| f.funcion(n)) {
+            match func.parametro(k) {
+                None => fallos.push(format!("{id}: {} no tiene el fijo {k}", func.name)),
+                Some(p) if p.tipo == TipoParam::Secret && !m.es_secreto(k) => {
+                    fallos.push(format!("{id}: el fijo {k} es secreto"));
+                }
+                Some(_) => {}
+            }
+        }
+    }
+}
+
 fn comprobar_campo(a: &Ajuste, c: &Campo, f: &Catalogo, m: &Mascara, fallos: &mut Vec<String>) {
     let donde = format!("{}.{}", a.id, c.id);
     let mut mal = |msg: String| fallos.push(format!("{donde}: {msg}"));
     if !es_nombre(&c.id) {
         mal("el id del campo solo admite minúsculas, cifras y _".into());
     }
+    if CAMPOS_RESERVADOS.contains(&c.id.as_str()) {
+        mal(format!(
+            "el id de campo {} está reservado para las claves del ajuste",
+            c.id
+        ));
+    }
     if c.lee.trim().is_empty() {
         mal("`lee` vacío".into());
     }
+    let campo_secreto = c.tipo == TipoCampo::Secreto;
+    // 5. Lo que se lee de un elemento secreto no sale del servidor.
+    if m.es_secreto(&c.lee) && !campo_secreto {
+        mal(format!(
+            "el elemento leído {} es secreto y el campo no es `secreto`",
+            c.lee
+        ));
+    }
     comprobar_forma(c, &mut mal);
 
+    let Some(e) = &c.escribe else {
+        if c.solo_lectura.is_none() {
+            mal("sin `escribe`, el campo necesita `solo_lectura`".into());
+        }
+        return;
+    };
     // 3. La función de escritura y su parámetro.
-    let nombre_f = &c.escribe.funcion;
+    let nombre_f = &e.funcion;
     let Some(func) = f.funcion(nombre_f) else {
         mal(format!("la función {nombre_f} no existe"));
         return;
@@ -140,23 +232,27 @@ fn comprobar_campo(a: &Ajuste, c: &Campo, f: &Catalogo, m: &Mascara, fallos: &mu
     if a.lista && func.lista.is_none() {
         mal(format!("lista = true, pero {nombre_f} no es una lista"));
     }
-    // 8. Secretos de la web básica.
+    // 8. Secretos de la web básica: se quedan en solo lectura. Es el único
+    // caso en que un campo de solo lectura conserva su `escribe`.
     let basica = func.origen == Origen::Basica || !nombre_f.starts_with("cb");
-    if c.tipo == TipoCampo::Secreto && basica && c.solo_lectura.is_none() {
+    let secreto_basico = campo_secreto && basica;
+    if secreto_basico && c.solo_lectura.is_none() {
         mal(format!(
             "secreto que solo escribe la web básica ({nombre_f}): necesita solo_lectura"
         ));
+    } else if !secreto_basico && c.solo_lectura.is_some() {
+        mal(
+            "`solo_lectura` con `escribe`: un campo de solo lectura no lleva `escribe` \
+             (salvo un secreto de la web básica)"
+                .into(),
+        );
     }
-    let Some(p) = func.parametro(&c.escribe.parametro) else {
-        mal(format!(
-            "{nombre_f} no tiene el parámetro {}",
-            c.escribe.parametro
-        ));
+    let Some(p) = func.parametro(&e.parametro) else {
+        mal(format!("{nombre_f} no tiene el parámetro {}", e.parametro));
         return;
     };
     // 5. Secreto ↔ secreto; 4. tipos compatibles.
-    let param_secreto = p.tipo == TipoParam::Secret || m.es_secreto(&p.nombre);
-    let campo_secreto = c.tipo == TipoCampo::Secreto;
+    let param_secreto = es_secreto(p, m);
     if param_secreto && !campo_secreto {
         mal(format!(
             "el parámetro {} es secreto y el campo no es `secreto`",
@@ -173,20 +269,70 @@ fn comprobar_campo(a: &Ajuste, c: &Campo, f: &Catalogo, m: &Mascara, fallos: &mu
             c.tipo, p.nombre, p.tipo
         ));
     }
-    // 6. Valores dentro del enum.
-    if p.tipo == TipoParam::Enum {
-        let validos: Vec<&str> = p.opciones.iter().map(|(v, _)| v.as_str()).collect();
-        let usados: Vec<&str> = match c.tipo {
-            TipoCampo::Opcion => c.opciones.iter().map(|o| o.valor.as_str()).collect(),
-            TipoCampo::Booleano => vec![c.booleano.si.as_str(), c.booleano.no.as_str()],
-            _ => Vec::new(),
+    // 6. Valores dentro del enum (y enteros en un `int`).
+    match c.tipo {
+        TipoCampo::Opcion => {
+            for o in &c.opciones {
+                comprobar_valor(p, &o.valor, &mut mal);
+            }
+        }
+        TipoCampo::Booleano => {
+            let (si, no) = c.si_no();
+            comprobar_valor(p, si, &mut mal);
+            comprobar_valor(p, no, &mut mal);
+        }
+        _ => {}
+    }
+    // Los parámetros extra de las opciones: reglas 3, 4, 5 y 6.
+    for ad in &c.ademas {
+        if ad.parametro == e.parametro {
+            mal(format!("`ademas` repite el parámetro {}", ad.parametro));
+            continue;
+        }
+        let Some(pa) = func.parametro(&ad.parametro) else {
+            mal(format!("{nombre_f} no tiene el parámetro {}", ad.parametro));
+            continue;
         };
-        for v in usados.into_iter().filter(|v| !validos.contains(v)) {
+        if es_secreto(pa, m) {
+            mal(format!("el parámetro {} es secreto", pa.nombre));
+            continue;
+        }
+        if m.es_secreto(&ad.lee) {
+            mal(format!("el elemento leído {} es secreto", ad.lee));
+        }
+        if !compatibles(TipoCampo::Opcion, pa) {
+            mal(format!(
+                "parámetro {} ({:?}) incompatible con las opciones",
+                pa.nombre, pa.tipo
+            ));
+        }
+        for v in c
+            .opciones
+            .iter()
+            .filter_map(|o| o.ademas.get(&ad.parametro))
+        {
+            comprobar_valor(pa, v, &mut mal);
+        }
+    }
+}
+
+/// Regla 6: un valor de un `enum` está entre los suyos; el de un `int`, es
+/// un entero.
+fn comprobar_valor(p: &Parametro, v: &str, mal: &mut impl FnMut(String)) {
+    match p.tipo {
+        TipoParam::Enum if !p.opciones.iter().any(|(valido, _)| valido == v) => {
             mal(format!(
                 "el valor {v} no está entre los del parámetro {}",
                 p.nombre
             ));
         }
+        TipoParam::Int if v.parse::<i64>().is_err() => {
+            mal(format!(
+                "el valor {v} del parámetro {} no es un entero",
+                p.nombre
+            ));
+        }
+        _ => {}
     }
 }
 
@@ -199,9 +345,21 @@ fn comprobar_forma(c: &Campo, mal: &mut impl FnMut(String)) {
         }
         _ => {}
     }
+    if !c.ademas.is_empty() && c.tipo != TipoCampo::Opcion {
+        mal("`ademas` solo vale en un campo `opcion`".into());
+    }
+    let mut extra = HashSet::new();
+    for ad in &c.ademas {
+        if !extra.insert(ad.parametro.as_str()) {
+            mal(format!("`ademas` repite el parámetro {}", ad.parametro));
+        }
+        if ad.lee.trim().is_empty() {
+            mal(format!("`lee` vacío en `ademas` ({})", ad.parametro));
+        }
+    }
     let (mut valores, mut claves) = (HashSet::new(), HashSet::new());
     for o in &c.opciones {
-        if !valores.insert(o.valor.as_str()) {
+        if !valores.insert((o.valor.as_str(), &o.ademas)) {
             mal(format!("opción con el valor {} repetido", o.valor));
         }
         if !claves.insert(o.clave.as_str()) {
@@ -213,8 +371,30 @@ fn comprobar_forma(c: &Campo, mal: &mut impl FnMut(String)) {
                 o.clave
             ));
         }
+        if OPCIONES_RESERVADAS.contains(&o.clave.as_str()) {
+            mal(format!(
+                "la clave de opción {} está reservada para las claves del campo",
+                o.clave
+            ));
+        }
         if o.aviso.as_deref().is_some_and(|av| !es_nombre(av)) {
             mal(format!("aviso no válido en la opción {}", o.clave));
+        }
+        for ad in c
+            .ademas
+            .iter()
+            .filter(|ad| !o.ademas.contains_key(&ad.parametro))
+        {
+            mal(format!(
+                "la opción {} no da valor a {}",
+                o.clave, ad.parametro
+            ));
+        }
+        for k in o.ademas.keys().filter(|k| !extra.contains(k.as_str())) {
+            mal(format!(
+                "la opción {} da valor a {k}, que no está en el `ademas` del campo",
+                o.clave
+            ));
         }
     }
     if c.opciones.iter().filter(|o| o.recomendada).count() > 1 {
@@ -226,7 +406,7 @@ fn comprobar_forma(c: &Campo, mal: &mut impl FnMut(String)) {
             TipoCampo::Opcion => {
                 mal("un campo `opcion` marca `recomendada` en la opción, no `recomendado`".into())
             }
-            _ if a_router(c, r).is_err() => {
+            _ if traducir(c, r).is_err() => {
                 mal(format!("recomendado «{r}» no es un valor válido del campo"));
             }
             _ => {}
@@ -234,6 +414,17 @@ fn comprobar_forma(c: &Campo, mal: &mut impl FnMut(String)) {
     }
     if c.invertido && c.tipo != TipoCampo::Booleano {
         mal("`invertido` solo vale en un campo `booleano`".into());
+    }
+    if let Some(b) = &c.booleano {
+        if c.tipo != TipoCampo::Booleano {
+            mal("`booleano` solo vale en un campo `booleano`".into());
+        }
+        if b.si == b.no {
+            mal("`booleano` con el mismo valor para sí y no".into());
+        }
+    }
+    if c.opcional && !admite_opcional(c.tipo) {
+        mal("`opcional` no vale en un campo `opcion` ni `booleano`".into());
     }
     if let Some(v) = c.validar {
         if !matches!(
@@ -282,7 +473,11 @@ fn comprobar_excluidas(c: &CatalogoAjustes, f: &Catalogo, fallos: &mut Vec<Strin
             fallos.push(format!("excluida {n}: sin motivo"));
         }
         for a in c.todos() {
-            for campo in a.campos.iter().filter(|campo| campo.escribe.funcion == *n) {
+            for campo in a
+                .campos
+                .iter()
+                .filter(|campo| campo.escribe.as_ref().is_some_and(|e| e.funcion == *n))
+            {
                 fallos.push(format!(
                     "excluida {n}: también la usa {}.{}",
                     a.id, campo.id

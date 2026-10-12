@@ -17,6 +17,16 @@ tipo = "lectura"
 descripcion = "Lee X"
 riesgo = "bajo"
 
+[[funcion.parametro]]
+nombre = "x_id"
+etiqueta = "Instancia"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "x_psk"
+etiqueta = "Clave"
+tipo = "text"
+
 [[funcion]]
 name = "cbSetX"
 area = "wifi"
@@ -28,6 +38,11 @@ riesgo = "medio"
 lectura_pareada = { funcion = "cbGetX" }
 
 [[funcion.parametro]]
+nombre = "x_id"
+etiqueta = "Instancia"
+tipo = "int"
+
+[[funcion.parametro]]
 nombre = "nombre"
 etiqueta = "Nombre"
 tipo = "text"
@@ -37,6 +52,12 @@ nombre = "seguridad"
 etiqueta = "Seguridad"
 tipo = "enum"
 opciones = [["11", "WPA2/WPA3"], ["3", "WPA2"], ["0", "Abierta"]]
+
+[[funcion.parametro]]
+nombre = "cifrado"
+etiqueta = "Cifrado"
+tipo = "enum"
+opciones = [["4", "AES"], ["2", "TKIP"], ["0", "Ninguno"]]
 
 [[funcion.parametro]]
 nombre = "oculta"
@@ -234,10 +255,8 @@ fn carga_y_por_tema() {
     let visible = &red.campos[2];
     assert_eq!(visible.tipo, TipoCampo::Booleano);
     assert!(visible.invertido);
-    assert_eq!(
-        (visible.booleano.si.as_str(), visible.booleano.no.as_str()),
-        ("1", "0")
-    );
+    assert_eq!(visible.booleano, None);
+    assert_eq!(visible.si_no(), ("1", "0"));
     assert_eq!(red.campos[0].validar.as_ref().and_then(|v| v.max), Some(32));
     assert!(red.campos[1].opciones[0].recomendada);
     assert_eq!(red.campos[1].opciones[2].aviso.as_deref(), Some("inseguro"));
@@ -413,19 +432,19 @@ fn rechaza_tipo_incompatible() {
         "lee = \"max_clientes\"\ntipo = \"numero\"",
         "lee = \"max_clientes\"\ntipo = \"ip\"",
     );
-    falla_con(&fallos(&ip, ""), "wifi.avanzado", "maximo");
+    falla_con(&fallos(&ip, ""), "wifi.avanzado.maximo", "incompatible");
     // Un texto declarado como booleano.
     let booleano = WIFI.replace(
         "lee = \"nombre\"\ntipo = \"texto\"",
         "lee = \"nombre\"\ntipo = \"booleano\"",
     );
-    falla_con(&fallos(&booleano, ""), "wifi.red", "nombre");
+    falla_con(&fallos(&booleano, ""), "wifi.red.nombre", "incompatible");
     // Un enum de tres opciones no es un booleano.
     let tres = WIFI.replace(
         "lee = \"seguridad\"\ntipo = \"opcion\"",
         "lee = \"seguridad\"\ntipo = \"booleano\"",
     );
-    falla_con(&fallos(&tres, ""), "wifi.red", "seguridad");
+    falla_con(&fallos(&tres, ""), "wifi.red.seguridad", "incompatible");
 }
 
 #[test]
@@ -435,16 +454,39 @@ fn rechaza_secreto_mal_declarado() {
         "lee = \"key_phrase\"\ntipo = \"secreto\"\nvalidar",
         "lee = \"key_phrase\"\ntipo = \"texto\"\nvalidar",
     );
-    falla_con(&fallos(&visible, ""), "wifi.red", "secreto");
+    falla_con(
+        &fallos(&visible, ""),
+        "wifi.red.clave",
+        "el parámetro key_phrase es secreto y el campo no es `secreto`",
+    );
     // Parámetro `text` que la máscara reconoce como secreto.
     let por_mascara = WIFI.replace("parametro = \"nombre\"", "parametro = \"wlPassphrase\"");
-    falla_con(&fallos(&por_mascara, ""), "wifi.red", "secreto");
+    falla_con(
+        &fallos(&por_mascara, ""),
+        "wifi.red.nombre",
+        "el parámetro wlPassphrase es secreto y el campo no es `secreto`",
+    );
+    // Un parámetro corriente que se lee de un elemento secreto: el valor
+    // leído llegaría a la página.
+    let lee_secreto = WIFI.replace(
+        "lee = \"nombre\"\ntipo = \"texto\"",
+        "lee = \"key_phrase\"\ntipo = \"texto\"",
+    );
+    falla_con(
+        &fallos(&lee_secreto, ""),
+        "wifi.red.nombre",
+        "el elemento leído key_phrase es secreto y el campo no es `secreto`",
+    );
     // Campo secreto sobre un parámetro que no lo es.
     let falso = WIFI.replace(
         "lee = \"nombre\"\ntipo = \"texto\"",
         "lee = \"nombre\"\ntipo = \"secreto\"",
     );
-    falla_con(&fallos(&falso, ""), "wifi.red", "secreto");
+    falla_con(
+        &fallos(&falso, ""),
+        "wifi.red.nombre",
+        "campo `secreto` sobre nombre, que no es un parámetro secreto",
+    );
     // `wlPassphrase` como secreto sí vale (lo dice la máscara).
     let bien = WIFI
         .replace("parametro = \"nombre\"", "parametro = \"wlPassphrase\"")
@@ -505,10 +547,14 @@ fn excluida_y_cubierta_a_la_vez() {
     // `te_x.wl` también es la función de `wifi.red.clave_basica`.
     let f = fallos(WIFI, EXCLUIDAS);
     falla_con(&f, "te_x.wl", "excluida");
-    let sin_basica = WIFI.replace(
-        "escribe = { funcion = \"te_x.wl\", parametro = \"wlWpaPsk\" }",
-        "escribe = { funcion = \"cbSetX\", parametro = \"key_phrase\" }",
-    );
+    // Si `clave_basica` escribe con `cbSetX` (y deja de ser de solo lectura,
+    // porque ya no es de la web básica), la exclusión vale.
+    let sin_basica = WIFI
+        .replace(
+            "escribe = { funcion = \"te_x.wl\", parametro = \"wlWpaPsk\" }",
+            "escribe = { funcion = \"cbSetX\", parametro = \"key_phrase\" }",
+        )
+        .replace("solo_lectura = \"ajustes-solo-lectura-basica\"\n", "");
     assert!(
         fallos(&sin_basica, EXCLUIDAS).is_empty(),
         "{:#?}",
@@ -540,8 +586,17 @@ fn opciones_y_recomendaciones_coherentes() {
 fn riesgo_es_el_mayor() {
     let c = cargar(&[("wifi", WIFI), ("red_local", RED_LOCAL)], "");
     let f = funciones();
-    // `wifi.red` escribe con `cbSetX` (medio) y `te_x.wl` (alto).
-    assert_eq!(riesgo(c.ajuste("wifi.red").unwrap(), &f), Riesgo::Alto);
+    // `wifi.red` solo escribe con `cbSetX` (medio): `clave_basica`, de
+    // `te_x.wl` (alto), es de solo lectura.
+    assert_eq!(riesgo(c.ajuste("wifi.red").unwrap(), &f), Riesgo::Medio);
+    // Con un campo editable de `te_x.wl`, alto.
+    let con_basica = WIFI.replace(
+        "fijos = { x_id = \"1\" }\n",
+        "\n[[ajuste.campo]]\nid = \"nombre_basico\"\n\
+         escribe = { funcion = \"te_x.wl\", parametro = \"wlSsid\" }\nlee = \"nombre\"\ntipo = \"texto\"\n",
+    );
+    let c2 = cargar(&[("wifi", &con_basica)], "");
+    assert_eq!(riesgo(c2.ajuste("wifi.red").unwrap(), &f), Riesgo::Alto);
     assert_eq!(
         riesgo(c.ajuste("wifi.avanzado").unwrap(), &f),
         Riesgo::Medio
@@ -556,4 +611,294 @@ fn riesgo_es_el_mayor() {
         "",
     );
     assert_eq!(riesgo(&solo.todos()[0], &f), Riesgo::Bajo);
+}
+
+#[test]
+fn rechaza_fijo_o_param_de_lectura_inexistente() {
+    // Parámetro de lectura que `cbGetX` no tiene.
+    let lectura = WIFI.replace(
+        "leer = { funcion = \"cbGetX\", params = { x_id = \"1\" } }",
+        "leer = { funcion = \"cbGetX\", params = { y_id = \"1\" } }",
+    );
+    falla_con(
+        &fallos(&lectura, ""),
+        "wifi.red",
+        "la lectura cbGetX no tiene el parámetro y_id",
+    );
+    // Parámetro de lectura secreto.
+    let lectura_secreta = WIFI.replace(
+        "params = { x_id = \"1\" }",
+        "params = { x_id = \"1\", x_psk = \"1\" }",
+    );
+    falla_con(
+        &fallos(&lectura_secreta, ""),
+        "wifi.red",
+        "el parámetro de lectura x_psk es secreto",
+    );
+    // Fijo que `cbSetX` no tiene.
+    let fijo = WIFI.replace("fijos = { x_id = \"1\" }", "fijos = { y_id = \"1\" }");
+    falla_con(
+        &fallos(&fijo, ""),
+        "wifi.red",
+        "cbSetX no tiene el fijo y_id",
+    );
+    // Fijo secreto.
+    let fijo_secreto = WIFI.replace(
+        "fijos = { x_id = \"1\" }",
+        "fijos = { x_id = \"1\", key_phrase = \"x\" }",
+    );
+    falla_con(
+        &fallos(&fijo_secreto, ""),
+        "wifi.red",
+        "el fijo key_phrase es secreto",
+    );
+    // El fijo debe estar en cada función de escritura del ajuste: `te_x.wl`
+    // no tiene `x_id`.
+    let otra_funcion = WIFI.replace(
+        "fijos = { x_id = \"1\" }\n",
+        "fijos = { x_id = \"1\" }\n\n[[ajuste.campo]]\nid = \"nombre_basico\"\n\
+         escribe = { funcion = \"te_x.wl\", parametro = \"wlSsid\" }\nlee = \"nombre\"\ntipo = \"texto\"\n",
+    );
+    falla_con(
+        &fallos(&otra_funcion, ""),
+        "wifi.red",
+        "te_x.wl no tiene el fijo x_id",
+    );
+    // Un fijo que también escribe un campo.
+    let pisado = WIFI.replace("fijos = { x_id = \"1\" }", "fijos = { nombre = \"1\" }");
+    falla_con(
+        &fallos(&pisado, ""),
+        "wifi.red",
+        "el fijo nombre también lo escribe un campo",
+    );
+    // Fijos en un ajuste que no escribe nada.
+    let sin_escritura = "[[ajuste]]\nid = \"wifi.estado\"\ntema = \"wifi\"\nnivel = \"basico\"\n\
+        leer = { funcion = \"cbGetX\" }\nfijos = { x_id = \"1\" }\n";
+    falla_con(
+        &fallos(sin_escritura, ""),
+        "wifi.estado",
+        "fijos en un ajuste que no escribe",
+    );
+}
+
+/// `wifi.seguridad`: cada opción escribe `seguridad` y `cifrado`.
+const SEGURIDAD: &str = r#"
+[[ajuste]]
+id = "wifi.seguridad"
+tema = "wifi"
+nivel = "basico"
+leer = { funcion = "cbGetX" }
+
+[[ajuste.campo]]
+id = "seguridad"
+escribe = { funcion = "cbSetX", parametro = "seguridad" }
+lee = "seguridad"
+tipo = "opcion"
+ademas = [{ parametro = "cifrado", lee = "cifrado" }]
+opciones = [
+  { valor = "11", clave = "wpa2_wpa3", recomendada = true, ademas = { cifrado = "4" } },
+  { valor = "3", clave = "wpa2", ademas = { cifrado = "4" } },
+  { valor = "3", clave = "wpa2_tkip", aviso = "inseguro", ademas = { cifrado = "2" } },
+  { valor = "0", clave = "abierta", aviso = "inseguro", ademas = { cifrado = "0" } },
+]
+"#;
+
+#[test]
+fn opcion_que_escribe_varios_parametros() {
+    let f = fallos(SEGURIDAD, "");
+    assert!(f.is_empty(), "{f:#?}");
+    let a = cargar(&[("wifi", SEGURIDAD)], "");
+    let campo = &a.ajuste("wifi.seguridad").unwrap().campos[0];
+    assert_eq!(campo.ademas[0].parametro, "cifrado");
+    assert_eq!(
+        campo.opciones[2].ademas.get("cifrado").map(String::as_str),
+        Some("2")
+    );
+
+    // Regla 3: el parámetro extra existe en la función.
+    let inexistente = SEGURIDAD.replace(
+        "parametro = \"cifrado\", lee",
+        "parametro = \"encriptado\", lee",
+    );
+    falla_con(
+        &fallos(&inexistente, ""),
+        "wifi.seguridad.seguridad",
+        "cbSetX no tiene el parámetro encriptado",
+    );
+    // Regla 5: ni el parámetro extra ni su lectura son secretos.
+    let secreto = SEGURIDAD.replace(
+        "parametro = \"cifrado\", lee = \"cifrado\"",
+        "parametro = \"key_phrase\", lee = \"cifrado\"",
+    );
+    falla_con(
+        &fallos(&secreto, ""),
+        "wifi.seguridad.seguridad",
+        "el parámetro key_phrase es secreto",
+    );
+    let lee_secreto = SEGURIDAD.replace("lee = \"cifrado\"", "lee = \"key_phrase\"");
+    falla_con(
+        &fallos(&lee_secreto, ""),
+        "wifi.seguridad.seguridad",
+        "el elemento leído key_phrase es secreto",
+    );
+    // Regla 6: el valor extra está en el enum.
+    let fuera = SEGURIDAD.replace(
+        "ademas = { cifrado = \"2\" }",
+        "ademas = { cifrado = \"9\" }",
+    );
+    falla_con(
+        &fallos(&fuera, ""),
+        "wifi.seguridad.seguridad",
+        "el valor 9 no está entre los del parámetro cifrado",
+    );
+    // Cada opción da valor a todos los parámetros extra, y solo a ellos.
+    let falta = SEGURIDAD.replace(
+        "aviso = \"inseguro\", ademas = { cifrado = \"0\" }",
+        "aviso = \"inseguro\"",
+    );
+    falla_con(
+        &fallos(&falta, ""),
+        "wifi.seguridad.seguridad",
+        "la opción abierta no da valor a cifrado",
+    );
+    let sobra = SEGURIDAD.replace(
+        "ademas = { cifrado = \"0\" }",
+        "ademas = { cifrado = \"0\", nombre = \"x\" }",
+    );
+    falla_con(
+        &fallos(&sobra, ""),
+        "wifi.seguridad.seguridad",
+        "la opción abierta da valor a nombre",
+    );
+    // Dos opciones que escriben lo mismo.
+    let repetida = SEGURIDAD.replace(
+        "clave = \"wpa2_tkip\", aviso = \"inseguro\", ademas = { cifrado = \"2\" }",
+        "clave = \"wpa2_tkip\", aviso = \"inseguro\", ademas = { cifrado = \"4\" }",
+    );
+    falla_con(
+        &fallos(&repetida, ""),
+        "wifi.seguridad.seguridad",
+        "opción con el valor 3 repetido",
+    );
+    // El parámetro extra no repite el del campo.
+    let mismo = SEGURIDAD.replace(
+        "parametro = \"cifrado\", lee",
+        "parametro = \"seguridad\", lee",
+    );
+    falla_con(
+        &fallos(&mismo, ""),
+        "wifi.seguridad.seguridad",
+        "`ademas` repite el parámetro seguridad",
+    );
+    // `ademas` solo en un campo `opcion`.
+    let en_texto = WIFI.replace(
+        "lee = \"nombre\"\ntipo = \"texto\"",
+        "lee = \"nombre\"\ntipo = \"texto\"\nademas = [{ parametro = \"cifrado\", lee = \"cifrado\" }]",
+    );
+    falla_con(
+        &fallos(&en_texto, ""),
+        "wifi.red.nombre",
+        "`ademas` solo vale en un campo `opcion`",
+    );
+}
+
+#[test]
+fn campos_de_solo_lectura() {
+    // Sin `escribe`, con su motivo: vale y no cuenta para el riesgo.
+    let solo = "[[ajuste]]\nid = \"wifi.estado\"\ntema = \"wifi\"\nnivel = \"basico\"\n\
+        leer = { funcion = \"cbGetX\" }\n\n[[ajuste.campo]]\nid = \"nombre\"\nlee = \"nombre\"\n\
+        tipo = \"texto\"\nsolo_lectura = \"ajustes-solo-lectura-estado\"\n";
+    let f = fallos(solo, "");
+    assert!(f.is_empty(), "{f:#?}");
+    let c = cargar(&[("wifi", solo)], "");
+    let a = c.ajuste("wifi.estado").unwrap();
+    assert!(a.campos[0].escribe.is_none());
+    assert!(a.campos[0].escribible().is_none());
+    assert_eq!(riesgo(a, &funciones()), Riesgo::Bajo);
+    assert!(claves_requeridas(a).contains(&"ajustes-solo-lectura-estado".to_owned()));
+
+    // Sin `escribe` ni `solo_lectura`.
+    let sin_nada = solo.replace("solo_lectura = \"ajustes-solo-lectura-estado\"\n", "");
+    falla_con(
+        &fallos(&sin_nada, ""),
+        "wifi.estado.nombre",
+        "sin `escribe`, el campo necesita `solo_lectura`",
+    );
+    // `solo_lectura` en un campo que se puede escribir.
+    let con_escribe = WIFI.replace(
+        "lee = \"nombre\"\ntipo = \"texto\"",
+        "lee = \"nombre\"\ntipo = \"texto\"\nsolo_lectura = \"ajustes-solo-lectura-estado\"",
+    );
+    falla_con(
+        &fallos(&con_escribe, ""),
+        "wifi.red.nombre",
+        "`solo_lectura` con `escribe`",
+    );
+}
+
+#[test]
+fn forma_de_booleanos_enteros_opcionales_y_claves() {
+    // Opciones sobre un parámetro `int`: enteras.
+    let entero = WIFI.replace(
+        "lee = \"max_clientes\"\ntipo = \"numero\"\nvalidar = { min = 1, max = 64 }",
+        "lee = \"max_clientes\"\ntipo = \"opcion\"\n\
+         opciones = [{ valor = \"8\", clave = \"pocos\" }, { valor = \"muchos\", clave = \"muchos\" }]",
+    );
+    falla_con(
+        &fallos(&entero, ""),
+        "wifi.avanzado.maximo",
+        "el valor muchos del parámetro max_clientes no es un entero",
+    );
+    // `booleano` con el mismo valor para sí y no.
+    let igual = WIFI.replace(
+        "tipo = \"booleano\"\ninvertido = true",
+        "tipo = \"booleano\"\nbooleano = { si = \"1\", no = \"1\" }\ninvertido = true",
+    );
+    falla_con(
+        &fallos(&igual, ""),
+        "wifi.red.visible",
+        "`booleano` con el mismo valor para sí y no",
+    );
+    // `booleano` en un campo que no lo es.
+    let en_texto = WIFI.replace(
+        "lee = \"nombre\"\ntipo = \"texto\"",
+        "lee = \"nombre\"\ntipo = \"texto\"\nbooleano = { si = \"1\", no = \"0\" }",
+    );
+    falla_con(
+        &fallos(&en_texto, ""),
+        "wifi.red.nombre",
+        "`booleano` solo vale en un campo `booleano`",
+    );
+    // `opcional` no vale en opciones ni booleanos; en texto, sí.
+    let opcional_opcion = WIFI.replace(
+        "lee = \"seguridad\"\ntipo = \"opcion\"",
+        "lee = \"seguridad\"\ntipo = \"opcion\"\nopcional = true",
+    );
+    falla_con(
+        &fallos(&opcional_opcion, ""),
+        "wifi.red.seguridad",
+        "`opcional` no vale",
+    );
+    let opcional_texto = WIFI.replace(
+        "lee = \"nombre\"\ntipo = \"texto\"",
+        "lee = \"nombre\"\ntipo = \"texto\"\nopcional = true",
+    );
+    let f = fallos(&opcional_texto, "");
+    assert!(f.is_empty(), "{f:#?}");
+    // Ids de campo y claves de opción que chocan con claves reservadas.
+    for reservado in ["titulo", "desc", "ayuda"] {
+        let malo = WIFI.replace("id = \"nombre\"", &format!("id = \"{reservado}\""));
+        falla_con(
+            &fallos(&malo, ""),
+            &format!("wifi.red.{reservado}"),
+            "reservado",
+        );
+    }
+    for reservada in ["desc", "recomendado"] {
+        let malo = WIFI.replace("clave = \"wpa2\"", &format!("clave = \"{reservada}\""));
+        falla_con(&fallos(&malo, ""), "wifi.red.seguridad", "reservad");
+    }
+    // `efecto` con forma de nombre.
+    let efecto = WIFI.replace("efecto = \"wifi_reinicia\"", "efecto = \"Wifi-Reinicia\"");
+    falla_con(&fallos(&efecto, ""), "wifi.red", "efecto");
 }

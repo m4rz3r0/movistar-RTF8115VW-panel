@@ -27,7 +27,7 @@ mod valores;
 pub use carga::{CatalogoAjustes, ErrorAjustes};
 #[cfg(feature = "catalogo")]
 pub use modelo::{
-    Ajuste, Booleano, Campo, Componente, Escritura, Excluida, Lectura, Opcion, Validar,
+    Adicional, Ajuste, Booleano, Campo, Componente, Escritura, Excluida, Lectura, Opcion, Validar,
 };
 #[cfg(feature = "catalogo")]
 pub use validar::{claves_requeridas, comprobar, prefijo_i18n, riesgo};

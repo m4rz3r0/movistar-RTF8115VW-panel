@@ -94,6 +94,26 @@ pub enum ValorLegible {
 pub use catalogo_toml::*;
 
 /// Formato de `ajustes/*.toml` y `excluidas.toml`.
+///
+/// Una opción que escribe varios parámetros de la misma función declara los
+/// extra en el campo (`ademas`, con el elemento de la lectura de cada uno) y
+/// les da valor en cada opción:
+///
+/// ```toml
+/// [[ajuste.campo]]
+/// id = "seguridad"
+/// escribe = { funcion = "cbSetWifiAccPt", parametro = "authentication" }
+/// lee = "authentication"
+/// tipo = "opcion"
+/// ademas = [{ parametro = "encryption", lee = "encryption" }]
+/// opciones = [
+///   { valor = "3", clave = "wpa2", recomendada = true, ademas = { encryption = "4" } },
+/// ]
+/// ```
+///
+/// Un campo que solo se lee no lleva `escribe` y sí `solo_lectura` (la clave
+/// del motivo); el único que lleva los dos es un secreto que solo escribe la
+/// web básica.
 #[cfg(feature = "catalogo")]
 mod catalogo_toml {
     use super::{Nivel, Tema, TipoCampo};
@@ -172,14 +192,17 @@ mod catalogo_toml {
         }
     }
 
-    /// Un campo del ajuste: un parámetro de una función de escritura.
+    /// Un campo del ajuste: un parámetro de una función de escritura (o un
+    /// valor que solo se lee).
     #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
     #[serde(deny_unknown_fields)]
     pub struct Campo {
         /// Id dentro del ajuste (`nombre`, `seguridad`…).
         pub id: String,
-        /// Función y parámetro con que se escribe.
-        pub escribe: Escritura,
+        /// Función y parámetro con que se escribe. Falta en un campo que solo
+        /// se lee, que entonces lleva `solo_lectura`.
+        #[serde(default)]
+        pub escribe: Option<Escritura>,
         /// Elemento de la lectura que da su valor.
         pub lee: String,
         pub tipo: TipoCampo,
@@ -188,13 +211,23 @@ mod catalogo_toml {
         /// Opciones de un campo `opcion` (valor del router ↔ clave legible).
         #[serde(default)]
         pub opciones: Vec<Opcion>,
-        /// Valores del router para sí y no, en un campo `booleano`.
+        /// Otros parámetros de la misma función de escritura que fija cada
+        /// opción de un campo `opcion` (p. ej. el cifrado que acompaña a cada
+        /// tipo de seguridad WiFi), con el elemento de la lectura que da su
+        /// valor. Cada opción les da valor en su propio `ademas`.
         #[serde(default)]
-        pub booleano: Booleano,
+        pub ademas: Vec<Adicional>,
+        /// Valores del router para sí y no, en un campo `booleano` (si falta,
+        /// `1` y `0`; ver [`Campo::si_no`]).
+        #[serde(default)]
+        pub booleano: Option<Booleano>,
         /// El parámetro dice lo contrario que la etiqueta («Visible» sobre
         /// `ssid_hide`).
         #[serde(default)]
         pub invertido: bool,
+        /// Se puede dejar vacío (p. ej. un DNS secundario).
+        #[serde(default)]
+        pub opcional: bool,
         /// Clave de traducción del motivo por el que no se puede editar.
         #[serde(default)]
         pub solo_lectura: Option<String>,
@@ -202,6 +235,33 @@ mod catalogo_toml {
         /// recomendada en la propia opción).
         #[serde(default)]
         pub recomendado: Option<String>,
+    }
+
+    impl Campo {
+        /// Valores del router para sí y no (`1` y `0` si el campo no dice
+        /// otros).
+        pub fn si_no(&self) -> (&str, &str) {
+            self.booleano
+                .as_ref()
+                .map_or(("1", "0"), |b| (b.si.as_str(), b.no.as_str()))
+        }
+
+        /// Escritura del campo, si se puede editar: `None` si no tiene
+        /// `escribe` o es de solo lectura.
+        pub fn escribible(&self) -> Option<&Escritura> {
+            self.escribe
+                .as_ref()
+                .filter(|_| self.solo_lectura.is_none())
+        }
+    }
+
+    /// Parámetro que acompaña al del campo en cada opción, y el elemento de la
+    /// lectura que da su valor.
+    #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+    #[serde(deny_unknown_fields)]
+    pub struct Adicional {
+        pub parametro: String,
+        pub lee: String,
     }
 
     /// Función de escritura y parámetro de un campo.
@@ -235,6 +295,10 @@ mod catalogo_toml {
         /// Aviso al elegirla (`inseguro` → `aviso-inseguro`).
         #[serde(default)]
         pub aviso: Option<String>,
+        /// Valor de cada parámetro del `ademas` del campo
+        /// (`ademas = { encryption = "4" }`).
+        #[serde(default)]
+        pub ademas: BTreeMap<String, String>,
     }
 
     /// Valores del router para sí y no.
@@ -243,15 +307,6 @@ mod catalogo_toml {
     pub struct Booleano {
         pub si: String,
         pub no: String,
-    }
-
-    impl Default for Booleano {
-        fn default() -> Self {
-            Booleano {
-                si: "1".into(),
-                no: "0".into(),
-            }
-        }
     }
 
     /// Función de escritura que ningún ajuste cubre, y por qué.
