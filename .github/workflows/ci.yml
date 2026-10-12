@@ -1,0 +1,144 @@
+# Comprobaciones de cada push y pull request: las de README.md
+# («Comprobaciones»), el comprobador de publicación y los e2e.
+#
+# Forgejo Actions también lee esta carpeta si no hay .forgejo/workflows; sin
+# runner, no se lanza nada.
+#
+# Las acciones van fijadas por el commit de su versión (en el comentario) y
+# las herramientas de cargo, por versión exacta con --locked.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  fmt:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - run: cargo fmt --all --check
+
+  clippy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Clippy con el servidor (ssr)
+        run: cargo clippy --workspace --all-targets --features panel/ssr -- -D warnings
+      - name: Clippy del cliente (wasm, hydrate)
+        run: cargo clippy -p panel --lib --target wasm32-unknown-unknown --no-default-features --features hydrate -- -D warnings
+
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Tests
+        run: cargo test --workspace
+      - name: Tests con el servidor (ssr)
+        run: cargo test --workspace --features panel/ssr
+
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - name: Instalar cargo-audit
+        run: cargo install --locked cargo-audit@0.22.2
+      - name: cargo audit (excepciones en .cargo/audit.toml)
+        run: cargo audit
+
+  deny:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - name: Instalar cargo-deny
+        run: cargo install --locked cargo-deny@0.20.2
+      - name: cargo deny (deny.toml)
+        run: cargo deny check
+
+  publicacion:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      # Sin las listas locales del dueño, que no están en el repositorio: solo
+      # las reglas generales y tools/publicacion-permitidos.txt.
+      - name: Comprobador de publicación
+        run: cargo run -p comprobar-publicacion -- --arbol --sin-locales
+
+  e2e:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Instalar cargo-leptos
+        run: cargo install --locked cargo-leptos@0.3.11
+      - name: Compilar el panel, router-sim y e2e_grupo
+        run: |
+          cargo leptos build
+          cargo build -p router-sim
+          cargo build -p panel --features ssr --example e2e_grupo
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+      - name: Instalar Playwright
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: e2e
+        working-directory: e2e
+        run: npx playwright test
+      - name: Guardar capturas y trazas si falla
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e
+          path: |
+            e2e/test-results/
+            e2e/capturas/
+          retention-days: 7
+          if-no-files-found: ignore

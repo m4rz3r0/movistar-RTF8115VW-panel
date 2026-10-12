@@ -67,3 +67,11 @@ valor 192.168.1.199 — fin del pool DHCP neutro de las fixtures
 red 10.255.0.0/24 — direcciones del operador renumeradas en las fixtures
 valor 172.16.0.1 — ejemplo genérico de red privada 172.16/12 en las pruebas
 ruta crates/router-sim/src/sanitize.rs ipv4 — entradas sintéticas de las pruebas del saneador (LAN y operador sin renumerar)
+
+# Commits de las acciones fijadas en .github/workflows (la versión va en el
+# comentario de cada «uses:»).
+valor 3d3c42e5aac5ba805825da76410c181273ba90b1 — actions/checkout v7.0.1
+valor 6323deb102c322ba6fcbdcafc7e3dddab59af2b6 — Swatinem/rust-cache v2.9.2
+valor 949feb2413d6458794dcd2491c4babbbce0c15c1 — actions/setup-node v7.1.0
+valor cf430e030ddbb5b0abf93d22962f4752f3646cd9 — actions/upload-artifact v7.0.2
+valor 9000827ccba6bdab643e8b6fd33ac0654aef8333 — actions/download-artifact v8.0.2

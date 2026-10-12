@@ -1,0 +1,143 @@
+# Releases para Linux: al subir una etiqueta vX.Y.Z (solo cifras: las únicas
+# versiones; ver deploy/linux/actualizar-release.sh), compila el panel para
+# x86_64 y aarch64, empaqueta cada uno con tools/empaquetar-release.sh y los
+# publica con SHA256SUMS en la release de la etiqueta, que pasa a ser la
+# última (latest). Es lo que descarga el actualizador, con <base> =
+# <repo>/releases:
+#   <base>/latest/download/SHA256SUMS
+#   <base>/download/<versión>/routerpanel-<versión>-<objetivo>.tar.gz
+#
+# Firma opcional: si el repositorio tiene el secreto MINISIGN_CLAVE_SECRETA
+# (el contenido de una clave secreta de minisign sin contraseña, de
+# `minisign -G -W`), firma SHA256SUMS en SHA256SUMS.minisig; si no, no firma.
+#
+# No hay compilación para FreeBSD: la jail compila desde el código (README).
+# Forgejo Actions también lee esta carpeta, pero la publicación usa gh y la
+# API de GitHub.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  version:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.etiqueta.outputs.version }}
+    steps:
+      - name: La etiqueta es vX.Y.Z
+        id: etiqueta
+        env:
+          TIPO: ${{ github.ref_type }}
+          ETIQUETA: ${{ github.ref_name }}
+        run: |
+          if [ "$TIPO" != tag ] || ! printf '%s\n' "$ETIQUETA" | grep -Eqx 'v[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "::error::solo se publican etiquetas vX.Y.Z (cifras, sin sufijo)"
+            exit 1
+          fi
+          echo "version=$ETIQUETA" >>"$GITHUB_OUTPUT"
+
+  compilar:
+    needs: version
+    strategy:
+      matrix:
+        include:
+          - objetivo: x86_64-unknown-linux-gnu
+            runner: ubuntu-24.04
+          - objetivo: aarch64-unknown-linux-gnu
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      OBJETIVO: ${{ matrix.objetivo }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: rustup (si el runner no lo trae)
+        run: |
+          if ! command -v rustup >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain none
+            echo "$HOME/.cargo/bin" >>"$GITHUB_PATH"
+          fi
+      - name: Toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - name: El equipo compila para el objetivo
+        run: |
+          host=$(rustc -vV | sed -n 's/^host: //p')
+          if [ "$host" != "$OBJETIVO" ]; then
+            echo "::error::el runner es $host, no $OBJETIVO"
+            exit 1
+          fi
+      - name: Instalar cargo-leptos
+        run: cargo install --locked cargo-leptos@0.3.11
+      - name: Compilar
+        run: cargo leptos build --release
+      - name: Empaquetar
+        run: tools/empaquetar-release.sh "$VERSION" "$OBJETIVO" target/release/panel target/site dist
+      # El mismo empaquetado, desplegado con actualizar-release.sh desde un
+      # servidor local y arrancado: el archivo y el actualizador casan.
+      - name: Probar el archivo con el actualizador
+        run: deploy/pruebas/release-local.sh
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: routerpanel-${{ matrix.objetivo }}
+          path: dist/routerpanel-*.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+  publicar:
+    needs: [version, compilar]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: routerpanel-*
+          merge-multiple: true
+          path: dist
+      - name: SHA256SUMS
+        run: |
+          tools/empaquetar-release.sh --sumas dist
+          test "$(wc -l <dist/SHA256SUMS)" -eq 2
+          cat dist/SHA256SUMS
+      - name: Firmar SHA256SUMS (si hay MINISIGN_CLAVE_SECRETA)
+        env:
+          MINISIGN_CLAVE_SECRETA: ${{ secrets.MINISIGN_CLAVE_SECRETA }}
+        run: |
+          if [ -z "$MINISIGN_CLAVE_SECRETA" ]; then
+            echo "sin MINISIGN_CLAVE_SECRETA: no se firma"
+            exit 0
+          fi
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq minisign
+          umask 077
+          clave=$(mktemp -p "$RUNNER_TEMP")
+          trap 'rm -f "$clave"' EXIT
+          printf '%s\n' "$MINISIGN_CLAVE_SECRETA" >"$clave"
+          minisign -S -s "$clave" -m dist/SHA256SUMS -x dist/SHA256SUMS.minisig \
+            -t "routerpanel $VERSION" </dev/null
+      # Solo llegan aquí versiones finales (vX.Y.Z), así que es la última.
+      - name: Publicar la release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -- dist/routerpanel-*.tar.gz dist/SHA256SUMS
+          if [ -f dist/SHA256SUMS.minisig ]; then set -- "$@" dist/SHA256SUMS.minisig; fi
+          gh release create "$VERSION" "$@" --verify-tag --latest --title "$VERSION" --generate-notes
