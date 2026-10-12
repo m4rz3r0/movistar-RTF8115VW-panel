@@ -1,8 +1,18 @@
 import { defineConfig } from "@playwright/test";
 import { instalado, todas } from "./instancias";
 
+// Las capturas del README (capturas-readme.spec.ts) sobrescriben
+// docs/capturas/, que está versionado: solo se generan cuando se piden por
+// su nombre (`npx playwright test capturas-readme`) o con
+// E2E_CAPTURAS_README=1, nunca en la pasada completa. La variable llega
+// también a los procesos de las pruebas.
+if (process.argv.some((a) => a.includes("capturas-readme"))) {
+  process.env.E2E_CAPTURAS_README = "1";
+}
+
 export default defineConfig({
   testDir: ".",
+  testIgnore: process.env.E2E_CAPTURAS_README ? [] : ["**/capturas-readme.spec.ts"],
   outputDir: "test-results",
   fullyParallel: false,
   workers: 1,

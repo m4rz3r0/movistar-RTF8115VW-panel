@@ -5,7 +5,7 @@ El panel corre en un servidor FreeBSD (probado en 15.x) en dos jails PkgBase:
 | Jail (`config.local`) | Contenido |
 |---|---|
 | `JAIL_PANEL` (`JAIL_PANEL_IP`) | base mínima (`FreeBSD-set-minimal-jail`), el binario y su web; servicio `routerpanel` en `PANEL_ESCUCHA` |
-| `JAIL_COMPILAR` (`JAIL_COMPILAR_IP`) | base completa, `rustup` (stable + `wasm32-unknown-unknown`), `cargo-leptos` 0.3.11, `wasm-bindgen-cli` (la versión del `Cargo.lock`), `binaryen` (`wasm-opt`), `git`; usuario sin privilegios `rpbuild` (uid `UID_COMPILAR`) con el clon en `/home/rpbuild/panel` |
+| `JAIL_COMPILAR` (`JAIL_COMPILAR_IP`) | base completa, `rustup` (la versión de Rust de `rust-toolchain.toml`, con `wasm32-unknown-unknown`, que instala al compilar), `cargo-leptos` 0.3.11, `wasm-bindgen-cli` (la versión del `Cargo.lock`), `binaryen` (`wasm-opt`), `git`; usuario sin privilegios `rpbuild` (uid `UID_COMPILAR`) con el clon en `/home/rpbuild/panel` |
 
 Se entra por un proxy inverso con HTTPS (`PROXIES_CONFIANZA`) en
 `PANEL_ORIGEN`. Con el módulo `caddyfile`, `install.sh` imprime el sitio para el

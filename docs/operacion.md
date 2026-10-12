@@ -1,47 +1,60 @@
 # Operación del panel
 
-Guía del día a día con el panel ya instalado en servidor-casa
-(`192.0.2.10`). Cómo se instala, las jails y pf: [`deploy/README.md`](../deploy/README.md).
+El día a día con el panel ya instalado. Cómo se instala en cada plataforma:
+[`deploy/README.md`](../deploy/README.md).
 
-Todas las órdenes se lanzan en el servidor (`ssh admin@192.0.2.10`) con
-`doas`. La jail del panel se llama `routerpanel`; desde el host su raíz está en
-`/usr/local/jails/containers/routerpanel`.
+Las órdenes cambian según cómo se instaló. En esta guía:
 
-> **Órdenes largas en un terminal propio.** Una compilación (`routerpanel-actualizar`)
-> tarda bastante más de 15 minutos. Lánzala en un terminal tuyo con SSH, no
-> desde una herramienta con límite de tiempo, y mejor desligada de la sesión
-> para que un corte de SSH no la mate:
->
-> ```sh
-> doas daemon -f /usr/local/sbin/routerpanel-actualizar --ref nucleo
-> doas tail -f /var/log/routerpanel-update.log
-> ```
+- **Linux**: la instalación de [`deploy/linux/`](../deploy/linux/README.md)
+  (systemd, `DynamicUser`), como root.
+- **Docker**: la de [`deploy/docker/`](../deploy/docker/README.md), desde la
+  raíz del repositorio (`docker` o `podman`; `compose` es
+  `docker compose -f deploy/docker/compose.yaml`).
+- **FreeBSD**: la de [`deploy/freebsd-jail/`](../deploy/freebsd-jail/README.md),
+  en el servidor con `doas`. `<JAIL_PANEL>` y `<JAILS_RAIZ>` son los valores
+  de tu `deploy/config.local`.
+
+| | Base de datos (`RP_DB`) | Clave maestra (`RP_HISTORY_KEY`) |
+|---|---|---|
+| Linux | `/var/lib/routerpanel/panel.db` | `/var/lib/routerpanel/history.key` (según `env.example`) |
+| Docker | `/data/panel.db` (volumen `datos`) | `/data/history.key` |
+| FreeBSD | `/var/db/routerpanel/panel.db` (en la jail) | `/usr/local/etc/routerpanel/history.key` (en la jail) |
+
+Sin `RP_DB` ni `RP_HISTORY_KEY`, el panel usa `/var/lib/routerpanel/panel.db`
+y `/etc/routerpanel/history.key` en Linux, y `/var/db/routerpanel/panel.db` y
+`/usr/local/etc/routerpanel/history.key` en FreeBSD.
 
 ## Primera instalación: el asistente
 
-Un panel sin usuarios sólo sirve el asistente de instalación
-(`https://panel.home.arpa/instalar`; cualquier otra página lleva allí):
+Un panel sin usuarios solo sirve el asistente de instalación (`/instalar`
+bajo `RP_ORIGIN`; cualquier otra página lleva allí):
 
 1. **Token.** Al arrancar sin usuarios, el panel genera un token de un solo
    uso, lo escribe en su registro («token de instalación: …») y en
-   `/var/db/routerpanel/instalar.token` (600, junto a la base de datos). En el
-   host:
+   `instalar.token` (600), junto a la base de datos:
 
    ```sh
-   doas cat /usr/local/jails/containers/routerpanel/var/db/routerpanel/instalar.token
+   # Linux
+   cat /var/lib/routerpanel/instalar.token
+   # Docker
+   compose exec panel cat /data/instalar.token
+   # FreeBSD
+   doas cat <JAILS_RAIZ>/<JAIL_PANEL>/var/db/routerpanel/instalar.token
    ```
 
-   `deploy/install.sh` dice dónde está si el panel aún no tiene usuarios. El
-   asistente sólo responde desde la red local y sin el token no hace nada.
+   Cada arranque sin administrador genera uno nuevo: si lo pierdes, reinicia
+   el panel. El asistente solo responde desde la red local (o desde las
+   redes de `RP_INSTALL_NETS`) y sin el token no hace nada.
 2. **Administrador.** Con el token, usuario y contraseña (mínimo 12
    caracteres) del primer usuario del panel. Al crearlo se borra el token y
-   queda la sesión abierta.
-3. **Router.** Dirección (`http://192.168.1.1`), usuario (`1234`) y
-   contraseña de la web del router. «Probar» entra, lee modelo y firmware y
-   sale sin guardar; «Guardar y seguir» las guarda **cifradas** en la base de
-   datos (con `history.key`) sólo si entran. Con un firmware que no es uno de
-   los probados el panel queda en **solo lectura** hasta confirmarlo en
-   «Router → Conexión con el router».
+   queda la sesión abierta. Desde entonces no hay token ni asistente; para
+   recuperar el acceso, `panel user passwd` (más abajo).
+3. **Router.** Dirección de la web del router (de fábrica,
+   `http://192.168.1.1`), su usuario y su contraseña. «Probar» entra, lee
+   modelo y firmware y sale sin guardar; «Guardar y seguir» las guarda
+   **cifradas** en la base de datos (con la clave maestra) solo si entran.
+   Con un firmware que no es uno de los probados el panel queda en **solo
+   lectura** hasta confirmarlo en «Router → Conexión con el router».
 4. **Lectura inicial.** Lee todas las funciones de lectura y guarda la «foto
    de partida» cifrada. Con eso la instalación termina: `/instalar` responde
    404 y el panel se usa como siempre.
@@ -57,11 +70,11 @@ página; `/router` lleva a la primera:
 - **Conexión con el router** (`/router/conexion`): credenciales (la
   contraseña guardada nunca se muestra; para cambiar algo se escribe la del
   router y el panel prueba a entrar antes de guardar), firmware y modo solo
-  lectura (con «Confirmar el firmware»).
+  lectura (con «Confirmar el firmware»), y la red detectada del router.
 
 ## Ajustes del panel (`/panel`)
 
-En el menú del usuario; sólo lo del panel. Secciones:
+En el menú del usuario; solo lo del panel. Secciones:
 
 - **Panel**: idioma por defecto de la instancia («El del navegador» si no se
   fija ninguno) y zona horaria. Al cambiar el idioma por defecto la página se
@@ -86,48 +99,51 @@ el idioma del navegador (`Accept-Language`); si no, español.
 
 ## Acceso y usuarios
 
-- Se entra por `https://panel.home.arpa`, sólo desde la LAN (Caddy
-  `solo_lan`). Un usuario y su contraseña del panel; no es la del router.
+- Se entra por `RP_ORIGIN`, a través del proxy con HTTPS y solo desde la red
+  local ([`proxy-tls.md`](proxy-tls.md)). Un usuario y su contraseña del
+  panel; no es la del router.
 - La sesión caduca a los 30 minutos sin uso y, como mucho, a las 12 horas.
 - Tras varios intentos fallidos el panel hace esperar (hasta 60 s) por IP y por
   usuario; la respuesta no dice si el usuario existe.
-- Si queda de antes `/root/routerpanel-admin-password.txt` (la contraseña
-  inicial que creaba `install.sh` antes del asistente), cambia esa contraseña
-  y borra el fichero.
 
-Los usuarios se gestionan en «Ajustes del panel» o con el propio binario,
-dentro de la jail y como el usuario del servicio (la base de datos es suya).
-Pide la contraseña dos veces, sin eco; mínimo 12 caracteres:
+Los usuarios se gestionan en «Ajustes del panel» o con el propio binario:
+`panel user add <usuario>` (alta) y `panel user passwd <usuario>` (cambio de
+contraseña; cierra todas las sesiones de ese usuario). Abren la base de datos
+de `RP_DB`, así que se ejecutan como el usuario del servicio, que es su
+dueño. Piden la contraseña dos veces, sin eco; mínimo 12 caracteres:
 
 ```sh
-# Alta
-doas jexec -U routerpanel routerpanel env RP_DB=/var/db/routerpanel/panel.db \
-    /usr/local/routerpanel/current/panel user add <usuario>
+# Linux (el mismo usuario dinámico y el mismo directorio que el servicio)
+systemd-run --pty --wait --quiet -p DynamicUser=yes -p User=routerpanel \
+    -p StateDirectory=routerpanel -E RP_DB=/var/lib/routerpanel/panel.db \
+    /opt/routerpanel/current/panel user add <usuario>
 
-# Cambio de contraseña (cierra todas las sesiones de ese usuario)
-doas jexec -U routerpanel routerpanel env RP_DB=/var/db/routerpanel/panel.db \
-    /usr/local/routerpanel/current/panel user passwd <usuario>
+# Docker
+compose exec panel /opt/routerpanel/panel user add <usuario>
+
+# FreeBSD
+doas jexec -U routerpanel <JAIL_PANEL> env RP_DB=/var/db/routerpanel/panel.db \
+    /usr/local/routerpanel/current/panel user add <usuario>
 ```
 
-No hace falta reiniciar el servicio. Borrar usuarios, sólo desde «Ajustes del
-panel» (nunca el último).
+(`user passwd` igual). No hace falta reiniciar el servicio. Borrar usuarios,
+solo desde «Ajustes del panel» (nunca el último).
 
 ## Cambiar la contraseña del router
 
 Las credenciales del router están en la base de datos del panel, con la
-contraseña cifrada con `history.key`. Para cambiarla:
+contraseña cifrada con la clave maestra. Para cambiarla:
 
-1. Cambia la contraseña **en el router** (su web, `http://192.168.1.1`).
-   Hasta el paso siguiente el sondeo del panel fallará («router: error» en
-   `/salud`).
+1. Cambia la contraseña **en el router** (en su web). Hasta el paso
+   siguiente el sondeo del panel fallará (`"router":"error"` en `/salud`).
 2. En «Router → Conexión con el router», escribe la nueva (y la dirección y el
    usuario si cambian), «Probar la conexión» y «Guardar las credenciales». El
    panel prueba a entrar antes de guardar y desde ese momento usa las nuevas;
    no hace falta reiniciar nada.
-3. Comprueba `/salud`:
+3. Comprueba `/salud` desde el equipo del panel (o desde el proxy):
 
    ```sh
-   doas jexec routerpanel-build fetch -qo - http://192.0.2.20:3000/salud
+   curl -s http://127.0.0.1:3000/salud   # la dirección de RP_LISTEN
    ```
 
    Da `"ok":true` y `"router":"ok"` cuando el último sondeo del router (cada
@@ -135,18 +151,94 @@ contraseña cifrada con `history.key`. Para cambiarla:
    credenciales (asistente sin terminar). Si da error, mira el registro del
    panel (abajo).
 
-`history.key` (`/usr/local/etc/routerpanel/`, dentro de la jail) es la clave
-maestra del panel: cifra las credenciales del router, los valores secretos
-del historial y la foto de partida. No la borres ni la cambies: sin ella el
-panel no arranca con las credenciales guardadas (habría que volver a pasar por
-el asistente) y no se podrán deshacer los cambios ya guardados.
+## La clave maestra y las copias de seguridad
+
+`history.key` es la clave maestra del panel: cifra las credenciales del
+router, los valores secretos del historial y la foto de partida. La crea el
+panel la primera vez que arranca. No la borres ni la cambies: sin ella el
+panel no puede usar las credenciales guardadas (habría que volver a pasar por
+el asistente) ni deshacer los cambios ya guardados.
+
+Para una copia de seguridad, guarda **las dos cosas**:
+
+- la base de datos: `panel.db` y, si existen, `panel.db-wal` y
+  `panel.db-shm`. Lo más sencillo es parar el servicio, copiar los ficheros
+  y volver a arrancarlo;
+- la clave maestra, `history.key`, **aparte**: una copia de la base sin la
+  clave no sirve de nada, y las dos juntas descifran todo lo guardado.
+
+```sh
+# Linux
+systemctl stop routerpanel
+cp -p /var/lib/routerpanel/panel.db* /ruta/de/la/copia/
+systemctl start routerpanel
+# Docker (con el contenedor parado también se puede copiar)
+compose stop panel
+compose cp panel:/data/panel.db ./copia/
+compose start panel
+# FreeBSD
+doas jexec <JAIL_PANEL> service routerpanel stop
+doas cp -p <JAILS_RAIZ>/<JAIL_PANEL>/var/db/routerpanel/panel.db* /ruta/de/la/copia/
+doas jexec <JAIL_PANEL> service routerpanel start
+```
+
+`history.key` se copia igual, desde la ruta de la tabla de arriba. Para
+restaurar: con el servicio parado, la base y la clave en su sitio, del
+usuario del servicio y con permisos 600.
+
+## Registros
+
+El panel escribe sus registros (arranque, errores con el router, cambios
+aplicados y revertidos) en la salida de error, con el nivel de `RP_LOG`
+(por defecto `info`). Nunca llevan la contraseña del router ni valores de
+campos secretos.
+
+```sh
+# Linux
+journalctl -u routerpanel -f
+# Docker
+compose logs -f panel
+# FreeBSD (lo rota newsyslog)
+doas tail -f <JAILS_RAIZ>/<JAIL_PANEL>/var/log/routerpanel.log
+doas jexec <JAIL_PANEL> service routerpanel status
+```
+
+Los actualizadores tienen su propio registro: en FreeBSD,
+`/var/log/routerpanel-update.log` (y la salida de la última compilación en
+`/var/log/routerpanel-build.log`); en Linux, la salida de
+`routerpanel-actualizar` (o `journalctl -u routerpanel-actualizar` si lo
+lanza un temporizador).
+
+## Actualizar
+
+Antes de actualizar conviene una copia de seguridad (arriba). Los
+actualizadores ya copian la base de datos antes de cambiar de versión y
+vuelven solos a la anterior si la nueva no responde en `/salud`.
+
+- **Linux**: `routerpanel-actualizar` descarga la última release, comprueba su
+  sha256 (y su firma de minisign si le das la clave) y la despliega; o a mano,
+  con una release nueva en `releases/` y el enlace `current`
+  ([`deploy/linux/`](../deploy/linux/README.md#actualizar)).
+- **Docker**: la versión nueva del repositorio (`git pull` o la etiqueta que
+  quieras) y `compose up -d --build`.
+- **FreeBSD**: el actualizador del host compila la última etiqueta `v*` en la
+  jail de compilación, cada 15 minutos
+  ([`deploy/freebsd-jail/`](../deploy/freebsd-jail/README.md#actualizador)).
+  Una compilación tarda bastante: si la lanzas a mano, hazlo en un terminal
+  propio y desligada de la sesión
+  (`doas daemon -f /usr/local/sbin/routerpanel-actualizar`). Los cambios en
+  `deploy/` no los despliega el actualizador: hay que repetir `install.sh`.
+
+Para volver atrás a mano: el enlace `current` a la versión anterior y, si la
+nueva cambió el esquema de la base de datos, la copia de antes de actualizar
+(en FreeBSD, `/var/db/routerpanel/antes-de-actualizar/` en la jail). Cada guía
+de instalación lo explica.
 
 ## Actualizar desde una versión anterior al asistente (v0.1.x)
 
-Las instalaciones de antes guardaban la contraseña del router en
-`/usr/local/etc/routerpanel/router.secret` y el servicio la pasaba con
-`RP_ROUTER_URL`, `RP_ROUTER_USER` y `RP_ROUTER_SECRET`. Al arrancar la versión
-nueva:
+Las instalaciones de antes del asistente guardaban la contraseña del router
+en un fichero (`router.secret`) y el servicio la pasaba con `RP_ROUTER_URL`,
+`RP_ROUTER_USER` y `RP_ROUTER_SECRET`. Al arrancar la versión nueva:
 
 - Con usuarios en la base de datos, el asistente no aparece nunca.
 - Si la base de datos aún no tiene credenciales del router, el panel las
@@ -156,126 +248,11 @@ nueva:
 - Las tres variables van juntas o ninguna: con una o dos, el panel no arranca
   (error claro en el registro).
 
-El actualizador sólo despliega el panel, así que el servicio sigue con su
-`routerpanel.rc` de antes (que pasa las variables) hasta repetir
-`deploy/install.sh`; el nuevo sólo las pasa si existe `router.secret`. Una vez
-importadas (ver el registro, o «Router → Conexión con el router»), **se pueden
-quitar**:
+Una vez importadas (ver el registro, o «Router → Conexión con el router»), se
+pueden quitar las variables y borrar el fichero. En FreeBSD, el
+`routerpanel.rc` que instala `install.sh` solo las pasa si existe el fichero:
 
 ```sh
-doas jexec -U routerpanel routerpanel rm /usr/local/etc/routerpanel/router.secret
-doas jexec routerpanel service routerpanel restart
+doas jexec -U routerpanel <JAIL_PANEL> rm /usr/local/etc/routerpanel/router.secret
+doas jexec <JAIL_PANEL> service routerpanel restart
 ```
-
-Con el `routerpanel.rc` de antes las variables se siguen pasando, pero con
-credenciales en la base de datos el panel ni las mira ni lee el fichero;
-`deploy/install.sh` instala el nuevo, que ya no las pasa.
-
-## Registros
-
-| Fichero (en el host) | Qué hay |
-|---|---|
-| `/usr/local/jails/containers/routerpanel/var/log/routerpanel.log` | el panel: arranque, errores con el router, cambios aplicados y revertidos (nivel `RP_LOG=info`, ver `routerpanel.rc`) |
-| `/var/log/routerpanel-update.log` | el actualizador: etiquetas nuevas, compilaciones, despliegues, vueltas atrás |
-| `/var/log/routerpanel-build.log` | salida de cargo de la **última** compilación |
-
-```sh
-doas tail -f /usr/local/jails/containers/routerpanel/var/log/routerpanel.log
-doas tail -n 50 /var/log/routerpanel-update.log
-doas jexec routerpanel service routerpanel status
-```
-
-Los rota newsyslog. Los registros nunca llevan la contraseña del router ni
-valores de campos secretos.
-
-## Actualizaciones
-
-- Se publican con una etiqueta `v*` (p. ej. `v0.1.1`) en Forgejo. El
-  actualizador (`/usr/local/sbin/routerpanel-actualizar`, cron cada 15 minutos
-  en el host) toma la más reciente (`sort -V`), la compila y prueba en la jail
-  `routerpanel-build`, copia la base de datos, cambia la versión y espera a
-  `/salud`. Si no responde en 60 s, vuelve a la anterior con la base de datos
-  de antes. Una etiqueta que falla (al compilar, en las pruebas o al
-  arrancar) se reintenta una vez en la ejecución siguiente; si vuelve a
-  fallar queda marcada como fallida y no se reintenta hasta que haya otra
-  (`/var/db/routerpanel-actualizar/fallida`; ver `routerpanel-update.log`).
-- **Cambios en `deploy/`** (el propio actualizador, `routerpanel.rc`, pf,
-  cron, Caddy…): el actualizador sólo despliega el panel. Tras publicar una
-  versión que toque `deploy/`, repite `deploy/install.sh` desde el portátil
-  (en la raíz del repositorio, con esa versión sacada). Es idempotente; si
-  cambian las reglas de pf vuelve a pasar por el interruptor de hombre muerto.
-- Para desplegar una rama o un commit a mano (en un terminal propio, ver
-  arriba):
-
-  ```sh
-  doas daemon -f /usr/local/sbin/routerpanel-actualizar --ref <rama|commit>
-  ```
-
-  La versión se llama `<ref>-<sha corto>`. Si ya es la desplegada, sólo
-  reinicia el servicio y comprueba `/salud`.
-- Ojo: mientras haya una etiqueta `v*` más reciente que lo desplegado, el cron
-  la vuelve a desplegar en 15 minutos. Un `--ref` sirve para probar, no para
-  quedarse en una rama.
-
-## Volver atrás a mano
-
-El actualizador ya vuelve atrás solo si la versión nueva no responde. Si la
-nueva arranca pero se porta mal:
-
-1. Versiones disponibles (se guardan las 3 últimas) y la actual:
-
-   ```sh
-   ls -lt /usr/local/routerpanel/releases/
-   readlink /usr/local/jails/containers/routerpanel/usr/local/routerpanel/current
-   ```
-
-2. Para el servicio y apunta `current` a la versión buena (enlace relativo):
-
-   ```sh
-   doas jexec routerpanel service routerpanel stop
-   doas ln -sfh releases/<versión> \
-       /usr/local/jails/containers/routerpanel/usr/local/routerpanel/current
-   ```
-
-3. Si la versión mala cambió el esquema de la base de datos (una migración
-   nueva), la vieja no arrancará con ella. Recupera la copia de antes del último
-   despliegue (se pierde lo registrado desde entonces):
-
-   ```sh
-   doas jexec -U routerpanel routerpanel /bin/sh -c '
-       cd /var/db/routerpanel && rm -f panel.db panel.db-wal panel.db-shm &&
-       cp -p antes-de-actualizar/* .'
-   ```
-
-4. Arranca y comprueba `/salud` (como arriba).
-5. Para que el cron no la vuelva a desplegar, marca la etiqueta mala como
-   fallida (hasta que se publique otra):
-
-   ```sh
-   echo <etiqueta mala, p. ej. v0.2.0> | doas tee /var/db/routerpanel-actualizar/fallida
-   ```
-
-## pf y el interruptor de hombre muerto
-
-Las reglas de pf del panel (`deploy/pf.conf.snippet`) sólo se tocan con
-`deploy/install.sh`, que las carga con un interruptor de hombre muerto: tras
-cargarlas, si en **180 s** nadie las confirma, el servidor vuelve solo a las
-reglas anteriores (fichero y núcleo; queda en syslog: `pf: reglas anteriores
-restauradas (hombre muerto)`). `install.sh` comprueba desde una conexión SSH
-nueva que los sitios web y el SSH de Forgejo siguen respondiendo y que las
-jails alcanzan sólo lo que deben; sólo entonces confirma.
-
-- Si una comprobación falla, no confirma: espera 3 minutos y todo vuelve a
-  estar como antes. No hace falta hacer nada.
-- Si `--pf-confirmar` dice «el interruptor ya saltó», las comprobaciones
-  tardaron más de 180 s y las reglas vigentes son las anteriores (queda la
-  marca `/var/run/routerpanel-pf-deadman.saltado` y la línea en syslog).
-  Repite `deploy/install.sh`.
-- Si dice «no hay interruptor armado», no se llegó a cargar nada con
-  `--pf-cargar` o alguien lo paró a mano: mira `doas pfctl -sr` antes de
-  seguir.
-- Para ver qué hay cargado: `doas pfctl -sr | grep -c ROUTERPANEL` (más de 0:
-  reglas del panel cargadas). Copia de antes del último cambio:
-  `/etc/pf.conf.bak-routerpanel`.
-- Nunca edites a mano los bloques entre `# >>> routerpanel` y `# <<< routerpanel`
-  de `/etc/pf.conf`: los regenera `install.sh`.

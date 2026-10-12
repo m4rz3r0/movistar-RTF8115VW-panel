@@ -66,6 +66,9 @@ valor 192.168.1.100 — inicio del pool DHCP neutro de las fixtures; IP de ejemp
 valor 192.168.1.199 — fin del pool DHCP neutro de las fixtures
 red 10.255.0.0/24 — direcciones del operador renumeradas en las fixtures
 valor 172.16.0.1 — ejemplo genérico de red privada 172.16/12 en las pruebas
+valor 10.0.0.0 — red privada 10/8 (RFC 1918) del ejemplo de nginx de docs/proxy-tls.md
+valor 172.16.0.0 — red privada 172.16/12 (RFC 1918) del ejemplo de nginx de docs/proxy-tls.md
+valor 192.168.0.0 — red privada 192.168/16 (RFC 1918) del ejemplo de nginx de docs/proxy-tls.md
 ruta crates/router-sim/src/sanitize.rs ipv4 — entradas sintéticas de las pruebas del saneador (LAN y operador sin renumerar)
 
 # Commits de las acciones fijadas en .github/workflows (la versión va en el
@@ -78,3 +81,9 @@ valor 3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c — actions/download-artifact v8.
 # sha256 de rustup-init, que release.yml comprueba si el runner no trae rustup.
 valor 4acc9acc76d5079515b46346a485974457b5a79893cfb01112423c89aeb5aa10 — sha256 de rustup-init 1.29.0 x86_64 (release.yml)
 valor 9732d6c5e2a098d3521fca8145d826ae0aaa067ef2385ead08e6feac88fa5792 — sha256 de rustup-init 1.29.0 aarch64 (release.yml)
+
+# Capturas del README (e2e/capturas-readme.spec.ts, router-sim con las fixtures
+# neutras; revisadas a mano, sin metadatos). Al regenerarlas cambia el sha256.
+binario docs/capturas/estado-escritorio.png 23dd35291ceb4e1ee9bcfc4359414a3fc02b898bcf27d57c3750a93eab3a52ff — captura del README (estado-escritorio), del simulador con datos inventados
+binario docs/capturas/estado-movil.png 0498a3615323a6d14064f7b630e015b0368764120c55b9fd5739bfb6609c31cb — captura del README (estado-movil), del simulador con datos inventados
+binario docs/capturas/configuracion-escritorio.png 008b978a2ca9c0fa14bdcaa7aede8b5f5d2250905cd5a337909c48486943301d — captura del README (configuracion-escritorio), del simulador con datos inventados

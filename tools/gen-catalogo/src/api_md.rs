@@ -169,8 +169,8 @@ pub fn generar(cat: &Catalogo, fixtures: &Path) -> Result<String, String> {
            `rqPasswd` ofuscados con XOR 0x1f, `rqTimeout`); la respuesta es\n  \
            `<Response><función>…<Result>0</Result></función></Response>` (`Result` 0\n  \
            = correcto, 1 = error con `ErrorString`).\n\
-         - Las escrituras llevan además `sessionKey`, sacado de la página indicada\n  \
-           (`var sessionKey='…'`). Las listas se leen con `all=ALL` (ids) y cada\n  \
+         - Las escrituras llevan además `sessionKey`, la clave de sesión que da la\n  \
+           página indicada. Las listas se leen con `all=ALL` (ids) y cada\n  \
            instancia con `<obj>_0i=<id>` o `<obj>_id=<id>`; los borrados llevan\n  \
            `del=DEL`; `-1` como id crea una instancia nueva.\n\
          - Los campos IP/MAC partidos (`<nombre>-0..-3` o `-0..-5`) se envían unidos\n  \
@@ -247,6 +247,24 @@ mod tests {
         );
         for f in cat.todas() {
             assert!(md.contains(&format!("### `{}`", f.name)), "{}", f.name);
+        }
+    }
+
+    /// La documentación describe la API con texto propio: ningún fragmento
+    /// literal de JavaScript o HTML de las páginas del router.
+    #[test]
+    fn api_md_sin_codigo_del_firmware() {
+        let cat = Catalogo::load().unwrap();
+        let md = generar(&cat, &crate::raiz().join("crates/hgu/fixtures")).unwrap();
+        let toml =
+            std::fs::read_to_string(crate::raiz().join("crates/catalogo/funciones.toml")).unwrap();
+        for (nombre, texto) in [("docs/api.md", &md), ("funciones.toml", &toml)] {
+            for fragmento in ["function(", "function (", "<div", "var ", "$("] {
+                assert!(
+                    !texto.contains(fragmento),
+                    "{nombre} contiene «{fragmento}», código literal del firmware"
+                );
+            }
         }
     }
 }

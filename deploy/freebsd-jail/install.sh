@@ -349,14 +349,12 @@ setup_build_jail()
 		pw -R "$BJ" useradd "$BUILD_USER" -u "$UID_COMPILAR" -g "$BUILD_USER" -c "Compilación del panel" -m -s /bin/sh
 	fi
 
+	# Sin toolchain por defecto: la versión de Rust la fija rust-toolchain.toml
+	# del repositorio, y rustup la instala (con su objetivo wasm y sus
+	# componentes) la primera vez que se compila en el clon.
 	if ! as_builder 'command -v rustup' >/dev/null 2>&1; then
-		say "$BUILD_JAIL: rustup (stable + wasm32-unknown-unknown)"
-		as_builder 'rustup-init -y --no-modify-path --profile minimal --default-toolchain stable \
-			-t wasm32-unknown-unknown -c rustfmt -c clippy'
-	fi
-	if [ "$(as_builder 'cargo leptos --version 2>/dev/null')" != "cargo-leptos $CARGO_LEPTOS_VERSION" ]; then
-		say "$BUILD_JAIL: cargo-leptos $CARGO_LEPTOS_VERSION (tarda)"
-		as_builder 'cargo install --locked cargo-leptos --version "$1"' "$CARGO_LEPTOS_VERSION"
+		say "$BUILD_JAIL: rustup (Rust de rust-toolchain.toml)"
+		as_builder 'rustup-init -y --no-modify-path --profile minimal --default-toolchain none'
 	fi
 
 	# Clave de despliegue (de sólo lectura en el servidor git) y la clave del
@@ -400,6 +398,12 @@ setup_build_jail()
 				git -C "$2" remote set-url origin "$1"
 				r=$?; rm -f "$b"; exit $r' "$REPO_URL" "$SRC" <"$DEPLOY_DIR/panel.bundle"
 		fi
+	fi
+
+	# Dentro del clon, para que cargo use la Rust de rust-toolchain.toml.
+	if [ "$(as_builder 'cd "$1" && cargo leptos --version 2>/dev/null' "$SRC")" != "cargo-leptos $CARGO_LEPTOS_VERSION" ]; then
+		say "$BUILD_JAIL: cargo-leptos $CARGO_LEPTOS_VERSION (tarda)"
+		as_builder 'cd "$1" && cargo install --locked cargo-leptos --version "$2"' "$SRC" "$CARGO_LEPTOS_VERSION"
 	fi
 }
 

@@ -10,8 +10,8 @@ crates/catalogo/funciones.toml. No editar a mano. -->
   `rqPasswd` ofuscados con XOR 0x1f, `rqTimeout`); la respuesta es
   `<Response><función>…<Result>0</Result></función></Response>` (`Result` 0
   = correcto, 1 = error con `ErrorString`).
-- Las escrituras llevan además `sessionKey`, sacado de la página indicada
-  (`var sessionKey='…'`). Las listas se leen con `all=ALL` (ids) y cada
+- Las escrituras llevan además `sessionKey`, la clave de sesión que da la
+  página indicada. Las listas se leen con `all=ALL` (ids) y cada
   instancia con `<obj>_0i=<id>` o `<obj>_id=<id>`; los borrados llevan
   `del=DEL`; `-1` como id crea una instancia nueva.
 - Los campos IP/MAC partidos (`<nombre>-0..-3` o `-0..-5`) se envían unidos
