@@ -855,6 +855,10 @@ async fn red_bloqueada_mientras_se_retoman_cambios() {
     }
     assert_eq!(b.activo(), None, "aún sin cambio activo: solo retomando");
 
+    // Estos 409 los da la reserva que mantiene `hueco`, no la comprobación de
+    // `reanudando`: la ventana en que solo se está retomando dura hasta
+    // `esperar_hueco` y no se puede sostener desde aquí. Lo que sí depende
+    // de la fase de retomar es el descarte de la detección, más abajo.
     let (status, body) = llamar(&p, "guardar_wan", json!({ "manual": "ip4" }), Some(&cookie)).await;
     assert_eq!(status, 409, "{body}");
     let (status, body) = llamar(&p, "redetectar", json!({}), Some(&cookie)).await;
