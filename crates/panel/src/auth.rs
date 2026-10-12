@@ -12,9 +12,9 @@ use leptos::prelude::*;
 pub use server::{
     AuthUser, LoginError, MAX_PASSWORD_BYTES, MIN_PASSWORD_CHARS, REAUTH_SECS, SESSION_COOKIE,
     User, UserError, abrir_ventana_de_reautenticacion, attempt_login, change_own_password,
-    client_ip, create_user, delay_secs, delete_user, hash_password, poner_cookie_de_sesion,
-    reautenticar_sesion, reauthenticate, require_page_session, require_reauth, require_user,
-    set_password, verify, warm_up,
+    client_ip, create_user, delay_secs, delete_user, guardar_modo_vista, hash_password,
+    poner_cookie_de_sesion, reautenticar_sesion, reauthenticate, require_page_session,
+    require_reauth, require_user, set_password, verify, warm_up,
 };
 
 /// Mensaje de error de las server functions sin sesión vigente (con estado
@@ -67,7 +67,7 @@ pub async fn quien_soy() -> Result<String, ServerFnError> {
 
 #[cfg(feature = "ssr")]
 mod server {
-    use crate::{redes::RedIp, state::AppState};
+    use crate::{redes::RedIp, state::AppState, vista::ModoVista};
     use argon2::{
         Argon2,
         password_hash::{PasswordHasher, PasswordVerifier, phc::PasswordHash},
@@ -119,6 +119,8 @@ mod server {
     pub struct User {
         pub id: i64,
         pub username: String,
+        /// Su modo de visualización (sin elegir, el de por defecto).
+        pub modo_vista: ModoVista,
     }
 
     fn now_ms() -> i64 {
@@ -438,15 +440,15 @@ mod server {
     /// borra; una vigente renueva `last_seen` (como mucho una vez por minuto).
     async fn session_user(db: &SqlitePool, id: &str) -> Result<Option<User>, sqlx::Error> {
         let key = session_key(id);
-        let row: Option<(i64, String, i64, i64)> = sqlx::query_as(
-            "SELECT u.id, u.username, s.created, s.last_seen
+        let row: Option<(i64, String, Option<String>, i64, i64)> = sqlx::query_as(
+            "SELECT u.id, u.username, u.modo_vista, s.created, s.last_seen
              FROM sessions s JOIN users u ON u.id = s.user_id
              WHERE s.id = ?",
         )
         .bind(&key)
         .fetch_optional(db)
         .await?;
-        let Some((user_id, username, created, last_seen)) = row else {
+        let Some((user_id, username, modo_vista, created, last_seen)) = row else {
             return Ok(None);
         };
         let now = now_secs();
@@ -467,6 +469,10 @@ mod server {
         Ok(Some(User {
             id: user_id,
             username,
+            modo_vista: modo_vista
+                .as_deref()
+                .and_then(ModoVista::desde_codigo)
+                .unwrap_or_default(),
         }))
     }
 
@@ -786,6 +792,23 @@ mod server {
         match user_from_headers(&state.db, &headers).await {
             Ok(Some(user)) => Ok(user),
             Ok(None) => fail(StatusCode::UNAUTHORIZED, super::ERROR_SESION),
+            Err(e) => internal(e),
+        }
+    }
+
+    /// Guarda el modo de visualización del usuario de la sesión (sin sesión,
+    /// 401). El de por defecto se guarda como `NULL`.
+    pub async fn guardar_modo_vista(modo: ModoVista) -> Result<(), ServerFnError> {
+        let state = app_state()?;
+        let user = require_user().await?;
+        let valor = (modo != ModoVista::default()).then_some(modo.codigo());
+        let res = sqlx::query("UPDATE users SET modo_vista = ? WHERE id = ?")
+            .bind(valor)
+            .bind(user.id)
+            .execute(&state.db)
+            .await;
+        match res {
+            Ok(_) => Ok(()),
             Err(e) => internal(e),
         }
     }

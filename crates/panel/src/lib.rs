@@ -14,6 +14,7 @@ pub mod instalar;
 pub mod panel_ajustes;
 pub mod preferencias;
 pub mod ui;
+pub mod vista;
 
 #[cfg(feature = "ssr")]
 pub mod changes;

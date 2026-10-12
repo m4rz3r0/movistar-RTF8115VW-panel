@@ -17,6 +17,7 @@ pub mod panel_ajustes;
 pub mod recomendaciones;
 pub mod router;
 pub mod table;
+pub mod vista;
 
 use crate::t;
 use leptos::prelude::*;
@@ -66,10 +67,28 @@ impl Estado {
     }
 }
 
+/// Oculta los iconos de estado ([`IconoEstado`]) de lo que se pinta debajo
+/// mientras la señal es cierta: en el modo de visualización «texto» la página
+/// de estado no lleva ningún gráfico (el texto que acompaña al icono ya dice
+/// el estado).
+#[derive(Clone, Copy)]
+pub(crate) struct IconosOcultos(pub Signal<bool>);
+
 /// Icono de 16 px del estado (círculo con marca, triángulo, círculo con
 /// aspa, círculo con «i»). Decorativo: el texto que lo acompaña da el estado.
+/// Debajo de [`IconosOcultos`], solo mientras no estén ocultos.
 #[component]
 pub fn IconoEstado(estado: Estado) -> impl IntoView {
+    match use_context::<IconosOcultos>() {
+        None => dibujo_estado(estado).into_any(),
+        Some(IconosOcultos(ocultos)) => {
+            (move || (!ocultos.get()).then(|| dibujo_estado(estado))).into_any()
+        }
+    }
+}
+
+/// SVG de [`IconoEstado`].
+fn dibujo_estado(estado: Estado) -> impl IntoView {
     let trazos = match estado {
         Estado::Ok => view! {
             <circle cx="8" cy="8" r="6.25" />

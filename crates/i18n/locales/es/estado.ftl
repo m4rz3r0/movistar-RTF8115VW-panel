@@ -39,6 +39,15 @@ estado-clientes = Clientes
 ## Gráficos
 estado-historico = Histórico
 estado-intervalo = Intervalo de los gráficos
+estado-vista = Visualización
+estado-vista-error = No se ha podido guardar el modo de visualización: { $error }
+estado-texto-historico = Histórico ({ $rango }): último valor, mínimo, media y máximo
+estado-texto-col-dato = Dato
+estado-texto-col-ultimo = Último
+estado-texto-col-minimo = Mínimo
+estado-texto-col-media = Media
+estado-texto-col-maximo = Máximo
+estado-texto-sin-muestras = Sin datos en este intervalo
 estado-trafico = Tráfico de los dispositivos
 estado-trafico-nota = Lo que envían y reciben los equipos de la red por cable y WiFi. Incluye el tráfico entre equipos conectados a puertos distintos del router.
 estado-disponibilidad = Disponibilidad de internet · { $rango }

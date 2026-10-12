@@ -1,5 +1,6 @@
 //! «Ajustes del panel» (`/panel`): solo lo del panel. Panel (idioma por
-//! defecto y zona horaria) y usuarios del panel. No está en el menú: se abre
+//! defecto y zona horaria), visualización (el modo de cada usuario,
+//! [`super::vista::SeccionVista`]) y usuarios del panel. No está en el menú: se abre
 //! con el nombre de usuario. Lo del router está en «Configuración del
 //! router» ([`super::router`]) y los parámetros que usan prestablecidos y
 //! recomendaciones, en «Tus preferencias» ([`super::recomendaciones`]).
@@ -18,6 +19,7 @@ use crate::panel_ajustes::{
 use crate::t;
 use crate::ui::charts::Zona;
 use crate::ui::i18n::nombre_idioma;
+use crate::ui::vista::SeccionVista;
 use ::i18n::Idioma;
 use leptos::{ev::SubmitEvent, html, prelude::*, task::spawn_local};
 use leptos_router::components::A;
@@ -117,6 +119,7 @@ fn Ajustes(a: AjustesPanel) -> impl IntoView {
     view! {
         <div class="ajustes-panel">
             <SeccionPanel instancia />
+            <SeccionVista />
             <SeccionUsuarios usuarios=a.usuarios.clone() yo=a.yo.clone() />
         </div>
     }
