@@ -28,11 +28,13 @@ async function comprobarEstado(page: Page, modo: string) {
   const main = page.locator("main");
   if (modo === "texto") {
     await expect(main.locator(".historico-texto table")).toHaveCount(2);
+    await expect(main.locator(".historico-texto th[scope=row]")).toHaveCount(5);
     await expect(main.locator("dl.indicadores-texto")).toBeVisible();
     await expect(main.locator("svg")).toHaveCount(0);
   } else if (modo === "grafica") {
     await expect(main.locator("figure.grafica").first()).toBeVisible();
     await expect(main.locator(".rejilla-indicadores.compactos")).toBeVisible();
+    await expect(main.locator(".rejilla-indicadores.compactos .indicador-sub").first()).toBeVisible();
     await expect(main.locator(".minigrafica")).toHaveCount(0);
   } else {
     await expect(main.locator(".minigrafica").first()).toBeVisible();

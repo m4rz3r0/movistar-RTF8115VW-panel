@@ -70,14 +70,17 @@ fn celda(c: Celda) -> AnyView {
     }
 }
 
-/// Tabla con cabecera, filas y, opcionalmente, título (`<caption>`) y texto
-/// para cuando no hay filas.
+/// Tabla con cabecera, filas y, opcionalmente, título (`<caption>`), texto
+/// para cuando no hay filas y, con `cabecera_fila`, la primera celda de cada
+/// fila como su encabezado (`<th scope="row">`), para que el lector de
+/// pantalla diga de qué fila es cada valor.
 #[component]
 pub fn Tabla(
     #[prop(into)] columnas: Signal<Vec<Columna>>,
     #[prop(into)] filas: Signal<Vec<Vec<Celda>>>,
     #[prop(into, optional)] titulo: MaybeProp<String>,
     #[prop(into, optional)] vacia: MaybeProp<String>,
+    #[prop(optional)] cabecera_fila: bool,
 ) -> impl IntoView {
     let cabecera = move || {
         columnas
@@ -113,7 +116,16 @@ pub fn Tabla(
                     .enumerate()
                     .map(|(i, c)| {
                         let clase = numericas.get(i).copied().unwrap_or(false).then_some("num");
-                        view! { <td class=clase>{celda(c)}</td> }
+                        if i == 0 && cabecera_fila {
+                            view! {
+                                <th scope="row" class=clase>
+                                    {celda(c)}
+                                </th>
+                            }
+                            .into_any()
+                        } else {
+                            view! { <td class=clase>{celda(c)}</td> }.into_any()
+                        }
                     })
                     .collect_view();
                 view! { <tr>{celdas}</tr> }
@@ -177,5 +189,26 @@ mod tests {
         assert!(!sin_valor.contains("aria-label"));
         let vacia = html(vec![Columna::new("A")], Vec::new());
         assert!(vacia.contains("Sin datos"), "{vacia}");
+    }
+
+    #[test]
+    fn primera_celda_como_encabezado_de_fila() {
+        let filas = vec![vec![
+            Celda::Texto("Bajada".into()),
+            Celda::Numero("1 Mbit/s".into()),
+        ]];
+        let columnas = vec![Columna::new("Dato"), Columna::numerica("Último")];
+        let h = Owner::new().with(|| {
+            view! { <Tabla columnas=columnas.clone() filas=filas.clone() cabecera_fila=true /> }
+                .to_html()
+        });
+        assert!(
+            h.contains("<th scope=\"row\" class=\"\">Bajada</th>"),
+            "{h}"
+        );
+        assert!(h.contains("<td class=\"num\">"), "{h}");
+        // Sin pedirlo, todas son celdas normales.
+        let h = html(columnas, filas);
+        assert!(!h.contains("scope=\"row\""), "{h}");
     }
 }

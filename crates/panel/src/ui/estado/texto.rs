@@ -10,7 +10,7 @@
 use super::{CorteVista, DatoIndicador, EstadoVista, Rango, SampleVista, selector_rango};
 use crate::t;
 use crate::ui::charts::{
-    Corte, Unidad, columnas_cortes, filas_cortes, formato_valor, resumen_cortes,
+    Corte, Unidad, columnas_cortes, filas_cortes, formato_decimal, formato_valor, resumen_cortes,
     texto_disponibilidad,
 };
 use crate::ui::table::{Celda, Columna, Tabla};
@@ -85,10 +85,16 @@ fn filas_historico(muestras: &[SampleVista]) -> Vec<Vec<Celda>> {
         .map(|(nombre, unidad, f)| {
             let mut fila = vec![Celda::Texto(nombre)];
             match resumen_serie(muestras.iter().map(f)) {
-                Some(r) => fila.extend(
-                    [r.ultimo, r.minimo, r.media, r.maximo]
-                        .map(|x| Celda::Numero(formato_valor(unidad, x))),
-                ),
+                Some(r) => {
+                    let valor = |x| Celda::Numero(formato_valor(unidad, x));
+                    // La media de una cantidad entera (clientes) con un
+                    // decimal: «3,4», no «3».
+                    let media = match unidad {
+                        Unidad::Entero => Celda::Numero(formato_decimal(r.media, 1)),
+                        _ => valor(r.media),
+                    };
+                    fila.extend([valor(r.ultimo), valor(r.minimo), media, valor(r.maximo)]);
+                }
                 None => fila.extend([Celda::Vacia, Celda::Vacia, Celda::Vacia, Celda::Vacia]),
             }
             fila
@@ -144,11 +150,16 @@ pub(super) fn HistoricoTexto(
     let rango_datos = move || muestras.with(|m| m.as_ref().map_or(rango.get(), |m| m.0));
     let hasta = move || vista.with(|v| v.as_ref().map(|v| v.ahora).unwrap_or_default());
     let desde = move || hasta() - rango_datos().segundos();
+    // Con 24 h y 7 d el servidor da medias de 1 y de 15 minutos: el título
+    // lo dice (el mínimo y el máximo son los de esas medias, no picos).
     let titulo = Signal::derive(move || {
-        t!(
-            "estado-texto-historico",
-            rango = rango_datos().descripcion()
-        )
+        let r = rango_datos();
+        let rango = r.descripcion();
+        match r {
+            Rango::Hora => t!("estado-texto-historico", rango = rango),
+            Rango::Dia => t!("estado-texto-historico-1min", rango = rango),
+            Rango::Semana => t!("estado-texto-historico-15min", rango = rango),
+        }
     });
     let columnas = vec![
         Columna::new(t!("estado-texto-col-dato")),
@@ -184,7 +195,13 @@ pub(super) fn HistoricoTexto(
                 {selector_rango(rango, set_rango)}
             </div>
             <div class="tarjeta">
-                <Tabla titulo columnas filas vacia=t!("estado-texto-sin-muestras") />
+                <Tabla
+                    titulo
+                    columnas
+                    filas
+                    vacia=t!("estado-texto-sin-muestras")
+                    cabecera_fila=true
+                />
             </div>
             <section class="tarjeta" aria-labelledby="disponibilidad-titulo">
                 <h3 id="disponibilidad-titulo" class="franja-titulo">
@@ -253,5 +270,11 @@ mod tests {
         );
         assert_eq!(filas[3][1], Celda::Numero("40,0 %".into()));
         assert_eq!(filas[4][4], Celda::Numero("3".into()));
+        // La media de los clientes, con un decimal.
+        let mut otra = muestra(120, None);
+        otra.clients = Some(4);
+        let filas = filas_historico(&[muestra(0, None), muestra(60, None), otra]);
+        assert_eq!(filas[4][3], Celda::Numero("3,3".into()));
+        assert_eq!(filas[4][2], Celda::Numero("3".into()));
     }
 }

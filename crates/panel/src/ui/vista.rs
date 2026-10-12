@@ -82,6 +82,14 @@ fn ayuda(m: ModoVista) -> String {
     }
 }
 
+/// Tras no poder guardar `fallido`, vuelve a `antes` solo si la página sigue
+/// en `fallido`: si entretanto se eligió otro modo, se queda en ese.
+fn deshacer_si_sigue(vista: RwSignal<ModoVista>, fallido: ModoVista, antes: ModoVista) {
+    if vista.get_untracked() == fallido {
+        vista.set(antes);
+    }
+}
+
 /// Selector rápido de la cabecera de Estado: cambia el modo de la página al
 /// momento y lo guarda; si no se puede guardar, vuelve al anterior y lo dice.
 #[component]
@@ -97,7 +105,7 @@ pub fn SelectorVista() -> impl IntoView {
         error.set(None);
         spawn_local(async move {
             if let Err(e) = guardar_vista(m).await {
-                vista.set(antes);
+                deshacer_si_sigue(vista, m, antes);
                 error.set(Some(t!("estado-vista-error", error = texto_error(&e))));
             }
         });
@@ -201,5 +209,25 @@ pub fn SeccionVista() -> impl IntoView {
                 </div>
             </form>
         </section>
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn un_fallo_no_pisa_un_modo_elegido_despues() {
+        Owner::new().with(|| {
+            // Mixto → Texto (falla): vuelve a Mixto.
+            let vista = RwSignal::new(ModoVista::Texto);
+            deshacer_si_sigue(vista, ModoVista::Texto, ModoVista::Mixto);
+            assert_eq!(vista.get_untracked(), ModoVista::Mixto);
+            // Mixto → Texto → Gráfica, y falla el guardado de Texto: se
+            // queda en Gráfica.
+            let vista = RwSignal::new(ModoVista::Grafica);
+            deshacer_si_sigue(vista, ModoVista::Texto, ModoVista::Mixto);
+            assert_eq!(vista.get_untracked(), ModoVista::Grafica);
+        });
     }
 }

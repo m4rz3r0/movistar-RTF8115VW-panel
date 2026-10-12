@@ -573,7 +573,7 @@ fn indicadores(
 }
 
 /// Fila de indicadores en tarjetas: con minigráfica y subtítulo (modo
-/// «mixto») o, `compactos`, solo con su valor (modo «gráfica»).
+/// «mixto») o, `compactos`, más pequeñas y sin minigráfica (modo «gráfica»).
 #[component]
 fn Indicadores(datos: Vec<DatoIndicador>, #[prop(optional)] compactos: bool) -> impl IntoView {
     let tarjetas = datos
@@ -589,7 +589,6 @@ fn Indicadores(datos: Vec<DatoIndicador>, #[prop(optional)] compactos: bool) -> 
                             <Indicador titulo valor sub estado minigrafica tono />
                         }
                         .into_any(),
-                        None if compactos => view! { <Indicador titulo valor estado /> }.into_any(),
                         None => view! { <Indicador titulo valor sub estado /> }.into_any(),
                     }
                 })

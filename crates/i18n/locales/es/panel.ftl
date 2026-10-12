@@ -31,7 +31,7 @@ panel-vista-modo = Modo de visualización
 panel-vista-texto = Texto
 panel-vista-texto-ayuda = Sin gráficos: los indicadores como una lista de nombre y valor, y el histórico en tablas con el último valor, el mínimo, la media y el máximo. Cómodo con lector de pantalla o en pantallas pequeñas.
 panel-vista-grafica = Gráfica
-panel-vista-grafica-ayuda = Las gráficas del histórico primero y a todo el ancho; los indicadores, compactos y solo con su valor.
+panel-vista-grafica-ayuda = Las gráficas del histórico primero y a todo el ancho; los indicadores, más compactos y sin minigráfica.
 panel-vista-mixto = Mixto
 panel-vista-mixto-ayuda = Indicadores con su minigráfica de la última hora y, debajo, las gráficas del histórico. Es el de por defecto.
 

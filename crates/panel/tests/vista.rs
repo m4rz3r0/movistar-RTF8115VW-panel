@@ -54,16 +54,24 @@ async fn guardar(p: &Panel, cookie: &str, modo: &str) {
     ok(p, "guardar_vista", json!({ "modo": modo }), cookie).await;
 }
 
-/// Todos los `<svg` del documento son iconos del menú (`icono`) o el logo
-/// (`marca-logo`): ninguno es de la página de estado.
-fn svgs_fuera_del_menu(html: &str) -> Vec<String> {
-    html.match_indices("<svg")
+/// Los `<svg` del contenido de la página: lo que va en `<main>` y los trozos
+/// que el servidor manda después de `</body>` (el contenido de los
+/// `Suspense`/`Transition`, que van dentro de `<main>`), sin el menú ni el
+/// logo. Exige que el contenido de Estado esté ahí (si no, no probaría nada).
+fn svgs_del_contenido(html: &str) -> Vec<String> {
+    let inicio = html.find("<main").expect("<main>");
+    let fin = inicio + html[inicio..].find("</main>").expect("</main>");
+    let tras_body = html.find("</body>").expect("</body>");
+    let contenido = format!("{}{}", &html[inicio..fin], &html[tras_body..]);
+    assert!(
+        contenido.contains("historico-texto"),
+        "sin el contenido de Estado: {html}"
+    );
+    contenido
+        .match_indices("<svg")
         .map(|(i, _)| {
-            let resto = &html[i..];
+            let resto = &contenido[i..];
             resto[..resto.find('>').unwrap_or(resto.len())].to_owned()
-        })
-        .filter(|etiqueta| {
-            !etiqueta.contains(r#"class="icono""#) && !etiqueta.contains(r#"class="marca-logo""#)
         })
         .collect()
 }
@@ -140,7 +148,7 @@ async fn vista_texto_sin_svg() {
     guardar(&p, &cookie, "texto").await;
     let html = pagina(&p, "/", &cookie).await;
     assert!(html.contains(r#"data-vista="texto""#), "{html}");
-    let sueltos = svgs_fuera_del_menu(&html);
+    let sueltos = svgs_del_contenido(&html);
     assert!(
         sueltos.is_empty(),
         "SVG en la página de estado: {sueltos:#?}"
@@ -160,6 +168,9 @@ async fn vista_texto_sin_svg() {
     ] {
         assert!(tabla.contains(texto), "{texto}: {html}");
     }
+    // Cada fila, con su encabezado (el nombre de la serie).
+    assert!(tabla.contains(r#"<th scope="row""#), "{html}");
+    assert!(tabla.contains(">Bajada</th>"), "{html}");
     // Los indicadores, como pares nombre/valor.
     let lista = &html[html
         .find(r#"class="indicadores-texto""#)
@@ -167,7 +178,7 @@ async fn vista_texto_sin_svg() {
     assert!(lista.contains("<dt>Internet"), "{html}");
     // En inglés, también.
     let html = body_text(get_con_cookie(&p.app, "/", &format!("{cookie}; rp_lang=en")).await).await;
-    assert!(svgs_fuera_del_menu(&html).is_empty(), "{html}");
+    assert!(svgs_del_contenido(&html).is_empty(), "{html}");
     let tabla = &html[html
         .find("historico-texto")
         .unwrap_or_else(|| panic!("tabla del histórico: {html}"))..];
@@ -191,7 +202,8 @@ async fn vista_grafica_sin_minigraficas() {
     assert!(graficas < indicadores, "{html}");
     assert!(html.contains("rejilla-estado una-columna"), "{html}");
     assert!(html.contains("rejilla-indicadores compactos"), "{html}");
-    assert!(!html.contains("indicador-sub"), "{html}");
+    // Compactos, pero con su subtítulo (la IP pública, el máximo de 1 h…).
+    assert!(html.contains("indicador-sub"), "{html}");
 }
 
 #[tokio::test]

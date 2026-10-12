@@ -31,7 +31,7 @@ panel-vista-modo = Display mode
 panel-vista-texto = Text
 panel-vista-texto-ayuda = No charts: indicators as a list of names and values, and the history as tables with the latest value, minimum, average and maximum. Handy with a screen reader or on small screens.
 panel-vista-grafica = Charts
-panel-vista-grafica-ayuda = History charts first and full width; indicators compact, with just their value.
+panel-vista-grafica-ayuda = History charts first and full width; indicators more compact, without sparklines.
 panel-vista-mixto = Mixed
 panel-vista-mixto-ayuda = Indicators with their last-hour sparkline and, below, the history charts. This is the default.
 

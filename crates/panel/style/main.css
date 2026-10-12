@@ -779,7 +779,7 @@ button {
   grid-column: auto;
 }
 
-/* «Gráfica»: indicadores compactos, solo con su valor. */
+/* «Gráfica»: indicadores compactos, sin minigráfica. */
 .rejilla-indicadores.compactos {
   grid-template-columns: repeat(auto-fill, minmax(min(140px, 100%), 1fr));
   gap: var(--esp-2);
@@ -1356,6 +1356,17 @@ button {
   letter-spacing: 0.02em;
 }
 
+/* Encabezado de fila (`<th scope="row">`): se lee como una celda más. */
+.tabla tbody th[scope="row"] {
+  position: static;
+  background: transparent;
+  color: var(--texto-1);
+  font-size: inherit;
+  font-weight: 500;
+  letter-spacing: normal;
+}
+
+.tabla tbody tr:last-child th,
 .tabla tbody tr:last-child td {
   border-bottom: 0;
 }
