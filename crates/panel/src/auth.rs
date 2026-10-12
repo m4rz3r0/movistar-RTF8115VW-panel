@@ -483,22 +483,36 @@ mod server {
     // ---- Freno de fuerza bruta ----
 
     /// IP del cliente: la del socket, salvo que el socket sea uno de los
-    /// proxies de confianza (`proxies`); entonces, el último valor de
-    /// `X-Forwarded-For` (el que añadió el proxy). Si el proxy no lo manda o
-    /// no es una IP, se usa la del proxy.
+    /// proxies de confianza (`proxies`). Entonces se recorre
+    /// `X-Forwarded-For` de derecha a izquierda (del proxy más cercano hacia
+    /// el cliente) saltando las direcciones de confianza: la primera que no
+    /// lo es, es el cliente. Lo que queda a su izquierda lo escribió el
+    /// cliente y no cuenta. Si se llega a un valor que no es una IP, o todos
+    /// son de confianza, se usa la última dirección de confianza vista (la
+    /// más a la izquierda; el propio socket si la cabecera falta).
     pub fn client_ip(peer: IpAddr, headers: &HeaderMap, proxies: &[RedIp]) -> IpAddr {
-        let peer = peer.to_canonical();
-        if !proxies.iter().any(|red| red.contiene(peer)) {
-            return peer;
+        let de_confianza = |ip: IpAddr| proxies.iter().any(|red| red.contiene(ip));
+        let mut ultima = peer.to_canonical();
+        if !de_confianza(ultima) {
+            return ultima;
         }
-        headers
+        let valores: Vec<&str> = headers
             .get_all("x-forwarded-for")
             .iter()
             .filter_map(|v| v.to_str().ok())
             .flat_map(|v| v.split(','))
-            .last()
-            .and_then(|ip| ip.trim().parse::<IpAddr>().ok())
-            .map_or(peer, |ip| ip.to_canonical())
+            .collect();
+        for valor in valores.into_iter().rev() {
+            let Ok(ip) = valor.trim().parse::<IpAddr>() else {
+                return ultima;
+            };
+            let ip = ip.to_canonical();
+            if !de_confianza(ip) {
+                return ip;
+            }
+            ultima = ip;
+        }
+        ultima
     }
 
     /// Espera tras `failures` fallos seguidos: `min(2^(fallos-1), 60)` s.
@@ -973,6 +987,69 @@ mod server {
             assert_eq!(
                 client_ip(ip("::ffff:192.0.2.100"), &xff(&["198.51.100.4"]), proxies),
                 ip("198.51.100.4")
+            );
+        }
+
+        #[test]
+        fn ip_del_cliente_tras_una_cadena_de_proxies() {
+            let ip = |s: &str| s.parse::<IpAddr>().unwrap();
+            // A (192.0.2.10) y B (192.0.2.20), de confianza: cliente → A → B.
+            let proxies = [
+                "192.0.2.10".parse::<RedIp>().unwrap(),
+                "192.0.2.20".parse::<RedIp>().unwrap(),
+            ];
+            let proxies = &proxies[..];
+            let b = ip("192.0.2.20");
+            assert_eq!(
+                client_ip(b, &xff(&["198.51.100.4, 192.0.2.10"]), proxies),
+                ip("198.51.100.4")
+            );
+            assert_eq!(
+                client_ip(b, &xff(&["198.51.100.4", "192.0.2.10"]), proxies),
+                ip("198.51.100.4")
+            );
+            // Lo que el cliente pone a la izquierda no cuenta.
+            assert_eq!(
+                client_ip(
+                    b,
+                    &xff(&["203.0.113.66, 198.51.100.4, 192.0.2.10"]),
+                    proxies
+                ),
+                ip("198.51.100.4")
+            );
+            // Un valor de confianza falsificado a la izquierda, tampoco.
+            assert_eq!(
+                client_ip(b, &xff(&["192.0.2.10, 198.51.100.4, 192.0.2.10"]), proxies),
+                ip("198.51.100.4")
+            );
+            // Basura en medio: la última dirección de confianza vista.
+            assert_eq!(
+                client_ip(b, &xff(&["198.51.100.4, nada, 192.0.2.10"]), proxies),
+                ip("192.0.2.10")
+            );
+            assert_eq!(client_ip(b, &xff(&["198.51.100.4, nada"]), proxies), b);
+            // Todos de confianza: el de más a la izquierda.
+            assert_eq!(
+                client_ip(b, &xff(&["192.0.2.20, 192.0.2.10"]), proxies),
+                ip("192.0.2.20")
+            );
+            // IPv4 mapeada, tanto en el socket como en la cabecera.
+            assert_eq!(
+                client_ip(
+                    ip("::ffff:192.0.2.20"),
+                    &xff(&["::ffff:198.51.100.4, ::ffff:192.0.2.10"]),
+                    proxies
+                ),
+                ip("198.51.100.4")
+            );
+            // Un socket que no es de confianza manda, aunque traiga la cadena.
+            assert_eq!(
+                client_ip(
+                    ip("203.0.113.9"),
+                    &xff(&["198.51.100.4, 192.0.2.10"]),
+                    proxies
+                ),
+                ip("203.0.113.9")
             );
         }
 

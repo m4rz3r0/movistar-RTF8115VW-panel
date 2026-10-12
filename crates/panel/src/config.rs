@@ -96,23 +96,65 @@ impl Config {
 }
 
 /// Orígenes de `RP_ORIGIN`, separados por comas y sin la `/` final (el
-/// navegador nunca la manda en `Origin`). Ninguno puede estar vacío.
+/// navegador nunca la manda en `Origin`). Cada uno es
+/// `http(s)://equipo[:puerto]`, sin ruta, consulta ni usuario. El error dice
+/// qué origen falla (contando desde 1) sin repetir su valor.
 fn origenes(texto: &str) -> Result<Vec<String>, String> {
     texto
         .split(',')
         .enumerate()
         .map(|(i, o)| {
             let o = o.trim().trim_end_matches('/');
-            if o.is_empty() {
-                Err(format!(
-                    "RP_ORIGIN no es válida: el origen {} está vacío (p. ej. https://panel.example)",
+            validar_origen(o).map(|()| o.to_owned()).map_err(|e| {
+                format!(
+                    "RP_ORIGIN no es válida: el origen {} {e} (p. ej. https://panel.example)",
                     i + 1
-                ))
-            } else {
-                Ok(o.to_owned())
-            }
+                )
+            })
         })
         .collect()
+}
+
+/// ¿Es `o` un origen `http(s)://equipo[:puerto]`? El error completa la
+/// frase «el origen N …».
+fn validar_origen(o: &str) -> Result<(), &'static str> {
+    if o.is_empty() {
+        return Err("está vacío");
+    }
+    let resto = o
+        .strip_prefix("https://")
+        .or_else(|| o.strip_prefix("http://"))
+        .ok_or("debe empezar por http:// o https://")?;
+    if resto.contains(['/', '?', '#', '@']) || resto.chars().any(char::is_whitespace) {
+        return Err("no puede llevar ruta, consulta, usuario ni espacios");
+    }
+    // `[IPv6]` o un nombre o IPv4; luego, `:puerto` opcional.
+    let (equipo, puerto) = match resto.strip_prefix('[') {
+        Some(r) => {
+            let (ip6, tras) = r.split_once(']').ok_or("tiene un equipo no válido")?;
+            if ip6.parse::<std::net::Ipv6Addr>().is_err() {
+                return Err("tiene un equipo no válido");
+            }
+            let puerto = match tras {
+                "" => None,
+                t => Some(t.strip_prefix(':').ok_or("tiene un puerto no válido")?),
+            };
+            (ip6, puerto)
+        }
+        None => match resto.split_once(':') {
+            Some((e, p)) => (e, Some(p)),
+            None => (resto, None),
+        },
+    };
+    if equipo.is_empty() {
+        return Err("no tiene equipo");
+    }
+    if let Some(p) = puerto
+        && !(p.bytes().all(|b| b.is_ascii_digit()) && p.parse::<u16>().is_ok())
+    {
+        return Err("tiene un puerto no válido");
+    }
+    Ok(())
 }
 
 /// Valor de `name`; el error nombra la variable sin repetir el valor.
@@ -267,6 +309,48 @@ mod tests {
             let e = from(&[("RP_ORIGIN", malo)]).unwrap_err();
             assert!(e.contains("RP_ORIGIN"), "{malo:?}: {e}");
         }
+    }
+
+    #[test]
+    fn origen_con_forma_de_origen() {
+        for bueno in [
+            "https://panel.example",
+            "http://panel.home.arpa:3000",
+            "http://127.0.0.1:3000",
+            "http://[::1]:3000",
+            "https://[2001:db8::1]",
+        ] {
+            let c = from(&[("RP_ORIGIN", bueno)]).unwrap_or_else(|e| panic!("{bueno}: {e}"));
+            assert_eq!(c.public_origins, [bueno]);
+        }
+        for malo in [
+            "otro.example",
+            "ftp://otro.example",
+            "HTTPS://otro.example",
+            "https://",
+            "https://:3000",
+            "https://otro.example/ruta",
+            "https://otro.example?x=1",
+            "https://otro.example#x",
+            "https://usuario:clave@[::1]",
+            "https://otro.example:",
+            "https://otro.example:puerto",
+            "https://otro.example:70000",
+            "https://panel example",
+            "http://[::1",
+            "http://[nada]:3000",
+            "http://[::1]3000",
+        ] {
+            let e = from(&[("RP_ORIGIN", malo)]).expect_err(malo);
+            assert!(e.contains("RP_ORIGIN"), "{malo:?}: {e}");
+            // El error no repite el valor (salvo lo que coincide con el ejemplo).
+            if !"https://panel.example".contains(malo) {
+                assert!(!e.contains(malo), "{malo:?}: {e}");
+            }
+        }
+        // Con varios, dice cuál falla.
+        let e = from(&[("RP_ORIGIN", "https://otro.example, otro.example")]).unwrap_err();
+        assert!(e.contains("origen 2"), "{e}");
     }
 
     #[test]

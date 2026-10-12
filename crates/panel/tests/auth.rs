@@ -189,7 +189,7 @@ async fn xff_ignorado_si_no_viene_del_proxy() {
 
 #[tokio::test]
 async fn xff_usado_si_viene_del_proxy() {
-    let p = panel().await; // trusted_proxy = 127.0.0.1
+    let p = panel().await; // proxy de confianza: 127.0.0.1
     let mut req = post_form("/api/login", &login_body("x", "mala"), "127.0.0.1");
     req.headers_mut()
         .insert("x-forwarded-for", "9.9.9.9, 198.51.100.4".parse().unwrap());
