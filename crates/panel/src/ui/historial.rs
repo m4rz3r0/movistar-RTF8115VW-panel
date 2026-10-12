@@ -1,9 +1,9 @@
 //! Historial (`/historial`): los cambios hechos desde el panel y los
 //! secretos revelados, del más reciente al más antiguo, 25 por página.
 //!
-//! Cada cambio muestra fecha (hora peninsular), usuario, función (enlace a
-//! su página del explorador), riesgo, estado, un resumen del diff y su
-//! detalle desplegable. «Deshacer» solo aparece si el gestor lo aceptaría
+//! Cada cambio muestra fecha (en la zona de la instancia), usuario, función
+//! (enlace a su página del explorador), riesgo, estado, un resumen del diff y
+//! su detalle desplegable. «Deshacer» solo aparece si el gestor lo aceptaría
 //! (el servidor lo vuelve a comprobar) y abre el mismo diálogo que el
 //! explorador, con la inversa. Los cambios en `aplicando` o `vigilando` se
 //! refrescan cada 2 s hasta que terminan; si no, no se sondea.
@@ -196,7 +196,7 @@ pub fn resumen(campos: &[CampoCambio]) -> String {
 }
 
 /// «09/10/2026 14:05» o, con segundos, «09/10/2026 14:05:09» (hora
-/// peninsular; la fecha, según el idioma).
+/// en la zona de la instancia; la fecha, según el idioma).
 pub fn fecha_hora(ts: i64, con_segundos: bool) -> String {
     let h = hora_local(ts);
     let base = format!("{} {:02}:{:02}", formato_fecha(&h), h.hora, h.minuto);

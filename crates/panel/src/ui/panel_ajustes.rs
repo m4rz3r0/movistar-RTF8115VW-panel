@@ -11,9 +11,10 @@
 use super::{es_error_de_reautenticacion, mensaje_del_servidor};
 use crate::panel_ajustes::{
     AjustesPanel, CamposInstancia, EquipoLan, IdiomaPorDefecto, MAX_DNS, borrar_usuario,
-    cambiar_contrasena, crear_usuario, guardar_instancia, leer_panel, reautenticar, zonas,
+    cambiar_contrasena, crear_usuario, desfases_fijos, guardar_instancia, leer_panel, reautenticar,
 };
 use crate::t;
+use crate::ui::charts::Zona;
 use crate::ui::i18n::nombre_idioma;
 use ::i18n::Idioma;
 use leptos::{ev::SubmitEvent, html, prelude::*, task::spawn_local};
@@ -181,6 +182,9 @@ struct Instancia {
     /// página se recarga para pintarse con el que le toque ahora.
     idioma_guardado: StoredValue<IdiomaPorDefecto>,
     zona: RwSignal<String>,
+    /// La zona horaria que tiene guardada la instancia: si cambia, la página
+    /// se recarga para pintar las fechas en la nueva.
+    zona_guardada: StoredValue<String>,
     dns: RwSignal<String>,
     confianza: RwSignal<String>,
     mantenimiento: RwSignal<String>,
@@ -210,6 +214,7 @@ impl Instancia {
             idioma: RwSignal::new(a.idioma),
             idioma_guardado: StoredValue::new(a.idioma),
             zona: RwSignal::new(a.zona_horaria.clone()),
+            zona_guardada: StoredValue::new(a.zona_horaria.clone()),
             dns: RwSignal::new(a.dns_preferidos.join(", ")),
             confianza: RwSignal::new(a.dispositivos_confianza.join(", ")),
             mantenimiento: RwSignal::new(a.mantenimiento.clone().unwrap_or_default()),
@@ -274,12 +279,23 @@ impl Instancia {
             match guardar_instancia(campos).await {
                 Ok(c) => {
                     // Otro idioma por defecto puede cambiar el de esta misma
-                    // página (si no se ha elegido uno en el menú): se vuelve a
-                    // pedir, para no quedarse a medias entre dos idiomas.
-                    if let Some(i) = c.idioma
-                        && i != self.idioma_guardado.get_value()
-                    {
+                    // página (si no se ha elegido uno en el menú), y otra zona
+                    // horaria, sus fechas: se vuelve a pedir, para no quedarse
+                    // a medias entre dos idiomas o dos zonas.
+                    let otro_idioma = c
+                        .idioma
+                        .is_some_and(|i| i != self.idioma_guardado.get_value());
+                    let otra_zona = c
+                        .zona_horaria
+                        .as_ref()
+                        .is_some_and(|z| *z != self.zona_guardada.get_value());
+                    if let Some(i) = c.idioma {
                         self.idioma_guardado.set_value(i);
+                    }
+                    if let Some(z) = &c.zona_horaria {
+                        self.zona_guardada.set_value(z.clone());
+                    }
+                    if otro_idioma || otra_zona {
                         let _ = window().location().reload();
                     }
                     self.fijar(c);
@@ -294,6 +310,17 @@ impl Instancia {
 
 /// Valor de la opción «el del navegador» del idioma por defecto.
 const VALOR_NAVEGADOR: &str = "navegador";
+
+/// Valor de la opción «Otra» (desfase fijo) de la zona horaria.
+const VALOR_OTRA: &str = "otra";
+
+/// Desfase de «Otra» si no hay uno guardado.
+const OTRA_POR_DEFECTO: &str = "UTC+01:00";
+
+/// La zona es un desfase fijo distinto de UTC (va en «Otra»).
+fn es_otra(codigo: &str) -> bool {
+    matches!(Zona::desde_texto(codigo), Some(Zona::Fija(d)) if d != 0)
+}
 
 /// Idioma por defecto de un valor del selector.
 fn idioma_por_defecto(valor: &str) -> Option<IdiomaPorDefecto> {
@@ -335,17 +362,75 @@ fn SeccionPanel(instancia: Instancia) -> impl IntoView {
             }
         })
         .collect_view();
-    let lista_zonas = zonas()
-        .into_iter()
-        .map(|z| {
-            let (valor, texto) = (z.clone(), z.clone());
+    // El último desfase elegido en «Otra», para volver a él.
+    let otra = RwSignal::new(if es_otra(&instancia.zona.get_untracked()) {
+        instancia.zona.get_untracked()
+    } else {
+        OTRA_POR_DEFECTO.to_owned()
+    });
+    // Solo cambia al entrar o salir de «Otra»: elegir otro desfase no rehace
+    // su selector (no pierde el foco).
+    let en_otra = Memo::new(move |_| instancia.zona.with(|z| es_otra(z)));
+    let lista_zonas = [
+        (Zona::Peninsular, t!("panel-zona-peninsular")),
+        (Zona::Canarias, t!("panel-zona-canarias")),
+        (Zona::Fija(0), t!("panel-zona-utc")),
+    ]
+    .into_iter()
+    .map(|(z, texto)| {
+        let valor = z.codigo();
+        let v = valor.clone();
+        view! {
+            <option value=valor selected=move || instancia.zona.with(|z| *z == v)>
+                {texto}
+            </option>
+        }
+    })
+    .collect_view();
+    let cambiar_zona = move |ev| {
+        let valor = event_target_value(&ev);
+        if valor == VALOR_OTRA {
+            instancia.zona.set(otra.get_untracked());
+        } else {
+            instancia.zona.set(valor);
+        }
+    };
+    let desfases = move || {
+        en_otra.get().then(|| {
+            // Uno guardado que no está en la lista (escrito a mano), también.
+            let mut lista = desfases_fijos();
+            let actual = instancia.zona.get_untracked();
+            if !lista.contains(&actual) {
+                lista.push(actual);
+            }
+            let opciones = lista
+                .into_iter()
+                .map(|d| {
+                    let (valor, texto) = (d.clone(), d.clone());
+                    view! {
+                        <option value=d selected=move || instancia.zona.with(|z| *z == valor)>
+                            {texto}
+                        </option>
+                    }
+                })
+                .collect_view();
             view! {
-                <option value=z selected=move || instancia.zona.get() == valor>
-                    {texto}
-                </option>
+                <p class="campo">
+                    <label for="panel-zona-otra">{t!("panel-zona-desfase")}</label>
+                    <select
+                        id="panel-zona-otra"
+                        on:change=move |ev| {
+                            let d = event_target_value(&ev);
+                            otra.set(d.clone());
+                            instancia.zona.set(d);
+                        }
+                    >
+                        {opciones}
+                    </select>
+                </p>
             }
         })
-        .collect_view();
+    };
     view! {
         <section class="tarjeta" aria-labelledby="panel-panel">
             <h2 id="panel-panel">{t!("panel-panel")}</h2>
@@ -371,12 +456,16 @@ fn SeccionPanel(instancia: Instancia) -> impl IntoView {
                     <select
                         id="panel-zona"
                         aria-describedby="panel-zona-ayuda"
-                        on:change=move |ev| instancia.zona.set(event_target_value(&ev))
+                        on:change=cambiar_zona
                     >
                         {lista_zonas}
+                        <option value=VALOR_OTRA selected=en_otra>
+                            {t!("panel-zona-otra")}
+                        </option>
                     </select>
                     <span class="nota" id="panel-zona-ayuda">{t!("panel-zona-ayuda")}</span>
                 </p>
+                {desfases}
                 {mensajes(error, aviso)}
                 <div class="botones">
                     <button class="boton" type="submit" disabled=move || pendiente.get()>

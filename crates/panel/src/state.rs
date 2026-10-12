@@ -1,6 +1,8 @@
 //! Estado compartido del servidor.
 
-use crate::{changes, config::Config, crypto::HistoryKey, db, poller::PollerHandle};
+use crate::{
+    changes, config::Config, crypto::HistoryKey, db, poller::PollerHandle, ui::charts::Zona,
+};
 use axum::extract::FromRef;
 use catalogo::{Catalogo, mask::Mascara};
 use hgu::{deteccion::RedDetectada, models::WanConn};
@@ -91,6 +93,10 @@ pub struct AppState {
     /// base de datos. Lo carga [`AppState::new`] y lo cambia
     /// [`AppState::fijar_idioma_por_defecto`].
     idioma_por_defecto: Arc<std::sync::RwLock<Option<Idioma>>>,
+    /// Zona horaria de la instancia (`claves::ZONA_HORARIA`; sin guardar, la
+    /// peninsular): copia en memoria para pintar las fechas de cada página.
+    /// La carga [`AppState::new`] y la cambia [`AppState::fijar_zona`].
+    zona: Arc<std::sync::RwLock<Zona>>,
     /// Red del router (`claves::RED_DETECTADA` y `claves::WAN_MANUAL`):
     /// copia en memoria cargada por [`AppState::new`].
     red: RedActual,
@@ -108,6 +114,16 @@ impl AppState {
             .idioma_por_defecto
             .read()
             .unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Zona horaria de la instancia.
+    pub fn zona(&self) -> Zona {
+        *self.zona.read().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Anota la zona horaria recién guardada en la base de datos.
+    pub fn fijar_zona(&self, zona: Zona) {
+        *self.zona.write().unwrap_or_else(|e| e.into_inner()) = zona;
     }
 
     /// La conexión a internet que vale: la elegida a mano
@@ -176,6 +192,10 @@ impl AppState {
         let idioma_por_defecto = crate::instancia::leer(&db, crate::instancia::claves::IDIOMA)
             .await
             .and_then(|v| serde_json::from_value(v).ok());
+        let zona = crate::instancia::leer(&db, crate::instancia::claves::ZONA_HORARIA)
+            .await
+            .and_then(|v| v.as_str().and_then(Zona::desde_texto))
+            .unwrap_or_default();
         let red = RedActual::default();
         red.fijar(
             crate::instancia::leer(&db, crate::instancia::claves::RED_DETECTADA)
@@ -199,6 +219,7 @@ impl AppState {
             cambios: changes::Ranura::default(),
             instalacion: Arc::default(),
             idioma_por_defecto: Arc::new(std::sync::RwLock::new(idioma_por_defecto)),
+            zona: Arc::new(std::sync::RwLock::new(zona)),
             red,
         })
     }

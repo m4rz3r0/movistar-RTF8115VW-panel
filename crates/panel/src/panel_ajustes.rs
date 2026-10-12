@@ -11,6 +11,7 @@
 //! [`crate::auth::ERROR_REAUTENTICACION`]. La contraseña del router nunca
 //! sale del servidor.
 
+use crate::ui::charts::Zona;
 use ::i18n::Idioma;
 use leptos::prelude::*;
 use leptos::server_fn::codec::Json;
@@ -23,8 +24,8 @@ pub use crate::instalar::{InfoRouter, ResumenRed};
 pub const MAX_DNS: usize = 4;
 /// Lo más largo de un nombre de conexión que se repite en un error.
 pub const MAX_NOMBRE_CONEXION: usize = 32;
-/// Zona horaria por defecto.
-pub const ZONA_POR_DEFECTO: &str = "UTC";
+/// Zona horaria por defecto (sin guardar): la peninsular.
+pub const ZONA_POR_DEFECTO: &str = "Europe/Madrid";
 
 /// Router configurado (sin la contraseña).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -122,9 +123,10 @@ pub enum ErrorInstancia {
 
 /// Valida y normaliza los parámetros presentes: DNS como direcciones
 /// IPv4/IPv6 (como mucho [`MAX_DNS`]), MACs en minúsculas
-/// `aa:bb:cc:dd:ee:ff`, mantenimiento `HH:MM-HH:MM`, zona horaria `UTC` o
-/// `UTC±HH:MM` y servidor propio IP o nombre. Quita espacios y repetidos;
-/// vacío es «sin valor» (en la zona, `UTC`).
+/// `aa:bb:cc:dd:ee:ff`, mantenimiento `HH:MM-HH:MM`, zona horaria
+/// `Europe/Madrid`, `Atlantic/Canary`, `UTC` o `UTC±HH:MM` (ver
+/// [`Zona::desde_texto`]) y servidor propio IP o nombre. Quita espacios y
+/// repetidos; vacío es «sin valor» (en la zona, la peninsular).
 pub fn normalizar(c: CamposInstancia) -> Result<CamposInstancia, ErrorInstancia> {
     Ok(CamposInstancia {
         idioma: c.idioma,
@@ -189,10 +191,10 @@ fn normalizar_zona(z: &str) -> Result<String, ErrorInstancia> {
     let z = z.trim();
     if z.is_empty() {
         Ok(ZONA_POR_DEFECTO.to_owned())
-    } else if zona_valida(z) {
-        Ok(z.to_owned())
     } else {
-        Err(ErrorInstancia::ZonaHoraria)
+        Zona::desde_texto(z)
+            .map(|z| z.codigo())
+            .ok_or(ErrorInstancia::ZonaHoraria)
     }
 }
 
@@ -234,39 +236,17 @@ fn franja_valida(s: &str) -> bool {
     }
 }
 
-/// `UTC` o `UTC±HH:MM` entre `UTC-12:00` y `UTC+14:00`.
-pub fn zona_valida(s: &str) -> bool {
-    if s == "UTC" {
-        return true;
-    }
-    let Some(resto) = s.strip_prefix("UTC+").or_else(|| s.strip_prefix("UTC-")) else {
-        return false;
-    };
-    let negativo = s.as_bytes()[3] == b'-';
-    match hora(resto) {
-        Some(min) => min <= if negativo { 12 * 60 } else { 14 * 60 },
-        None => false,
-    }
-}
-
-/// Zonas horarias que ofrece la página: los desfases en uso, de `UTC-12:00`
-/// a `UTC+14:00` (sin cambio de horario: es un desfase fijo).
-pub fn zonas() -> Vec<String> {
+/// Desfases fijos que ofrece la página en «Otra»: los que están en uso, de
+/// `UTC-12:00` a `UTC+14:00` (sin `UTC`, que tiene opción propia).
+pub fn desfases_fijos() -> Vec<String> {
     const DESFASES: &[i32] = &[
-        -720, -660, -600, -570, -540, -480, -420, -360, -300, -240, -210, -180, -120, -60, 0, 60,
-        120, 180, 210, 240, 270, 300, 330, 345, 360, 390, 420, 480, 525, 540, 570, 600, 630, 660,
-        720, 765, 780, 840,
+        -720, -660, -600, -570, -540, -480, -420, -360, -300, -240, -210, -180, -120, -60, 60, 120,
+        180, 210, 240, 270, 300, 330, 345, 360, 390, 420, 480, 525, 540, 570, 600, 630, 660, 720,
+        765, 780, 840,
     ];
     DESFASES
         .iter()
-        .map(|&d| {
-            if d == 0 {
-                ZONA_POR_DEFECTO.to_owned()
-            } else {
-                let signo = if d < 0 { '-' } else { '+' };
-                format!("UTC{signo}{:02}:{:02}", d.abs() / 60, d.abs() % 60)
-            }
-        })
+        .map(|&d| Zona::Fija(d * 60).codigo())
         .collect()
 }
 
@@ -477,7 +457,9 @@ mod servidor {
             firmware,
             idioma,
             zona_horaria: texto(instancia::leer(db, claves::ZONA_HORARIA).await)
-                .unwrap_or_else(|| ZONA_POR_DEFECTO.to_owned()),
+                .and_then(|z| Zona::desde_texto(&z))
+                .unwrap_or_default()
+                .codigo(),
             dns_preferidos: lista(instancia::leer(db, claves::DNS_PREFERIDOS).await),
             dispositivos_confianza: lista(
                 instancia::leer(db, claves::DISPOSITIVOS_CONFIANZA).await,
@@ -625,6 +607,9 @@ mod servidor {
             .map_err(interno)?;
         if let Some(i) = c.idioma {
             state.fijar_idioma_por_defecto(i.fijo());
+        }
+        if let Some(z) = &c.zona_horaria {
+            state.fijar_zona(Zona::desde_texto(z).unwrap_or_default());
         }
         tracing::info!("parámetros de la instancia guardados");
         Ok(c)
@@ -781,32 +766,29 @@ mod tests {
 
     #[test]
     fn zonas_horarias() {
-        for z in [
-            "UTC",
-            "UTC+01:00",
-            "UTC-03:30",
-            "UTC+05:45",
-            "UTC+14:00",
-            "UTC-12:00",
+        for (z, n) in [
+            ("Europe/Madrid", "Europe/Madrid"),
+            ("Atlantic/Canary", "Atlantic/Canary"),
+            (" UTC ", "UTC"),
+            ("UTC+00:00", "UTC"),
+            ("UTC+01:00", "UTC+01:00"),
+            ("UTC-12:30", "UTC-12:30"),
+            ("", ZONA_POR_DEFECTO),
         ] {
-            assert!(zona_valida(z), "{z}");
+            assert_eq!(normalizar_zona(z).as_deref(), Ok(n), "{z}");
         }
-        for z in [
-            "",
-            "utc",
-            "Europe/Madrid",
-            "UTC+1",
-            "UTC+14:30",
-            "UTC-12:30",
-            "UTC+01:60",
-            "UTC 01:00",
-        ] {
-            assert!(!zona_valida(z), "{z}");
+        for z in ["utc", "America/New_York", "UTC+1", "UTC+14:30", "UTC 01:00"] {
+            assert_eq!(normalizar_zona(z), Err(ErrorInstancia::ZonaHoraria), "{z}");
         }
-        let todas = zonas();
-        assert!(todas.iter().all(|z| zona_valida(z)), "{todas:?}");
-        assert!(todas.contains(&"UTC+01:00".to_owned()));
-        assert!(todas.contains(&"UTC".to_owned()));
+        let fijos = desfases_fijos();
+        assert!(
+            fijos
+                .iter()
+                .all(|z| matches!(Zona::desde_texto(z), Some(Zona::Fija(d)) if d != 0)),
+            "{fijos:?}"
+        );
+        assert!(fijos.contains(&"UTC+01:00".to_owned()));
+        assert!(fijos.contains(&"UTC-03:30".to_owned()));
     }
 
     #[test]
@@ -845,7 +827,7 @@ mod tests {
             n.dns_preferidos.as_deref(),
             Some(&["9.9.9.9".to_owned(), "2620:fe::fe".to_owned()][..])
         );
-        assert_eq!(n.zona_horaria.as_deref(), Some("UTC"));
+        assert_eq!(n.zona_horaria.as_deref(), Some(ZONA_POR_DEFECTO));
         assert_eq!(n.servidor_propio.as_deref(), Some("nas.home.arpa"));
         assert_eq!(n.mantenimiento.as_deref(), Some(""), "vacío: quitar");
         // Lo que no llega sigue sin llegar.

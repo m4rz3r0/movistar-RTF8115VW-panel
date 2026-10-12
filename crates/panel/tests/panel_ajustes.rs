@@ -377,7 +377,7 @@ async fn instancia_valida_dns_y_macs() {
         ("mantenimiento", json!("3-5")),
         ("mantenimiento", json!("25:00-05:00")),
         ("mantenimiento", json!("03:00-03:60")),
-        ("zona_horaria", json!("Europe/Madrid")),
+        ("zona_horaria", json!("America/New_York")),
         ("zona_horaria", json!("UTC+15:00")),
         ("zona_horaria", json!("UTC+1")),
         ("servidor_propio", json!("http://servidor.home.arpa/")),
@@ -426,7 +426,8 @@ async fn leer_panel_no_devuelve_contrasena() {
     assert_eq!(v["usuarios"], json!([PANEL_USER]));
     assert_eq!(v["solo_lectura"], false);
     assert_eq!(v["dns_preferidos"], json!([]));
-    assert_eq!(v["zona_horaria"], "UTC");
+    // Sin zona guardada, la peninsular.
+    assert_eq!(v["zona_horaria"], "Europe/Madrid");
     // La página tampoco la lleva.
     let resp = get_con_cookie(&p.app, "/panel", &cookie).await;
     assert_eq!(resp.status(), 200);
@@ -877,4 +878,123 @@ async fn red_bloqueada_mientras_se_retoman_cambios() {
         tokio::time::sleep(Duration::from_millis(20)).await;
     }
     ok(&p, "guardar_wan", json!({ "manual": "ip4" }), &cookie).await;
+}
+
+/// Zonas horarias que se aceptan (Península, Canarias, UTC y desfases fijos
+/// de hasta 14 h) y que pasan a usarse en el acto; las demás, 400 sin tocar
+/// nada.
+#[tokio::test]
+async fn zona_valida_y_no_valida() {
+    use panel::ui::charts::Zona;
+    let p = panel().await;
+    let cookie = sesion(&p).await;
+    assert_eq!(p.state.zona(), Zona::Peninsular);
+    for (zona, guardada, en_memoria) in [
+        ("Atlantic/Canary", "Atlantic/Canary", Zona::Canarias),
+        ("UTC", "UTC", Zona::Fija(0)),
+        (" UTC+00:00 ", "UTC", Zona::Fija(0)),
+        ("UTC-03:30", "UTC-03:30", Zona::Fija(-12_600)),
+        ("UTC+14:00", "UTC+14:00", Zona::Fija(50_400)),
+        ("Europe/Madrid", "Europe/Madrid", Zona::Peninsular),
+        ("", "Europe/Madrid", Zona::Peninsular),
+    ] {
+        let c = ok(
+            &p,
+            "guardar_instancia",
+            json!({ "campos": { "zona_horaria": zona } }),
+            &cookie,
+        )
+        .await;
+        assert_eq!(c["zona_horaria"], guardada, "{zona}");
+        let v = ok(&p, "leer_panel", json!({}), &cookie).await;
+        assert_eq!(v["zona_horaria"], guardada, "{zona}");
+        assert_eq!(p.state.zona(), en_memoria, "{zona}");
+    }
+    ok(
+        &p,
+        "guardar_instancia",
+        json!({ "campos": { "zona_horaria": "Atlantic/Canary" } }),
+        &cookie,
+    )
+    .await;
+    for zona in [
+        "America/New_York",
+        "europe/madrid",
+        "UTC+15:00",
+        "UTC-14:30",
+        "UTC+1",
+    ] {
+        let (status, body) = llamar(
+            &p,
+            "guardar_instancia",
+            json!({ "campos": { "zona_horaria": zona } }),
+            Some(&cookie),
+        )
+        .await;
+        assert_eq!(status, 400, "{zona}: {body}");
+        assert_eq!(p.state.zona(), Zona::Canarias, "{zona}");
+    }
+    // Al arrancar, la guardada.
+    let dir = p.state.cfg.db_path.parent().unwrap();
+    let otro = common::estado((*p.state.cfg).clone(), dir).await;
+    assert_eq!(otro.zona(), Zona::Canarias);
+}
+
+/// La zona va en `<html data-zona>` (el navegador la lee de ahí al hidratar)
+/// y las fechas de la página salen en ella.
+#[tokio::test]
+async fn html_lleva_data_zona() {
+    let p = panel().await;
+    let cookie = sesion(&p).await;
+    let html = body_text(get_con_cookie(&p.app, "/panel", &cookie).await).await;
+    assert!(html.contains(r#"data-zona="Europe/Madrid""#), "{html}");
+    ok(
+        &p,
+        "guardar_instancia",
+        json!({ "campos": { "zona_horaria": "Atlantic/Canary" } }),
+        &cookie,
+    )
+    .await;
+    for ruta in ["/panel", "/", "/historial", "/login"] {
+        let html = body_text(get_con_cookie(&p.app, ruta, &cookie).await).await;
+        assert!(
+            html.contains(r#"data-zona="Atlantic/Canary""#),
+            "{ruta}: {html}"
+        );
+    }
+    // El selector, en «Canarias».
+    let html = body_text(get_con_cookie(&p.app, "/panel", &cookie).await).await;
+    assert!(
+        html.contains(r#"<option value="Atlantic/Canary" selected"#),
+        "{html}"
+    );
+    // Un desfase fijo distinto de UTC va en «Otra», con su propio selector.
+    ok(
+        &p,
+        "guardar_instancia",
+        json!({ "campos": { "zona_horaria": "UTC+05:45" } }),
+        &cookie,
+    )
+    .await;
+    let html = body_text(get_con_cookie(&p.app, "/panel", &cookie).await).await;
+    assert!(html.contains(r#"data-zona="UTC+05:45""#), "{html}");
+    assert!(html.contains(r#"<option value="otra" selected"#), "{html}");
+    assert!(html.contains(r#"id="panel-zona-otra""#), "{html}");
+    assert!(
+        html.contains(r#"<option value="UTC+05:45" selected"#),
+        "{html}"
+    );
+    // Uno válido que no está en la lista, también se ve elegido.
+    ok(
+        &p,
+        "guardar_instancia",
+        json!({ "campos": { "zona_horaria": "UTC-14:00" } }),
+        &cookie,
+    )
+    .await;
+    let html = body_text(get_con_cookie(&p.app, "/panel", &cookie).await).await;
+    assert!(
+        html.contains(r#"<option value="UTC-14:00" selected"#),
+        "{html}"
+    );
 }

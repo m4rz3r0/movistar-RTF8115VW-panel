@@ -14,7 +14,12 @@ panel-idioma = Default language
 panel-idioma-navegador = The browser's
 panel-idioma-ayuda = For anyone who hasn't picked a language with the menu selector, which is where you change yours.
 panel-zona = Time zone
-panel-zona-ayuda = Fixed offset from UTC: it does not follow daylight saving time.
+panel-zona-ayuda = Used for the panel's dates and charts. Peninsular Spain and the Canary Islands follow daylight saving time on their own; UTC and “Other” are a fixed offset.
+panel-zona-peninsular = Peninsular Spain (Madrid time)
+panel-zona-canarias = Canary Islands
+panel-zona-utc = UTC
+panel-zona-otra = Other (UTC±HH:MM)
+panel-zona-desfase = Offset from UTC
 
 ## Privacy and instance
 panel-privacidad = Privacy and instance

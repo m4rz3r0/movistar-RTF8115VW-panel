@@ -241,3 +241,65 @@ async fn la_bajada_sigue_a_los_puertos_lan_y_no_a_ip2() {
             .all(|m| m.tx_bps.is_none_or(|t| t < media_eth / 100.0))
     );
 }
+
+/// La página de estado se pinta en el servidor con los mismos datos que manda
+/// al navegador para hidratar. Leptos avisa a `<Transition>` de que un recurso
+/// ha llegado un instante antes de marcar como sucios los `Memo` que lo leen:
+/// si la página se pintaba en ese hueco, salía «sin datos» mientras los datos
+/// serializados sí los tenían, y al hidratar el navegador no encontraba lo que
+/// esperaba (error de hidratación intermitente en Estado y en las marcas del
+/// eje de tiempo). Ocurría en ~1 de cada 30 cargas: se repite muchas veces.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn estado_se_pinta_con_los_datos_que_serializa() {
+    let mut p = panel().await;
+    let cookie = sesion(&p).await;
+    let h = arrancar_sondeo(&mut p);
+    esperar("primer dato", || h.healthy()).await;
+    let mut fallos = Vec::new();
+    for i in 0..300 {
+        let html = body_text(get_con_cookie(&p.app, "/", &cookie).await).await;
+        // Los datos del estado van en el documento; el contenido pintado,
+        // en la plantilla del `<Transition>`.
+        assert!(html.contains(r#"\"at\":"#), "{html}");
+        if !html.contains("rejilla-indicadores") {
+            fallos.push(i);
+        }
+    }
+    assert!(
+        fallos.is_empty(),
+        "pintada sin los datos en {fallos:?} de 300"
+    );
+}
+
+/// Con la zona de Canarias, la página de estado pinta la hora del dato una
+/// hora antes que en la Península (en el servidor, igual que al hidratar).
+#[tokio::test]
+async fn estado_pinta_la_hora_en_la_zona_de_la_instancia() {
+    use panel::ui::charts::Zona;
+    let mut p = panel().await;
+    let cookie = sesion(&p).await;
+    p.state.fijar_zona(Zona::Canarias);
+    let h = arrancar_sondeo(&mut p);
+    esperar("primer dato", || h.healthy()).await;
+    let html = body_text(get_con_cookie(&p.app, "/", &cookie).await).await;
+    // El instante del dato, de los datos serializados de la misma página.
+    let (_, resto) = html.split_once(r#"\"at\":"#).expect("datos del estado");
+    let at: i64 = resto
+        .split(|c: char| !c.is_ascii_digit())
+        .next()
+        .unwrap()
+        .parse()
+        .unwrap();
+    let hora = |z: Zona| {
+        let h = z.hora_local(at);
+        format!("{:02}:{:02}:{:02}", h.hora, h.minuto, h.segundo)
+    };
+    assert!(
+        html.contains(&format!("datos de las {}", hora(Zona::Canarias))),
+        "{html}"
+    );
+    assert!(
+        !html.contains(&format!("datos de las {}", hora(Zona::Peninsular))),
+        "{html}"
+    );
+}

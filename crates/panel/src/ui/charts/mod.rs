@@ -12,8 +12,9 @@
 //! `tono-1`/`tono-2` de la hoja de estilos (sin estilos en línea por la CSP);
 //! los textos nunca llevan el color de la serie.
 //!
-//! Las horas se pintan en hora peninsular española, calculada aquí mismo para
-//! que el servidor y el navegador generen el mismo HTML al hidratar.
+//! Las horas se pintan en la zona horaria de la instancia ([`Zona`]), calculada
+//! aquí mismo para que el servidor y el navegador generen el mismo HTML al
+//! hidratar.
 
 mod escalas;
 mod franja;

@@ -21,6 +21,7 @@ use crate::ui::{
     table::{Celda, Columna, Tabla},
 };
 use leptos::prelude::*;
+use leptos::reactive::computed::ScopedFuture;
 
 /// Cada cuánto se piden datos nuevos.
 const REFRESCO: std::time::Duration = std::time::Duration::from_secs(10);
@@ -82,6 +83,23 @@ pub fn PaginaEstado() -> impl IntoView {
     let hora = Resource::new(move || tick.get(), |_| series(Rango::Hora));
     refresco_periodico(set_tick);
 
+    // El contenido se crea cuando ya han llegado los cuatro recursos, y no
+    // antes: Leptos avisa a `Transition` de que un recurso está listo un
+    // instante antes de marcar como sucios los `Memo` que lo leen, así que un
+    // `Memo` creado antes podía pintarse en el servidor todavía «sin datos»
+    // mientras los datos serializados para el navegador sí los llevaban (error
+    // de hidratación intermitente). La espera no sigue a los recursos: al
+    // refrescar, el contenido no se rehace (se actualiza por señales).
+    let contenido = move || {
+        Suspend::new(ScopedFuture::new_untracked(async move {
+            estado.ready().await;
+            historico.ready().await;
+            cortes_r.ready().await;
+            hora.ready().await;
+            view! { <Contenido estado historico cortes_r hora rango set_rango /> }
+        }))
+    };
+
     view! {
         <Transition fallback=|| {
             view! {
@@ -90,9 +108,7 @@ pub fn PaginaEstado() -> impl IntoView {
                 </header>
                 <p class="estado-espera">{t!("comun-cargando")}</p>
             }
-        }>
-            <Contenido estado historico cortes_r hora rango set_rango />
-        </Transition>
+        }>{contenido}</Transition>
     }
     .into_any()
 }

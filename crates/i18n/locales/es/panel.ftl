@@ -14,7 +14,12 @@ panel-idioma = Idioma por defecto
 panel-idioma-navegador = El del navegador
 panel-idioma-ayuda = Para quien no ha elegido idioma con el selector del menú, que es donde se cambia el tuyo.
 panel-zona = Zona horaria
-panel-zona-ayuda = Desfase fijo respecto a UTC: no cambia solo con el horario de verano.
+panel-zona-ayuda = La de las fechas y gráficas del panel. Península y Canarias cambian solas con el horario de verano; UTC y «Otra» son un desfase fijo.
+panel-zona-peninsular = Península (hora de Madrid)
+panel-zona-canarias = Canarias
+panel-zona-utc = UTC
+panel-zona-otra = Otra (UTC±HH:MM)
+panel-zona-desfase = Desfase respecto a UTC
 
 ## Privacidad e instancia
 panel-privacidad = Privacidad e instancia
