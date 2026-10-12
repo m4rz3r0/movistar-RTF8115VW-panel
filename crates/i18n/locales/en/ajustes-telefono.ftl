@@ -16,7 +16,7 @@ ajuste-telefono-linea-silencio-recomendado = Recommended if you have fibre or a 
 ajuste-telefono-linea_oculto-titulo = Line account and direct line
 ajuste-telefono-linea_oculto-desc = The details the line uses to identify itself to the operator, and the automatic call when you pick up.
 ajuste-telefono-linea_oculto-ayuda = The operator sets these and they are never shown. If you type one wrong, the landline stops working until you undo the change. The line password is not changed from here. Only change them if the operator asks you to.
-ajuste-telefono-linea_oculto-usuario = Line username
+ajuste-telefono-linea_oculto-usuario = Line user name
 ajuste-telefono-linea_oculto-usuario-desc = The name the line uses to identify itself to the operator.
 ajuste-telefono-linea_oculto-linea_directa = Direct line
 ajuste-telefono-linea_oculto-linea_directa-desc = When you pick up, the phone calls a set number on its own: straight away or, if you do not dial anything, after a few seconds, depending on what the operator has set. If you do not know what it is for, leave it alone.
@@ -35,7 +35,7 @@ ajuste-telefono-sip-tonos-en_la_voz = Inside the voice
 ajuste-telefono-sip-tonos-en_la_voz-desc = The key beeps are mixed into the sound, as on an old phone. They can get lost if the call sounds poor.
 ajuste-telefono-sip-tonos-mensajes = As call messages
 ajuste-telefono-sip-tonos-mensajes-desc = Each key travels in a message separate from the sound. It only works if the operator supports it.
-ajuste-telefono-sip-tonos-recomendado = Recommended if you use phone menus («press 1 for…») or don't know. Pros: it is the most widespread way, and keys get through even if the call sounds poor. Cons: none significant for most people; if a menu does not recognise what you press, try another option.
+ajuste-telefono-sip-tonos-recomendado = Recommended if you use phone menus ("press 1 for…") or don't know. Pros: it is the most widespread way, and keys get through even if the call sounds poor. Cons: none significant for most people; if a menu does not recognise what you press, try another option.
 ajuste-telefono-sip-fax = Fax over the internet
 ajuste-telefono-sip-fax-desc = Sends faxes in a way designed for the internet, which copes better with small drop-outs. It only works if the operator supports it.
 

@@ -189,6 +189,10 @@ fn ajustes_minimos_presentes() {
         opciones,
         [("1", "encendida", false), ("0", "apagada", true)]
     );
+    // El relé DNS va sin recomendación hasta que la fase 3 compruebe qué
+    // cambia al encenderlo en este router.
+    let dns = c.ajuste("internet.dns").unwrap();
+    assert_eq!(dns.campo("rele").unwrap().recomendado, None);
 }
 
 /// La contraseña de la línea de voz no se edita: el router la devuelve
@@ -258,35 +262,30 @@ fn valores_del_fichero(ruta: &PathBuf) -> Vec<(String, String)> {
     valores
 }
 
-/// Nombres de parámetro del catálogo que también son palabras corrientes en
-/// español o en inglés: aparecen en los textos sin delatar la API.
-/// - `account`, `all`, `password`, `provider`, `username`: palabras
-///   inglesas de uso diario («your WiFi password», «all devices», «Line
-///   username»);
-/// - `authentication`, `encryption`, `isolation`, `standard`: términos
-///   corrientes al explicar la seguridad y la compatibilidad de la WiFi;
-/// - `beamforming`: el nombre de la técnica, que el texto explica;
-/// - `wmm`: el nombre del estándar de la WiFi («WMM»), que el texto explica.
-///
-/// La comparación no distingue mayúsculas: «SSID» delata `ssid` igual que
-/// «ssid», así que cada excepción tiene que estar justificada aquí.
-const PALABRAS_CORRIENTES: [&str; 11] = [
+/// Formas literales de palabras corrientes que coinciden con un nombre de la
+/// API y aparecen en los textos sin delatarla. Se comparan **tal cual**,
+/// distinguiendo mayúsculas: solo se perdona un hallazgo si el trozo que casó
+/// es exactamente una de estas formas (así «WMM» pasa, pero «wmm» o
+/// «UserName» se detectan).
+/// - «account», «Account», «all», «All», «password», «Password»: palabras
+///   inglesas de uso diario («your WiFi password», «all devices»);
+/// - «isolation»: término corriente al explicar el aislamiento de la WiFi;
+/// - «beamforming»: el nombre de la técnica, que el texto explica;
+/// - «WMM»: el nombre del estándar de la WiFi, en mayúsculas como se escribe.
+const FORMAS_CORRIENTES: [&str; 9] = [
     "account",
+    "Account",
     "all",
-    "authentication",
+    "All",
     "beamforming",
-    "encryption",
     "isolation",
     "password",
-    "provider",
-    "standard",
-    "username",
-    "wmm",
+    "Password",
+    "WMM",
 ];
 
 /// Nombres de la API que usa el catálogo de ajustes: parámetros (de
-/// escritura, de lectura y fijos) y elementos leídos, salvo las
-/// [`PALABRAS_CORRIENTES`].
+/// escritura, de lectura y fijos) y elementos leídos.
 fn nombres_de_la_api(c: &CatalogoAjustes) -> BTreeSet<String> {
     let mut nombres = BTreeSet::new();
     for a in c.todos() {
@@ -301,7 +300,6 @@ fn nombres_de_la_api(c: &CatalogoAjustes) -> BTreeSet<String> {
             }
         }
     }
-    nombres.retain(|n| !PALABRAS_CORRIENTES.contains(&n.to_lowercase().as_str()));
     nombres
 }
 
@@ -322,18 +320,21 @@ fn patrones_de_la_api(c: &CatalogoAjustes) -> Vec<Regex> {
     patrones
 }
 
-/// Trozos de `texto` que casan con algún patrón.
+/// Trozos de `texto` que casan con algún patrón, salvo los que son
+/// exactamente una de las [`FORMAS_CORRIENTES`].
 fn hallazgos(patrones: &[Regex], texto: &str) -> Vec<String> {
     patrones
         .iter()
-        .filter_map(|p| p.find(texto))
-        .map(|m| m.as_str().to_owned())
+        .flat_map(|p| p.find_iter(texto))
+        .map(|m| m.as_str())
+        .filter(|m| !FORMAS_CORRIENTES.contains(m))
+        .map(str::to_owned)
         .collect()
 }
 
 /// El detector reconoce páginas, funciones y parámetros (escritos en
-/// minúsculas, en mayúsculas o mezcladas) y deja pasar las palabras
-/// corrientes de [`PALABRAS_CORRIENTES`].
+/// minúsculas, en mayúsculas o mezcladas) y deja pasar solo las formas
+/// exactas de [`FORMAS_CORRIENTES`].
 #[test]
 fn detector_de_nombres_de_la_api() {
     let patrones = patrones_de_la_api(&cargar());
@@ -350,6 +351,8 @@ fn detector_de_nombres_de_la_api() {
         "cambia el SSID de la red",
         "the router Hostname",
         "ENABLECWMP",
+        "el campo UserName",
+        "pon wmm a 1",
     ] {
         assert!(
             !hallazgos(&patrones, delator).is_empty(),
@@ -358,7 +361,7 @@ fn detector_de_nombres_de_la_api() {
     }
     for llano in [
         "Change your WiFi password for all devices.",
-        "Encryption and isolation keep the network safe.",
+        "Turn on isolation and beamforming; All your Account details stay safe.",
         "Activa WMM en la red de casa, por ejemplo hora.example.",
     ] {
         assert!(
@@ -376,6 +379,57 @@ fn marcas_de_recomendacion(idioma: Idioma) -> [&'static str; 3] {
     match idioma {
         Idioma::Es => ["Recomendado si", "A favor:", "En contra:"],
         Idioma::En => ["Recommended if", "Pros:", "Cons:"],
+    }
+}
+
+/// `texto` empieza por la primera marca, trae las tres en orden y, tras
+/// cada una, algo más que espacios y signos de puntuación.
+fn recomendacion_bien_formada(texto: &str, marcas: [&str; 3]) -> bool {
+    let Some(mut resto) = texto.strip_prefix(marcas[0]) else {
+        return false;
+    };
+    let con_texto = |s: &str| s.chars().any(char::is_alphanumeric);
+    for marca in &marcas[1..] {
+        let Some((antes, despues)) = resto.split_once(marca) else {
+            return false;
+        };
+        if !con_texto(antes) {
+            return false;
+        }
+        resto = despues;
+    }
+    con_texto(resto)
+}
+
+/// El formato no se cumple con marcas vacías: tras cada una hay texto.
+#[test]
+fn formato_de_recomendacion_exige_texto_tras_cada_marca() {
+    let es = marcas_de_recomendacion(Idioma::Es);
+    let en = marcas_de_recomendacion(Idioma::En);
+    assert!(recomendacion_bien_formada(
+        "Recomendado si usas el fijo. A favor: llamas. En contra: ninguno importante.",
+        es
+    ));
+    assert!(recomendacion_bien_formada(
+        "Recommended if you use it. Pros: calls. Cons: none.",
+        en
+    ));
+    for (vacia, marcas) in [
+        ("Recomendado si. A favor: En contra:", es),
+        (
+            "Recomendado si usas el fijo. A favor: . En contra: ninguno.",
+            es,
+        ),
+        (
+            "Recomendado si usas el fijo. A favor: llamas. En contra: .",
+            es,
+        ),
+        ("Recommended if . Pros: calls. Cons: none.", en),
+    ] {
+        assert!(
+            !recomendacion_bien_formada(vacia, marcas),
+            "acepta marcas vacías: «{vacia}»"
+        );
     }
 }
 
@@ -399,14 +453,7 @@ fn recomendaciones_con_pros_y_contras() {
                     continue;
                 }
                 let texto = i18n::tr(idioma, &clave, None);
-                let marcas = marcas_de_recomendacion(idioma);
-                let posiciones: Vec<Option<usize>> = marcas.iter().map(|m| texto.find(m)).collect();
-                let en_orden = texto.starts_with(marcas[0])
-                    && posiciones.windows(2).all(|p| match (p[0], p[1]) {
-                        (Some(a), Some(b)) => a < b,
-                        _ => false,
-                    });
-                if !en_orden {
+                if !recomendacion_bien_formada(&texto, marcas_de_recomendacion(idioma)) {
                     fallos.push(format!("{idioma:?} {clave}: «{texto}»"));
                 }
             }

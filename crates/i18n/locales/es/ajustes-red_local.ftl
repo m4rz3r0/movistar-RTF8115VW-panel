@@ -47,4 +47,4 @@ ajuste-red_local-ipv6-ipv6 = IPv6 en la red local
 ajuste-red_local-ipv6-ipv6-desc = Si lo activas, el router da direcciones IPv6 a tus aparatos además de las de siempre.
 ajuste-red_local-ipv6-anuncios = Anuncios del router
 ajuste-red_local-ipv6-anuncios-desc = El router avisa a los aparatos de que hay IPv6 para que se configuren solos. Sin estos avisos, casi ninguno usará IPv6.
-ajuste-red_local-ipv6-anuncios-recomendado = Recomendado si tienes IPv6 encendido en la red de casa. A favor: los aparatos se configuran IPv6 solos; sin estos avisos, casi ninguno lo usará. En contra: ninguno importante para la mayoría; si no usas IPv6, no hacen nada.
+ajuste-red_local-ipv6-anuncios-recomendado = Recomendado si tienes IPv6 encendido en la red de casa. A favor: los aparatos se configuran IPv6 solos y encuentran por dónde salir a internet con IPv6. En contra: ninguno importante para la mayoría; si no usas IPv6, no hacen nada.

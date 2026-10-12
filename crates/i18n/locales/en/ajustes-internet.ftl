@@ -5,8 +5,7 @@ ajuste-internet-dns-titulo = DNS relay
 ajuste-internet-dns-desc = DNS turns website names into addresses. With the relay, the router forwards your devices' lookups to your connection's DNS servers.
 ajuste-internet-dns-ayuda = If you don't know why you'd change it, leave it as it is. A change here can make devices on your network stop finding websites even though the internet is still connected; if that happens, go back to the previous value.
 ajuste-internet-dns-rele = DNS relay on
-ajuste-internet-dns-rele-desc = If you turn it on, the router forwards your devices' DNS lookups to your connection's DNS servers.
-ajuste-internet-dns-rele-recomendado = Recommended if web pages load fine for you. Pros: you leave alone something that works; with the relay off, the router still looks up pages for your devices. Cons: none known, although it has not yet been checked on this router what exactly changes when it is turned on.
+ajuste-internet-dns-rele-desc = In principle, the router passes your devices' lookups to your connection's DNS servers. With the relay off it already answers them itself; what turning it on changes on this router is still to be checked.
 
 ## Fixed name for your connection (dynamic DNS)
 ajuste-internet-ddns-titulo = Fixed name for your connection (dynamic DNS)
@@ -27,6 +26,6 @@ ajuste-internet-ddns-servicio-now_dns-desc = The Now-DNS service.
 ajuste-internet-ddns-nombre = Name
 ajuste-internet-ddns-nombre-desc = The full name you registered with the service, for example myhome.example.
 ajuste-internet-ddns-cuenta = Account
-ajuste-internet-ddns-cuenta-desc = The username or email of your account with the service.
+ajuste-internet-ddns-cuenta-desc = The user name or email of your account with the service.
 ajuste-internet-ddns-contrasena = Password
 ajuste-internet-ddns-contrasena-desc = The password (or the key the service gives you) for that account.

@@ -31,7 +31,7 @@ ajuste-puertos-upnp-desc = Permite que los aparatos de tu red abran puertos por 
 ajuste-puertos-upnp-ayuda = Algunas consolas y programas de descargas entre usuarios (P2P) lo usan para jugar en línea o conectar mejor; si lo apagas, puede que avisen de una conexión restringida y tengas que abrir sus puertos a mano. A cambio, con UPnP cualquier programa de tu red, también uno malicioso, puede abrir puertos sin preguntar.
 ajuste-puertos-upnp-activo = UPnP activado
 ajuste-puertos-upnp-activo-desc = Si lo activas, los aparatos de tu red pueden abrir puertos hacia internet sin pedir permiso.
-ajuste-puertos-upnp-activo-recomendado = Recomendado si prefieres decidir tú qué puertos se abren. A favor: ningún programa de tu red, tampoco uno malicioso, puede abrir puertos sin que lo sepas. En contra: algunas consolas y programas de descargas pueden avisar de una conexión restringida y tendrás que abrir sus puertos a mano.
+ajuste-puertos-upnp-activo-recomendado = Recomendado si prefieres decidir tú qué puertos se abren. A favor: ningún programa de tu red, tampoco uno malicioso, puede abrir puertos sin que lo sepas. En contra: algunas consolas y programas de descargas pueden avisar de una conexión restringida y quizá tengas que abrir sus puertos a mano.
 
 ## Ayudantes de protocolos (ALG)
 ajuste-puertos-alg-titulo = Ayudantes de protocolos (ALG)

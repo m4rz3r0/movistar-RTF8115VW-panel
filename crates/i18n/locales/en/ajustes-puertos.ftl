@@ -31,7 +31,7 @@ ajuste-puertos-upnp-desc = Lets the devices on your network open ports by themse
 ajuste-puertos-upnp-ayuda = Some consoles and peer-to-peer (P2P) download programs use it to play online or connect better; if you turn it off, they may report a restricted connection and you may have to open their ports by hand. On the other hand, with UPnP any program on your network, including a malicious one, can open ports without asking.
 ajuste-puertos-upnp-activo = UPnP on
 ajuste-puertos-upnp-activo-desc = If you turn it on, the devices on your network can open ports to the internet without asking.
-ajuste-puertos-upnp-activo-recomendado = Recommended if you prefer to decide which ports are opened. Pros: no program on your network, not even a malicious one, can open ports without you knowing. Cons: some consoles and download programs may warn of a restricted connection, and you will have to open their ports by hand.
+ajuste-puertos-upnp-activo-recomendado = Recommended if you prefer to decide which ports are opened. Pros: no program on your network, not even a malicious one, can open ports without you knowing. Cons: some consoles and download programs may warn of a restricted connection, and you may have to open their ports by hand.
 
 ## Protocol helpers (ALG)
 ajuste-puertos-alg-titulo = Protocol helpers (ALG)
@@ -39,7 +39,7 @@ ajuste-puertos-alg-desc = Router helpers that let some older programs work throu
 ajuste-puertos-alg-ayuda = Each helper adjusts the traffic of one kind of program so it gets through the router properly. If everything works, leave them alone. Turning one off may stop that kind of program from working from your network; turning on the calls helper sometimes causes trouble with the phones or calling apps on your network.
 ajuste-puertos-alg-ftp = File transfer (FTP)
 ajuste-puertos-alg-ftp-desc = Makes file transfer programs that use FTP active mode work.
-ajuste-puertos-alg-ftp-recomendado = Recommended if you use file transfer programs or don't know. Pros: those that use active FTP mode, the oldest one, also work. Cons: little for most people, although these helpers have occasionally been used in attacks to open ports into home networks.
+ajuste-puertos-alg-ftp-recomendado = Recommended if you use file transfer programs or don't know. Pros: those that use active FTP mode, the oldest one, also work. Cons: not much for most people, although these helpers have occasionally been used in attacks to open ports into home networks.
 ajuste-puertos-alg-sip = Internet calls (SIP)
 ajuste-puertos-alg-sip-desc = Adjusts the internet calls of devices on your network. Current phones and calling apps already know how to get through the router on their own.
 ajuste-puertos-alg-sip-recomendado = Recommended if you make internet calls on your phone or computer, or don't know. Pros: it avoids calls with no sound or that drop, a common fault of this helper, and closes a path used in attacks to open ports. Cons: some old internet phones may need it to work.

@@ -47,4 +47,4 @@ ajuste-red_local-ipv6-ipv6 = IPv6 on the local network
 ajuste-red_local-ipv6-ipv6-desc = If you turn it on, the router gives your devices IPv6 addresses as well as the usual ones.
 ajuste-red_local-ipv6-anuncios = Router announcements
 ajuste-red_local-ipv6-anuncios-desc = The router tells devices that IPv6 is available so they set themselves up. Without these announcements, hardly any will use IPv6.
-ajuste-red_local-ipv6-anuncios-recomendado = Recommended if IPv6 is on in your home network. Pros: devices set up IPv6 on their own; without these announcements, hardly any will use it. Cons: none significant for most people; if you don't use IPv6, they do nothing.
+ajuste-red_local-ipv6-anuncios-recomendado = Recommended if IPv6 is on in your home network. Pros: devices set up IPv6 on their own and find their way out to the internet over IPv6. Cons: none significant for most people; if you don't use IPv6, they do nothing.
