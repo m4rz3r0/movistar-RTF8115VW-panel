@@ -17,9 +17,15 @@
 #   RP_INSTALL_NETS    redes desde las que el asistente acepta peticiones
 #                      además de las privadas (vacía)
 #
-# La subred y la IP por defecto son de documentación (RFC 5737): no chocan con
-# ninguna red real, pero cámbialas si quieres por una privada libre en tu
-# equipo, siempre las dos a la vez.
+# La subred de Compose tiene que ser NO privada: por defecto, una de
+# documentación (RFC 5737), que no choca con ninguna red real. Si la cambias,
+# usa otra que tampoco sea privada (p. ej. 203.0.113.0/24) y cambia
+# RP_IP_PROXY con ella. Con una subred privada (10/8, 172.16/12, 192.168/16),
+# la puerta de enlace de la red (por la que llega cualquier conexión directa
+# desde este equipo y, con Docker con root, también los clientes por IPv6) y
+# cualquier otro contenedor de la red contarían como «red local»: el proxy
+# los dejaría pasar y el asistente de instalación les respondería, y solo los
+# pararía el token. Ver README.md, «Quién llega al panel».
 #
 # Perfil «prueba»: añade router-sim (un router simulado, en
 # http://router-sim:8081, usuario y contraseña «sim») para probar el panel sin

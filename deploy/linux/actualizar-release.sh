@@ -6,10 +6,13 @@
 #
 #   routerpanel-actualizar              despliega la última versión publicada
 #   routerpanel-actualizar --comprobar  solo dice si hay una versión nueva
+#   routerpanel-actualizar --forzar     despliega la última publicada aunque
+#                                       no sea posterior a la desplegada
 #
 # Configuración: /etc/routerpanel/actualizar.env (root, 600; o el entorno):
 #   RP_RELEASES_URL    base de las releases, p. ej.
-#                      https://github.com/<usuario>/<repo>/releases
+#                      https://github.com/<usuario>/<repo>/releases; tiene
+#                      que ser https:// salvo que haya RP_MINISIGN_CLAVE
 #   RP_OBJETIVO        x86_64-unknown-linux-gnu o aarch64-unknown-linux-gnu
 #                      (por defecto, el de este equipo)
 #   RP_MINISIGN_CLAVE  opcional: clave pública de minisign; si está, la firma
@@ -17,8 +20,8 @@
 #
 # Pasos:
 # 1. Lee la última versión de <base>/latest/download/SHA256SUMS (la línea de
-#    routerpanel-<versión>-<objetivo>.tar.gz) y, si no es la desplegada,
-#    descarga de <base>/download/<versión>/ el archivo y su SHA256SUMS (y la
+#    routerpanel-<versión>-<objetivo>.tar.gz) y, si es posterior a la
+#    desplegada (sort -V; con --forzar, basta con que sea otra), descarga de <base>/download/<versión>/ el archivo y su SHA256SUMS (y la
 #    firma si hay clave).
 # 2. Comprueba la firma (con clave) y el sha256; si algo no cuadra, se para
 #    sin tocar nada.
@@ -115,9 +118,21 @@ dir_db()
 	dirname "${_db:-/var/lib/routerpanel/panel.db}"
 }
 
+# Descarga $1 en $2. Solo https, salvo con firma (RP_MINISIGN_CLAVE): ahí la
+# integridad la da la firma y vale también http (también en redirecciones).
 descargar()
 {
-	curl -fsSL --proto '=https,http' --max-time 600 -o "$2" "$1"
+	_proto='=https'
+	if [ -n "$RP_MINISIGN_CLAVE" ]; then _proto='=https,http'; fi
+	curl -fsSL --proto "$_proto" --proto-redir "$_proto" --max-time 600 -o "$2" "$1"
+}
+
+# ¿Es $1 posterior a $2 según sort -V? (Con $2 vacía, sí.)
+posterior()
+{
+	[ -n "$2" ] || return 0
+	[ "$1" != "$2" ] &&
+		[ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n 1)" = "$1" ]
 }
 
 # /salud responde 200 con "ok":true en $ESPERA segundos.
@@ -178,7 +193,8 @@ desempaquetar()
 	_tmp=$RELEASES/.$2.tmp
 	rm -rf "$_tmp"
 	mkdir -p "$_tmp/x" || return 1
-	if ! tar -xzf "$_arch" -C "$_tmp/x" --no-same-owner; then
+	# Como root, tar conservaría dueños y modos del archivo (setuid incluido).
+	if ! tar -xzf "$_arch" -C "$_tmp/x" --no-same-owner --no-same-permissions; then
 		error "no se puede desempaquetar $(basename "$_arch")"
 		rm -rf "$_tmp"
 		return 1
@@ -200,7 +216,10 @@ desempaquetar()
 		rm -rf "$_tmp"
 		return 1
 	fi
-	mv "$_raiz" "$_dest" && chmod 755 "$_dest/panel" && rm -rf "$_tmp"
+	# touch: podar ordena por fecha, y tar deja la del archivo (con builds
+	# reproducibles, la misma en todas las versiones).
+	mv "$_raiz" "$_dest" && chmod -R go-w,a-s "$_dest" && chmod 755 "$_dest/panel" &&
+		touch "$_dest" && rm -rf "$_tmp"
 }
 
 # Borra las versiones más antiguas; nunca la desplegada.
@@ -221,13 +240,21 @@ desplegar()
 {
 	_nueva=$1
 	_antes=$(desplegada)
-	servicio stop
+	# Sin parar el servicio, la copia de la base de datos no sería fiable.
+	if ! servicio stop; then
+		error "no se puede parar $SERVICIO; no se despliega $_nueva"
+		return 1
+	fi
 	if ! copiar_db; then
 		error "no se puede copiar la base de datos; no se despliega $_nueva"
 		servicio start
 		return 1
 	fi
-	fijar_current "$_nueva" || return 1
+	if ! fijar_current "$_nueva"; then
+		error "no se puede cambiar current a $_nueva; sigue ${_antes:-sin versión}"
+		servicio start
+		return 1
+	fi
 	servicio start
 	if sano; then
 		log "desplegada $_nueva (antes: ${_antes:-ninguna})"
@@ -256,14 +283,17 @@ desplegar()
 main()
 {
 	_comprobar=
-	case "${1:-}" in
-	--comprobar) _comprobar=1 ;;
-	"") ;;
-	*)
-		echo "uso: $0 [--comprobar]" >&2
-		exit 2
-		;;
-	esac
+	_forzar=
+	for _arg in "$@"; do
+		case $_arg in
+		--comprobar) _comprobar=1 ;;
+		--forzar) _forzar=1 ;;
+		*)
+			echo "uso: $0 [--comprobar] [--forzar]" >&2
+			exit 2
+			;;
+		esac
+	done
 	RP_OBJETIVO=${RP_OBJETIVO:-$(objetivo_por_defecto)}
 	case $RP_OBJETIVO in
 	x86_64-unknown-linux-gnu | aarch64-unknown-linux-gnu) ;;
@@ -277,6 +307,19 @@ main()
 		exit 1
 	fi
 	_base=${RP_RELEASES_URL%/}
+	case $_base in
+	https://*) ;;
+	http://*)
+		if [ -z "$RP_MINISIGN_CLAVE" ]; then
+			error "RP_RELEASES_URL tiene que ser https:// (http:// solo con RP_MINISIGN_CLAVE: sin firma, nada garantiza lo que se descarga)"
+			exit 1
+		fi
+		;;
+	*)
+		error "RP_RELEASES_URL tiene que empezar por https://"
+		exit 1
+		;;
+	esac
 	for _orden in curl sha256sum tar; do
 		command -v "$_orden" >/dev/null 2>&1 || {
 			error "falta $_orden"
@@ -305,6 +348,19 @@ main()
 	if [ "$_ver" = "$_hay" ]; then
 		log "al día: $_ver"
 		exit 0
+	fi
+	# La versión «última» no va firmada: sin esto, quien controle la descarga
+	# podría hacer volver a una versión antigua (aunque esté firmada).
+	if ! posterior "$_ver" "$_hay"; then
+		if [ -n "$_comprobar" ]; then
+			log "la última publicada ($_ver) no es posterior a la desplegada ($_hay)"
+			exit 0
+		fi
+		if [ -z "$_forzar" ]; then
+			error "la última publicada ($_ver) no es posterior a la desplegada ($_hay); no se despliega (--forzar para hacerlo igualmente)"
+			exit 1
+		fi
+		log "se despliega $_ver, anterior a $_hay, por --forzar"
 	fi
 	if [ -n "$_comprobar" ]; then
 		log "hay una versión nueva: $_ver (desplegada: ${_hay:-ninguna})"

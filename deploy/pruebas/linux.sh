@@ -4,13 +4,19 @@
 # - systemd-analyze verify de routerpanel.service (si está), con ExecStart
 #   apuntando a un ejecutable de mentira (verify exige que exista);
 # - sh -n y shellcheck (si está) de actualizar-release.sh;
-# - actualizar-release.sh contra releases servidas con python3 -m http.server
-#   en un puerto propio (RP_PRUEBA_PUERTO, por defecto 8501), con systemctl
-#   y /salud de mentira y todo bajo una carpeta temporal:
+# - actualizar-release.sh contra releases servidas por HTTPS (python3 con un
+#   certificado propio de usar y tirar, hecho con openssl) en un puerto propio
+#   (RP_PRUEBA_PUERTO, por defecto 8501), con systemctl y /salud de mentira y
+#   todo bajo una carpeta temporal:
 #   1. un SHA256SUMS alterado se rechaza y no toca «current»;
-#   2. --comprobar informa de la versión nueva y no toca nada;
-#   3. con la suma buena, despliega y cambia «current»;
-#   4. si /salud no responde, vuelve a la versión anterior y borra la nueva.
+#   2. una URL http:// sin RP_MINISIGN_CLAVE se rechaza;
+#   3. --comprobar informa de la versión nueva y no toca nada;
+#   4. con la suma buena, despliega y cambia «current»;
+#   5. si /salud no responde, vuelve a la versión anterior y borra la nueva;
+#   6. un archivo con «../» o que escribe a través de un enlace simbólico se
+#      rechaza sin escribir fuera;
+#   7. una versión anterior a la desplegada no se despliega, salvo con
+#      --forzar.
 #
 # Uso: deploy/pruebas/linux.sh (desde cualquier sitio).
 
@@ -103,6 +109,13 @@ fi
 EOF
 chmod 755 "$TMP/systemctl"
 
+# SHA256SUMS del archivo de la versión $1, que pasa a ser la última.
+sumar()
+{
+	(cd "$SRV/download/$1" && sha256sum "routerpanel-$1-$OBJ.tar.gz" >SHA256SUMS)
+	cp "$SRV/download/$1/SHA256SUMS" "$SRV/latest/download/SHA256SUMS"
+}
+
 # Publica la versión $1 (como hará la CI) y la deja como la última.
 publicar()
 {
@@ -113,19 +126,52 @@ publicar()
 	chmod 755 "$_d/panel"
 	printf 'css\n' >"$_d/site/pkg/panel.css"
 	tar -czf "$SRV/download/$_v/routerpanel-$_v-$OBJ.tar.gz" -C "$TMP/build" "routerpanel-$_v-$OBJ"
-	(cd "$SRV/download/$_v" && sha256sum "routerpanel-$_v-$OBJ.tar.gz" >SHA256SUMS)
-	cp "$SRV/download/$_v/SHA256SUMS" "$SRV/latest/download/SHA256SUMS"
+	sumar "$_v"
+}
+
+# Publica la versión $1 con un archivo malicioso (con sumas válidas): $2 es
+# «punto» (un miembro ../../../../escape-punto, que acabaría en $TMP) o
+# «enlace» (lnk -> $TMP/fuera y luego lnk/escape-enlace).
+publicar_malo()
+{
+	mkdir -p "$SRV/download/$1"
+	python3 -I - "$SRV/download/$1/routerpanel-$1-$OBJ.tar.gz" "routerpanel-$1-$OBJ" \
+		"$2" "$TMP/fuera" <<'PY'
+import io, sys, tarfile
+salida, raiz, tipo, fuera = sys.argv[1:]
+def fichero(t, nombre, datos=b"x\n", modo=0o644):
+    i = tarfile.TarInfo(nombre)
+    i.size = len(datos)
+    i.mode = modo
+    t.addfile(i, io.BytesIO(datos))
+with tarfile.open(salida, "w:gz", format=tarfile.GNU_FORMAT) as t:
+    d = tarfile.TarInfo(raiz + "/site")
+    d.type = tarfile.DIRTYPE
+    d.mode = 0o755
+    t.addfile(d)
+    fichero(t, raiz + "/panel", b"panel malo\n", 0o755)
+    if tipo == "punto":
+        fichero(t, "../../../../escape-punto")
+    else:
+        e = tarfile.TarInfo(raiz + "/lnk")
+        e.type = tarfile.SYMTYPE
+        e.linkname = fuera
+        t.addfile(e)
+        fichero(t, raiz + "/lnk/escape-enlace")
+PY
+	sumar "$1"
 }
 
 actualizar()
 {
-	RP_ACTUALIZAR_CONF=$TMP/no-existe \
-		RP_RELEASES_URL="http://127.0.0.1:$PUERTO" \
+	CURL_CA_BUNDLE=$TMP/cert.pem \
+		RP_ACTUALIZAR_CONF=$TMP/no-existe \
+		RP_RELEASES_URL=${URL:-"https://127.0.0.1:$PUERTO"} \
 		RP_OBJETIVO=$OBJ \
 		RP_PREFIJO=$PREFIJO \
 		RP_SYSTEMCTL=$TMP/systemctl \
 		RP_ENV_PANEL=$TMP/env \
-		RP_SALUD_URL=${SALUD:-"http://127.0.0.1:$PUERTO/salud"} \
+		RP_SALUD_URL=${SALUD:-"https://127.0.0.1:$PUERTO/salud"} \
 		RP_SALUD_ESPERA=4 \
 		sh "$ACTUALIZAR" "$@" >"$TMP/salida" 2>&1
 }
@@ -135,15 +181,31 @@ actual()
 	readlink "$PREFIJO/current"
 }
 
-if command -v python3 >/dev/null 2>&1; then
-	python3 -m http.server --bind 127.0.0.1 --directory "$SRV" "$PUERTO" \
-		>"$TMP/http.log" 2>&1 &
+if command -v python3 >/dev/null 2>&1 && command -v openssl >/dev/null 2>&1; then
+	mkdir -p "$TMP/fuera"
+	openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
+		-days 1 -subj /CN=127.0.0.1 -addext subjectAltName=IP:127.0.0.1 \
+		-keyout "$TMP/clave.pem" -out "$TMP/cert.pem" 2>"$TMP/openssl.log" || {
+		cat "$TMP/openssl.log" >&2
+		echo "FALLO: openssl no genera el certificado de la prueba" >&2
+		exit 1
+	}
+	python3 -I - "$SRV" "$PUERTO" "$TMP/cert.pem" "$TMP/clave.pem" >"$TMP/http.log" 2>&1 <<'PY' &
+import functools, http.server, ssl, sys
+carpeta, puerto, cert, clave = sys.argv[1:]
+manejador = functools.partial(http.server.SimpleHTTPRequestHandler, directory=carpeta)
+servidor = http.server.ThreadingHTTPServer(("127.0.0.1", int(puerto)), manejador)
+ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+ctx.load_cert_chain(cert, clave)
+servidor.socket = ctx.wrap_socket(servidor.socket, server_side=True)
+servidor.serve_forever()
+PY
 	SERVIDOR=$!
 	n=0
-	until curl -s -m 1 -o /dev/null "http://127.0.0.1:$PUERTO/salud"; do
+	until curl -s -m 1 -o /dev/null --cacert "$TMP/cert.pem" "https://127.0.0.1:$PUERTO/salud"; do
 		n=$((n + 1))
 		if [ "$n" -ge 50 ] || ! kill -0 "$SERVIDOR" 2>/dev/null; then
-			echo "FALLO: http.server no responde en 127.0.0.1:$PUERTO (¿puerto ocupado? RP_PRUEBA_PUERTO)" >&2
+			echo "FALLO: el servidor de la prueba no responde en 127.0.0.1:$PUERTO (¿puerto ocupado? RP_PRUEBA_PUERTO)" >&2
 			exit 1
 		fi
 		sleep 0.1
@@ -165,8 +227,15 @@ if command -v python3 >/dev/null 2>&1; then
 		fallo "el error de una suma alterada no habla de sha256"
 	}
 
-	# 2. --comprobar: informa y no toca nada.
+	# 2. http:// sin clave de minisign: se rechaza.
 	publicar v1.0.0
+	if URL="http://127.0.0.1:$PUERTO" actualizar; then
+		fallo "una URL http:// sin RP_MINISIGN_CLAVE no falla"
+	fi
+	grep -q 'https://' "$TMP/salida" || fallo "el error de una URL http:// no pide https://"
+	[ "$(actual)" = releases/v0.9.0 ] || fallo "una URL http:// ha cambiado current"
+
+	# 3. --comprobar: informa y no toca nada.
 	if ! actualizar --comprobar; then
 		cat "$TMP/salida" >&2
 		fallo "--comprobar falla"
@@ -175,7 +244,7 @@ if command -v python3 >/dev/null 2>&1; then
 	[ "$(actual)" = releases/v0.9.0 ] || fallo "--comprobar ha cambiado current"
 	[ ! -e "$PREFIJO/releases/v1.0.0" ] || fallo "--comprobar ha descargado la versión"
 
-	# 3. Suma buena: despliega.
+	# 4. Suma buena: despliega.
 	if ! actualizar; then
 		cat "$TMP/salida" >&2
 		fallo "no despliega una versión buena"
@@ -188,17 +257,49 @@ if command -v python3 >/dev/null 2>&1; then
 	grep -q 'start routerpanel' "$TMP/systemctl.log" 2>/dev/null || fallo "no arranca el servicio"
 	[ -f "$TMP/datos/antes-de-actualizar/panel.db" ] || fallo "no copia la base de datos antes de desplegar"
 
-	# 4. /salud no responde: vuelve a la anterior.
+	# 5. /salud no responde: vuelve a la anterior.
 	publicar v1.1.0
 	cp "$TMP/datos/panel.db" "$TMP/db-antes"
-	if SALUD="http://127.0.0.1:$PUERTO/no-existe" actualizar; then
+	if SALUD="https://127.0.0.1:$PUERTO/no-existe" actualizar; then
 		fallo "una versión que no responde en /salud no falla"
 	fi
 	[ "$(actual)" = releases/v1.0.0 ] || fallo "no vuelve a v1.0.0 ($(actual))"
 	[ ! -e "$PREFIJO/releases/v1.1.0" ] || fallo "no borra la versión fallida"
 	cmp -s "$TMP/db-antes" "$TMP/datos/panel.db" || fallo "no restaura la base de datos de antes"
+
+	# 6. Archivos maliciosos con sumas válidas: no escriben fuera.
+	for caso in punto:v2.1.0 enlace:v2.2.0; do
+		tipo=${caso%%:*}
+		v=${caso#*:}
+		publicar_malo "$v" "$tipo"
+		if actualizar; then
+			fallo "un archivo con «$tipo» no falla"
+		fi
+		[ "$(actual)" = releases/v1.0.0 ] || fallo "un archivo con «$tipo» ha cambiado current ($(actual))"
+		[ ! -e "$PREFIJO/releases/$v" ] || fallo "un archivo con «$tipo» ha dejado releases/$v"
+	done
+	if [ -n "$(find "$TMP" -name 'escape-*' -print)" ]; then
+		fallo "un archivo malicioso ha escrito fuera de su carpeta"
+	fi
+
+	# 7. Versión anterior a la desplegada: no, salvo con --forzar.
+	publicar v0.9.5
+	if actualizar; then
+		fallo "se despliega una versión anterior sin --forzar"
+	fi
+	grep -q -- '--forzar' "$TMP/salida" || fallo "el rechazo de una versión anterior no menciona --forzar"
+	[ "$(actual)" = releases/v1.0.0 ] || fallo "una versión anterior ha cambiado current ($(actual))"
+	[ ! -e "$PREFIJO/releases/v0.9.5" ] || fallo "una versión anterior se ha descargado sin --forzar"
+	if ! actualizar --comprobar || ! grep -q 'no es posterior' "$TMP/salida"; then
+		fallo "--comprobar no dice que la última no es posterior"
+	fi
+	if ! actualizar --forzar; then
+		cat "$TMP/salida" >&2
+		fallo "--forzar no despliega la versión anterior"
+	fi
+	[ "$(actual)" = releases/v0.9.5 ] || fallo "--forzar no cambia current a v0.9.5 ($(actual))"
 else
-	echo "aviso: no hay python3; no se prueba el actualizador" >&2
+	echo "aviso: no hay python3 u openssl; no se prueba el actualizador" >&2
 fi
 
 if [ "$fallos" -ne 0 ]; then

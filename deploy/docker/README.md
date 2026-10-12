@@ -66,14 +66,28 @@ Al crear el administrador, el token se borra.
    enlace de la red, por la que llega cualquier conexión directa desde este
    equipo, y cualquier otro contenedor que conectes a ella. Si una de esas
    le dijera en `X-Forwarded-For` que viene de la red local, el panel no la
-   creería: para él es la IP de la puerta de enlace, que con la subred por
-   defecto (de documentación) ni siquiera es privada.
+   creería: para él es la IP de la puerta de enlace, que no es privada.
 3. **El asistente pide red local y token.** Solo responde a clientes de la red
    local o de `RP_INSTALL_NETS`, y aun así sin el token de `/data/instalar.token`
    no crea el administrador. El token es lo que de verdad lo protege: las dos
    capas de antes solo reducen quién puede intentarlo.
 4. **Después, usuario y contraseña**, con la sesión, la reautenticación y el
    freno de intentos del panel.
+
+### La subred de Compose no puede ser privada
+
+Las capas 1 y 3 deciden qué es «red local» por la IP. Por eso la red de
+Compose usa por defecto una subred de documentación (`198.51.100.0/24`), que
+no es privada: ni la puerta de enlace de la red ni otro contenedor conectado
+a ella cuentan como red local. Si cambias `RP_RED_INTERNA`, usa otra subred
+**no privada** (p. ej. `203.0.113.0/24`, con `RP_IP_PROXY` dentro de ella).
+
+Con una subred privada, la puerta de enlace y todos los contenedores de la
+red serían «red local»: una conexión directa desde este equipo o desde otro
+contenedor llegaría al asistente, y solo la pararía el token. Con Docker con
+root e IPv6 en el equipo, además, el proxy de puertos de Docker reenvía los
+clientes que llegan por IPv6 desde la puerta de enlace de la red: con una
+subred privada, cualquiera que llegue por IPv6 pasaría la capa 1.
 
 La prueba de humo comprueba la 2 y la 3: una petición directa desde la puerta
 de enlace, diciendo venir de la red local, y otra a través del proxy sin
