@@ -1,6 +1,6 @@
-# Explorador (biblioteca de funciones del router): la interfaz. Lo que viene
+# Biblioteca de funciones del router (ruta /explorador): la interfaz. Lo que viene
 # del catálogo (áreas, descripciones, etiquetas) no se traduce.
-biblioteca-titulo = Explorador
+biblioteca-titulo = Biblioteca
 biblioteca-inicio-texto = Las lecturas se ejecutan al abrirlas, con los secretos enmascarados. Las escrituras pasan por el gestor de cambios: ves el antes y el después, el panel vigila el router tras aplicarlas y revierte si deja de responder.
 biblioteca-inicio-total = { $n } funciones del router, de la web básica, la avanzada y las que no enlaza ningún menú.
 biblioteca-buscar = Buscar función

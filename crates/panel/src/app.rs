@@ -11,6 +11,7 @@ use crate::ui::{
     layout::Layout,
     login::PaginaLogin,
     panel_ajustes::PaginaPanel,
+    recomendaciones::{InicioRecomendaciones, PaginaPreferencias, SeccionRecomendaciones},
     router::{InicioRouter, PaginaConexion, SeccionRouter},
 };
 use leptos::prelude::*;
@@ -70,7 +71,8 @@ pub fn App() -> impl IntoView {
     provide_meta_context();
     provide_idioma(idioma_inicial());
     provide_zona(zona_inicial());
-    // `<Redirect>` en el servidor: 302 con `Location` (`/router`).
+    // `<Redirect>` en el servidor: 302 con `Location` (`/router`,
+    // `/recomendaciones`).
     #[cfg(feature = "ssr")]
     leptos_router::components::provide_server_redirect(leptos_axum::redirect);
     view! {
@@ -87,6 +89,10 @@ pub fn App() -> impl IntoView {
                     <Route path=StaticSegment("") view=PaginaEstado />
                     <Route path=StaticSegment("historial") view=PaginaHistorial />
                     <Route path=StaticSegment("panel") view=PaginaPanel />
+                    <ParentRoute path=StaticSegment("recomendaciones") view=SeccionRecomendaciones>
+                        <Route path=StaticSegment("") view=InicioRecomendaciones />
+                        <Route path=StaticSegment("preferencias") view=PaginaPreferencias />
+                    </ParentRoute>
                     <ParentRoute path=StaticSegment("router") view=SeccionRouter>
                         <Route path=StaticSegment("") view=InicioRouter />
                         <Route path=StaticSegment("conexion") view=PaginaConexion />

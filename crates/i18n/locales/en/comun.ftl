@@ -6,11 +6,15 @@ comun-marca-inicio = RTF8115VW, home
 comun-marca-sub = Router panel
 comun-menu = Menu
 comun-nav-principal = Main
-comun-nav-usuario = User
 comun-nav-estado = Status
-comun-nav-explorador = Explorer
+comun-nav-ajustes = Settings
+comun-nav-recomendaciones = Recommendations
 comun-nav-historial = History
-comun-nav-router = Router
+comun-nav-biblioteca = Library
+comun-nav-router = Router settings
+# Screen readers only, after the menu's username (which opens “Panel
+# settings”).
+comun-usuario-ajustes = Panel settings
 comun-salir = Sign out
 comun-idioma = Language
 # Each language, in its own name (the same in every file).

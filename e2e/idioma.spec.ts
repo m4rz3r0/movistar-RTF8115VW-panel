@@ -11,14 +11,14 @@ async function enIngles(page: Page) {
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   const nav = page.getByRole("navigation", { name: "Main", exact: true });
   await expect(nav.getByRole("link", { name: "Status" })).toBeVisible();
-  await expect(nav.getByRole("link", { name: "Explorer" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Library" })).toBeVisible();
   await expect(nav.getByRole("link", { name: "History" })).toBeVisible();
 }
 
 const paginas = [
   { ruta: "/", titulo: "Status" },
   { ruta: "/historial", titulo: "History" },
-  { ruta: "/explorador", titulo: "Explorer" },
+  { ruta: "/explorador", titulo: "Library" },
 ];
 
 test.describe("idioma", () => {
@@ -42,7 +42,7 @@ test.describe("idioma", () => {
     }
     await page.reload();
     await enIngles(page);
-    await expect(page.locator("main h1").first()).toHaveText("Explorer");
+    await expect(page.locator("main h1").first()).toHaveText("Library");
     expect(errores, "errores o avisos en la consola").toEqual([]);
   });
 

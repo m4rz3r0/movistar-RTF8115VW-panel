@@ -1,7 +1,9 @@
-//! Server functions de «Ajustes del panel» (`/panel`: parámetros de la
-//! instancia y usuarios del panel) y de «Router → Conexión con el router»
-//! (`/router/conexion`: credenciales del router, confirmación del firmware y
-//! red detectada, con la conexión a internet elegida a mano).
+//! Server functions de «Ajustes del panel» (`/panel`: idioma, zona horaria y
+//! usuarios del panel), de «Configuración del router → Conexión con el
+//! router» (`/router/conexion`: credenciales del router, confirmación del
+//! firmware y red detectada, con la conexión a internet elegida a mano) y el
+//! guardado de los parámetros de la instancia, que también usa «Tus
+//! preferencias» ([`crate::preferencias`]).
 //!
 //! Todas exigen sesión. Las delicadas (cambiar las credenciales del router,
 //! confirmar el firmware, elegir la conexión a internet, volver a detectar la
@@ -34,13 +36,6 @@ pub struct RouterPanel {
     pub usuario: String,
 }
 
-/// Equipo que conoce el router, para elegir los de confianza.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct EquipoLan {
-    pub mac: String,
-    pub nombre: String,
-}
-
 /// Idioma por defecto de la instancia: el de quien no ha elegido uno con el
 /// selector del menú. Sin fijar, cada navegador pide el suyo
 /// (`Accept-Language`).
@@ -61,8 +56,8 @@ impl IdiomaPorDefecto {
     }
 }
 
-/// Todo lo que muestran «Ajustes del panel» y «Router → Conexión con el
-/// router». Nunca lleva la contraseña del router.
+/// Todo lo que muestran «Ajustes del panel» y «Configuración del router →
+/// Conexión con el router». Nunca lleva la contraseña del router.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AjustesPanel {
     pub router: RouterPanel,
@@ -71,13 +66,7 @@ pub struct AjustesPanel {
     pub firmware: Option<String>,
     pub idioma: IdiomaPorDefecto,
     pub zona_horaria: String,
-    pub dns_preferidos: Vec<String>,
-    pub dispositivos_confianza: Vec<String>,
-    pub mantenimiento: Option<String>,
-    pub servidor_propio: Option<String>,
     pub usuarios: Vec<String>,
-    /// Equipos de la última lectura del router.
-    pub equipos: Vec<EquipoLan>,
     /// Usuario de la sesión.
     pub yo: String,
     /// Red del router detectada.
@@ -92,7 +81,8 @@ pub struct AjustesPanel {
 }
 
 /// Parámetros de la instancia que se guardan: solo los presentes (`Some`);
-/// cada sección de la página manda los suyos. En `mantenimiento` y
+/// cada página manda los suyos («Ajustes del panel», idioma y zona; «Tus
+/// preferencias», el resto). En `mantenimiento` y
 /// `servidor_propio`, vacío quita el valor.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CamposInstancia {
@@ -352,7 +342,7 @@ pub async fn reautenticar(contrasena: String) -> Result<(), ServerFnError> {
 }
 
 #[cfg(feature = "ssr")]
-mod servidor {
+pub(crate) mod servidor {
     use super::*;
     use crate::{
         auth::{self, UserError},
@@ -374,8 +364,9 @@ mod servidor {
         use_context::<AppState>().ok_or_else(|| interno("falta el estado del panel"))
     }
 
-    /// Estado del panel y usuario de la sesión (401 sin ella).
-    pub(super) async fn preparar() -> Result<(AppState, auth::User), ServerFnError> {
+    /// Estado del panel y usuario de la sesión (401 sin ella). La respuesta
+    /// va con `no-store`.
+    pub(crate) async fn preparar() -> Result<(AppState, auth::User), ServerFnError> {
         let state = estado()?;
         Ok((state, auth::require_user().await?))
     }
@@ -386,14 +377,16 @@ mod servidor {
         Ok((state, auth::require_reauth().await?))
     }
 
-    fn texto(db: Option<Value>) -> Option<String> {
+    /// Texto guardado no vacío.
+    pub(crate) fn texto(db: Option<Value>) -> Option<String> {
         match db {
             Some(Value::String(s)) if !s.is_empty() => Some(s),
             _ => None,
         }
     }
 
-    fn lista(db: Option<Value>) -> Vec<String> {
+    /// Lista de textos guardada (vacía si no hay).
+    pub(crate) fn lista(db: Option<Value>) -> Vec<String> {
         db.and_then(|v| serde_json::from_value(v).ok())
             .unwrap_or_default()
     }
@@ -419,17 +412,6 @@ mod servidor {
             .as_ref()
             .map(|s| s.summary.firmware.clone())
             .filter(|f| !f.is_empty());
-        let mut equipos: Vec<EquipoLan> = Vec::new();
-        for h in foto.iter().flat_map(|s| &s.hosts) {
-            if let Some(mac) = normalizar_mac(&h.mac)
-                && !equipos.iter().any(|e| e.mac == mac)
-            {
-                equipos.push(EquipoLan {
-                    mac,
-                    nombre: h.hostname.clone(),
-                });
-            }
-        }
         // Las conexiones de la última lectura del sondeo. Sin ninguna aún, las
         // que se conocen aquí (la detectada y la elegida a mano): nunca se
         // pregunta al router desde la página (con el router caído la
@@ -460,14 +442,7 @@ mod servidor {
                 .and_then(|z| Zona::desde_texto(&z))
                 .unwrap_or_default()
                 .codigo(),
-            dns_preferidos: lista(instancia::leer(db, claves::DNS_PREFERIDOS).await),
-            dispositivos_confianza: lista(
-                instancia::leer(db, claves::DISPOSITIVOS_CONFIANZA).await,
-            ),
-            mantenimiento: texto(instancia::leer(db, claves::MANTENIMIENTO).await),
-            servidor_propio: texto(instancia::leer(db, claves::SERVIDOR_PROPIO).await),
             usuarios,
-            equipos,
             yo,
             red: state.red().as_ref().map(ResumenRed::from),
             wan_manual: state.wan_manual(),

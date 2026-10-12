@@ -10,7 +10,7 @@ import { asentar, entrar, recogerErrores } from "./util";
 const paginas = [
   { ruta: "/", titulo: "Estado" },
   { ruta: "/historial", titulo: "Historial" },
-  { ruta: "/explorador", titulo: "Explorador" },
+  { ruta: "/explorador", titulo: "Biblioteca" },
   { ruta: "/panel", titulo: "Ajustes del panel" },
   { ruta: "/router/conexion", titulo: "Conexión con el router" },
 ];

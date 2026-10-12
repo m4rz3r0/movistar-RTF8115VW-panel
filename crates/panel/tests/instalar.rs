@@ -319,7 +319,8 @@ async fn firmware_no_probado_queda_en_solo_lectura() {
     assert_eq!(status, 403, "{body}");
     assert!(body.contains("solo lectura"), "{body}");
 
-    // Confirmado el firmware (lo hará «Router → Conexión con el router»), se escribe.
+    // Confirmado el firmware (lo hará «Configuración del router → Conexión
+    // con el router»), se escribe.
     instancia::escribir(&p.state.db, claves::SOLO_LECTURA, &json!(false))
         .await
         .unwrap();

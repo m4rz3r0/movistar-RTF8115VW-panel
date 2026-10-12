@@ -1,5 +1,7 @@
-//! Pruebas de «Ajustes del panel» (`/panel`): credenciales del router,
-//! parámetros de la instancia, usuarios y ventana de reautenticación.
+//! Pruebas de «Ajustes del panel» (`/panel`), «Configuración del router»
+//! (`/router/conexion`) y «Tus preferencias» (`/recomendaciones/preferencias`):
+//! credenciales del router, parámetros de la instancia, usuarios y ventana de
+//! reautenticación.
 
 mod common;
 
@@ -341,7 +343,7 @@ async fn instancia_valida_dns_y_macs() {
     c["servidor_propio"] = json!("servidor.home.arpa");
     c["idioma"] = json!({ "Fijo": "En" });
     ok(&p, "guardar_instancia", json!({ "campos": c }), &cookie).await;
-    let v = ok(&p, "leer_panel", json!({}), &cookie).await;
+    let v = ok(&p, "leer_preferencias", json!({}), &cookie).await;
     assert_eq!(
         v["dns_preferidos"],
         json!(["9.9.9.9", "2620:fe::fe", "194.242.2.2"])
@@ -356,8 +358,9 @@ async fn instancia_valida_dns_y_macs() {
     );
     assert_eq!(v["mantenimiento"], "03:00-05:30");
     assert_eq!(v["servidor_propio"], "servidor.home.arpa");
-    assert_eq!(v["zona_horaria"], "UTC+01:00");
-    assert_eq!(v["idioma"], json!({ "Fijo": "En" }));
+    let panel = ok(&p, "leer_panel", json!({}), &cookie).await;
+    assert_eq!(panel["zona_horaria"], "UTC+01:00");
+    assert_eq!(panel["idioma"], json!({ "Fijo": "En" }));
 
     let malos: Vec<(&str, Value)> = vec![
         ("dns_preferidos", json!(["9.9.9.9x"])),
@@ -395,8 +398,8 @@ async fn instancia_valida_dns_y_macs() {
         assert_eq!(status, 400, "{campo} = {valor}: {body}");
     }
     // Nada de lo malo se ha guardado.
-    let v2 = ok(&p, "leer_panel", json!({}), &cookie).await;
-    assert_eq!(v, v2);
+    assert_eq!(v, ok(&p, "leer_preferencias", json!({}), &cookie).await);
+    assert_eq!(panel, ok(&p, "leer_panel", json!({}), &cookie).await);
     assert_eq!(
         instancia::leer(&p.state.db, claves::MANTENIMIENTO).await,
         Some(json!("03:00-05:30"))
@@ -406,7 +409,7 @@ async fn instancia_valida_dns_y_macs() {
     c["mantenimiento"] = json!("");
     c["servidor_propio"] = json!("  ");
     ok(&p, "guardar_instancia", json!({ "campos": c }), &cookie).await;
-    let v = ok(&p, "leer_panel", json!({}), &cookie).await;
+    let v = ok(&p, "leer_preferencias", json!({}), &cookie).await;
     assert_eq!(v["mantenimiento"], Value::Null);
     assert_eq!(v["servidor_propio"], Value::Null);
 }
@@ -425,7 +428,7 @@ async fn leer_panel_no_devuelve_contrasena() {
     assert_eq!(v["router"]["usuario"], USER);
     assert_eq!(v["usuarios"], json!([PANEL_USER]));
     assert_eq!(v["solo_lectura"], false);
-    assert_eq!(v["dns_preferidos"], json!([]));
+    assert_eq!(v.get("dns_preferidos"), None, "es de «Tus preferencias»");
     // Sin zona guardada, la peninsular.
     assert_eq!(v["zona_horaria"], "Europe/Madrid");
     // La página tampoco la lleva.
@@ -581,7 +584,7 @@ async fn cada_seccion_guarda_solo_lo_suyo() {
         &cookie,
     )
     .await;
-    // «Privacidad e instancia» no manda la zona ni el idioma.
+    // «Tus preferencias» no manda la zona ni el idioma.
     ok(
         &p,
         "guardar_instancia",
@@ -592,8 +595,9 @@ async fn cada_seccion_guarda_solo_lo_suyo() {
     .await;
     let v = ok(&p, "leer_panel", json!({}), &cookie).await;
     assert_eq!(v["zona_horaria"], "UTC+01:00");
-    assert_eq!(v["dns_preferidos"], json!(["9.9.9.9"]));
-    // «Panel» no manda los DNS.
+    let pref = ok(&p, "leer_preferencias", json!({}), &cookie).await;
+    assert_eq!(pref["dns_preferidos"], json!(["9.9.9.9"]));
+    // «Ajustes del panel» no manda los DNS.
     ok(
         &p,
         "guardar_instancia",
@@ -604,11 +608,53 @@ async fn cada_seccion_guarda_solo_lo_suyo() {
     let v = ok(&p, "leer_panel", json!({}), &cookie).await;
     assert_eq!(v["zona_horaria"], "UTC-03:00");
     assert_eq!(v["idioma"], json!({ "Fijo": "En" }));
-    assert_eq!(v["dns_preferidos"], json!(["9.9.9.9"]));
+    let pref = ok(&p, "leer_preferencias", json!({}), &cookie).await;
+    assert_eq!(pref["dns_preferidos"], json!(["9.9.9.9"]));
 }
 
-/// La conexión con el router vive en «Router → Conexión con el router»
-/// (`/router/conexion`), no en «Ajustes del panel»; `/router` lleva allí.
+#[tokio::test]
+async fn leer_preferencias_exige_sesion() {
+    let p = panel().await;
+    let (status, _) = llamar(&p, "leer_preferencias", json!({}), None).await;
+    assert_eq!(status, 401);
+    let cookie = sesion(&p).await;
+    let resp = send(&p.app, {
+        let mut req = post_json("/api/leer_preferencias", "{}", "127.0.0.1");
+        req.headers_mut().insert("cookie", cookie.parse().unwrap());
+        req
+    })
+    .await;
+    assert_eq!(resp.status(), 200);
+    assert_eq!(resp.headers()["cache-control"], "no-store");
+    let v: Value = serde_json::from_str(&body_text(resp).await).unwrap();
+    assert_eq!(v["dns_preferidos"], json!([]));
+    assert_eq!(v["dispositivos_confianza"], json!([]));
+    assert_eq!(v["mantenimiento"], Value::Null);
+    assert_eq!(v["servidor_propio"], Value::Null);
+}
+
+/// Los parámetros que usan prestablecidos y recomendaciones están en
+/// «Recomendaciones → Tus preferencias», no en «Ajustes del panel».
+#[tokio::test]
+async fn preferencias_fuera_de_ajustes_del_panel() {
+    let p = panel().await;
+    let cookie = sesion(&p).await;
+    let html = body_text(get_con_cookie(&p.app, "/panel", &cookie).await).await;
+    assert!(html.contains(r#"id="panel-idioma""#), "{html}");
+    assert!(!html.contains(r#"id="panel-dns""#), "{html}");
+    let resp = get_con_cookie(&p.app, "/recomendaciones/preferencias", &cookie).await;
+    assert_eq!(resp.status(), 200);
+    let html = body_text(resp).await;
+    assert!(html.contains("Tus preferencias"), "{html}");
+    assert!(html.contains(r#"id="pref-dns""#), "{html}");
+    assert!(html.contains(r#"id="pref-confianza""#), "{html}");
+    assert!(html.contains(r#"id="pref-mantenimiento""#), "{html}");
+    assert!(html.contains(r#"id="pref-servidor""#), "{html}");
+}
+
+/// La conexión con el router vive en «Configuración del router → Conexión
+/// con el router» (`/router/conexion`), no en «Ajustes del panel»; `/router`
+/// lleva allí.
 #[tokio::test]
 async fn conexion_con_el_router_en_su_seccion() {
     let p = panel().await;
@@ -779,6 +825,12 @@ async fn leer_panel_sin_sondeo_no_pregunta_al_router() {
     .await
     .expect("leer_panel no espera al router");
     assert!(antes.elapsed() < Duration::from_secs(2));
+    tokio::time::timeout(
+        Duration::from_secs(2),
+        ok(&p, "leer_preferencias", json!({}), &cookie),
+    )
+    .await
+    .expect("leer_preferencias no espera al router");
     assert_eq!(v["conexiones"], json!(["ip2", "ip4"]), "{v}");
     assert_eq!(v["wan_manual"], "ip4", "{v}");
 

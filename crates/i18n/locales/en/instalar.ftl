@@ -28,7 +28,7 @@ instalar-probar = Test
 instalar-guardar = Save and continue
 instalar-detectado = { $modelo } with firmware { $firmware }
 instalar-firmware-probado = Firmware tested with the panel
-instalar-firmware-no-probado = Untested firmware: the panel stays read-only until you confirm it in Router → Router connection
+instalar-firmware-no-probado = Untested firmware: the panel stays read-only until you confirm it in Router settings → Router connection
 
 ## Initial read
 instalar-lectura-texto = The panel now reads the router's whole configuration and stores it encrypted as the starting snapshot, so you can compare against it and go back to it later. It may take a minute.
@@ -46,9 +46,9 @@ instalar-fallidas = { $n ->
 ## Done
 instalar-fin-texto = The panel is set up.
 instalar-red = Router network detected:
-instalar-red-sin-detectar = The router network could not be detected: you can try again in Router → Router connection.
-instalar-fin-opcional = You can adjust the optional instance parameters now or later in Panel settings.
-instalar-ir-ajustes = Panel settings
+instalar-red-sin-detectar = The router network could not be detected: you can try again in Router settings → Router connection.
+instalar-fin-opcional = You can adjust the optional instance parameters (preferred DNS, trusted devices, maintenance window and own server) now or later in Recommendations → Your preferences.
+instalar-ir-preferencias = Your preferences
 instalar-ir-estado = Go to Status
 
 ## Errors

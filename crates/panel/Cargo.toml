@@ -126,6 +126,10 @@ name = "panel_ajustes"
 required-features = ["ssr"]
 
 [[test]]
+name = "menu"
+required-features = ["ssr"]
+
+[[test]]
 name = "grupos"
 required-features = ["ssr"]
 

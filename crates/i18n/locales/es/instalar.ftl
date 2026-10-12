@@ -28,7 +28,7 @@ instalar-probar = Probar
 instalar-guardar = Guardar y seguir
 instalar-detectado = { $modelo } con el firmware { $firmware }
 instalar-firmware-probado = Firmware probado con el panel
-instalar-firmware-no-probado = Firmware sin probar: el panel quedará en solo lectura hasta que lo confirmes en Router → Conexión con el router
+instalar-firmware-no-probado = Firmware sin probar: el panel quedará en solo lectura hasta que lo confirmes en Configuración del router → Conexión con el router
 
 ## Lectura inicial
 instalar-lectura-texto = El panel lee ahora toda la configuración del router y la guarda cifrada como foto de partida, para poder compararla y volver a ella más adelante. Puede tardar un minuto.
@@ -46,9 +46,9 @@ instalar-fallidas = { $n ->
 ## Fin
 instalar-fin-texto = El panel ya está configurado.
 instalar-red = Red del router detectada:
-instalar-red-sin-detectar = No se pudo detectar la red del router: puedes volver a intentarlo en Router → Conexión con el router.
-instalar-fin-opcional = Puedes ajustar ahora los parámetros opcionales de la instancia o hacerlo más tarde desde Ajustes del panel.
-instalar-ir-ajustes = Ajustes del panel
+instalar-red-sin-detectar = No se pudo detectar la red del router: puedes volver a intentarlo en Configuración del router → Conexión con el router.
+instalar-fin-opcional = Puedes ajustar ahora los parámetros opcionales de la instancia (DNS preferidos, dispositivos de confianza, horario de mantenimiento y servidor propio) o hacerlo más tarde en Recomendaciones → Tus preferencias.
+instalar-ir-preferencias = Tus preferencias
 instalar-ir-estado = Ir al estado
 
 ## Errores

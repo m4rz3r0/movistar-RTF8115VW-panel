@@ -400,7 +400,9 @@ fn PasoFin(resumen: RwSignal<Option<ResumenFoto>>) -> impl IntoView {
         </div>
         <p class="pagina-sub">{t!("instalar-fin-opcional")}</p>
         <div class="instalar-botones">
-            <a class="boton-sutil" href="/panel">{t!("instalar-ir-ajustes")}</a>
+            <a class="boton-sutil" href=crate::ui::recomendaciones::RUTA_PREFERENCIAS>
+                {t!("instalar-ir-preferencias")}
+            </a>
             <a class="boton" href="/" rel="external">{t!("instalar-ir-estado")}</a>
         </div>
     }

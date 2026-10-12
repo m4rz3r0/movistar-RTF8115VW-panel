@@ -14,6 +14,7 @@ const paginas = [
   { nombre: "historial", ruta: "/historial", listo: "main h1" },
   { nombre: "ajustes-del-panel", ruta: "/panel", listo: "#panel-idioma" },
   { nombre: "router-conexion", ruta: "/router/conexion", listo: "#panel-router-url" },
+  { nombre: "tus-preferencias", ruta: "/recomendaciones/preferencias", listo: "#pref-dns" },
 ];
 
 const anchos = [
