@@ -880,12 +880,22 @@ fn lecturas_hermanas(name: &str) -> &'static [&'static str] {
 }
 
 /// Aplica sobre la respuesta lo escrito en sus instancias: solo cambia hijos
-/// que ya existen.
+/// que ya existen. Una edición con instancia busca esos nodos a cualquier
+/// profundidad.
 fn aplicar_ediciones(st: &SimState, name: &str, node: &mut XmlNode) {
     let hermanas = lecturas_hermanas(name);
     for e in &st.ediciones {
         if e.lectura == name || hermanas.contains(&e.lectura.as_str()) {
-            for_each_node(node, &mut |n| aplicar_campos(n, &e.ident, &e.campos));
+            if e.ident.is_empty() {
+                // Sin instancia: solo la respuesta y sus hijos directos
+                // (el contenedor de los campos), no nodos más profundos.
+                aplicar_campos(node, &[], &e.campos);
+                for c in &mut node.children {
+                    aplicar_campos(c, &[], &e.campos);
+                }
+            } else {
+                for_each_node(node, &mut |n| aplicar_campos(n, &e.ident, &e.campos));
+            }
         }
     }
 }
@@ -912,34 +922,55 @@ fn es_lectura_de_lista(s: &Inner, name: &str) -> bool {
 
 /// Lectura servida desde la lista materializada de `name`, si la hay y la
 /// lectura pide todas (`all=ALL`, o sin parámetros) o filtra por un campo de
-/// la instancia (id, índice…); `None` si no aplica.
+/// la instancia; `None` si no aplica.
+///
+/// Un parámetro `X_0i=v` elige la instancia cuyo `X_id` vale `v` (así lo usan
+/// las lecturas pareadas: `X_0i={X_id}`). Una lectura por `*_id` devuelve
+/// `*_0i = -1`, como el router real; con `all=ALL` o por `*_0i`, el de la
+/// instancia.
 fn read_lista(
     lista: &ListaViva,
     name: &str,
     params: &[(String, String)],
 ) -> Option<Result<XmlNode, String>> {
-    let filtros: Vec<&(String, String)> = params
+    // (hijo que se compara, valor, el parámetro era un índice)
+    let mut filtros: Vec<(String, &str, bool)> = Vec::new();
+    for (k, v) in params
         .iter()
         .filter(|(k, _)| k != "all" && k != "sessionKey")
-        .filter(|(k, _)| lista.plantilla.get(k).is_some())
-        .collect();
+    {
+        let por_id = k
+            .strip_suffix("_0i")
+            .map(|b| format!("{b}_id"))
+            .filter(|id| lista.plantilla.get(id).is_some());
+        if let Some(id) = por_id {
+            filtros.push((id, v, true));
+        } else if lista.plantilla.get(k).is_some() {
+            filtros.push((k.clone(), v, false));
+        }
+    }
     let todas = param(params, "all") == Some("ALL");
     let sin_parametros = params.iter().all(|(k, _)| k == "sessionKey");
     if !(todas || sin_parametros || !filtros.is_empty()) {
         return None;
     }
-    let nodos: Vec<XmlNode> = lista
+    let mut nodos: Vec<XmlNode> = lista
         .nodos
         .iter()
-        .filter(|n| {
-            filtros
-                .iter()
-                .all(|(k, v)| n.text_of(k) == Some(v.as_str()))
-        })
+        .filter(|n| filtros.iter().all(|(k, v, _)| n.text_of(k) == Some(*v)))
         .cloned()
         .collect();
     if !filtros.is_empty() && nodos.is_empty() {
         return Some(Err("no existe".to_owned()));
+    }
+    if !todas {
+        for (hijo, _, indice) in &filtros {
+            if let (false, Some(base)) = (indice, hijo.strip_suffix("_id")) {
+                for n in &mut nodos {
+                    set_child(n, &format!("{base}_0i"), "-1");
+                }
+            }
+        }
     }
     Some(Ok(result_node(name, nodos, "0", "")))
 }
@@ -1100,6 +1131,10 @@ fn escritura_generica(
     };
     let lectura = pareada.funcion.as_str();
     if let Some(lista) = &f.lista {
+        if name == "cbDhcpV4SvrPoolSetStatic" {
+            let p = validar_reserva(s, st, lectura, p)?;
+            return escribir_lista(s, st, lectura, lista, &p);
+        }
         return escribir_lista(s, st, lectura, lista, p);
     }
     // La instancia: los `{x}` de la lectura pareada, con el valor escrito.
@@ -1124,6 +1159,44 @@ fn escritura_generica(
         }),
     }
     Ok(())
+}
+
+/// Reglas de una reserva DHCP que el router aplica y el catálogo no recoge:
+/// un solo pool (el 0), id obligatorio (`-1` crea; otro que no existe, no),
+/// MAC e IP al crear. Devuelve los parámetros con `adm_state` activado si se
+/// crea sin él.
+fn validar_reserva(
+    s: &Inner,
+    st: &mut SimState,
+    lectura: &str,
+    p: &[(String, String)],
+) -> Result<Params, String> {
+    if param(p, "rtm_cfg_dhcpv4_svr_pool_id") != Some("0") {
+        return Err("pool desconocido".to_owned());
+    }
+    let id = param(p, "rtm_dhcpv4_svr_pool_static_id").ok_or("falta el id")?;
+    let mut p = p.to_vec();
+    if param(&p, "del") == Some("DEL") {
+        return Ok(p);
+    }
+    if id == "-1" {
+        for campo in ["mac_addr", "ipv4_addr"] {
+            param(&p, campo).ok_or_else(|| format!("falta {campo}"))?;
+        }
+        if param(&p, "adm_state").is_none() {
+            p.push(("adm_state".to_owned(), "1".to_owned()));
+        }
+    } else {
+        materializar_lista(s, st, lectura)?;
+        let existe = st.listas[lectura]
+            .nodos
+            .iter()
+            .any(|n| n.text_of("rtm_dhcpv4_svr_pool_static_id") == Some(id));
+        if !existe {
+            return Err("no existe".to_owned());
+        }
+    }
+    Ok(p)
 }
 
 /// Parámetros que llevan valor a la instancia (todos menos los de control y
@@ -1153,6 +1226,9 @@ fn escribir_lista(
             .position(|n| n.text_of(id_param) == Some(id))
     });
     if param(p, "del") == Some("DEL") {
+        if !lista.del {
+            return Err("esta lista no admite borrar".to_owned());
+        }
         viva.nodos.remove(pos.ok_or("no existe")?);
     } else {
         let campos = campos_escritos(p, &[id_param, "del"]);
@@ -1167,22 +1243,22 @@ fn escribir_lista(
                     .map_or(0, |m| m + 1);
                 let mut nuevo = viva.plantilla.clone();
                 aplicar_campos(&mut nuevo, &[], &campos);
-                set_child(&mut nuevo, id_param, &id.to_string());
+                let con_id = |mut n: XmlNode, id: u64| {
+                    set_child(&mut n, id_param, &id.to_string());
+                    // El índice de una instancia nueva es su id; el de las
+                    // existentes no se toca (aunque se borren otras).
+                    if let Some(base) = id_param.strip_suffix("_id") {
+                        set_child(&mut n, &format!("{base}_0i"), &id.to_string());
+                    }
+                    n
+                };
                 if create_twice {
-                    let mut otro = nuevo.clone();
-                    set_child(&mut otro, id_param, &(id + 1).to_string());
-                    viva.nodos.push(nuevo);
-                    viva.nodos.push(otro);
+                    viva.nodos.push(con_id(nuevo.clone(), id));
+                    viva.nodos.push(con_id(nuevo, id + 1));
                 } else {
-                    viva.nodos.push(nuevo);
+                    viva.nodos.push(con_id(nuevo, id));
                 }
             }
-        }
-    }
-    // El índice de cada instancia (`*_0i`) es su posición.
-    if let Some(indice) = id_param.strip_suffix("_id").map(|b| format!("{b}_0i")) {
-        for (i, n) in viva.nodos.iter_mut().enumerate() {
-            set_child(n, &indice, &i.to_string());
         }
     }
     if pos.is_none() && param(p, "del") != Some("DEL") {
@@ -1242,5 +1318,59 @@ mod tests {
                 ("p".to_owned(), "%zz".to_owned())
             ]
         );
+    }
+
+    fn inner_de_prueba() -> Inner {
+        let lista = "<?xml version=\"1.0\" ?><Response><cbGetX><x><x_0i>0</x_0i><x_id>0</x_id>\
+                     <v>a</v></x><Result>0</Result></cbGetX></Response>";
+        Inner {
+            user: "u".into(),
+            password: Mutex::new("p".into()),
+            fixtures: HashMap::from([(
+                fixture_key("cbGetX", &[("all".into(), "ALL".into())]),
+                lista.to_owned(),
+            )]),
+            catalogo: Catalogo::load().unwrap(),
+            wan: None,
+            unresponsive: AtomicBool::new(false),
+            state: Mutex::new(SimState::default()),
+        }
+    }
+
+    fn p(kv: &[(&str, &str)]) -> Params {
+        kv.iter().map(|(k, v)| ((*k).into(), (*v).into())).collect()
+    }
+
+    #[test]
+    fn lista_sin_del_rechaza_borrar() {
+        let s = inner_de_prueba();
+        let mut st = SimState::default();
+        let sin_del = Lista {
+            id_param: "x_id".into(),
+            all: false,
+            del: false,
+        };
+        let r = escribir_lista(
+            &s,
+            &mut st,
+            "cbGetX",
+            &sin_del,
+            &p(&[("x_id", "0"), ("del", "DEL")]),
+        );
+        assert!(r.is_err(), "{r:?}");
+        assert_eq!(st.listas["cbGetX"].nodos.len(), 1, "no se borra nada");
+        let con_del = Lista {
+            del: true,
+            ..sin_del
+        };
+        escribir_lista(
+            &s,
+            &mut st,
+            "cbGetX",
+            &con_del,
+            &p(&[("x_id", "0"), ("del", "DEL")]),
+        )
+        .unwrap();
+        assert!(st.listas["cbGetX"].nodos.is_empty());
     }
 }
