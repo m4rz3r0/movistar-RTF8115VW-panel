@@ -6,8 +6,6 @@ panel-titulo = Panel settings
 panel-sub = Language, time zone and panel users. They are stored in the panel's database.
 panel-sub-router = The connection to the router is under
 panel-sub-router-enlace = Router settings
-panel-sub-preferencias = and the parameters that presets and recommendations use, under
-panel-sub-preferencias-enlace = Recommendations → Your preferences
 panel-guardar = Save
 panel-guardado = Saved.
 

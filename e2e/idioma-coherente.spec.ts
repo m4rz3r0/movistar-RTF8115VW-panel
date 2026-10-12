@@ -103,7 +103,6 @@ const rutas = [
   "/explorador/lan_dhcp",
   "/panel",
   "/router/conexion",
-  "/recomendaciones/preferencias",
 ];
 
 const combinaciones = [
@@ -131,12 +130,18 @@ test.describe("idioma coherente", () => {
       }
 
       // Tras hablar con el servidor: error de validación…
-      await page.goto("/recomendaciones/preferencias");
+      // (una zona horaria que el servidor no acepta: el selector no la ofrece).
+      await page.goto("/panel");
       await asentar(page);
-      await page.locator("#pref-dns").fill("no-es-una-ip");
-      await page.locator("section[aria-labelledby=pref-preferencias] button[type=submit]").click();
-      await expect(page.locator("section[aria-labelledby=pref-preferencias] .error-formulario")).not.toBeEmpty();
-      await sinIngles(page, "/recomendaciones/preferencias con error");
+      await page.locator("#panel-zona").evaluate((el) => {
+        const o = document.createElement("option");
+        o.value = "no-es-una-zona";
+        el.appendChild(o);
+      });
+      await page.locator("#panel-zona").selectOption("no-es-una-zona");
+      await page.locator("section[aria-labelledby=panel-panel] button[type=submit]").click();
+      await expect(page.locator("section[aria-labelledby=panel-panel] .error-formulario")).not.toBeEmpty();
+      await sinIngles(page, "/panel con error");
 
       // …y diálogo de reautenticación con contraseña mala.
       await page.goto("/router/conexion");

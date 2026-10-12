@@ -6,8 +6,6 @@ panel-titulo = Ajustes del panel
 panel-sub = Idioma, zona horaria y usuarios del panel. Se guardan en la base de datos del panel.
 panel-sub-router = La conexión con el router está en
 panel-sub-router-enlace = Configuración del router
-panel-sub-preferencias = y los parámetros que usan los prestablecidos y las recomendaciones, en
-panel-sub-preferencias-enlace = Recomendaciones → Tus preferencias
 panel-guardar = Guardar
 panel-guardado = Guardado.
 

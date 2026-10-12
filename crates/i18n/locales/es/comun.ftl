@@ -8,7 +8,6 @@ comun-menu = Menú
 comun-nav-principal = Principal
 comun-nav-estado = Estado
 comun-nav-ajustes = Ajustes
-comun-nav-recomendaciones = Recomendaciones
 comun-nav-historial = Historial
 comun-nav-biblioteca = Biblioteca
 comun-nav-router = Configuración del router

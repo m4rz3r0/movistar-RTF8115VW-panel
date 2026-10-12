@@ -11,7 +11,7 @@ use crate::ui::{
     layout::Layout,
     login::PaginaLogin,
     panel_ajustes::PaginaPanel,
-    recomendaciones::{InicioRecomendaciones, PaginaPreferencias, SeccionRecomendaciones},
+    recomendaciones::RecomendacionesAlEstado,
     router::{InicioRouter, PaginaConexion, SeccionRouter},
     vista::{provide_vista, vista_inicial},
 };
@@ -19,7 +19,7 @@ use leptos::prelude::*;
 use leptos_meta::{Link, MetaTags, Stylesheet, Title, provide_meta_context};
 use leptos_router::{
     ParamSegment, StaticSegment,
-    components::{ParentRoute, Route, Router, Routes},
+    components::{Outlet, ParentRoute, Route, Router, Routes},
 };
 
 /// Documento HTML que envuelve la aplicación en el servidor.
@@ -76,7 +76,7 @@ pub fn App() -> impl IntoView {
     provide_zona(zona_inicial());
     provide_vista(vista_inicial());
     // `<Redirect>` en el servidor: 302 con `Location` (`/router`,
-    // `/recomendaciones`).
+    // `/recomendaciones/*`).
     #[cfg(feature = "ssr")]
     leptos_router::components::provide_server_redirect(leptos_axum::redirect);
     view! {
@@ -93,9 +93,10 @@ pub fn App() -> impl IntoView {
                     <Route path=StaticSegment("") view=PaginaEstado />
                     <Route path=StaticSegment("historial") view=PaginaHistorial />
                     <Route path=StaticSegment("panel") view=PaginaPanel />
-                    <ParentRoute path=StaticSegment("recomendaciones") view=SeccionRecomendaciones>
-                        <Route path=StaticSegment("") view=InicioRecomendaciones />
-                        <Route path=StaticSegment("preferencias") view=PaginaPreferencias />
+                    // Vuelve en la fase 4 con sus tarjetas.
+                    <ParentRoute path=StaticSegment("recomendaciones") view=Outlet>
+                        <Route path=StaticSegment("") view=RecomendacionesAlEstado />
+                        <Route path=StaticSegment("preferencias") view=RecomendacionesAlEstado />
                     </ParentRoute>
                     <ParentRoute path=StaticSegment("router") view=SeccionRouter>
                         <Route path=StaticSegment("") view=InicioRouter />

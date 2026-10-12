@@ -6,13 +6,13 @@
 #   ruta <glob> <regla> — <motivo>
 #   binario <ruta> <sha256> — <motivo>
 
-# DNS públicos de las sugerencias de Ajustes.
-valor 9.9.9.9 — DNS público (Quad9) de las sugerencias
-valor 149.112.112.112 — DNS público (Quad9) de las sugerencias
-valor 2620:fe::fe — DNS público IPv6 (Quad9) de las sugerencias
-valor 194.242.2.2 — DNS público (Mullvad) de las sugerencias
-valor 1.1.1.1 — DNS público (Cloudflare) de las sugerencias
-valor 1.0.0.1 — DNS público (Cloudflare) de las sugerencias
+# DNS públicos de ejemplo en las pruebas.
+valor 9.9.9.9 — DNS público (Quad9) de ejemplo en las pruebas
+valor 149.112.112.112 — DNS público (Quad9) de ejemplo en las pruebas
+valor 2620:fe::fe — DNS público IPv6 (Quad9) de ejemplo en las pruebas
+valor 194.242.2.2 — DNS público (Mullvad) de ejemplo en las pruebas
+valor 1.1.1.1 — DNS público (Cloudflare) de ejemplo en las pruebas
+valor 1.0.0.1 — DNS público (Cloudflare) de ejemplo en las pruebas
 
 # Valores de fábrica del operador, iguales en todas las líneas.
 valor 192.168.144.1 — puerta de enlace WAN de fábrica del operador
@@ -29,9 +29,9 @@ dominio rust-lang.org — documentación de Rust
 dominio npmjs.org — registro de paquetes de las pruebas e2e
 dominio docker.io — registro de las imágenes oficiales de deploy/docker
 dominio sil.org — licencia OFL de las tipografías
-dominio quad9.net — proveedor de DNS de las sugerencias
-dominio mullvad.net — proveedor de DNS de las sugerencias
-dominio cloudflare.com — proveedor de DNS de las sugerencias
+dominio quad9.net — proveedor de DNS de ejemplo en las pruebas
+dominio mullvad.net — proveedor de DNS de ejemplo en las pruebas
+dominio cloudflare.com — proveedor de DNS de ejemplo en las pruebas
 dominio playwright.dev — documentación de las pruebas e2e
 dominio anthropic.com — créditos de los commits
 dominio config.local — nombre del fichero deploy/config.local, no un dominio

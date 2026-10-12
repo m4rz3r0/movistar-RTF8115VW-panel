@@ -68,15 +68,11 @@ async fn menu_en_orden() {
         .collect();
     assert_eq!(
         hrefs,
-        [
-            "/",
-            "/recomendaciones/preferencias",
-            "/historial",
-            "/explorador",
-            "/router/conexion"
-        ]
+        ["/", "/historial", "/explorador", "/router/conexion"]
     );
     assert!(!html.contains(r#"href="/prestablecidos""#), "{html}");
+    // Recomendaciones vuelve con sus tarjetas (fase 4).
+    assert!(!html.contains(r#"href="/recomendaciones"#), "{html}");
 }
 
 #[tokio::test]
@@ -103,10 +99,6 @@ async fn seccion_marcada_en_subrutas() {
         ("/historial", "/historial"),
         ("/explorador/lan_dhcp", "/explorador"),
         ("/router/conexion", "/router/conexion"),
-        (
-            "/recomendaciones/preferencias",
-            "/recomendaciones/preferencias",
-        ),
     ] {
         let html = pagina(ruta).await;
         let marcados: Vec<&str> = enlaces(nav_principal(&html))
@@ -125,20 +117,24 @@ async fn seccion_marcada_en_subrutas() {
     );
 }
 
+/// Las rutas de Recomendaciones (sin contenido hasta la fase 4) llevan al
+/// Estado: los enlaces guardados no se rompen.
 #[tokio::test]
-async fn recomendaciones_lleva_a_preferencias() {
+async fn recomendaciones_lleva_al_estado() {
     let p = panel().await;
     let cookie = sesion(&p).await;
-    // Como la pide el navegador.
-    let resp = send(
-        &p.app,
-        axum::http::Request::get("/recomendaciones")
-            .header("cookie", &cookie)
-            .header("accept", "text/html")
-            .body(axum::body::Body::empty())
-            .unwrap(),
-    )
-    .await;
-    assert_eq!(resp.status(), 302);
-    assert_eq!(resp.headers()["location"], "/recomendaciones/preferencias");
+    for ruta in ["/recomendaciones", "/recomendaciones/preferencias"] {
+        // Como la pide el navegador.
+        let resp = send(
+            &p.app,
+            axum::http::Request::get(ruta)
+                .header("cookie", &cookie)
+                .header("accept", "text/html")
+                .body(axum::body::Body::empty())
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(resp.status(), 302, "{ruta}");
+        assert_eq!(resp.headers()["location"], "/", "{ruta}");
+    }
 }

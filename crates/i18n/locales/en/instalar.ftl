@@ -47,8 +47,6 @@ instalar-fallidas = { $n ->
 instalar-fin-texto = The panel is set up.
 instalar-red = Router network detected:
 instalar-red-sin-detectar = The router network could not be detected: you can try again in Router settings → Router connection.
-instalar-fin-opcional = You can adjust the optional instance parameters (preferred DNS, trusted devices, maintenance window and own server) now or later in Recommendations → Your preferences.
-instalar-ir-preferencias = Your preferences
 instalar-ir-estado = Go to Status
 
 ## Errors
