@@ -1,0 +1,142 @@
+#!/bin/sh
+# shellcheck disable=SC1091,SC2034 # rc.subr: lo carga y lee el sistema
+#
+# PROVIDE: routerpanel
+# REQUIRE: DAEMON NETWORKING
+# KEYWORD: shutdown
+#
+# Panel del router (en su jail). Se instala como
+# /usr/local/etc/rc.d/routerpanel; lo activa routerpanel_enable="YES".
+#
+# Arranca la versión a la que apunta /usr/local/routerpanel/current. El enlace
+# se resuelve al arrancar: binario y web salen siempre de la misma versión
+# aunque el actualizador cambie «current» con el proceso en marcha.
+
+. /etc/rc.subr
+
+name=routerpanel
+rcvar=routerpanel_enable
+
+load_rc_config $name
+: "${routerpanel_enable:=NO}"
+: "${routerpanel_user:=routerpanel}"
+: "${routerpanel_current:=/usr/local/routerpanel/current}"
+: "${routerpanel_log:=/var/log/routerpanel.log}"
+# Origen público del panel (RP_ORIGIN: uno o varios http(s)://equipo[:puerto]
+# separados por comas). No tiene valor por defecto: sin él el servicio no
+# arranca, porque el freno de CSRF compara con él el Origin de cada petición.
+: "${routerpanel_origin:=}"
+# Dirección de escucha (RP_LISTEN y LEPTOS_SITE_ADDR) y proxies inversos de
+# confianza para X-Forwarded-For (RP_TRUSTED_PROXY: IPs o redes separadas por
+# comas). Por defecto, solo el propio equipo.
+: "${routerpanel_listen:=127.0.0.1:3000}"
+: "${routerpanel_trusted_proxy:=127.0.0.1}"
+# Redes desde las que se acepta el asistente de instalación además de la red
+# local (RP_INSTALL_NETS; vacía: ninguna).
+: "${routerpanel_install_nets:=}"
+# Credenciales del router de las instalaciones anteriores al asistente de
+# instalación: sólo se pasan al panel si existe el fichero de la contraseña.
+# El panel las importa una vez a su base de datos (cifradas); después sobran:
+# borrado router.secret, el panel sigue con las de la base de datos.
+: "${routerpanel_router_url:=http://192.168.1.1}"
+: "${routerpanel_router_user:=1234}"
+: "${routerpanel_router_secret:=/usr/local/etc/routerpanel/router.secret}"
+
+# daemon(8) con -r relanza al hijo en cuanto muere: para parar hay que matar al
+# supervisor, que reenvía el SIGTERM al hijo. De ahí los dos pidfiles.
+pidfile="/var/run/${name}.pid"
+child_pidfile="/var/run/${name}.child.pid"
+
+start_cmd="routerpanel_start"
+stop_cmd="routerpanel_stop"
+status_cmd="routerpanel_status"
+
+_alive()
+{
+	[ -f "$1" ] && kill -0 "$(cat "$1")" 2>/dev/null
+}
+
+routerpanel_start()
+{
+	if _alive "$pidfile"; then
+		echo "${name} ya está en marcha."
+		return 1
+	fi
+	if [ -z "$routerpanel_origin" ]; then
+		echo "${name}: falta routerpanel_origin en rc.conf: el origen público del panel (p. ej. sysrc routerpanel_origin=https://panel.example)."
+		return 1
+	fi
+	_dir=$(realpath "$routerpanel_current" 2>/dev/null)
+	if [ -z "$_dir" ] || [ ! -x "$_dir/panel" ]; then
+		echo "${name}: no hay ninguna versión instalada en $routerpanel_current."
+		return 1
+	fi
+	# Las tres variables del router van juntas o ninguna.
+	set --
+	if [ -f "$routerpanel_router_secret" ]; then
+		set -- RP_ROUTER_URL="$routerpanel_router_url" \
+			RP_ROUTER_USER="$routerpanel_router_user" \
+			RP_ROUTER_SECRET="$routerpanel_router_secret"
+	fi
+	if [ -n "$routerpanel_install_nets" ]; then
+		set -- "$@" RP_INSTALL_NETS="$routerpanel_install_nets"
+	fi
+	echo "Arrancando ${name} ($(basename "$_dir"))."
+	# -f suelta la entrada/salida de quien lo lanza (si no, un «service
+	# routerpanel start» por SSH no termina nunca); -H reabre el log con
+	# SIGHUP (newsyslog). El fichero lo abre el
+	# supervisor, que sigue como root; sólo el hijo baja a routerpanel.
+	/usr/bin/env \
+		RP_LISTEN="$routerpanel_listen" \
+		RP_DB=/var/db/routerpanel/panel.db \
+		"$@" \
+		RP_HISTORY_KEY=/usr/local/etc/routerpanel/history.key \
+		RP_TRUSTED_PROXY="$routerpanel_trusted_proxy" \
+		RP_ORIGIN="$routerpanel_origin" \
+		RP_LOG=info \
+		LEPTOS_OUTPUT_NAME=panel \
+		LEPTOS_SITE_ROOT="$_dir/site" \
+		LEPTOS_SITE_PKG_DIR=pkg \
+		LEPTOS_SITE_ADDR="$routerpanel_listen" \
+		LEPTOS_ENV=PROD \
+		/usr/sbin/daemon -f -r -R 5 -u "$routerpanel_user" \
+		-P "$pidfile" -p "$child_pidfile" -H -o "$routerpanel_log" \
+		-t "$name" "$_dir/panel"
+}
+
+routerpanel_stop()
+{
+	if ! _alive "$pidfile"; then
+		echo "${name} no está en marcha."
+		rm -f "$pidfile" "$child_pidfile"
+		return 0
+	fi
+	echo "Parando ${name}."
+	_pid=$(cat "$pidfile")
+	kill -TERM "$_pid" 2>/dev/null
+	# Hasta que el supervisor sale, el hijo puede tener aún el puerto; un
+	# «restart» que arrancase antes fallaría al escuchar.
+	_n=0
+	while kill -0 "$_pid" 2>/dev/null && [ "$_n" -lt 20 ]; do
+		sleep 0.5
+		_n=$((_n + 1))
+	done
+	if kill -0 "$_pid" 2>/dev/null; then
+		_alive "$child_pidfile" && kill -KILL "$(cat "$child_pidfile")" 2>/dev/null
+		kill -KILL "$_pid" 2>/dev/null
+	fi
+	rm -f "$pidfile" "$child_pidfile"
+	return 0
+}
+
+routerpanel_status()
+{
+	if _alive "$pidfile"; then
+		echo "${name} está en marcha (pid $(cat "$child_pidfile" 2>/dev/null), $(basename "$(realpath "$routerpanel_current")"))."
+	else
+		echo "${name} está parado."
+		return 1
+	fi
+}
+
+run_rc_command "$1"

@@ -1,0 +1,13 @@
+# No hace falta ninguna regla de doas.
+#
+# El diseño original ponía el actualizador en la jail de compilación y le
+# daba, en el doas.conf del host, permiso para reiniciar el servicio:
+#
+#   permit nopass routerpanel-build as root cmd jexec args routerpanel service routerpanel restart
+#
+# Eso no puede funcionar: doas.conf es del host y desde dentro de una jail no
+# se llega al doas del host. Por eso el actualizador corre EN EL HOST como root
+# (/usr/local/sbin/routerpanel-actualizar, desde /usr/local/etc/cron.d):
+# compila y prueba dentro de la jail de compilación con un usuario sin
+# privilegios (jexec -U rpbuild), y luego, ya en el host, cambia «current»,
+# reinicia el servicio con jexec y comprueba /salud. Ver deploy/freebsd-jail/README.md.

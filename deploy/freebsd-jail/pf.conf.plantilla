@@ -1,0 +1,36 @@
+# Dos bloques que install.sh mete en /etc/pf.conf entre marcas
+# «# >>> routerpanel …» / «# <<< routerpanel …». Este fichero no se carga tal
+# cual: install.sh lo rellena con la configuración y lo trocea por las marcas
+# «@nat» y «@filtro».
+#
+# @nat
+# Antes de la primera regla nat del host (en nat gana la primera). Las
+# etiquetas hacen falta porque el filtro ve los paquetes ya traducidos: lo que
+# sale de una jail por la interfaz externa lleva como origen la IP del host,
+# no la de la jail, así que una regla «from <IP de la jail>» no lo vería.
+nat on @INTERFAZ_EXT@ from @JAIL_PANEL_IP@ to any tag ROUTERPANEL -> (@INTERFAZ_EXT@)
+nat on @INTERFAZ_EXT@ from @JAIL_COMPILAR_IP@ to any tag ROUTERPANEL_BUILD -> (@INTERFAZ_EXT@)
+# @filtro
+# Encima de «block all». Al panel sólo llegan los proxies de confianza y la
+# jail de compilación, que comprueba /salud tras cada despliegue. Entre jails
+# el tráfico va por lo0, donde un «pass on lo0 all» lo dejaría pasar.
+pass quick proto tcp from @PROXIES_PF@ to @JAIL_PANEL_IP@ port @PANEL_PUERTO@
+pass quick proto tcp from @JAIL_COMPILAR_IP@ to @JAIL_PANEL_IP@ port @PANEL_PUERTO@
+block quick proto tcp to @JAIL_PANEL_IP@ port @PANEL_PUERTO@
+# La jail del panel sólo sale hacia la web del router (tcp 80). Las respuestas
+# a lo que entra al panel no pasan por aquí: casan con el estado que crea el
+# pass de arriba. Hacia la interfaz externa manda la etiqueta del nat; hacia
+# el host y las demás jails (lo0, sin nat) la dirección de origen.
+pass out quick on @INTERFAZ_EXT@ proto tcp to @ROUTER_IP@ port 80 tagged ROUTERPANEL
+block quick tagged ROUTERPANEL
+pass quick proto tcp from @JAIL_PANEL_IP@ to @ROUTER_IP@ port 80
+block quick from @JAIL_PANEL_IP@ to ! @JAIL_PANEL_IP@
+# La jail de compilación ejecuta código del repositorio: sale a Internet
+# (crates.io, rustup, pkg) pero de la red propia sólo alcanza el repositorio
+# git (si está en ella), el DNS, el panel (/salud, arriba) y a sí misma (las
+# pruebas escuchan en 127.0.0.1, que en la jail es su propia IP).
+pass quick from @JAIL_COMPILAR_IP@ to @JAIL_COMPILAR_IP@
+@REGLA_REPO@
+pass quick proto { tcp udp } from @JAIL_COMPILAR_IP@ to @DNS_IP@ port 53
+block quick to @REDES_PROPIAS@ tagged ROUTERPANEL_BUILD
+block quick from @JAIL_COMPILAR_IP@ to @REDES_PROPIAS@

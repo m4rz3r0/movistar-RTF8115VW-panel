@@ -1,0 +1,71 @@
+# Configuración de la instalación en jail de FreeBSD (deploy/freebsd-jail/).
+#
+# Cópiala a deploy/config.local (git la ignora) y cambia los valores. Es sh:
+# CLAVE=valor, con comillas si el valor lleva espacios o «$». También puedes
+# dejar en config.local solo lo que cambia, empezando por la línea
+#   . "$CONFIG_EJEMPLO"
+# que carga este fichero.
+#
+# Los valores de aquí son de documentación (192.0.2.x, *.example): no
+# funcionan tal cual.
+
+# Usuario y equipo FreeBSD donde se instala (ssh, y doas como root allí).
+SERVIDOR_SSH=admin@192.0.2.10
+
+# Dónde viven las jails y su dataset ZFS (las rutas del manual de FreeBSD).
+JAILS_RAIZ=/usr/local/jails/containers
+ZFS_DATASET=zroot/jails/containers
+
+# Jail del panel: solo el binario y su web; su única salida es el router.
+JAIL_PANEL=routerpanel
+JAIL_PANEL_IP=192.0.2.20
+
+# Jail de compilación: Rust, el clon del repositorio y las pruebas. Sale a
+# Internet, pero de tu red solo alcanza el DNS, el repositorio y el panel.
+JAIL_COMPILAR=routerpanel-build
+JAIL_COMPILAR_IP=192.0.2.21
+# uid (y gid) del usuario que compila; que no lo use nadie en el host.
+UID_COMPILAR=3160
+
+# Interfaz de salida del host para el nat de pf (o una macro de tu pf.conf,
+# entre comillas simples).
+INTERFAZ_EXT=em0
+# Tu red local y, si tienes, la de tu VPN: la jail de compilación no entra en
+# ninguna de las dos. RED_VPN vacía = sin regla para la VPN. También valen
+# macros de tu pf.conf, entre comillas simples.
+RED_LAN=192.0.2.0/24
+RED_VPN=
+
+# IP de la web del router (la de fábrica es 192.168.1.1).
+ROUTER_IP=192.168.1.1
+# DNS que usa la jail de compilación (el del host o el de tu red).
+DNS_IP=192.0.2.10
+
+# Dirección pública del panel, como la escribe el navegador (RP_ORIGIN; varias
+# separadas por comas).
+PANEL_ORIGEN=https://panel.example
+# IP:puerto donde escucha el panel dentro de su jail (RP_LISTEN).
+PANEL_ESCUCHA=192.0.2.20:3000
+# Proxies inversos delante del panel: IPs o redes separadas por comas
+# (RP_TRUSTED_PROXY). pf solo les deja llegar a ellos y a la jail de
+# compilación.
+PROXIES_CONFIANZA=192.0.2.10
+
+# Repositorio del que se compila: cualquier URL de git (https://… o
+# ssh://git@equipo:puerto/…). Si está en tu red, pon su IP: pf solo abre a la
+# jail de compilación una IP de tu red.
+REPO_URL=https://git.example/routerpanel.git
+# Línea de known_hosts del servidor git por SSH, p. ej.
+# «[192.0.2.30]:2222 ssh-ed25519 …». Vacía: se acepta la primera clave que
+# presente (y se fija). Con https no hace falta.
+REPO_HOST_CLAVE=
+
+# Qué se instala: pf (reglas con interruptor de hombre muerto), rc (jail y
+# servicio del panel), actualizador (jail de compilación y cron). Opcionales:
+# caddyfile (genera el sitio para tu Caddyfile) y unbound (nombre del panel
+# en el unbound del host).
+MODULOS="pf rc actualizador"
+
+# Webs que tienen que seguir respondiendo al cargar las reglas de pf,
+# separadas por espacios (opcional; si alguna falla, pf vuelve atrás solo).
+COMPROBAR_URLS=

@@ -1,0 +1,12 @@
+
+# Panel del router (movistar-RTF8115VW-panel). La de ejecución sólo lleva el
+# binario y su web; la de compilación tiene la cadena de Rust y no expone nada.
+@JAIL_PANEL@ {
+    allow.chflags;
+    ip4.addr = @JAIL_PANEL_IP@;
+}
+
+@JAIL_COMPILAR@ {
+    allow.chflags;
+    ip4.addr = @JAIL_COMPILAR_IP@;
+}
