@@ -2,7 +2,9 @@
 //! sus textos en los dos idiomas (y ninguno de sobra) y trae los ajustes que
 //! usan las páginas por tema.
 
-use ajustes::{Ajuste, Campo, CatalogoAjustes, Componente, Nivel, claves_requeridas, comprobar};
+use ajustes::{
+    Ajuste, Campo, CatalogoAjustes, Componente, Nivel, claves_requeridas, comprobar, prefijo_i18n,
+};
 use catalogo::{Catalogo, Tipo, mask::Mascara};
 use i18n::Idioma;
 use regex::Regex;
@@ -258,12 +260,17 @@ fn valores_del_fichero(ruta: &PathBuf) -> Vec<(String, String)> {
 
 /// Nombres de parámetro del catálogo que también son palabras corrientes en
 /// español o en inglés: aparecen en los textos sin delatar la API.
-/// - `account`, `all`, `password`, `provider`: palabras inglesas de uso
-///   diario («your WiFi password», «all devices»);
+/// - `account`, `all`, `password`, `provider`, `username`: palabras
+///   inglesas de uso diario («your WiFi password», «all devices», «Line
+///   username»);
 /// - `authentication`, `encryption`, `isolation`, `standard`: términos
 ///   corrientes al explicar la seguridad y la compatibilidad de la WiFi;
-/// - `beamforming`: el nombre de la técnica, que el texto explica.
-const PALABRAS_CORRIENTES: [&str; 9] = [
+/// - `beamforming`: el nombre de la técnica, que el texto explica;
+/// - `wmm`: el nombre del estándar de la WiFi («WMM»), que el texto explica.
+///
+/// La comparación no distingue mayúsculas: «SSID» delata `ssid` igual que
+/// «ssid», así que cada excepción tiene que estar justificada aquí.
+const PALABRAS_CORRIENTES: [&str; 11] = [
     "account",
     "all",
     "authentication",
@@ -273,6 +280,8 @@ const PALABRAS_CORRIENTES: [&str; 9] = [
     "password",
     "provider",
     "standard",
+    "username",
+    "wmm",
 ];
 
 /// Nombres de la API que usa el catálogo de ajustes: parámetros (de
@@ -292,14 +301,14 @@ fn nombres_de_la_api(c: &CatalogoAjustes) -> BTreeSet<String> {
             }
         }
     }
-    nombres.retain(|n| !PALABRAS_CORRIENTES.contains(&n.as_str()));
+    nombres.retain(|n| !PALABRAS_CORRIENTES.contains(&n.to_lowercase().as_str()));
     nombres
 }
 
 /// Patrones que delatan la API: funciones `cb…`, páginas y órdenes del
 /// router (`cwmp.asp`, `te_wifi.wl`, `scbidirectionalflt.cmd`…) y los
-/// nombres de parámetro del catálogo, como palabra entera y distinguiendo
-/// mayúsculas («WMM» no es `wmm`).
+/// nombres de parámetro del catálogo, como palabra entera y sin distinguir
+/// mayúsculas («SSID» delata `ssid`).
 fn patrones_de_la_api(c: &CatalogoAjustes) -> Vec<Regex> {
     let mut patrones = vec![
         Regex::new(r"\bcb[A-Z]\w+").unwrap(),
@@ -308,7 +317,7 @@ fn patrones_de_la_api(c: &CatalogoAjustes) -> Vec<Regex> {
     patrones.extend(
         nombres_de_la_api(c)
             .iter()
-            .map(|n| Regex::new(&format!(r"\b{}\b", regex::escape(n))).unwrap()),
+            .map(|n| Regex::new(&format!(r"(?i)\b{}\b", regex::escape(n))).unwrap()),
     );
     patrones
 }
@@ -322,8 +331,9 @@ fn hallazgos(patrones: &[Regex], texto: &str) -> Vec<String> {
         .collect()
 }
 
-/// El detector reconoce páginas, funciones y parámetros (también los que van
-/// en minúsculas) y deja pasar las palabras corrientes y las siglas.
+/// El detector reconoce páginas, funciones y parámetros (escritos en
+/// minúsculas, en mayúsculas o mezcladas) y deja pasar las palabras
+/// corrientes de [`PALABRAS_CORRIENTES`].
 #[test]
 fn detector_de_nombres_de_la_api() {
     let patrones = patrones_de_la_api(&cargar());
@@ -337,6 +347,9 @@ fn detector_de_nombres_de_la_api() {
         "el valor de ssid",
         "pon enableCWMP a 0",
         "ssid_hide vale 1",
+        "cambia el SSID de la red",
+        "the router Hostname",
+        "ENABLECWMP",
     ] {
         assert!(
             !hallazgos(&patrones, delator).is_empty(),
@@ -354,6 +367,56 @@ fn detector_de_nombres_de_la_api() {
             hallazgos(&patrones, llano)
         );
     }
+}
+
+/// Marcas que exige cada `…-recomendado`, por idioma y en este orden: para
+/// quién es, lo que se gana y lo que se pierde (decisión del usuario,
+/// 2026-10-13).
+fn marcas_de_recomendacion(idioma: Idioma) -> [&'static str; 3] {
+    match idioma {
+        Idioma::Es => ["Recomendado si", "A favor:", "En contra:"],
+        Idioma::En => ["Recommended if", "Pros:", "Cons:"],
+    }
+}
+
+/// Cada recomendación dice para quién es, qué se gana y qué se pierde, en
+/// todos los idiomas: «Recomendado si …. A favor: …. En contra: ….».
+#[test]
+fn recomendaciones_con_pros_y_contras() {
+    let c = cargar();
+    let mut fallos = Vec::new();
+    let mut vistas = 0;
+    for a in c.todos() {
+        for x in &a.campos {
+            if x.recomendado.is_none() && !x.opciones.iter().any(|o| o.recomendada) {
+                continue;
+            }
+            vistas += 1;
+            let clave = format!("{}-{}-recomendado", prefijo_i18n(a), x.id);
+            for idioma in Idioma::TODOS {
+                if !i18n::existe(idioma, &clave) {
+                    fallos.push(format!("{idioma:?} {clave}: no existe"));
+                    continue;
+                }
+                let texto = i18n::tr(idioma, &clave, None);
+                let marcas = marcas_de_recomendacion(idioma);
+                let posiciones: Vec<Option<usize>> = marcas.iter().map(|m| texto.find(m)).collect();
+                let en_orden = texto.starts_with(marcas[0])
+                    && posiciones.windows(2).all(|p| match (p[0], p[1]) {
+                        (Some(a), Some(b)) => a < b,
+                        _ => false,
+                    });
+                if !en_orden {
+                    fallos.push(format!("{idioma:?} {clave}: «{texto}»"));
+                }
+            }
+        }
+    }
+    assert!(vistas > 0, "ningún campo con recomendación");
+    assert!(
+        fallos.is_empty(),
+        "recomendaciones sin «para quién / a favor / en contra»: {fallos:#?}"
+    );
 }
 
 /// Ningún texto de los ajustes (ni de las recomendaciones) nombra una

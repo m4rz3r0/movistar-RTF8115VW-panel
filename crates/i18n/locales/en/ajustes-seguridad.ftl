@@ -11,7 +11,7 @@ ajuste-seguridad-gestion_remota-activa-encendida = On
 ajuste-seguridad-gestion_remota-activa-encendida-desc = You get the operator's updates and remote support; in exchange, it can change the router without asking you.
 ajuste-seguridad-gestion_remota-activa-apagada = Off
 ajuste-seguridad-gestion_remota-activa-apagada-desc = Nobody outside can change the router; in exchange, you stop getting the operator's updates and remote support.
-ajuste-seguridad-gestion_remota-activa-recomendado = Recommended if your privacy and security come first. For: the operator can no longer change the settings remotely and a known way of attack is closed. Against: you will stop getting the operator's automatic updates, its support will not be able to check the router remotely, and changes it makes to your line, including the phone, will not reach the router.
+ajuste-seguridad-gestion_remota-activa-recomendado = Recommended if your privacy and security come first. Pros: the operator can no longer change the settings remotely and a known way of attack is closed. Cons: you will stop getting the operator's automatic updates, its support will not be able to check the router remotely, and changes it makes to your line, including the phone, will not reach the router.
 
 ## Remote management: regular check-in
 ajuste-seguridad-gestion_remota_avanzado-titulo = Regular check-in with the operator

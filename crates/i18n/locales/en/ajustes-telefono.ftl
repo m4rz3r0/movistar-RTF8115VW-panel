@@ -7,10 +7,10 @@ ajuste-telefono-linea-desc = The landline phone plugged into the router.
 ajuste-telefono-linea-ayuda = The landline arrives over the internet and the operator sets it up. If it works properly, there is no need to touch anything here.
 ajuste-telefono-linea-activa = Line on
 ajuste-telefono-linea-activa-desc = If you turn it off, the landline can no longer make or receive calls.
-ajuste-telefono-linea-activa-recomendado = While it is off you cannot make or receive calls, not even to emergency services from the landline.
+ajuste-telefono-linea-activa-recomendado = Recommended if you use the landline. Pros: you can make and receive calls, including to emergency services. Cons: none significant; if you don't use the landline, turning it off stops it ringing.
 ajuste-telefono-linea-silencio = Save during silences
 ajuste-telefono-linea-silencio-desc = While nobody is speaking, the router stops sending sound to use less of the connection.
-ajuste-telefono-linea-silencio-recomendado = With fibre the saving is not noticeable, and in exchange the start of words may be cut off or the call may seem to have dropped.
+ajuste-telefono-linea-silencio-recomendado = Recommended if you have fibre or a good connection, as is usual today. Pros: the start of words is not cut off and the call does not seem to have dropped. Cons: each call uses a little more of the connection, which you will not notice with fibre.
 
 ## Phone line: account and direct line
 ajuste-telefono-linea_oculto-titulo = Line account and direct line
@@ -30,12 +30,12 @@ ajuste-telefono-sip-ayuda = Keys matter in phone menus ("press 1 for…"). If a 
 ajuste-telefono-sip-tonos = Keys during a call
 ajuste-telefono-sip-tonos-desc = How the keys you press while a call is in progress reach the other end.
 ajuste-telefono-sip-tonos-aparte = Separate from the voice
-ajuste-telefono-sip-tonos-aparte-desc = Each key travels as its own signal, alongside the voice.
+ajuste-telefono-sip-tonos-aparte-desc = Each key travels as its own signal, alongside the voice, so it does not depend on the sound quality.
 ajuste-telefono-sip-tonos-en_la_voz = Inside the voice
 ajuste-telefono-sip-tonos-en_la_voz-desc = The key beeps are mixed into the sound, as on an old phone. They can get lost if the call sounds poor.
 ajuste-telefono-sip-tonos-mensajes = As call messages
 ajuste-telefono-sip-tonos-mensajes-desc = Each key travels in a message separate from the sound. It only works if the operator supports it.
-ajuste-telefono-sip-tonos-recomendado = It is the most widespread and most reliable way: keys are not lost even if the call sounds poor.
+ajuste-telefono-sip-tonos-recomendado = Recommended if you use phone menus («press 1 for…») or don't know. Pros: it is the most widespread way, and keys get through even if the call sounds poor. Cons: none significant for most people; if a menu does not recognise what you press, try another option.
 ajuste-telefono-sip-fax = Fax over the internet
 ajuste-telefono-sip-fax-desc = Sends faxes in a way designed for the internet, which copes better with small drop-outs. It only works if the operator supports it.
 
@@ -45,7 +45,7 @@ ajuste-telefono-sip_oculto-desc = The addresses the router connects to in order 
 ajuste-telefono-sip_oculto-ayuda = The operator sets these and the addresses are never shown. If you type one wrong, the landline stops working until you undo the change. Only change them if the operator asks you to.
 ajuste-telefono-sip_oculto-activo = Internet phone on
 ajuste-telefono-sip_oculto-activo-desc = If you turn it off, the router stops connecting to the operator for calls and the landline does not work.
-ajuste-telefono-sip_oculto-activo-recomendado = While it is off you cannot make or receive calls from the landline.
+ajuste-telefono-sip_oculto-activo-recomendado = Recommended if you use the landline. Pros: the router connects to the operator and the landline can make and receive calls. Cons: none significant for most people.
 ajuste-telefono-sip_oculto-dominio = Line domain
 ajuste-telefono-sip_oculto-dominio-desc = The name of the operator's phone service, for example voz.example. No spaces or accented letters.
 ajuste-telefono-sip_oculto-servidor = Call server

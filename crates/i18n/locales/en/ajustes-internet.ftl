@@ -6,7 +6,7 @@ ajuste-internet-dns-desc = DNS turns website names into addresses. With the rela
 ajuste-internet-dns-ayuda = If you don't know why you'd change it, leave it as it is. A change here can make devices on your network stop finding websites even though the internet is still connected; if that happens, go back to the previous value.
 ajuste-internet-dns-rele = DNS relay on
 ajuste-internet-dns-rele-desc = If you turn it on, the router forwards your devices' DNS lookups to your connection's DNS servers.
-ajuste-internet-dns-rele-recomendado = With the relay off, the router still resolves website names for your devices, so there is no need to turn it on.
+ajuste-internet-dns-rele-recomendado = Recommended if web pages load fine for you. Pros: you leave alone something that works; with the relay off, the router still looks up pages for your devices. Cons: none known, although it has not yet been checked on this router what exactly changes when it is turned on.
 
 ## Fixed name for your connection (dynamic DNS)
 ajuste-internet-ddns-titulo = Fixed name for your connection (dynamic DNS)
