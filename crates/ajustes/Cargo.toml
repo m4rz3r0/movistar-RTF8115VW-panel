@@ -1,0 +1,27 @@
+[package]
+name = "ajustes"
+version = "0.2.2"
+description = "Catálogo de ajustes del panel: cada ajuste humano y las funciones del router que lo leen y lo escriben"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+# Sin features: solo los tipos que usan las vistas (también en el navegador).
+serde.workspace = true
+# Feature `catalogo` (servidor): carga, validación y traducción de valores.
+catalogo = { path = "../catalogo", optional = true }
+toml = { workspace = true, optional = true }
+thiserror = { workspace = true, optional = true }
+
+[features]
+catalogo = ["dep:catalogo", "dep:toml", "dep:thiserror"]
+
+[[test]]
+name = "modelo"
+required-features = ["catalogo"]
+
+[[test]]
+name = "valores"
+required-features = ["catalogo"]
