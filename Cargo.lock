@@ -2430,6 +2430,7 @@ name = "router-sim"
 version = "0.2.2"
 dependencies = [
  "axum",
+ "catalogo",
  "hgu",
  "regex",
  "roxmltree",

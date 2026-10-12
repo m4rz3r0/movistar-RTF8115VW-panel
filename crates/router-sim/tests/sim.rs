@@ -716,3 +716,291 @@ async fn contrasena_cambiable() {
     cfg.min_gap = Duration::from_millis(1);
     Client::new(cfg).call("cbGetSummary", &[]).await.unwrap();
 }
+
+// ------------------------------------------------ escritura genérica
+
+/// Valor del primer nodo con hijo `campo` en `n` (o en sus descendientes).
+fn valor(n: &XmlNode, campo: &str) -> Option<String> {
+    n.text_of(campo)
+        .map(str::to_owned)
+        .or_else(|| n.children.iter().find_map(|c| valor(c, campo)))
+}
+
+#[tokio::test]
+async fn escritura_generica_se_lee() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    let antes = c.call("cbGetTimeNtp", &[]).await.unwrap();
+    assert_eq!(valor(&antes, "ntp_svr_2").as_deref(), Some(""));
+    c.write(
+        "ntp.asp",
+        "cbSetTimeNtp",
+        &[("ntp_svr_2", "ntp.example"), ("campo_inexistente", "x")],
+    )
+    .await
+    .unwrap();
+    let despues = c.call("cbGetTimeNtp", &[]).await.unwrap();
+    assert_eq!(valor(&despues, "ntp_svr_2").as_deref(), Some("ntp.example"));
+    assert_eq!(valor(&despues, "ntp_svr_1"), valor(&antes, "ntp_svr_1"));
+    assert_eq!(
+        valor(&despues, "campo_inexistente"),
+        None,
+        "no se inventan hijos"
+    );
+
+    assert_eq!(
+        valor(&c.call("cbGetTr69Config", &[]).await.unwrap(), "enableCWMP").as_deref(),
+        Some("1")
+    );
+    c.write("cwmp.asp", "cbSetTr69Config", &[("enableCWMP", "0")])
+        .await
+        .unwrap();
+    assert_eq!(
+        valor(&c.call("cbGetTr69Config", &[]).await.unwrap(), "enableCWMP").as_deref(),
+        Some("0")
+    );
+    assert_eq!(
+        sim.control.fixture_valor("cbGetTr69Config", "enableCWMP"),
+        Some("0".into())
+    );
+    assert_eq!(
+        sim.control.fixture_valor("cbGetTr69Config", "no_existe"),
+        None
+    );
+}
+
+#[tokio::test]
+async fn escritura_por_instancia_no_toca_otra() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    let ssid = |n: &XmlNode| valor(n, "ssid").unwrap();
+    let uno = [("dpm_cfg_wifi_acc_pt_id", "1")];
+    let otro = c
+        .call("cbListWifiAccPt", &[("dpm_cfg_wifi_id", "0")])
+        .await
+        .unwrap();
+    let id_otro = valor(&otro, "dpm_cfg_wifi_acc_pt_id").unwrap();
+    assert_ne!(id_otro, "1", "la fixture tiene un segundo punto de acceso");
+    let ssid_otro = ssid(&otro);
+    c.write(
+        "wifi.asp",
+        "cbSetWifiAccPt",
+        &[("dpm_cfg_wifi_acc_pt_id", "1"), ("ssid", "RED-solo-uno")],
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        ssid(&c.call("cbGetWifiAccPt", &uno).await.unwrap()),
+        "RED-solo-uno"
+    );
+    let lista = c
+        .call("cbListWifiAccPt", &[("dpm_cfg_wifi_id", "1")])
+        .await
+        .unwrap();
+    assert_eq!(
+        ssid(&lista),
+        "RED-solo-uno",
+        "la lista por radio también lo refleja"
+    );
+    let otro = c
+        .call("cbListWifiAccPt", &[("dpm_cfg_wifi_id", "0")])
+        .await
+        .unwrap();
+    assert_eq!(ssid(&otro), ssid_otro, "la otra instancia no cambia");
+}
+
+fn ids_nat(n: &XmlNode) -> Vec<(String, String)> {
+    n.all("rtm_cfg_nat_port_mapping")
+        .into_iter()
+        .map(|e| {
+            (
+                e.text_of("nat_port_mapping_id").unwrap().to_owned(),
+                e.text_of("desc").unwrap().to_owned(),
+            )
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn lista_crear_editar_borrar() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    let todas = [("all", "ALL")];
+    let inicial = ids_nat(&c.call("cbGetNatPortMapping", &todas).await.unwrap());
+    assert_eq!(inicial.len(), 1);
+    let id0 = inicial[0].0.clone();
+
+    // Crear: sin id.
+    c.write(
+        "natportmap.asp",
+        "cbSetNatPortMapping",
+        &[("desc", "nueva"), ("int_ip_addr", "192.0.2.10")],
+    )
+    .await
+    .unwrap();
+    let tras = c.call("cbGetNatPortMapping", &todas).await.unwrap();
+    let ids = ids_nat(&tras);
+    assert_eq!(ids.len(), 2);
+    let nuevo = ids.iter().find(|(_, d)| d == "nueva").unwrap().0.clone();
+    assert_eq!(
+        nuevo,
+        (id0.parse::<u32>().unwrap() + 1).to_string(),
+        "max + 1"
+    );
+    let por_indice = c
+        .call("cbGetNatPortMapping", &[("nat_port_mapping_0i", "1")])
+        .await
+        .unwrap();
+    assert_eq!(
+        valor(&por_indice, "int_ip_addr").as_deref(),
+        Some("192.0.2.10")
+    );
+
+    // Editar la existente.
+    c.write(
+        "natportmap.asp",
+        "cbSetNatPortMapping",
+        &[("nat_port_mapping_id", &id0), ("desc", "editada")],
+    )
+    .await
+    .unwrap();
+    let ids = ids_nat(&c.call("cbGetNatPortMapping", &todas).await.unwrap());
+    assert_eq!(ids.len(), 2, "editar no crea");
+    assert!(ids.contains(&(id0.clone(), "editada".into())));
+
+    // Borrar la primera.
+    c.write(
+        "natportmap.asp",
+        "cbSetNatPortMapping",
+        &[("nat_port_mapping_id", &id0), ("del", "DEL")],
+    )
+    .await
+    .unwrap();
+    let ids = ids_nat(&c.call("cbGetNatPortMapping", &todas).await.unwrap());
+    assert_eq!(ids, vec![(nuevo.clone(), "nueva".into())]);
+    let r = c
+        .call("cbGetNatPortMapping", &[("nat_port_mapping_id", &id0)])
+        .await;
+    assert!(r.is_err(), "una instancia borrada ya no se lee");
+}
+
+// ------------------------------------------------ cbModifyPwd y login
+
+fn cliente_con(sim: &SimHandle, password: &str) -> Client {
+    Client::new(ClientConfig {
+        base_url: sim.base_url.clone(),
+        user: USER.into(),
+        password: password.into(),
+        timeout: Duration::from_secs(5),
+        min_gap: Duration::from_millis(1),
+    })
+}
+
+fn cambio_pwd<'a>(actual: &'a str, nueva: &'a str) -> [(&'a str, &'a str); 3] {
+    [("rqUser", USER), ("rqOPwd", actual), ("rqNPwd", nueva)]
+}
+
+#[tokio::test]
+async fn modify_pwd_cambia_y_el_login_nuevo_entra() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    c.call("cbGetSummary", &[]).await.unwrap();
+    c.write(
+        "user_profile.asp",
+        "cbModifyPwd",
+        &cambio_pwd(PASS, "clave-nueva"),
+    )
+    .await
+    .unwrap();
+    // La sesión abierta sigue valiendo.
+    c.call("cbGetSummary", &[]).await.unwrap();
+    // La nueva entra; la vieja ya no.
+    cliente_con(&sim, "clave-nueva")
+        .call("cbGetSummary", &[])
+        .await
+        .unwrap();
+    assert!(
+        cliente_con(&sim, PASS)
+            .call("cbGetSummary", &[])
+            .await
+            .is_err()
+    );
+}
+
+#[tokio::test]
+async fn modify_pwd_con_actual_mala_falla() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    let e = c
+        .write(
+            "user_profile.asp",
+            "cbModifyPwd",
+            &cambio_pwd("otra", "clave-nueva"),
+        )
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(&e, Error::CallFailed { result, .. } if result != "0"),
+        "{e:?}"
+    );
+    let e = c
+        .write(
+            "user_profile.asp",
+            "cbModifyPwd",
+            &[("rqUser", "otro"), ("rqOPwd", PASS), ("rqNPwd", "x")],
+        )
+        .await
+        .unwrap_err();
+    assert!(matches!(e, Error::CallFailed { .. }));
+    cliente_con(&sim, PASS)
+        .call("cbGetSummary", &[])
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn modify_pwd_sin_efecto_responde_ok_y_no_cambia() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    sim.control.modify_pwd_sin_efecto();
+    c.write(
+        "user_profile.asp",
+        "cbModifyPwd",
+        &cambio_pwd(PASS, "clave-nueva"),
+    )
+    .await
+    .unwrap();
+    cliente_con(&sim, PASS)
+        .call("cbGetSummary", &[])
+        .await
+        .unwrap();
+    // Solo la próxima: la siguiente sí cambia.
+    c.write(
+        "user_profile.asp",
+        "cbModifyPwd",
+        &cambio_pwd(PASS, "clave-nueva"),
+    )
+    .await
+    .unwrap();
+    cliente_con(&sim, "clave-nueva")
+        .call("cbGetSummary", &[])
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn login_falla_con_aunque_sea_la_vigente() {
+    let sim = start().await;
+    sim.control.login_falla_con(PASS);
+    assert!(
+        client(&sim, Duration::from_secs(5))
+            .call("cbGetSummary", &[])
+            .await
+            .is_err()
+    );
+    sim.control.set_password("otra-clave");
+    cliente_con(&sim, "otra-clave")
+        .call("cbGetSummary", &[])
+        .await
+        .unwrap();
+}

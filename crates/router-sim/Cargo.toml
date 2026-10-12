@@ -10,6 +10,7 @@ publish = false
 
 [dependencies]
 hgu = { path = "../hgu" }
+catalogo = { path = "../catalogo" }
 axum.workspace = true
 regex.workspace = true
 tokio.workspace = true
