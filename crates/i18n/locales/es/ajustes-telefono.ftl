@@ -15,13 +15,11 @@ ajuste-telefono-linea-silencio-recomendado = Con fibra el ahorro no se nota, y a
 ## Línea de teléfono: cuenta y línea directa
 ajuste-telefono-linea_oculto-titulo = Cuenta de la línea y línea directa
 ajuste-telefono-linea_oculto-desc = Los datos con los que la línea se identifica ante el operador y la llamada automática al descolgar.
-ajuste-telefono-linea_oculto-ayuda = Estos datos los pone el operador y no se muestran nunca. Si escribes uno mal, el teléfono fijo deja de funcionar hasta que vuelvas a poner el correcto. Cámbialos solo si el operador te lo pide.
+ajuste-telefono-linea_oculto-ayuda = Estos datos los pone el operador y no se muestran nunca. Si escribes uno mal, el teléfono fijo deja de funcionar hasta que deshagas el cambio. La contraseña de la línea no se cambia desde aquí. Cámbialos solo si el operador te lo pide.
 ajuste-telefono-linea_oculto-usuario = Usuario de la línea
 ajuste-telefono-linea_oculto-usuario-desc = El nombre con el que la línea se identifica ante el operador.
-ajuste-telefono-linea_oculto-contrasena = Contraseña de la línea
-ajuste-telefono-linea_oculto-contrasena-desc = La contraseña con la que la línea se identifica ante el operador.
 ajuste-telefono-linea_oculto-linea_directa = Línea directa
-ajuste-telefono-linea_oculto-linea_directa-desc = Al descolgar, si no marcas nada en unos segundos, el teléfono llama solo a un número fijado. La pone el operador: si no sabes para qué está, no la toques.
+ajuste-telefono-linea_oculto-linea_directa-desc = Al descolgar, el teléfono llama solo a un número fijado: nada más descolgar o, si no marcas nada, al cabo de unos segundos, según lo que haya dejado puesto el operador. Si no sabes para qué está, no la toques.
 ajuste-telefono-linea_oculto-numero_directo = Número de la línea directa
 ajuste-telefono-linea_oculto-numero_directo-desc = El número al que se llama solo con la línea directa encendida.
 
@@ -44,7 +42,7 @@ ajuste-telefono-sip-fax-desc = Envía los faxes de una forma pensada para intern
 ## Llamadas: servidores del operador
 ajuste-telefono-sip_oculto-titulo = Servidores de teléfono del operador
 ajuste-telefono-sip_oculto-desc = Las direcciones a las que el router se conecta para hacer y recibir llamadas.
-ajuste-telefono-sip_oculto-ayuda = Estos datos los pone el operador y las direcciones no se muestran nunca. Si escribes uno mal, el teléfono fijo deja de funcionar hasta que vuelvas a poner el correcto. Cámbialos solo si el operador te lo pide.
+ajuste-telefono-sip_oculto-ayuda = Estos datos los pone el operador y las direcciones no se muestran nunca. Si escribes uno mal, el teléfono fijo deja de funcionar hasta que deshagas el cambio. Cámbialos solo si el operador te lo pide.
 ajuste-telefono-sip_oculto-activo = Teléfono por internet encendido
 ajuste-telefono-sip_oculto-activo-desc = Si lo apagas, el router deja de conectarse al operador para las llamadas y el teléfono fijo no funciona.
 ajuste-telefono-sip_oculto-activo-recomendado = Apagado no puedes llamar ni recibir llamadas desde el fijo.

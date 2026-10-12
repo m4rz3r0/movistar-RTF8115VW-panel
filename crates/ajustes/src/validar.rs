@@ -459,7 +459,8 @@ fn compatibles(t: TipoCampo, p: &Parametro) -> bool {
     }
 }
 
-/// Regla 9: cada excluida existe, tiene motivo y ningún ajuste la usa.
+/// Regla 9: cada excluida es una escritura no bloqueada del catálogo, tiene
+/// motivo y ningún ajuste la usa.
 fn comprobar_excluidas(c: &CatalogoAjustes, f: &Catalogo, fallos: &mut Vec<String>) {
     let mut vistas = HashSet::new();
     for e in c.excluidas() {
@@ -467,10 +468,17 @@ fn comprobar_excluidas(c: &CatalogoAjustes, f: &Catalogo, fallos: &mut Vec<Strin
         if !vistas.insert(n.as_str()) {
             fallos.push(format!("excluida {n}: repetida"));
         }
-        if f.funcion(n).is_none() {
-            fallos.push(format!(
+        match f.funcion(n) {
+            None => fallos.push(format!(
                 "excluida {n}: no existe en el catálogo de funciones"
-            ));
+            )),
+            Some(func) if func.tipo != Tipo::Escritura => fallos.push(format!(
+                "excluida {n}: no es una escritura (solo se excluyen escrituras)"
+            )),
+            Some(func) if func.bloqueada.is_some() => fallos.push(format!(
+                "excluida {n}: está bloqueada en el catálogo de funciones (no hace falta excluirla)"
+            )),
+            Some(_) => {}
         }
         if e.motivo.trim().is_empty() {
             fallos.push(format!("excluida {n}: sin motivo"));

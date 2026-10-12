@@ -4,14 +4,16 @@
 # (reinicio, guardado…) no entran: son de los prestablecidos (fase 4).
 
 # ---- Duplicados de la web básica: el ajuste usa la función de la avanzada.
+# Las de IPv6 de la web básica (`te_ipv6.cmd`) no son duplicados: van con
+# las de fuera de las familias, más abajo.
 
 [[excluida]]
 funcion = "te_wifi.wl"
-motivo = "duplicado de la web básica de wifi.red_24 y wifi.radio_24"
+motivo = "duplicado de la web básica de wifi.red_24 y wifi.radio_24, salvo el filtro por MAC, que ningún ajuste ofrece (formato por validar con el router real; fase 3)"
 
 [[excluida]]
 funcion = "te_wifi_5ghz.wl"
-motivo = "duplicado de la web básica de wifi.red_5 y wifi.radio_5"
+motivo = "duplicado de la web básica de wifi.red_5 y wifi.radio_5, salvo el filtro por MAC, que ningún ajuste ofrece (formato por validar con el router real; fase 3)"
 
 [[excluida]]
 funcion = "te_wifi_guest.wl"
@@ -41,31 +43,23 @@ motivo = "duplicado de la web básica de puertos.reglas (formato antiguo)"
 funcion = "te_upnp.cmd"
 motivo = "duplicado de la web básica de puertos.upnp"
 
-[[excluida]]
-funcion = "te_ipv6.cmd?action=lanapply"
-motivo = "duplicado de la web básica de red_local.ipv6"
-
-[[excluida]]
-funcion = "te_ipv6.cmd?action=dhcpapply"
-motivo = "duplicado de la web básica de red_local.ipv6"
-
-# ---- Cambian la IP del router (CAMBIAN_IP_LAN del gestor).
+# ---- Las de CAMBIAN_IP_LAN del gestor: pueden cortar la conexión del panel.
 
 [[excluida]]
 funcion = "cbSetLanIPv4Addr"
-motivo = "cambia la IP del router y corta la conexión del panel"
+motivo = "cambia la IP del router: puede cortar la conexión del panel con el router"
 
 [[excluida]]
 funcion = "cbSetLanIPv4Intf"
-motivo = "cambia la IP del router y corta la conexión del panel"
+motivo = "activa o desactiva la interfaz de la red de casa: puede cortar la conexión del panel con el router"
 
 [[excluida]]
 funcion = "te_red_local.cgi"
-motivo = "cambia la IP del router y corta la conexión del panel"
+motivo = "cambia la IP del router: puede cortar la conexión del panel con el router"
 
 [[excluida]]
 funcion = "te_mapa_red_local.cgi"
-motivo = "cambia la IP del router y corta la conexión del panel"
+motivo = "cambia la IP del router: puede cortar la conexión del panel con el router"
 
 # ---- Configuración del operador.
 
@@ -179,11 +173,11 @@ motivo = "nombre e icono de un equipo en el mapa de la web básica: no cambia la
 
 [[excluida]]
 funcion = "cbAddUser"
-motivo = "usuarios de la web del router: crearlos o borrarlos va con las contraseñas de otros usuarios; fase 3"
+motivo = "usuarios de la web del router: crear uno fija una contraseña que el panel no puede comprobar ni deshacer; fase 3, con las contraseñas de otros usuarios"
 
 [[excluida]]
 funcion = "cbDeleteUser"
-motivo = "usuarios de la web del router: crearlos o borrarlos va con las contraseñas de otros usuarios; fase 3"
+motivo = "usuarios de la web del router: puede borrar el usuario con el que entra el panel y dejarlo fuera; fase 3, con las contraseñas de otros usuarios"
 
 [[excluida]]
 funcion = "cbSetWifiWds"
@@ -196,3 +190,11 @@ motivo = "restos sin terminar de la web del router: responde 404; la hora se cam
 [[excluida]]
 funcion = "cbSetSystemTimeZone"
 motivo = "restos sin terminar de la web del router: responde 404"
+
+[[excluida]]
+funcion = "te_ipv6.cmd?action=lanapply"
+motivo = "prefijo IPv6 de la red de casa desde la web básica: ningún ajuste lo ofrece en esta fase (red_local.ipv6 solo activa IPv6 y los anuncios); formato por validar con el router real; fase 3"
+
+[[excluida]]
+funcion = "te_ipv6.cmd?action=dhcpapply"
+motivo = "modo y rango de DHCPv6 desde la web básica: ningún ajuste lo ofrece en esta fase (red_local.ipv6 solo activa IPv6 y los anuncios); formato por validar con el router real; fase 3"

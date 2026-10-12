@@ -176,6 +176,35 @@ fn ajustes_minimos_presentes() {
         Some("enableCWMP")
     );
     assert_eq!(tr69.leer.funcion, "cbGetTr69Config");
+    // Decisión del usuario: se recomienda apagada, con las dos opciones a la
+    // vista (qué se gana y qué se pierde con cada una).
+    let opciones: Vec<(&str, &str, bool)> = activa
+        .opciones
+        .iter()
+        .map(|o| (o.valor.as_str(), o.clave.as_str(), o.recomendada))
+        .collect();
+    assert_eq!(
+        opciones,
+        [("1", "encendida", false), ("0", "apagada", true)]
+    );
+}
+
+/// La contraseña de la línea de voz no se edita: el router la devuelve
+/// vacía, así que no hay valor anterior al que volver (fase 3).
+#[test]
+fn contrasena_de_la_voz_no_se_edita() {
+    let c = cargar();
+    let editables: Vec<String> = c
+        .todos()
+        .iter()
+        .flat_map(|a| a.campos.iter().map(move |x| (a, x)))
+        .filter(|(_, x)| {
+            x.escribible()
+                .is_some_and(|e| e.funcion == "cbSetVoiceLine" && e.parametro == "auth_password")
+        })
+        .map(|(a, x)| format!("{}.{}", a.id, x.id))
+        .collect();
+    assert!(editables.is_empty(), "{editables:?}");
 }
 
 /// Cada función de escritura que no está bloqueada en el catálogo de
@@ -227,10 +256,28 @@ fn valores_del_fichero(ruta: &PathBuf) -> Vec<(String, String)> {
     valores
 }
 
-/// Nombres de la API que usa el catálogo de ajustes: funciones, parámetros
-/// (de escritura, de lectura y fijos) y elementos leídos. Solo los que
-/// parecen identificadores (llevan `_`, una mayúscula o una cifra): una
-/// palabra corriente como `region` no delata la API.
+/// Nombres de parámetro del catálogo que también son palabras corrientes en
+/// español o en inglés: aparecen en los textos sin delatar la API.
+/// - `account`, `all`, `password`, `provider`: palabras inglesas de uso
+///   diario («your WiFi password», «all devices»);
+/// - `authentication`, `encryption`, `isolation`, `standard`: términos
+///   corrientes al explicar la seguridad y la compatibilidad de la WiFi;
+/// - `beamforming`: el nombre de la técnica, que el texto explica.
+const PALABRAS_CORRIENTES: [&str; 9] = [
+    "account",
+    "all",
+    "authentication",
+    "beamforming",
+    "encryption",
+    "isolation",
+    "password",
+    "provider",
+    "standard",
+];
+
+/// Nombres de la API que usa el catálogo de ajustes: parámetros (de
+/// escritura, de lectura y fijos) y elementos leídos, salvo las
+/// [`PALABRAS_CORRIENTES`].
 fn nombres_de_la_api(c: &CatalogoAjustes) -> BTreeSet<String> {
     let mut nombres = BTreeSet::new();
     for a in c.todos() {
@@ -245,31 +292,79 @@ fn nombres_de_la_api(c: &CatalogoAjustes) -> BTreeSet<String> {
             }
         }
     }
-    nombres.retain(|n| {
-        n.contains('_')
-            || n.chars()
-                .any(|ch| ch.is_ascii_uppercase() || ch.is_ascii_digit())
-    });
+    nombres.retain(|n| !PALABRAS_CORRIENTES.contains(&n.as_str()));
     nombres
 }
 
+/// Patrones que delatan la API: funciones `cb…`, páginas y órdenes del
+/// router (`cwmp.asp`, `te_wifi.wl`, `scbidirectionalflt.cmd`…) y los
+/// nombres de parámetro del catálogo, como palabra entera y distinguiendo
+/// mayúsculas («WMM» no es `wmm`).
+fn patrones_de_la_api(c: &CatalogoAjustes) -> Vec<Regex> {
+    let mut patrones = vec![
+        Regex::new(r"\bcb[A-Z]\w+").unwrap(),
+        Regex::new(r"\b\w+\.(asp|cmd|cgi|wl)\b").unwrap(),
+    ];
+    patrones.extend(
+        nombres_de_la_api(c)
+            .iter()
+            .map(|n| Regex::new(&format!(r"\b{}\b", regex::escape(n))).unwrap()),
+    );
+    patrones
+}
+
+/// Trozos de `texto` que casan con algún patrón.
+fn hallazgos(patrones: &[Regex], texto: &str) -> Vec<String> {
+    patrones
+        .iter()
+        .filter_map(|p| p.find(texto))
+        .map(|m| m.as_str().to_owned())
+        .collect()
+}
+
+/// El detector reconoce páginas, funciones y parámetros (también los que van
+/// en minúsculas) y deja pasar las palabras corrientes y las siglas.
+#[test]
+fn detector_de_nombres_de_la_api() {
+    let patrones = patrones_de_la_api(&cargar());
+    for delator in [
+        "se cambia en cwmp.asp",
+        "la página voiceadvance.asp",
+        "scbidirectionalflt.cmd?action=add",
+        "con te_wifi.wl",
+        "llama a cbSetTr69Config",
+        "el campo hostname",
+        "el valor de ssid",
+        "pon enableCWMP a 0",
+        "ssid_hide vale 1",
+    ] {
+        assert!(
+            !hallazgos(&patrones, delator).is_empty(),
+            "no detecta «{delator}»"
+        );
+    }
+    for llano in [
+        "Change your WiFi password for all devices.",
+        "Encryption and isolation keep the network safe.",
+        "Activa WMM en la red de casa, por ejemplo hora.example.",
+    ] {
+        assert!(
+            hallazgos(&patrones, llano).is_empty(),
+            "falso positivo en «{llano}»: {:?}",
+            hallazgos(&patrones, llano)
+        );
+    }
+}
+
 /// Ningún texto de los ajustes (ni de las recomendaciones) nombra una
-/// función de la API ni un parámetro del catálogo: eso solo lo enseñan los
+/// función, una página o un parámetro de la API: eso solo lo enseñan los
 /// detalles técnicos plegados.
 #[test]
 fn textos_de_ajustes_sin_api() {
     let c = cargar();
-    let mut patrones = vec![
-        Regex::new(r"\bcb[A-Z]\w+").unwrap(),
-        Regex::new(r"\bte_\w+\.(asp|cmd|cgi|wl)\b").unwrap(),
-    ];
     let nombres = nombres_de_la_api(&c);
     assert!(nombres.contains("ssid_hide") && nombres.contains("enableCWMP"));
-    patrones.extend(
-        nombres
-            .iter()
-            .map(|n| Regex::new(&format!(r"\b{}\b", regex::escape(n))).unwrap()),
-    );
+    let patrones = patrones_de_la_api(&c);
     let mut fallos = Vec::new();
     for idioma in Idioma::TODOS {
         let rutas = ficheros_ftl(idioma.codigo(), |s| {
@@ -278,14 +373,11 @@ fn textos_de_ajustes_sin_api() {
         assert!(!rutas.is_empty(), "sin ficheros de ajustes en {idioma:?}");
         for ruta in rutas {
             for (clave, valor) in valores_del_fichero(&ruta) {
-                for p in &patrones {
-                    if let Some(m) = p.find(&valor) {
-                        fallos.push(format!(
-                            "{} {clave}: «{}»",
-                            ruta.file_name().unwrap().to_string_lossy(),
-                            m.as_str()
-                        ));
-                    }
+                for m in hallazgos(&patrones, &valor) {
+                    fallos.push(format!(
+                        "{} {clave}: «{m}»",
+                        ruta.file_name().unwrap().to_string_lossy()
+                    ));
                 }
             }
         }

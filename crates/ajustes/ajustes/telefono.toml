@@ -24,6 +24,11 @@ lee = "vad_state"
 tipo = "booleano"
 recomendado = "false"
 
+# La contraseña de la línea (`auth_password`) no está: el router la devuelve
+# vacía, así que el panel no tendría valor anterior al que volver. La fase 3
+# debe comprobar, antes de la primera escritura de voz, que reenviar ese
+# secreto vacío (el gestor completa cada escritura con la lectura) no borra
+# la contraseña de la línea, o hacer que el gestor no lo envíe.
 [[ajuste]]
 id = "telefono.linea_oculto"
 tema = "telefono"
@@ -35,13 +40,6 @@ fijos = { interwork_id = "0" }
 id = "usuario"
 escribe = { funcion = "cbSetVoiceLine", parametro = "auth_username" }
 lee = "auth_username"
-tipo = "secreto"
-validar = { min = 1 }
-
-[[ajuste.campo]]
-id = "contrasena"
-escribe = { funcion = "cbSetVoiceLine", parametro = "auth_password" }
-lee = "auth_password"
 tipo = "secreto"
 validar = { min = 1 }
 

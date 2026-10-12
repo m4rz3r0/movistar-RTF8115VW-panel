@@ -15,13 +15,11 @@ ajuste-telefono-linea-silencio-recomendado = With fibre the saving is not notice
 ## Phone line: account and direct line
 ajuste-telefono-linea_oculto-titulo = Line account and direct line
 ajuste-telefono-linea_oculto-desc = The details the line uses to identify itself to the operator, and the automatic call when you pick up.
-ajuste-telefono-linea_oculto-ayuda = The operator sets these and they are never shown. If you type one wrong, the landline stops working until you put the right one back. Only change them if the operator asks you to.
+ajuste-telefono-linea_oculto-ayuda = The operator sets these and they are never shown. If you type one wrong, the landline stops working until you undo the change. The line password is not changed from here. Only change them if the operator asks you to.
 ajuste-telefono-linea_oculto-usuario = Line username
 ajuste-telefono-linea_oculto-usuario-desc = The name the line uses to identify itself to the operator.
-ajuste-telefono-linea_oculto-contrasena = Line password
-ajuste-telefono-linea_oculto-contrasena-desc = The password the line uses to identify itself to the operator.
 ajuste-telefono-linea_oculto-linea_directa = Direct line
-ajuste-telefono-linea_oculto-linea_directa-desc = When you pick up, if you do not dial anything within a few seconds, the phone calls a set number on its own. The operator sets it: if you do not know what it is for, leave it alone.
+ajuste-telefono-linea_oculto-linea_directa-desc = When you pick up, the phone calls a set number on its own: straight away or, if you do not dial anything, after a few seconds, depending on what the operator has set. If you do not know what it is for, leave it alone.
 ajuste-telefono-linea_oculto-numero_directo = Direct line number
 ajuste-telefono-linea_oculto-numero_directo-desc = The number that is called on its own while the direct line is on.
 
@@ -44,7 +42,7 @@ ajuste-telefono-sip-fax-desc = Sends faxes in a way designed for the internet, w
 ## Calls: operator's servers
 ajuste-telefono-sip_oculto-titulo = Operator's phone servers
 ajuste-telefono-sip_oculto-desc = The addresses the router connects to in order to make and receive calls.
-ajuste-telefono-sip_oculto-ayuda = The operator sets these and the addresses are never shown. If you type one wrong, the landline stops working until you put the right one back. Only change them if the operator asks you to.
+ajuste-telefono-sip_oculto-ayuda = The operator sets these and the addresses are never shown. If you type one wrong, the landline stops working until you undo the change. Only change them if the operator asks you to.
 ajuste-telefono-sip_oculto-activo = Internet phone on
 ajuste-telefono-sip_oculto-activo-desc = If you turn it off, the router stops connecting to the operator for calls and the landline does not work.
 ajuste-telefono-sip_oculto-activo-recomendado = While it is off you cannot make or receive calls from the landline.

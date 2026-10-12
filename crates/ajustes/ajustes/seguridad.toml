@@ -15,8 +15,13 @@ leer = { funcion = "cbGetTr69Config" }
 id = "activa"
 escribe = { funcion = "cbSetTr69Config", parametro = "enableCWMP" }
 lee = "enableCWMP"
-tipo = "booleano"
-recomendado = "true"
+tipo = "opcion"
+# Recomendada apagada (decisión del usuario, 2026-10-13): el motivo dice para
+# quién es y qué se gana y qué se pierde.
+opciones = [
+  { valor = "1", clave = "encendida" },
+  { valor = "0", clave = "apagada", recomendada = true },
+]
 
 [[ajuste]]
 id = "seguridad.gestion_remota_avanzado"

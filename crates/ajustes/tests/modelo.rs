@@ -912,3 +912,28 @@ fn forma_de_booleanos_enteros_opcionales_y_claves() {
         "`ascii` solo vale en texto o secreto",
     );
 }
+
+/// Regla 9: solo se excluye una escritura no bloqueada (una lectura, una
+/// acción o una función bloqueada no necesitan ajuste ni motivo).
+#[test]
+fn excluida_solo_de_escrituras_no_bloqueadas() {
+    let solo = |ex: &str, f: &Catalogo| comprobar(&cargar(&[], ex), f, &mascara());
+    let lectura = "[[excluida]]\nfuncion = \"cbGetX\"\nmotivo = \"es una lectura\"\n";
+    falla_con(
+        &solo(lectura, &funciones()),
+        "cbGetX",
+        "no es una escritura",
+    );
+    let set_x = "[[excluida]]\nfuncion = \"cbSetX\"\nmotivo = \"sin ajuste\"\n";
+    assert!(
+        solo(set_x, &funciones()).is_empty(),
+        "{:#?}",
+        solo(set_x, &funciones())
+    );
+    let bloqueada = Catalogo::from_toml(&FUNCIONES.replace(
+        "descripcion = \"Escribe X\"",
+        "descripcion = \"Escribe X\"\nbloqueada = \"motivo de prueba suficiente\"",
+    ))
+    .unwrap();
+    falla_con(&solo(set_x, &bloqueada), "cbSetX", "bloqueada");
+}
