@@ -283,7 +283,7 @@ checksum = "bbbad30e4b4c14a39e3cc8aed085a12a327257c316619c93581e017bc52be591"
 
 [[package]]
 name = "catalogo"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "hgu",
  "serde",
@@ -1044,7 +1044,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "hgu"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "axum",
  "regex",
@@ -1211,7 +1211,7 @@ dependencies = [
 
 [[package]]
 name = "i18n"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "fluent-bundle",
  "fluent-syntax",
@@ -1932,7 +1932,7 @@ checksum = "8c04f5d74368e4d0dfe06c45c8627c81bd7c317d52762d118fb9b3076f6420fd"
 
 [[package]]
 name = "panel"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "argon2",
  "axum",
@@ -2416,7 +2416,7 @@ dependencies = [
 
 [[package]]
 name = "router-sim"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "axum",
  "hgu",
