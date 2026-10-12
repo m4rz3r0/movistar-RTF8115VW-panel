@@ -1,11 +1,14 @@
 # Ajustes del panel.
-panel-solo-lectura = El panel está en solo lectura: el firmware del router no se ha probado con el panel. Confírmalo en Router → Conexión con el router para poder hacer cambios.
+panel-solo-lectura = El panel está en solo lectura: el firmware del router no se ha probado con el panel. Confírmalo en Configuración del router → Conexión con el router para poder hacer cambios.
 
 ## Página
 panel-titulo = Ajustes del panel
-panel-sub = Idioma y zona horaria, privacidad e instancia y usuarios del panel. Se guardan en la base de datos del panel.
+panel-sub = Idioma, zona horaria y usuarios del panel. Se guardan en la base de datos del panel.
 panel-sub-router = La conexión con el router está en
-panel-sub-router-enlace = Router → Conexión con el router
+panel-sub-router-enlace = Configuración del router
+panel-sub-preferencias = y los parámetros que usan los prestablecidos y las recomendaciones, en
+panel-sub-preferencias-enlace = Recomendaciones → Tus preferencias
+panel-guardar = Guardar
 panel-guardado = Guardado.
 
 ## Panel
@@ -21,33 +24,6 @@ panel-zona-utc = UTC
 panel-zona-otra = Otra (UTC±HH:MM)
 panel-zona-desfase = Desfase respecto a UTC
 
-## Privacidad e instancia
-panel-privacidad = Privacidad e instancia
-panel-privacidad-texto = Parámetros que usan las acciones y las recomendaciones. Todos son opcionales.
-panel-dns = DNS preferidos
-panel-dns-ayuda = Hasta { $n } direcciones IPv4 o IPv6, separadas por comas o espacios. Vacío: los del operador.
-panel-dns-sugerencias = Sugerencias públicas
-panel-dns-usar = Usar { $nombre }
-panel-dns-politica = política de privacidad de { $nombre }
-panel-dns-quad9 = Quad9
-panel-dns-quad9-ips = 9.9.9.9
-panel-dns-quad9-politica = https://quad9.net/privacy/policy/
-panel-dns-mullvad = Mullvad
-panel-dns-mullvad-ips = 194.242.2.2
-panel-dns-mullvad-politica = https://mullvad.net/help/privacy-policy
-panel-dns-cloudflare = Cloudflare
-panel-dns-cloudflare-ips = 1.1.1.1
-panel-dns-cloudflare-politica = https://developers.cloudflare.com/1.1.1.1/privacy/public-dns-resolver/
-panel-confianza = Dispositivos de confianza
-panel-confianza-ayuda = Direcciones MAC, separadas por comas o espacios.
-panel-confianza-equipos = Equipos que ve el router
-panel-confianza-anadir = Añadir { $nombre }
-panel-equipo-sin-nombre = (sin nombre)
-panel-mantenimiento = Horario de mantenimiento
-panel-mantenimiento-ayuda = Como 03:00-05:00. Vacío: sin horario.
-panel-servidor = Servidor propio
-panel-servidor-ayuda = IP o nombre de un servidor de la red, si tienes uno. Vacío: ninguno.
-panel-guardar = Guardar
 
 ## Usuarios
 panel-usuarios = Usuarios del panel

@@ -548,9 +548,10 @@ pub(crate) mod servidor {
 
     /// Prueba las credenciales del router y, si entran, las guarda, las pasa
     /// al cliente del panel y fija el modo según el firmware. La usan el
-    /// asistente y «Router → Conexión con el router». Con un cambio
-    /// aplicándose o vigilándose, 409 sin tocar nada: el vigilante seguiría
-    /// con otro router; mientras dura, el gestor no empieza ningún cambio.
+    /// asistente y «Configuración del router → Conexión con el router». Con
+    /// un cambio aplicándose o vigilándose, 409 sin tocar nada: el vigilante
+    /// seguiría con otro router; mientras dura, el gestor no empieza ningún
+    /// cambio.
     pub(crate) async fn guardar(
         state: &AppState,
         url: &str,

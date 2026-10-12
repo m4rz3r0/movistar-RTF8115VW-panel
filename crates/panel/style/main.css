@@ -346,7 +346,10 @@ button {
   gap: 2px;
 }
 
-.nav a {
+/* El nombre de usuario de la zona de sesión (abre «Ajustes del panel») se
+   ve y se marca como un enlace del menú. */
+.nav a,
+.sesion-usuario {
   position: relative;
   display: flex;
   align-items: center;
@@ -360,21 +363,25 @@ button {
   transition: color 120ms ease, background 120ms ease;
 }
 
-.nav a:hover {
+.nav a:hover,
+.sesion-usuario:hover {
   color: var(--texto-1);
   background: var(--superficie-2);
 }
 
-.nav a[aria-current="page"] {
+.nav a[aria-current="page"],
+.sesion-usuario[aria-current="page"] {
   color: var(--texto-1);
   background: var(--acento-suave);
 }
 
-.nav a[aria-current="page"] .icono {
+.nav a[aria-current="page"] .icono,
+.sesion-usuario[aria-current="page"] .icono {
   color: var(--acento);
 }
 
-.nav a[aria-current="page"]::before {
+.nav a[aria-current="page"]::before,
+.sesion-usuario[aria-current="page"]::before {
   content: "";
   position: absolute;
   left: -12px;
@@ -393,14 +400,16 @@ button {
   border-top: 1px solid var(--borde);
 }
 
+/* Un nombre largo se corta con puntos suspensivos: no ensancha la barra. */
 .sesion-usuario {
-  display: flex;
-  align-items: center;
-  gap: var(--esp-2);
   min-width: 0;
-  padding: 0 var(--esp-2);
-  color: var(--texto-2);
-  overflow-wrap: anywhere;
+}
+
+.sesion-nombre {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .salir {
@@ -490,7 +499,8 @@ button {
     display: flex;
   }
 
-  .nav a[aria-current="page"]::before {
+  .nav a[aria-current="page"]::before,
+  .sesion-usuario[aria-current="page"]::before {
     left: 0;
   }
 
@@ -508,6 +518,15 @@ button {
   align-items: flex-end;
   justify-content: space-between;
   gap: var(--esp-4);
+}
+
+.pagina-antetitulo {
+  margin-bottom: var(--esp-1);
+  color: var(--texto-2);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .pagina-sub {

@@ -14,6 +14,7 @@ pub mod instalar;
 pub mod layout;
 pub mod login;
 pub mod panel_ajustes;
+pub mod recomendaciones;
 pub mod router;
 pub mod table;
 

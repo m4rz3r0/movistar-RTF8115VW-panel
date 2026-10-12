@@ -40,7 +40,8 @@ locales!(
     "biblioteca",
     "instalar",
     "panel",
-    "router"
+    "router",
+    "recomendaciones"
 );
 
 /// Idioma de la interfaz.

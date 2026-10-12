@@ -11,7 +11,7 @@ async function enIngles(page: Page) {
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   const nav = page.getByRole("navigation", { name: "Main", exact: true });
   await expect(nav.getByRole("link", { name: "Status" })).toBeVisible();
-  await expect(nav.getByRole("link", { name: "Explorer" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Library" })).toBeVisible();
   await expect(nav.getByRole("link", { name: "History" })).toBeVisible();
 }
 

@@ -1,7 +1,9 @@
-//! Sección «Router» (`/router/*`): los ajustes del router, cada uno en su
-//! página. La primera es «Conexión con el router» (`/router/conexion`):
-//! dirección, usuario y contraseña con los que entra el panel, prueba de la
-//! conexión y confirmación del firmware. `/router` lleva a ella.
+//! Sección «Configuración del router» (`/router/*`): todo lo que necesita el
+//! panel para conectar con el router, cada cosa en su página (los ajustes
+//! del propio router van en «Ajustes»). La primera es «Conexión con el
+//! router» (`/router/conexion`): dirección, usuario y contraseña con los que
+//! entra el panel, prueba de la conexión y confirmación del firmware.
+//! `/router` lleva a ella.
 //!
 //! La misma página muestra la red del router detectada (conexión a internet,
 //! LAN, telefonía y televisión) y deja elegir a mano la conexión a internet

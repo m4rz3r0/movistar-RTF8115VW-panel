@@ -1,17 +1,19 @@
 //! «Ajustes del panel» (`/panel`): solo lo del panel. Panel (idioma por
-//! defecto y zona horaria), privacidad e instancia (DNS preferidos,
-//! dispositivos de confianza, mantenimiento, servidor propio) y usuarios del
-//! panel. Lo del router está en la sección «Router» ([`super::router`]).
+//! defecto y zona horaria) y usuarios del panel. No está en el menú: se abre
+//! con el nombre de usuario. Lo del router está en «Configuración del
+//! router» ([`super::router`]) y los parámetros que usan prestablecidos y
+//! recomendaciones, en «Tus preferencias» ([`super::recomendaciones`]).
 //!
-//! Lo delicado (usuarios aquí; credenciales y firmware en «Router») pide la
-//! contraseña del panel si no se ha escrito en los últimos 5 minutos: el
-//! servidor responde con [`crate::auth::ERROR_REAUTENTICACION`], la página
-//! la pide en un diálogo ([`DialogoReautenticar`]) y repite la operación.
+//! Lo delicado (usuarios aquí; credenciales y firmware en «Configuración del
+//! router») pide la contraseña del panel si no se ha escrito en los últimos
+//! 5 minutos: el servidor responde con
+//! [`crate::auth::ERROR_REAUTENTICACION`], la página la pide en un diálogo
+//! ([`DialogoReautenticar`]) y repite la operación.
 
 use super::{es_error_de_reautenticacion, mensaje_del_servidor};
 use crate::panel_ajustes::{
-    AjustesPanel, CamposInstancia, EquipoLan, IdiomaPorDefecto, MAX_DNS, borrar_usuario,
-    cambiar_contrasena, crear_usuario, desfases_fijos, guardar_instancia, leer_panel, reautenticar,
+    AjustesPanel, CamposInstancia, IdiomaPorDefecto, borrar_usuario, cambiar_contrasena,
+    crear_usuario, desfases_fijos, guardar_instancia, leer_panel, reautenticar,
 };
 use crate::t;
 use crate::ui::charts::Zona;
@@ -86,6 +88,10 @@ pub fn PaginaPanel() -> impl IntoView {
                 <p class="pagina-sub">
                     {t!("panel-sub")} " " {t!("panel-sub-router")} " "
                     <A href=super::router::RUTA_CONEXION>{t!("panel-sub-router-enlace")}</A>
+                    " " {t!("panel-sub-preferencias")} " "
+                    <A href=super::recomendaciones::RUTA_PREFERENCIAS>
+                        {t!("panel-sub-preferencias-enlace")}
+                    </A>
                     "."
                 </p>
             </div>
@@ -111,7 +117,6 @@ fn Ajustes(a: AjustesPanel) -> impl IntoView {
     view! {
         <div class="ajustes-panel">
             <SeccionPanel instancia />
-            <SeccionPrivacidad instancia equipos=a.equipos.clone() />
             <SeccionUsuarios usuarios=a.usuarios.clone() yo=a.yo.clone() />
         </div>
     }
@@ -171,10 +176,10 @@ pub(crate) fn campo(
     }
 }
 
-// ---- Parámetros de la instancia
+// ---- Idioma y zona horaria
 
-/// Parámetros de la instancia en edición. Cada sección guarda solo los
-/// suyos ([`Seccion`]): lo que se esté editando en la otra no se envía.
+/// Idioma por defecto y zona horaria en edición. Solo se guardan estos dos
+/// parámetros de la instancia: los de «Tus preferencias» no se envían.
 #[derive(Clone, Copy)]
 struct Instancia {
     idioma: RwSignal<IdiomaPorDefecto>,
@@ -185,27 +190,6 @@ struct Instancia {
     /// La zona horaria que tiene guardada la instancia: si cambia, la página
     /// se recarga para pintar las fechas en la nueva.
     zona_guardada: StoredValue<String>,
-    dns: RwSignal<String>,
-    confianza: RwSignal<String>,
-    mantenimiento: RwSignal<String>,
-    servidor: RwSignal<String>,
-}
-
-/// Sección de la página que guarda parámetros de la instancia.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Seccion {
-    /// Idioma y zona horaria.
-    Panel,
-    /// DNS, dispositivos de confianza, mantenimiento y servidor propio.
-    Privacidad,
-}
-
-/// Lista escrita a mano: separada por comas, espacios o saltos de línea.
-fn trocear(s: &str) -> Vec<String> {
-    s.split(|c: char| c == ',' || c == ';' || c.is_whitespace())
-        .filter(|x| !x.is_empty())
-        .map(str::to_owned)
-        .collect()
 }
 
 impl Instancia {
@@ -215,10 +199,6 @@ impl Instancia {
             idioma_guardado: StoredValue::new(a.idioma),
             zona: RwSignal::new(a.zona_horaria.clone()),
             zona_guardada: StoredValue::new(a.zona_horaria.clone()),
-            dns: RwSignal::new(a.dns_preferidos.join(", ")),
-            confianza: RwSignal::new(a.dispositivos_confianza.join(", ")),
-            mantenimiento: RwSignal::new(a.mantenimiento.clone().unwrap_or_default()),
-            servidor: RwSignal::new(a.servidor_propio.clone().unwrap_or_default()),
         }
     }
 
@@ -231,42 +211,19 @@ impl Instancia {
         if let Some(z) = c.zona_horaria {
             self.zona.set(z);
         }
-        if let Some(d) = c.dns_preferidos {
-            self.dns.set(d.join(", "));
-        }
-        if let Some(m) = c.dispositivos_confianza {
-            self.confianza.set(m.join(", "));
-        }
-        if let Some(m) = c.mantenimiento {
-            self.mantenimiento.set(m);
-        }
-        if let Some(v) = c.servidor_propio {
-            self.servidor.set(v);
+    }
+
+    fn campos(self) -> CamposInstancia {
+        CamposInstancia {
+            idioma: Some(self.idioma.get_untracked()),
+            zona_horaria: Some(self.zona.get_untracked()),
+            ..CamposInstancia::default()
         }
     }
 
-    fn campos(self, seccion: Seccion) -> CamposInstancia {
-        match seccion {
-            Seccion::Panel => CamposInstancia {
-                idioma: Some(self.idioma.get_untracked()),
-                zona_horaria: Some(self.zona.get_untracked()),
-                ..CamposInstancia::default()
-            },
-            Seccion::Privacidad => CamposInstancia {
-                dns_preferidos: Some(trocear(&self.dns.get_untracked())),
-                dispositivos_confianza: Some(trocear(&self.confianza.get_untracked())),
-                mantenimiento: Some(self.mantenimiento.get_untracked()),
-                servidor_propio: Some(self.servidor.get_untracked()),
-                ..CamposInstancia::default()
-            },
-        }
-    }
-
-    /// Guarda los parámetros de `seccion`; el resultado, en `error` o
-    /// `aviso`.
+    /// Guarda el idioma y la zona; el resultado, en `error` o `aviso`.
     fn guardar(
         self,
-        seccion: Seccion,
         pendiente: RwSignal<bool>,
         error: RwSignal<Option<String>>,
         aviso: RwSignal<Option<String>>,
@@ -274,7 +231,7 @@ impl Instancia {
         error.set(None);
         aviso.set(None);
         pendiente.set(true);
-        let campos = self.campos(seccion);
+        let campos = self.campos();
         spawn_local(async move {
             match guardar_instancia(campos).await {
                 Ok(c) => {
@@ -338,7 +295,7 @@ fn SeccionPanel(instancia: Instancia) -> impl IntoView {
     let pendiente = RwSignal::new(false);
     let enviar = move |ev: SubmitEvent| {
         ev.prevent_default();
-        instancia.guardar(Seccion::Panel, pendiente, error, aviso);
+        instancia.guardar(pendiente, error, aviso);
     };
     let navegador = view! {
         <option
@@ -466,151 +423,6 @@ fn SeccionPanel(instancia: Instancia) -> impl IntoView {
                     <span class="nota" id="panel-zona-ayuda">{t!("panel-zona-ayuda")}</span>
                 </p>
                 {desfases}
-                {mensajes(error, aviso)}
-                <div class="botones">
-                    <button class="boton" type="submit" disabled=move || pendiente.get()>
-                        {t!("panel-guardar")}
-                    </button>
-                </div>
-            </form>
-        </section>
-    }
-}
-
-/// Sugerencias de DNS públicos: nombre, direcciones y política de
-/// privacidad (claves i18n).
-fn sugerencias_dns() -> [(String, String, String); 3] {
-    [
-        (
-            t!("panel-dns-quad9"),
-            t!("panel-dns-quad9-ips"),
-            t!("panel-dns-quad9-politica"),
-        ),
-        (
-            t!("panel-dns-mullvad"),
-            t!("panel-dns-mullvad-ips"),
-            t!("panel-dns-mullvad-politica"),
-        ),
-        (
-            t!("panel-dns-cloudflare"),
-            t!("panel-dns-cloudflare-ips"),
-            t!("panel-dns-cloudflare-politica"),
-        ),
-    ]
-}
-
-#[component]
-fn SeccionPrivacidad(instancia: Instancia, equipos: Vec<EquipoLan>) -> impl IntoView {
-    let error = RwSignal::new(None::<String>);
-    let aviso = RwSignal::new(None::<String>);
-    let pendiente = RwSignal::new(false);
-    let enviar = move |ev: SubmitEvent| {
-        ev.prevent_default();
-        instancia.guardar(Seccion::Privacidad, pendiente, error, aviso);
-    };
-    let sugerencias = sugerencias_dns()
-        .into_iter()
-        .map(|(nombre, ips, politica)| {
-            let usar = t!("panel-dns-usar", nombre = nombre.clone());
-            let enlace = t!("panel-dns-politica", nombre = nombre);
-            view! {
-                <li>
-                    <button
-                        class="boton-sutil"
-                        type="button"
-                        on:click=move |_| instancia.dns.set(ips.clone())
-                    >
-                        {usar}
-                    </button>
-                    <a href=politica rel="noopener noreferrer" target="_blank">
-                        {enlace}
-                    </a>
-                </li>
-            }
-        })
-        .collect_view();
-    let anadir = move |mac: String| {
-        instancia.confianza.update(|c| {
-            let mut l = trocear(c);
-            if !l.iter().any(|m| m.eq_ignore_ascii_case(&mac)) {
-                l.push(mac);
-            }
-            *c = l.join(", ");
-        });
-    };
-    let equipos = (!equipos.is_empty()).then(|| {
-        let botones = equipos
-            .into_iter()
-            .map(|e| {
-                let nombre = if e.nombre.is_empty() {
-                    t!("panel-equipo-sin-nombre")
-                } else {
-                    e.nombre.clone()
-                };
-                let mac = e.mac.clone();
-                view! {
-                    <li>
-                        <button
-                            class="boton-sutil"
-                            type="button"
-                            on:click=move |_| anadir(mac.clone())
-                        >
-                            {t!("panel-confianza-anadir", nombre = nombre)}
-                            <span class="mono">{e.mac}</span>
-                        </button>
-                    </li>
-                }
-            })
-            .collect_view();
-        view! {
-            <div class="ajustes-sugerencias">
-                <p class="nota">{t!("panel-confianza-equipos")}</p>
-                <ul class="lista-limpia ajustes-botones">{botones}</ul>
-            </div>
-        }
-    });
-    view! {
-        <section class="tarjeta" aria-labelledby="panel-privacidad">
-            <h2 id="panel-privacidad">{t!("panel-privacidad")}</h2>
-            <form class="ajustes-formulario" on:submit=enviar>
-                <p class="nota">{t!("panel-privacidad-texto")}</p>
-                {campo(
-                    "panel-dns",
-                    t!("panel-dns"),
-                    "text",
-                    "off",
-                    instancia.dns,
-                    Some(t!("panel-dns-ayuda", n = MAX_DNS)),
-                )}
-                <div class="ajustes-sugerencias">
-                    <p class="nota">{t!("panel-dns-sugerencias")}</p>
-                    <ul class="lista-limpia ajustes-botones">{sugerencias}</ul>
-                </div>
-                {campo(
-                    "panel-confianza",
-                    t!("panel-confianza"),
-                    "text",
-                    "off",
-                    instancia.confianza,
-                    Some(t!("panel-confianza-ayuda")),
-                )}
-                {equipos}
-                {campo(
-                    "panel-mantenimiento",
-                    t!("panel-mantenimiento"),
-                    "text",
-                    "off",
-                    instancia.mantenimiento,
-                    Some(t!("panel-mantenimiento-ayuda")),
-                )}
-                {campo(
-                    "panel-servidor",
-                    t!("panel-servidor"),
-                    "text",
-                    "off",
-                    instancia.servidor,
-                    Some(t!("panel-servidor-ayuda")),
-                )}
                 {mensajes(error, aviso)}
                 <div class="botones">
                     <button class="boton" type="submit" disabled=move || pendiente.get()>

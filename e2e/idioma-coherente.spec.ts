@@ -96,7 +96,15 @@ async function sinJs(browser: Browser, ctx: BrowserContext, locale: string, ruta
   return { p, cerrar: () => otro.close() };
 }
 
-const rutas = ["/", "/historial", "/explorador", "/explorador/lan_dhcp", "/panel", "/router/conexion"];
+const rutas = [
+  "/",
+  "/historial",
+  "/explorador",
+  "/explorador/lan_dhcp",
+  "/panel",
+  "/router/conexion",
+  "/recomendaciones/preferencias",
+];
 
 const combinaciones = [
   { nombre: "cookie es y navegador en inglés", locale: "en-US", cookie: "es" },
@@ -123,12 +131,12 @@ test.describe("idioma coherente", () => {
       }
 
       // Tras hablar con el servidor: error de validación…
-      await page.goto("/panel");
+      await page.goto("/recomendaciones/preferencias");
       await asentar(page);
-      await page.locator("#panel-dns").fill("no-es-una-ip");
-      await page.locator("section[aria-labelledby=panel-privacidad] button[type=submit]").click();
-      await expect(page.locator("section[aria-labelledby=panel-privacidad] .error-formulario")).not.toBeEmpty();
-      await sinIngles(page, "/panel con error");
+      await page.locator("#pref-dns").fill("no-es-una-ip");
+      await page.locator("section[aria-labelledby=pref-preferencias] button[type=submit]").click();
+      await expect(page.locator("section[aria-labelledby=pref-preferencias] .error-formulario")).not.toBeEmpty();
+      await sinIngles(page, "/recomendaciones/preferencias con error");
 
       // …y diálogo de reautenticación con contraseña mala.
       await page.goto("/router/conexion");

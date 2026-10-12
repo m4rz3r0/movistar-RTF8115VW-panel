@@ -2,18 +2,22 @@ import { expect, test } from "@playwright/test";
 import { CONTRASENA } from "./instancias";
 import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 
-// Sección «Router»: el enlace de la navegación lleva a «Conexión con el
-// router» y «Atrás» vuelve a la página de antes (sin quedarse atrapado en
-// una redirección). Desde «Ajustes del panel» hay un enlace a la conexión.
+// Sección «Configuración del router»: el enlace de la navegación lleva a
+// «Conexión con el router» y «Atrás» vuelve a la página de antes (sin
+// quedarse atrapado en una redirección). «Ajustes del panel» (se abre con el
+// nombre de usuario) enlaza con la conexión.
 
-test.describe("sección Router", () => {
+test.describe("sección Configuración del router", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
-  test("Router desde Estado y Atrás vuelve a Estado", async ({ page }) => {
+  test("Configuración del router desde Estado y Atrás vuelve a Estado", async ({ page }) => {
     const errores = recogerErrores(page);
     await entrar(page);
     await asentar(page);
-    await page.getByRole("navigation", { name: "Principal" }).getByRole("link", { name: "Router" }).click();
+    await page
+      .getByRole("navigation", { name: "Principal" })
+      .getByRole("link", { name: "Configuración del router" })
+      .click();
     await page.waitForURL((url) => url.pathname === "/router/conexion");
     await expect(page.locator("main h1")).toHaveText("Conexión con el router");
     await page.goBack();
@@ -39,7 +43,9 @@ test.describe("sección Router", () => {
 
   test("Ajustes del panel enlaza con la conexión", async ({ page }) => {
     await entrar(page);
-    await page.goto("/panel");
+    await asentar(page);
+    await page.getByRole("link", { name: "Ajustes del panel" }).click();
+    await page.waitForURL((url) => url.pathname === "/panel");
     await asentar(page);
     await page.locator("main .pagina-sub a[href='/router/conexion']").click();
     await page.waitForURL((url) => url.pathname === "/router/conexion");

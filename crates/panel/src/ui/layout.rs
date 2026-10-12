@@ -1,13 +1,44 @@
-//! Marco de las páginas con sesión: barra lateral (Estado, Explorador,
-//! Historial, Router; menú del usuario con «Ajustes del panel», idioma y «Salir»)
-//! que en pantallas estrechas pasa a ser una barra superior con el menú
-//! plegable.
+//! Marco de las páginas con sesión: barra lateral (Estado, Recomendaciones,
+//! Historial, Biblioteca y Configuración del router; debajo, el selector de
+//! idioma y la zona de sesión: el nombre de usuario, que abre «Ajustes del
+//! panel», y «Salir») que en pantallas estrechas pasa a ser una barra
+//! superior con el menú plegable.
 
 use crate::auth::{Logout, quien_soy};
 use crate::t;
 use crate::ui::i18n::SelectorIdioma;
 use leptos::prelude::*;
-use leptos_router::{components::A, components::Outlet, hooks::use_navigate};
+use leptos_router::{
+    components::{A, Outlet},
+    hooks::{use_location, use_navigate},
+};
+
+/// ¿`ruta` está en la sección de `prefijo`? Lo está la propia `prefijo` y
+/// cualquier ruta que siga con `/` (`/router` y `/router/conexion`, pero no
+/// `/routerx`).
+pub fn seccion_activa(prefijo: &str, ruta: &str) -> bool {
+    ruta.strip_prefix(prefijo)
+        .is_some_and(|resto| resto.is_empty() || resto.starts_with('/'))
+}
+
+/// Enlace a una sección del menú: marcado (`aria-current="page"`) en
+/// cualquier página de la sección, no solo en la de `href` (el `<A>` de
+/// leptos_router compara con el `href`). Los atributos y eventos que se le
+/// pongan (`attr:class`, `on:click`) van al `<a>`.
+#[component]
+pub fn EnlaceSeccion(
+    href: &'static str,
+    prefijo: &'static str,
+    children: Children,
+) -> impl IntoView {
+    let ruta = use_location().pathname;
+    let actual = move || ruta.with(|r| seccion_activa(prefijo, r)).then_some("page");
+    view! {
+        <a href=href aria-current=actual>
+            {children()}
+        </a>
+    }
+}
 
 /// Icono de trazo de 20 px; `d` es el trazado.
 fn icono(d: &'static str) -> impl IntoView {
@@ -32,13 +63,15 @@ fn icono(d: &'static str) -> impl IntoView {
 
 /// Pulso (Estado).
 const ICONO_ESTADO: &str = "M2 10h3.5l2-5 3.5 10 2-5H18";
-/// Rejilla de bloques (Explorador).
-const ICONO_EXPLORADOR: &str =
+/// Bombilla (Recomendaciones).
+const ICONO_RECOMENDACIONES: &str = "M7.5 15h5M8.25 17.5h3.5M10 2.5a5 5 0 0 0-3 9c.6.5 1 1.2 1 2V15h4v-1.5c0-.8.4-1.5 1-2a5 5 0 0 0-3-9z";
+/// Rejilla de bloques (Biblioteca).
+const ICONO_BIBLIOTECA: &str =
     "M3 3h5.5v5.5H3zM11.5 3H17v5.5h-5.5zM3 11.5h5.5V17H3zM11.5 11.5H17V17h-5.5z";
 /// Reloj (Historial).
 const ICONO_HISTORIAL: &str =
     "M10 2.75a7.25 7.25 0 1 1 0 14.5 7.25 7.25 0 0 1 0-14.5zM10 6v4l2.75 1.75";
-/// Router con antenas (sección Router).
+/// Router con antenas (Configuración del router).
 const ICONO_ROUTER: &str =
     "M3 11.5h14v5H3zM6 14h.01M9 14h.01M5 11.5 4 6M15 11.5l1-5.5M8 8.25a3 3 0 0 1 4 0";
 /// Puerta con flecha (Salir).
@@ -47,8 +80,6 @@ const ICONO_SALIR: &str =
 /// Persona (usuario).
 const ICONO_USUARIO: &str =
     "M10 3a3.25 3.25 0 1 1 0 6.5A3.25 3.25 0 0 1 10 3zM3.75 17c.6-3.1 3.1-5 6.25-5s5.65 1.9 6.25 5";
-/// Controles deslizantes (Ajustes del panel).
-const ICONO_AJUSTES: &str = "M3 5.5h8M15 5.5h2M3 14.5h2M9 14.5h8M13 3.5v4M7 12.5v4";
 /// Tres rayas (menú).
 const ICONO_MENU: &str = "M3 5.5h14M3 10h14M3 14.5h14";
 
@@ -56,7 +87,9 @@ const ICONO_MENU: &str = "M3 5.5h14M3 10h14M3 14.5h14";
 #[component]
 pub fn Layout() -> impl IntoView {
     let (abierto, set_abierto) = signal(false);
-    let usuario = OnceResource::new(quien_soy());
+    // Bloqueante: el nombre (una consulta de la sesión, rápida) ya va en el
+    // HTML del servidor, dentro de su enlace, no en un trozo posterior.
+    let usuario = OnceResource::new_blocking(quien_soy());
     let salir = ServerAction::<Logout>::new();
     let navigate = use_navigate();
     Effect::new(move |_| {
@@ -111,35 +144,44 @@ pub fn Layout() -> impl IntoView {
                             {icono(ICONO_ESTADO)}
                             <span>{t!("comun-nav-estado")}</span>
                         </A>
-                        <A href="/explorador">
-                            {icono(ICONO_EXPLORADOR)}
-                            <span>{t!("comun-nav-explorador")}</span>
-                        </A>
-                        <A href="/historial">
+                        <EnlaceSeccion
+                            href=crate::ui::recomendaciones::RUTA_PREFERENCIAS
+                            prefijo="/recomendaciones"
+                        >
+                            {icono(ICONO_RECOMENDACIONES)}
+                            <span>{t!("comun-nav-recomendaciones")}</span>
+                        </EnlaceSeccion>
+                        <EnlaceSeccion href="/historial" prefijo="/historial">
                             {icono(ICONO_HISTORIAL)}
                             <span>{t!("comun-nav-historial")}</span>
-                        </A>
-                        <A href=crate::ui::router::RUTA_CONEXION>
+                        </EnlaceSeccion>
+                        <EnlaceSeccion href="/explorador" prefijo="/explorador">
+                            {icono(ICONO_BIBLIOTECA)}
+                            <span>{t!("comun-nav-biblioteca")}</span>
+                        </EnlaceSeccion>
+                        <EnlaceSeccion href=crate::ui::router::RUTA_CONEXION prefijo="/router">
                             {icono(ICONO_ROUTER)}
                             <span>{t!("comun-nav-router")}</span>
-                        </A>
+                        </EnlaceSeccion>
                     </nav>
                     <div class="sesion">
-                        <span class="sesion-usuario">
-                            {icono(ICONO_USUARIO)}
-                            <Suspense fallback=|| view! { <span>"…"</span> }>
-                                {move || Suspend::new(async move {
-                                    usuario.await.unwrap_or_else(|_| "—".to_owned())
-                                })}
-                            </Suspense>
-                        </span>
-                        <nav class="nav" aria-label=t!("comun-nav-usuario") on:click=cerrar>
-                            <A href="/panel">
-                                {icono(ICONO_AJUSTES)}
-                                <span>{t!("panel-titulo")}</span>
-                            </A>
-                        </nav>
                         <SelectorIdioma />
+                        <EnlaceSeccion
+                            href="/panel"
+                            prefijo="/panel"
+                            attr:class="sesion-usuario"
+                            on:click=cerrar
+                        >
+                            {icono(ICONO_USUARIO)}
+                            <span class="sesion-nombre">
+                                <Suspense fallback=|| view! { "…" }>
+                                    {move || Suspend::new(async move {
+                                        usuario.await.unwrap_or_else(|_| "—".to_owned())
+                                    })}
+                                </Suspense>
+                            </span>
+                            <span class="solo-lector">{t!("comun-usuario-ajustes")}</span>
+                        </EnlaceSeccion>
                         <button
                             class="boton-sutil salir"
                             type="button"
@@ -160,4 +202,17 @@ pub fn Layout() -> impl IntoView {
         </div>
     }
     .into_any()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::seccion_activa;
+
+    #[test]
+    fn seccion_activa_por_prefijo() {
+        assert!(seccion_activa("/router", "/router/conexion"));
+        assert!(seccion_activa("/router", "/router"));
+        assert!(!seccion_activa("/router", "/routerx"));
+        assert!(!seccion_activa("/recomendaciones", "/"));
+    }
 }
