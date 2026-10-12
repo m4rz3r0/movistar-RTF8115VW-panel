@@ -1,5 +1,9 @@
 # WiFi: las tres redes (2,4 GHz, 5 GHz e invitados) y las dos radios.
 #
+# Efectos: `wifi_red` en la tarjeta básica de cada red (cambiar el nombre,
+# la contraseña o la seguridad obliga a volver a conectar los aparatos) y
+# `wifi_corte` en el resto.
+#
 # Cada red y cada radio se parte en dos ajustes: lo esencial (nivel básico) y
 # «…_avanzado» (nivel avanzado), porque el nivel es del ajuste, no del campo.
 # Los dos escriben en la misma instancia con los mismos `fijos`.
@@ -12,15 +16,9 @@
 id = "wifi.red_24"
 tema = "wifi"
 nivel = "basico"
-efecto = "wifi_corte"
+efecto = "wifi_red"
 leer = { funcion = "cbGetWifiAccPt", params = { dpm_cfg_wifi_acc_pt_id = "0" } }
 fijos = { dpm_cfg_wifi_acc_pt_id = "0" }
-
-[[ajuste.campo]]
-id = "activa"
-escribe = { funcion = "cbSetWifiAccPt", parametro = "adm_state" }
-lee = "adm_state"
-tipo = "booleano"
 
 [[ajuste.campo]]
 id = "nombre"
@@ -34,8 +32,9 @@ id = "contrasena"
 escribe = { funcion = "cbSetWifiAccPt", parametro = "key_phrase" }
 lee = "key_phrase"
 tipo = "secreto"
-validar = { min = 8, max = 63 }
+validar = { min = 8, max = 63, ascii = true }
 
+# La frase WPA es ASCII imprimible (32–126), de 8 a 63 caracteres.
 # WPA2 con AES o abierta. TKIP, WEP y el modo mixto WPA/WPA2 no se ofrecen:
 # si el router los tiene puestos, se ven como valor desconocido.
 [[ajuste.campo]]
@@ -72,6 +71,15 @@ efecto = "wifi_corte"
 leer = { funcion = "cbGetWifiAccPt", params = { dpm_cfg_wifi_acc_pt_id = "0" } }
 fijos = { dpm_cfg_wifi_acc_pt_id = "0" }
 
+# Pendiente de la fase 3: en las fixtures todos los puntos de acceso traen
+# `adm_state=0`, también los que emiten; hasta confirmar qué significa, va
+# aquí y no en la tarjeta básica.
+[[ajuste.campo]]
+id = "activa"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "adm_state" }
+lee = "adm_state"
+tipo = "booleano"
+
 [[ajuste.campo]]
 id = "aislamiento"
 escribe = { funcion = "cbSetWifiAccPt", parametro = "isolation" }
@@ -97,15 +105,9 @@ validar = { min = 1, max = 64 }
 id = "wifi.red_5"
 tema = "wifi"
 nivel = "basico"
-efecto = "wifi_corte"
+efecto = "wifi_red"
 leer = { funcion = "cbGetWifiAccPt", params = { dpm_cfg_wifi_acc_pt_id = "1" } }
 fijos = { dpm_cfg_wifi_acc_pt_id = "1" }
-
-[[ajuste.campo]]
-id = "activa"
-escribe = { funcion = "cbSetWifiAccPt", parametro = "adm_state" }
-lee = "adm_state"
-tipo = "booleano"
 
 [[ajuste.campo]]
 id = "nombre"
@@ -119,8 +121,9 @@ id = "contrasena"
 escribe = { funcion = "cbSetWifiAccPt", parametro = "key_phrase" }
 lee = "key_phrase"
 tipo = "secreto"
-validar = { min = 8, max = 63 }
+validar = { min = 8, max = 63, ascii = true }
 
+# La frase WPA es ASCII imprimible (32–126), de 8 a 63 caracteres.
 # WPA2 con AES o abierta. TKIP, WEP y el modo mixto WPA/WPA2 no se ofrecen:
 # si el router los tiene puestos, se ven como valor desconocido.
 [[ajuste.campo]]
@@ -157,6 +160,15 @@ efecto = "wifi_corte"
 leer = { funcion = "cbGetWifiAccPt", params = { dpm_cfg_wifi_acc_pt_id = "1" } }
 fijos = { dpm_cfg_wifi_acc_pt_id = "1" }
 
+# Pendiente de la fase 3: en las fixtures todos los puntos de acceso traen
+# `adm_state=0`, también los que emiten; hasta confirmar qué significa, va
+# aquí y no en la tarjeta básica.
+[[ajuste.campo]]
+id = "activa"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "adm_state" }
+lee = "adm_state"
+tipo = "booleano"
+
 [[ajuste.campo]]
 id = "aislamiento"
 escribe = { funcion = "cbSetWifiAccPt", parametro = "isolation" }
@@ -182,15 +194,9 @@ validar = { min = 1, max = 64 }
 id = "wifi.invitados"
 tema = "wifi"
 nivel = "basico"
-efecto = "wifi_corte"
+efecto = "wifi_red"
 leer = { funcion = "cbGetWifiAccPt", params = { dpm_cfg_wifi_acc_pt_id = "2" } }
 fijos = { dpm_cfg_wifi_acc_pt_id = "2" }
-
-[[ajuste.campo]]
-id = "activa"
-escribe = { funcion = "cbSetWifiAccPt", parametro = "adm_state" }
-lee = "adm_state"
-tipo = "booleano"
 
 [[ajuste.campo]]
 id = "nombre"
@@ -204,8 +210,9 @@ id = "contrasena"
 escribe = { funcion = "cbSetWifiAccPt", parametro = "key_phrase" }
 lee = "key_phrase"
 tipo = "secreto"
-validar = { min = 8, max = 63 }
+validar = { min = 8, max = 63, ascii = true }
 
+# La frase WPA es ASCII imprimible (32–126), de 8 a 63 caracteres.
 # WPA2 con AES o abierta. TKIP, WEP y el modo mixto WPA/WPA2 no se ofrecen:
 # si el router los tiene puestos, se ven como valor desconocido.
 [[ajuste.campo]]
@@ -241,6 +248,15 @@ nivel = "avanzado"
 efecto = "wifi_corte"
 leer = { funcion = "cbGetWifiAccPt", params = { dpm_cfg_wifi_acc_pt_id = "2" } }
 fijos = { dpm_cfg_wifi_acc_pt_id = "2" }
+
+# Pendiente de la fase 3: en las fixtures todos los puntos de acceso traen
+# `adm_state=0`, también los que emiten; hasta confirmar qué significa, va
+# aquí y no en la tarjeta básica.
+[[ajuste.campo]]
+id = "activa"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "adm_state" }
+lee = "adm_state"
+tipo = "booleano"
 
 [[ajuste.campo]]
 id = "aislamiento"

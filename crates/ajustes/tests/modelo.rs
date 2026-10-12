@@ -901,4 +901,14 @@ fn forma_de_booleanos_enteros_opcionales_y_claves() {
     // `efecto` con forma de nombre.
     let efecto = WIFI.replace("efecto = \"wifi_reinicia\"", "efecto = \"Wifi-Reinicia\"");
     falla_con(&fallos(&efecto, ""), "wifi.red", "efecto");
+    // `ascii` solo en texto o secreto.
+    let ascii_numero = WIFI.replace(
+        "tipo = \"numero\"\nvalidar = { min = 1, max = 64 }",
+        "tipo = \"numero\"\nvalidar = { min = 1, max = 64, ascii = true }",
+    );
+    falla_con(
+        &fallos(&ascii_numero, ""),
+        "wifi.avanzado.maximo",
+        "`ascii` solo vale en texto o secreto",
+    );
 }

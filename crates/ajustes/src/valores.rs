@@ -30,6 +30,8 @@ pub enum ErrorValor {
     Opcion,
     #[error("lleva caracteres de control")]
     Control,
+    #[error("solo admite letras sin tilde, cifras y signos ASCII")]
+    Ascii,
     #[error("el campo es de solo lectura")]
     SoloLectura,
 }
@@ -56,6 +58,7 @@ impl ErrorValor {
             ErrorValor::Mac => "ajustes-error-mac",
             ErrorValor::Opcion => "ajustes-error-opcion",
             ErrorValor::Control => "ajustes-error-control",
+            ErrorValor::Ascii => "ajustes-error-ascii",
             ErrorValor::SoloLectura => "ajustes-error-solo-lectura",
         }
     }
@@ -172,8 +175,12 @@ pub(crate) fn traducir<'c>(
         };
     }
     let (min, max) = c.validar.map_or((None, None), |v| (v.min, v.max));
+    let ascii = c.validar.is_some_and(|v| v.ascii);
     let valor = match c.tipo {
         TipoCampo::Texto | TipoCampo::Secreto => {
+            if ascii && !legible.bytes().all(|b| (b' '..=b'~').contains(&b)) {
+                return Err(ErrorValor::Ascii);
+            }
             let bytes = legible.len() as i64;
             if let Some(min) = min.filter(|m| bytes < *m) {
                 return Err(ErrorValor::Corto { min });

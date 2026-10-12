@@ -6,6 +6,7 @@ ajuste-internet-dns-desc = El DNS traduce los nombres de las páginas web a dire
 ajuste-internet-dns-ayuda = Si no sabes para qué lo quieres cambiar, déjalo como está. Un cambio aquí puede hacer que los aparatos de tu red dejen de encontrar las páginas web aunque internet siga conectado; si pasa, vuelve al valor anterior.
 ajuste-internet-dns-rele = Relé DNS activado
 ajuste-internet-dns-rele-desc = Si lo activas, el router reenvía las consultas DNS de tus aparatos a los servidores DNS de tu conexión.
+ajuste-internet-dns-rele-recomendado = Con el relé apagado el router sigue resolviendo los nombres de las páginas para tus aparatos, así que no hace falta encenderlo.
 
 ## Nombre fijo para tu conexión (DNS dinámico)
 ajuste-internet-ddns-titulo = Nombre fijo para tu conexión (DNS dinámico)

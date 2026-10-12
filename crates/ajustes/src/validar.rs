@@ -433,6 +433,9 @@ fn comprobar_forma(c: &Campo, mal: &mut impl FnMut(String)) {
         ) {
             mal("`validar` solo vale en texto, secreto o número".into());
         }
+        if v.ascii && !matches!(c.tipo, TipoCampo::Texto | TipoCampo::Secreto) {
+            mal("`ascii` solo vale en texto o secreto".into());
+        }
         if let (Some(min), Some(max)) = (v.min, v.max)
             && min > max
         {

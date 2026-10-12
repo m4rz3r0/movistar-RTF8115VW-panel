@@ -91,3 +91,4 @@ id = "anuncios"
 escribe = { funcion = "cbSetLanIPv6Config", parametro = "radv_adm_state" }
 lee = "radv_adm_state"
 tipo = "booleano"
+recomendado = "true"

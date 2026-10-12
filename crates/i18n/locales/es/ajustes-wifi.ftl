@@ -1,17 +1,16 @@
 # Ajustes del tema WiFi: las tres redes y las dos radios.
-efecto-wifi_corte = La WiFi se corta unos segundos al aplicarlo y los aparatos se vuelven a conectar solos.
+efecto-wifi_corte = La WiFi se corta unos segundos al aplicarlo; si la red o la radio siguen encendidas, los aparatos se vuelven a conectar solos.
+efecto-wifi_red = La red se corta unos segundos al aplicarlo. Si cambias el nombre, la contraseña o la seguridad, tendrás que volver a conectar cada aparato con los datos nuevos; con otros cambios se vuelven a conectar solos.
 aviso-wifi_abierta = Sin contraseña, cualquiera que esté cerca puede conectarse a esta red y ver lo que no vaya cifrado.
 
 ## Red WiFi 2,4 GHz
 ajuste-wifi-red_24-titulo = Red WiFi 2,4 GHz
 ajuste-wifi-red_24-desc = La red WiFi principal en la banda de 2,4 GHz: llega más lejos y atraviesa mejor las paredes, pero es más lenta y suele estar más saturada.
 ajuste-wifi-red_24-ayuda = Aquí cambias el nombre, la contraseña y la seguridad de tu red de 2,4 GHz. Si cambias el nombre o la contraseña, todos los aparatos conectados a esta red se desconectan y tendrás que volver a conectarlos con los datos nuevos. Si este panel te llega por esta red, perderás la conexión hasta que te vuelvas a conectar.
-ajuste-wifi-red_24-activa = Red activa
-ajuste-wifi-red_24-activa-desc = Si la apagas, esta red deja de verse y los aparatos conectados a ella se quedan sin WiFi. Las demás redes siguen funcionando.
 ajuste-wifi-red_24-nombre = Nombre de la red
-ajuste-wifi-red_24-nombre-desc = El nombre que ves al buscar redes WiFi en el móvil o el portátil. Hasta 32 bytes (las letras con tilde o la ñ ocupan dos).
+ajuste-wifi-red_24-nombre-desc = El nombre que ves al buscar redes WiFi en el móvil o el portátil. Hasta 32 letras sin tilde; las letras con tilde y la ñ cuentan doble, y los emoji, cuádruple.
 ajuste-wifi-red_24-contrasena = Contraseña
-ajuste-wifi-red_24-contrasena-desc = La clave para conectarse a la red: entre 8 y 63 caracteres. Mejor una frase larga y fácil de recordar que una palabra corta.
+ajuste-wifi-red_24-contrasena-desc = La clave para conectarse a la red: entre 8 y 63 caracteres, sin tildes, ñ ni emoji. Mejor una frase larga y fácil de recordar que una palabra corta.
 ajuste-wifi-red_24-seguridad = Seguridad
 ajuste-wifi-red_24-seguridad-desc = Cómo se protege la red. Con WPA2 hace falta la contraseña para conectarse y lo que se envía va cifrado.
 ajuste-wifi-red_24-seguridad-wpa2 = WPA2 (con contraseña)
@@ -28,10 +27,12 @@ ajuste-wifi-red_24-wps-recomendado = El código de WPS tiene un fallo conocido q
 
 ## Red WiFi 2,4 GHz: más opciones
 ajuste-wifi-red_24_avanzado-titulo = Red WiFi 2,4 GHz: más opciones
-ajuste-wifi-red_24_avanzado-desc = Opciones menos habituales de la red de 2,4 GHz: aislamiento entre aparatos, prioridad del tráfico y límite de aparatos.
-ajuste-wifi-red_24_avanzado-ayuda = Los valores de fábrica funcionan bien en casi todas las casas. Cámbialos solo si sabes para qué: un cambio aquí puede impedir que algunos aparatos se conecten o hagan cosas como enviar contenido a la tele.
+ajuste-wifi-red_24_avanzado-desc = Opciones menos habituales de la red de 2,4 GHz: encenderla o apagarla, aislamiento entre aparatos, prioridad del tráfico y límite de aparatos.
+ajuste-wifi-red_24_avanzado-ayuda = Los valores de fábrica funcionan bien en casi todas las casas. Cámbialos solo si sabes para qué: un cambio aquí puede impedir que algunos aparatos se conecten o hagan cosas como enviar contenido a la tele. Que la red figure activa o apagada es un dato que el panel aún no ha comprobado con este router: puede no coincidir con lo que ves en tus aparatos.
+ajuste-wifi-red_24_avanzado-activa = Red activa
+ajuste-wifi-red_24_avanzado-activa-desc = Si la apagas, esta red deja de verse y los aparatos conectados a ella se quedan sin WiFi. Las demás redes siguen funcionando.
 ajuste-wifi-red_24_avanzado-aislamiento = Aislar los aparatos entre sí
-ajuste-wifi-red_24_avanzado-aislamiento-desc = Los aparatos de esta red solo pueden ir a internet: no se ven entre ellos, así que no funcionan la impresora compartida ni enviar contenido a la tele.
+ajuste-wifi-red_24_avanzado-aislamiento-desc = Los aparatos conectados por WiFi a esta red no se ven entre ellos: por ejemplo, no podrás enviar contenido a una tele que esté en la misma WiFi. Normalmente siguen llegando a internet y a los aparatos conectados por cable.
 ajuste-wifi-red_24_avanzado-aislamiento-recomendado = En tu red de casa los aparatos necesitan verse entre ellos para imprimir, enviar contenido a la tele o usar altavoces.
 ajuste-wifi-red_24_avanzado-wmm = Prioridad del tráfico (WMM)
 ajuste-wifi-red_24_avanzado-wmm-desc = Da prioridad a las llamadas y al vídeo sobre las descargas. También hace falta para las velocidades altas de la WiFi moderna.
@@ -43,12 +44,10 @@ ajuste-wifi-red_24_avanzado-max_clientes-desc = Cuántos aparatos pueden estar c
 ajuste-wifi-red_5-titulo = Red WiFi 5 GHz
 ajuste-wifi-red_5-desc = La red WiFi principal en la banda de 5 GHz: es más rápida y tiene menos interferencias, pero llega menos lejos.
 ajuste-wifi-red_5-ayuda = Aquí cambias el nombre, la contraseña y la seguridad de tu red de 5 GHz. Si cambias el nombre o la contraseña, todos los aparatos conectados a esta red se desconectan y tendrás que volver a conectarlos con los datos nuevos. Si este panel te llega por esta red, perderás la conexión hasta que te vuelvas a conectar.
-ajuste-wifi-red_5-activa = Red activa
-ajuste-wifi-red_5-activa-desc = Si la apagas, esta red deja de verse y los aparatos conectados a ella se quedan sin WiFi. Las demás redes siguen funcionando.
 ajuste-wifi-red_5-nombre = Nombre de la red
-ajuste-wifi-red_5-nombre-desc = El nombre que ves al buscar redes WiFi en el móvil o el portátil. Hasta 32 bytes (las letras con tilde o la ñ ocupan dos).
+ajuste-wifi-red_5-nombre-desc = El nombre que ves al buscar redes WiFi en el móvil o el portátil. Hasta 32 letras sin tilde; las letras con tilde y la ñ cuentan doble, y los emoji, cuádruple.
 ajuste-wifi-red_5-contrasena = Contraseña
-ajuste-wifi-red_5-contrasena-desc = La clave para conectarse a la red: entre 8 y 63 caracteres. Mejor una frase larga y fácil de recordar que una palabra corta.
+ajuste-wifi-red_5-contrasena-desc = La clave para conectarse a la red: entre 8 y 63 caracteres, sin tildes, ñ ni emoji. Mejor una frase larga y fácil de recordar que una palabra corta.
 ajuste-wifi-red_5-seguridad = Seguridad
 ajuste-wifi-red_5-seguridad-desc = Cómo se protege la red. Con WPA2 hace falta la contraseña para conectarse y lo que se envía va cifrado.
 ajuste-wifi-red_5-seguridad-wpa2 = WPA2 (con contraseña)
@@ -65,10 +64,12 @@ ajuste-wifi-red_5-wps-recomendado = El código de WPS tiene un fallo conocido qu
 
 ## Red WiFi 5 GHz: más opciones
 ajuste-wifi-red_5_avanzado-titulo = Red WiFi 5 GHz: más opciones
-ajuste-wifi-red_5_avanzado-desc = Opciones menos habituales de la red de 5 GHz: aislamiento entre aparatos, prioridad del tráfico y límite de aparatos.
-ajuste-wifi-red_5_avanzado-ayuda = Los valores de fábrica funcionan bien en casi todas las casas. Cámbialos solo si sabes para qué: un cambio aquí puede impedir que algunos aparatos se conecten o hagan cosas como enviar contenido a la tele.
+ajuste-wifi-red_5_avanzado-desc = Opciones menos habituales de la red de 5 GHz: encenderla o apagarla, aislamiento entre aparatos, prioridad del tráfico y límite de aparatos.
+ajuste-wifi-red_5_avanzado-ayuda = Los valores de fábrica funcionan bien en casi todas las casas. Cámbialos solo si sabes para qué: un cambio aquí puede impedir que algunos aparatos se conecten o hagan cosas como enviar contenido a la tele. Que la red figure activa o apagada es un dato que el panel aún no ha comprobado con este router: puede no coincidir con lo que ves en tus aparatos.
+ajuste-wifi-red_5_avanzado-activa = Red activa
+ajuste-wifi-red_5_avanzado-activa-desc = Si la apagas, esta red deja de verse y los aparatos conectados a ella se quedan sin WiFi. Las demás redes siguen funcionando.
 ajuste-wifi-red_5_avanzado-aislamiento = Aislar los aparatos entre sí
-ajuste-wifi-red_5_avanzado-aislamiento-desc = Los aparatos de esta red solo pueden ir a internet: no se ven entre ellos, así que no funcionan la impresora compartida ni enviar contenido a la tele.
+ajuste-wifi-red_5_avanzado-aislamiento-desc = Los aparatos conectados por WiFi a esta red no se ven entre ellos: por ejemplo, no podrás enviar contenido a una tele que esté en la misma WiFi. Normalmente siguen llegando a internet y a los aparatos conectados por cable.
 ajuste-wifi-red_5_avanzado-aislamiento-recomendado = En tu red de casa los aparatos necesitan verse entre ellos para imprimir, enviar contenido a la tele o usar altavoces.
 ajuste-wifi-red_5_avanzado-wmm = Prioridad del tráfico (WMM)
 ajuste-wifi-red_5_avanzado-wmm-desc = Da prioridad a las llamadas y al vídeo sobre las descargas. También hace falta para las velocidades altas de la WiFi moderna.
@@ -79,13 +80,11 @@ ajuste-wifi-red_5_avanzado-max_clientes-desc = Cuántos aparatos pueden estar co
 ## Red de invitados
 ajuste-wifi-invitados-titulo = Red de invitados
 ajuste-wifi-invitados-desc = Una red WiFi aparte, en la banda de 2,4 GHz, para dar internet a las visitas sin darles la contraseña de tu red principal.
-ajuste-wifi-invitados-ayuda = Actívala cuando tengas visitas y apágala cuando ya no la necesites. Usa una contraseña distinta de la de tu red principal. Si cambias el nombre o la contraseña, los aparatos conectados a esta red se desconectan y tendrán que volver a conectarse con los datos nuevos.
-ajuste-wifi-invitados-activa = Red activa
-ajuste-wifi-invitados-activa-desc = Si la apagas, esta red deja de verse y los aparatos conectados a ella se quedan sin WiFi. Las demás redes siguen funcionando.
+ajuste-wifi-invitados-ayuda = Puedes encenderla cuando tengas visitas y apagarla cuando ya no la necesites, en sus opciones avanzadas. Usa una contraseña distinta de la de tu red principal. Si cambias el nombre o la contraseña, los aparatos conectados a esta red se desconectan y tendrán que volver a conectarse con los datos nuevos.
 ajuste-wifi-invitados-nombre = Nombre de la red
-ajuste-wifi-invitados-nombre-desc = El nombre que ves al buscar redes WiFi en el móvil o el portátil. Hasta 32 bytes (las letras con tilde o la ñ ocupan dos).
+ajuste-wifi-invitados-nombre-desc = El nombre que ves al buscar redes WiFi en el móvil o el portátil. Hasta 32 letras sin tilde; las letras con tilde y la ñ cuentan doble, y los emoji, cuádruple.
 ajuste-wifi-invitados-contrasena = Contraseña
-ajuste-wifi-invitados-contrasena-desc = La clave para conectarse a la red: entre 8 y 63 caracteres. Mejor una frase larga y fácil de recordar que una palabra corta.
+ajuste-wifi-invitados-contrasena-desc = La clave para conectarse a la red: entre 8 y 63 caracteres, sin tildes, ñ ni emoji. Mejor una frase larga y fácil de recordar que una palabra corta.
 ajuste-wifi-invitados-seguridad = Seguridad
 ajuste-wifi-invitados-seguridad-desc = Cómo se protege la red. Con WPA2 hace falta la contraseña para conectarse y lo que se envía va cifrado.
 ajuste-wifi-invitados-seguridad-wpa2 = WPA2 (con contraseña)
@@ -102,10 +101,12 @@ ajuste-wifi-invitados-wps-recomendado = El código de WPS tiene un fallo conocid
 
 ## Red de invitados: más opciones
 ajuste-wifi-invitados_avanzado-titulo = Red de invitados: más opciones
-ajuste-wifi-invitados_avanzado-desc = Opciones menos habituales de la red de invitados: aislamiento entre aparatos, prioridad del tráfico y límite de aparatos.
-ajuste-wifi-invitados_avanzado-ayuda = Los valores de fábrica funcionan bien en casi todas las casas. Cámbialos solo si sabes para qué: un cambio aquí puede impedir que algunos aparatos se conecten o hagan cosas como enviar contenido a la tele.
+ajuste-wifi-invitados_avanzado-desc = Opciones menos habituales de la red de invitados: encenderla o apagarla, aislamiento entre aparatos, prioridad del tráfico y límite de aparatos.
+ajuste-wifi-invitados_avanzado-ayuda = Los valores de fábrica funcionan bien en casi todas las casas. Cámbialos solo si sabes para qué: un cambio aquí puede impedir que algunos aparatos se conecten o hagan cosas como enviar contenido a la tele. Que la red figure activa o apagada es un dato que el panel aún no ha comprobado con este router: puede no coincidir con lo que ves en tus aparatos.
+ajuste-wifi-invitados_avanzado-activa = Red activa
+ajuste-wifi-invitados_avanzado-activa-desc = Si la apagas, esta red deja de verse y los aparatos conectados a ella se quedan sin WiFi. Las demás redes siguen funcionando.
 ajuste-wifi-invitados_avanzado-aislamiento = Aislar los aparatos entre sí
-ajuste-wifi-invitados_avanzado-aislamiento-desc = Los aparatos de esta red solo pueden ir a internet: no se ven entre ellos, así que no funcionan la impresora compartida ni enviar contenido a la tele.
+ajuste-wifi-invitados_avanzado-aislamiento-desc = Los aparatos conectados por WiFi a esta red no se ven entre ellos: por ejemplo, no podrás enviar contenido a una tele que esté en la misma WiFi. Normalmente siguen llegando a internet y a los aparatos conectados por cable.
 ajuste-wifi-invitados_avanzado-aislamiento-recomendado = En una red de invitados conviene que los aparatos de las visitas no se vean entre ellos.
 ajuste-wifi-invitados_avanzado-wmm = Prioridad del tráfico (WMM)
 ajuste-wifi-invitados_avanzado-wmm-desc = Da prioridad a las llamadas y al vídeo sobre las descargas. También hace falta para las velocidades altas de la WiFi moderna.
@@ -190,7 +191,7 @@ ajuste-wifi-radio_5-ancho-recomendado = En 5 GHz hay sitio de sobra y 80 MHz da 
 
 ## Radio de 5 GHz: más opciones
 ajuste-wifi-radio_5_avanzado-titulo = Radio de 5 GHz: más opciones
-ajuste-wifi-radio_5_avanzado-desc = Potencia de emisión y compatibilidad con aparatos antiguos, y señal dirigida.
+ajuste-wifi-radio_5_avanzado-desc = Potencia de emisión, compatibilidad con aparatos antiguos y señal dirigida.
 ajuste-wifi-radio_5_avanzado-ayuda = Los valores de fábrica son los adecuados casi siempre. Bajar la potencia reduce el alcance; quitar la compatibilidad con aparatos antiguos deja sin WiFi a los que solo conocen esos modos.
 ajuste-wifi-radio_5_avanzado-potencia = Potencia de emisión
 ajuste-wifi-radio_5_avanzado-potencia-desc = Con cuánta fuerza emite la radio: más potencia, más alcance.

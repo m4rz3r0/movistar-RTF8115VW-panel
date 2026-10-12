@@ -272,7 +272,8 @@ mod catalogo_toml {
         pub parametro: String,
     }
 
-    /// Límites: en bytes UTF-8 para textos y secretos, en valor para números.
+    /// Límites: en bytes UTF-8 para textos y secretos, en valor para números;
+    /// y, en textos y secretos, si solo admiten ASCII imprimible.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
     #[serde(deny_unknown_fields)]
     pub struct Validar {
@@ -280,6 +281,10 @@ mod catalogo_toml {
         pub min: Option<i64>,
         #[serde(default)]
         pub max: Option<i64>,
+        /// Solo ASCII imprimible (del espacio a `~`), como la frase de una
+        /// red WPA. Solo en texto o secreto.
+        #[serde(default)]
+        pub ascii: bool,
     }
 
     /// Opción de un campo `opcion`.

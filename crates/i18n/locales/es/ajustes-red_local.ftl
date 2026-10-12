@@ -8,7 +8,7 @@ ajuste-red_local-dispositivos-ayuda = Esta lista solo se consulta: no cambia nad
 ## IP fijas
 ajuste-red_local-reservas-titulo = IP fijas
 ajuste-red_local-reservas-desc = Aparatos que reciben siempre la misma dirección IP en tu red, como una impresora o una consola a la que abres puertos.
-ajuste-red_local-reservas-ayuda = El router reconoce cada aparato por su dirección física (MAC) y le da siempre la IP que elijas. El cambio vale la próxima vez que el aparato pida dirección: si lo desconectas y lo vuelves a conectar, la toma enseguida. Algunos móviles usan una dirección física distinta en cada red; para ellos, desactiva esa opción en su configuración WiFi.
+ajuste-red_local-reservas-ayuda = El router reconoce cada aparato por su dirección física (MAC) y le da siempre la IP que elijas. El cambio vale la próxima vez que el aparato pida dirección: si lo desconectas y lo vuelves a conectar, la toma enseguida. Algunos móviles y ordenadores pueden cambiar su dirección física de vez en cuando (la opción suele llamarse «dirección privada», «dirección aleatoria» o «MAC aleatoria»). Si al aparato no le llega su IP fija, en sus ajustes WiFi de esta red pon esa opción en «fija» o desactívala.
 ajuste-red_local-reservas-mac = Dirección física (MAC)
 ajuste-red_local-reservas-mac-desc = El identificador del aparato: seis pares de cifras y letras separados por dos puntos, como 02:00:00:00:00:01.
 ajuste-red_local-reservas-ip = Dirección IP
@@ -47,3 +47,4 @@ ajuste-red_local-ipv6-ipv6 = IPv6 en la red local
 ajuste-red_local-ipv6-ipv6-desc = Si lo activas, el router da direcciones IPv6 a tus aparatos además de las de siempre.
 ajuste-red_local-ipv6-anuncios = Anuncios del router
 ajuste-red_local-ipv6-anuncios-desc = El router avisa a los aparatos de que hay IPv6 para que se configuren solos. Sin estos avisos, casi ninguno usará IPv6.
+ajuste-red_local-ipv6-anuncios-recomendado = Si usas IPv6 en casa, los aparatos necesitan estos avisos para configurarse; si no lo usas, no hacen nada.

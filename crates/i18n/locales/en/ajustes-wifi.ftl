@@ -1,17 +1,16 @@
 # Settings in the WiFi section: the three networks and the two radios.
-efecto-wifi_corte = WiFi drops for a few seconds when applied, and devices reconnect on their own.
+efecto-wifi_corte = WiFi drops for a few seconds when applied; if the network or the radio stays on, devices reconnect on their own.
+efecto-wifi_red = The network drops for a few seconds when applied. If you change the name, the password or the security, you will have to reconnect each device with the new details; after other changes they reconnect on their own.
 aviso-wifi_abierta = Without a password, anyone nearby can join this network and see anything that isn't encrypted.
 
 ## 2.4 GHz WiFi network
 ajuste-wifi-red_24-titulo = 2.4 GHz WiFi network
 ajuste-wifi-red_24-desc = The main WiFi network on the 2.4 GHz band: it reaches further and goes through walls better, but it is slower and usually more crowded.
 ajuste-wifi-red_24-ayuda = Here you change the name, password and security of your 2.4 GHz network. If you change the name or the password, every device on this network disconnects and you will have to reconnect them with the new details. If you reach this panel over this network, you will lose the connection until you reconnect.
-ajuste-wifi-red_24-activa = Network on
-ajuste-wifi-red_24-activa-desc = If you turn it off, this network disappears and the devices on it lose WiFi. The other networks keep working.
 ajuste-wifi-red_24-nombre = Network name
-ajuste-wifi-red_24-nombre-desc = The name you see when you look for WiFi networks on your phone or laptop. Up to 32 bytes (accented letters take two).
+ajuste-wifi-red_24-nombre-desc = The name you see when you look for WiFi networks on your phone or laptop. Up to 32 plain letters; accented letters and ñ count double, and emoji count four times.
 ajuste-wifi-red_24-contrasena = Password
-ajuste-wifi-red_24-contrasena-desc = The key to join the network: 8 to 63 characters. A long, easy-to-remember phrase is better than a short word.
+ajuste-wifi-red_24-contrasena-desc = The key to join the network: 8 to 63 characters, with no accents, ñ or emoji. A long, easy-to-remember phrase is better than a short word.
 ajuste-wifi-red_24-seguridad = Security
 ajuste-wifi-red_24-seguridad-desc = How the network is protected. With WPA2 you need the password to join, and what is sent is encrypted.
 ajuste-wifi-red_24-seguridad-wpa2 = WPA2 (with password)
@@ -28,10 +27,12 @@ ajuste-wifi-red_24-wps-recomendado = The WPS code has a known flaw that lets it 
 
 ## 2.4 GHz WiFi network: more options
 ajuste-wifi-red_24_avanzado-titulo = 2.4 GHz WiFi network: more options
-ajuste-wifi-red_24_avanzado-desc = Less common options of the 2.4 GHz network: isolation between devices, traffic priority and device limit.
-ajuste-wifi-red_24_avanzado-ayuda = The factory values work well in almost every home. Only change them if you know why: a change here can stop some devices from connecting or from doing things like casting to the TV.
+ajuste-wifi-red_24_avanzado-desc = Less common options of the 2.4 GHz network: turning it on or off, isolation between devices, traffic priority and device limit.
+ajuste-wifi-red_24_avanzado-ayuda = The factory values work well in almost every home. Only change them if you know why: a change here can stop some devices from connecting or from doing things like casting to the TV. Whether the network shows as on or off is something the panel has not yet checked against this router: it may not match what you see on your devices.
+ajuste-wifi-red_24_avanzado-activa = Network on
+ajuste-wifi-red_24_avanzado-activa-desc = If you turn it off, this network disappears and the devices on it lose WiFi. The other networks keep working.
 ajuste-wifi-red_24_avanzado-aislamiento = Isolate devices from each other
-ajuste-wifi-red_24_avanzado-aislamiento-desc = Devices on this network can only reach the internet: they cannot see each other, so a shared printer or casting to the TV will not work.
+ajuste-wifi-red_24_avanzado-aislamiento-desc = Devices connected to this network over WiFi cannot see each other: for example, you will not be able to cast to a TV on the same WiFi. They can usually still reach the internet and devices connected by cable.
 ajuste-wifi-red_24_avanzado-aislamiento-recomendado = On your home network, devices need to see each other to print, cast to the TV or use speakers.
 ajuste-wifi-red_24_avanzado-wmm = Traffic priority (WMM)
 ajuste-wifi-red_24_avanzado-wmm-desc = Gives calls and video priority over downloads. It is also needed for the high speeds of modern WiFi.
@@ -43,12 +44,10 @@ ajuste-wifi-red_24_avanzado-max_clientes-desc = How many devices can be connecte
 ajuste-wifi-red_5-titulo = 5 GHz WiFi network
 ajuste-wifi-red_5-desc = The main WiFi network on the 5 GHz band: it is faster and has less interference, but its range is shorter.
 ajuste-wifi-red_5-ayuda = Here you change the name, password and security of your 5 GHz network. If you change the name or the password, every device on this network disconnects and you will have to reconnect them with the new details. If you reach this panel over this network, you will lose the connection until you reconnect.
-ajuste-wifi-red_5-activa = Network on
-ajuste-wifi-red_5-activa-desc = If you turn it off, this network disappears and the devices on it lose WiFi. The other networks keep working.
 ajuste-wifi-red_5-nombre = Network name
-ajuste-wifi-red_5-nombre-desc = The name you see when you look for WiFi networks on your phone or laptop. Up to 32 bytes (accented letters take two).
+ajuste-wifi-red_5-nombre-desc = The name you see when you look for WiFi networks on your phone or laptop. Up to 32 plain letters; accented letters and ñ count double, and emoji count four times.
 ajuste-wifi-red_5-contrasena = Password
-ajuste-wifi-red_5-contrasena-desc = The key to join the network: 8 to 63 characters. A long, easy-to-remember phrase is better than a short word.
+ajuste-wifi-red_5-contrasena-desc = The key to join the network: 8 to 63 characters, with no accents, ñ or emoji. A long, easy-to-remember phrase is better than a short word.
 ajuste-wifi-red_5-seguridad = Security
 ajuste-wifi-red_5-seguridad-desc = How the network is protected. With WPA2 you need the password to join, and what is sent is encrypted.
 ajuste-wifi-red_5-seguridad-wpa2 = WPA2 (with password)
@@ -65,10 +64,12 @@ ajuste-wifi-red_5-wps-recomendado = The WPS code has a known flaw that lets it b
 
 ## 5 GHz WiFi network: more options
 ajuste-wifi-red_5_avanzado-titulo = 5 GHz WiFi network: more options
-ajuste-wifi-red_5_avanzado-desc = Less common options of the 5 GHz network: isolation between devices, traffic priority and device limit.
-ajuste-wifi-red_5_avanzado-ayuda = The factory values work well in almost every home. Only change them if you know why: a change here can stop some devices from connecting or from doing things like casting to the TV.
+ajuste-wifi-red_5_avanzado-desc = Less common options of the 5 GHz network: turning it on or off, isolation between devices, traffic priority and device limit.
+ajuste-wifi-red_5_avanzado-ayuda = The factory values work well in almost every home. Only change them if you know why: a change here can stop some devices from connecting or from doing things like casting to the TV. Whether the network shows as on or off is something the panel has not yet checked against this router: it may not match what you see on your devices.
+ajuste-wifi-red_5_avanzado-activa = Network on
+ajuste-wifi-red_5_avanzado-activa-desc = If you turn it off, this network disappears and the devices on it lose WiFi. The other networks keep working.
 ajuste-wifi-red_5_avanzado-aislamiento = Isolate devices from each other
-ajuste-wifi-red_5_avanzado-aislamiento-desc = Devices on this network can only reach the internet: they cannot see each other, so a shared printer or casting to the TV will not work.
+ajuste-wifi-red_5_avanzado-aislamiento-desc = Devices connected to this network over WiFi cannot see each other: for example, you will not be able to cast to a TV on the same WiFi. They can usually still reach the internet and devices connected by cable.
 ajuste-wifi-red_5_avanzado-aislamiento-recomendado = On your home network, devices need to see each other to print, cast to the TV or use speakers.
 ajuste-wifi-red_5_avanzado-wmm = Traffic priority (WMM)
 ajuste-wifi-red_5_avanzado-wmm-desc = Gives calls and video priority over downloads. It is also needed for the high speeds of modern WiFi.
@@ -79,13 +80,11 @@ ajuste-wifi-red_5_avanzado-max_clientes-desc = How many devices can be connected
 ## Guest network
 ajuste-wifi-invitados-titulo = Guest network
 ajuste-wifi-invitados-desc = A separate WiFi network, on the 2.4 GHz band, to give visitors internet access without sharing the password of your main network.
-ajuste-wifi-invitados-ayuda = Turn it on when you have visitors and off when you no longer need it. Use a password different from your main network's. If you change the name or the password, devices on this network disconnect and will have to reconnect with the new details.
-ajuste-wifi-invitados-activa = Network on
-ajuste-wifi-invitados-activa-desc = If you turn it off, this network disappears and the devices on it lose WiFi. The other networks keep working.
+ajuste-wifi-invitados-ayuda = You can turn it on when you have visitors and off when you no longer need it, in its advanced options. Use a password different from your main network's. If you change the name or the password, devices on this network disconnect and will have to reconnect with the new details.
 ajuste-wifi-invitados-nombre = Network name
-ajuste-wifi-invitados-nombre-desc = The name you see when you look for WiFi networks on your phone or laptop. Up to 32 bytes (accented letters take two).
+ajuste-wifi-invitados-nombre-desc = The name you see when you look for WiFi networks on your phone or laptop. Up to 32 plain letters; accented letters and ñ count double, and emoji count four times.
 ajuste-wifi-invitados-contrasena = Password
-ajuste-wifi-invitados-contrasena-desc = The key to join the network: 8 to 63 characters. A long, easy-to-remember phrase is better than a short word.
+ajuste-wifi-invitados-contrasena-desc = The key to join the network: 8 to 63 characters, with no accents, ñ or emoji. A long, easy-to-remember phrase is better than a short word.
 ajuste-wifi-invitados-seguridad = Security
 ajuste-wifi-invitados-seguridad-desc = How the network is protected. With WPA2 you need the password to join, and what is sent is encrypted.
 ajuste-wifi-invitados-seguridad-wpa2 = WPA2 (with password)
@@ -102,10 +101,12 @@ ajuste-wifi-invitados-wps-recomendado = The WPS code has a known flaw that lets 
 
 ## Guest network: more options
 ajuste-wifi-invitados_avanzado-titulo = Guest network: more options
-ajuste-wifi-invitados_avanzado-desc = Less common options of the guest network: isolation between devices, traffic priority and device limit.
-ajuste-wifi-invitados_avanzado-ayuda = The factory values work well in almost every home. Only change them if you know why: a change here can stop some devices from connecting or from doing things like casting to the TV.
+ajuste-wifi-invitados_avanzado-desc = Less common options of the guest network: turning it on or off, isolation between devices, traffic priority and device limit.
+ajuste-wifi-invitados_avanzado-ayuda = The factory values work well in almost every home. Only change them if you know why: a change here can stop some devices from connecting or from doing things like casting to the TV. Whether the network shows as on or off is something the panel has not yet checked against this router: it may not match what you see on your devices.
+ajuste-wifi-invitados_avanzado-activa = Network on
+ajuste-wifi-invitados_avanzado-activa-desc = If you turn it off, this network disappears and the devices on it lose WiFi. The other networks keep working.
 ajuste-wifi-invitados_avanzado-aislamiento = Isolate devices from each other
-ajuste-wifi-invitados_avanzado-aislamiento-desc = Devices on this network can only reach the internet: they cannot see each other, so a shared printer or casting to the TV will not work.
+ajuste-wifi-invitados_avanzado-aislamiento-desc = Devices connected to this network over WiFi cannot see each other: for example, you will not be able to cast to a TV on the same WiFi. They can usually still reach the internet and devices connected by cable.
 ajuste-wifi-invitados_avanzado-aislamiento-recomendado = On a guest network, visitors' devices should not see each other.
 ajuste-wifi-invitados_avanzado-wmm = Traffic priority (WMM)
 ajuste-wifi-invitados_avanzado-wmm-desc = Gives calls and video priority over downloads. It is also needed for the high speeds of modern WiFi.
@@ -190,7 +191,7 @@ ajuste-wifi-radio_5-ancho-recomendado = There is plenty of room at 5 GHz, and 80
 
 ## 5 GHz radio: more options
 ajuste-wifi-radio_5_avanzado-titulo = 5 GHz radio: more options
-ajuste-wifi-radio_5_avanzado-desc = Transmit power and compatibility with old devices, and directed signal.
+ajuste-wifi-radio_5_avanzado-desc = Transmit power, compatibility with old devices and directed signal.
 ajuste-wifi-radio_5_avanzado-ayuda = The factory values are right almost every time. Lowering the power reduces range; dropping compatibility with old devices leaves those that only know those modes without WiFi.
 ajuste-wifi-radio_5_avanzado-potencia = Transmit power
 ajuste-wifi-radio_5_avanzado-potencia-desc = How strongly the radio transmits: more power, more range.

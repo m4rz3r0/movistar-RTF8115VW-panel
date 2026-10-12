@@ -1409,3 +1409,94 @@ async fn login_falla_con_tambien_en_el_avanzado_aunque_el_basico_pase() {
         "{mal}"
     );
 }
+
+/// Cualquier punto de acceso se lee por id, aunque solo esté en la lista por
+/// radio (los ids 0 y 2 no tienen fixture propia), y una escritura en uno se
+/// lee en ese y no en los demás.
+#[tokio::test]
+async fn cualquier_punto_de_acceso_se_lee_por_id() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    let leer = async |id: &str| {
+        c.call("cbGetWifiAccPt", &[("dpm_cfg_wifi_acc_pt_id", id)])
+            .await
+            .unwrap_or_else(|e| panic!("punto de acceso {id}: {e}"))
+    };
+    let mut antes = Vec::new();
+    for id in ["0", "1", "2"] {
+        let n = leer(id).await;
+        assert_eq!(valor(&n, "dpm_cfg_wifi_acc_pt_id").as_deref(), Some(id));
+        assert_eq!(
+            valor(&n, "dpm_cfg_wifi_acc_pt_0i").as_deref(),
+            Some("-1"),
+            "leído por id, como el router"
+        );
+        assert!(valor(&n, "authentication").is_some(), "{id}");
+        antes.push(valor(&n, "ssid").unwrap());
+    }
+    // Por índice también.
+    let n = c
+        .call("cbGetWifiAccPt", &[("dpm_cfg_wifi_acc_pt_0i", "2")])
+        .await
+        .unwrap();
+    assert_eq!(valor(&n, "ssid").as_deref(), Some(antes[2].as_str()));
+    // Un id que no existe sigue fallando.
+    assert!(
+        c.call("cbGetWifiAccPt", &[("dpm_cfg_wifi_acc_pt_id", "99")])
+            .await
+            .is_err()
+    );
+    c.write(
+        "wifi.asp",
+        "cbSetWifiAccPt",
+        &[("dpm_cfg_wifi_acc_pt_id", "2"), ("ssid", "RED-invitados")],
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        valor(&leer("2").await, "ssid").as_deref(),
+        Some("RED-invitados")
+    );
+    assert_eq!(valor(&leer("0").await, "ssid").unwrap(), antes[0]);
+    assert_eq!(valor(&leer("1").await, "ssid").unwrap(), antes[1]);
+}
+
+/// Cada ajuste del catálogo se lee en el sim con su lectura y sus
+/// parámetros, y la respuesta trae el elemento de cada campo (salvo en una
+/// lista vacía, como la de DNS dinámico de las fixtures).
+#[tokio::test]
+async fn cada_ajuste_del_catalogo_se_lee() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    let catalogo = ajustes::CatalogoAjustes::load().unwrap();
+    let mut fallos = Vec::new();
+    for a in catalogo.todos() {
+        let params: Vec<(&str, &str)> = a
+            .leer
+            .params
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_str()))
+            .collect();
+        let n = match c.call(&a.leer.funcion, &params).await {
+            Ok(n) => n,
+            Err(e) => {
+                fallos.push(format!("{}: {e}", a.id));
+                continue;
+            }
+        };
+        let vacia = a.lista && n.children.iter().all(|h| h.tag == "Result");
+        if vacia {
+            continue;
+        }
+        for campo in &a.campos {
+            let elementos =
+                std::iter::once(&campo.lee).chain(campo.ademas.iter().map(|ad| &ad.lee));
+            for lee in elementos {
+                if valor(&n, lee).is_none() {
+                    fallos.push(format!("{}.{}: falta {lee}", a.id, campo.id));
+                }
+            }
+        }
+    }
+    assert!(fallos.is_empty(), "{fallos:#?}");
+}

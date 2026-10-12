@@ -69,6 +69,13 @@ tipo = "secreto"
 validar = { min = 8, max = 63 }
 
 [[ajuste.campo]]
+id = "frase"
+escribe = { funcion = "cbSetX", parametro = "key_phrase" }
+lee = "key_phrase"
+tipo = "secreto"
+validar = { min = 8, max = 63, ascii = true }
+
+[[ajuste.campo]]
 id = "cifrado"
 escribe = { funcion = "cbSetX", parametro = "authentication" }
 lee = "authentication"
@@ -308,6 +315,30 @@ fn claves_de_error() {
     assert_eq!(ErrorValor::Mac.clave_i18n(), "ajustes-error-mac");
     assert_eq!(ErrorValor::Opcion.clave_i18n(), "ajustes-error-opcion");
     assert_eq!(ErrorValor::Control.clave_i18n(), "ajustes-error-control");
+    assert_eq!(ErrorValor::Ascii.clave_i18n(), "ajustes-error-ascii");
+}
+
+#[test]
+fn solo_ascii_imprimible_si_el_campo_lo_pide() {
+    let frase = campo("frase");
+    // Del espacio a la tilde (32–126), todo vale.
+    let todo: String = (b' '..=b'~').map(char::from).take(63).collect();
+    assert_eq!(al_router(&frase, &todo), Ok(todo.clone()));
+    assert_eq!(
+        al_router(&frase, "una frase larga"),
+        Ok("una frase larga".into())
+    );
+    for mala in ["contraseña", "café con leche", "clave😀segura"] {
+        assert_eq!(al_router(&frase, mala), Err(ErrorValor::Ascii), "{mala}");
+    }
+    // Los límites se siguen aplicando, y el control se rechaza antes.
+    assert_eq!(
+        al_router(&frase, "corta"),
+        Err(ErrorValor::Corto { min: 8 })
+    );
+    assert_eq!(al_router(&frase, "abc\tdefgh"), Err(ErrorValor::Control));
+    // Sin `ascii`, la ñ sigue valiendo.
+    assert!(al_router(&campo("clave"), "contraseña").is_ok());
 }
 
 #[test]

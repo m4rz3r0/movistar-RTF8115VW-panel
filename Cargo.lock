@@ -2430,6 +2430,7 @@ dependencies = [
 name = "router-sim"
 version = "0.2.2"
 dependencies = [
+ "ajustes",
  "axum",
  "catalogo",
  "hgu",

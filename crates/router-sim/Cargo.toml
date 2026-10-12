@@ -17,3 +17,5 @@ tokio.workspace = true
 
 [dev-dependencies]
 roxmltree.workspace = true
+# Las lecturas del catálogo de ajustes se prueban contra el sim.
+ajustes = { path = "../ajustes", features = ["catalogo"] }

@@ -848,14 +848,14 @@ fn read_node(
     {
         return r;
     }
-    let mut node = match raw {
-        Some(raw) => {
-            hgu::xml::parse_response(name, raw).map_err(|e| format!("fixture no válida: {e}"))?
-        }
-        None if params.is_empty() => {
-            all_instances(s, name).ok_or_else(|| "no fixture".to_owned())?
-        }
-        None => return Err("no fixture".to_owned()),
+    let mut node = if let Some(raw) = raw {
+        hgu::xml::parse_response(name, raw).map_err(|e| format!("fixture no válida: {e}"))?
+    } else if let Some(n) = instancia_de_la_lista(s, name, params) {
+        n
+    } else if params.is_empty() {
+        all_instances(s, name).ok_or_else(|| "no fixture".to_owned())?
+    } else {
+        return Err("no fixture".to_owned());
     };
     aplicar_ediciones(st, name, &mut node);
     patch(s, st, name, &mut node);
@@ -877,6 +877,50 @@ fn lecturas_hermanas(name: &str) -> &'static [&'static str] {
         "cbListWifiAccPt" => &["cbGetWifiAccPt"],
         _ => &[],
     }
+}
+
+/// Lista que contiene las mismas instancias que una lectura de una sola:
+/// `cbGetWifiAccPt` (un punto de acceso) sale de `cbListWifiAccPt` (los de
+/// una radio) cuando no hay fixture para ese punto de acceso.
+fn lista_de_instancias(name: &str) -> Option<&'static str> {
+    match name {
+        "cbGetWifiAccPt" => Some("cbListWifiAccPt"),
+        _ => None,
+    }
+}
+
+/// Lectura de una instancia de `name` construida desde las fixtures de su
+/// lista ([`lista_de_instancias`]): la instancia cuyos hijos casan con los
+/// parámetros (`X_0i=v` elige la de `X_id=v`). Leída por `*_id`, devuelve
+/// `*_0i = -1`, como el router. Las ediciones se aplican después, como a
+/// cualquier lectura. `None` si no hay lista o ninguna instancia casa.
+fn instancia_de_la_lista(s: &Inner, name: &str, params: &[(String, String)]) -> Option<XmlNode> {
+    let lista = lista_de_instancias(name)?;
+    let filtros: Vec<(String, &str, bool)> = params
+        .iter()
+        .filter(|(k, _)| k != "sessionKey")
+        .map(|(k, v)| match k.strip_suffix("_0i") {
+            Some(base) => (format!("{base}_id"), v.as_str(), true),
+            None => (k.clone(), v.as_str(), false),
+        })
+        .collect();
+    if filtros.is_empty() {
+        return None;
+    }
+    let mut claves: Vec<&FixtureKey> = s.fixtures.keys().filter(|(n, _)| n == lista).collect();
+    claves.sort();
+    let mut nodo = claves.into_iter().find_map(|k| {
+        let n = hgu::xml::parse_response(lista, &s.fixtures[k]).ok()?;
+        n.children
+            .into_iter()
+            .find(|c| filtros.iter().all(|(k, v, _)| c.text_of(k) == Some(*v)))
+    })?;
+    for (hijo, _, indice) in &filtros {
+        if let (false, Some(base)) = (indice, hijo.strip_suffix("_id")) {
+            set_child(&mut nodo, &format!("{base}_0i"), "-1");
+        }
+    }
+    Some(result_node(name, vec![nodo], "0", ""))
 }
 
 /// Aplica sobre la respuesta lo escrito en sus instancias: solo cambia hijos

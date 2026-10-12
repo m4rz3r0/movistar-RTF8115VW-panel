@@ -8,7 +8,7 @@ ajuste-red_local-dispositivos-ayuda = This list is only for reading: it changes 
 ## Fixed IPs
 ajuste-red_local-reservas-titulo = Fixed IPs
 ajuste-red_local-reservas-desc = Devices that always get the same IP address on your network, such as a printer or a console you open ports for.
-ajuste-red_local-reservas-ayuda = The router recognises each device by its physical address (MAC) and always gives it the IP you choose. The change applies the next time the device asks for an address: disconnect and reconnect it and it picks it up straight away. Some phones use a different physical address on each network; for those, turn that option off in their WiFi settings.
+ajuste-red_local-reservas-ayuda = The router recognises each device by its physical address (MAC) and always gives it the IP you choose. The change applies the next time the device asks for an address: disconnect and reconnect it and it picks it up straight away. Some phones and computers may change their physical address from time to time (the option is usually called "private address", "random address" or "random MAC"). If the device doesn't get its fixed IP, set that option to "fixed" or turn it off in the device's WiFi settings for this network.
 ajuste-red_local-reservas-mac = Physical address (MAC)
 ajuste-red_local-reservas-mac-desc = The device's identifier: six pairs of digits and letters separated by colons, such as 02:00:00:00:00:01.
 ajuste-red_local-reservas-ip = IP address
@@ -47,3 +47,4 @@ ajuste-red_local-ipv6-ipv6 = IPv6 on the local network
 ajuste-red_local-ipv6-ipv6-desc = If you turn it on, the router gives your devices IPv6 addresses as well as the usual ones.
 ajuste-red_local-ipv6-anuncios = Router announcements
 ajuste-red_local-ipv6-anuncios-desc = The router tells devices that IPv6 is available so they set themselves up. Without these announcements, hardly any will use IPv6.
+ajuste-red_local-ipv6-anuncios-recomendado = If you use IPv6 at home, devices need these announcements to set themselves up; if you don't, they do nothing.
