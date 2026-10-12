@@ -1,0 +1,405 @@
+# WiFi: las tres redes (2,4 GHz, 5 GHz e invitados) y las dos radios.
+#
+# Cada red y cada radio se parte en dos ajustes: lo esencial (nivel básico) y
+# «…_avanzado» (nivel avanzado), porque el nivel es del ajuste, no del campo.
+# Los dos escriben en la misma instancia con los mismos `fijos`.
+#
+# Ids de las instancias (fixtures del router): radio 0 = 2,4 GHz, radio 1 =
+# 5 GHz; punto de acceso 0 = red principal de 2,4 GHz, 1 = red principal de
+# 5 GHz, 2 = primera red de invitados (en la radio de 2,4 GHz).
+
+[[ajuste]]
+id = "wifi.red_24"
+tema = "wifi"
+nivel = "basico"
+efecto = "wifi_corte"
+leer = { funcion = "cbGetWifiAccPt", params = { dpm_cfg_wifi_acc_pt_id = "0" } }
+fijos = { dpm_cfg_wifi_acc_pt_id = "0" }
+
+[[ajuste.campo]]
+id = "activa"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "adm_state" }
+lee = "adm_state"
+tipo = "booleano"
+
+[[ajuste.campo]]
+id = "nombre"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "ssid" }
+lee = "ssid"
+tipo = "texto"
+validar = { min = 1, max = 32 }
+
+[[ajuste.campo]]
+id = "contrasena"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "key_phrase" }
+lee = "key_phrase"
+tipo = "secreto"
+validar = { min = 8, max = 63 }
+
+# WPA2 con AES o abierta. TKIP, WEP y el modo mixto WPA/WPA2 no se ofrecen:
+# si el router los tiene puestos, se ven como valor desconocido.
+[[ajuste.campo]]
+id = "seguridad"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "authentication" }
+lee = "authentication"
+tipo = "opcion"
+ademas = [{ parametro = "encryption", lee = "encryption" }]
+opciones = [
+  { valor = "3", clave = "wpa2", recomendada = true, ademas = { encryption = "4" } },
+  { valor = "0", clave = "abierta", aviso = "wifi_abierta", ademas = { encryption = "0" } },
+]
+
+[[ajuste.campo]]
+id = "visible"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "ssid_hide" }
+lee = "ssid_hide"
+tipo = "booleano"
+invertido = true
+recomendado = "true"
+
+[[ajuste.campo]]
+id = "wps"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "wps_adm_state" }
+lee = "wps_adm_state"
+tipo = "booleano"
+recomendado = "false"
+
+[[ajuste]]
+id = "wifi.red_24_avanzado"
+tema = "wifi"
+nivel = "avanzado"
+efecto = "wifi_corte"
+leer = { funcion = "cbGetWifiAccPt", params = { dpm_cfg_wifi_acc_pt_id = "0" } }
+fijos = { dpm_cfg_wifi_acc_pt_id = "0" }
+
+[[ajuste.campo]]
+id = "aislamiento"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "isolation" }
+lee = "isolation"
+tipo = "booleano"
+recomendado = "false"
+
+[[ajuste.campo]]
+id = "wmm"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "wmm" }
+lee = "wmm"
+tipo = "booleano"
+recomendado = "true"
+
+[[ajuste.campo]]
+id = "max_clientes"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "max_clt_count" }
+lee = "max_clt_count"
+tipo = "numero"
+validar = { min = 1, max = 64 }
+
+[[ajuste]]
+id = "wifi.red_5"
+tema = "wifi"
+nivel = "basico"
+efecto = "wifi_corte"
+leer = { funcion = "cbGetWifiAccPt", params = { dpm_cfg_wifi_acc_pt_id = "1" } }
+fijos = { dpm_cfg_wifi_acc_pt_id = "1" }
+
+[[ajuste.campo]]
+id = "activa"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "adm_state" }
+lee = "adm_state"
+tipo = "booleano"
+
+[[ajuste.campo]]
+id = "nombre"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "ssid" }
+lee = "ssid"
+tipo = "texto"
+validar = { min = 1, max = 32 }
+
+[[ajuste.campo]]
+id = "contrasena"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "key_phrase" }
+lee = "key_phrase"
+tipo = "secreto"
+validar = { min = 8, max = 63 }
+
+# WPA2 con AES o abierta. TKIP, WEP y el modo mixto WPA/WPA2 no se ofrecen:
+# si el router los tiene puestos, se ven como valor desconocido.
+[[ajuste.campo]]
+id = "seguridad"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "authentication" }
+lee = "authentication"
+tipo = "opcion"
+ademas = [{ parametro = "encryption", lee = "encryption" }]
+opciones = [
+  { valor = "3", clave = "wpa2", recomendada = true, ademas = { encryption = "4" } },
+  { valor = "0", clave = "abierta", aviso = "wifi_abierta", ademas = { encryption = "0" } },
+]
+
+[[ajuste.campo]]
+id = "visible"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "ssid_hide" }
+lee = "ssid_hide"
+tipo = "booleano"
+invertido = true
+recomendado = "true"
+
+[[ajuste.campo]]
+id = "wps"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "wps_adm_state" }
+lee = "wps_adm_state"
+tipo = "booleano"
+recomendado = "false"
+
+[[ajuste]]
+id = "wifi.red_5_avanzado"
+tema = "wifi"
+nivel = "avanzado"
+efecto = "wifi_corte"
+leer = { funcion = "cbGetWifiAccPt", params = { dpm_cfg_wifi_acc_pt_id = "1" } }
+fijos = { dpm_cfg_wifi_acc_pt_id = "1" }
+
+[[ajuste.campo]]
+id = "aislamiento"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "isolation" }
+lee = "isolation"
+tipo = "booleano"
+recomendado = "false"
+
+[[ajuste.campo]]
+id = "wmm"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "wmm" }
+lee = "wmm"
+tipo = "booleano"
+recomendado = "true"
+
+[[ajuste.campo]]
+id = "max_clientes"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "max_clt_count" }
+lee = "max_clt_count"
+tipo = "numero"
+validar = { min = 1, max = 64 }
+
+[[ajuste]]
+id = "wifi.invitados"
+tema = "wifi"
+nivel = "basico"
+efecto = "wifi_corte"
+leer = { funcion = "cbGetWifiAccPt", params = { dpm_cfg_wifi_acc_pt_id = "2" } }
+fijos = { dpm_cfg_wifi_acc_pt_id = "2" }
+
+[[ajuste.campo]]
+id = "activa"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "adm_state" }
+lee = "adm_state"
+tipo = "booleano"
+
+[[ajuste.campo]]
+id = "nombre"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "ssid" }
+lee = "ssid"
+tipo = "texto"
+validar = { min = 1, max = 32 }
+
+[[ajuste.campo]]
+id = "contrasena"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "key_phrase" }
+lee = "key_phrase"
+tipo = "secreto"
+validar = { min = 8, max = 63 }
+
+# WPA2 con AES o abierta. TKIP, WEP y el modo mixto WPA/WPA2 no se ofrecen:
+# si el router los tiene puestos, se ven como valor desconocido.
+[[ajuste.campo]]
+id = "seguridad"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "authentication" }
+lee = "authentication"
+tipo = "opcion"
+ademas = [{ parametro = "encryption", lee = "encryption" }]
+opciones = [
+  { valor = "3", clave = "wpa2", recomendada = true, ademas = { encryption = "4" } },
+  { valor = "0", clave = "abierta", aviso = "wifi_abierta", ademas = { encryption = "0" } },
+]
+
+[[ajuste.campo]]
+id = "visible"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "ssid_hide" }
+lee = "ssid_hide"
+tipo = "booleano"
+invertido = true
+recomendado = "true"
+
+[[ajuste.campo]]
+id = "wps"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "wps_adm_state" }
+lee = "wps_adm_state"
+tipo = "booleano"
+recomendado = "false"
+
+[[ajuste]]
+id = "wifi.invitados_avanzado"
+tema = "wifi"
+nivel = "avanzado"
+efecto = "wifi_corte"
+leer = { funcion = "cbGetWifiAccPt", params = { dpm_cfg_wifi_acc_pt_id = "2" } }
+fijos = { dpm_cfg_wifi_acc_pt_id = "2" }
+
+[[ajuste.campo]]
+id = "aislamiento"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "isolation" }
+lee = "isolation"
+tipo = "booleano"
+recomendado = "true"
+
+[[ajuste.campo]]
+id = "wmm"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "wmm" }
+lee = "wmm"
+tipo = "booleano"
+recomendado = "true"
+
+[[ajuste.campo]]
+id = "max_clientes"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "max_clt_count" }
+lee = "max_clt_count"
+tipo = "numero"
+validar = { min = 1, max = 64 }
+
+[[ajuste]]
+id = "wifi.radio_24"
+tema = "wifi"
+nivel = "basico"
+efecto = "wifi_corte"
+leer = { funcion = "cbGetWifi", params = { dpm_cfg_wifi_0i = "0" } }
+fijos = { dpm_cfg_wifi_id = "0" }
+
+[[ajuste.campo]]
+id = "encendida"
+escribe = { funcion = "cbSetWifi", parametro = "radio_adm_state" }
+lee = "radio_adm_state"
+tipo = "booleano"
+recomendado = "true"
+
+[[ajuste.campo]]
+id = "canal"
+escribe = { funcion = "cbSetWifi", parametro = "adm_channel" }
+lee = "adm_channel"
+tipo = "opcion"
+opciones = [
+  { valor = "0", clave = "automatico", recomendada = true },
+  { valor = "1", clave = "canal_1" },
+  { valor = "6", clave = "canal_6" },
+  { valor = "11", clave = "canal_11" },
+]
+
+[[ajuste.campo]]
+id = "ancho"
+escribe = { funcion = "cbSetWifi", parametro = "adm_bandwidth" }
+lee = "adm_bandwidth"
+tipo = "opcion"
+opciones = [
+  { valor = "1", clave = "mhz_20", recomendada = true },
+  { valor = "2", clave = "mhz_40" },
+]
+
+[[ajuste]]
+id = "wifi.radio_24_avanzado"
+tema = "wifi"
+nivel = "avanzado"
+efecto = "wifi_corte"
+leer = { funcion = "cbGetWifi", params = { dpm_cfg_wifi_0i = "0" } }
+fijos = { dpm_cfg_wifi_id = "0" }
+
+[[ajuste.campo]]
+id = "potencia"
+escribe = { funcion = "cbSetWifi", parametro = "adm_tx_pwr_ratio" }
+lee = "adm_tx_pwr_ratio"
+tipo = "opcion"
+opciones = [
+  { valor = "255", clave = "automatica", recomendada = true },
+  { valor = "100", clave = "maxima" },
+  { valor = "50", clave = "media" },
+  { valor = "20", clave = "baja" },
+]
+
+[[ajuste.campo]]
+id = "modo"
+escribe = { funcion = "cbSetWifi", parametro = "standard" }
+lee = "standard"
+tipo = "opcion"
+opciones = [
+  { valor = "14", clave = "bgn", recomendada = true },
+  { valor = "12", clave = "gn" },
+]
+
+[[ajuste]]
+id = "wifi.radio_5"
+tema = "wifi"
+nivel = "basico"
+efecto = "wifi_corte"
+leer = { funcion = "cbGetWifi", params = { dpm_cfg_wifi_0i = "1" } }
+fijos = { dpm_cfg_wifi_id = "1" }
+
+[[ajuste.campo]]
+id = "encendida"
+escribe = { funcion = "cbSetWifi", parametro = "radio_adm_state" }
+lee = "radio_adm_state"
+tipo = "booleano"
+recomendado = "true"
+
+[[ajuste.campo]]
+id = "canal"
+escribe = { funcion = "cbSetWifi", parametro = "adm_channel" }
+lee = "adm_channel"
+tipo = "opcion"
+opciones = [
+  { valor = "0", clave = "automatico", recomendada = true },
+  { valor = "36", clave = "canal_36" },
+  { valor = "100", clave = "canal_100" },
+]
+
+[[ajuste.campo]]
+id = "ancho"
+escribe = { funcion = "cbSetWifi", parametro = "adm_bandwidth" }
+lee = "adm_bandwidth"
+tipo = "opcion"
+opciones = [
+  { valor = "1", clave = "mhz_20" },
+  { valor = "2", clave = "mhz_40" },
+  { valor = "3", clave = "mhz_80", recomendada = true },
+]
+
+[[ajuste]]
+id = "wifi.radio_5_avanzado"
+tema = "wifi"
+nivel = "avanzado"
+efecto = "wifi_corte"
+leer = { funcion = "cbGetWifi", params = { dpm_cfg_wifi_0i = "1" } }
+fijos = { dpm_cfg_wifi_id = "1" }
+
+[[ajuste.campo]]
+id = "potencia"
+escribe = { funcion = "cbSetWifi", parametro = "adm_tx_pwr_ratio" }
+lee = "adm_tx_pwr_ratio"
+tipo = "opcion"
+opciones = [
+  { valor = "255", clave = "automatica", recomendada = true },
+  { valor = "100", clave = "maxima" },
+  { valor = "50", clave = "media" },
+  { valor = "20", clave = "baja" },
+]
+
+[[ajuste.campo]]
+id = "modo"
+escribe = { funcion = "cbSetWifi", parametro = "standard" }
+lee = "standard"
+tipo = "opcion"
+opciones = [
+  { valor = "25", clave = "anac", recomendada = true },
+  { valor = "9", clave = "an" },
+]
+
+[[ajuste.campo]]
+id = "beamforming"
+escribe = { funcion = "cbSetWifi", parametro = "beamforming" }
+lee = "beamforming"
+tipo = "booleano"
+recomendado = "true"

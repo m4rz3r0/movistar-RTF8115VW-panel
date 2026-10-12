@@ -15,6 +15,10 @@ catalogo = { path = "../catalogo", optional = true }
 toml = { workspace = true, optional = true }
 thiserror = { workspace = true, optional = true }
 
+[dev-dependencies]
+# Las pruebas del catálogo real comprueban sus textos.
+i18n = { path = "../i18n" }
+
 [features]
 catalogo = ["dep:catalogo", "dep:toml", "dep:thiserror"]
 
@@ -24,4 +28,8 @@ required-features = ["catalogo"]
 
 [[test]]
 name = "valores"
+required-features = ["catalogo"]
+
+[[test]]
+name = "catalogo_real"
 required-features = ["catalogo"]

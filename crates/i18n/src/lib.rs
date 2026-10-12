@@ -40,7 +40,11 @@ locales!(
     "biblioteca",
     "instalar",
     "panel",
-    "router"
+    "router",
+    "ajustes-internet",
+    "ajustes-wifi",
+    "ajustes-red_local",
+    "ajustes-puertos"
 );
 
 /// Idioma de la interfaz.

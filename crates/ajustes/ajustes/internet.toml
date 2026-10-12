@@ -1,0 +1,62 @@
+# Internet: relé DNS y DNS dinámico. La conexión a internet (tipo, PPPoE)
+# no está aquí: depende de la conexión detectada y puede cortar el acceso
+# (ver `excluidas.toml`).
+
+[[ajuste]]
+id = "internet.dns"
+tema = "internet"
+nivel = "avanzado"
+leer = { funcion = "cbGetDnsRelay" }
+
+[[ajuste.campo]]
+id = "rele"
+escribe = { funcion = "cbSetDnsRelay", parametro = "dns_relay_adm_state" }
+lee = "dns_relay_adm_state"
+tipo = "booleano"
+
+# Cuenta y contraseña: secretos de la web avanzada, editables.
+[[ajuste]]
+id = "internet.ddns"
+tema = "internet"
+nivel = "oculto"
+lista = true
+leer = { funcion = "cbGetDdns", params = { all = "ALL" } }
+
+[[ajuste.campo]]
+id = "activa"
+escribe = { funcion = "cbSetDdns", parametro = "adm_state" }
+lee = "adm_state"
+tipo = "booleano"
+
+[[ajuste.campo]]
+id = "servicio"
+escribe = { funcion = "cbSetDdns", parametro = "provider" }
+lee = "provider"
+tipo = "opcion"
+opciones = [
+  { valor = "0", clave = "no_ip" },
+  { valor = "1", clave = "now_ip" },
+  { valor = "2", clave = "dyndns" },
+  { valor = "3", clave = "now_dns" },
+]
+
+[[ajuste.campo]]
+id = "nombre"
+escribe = { funcion = "cbSetDdns", parametro = "hostname" }
+lee = "hostname"
+tipo = "texto"
+validar = { min = 1, max = 253 }
+
+[[ajuste.campo]]
+id = "cuenta"
+escribe = { funcion = "cbSetDdns", parametro = "account" }
+lee = "account"
+tipo = "secreto"
+validar = { min = 1 }
+
+[[ajuste.campo]]
+id = "contrasena"
+escribe = { funcion = "cbSetDdns", parametro = "password" }
+lee = "password"
+tipo = "secreto"
+validar = { min = 1 }

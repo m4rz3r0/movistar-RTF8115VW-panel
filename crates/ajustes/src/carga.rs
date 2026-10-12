@@ -18,7 +18,7 @@ macro_rules! ficheros {
     };
 }
 
-ficheros!();
+ficheros!("internet", "wifi", "red_local", "puertos");
 
 /// Texto de `excluidas.toml`.
 const EXCLUIDAS: &str = include_str!("../excluidas.toml");
