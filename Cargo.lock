@@ -33,6 +33,7 @@ version = "0.2.2"
 dependencies = [
  "catalogo",
  "i18n",
+ "regex",
  "serde",
  "thiserror 2.0.21",
  "toml",

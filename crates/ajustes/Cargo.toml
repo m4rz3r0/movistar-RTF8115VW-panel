@@ -18,6 +18,8 @@ thiserror = { workspace = true, optional = true }
 [dev-dependencies]
 # Las pruebas del catálogo real comprueban sus textos.
 i18n = { path = "../i18n" }
+# Los textos sin nombres de la API se buscan con expresiones regulares.
+regex.workspace = true
 
 [features]
 catalogo = ["dep:catalogo", "dep:toml", "dep:thiserror"]

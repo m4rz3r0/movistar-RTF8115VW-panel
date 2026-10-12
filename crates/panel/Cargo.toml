@@ -129,6 +129,10 @@ name = "panel_ajustes"
 required-features = ["ssr"]
 
 [[test]]
+name = "ajustes_catalogo"
+required-features = ["ssr"]
+
+[[test]]
 name = "menu"
 required-features = ["ssr"]
 

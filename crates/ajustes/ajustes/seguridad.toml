@@ -1,0 +1,120 @@
+# Seguridad: gestión remota del operador (TR-069), contraseña del router y
+# usuarios de la web del router.
+
+# Gestión remota: activarla o no (básico), el aviso periódico al operador
+# (avanzado) y la dirección y las credenciales del servidor del operador
+# (oculto). Los secretos son de la web avanzada (`cwmp.asp`): se pueden
+# editar.
+[[ajuste]]
+id = "seguridad.gestion_remota"
+tema = "seguridad"
+nivel = "basico"
+leer = { funcion = "cbGetTr69Config" }
+
+[[ajuste.campo]]
+id = "activa"
+escribe = { funcion = "cbSetTr69Config", parametro = "enableCWMP" }
+lee = "enableCWMP"
+tipo = "booleano"
+recomendado = "true"
+
+[[ajuste]]
+id = "seguridad.gestion_remota_avanzado"
+tema = "seguridad"
+nivel = "avanzado"
+leer = { funcion = "cbGetTr69Config" }
+
+[[ajuste.campo]]
+id = "aviso"
+escribe = { funcion = "cbSetTr69Config", parametro = "periodicInformEnable" }
+lee = "periodicInformEnable"
+tipo = "booleano"
+
+[[ajuste.campo]]
+id = "intervalo"
+escribe = { funcion = "cbSetTr69Config", parametro = "periodicInformInterval" }
+lee = "periodicInformInterval"
+tipo = "opcion"
+opciones = [
+  { valor = "3600", clave = "hora" },
+  { valor = "86400", clave = "dia" },
+  { valor = "604800", clave = "semana" },
+]
+
+[[ajuste]]
+id = "seguridad.gestion_remota_oculto"
+tema = "seguridad"
+nivel = "oculto"
+leer = { funcion = "cbGetTr69Config" }
+
+[[ajuste.campo]]
+id = "servidor"
+escribe = { funcion = "cbSetTr69Config", parametro = "acs_URL" }
+lee = "acs_URL"
+tipo = "secreto"
+validar = { min = 1, max = 256, ascii = true }
+
+[[ajuste.campo]]
+id = "usuario"
+escribe = { funcion = "cbSetTr69Config", parametro = "acs_username" }
+lee = "acs_username"
+tipo = "secreto"
+validar = { min = 1, max = 256 }
+
+[[ajuste.campo]]
+id = "contrasena"
+escribe = { funcion = "cbSetTr69Config", parametro = "acs_password" }
+lee = "acs_password"
+tipo = "secreto"
+validar = { min = 1, max = 256 }
+
+[[ajuste.campo]]
+id = "usuario_entrada"
+escribe = { funcion = "cbSetTr69Config", parametro = "connectionRequestUsername" }
+lee = "connectionRequestUsername"
+tipo = "secreto"
+validar = { min = 1, max = 256 }
+
+[[ajuste.campo]]
+id = "contrasena_entrada"
+escribe = { funcion = "cbSetTr69Config", parametro = "connectionRequestPassword" }
+lee = "connectionRequestPassword"
+tipo = "secreto"
+validar = { min = 1, max = 256 }
+
+# Contraseña de la web del router: la cambia su propio componente (Tarea
+# 12), fuera del gestor de cambios. Se registra con la lista de usuarios.
+[[ajuste]]
+id = "seguridad.contrasena_router"
+tema = "seguridad"
+nivel = "basico"
+componente = "contrasena_router"
+leer = { funcion = "cbGetUserList" }
+
+# Usuarios de la web del router, solo lectura: cambiar la contraseña de otro
+# usuario está bloqueado (puede ser el usuario con el que entra el panel) y
+# crear o borrar usuarios queda para la fase 3. La respuesta trae pares
+# nombre/papel seguidos, sin elemento que agrupe cada usuario.
+[[ajuste]]
+id = "seguridad.usuarios_router"
+tema = "seguridad"
+nivel = "avanzado"
+lista = true
+leer = { funcion = "cbGetUserList" }
+
+[[ajuste.campo]]
+id = "nombre"
+lee = "UserName"
+tipo = "secreto"
+solo_lectura = "ajuste-seguridad-usuarios_router-motivo"
+
+[[ajuste.campo]]
+id = "papel"
+lee = "UserRole"
+tipo = "opcion"
+solo_lectura = "ajuste-seguridad-usuarios_router-motivo"
+opciones = [
+  { valor = "system", clave = "operador" },
+  { valor = "admin", clave = "administrador" },
+  { valor = "user", clave = "usuario" },
+]

@@ -44,7 +44,10 @@ locales!(
     "ajustes-internet",
     "ajustes-wifi",
     "ajustes-red_local",
-    "ajustes-puertos"
+    "ajustes-puertos",
+    "ajustes-seguridad",
+    "ajustes-telefono",
+    "ajustes-sistema"
 );
 
 /// Idioma de la interfaz.
