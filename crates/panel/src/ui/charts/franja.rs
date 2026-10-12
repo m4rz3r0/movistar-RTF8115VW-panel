@@ -58,8 +58,9 @@ fn cabecera_tramo(t: &Tramo) -> String {
     format!("{} → {fin}", formato_fecha_hora(t.desde, false))
 }
 
-/// Resumen para lectores de pantalla.
-fn texto_aria(r: &ResumenCortes) -> String {
+/// Resumen en una frase (lectores de pantalla y modo de visualización
+/// «texto»).
+pub fn texto_disponibilidad(r: &ResumenCortes) -> String {
     t!(
         "comun-franja-aria",
         disponible = formato_disponibilidad(r),
@@ -99,6 +100,33 @@ fn formato_disponibilidad(r: &ResumenCortes) -> String {
             formato_decimal((r.disponibilidad * 100.0).floor() / 100.0, 2)
         )
     }
+}
+
+/// Columnas de la tabla de cortes.
+pub fn columnas_cortes() -> Vec<Columna> {
+    vec![
+        Columna::new(t!("comun-col-inicio")),
+        Columna::new(t!("comun-col-fin")),
+        Columna::numerica(t!("comun-col-duracion")),
+    ]
+}
+
+/// Filas de la tabla de cortes que tocan `[desde, hasta]` (inicio, fin o «en
+/// curso», duración).
+pub fn filas_cortes(eventos: &[Corte], desde: i64, hasta: i64) -> Vec<Vec<Celda>> {
+    eventos
+        .iter()
+        .filter(|c| c.hasta.unwrap_or(hasta) > desde && c.desde < hasta)
+        .map(|c| {
+            vec![
+                Celda::Numero(formato_fecha_hora(c.desde, false)),
+                c.hasta.map_or(Celda::Texto(t!("comun-en-curso")), |t| {
+                    Celda::Numero(formato_fecha_hora(t, false))
+                }),
+                Celda::Numero(formato_duracion(c.hasta.unwrap_or(hasta) - c.desde)),
+            ]
+        })
+        .collect()
 }
 
 /// Franja de disponibilidad de internet en `[desde, hasta]`: resumen (cortes,
@@ -285,31 +313,14 @@ pub fn FranjaDisponibilidad(
 
     let tabla = move || {
         tabla_abierta.get().then(|| {
-            let columnas = vec![
-                Columna::new(t!("comun-col-inicio")),
-                Columna::new(t!("comun-col-fin")),
-                Columna::numerica(t!("comun-col-duracion")),
-            ];
+            let columnas = columnas_cortes();
             let (d, h) = (desde.get_untracked(), hasta.get_untracked());
-            let filas: Vec<Vec<Celda>> = eventos.with_untracked(|e| {
-                e.iter()
-                    .filter(|c| c.hasta.unwrap_or(h) > d && c.desde < h)
-                    .map(|c| {
-                        vec![
-                            Celda::Numero(formato_fecha_hora(c.desde, false)),
-                            c.hasta.map_or(Celda::Texto(t!("comun-en-curso")), |t| {
-                                Celda::Numero(formato_fecha_hora(t, false))
-                            }),
-                            Celda::Numero(formato_duracion(c.hasta.unwrap_or(h) - c.desde)),
-                        ]
-                    })
-                    .collect()
-            });
+            let filas = eventos.with_untracked(|e| filas_cortes(e, d, h));
             view! { <Tabla columnas filas vacia=t!("comun-sin-cortes-intervalo") /> }
         })
     };
 
-    let etiqueta_aria = move || texto_aria(&resumen.get());
+    let etiqueta_aria = move || texto_disponibilidad(&resumen.get());
 
     view! {
         <figure class="franja">
@@ -454,9 +465,9 @@ mod tests {
             1000,
         );
         assert!(
-            texto_aria(&uno).contains(", 1 corte,"),
+            texto_disponibilidad(&uno).contains(", 1 corte,"),
             "{}",
-            texto_aria(&uno)
+            texto_disponibilidad(&uno)
         );
         let dos = resumen_cortes(
             &[
@@ -472,8 +483,8 @@ mod tests {
             0,
             1000,
         );
-        assert!(texto_aria(&dos).contains(", 2 cortes,"));
+        assert!(texto_disponibilidad(&dos).contains(", 2 cortes,"));
         let cero = resumen_cortes(&[], 0, 1000);
-        assert!(texto_aria(&cero).contains(", 0 cortes,"));
+        assert!(texto_disponibilidad(&cero).contains(", 0 cortes,"));
     }
 }

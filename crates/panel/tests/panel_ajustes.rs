@@ -1,7 +1,7 @@
-//! Pruebas de «Ajustes del panel» (`/panel`), «Configuración del router»
-//! (`/router/conexion`) y «Tus preferencias» (`/recomendaciones/preferencias`):
-//! credenciales del router, parámetros de la instancia, usuarios y ventana de
-//! reautenticación.
+//! Pruebas de «Ajustes del panel» (`/panel`) y «Configuración del router»
+//! (`/router/conexion`): credenciales del router, parámetros de la instancia
+//! (también los que usarán las recomendaciones de la fase 4), usuarios y
+//! ventana de reautenticación.
 
 mod common;
 
@@ -428,7 +428,11 @@ async fn leer_panel_no_devuelve_contrasena() {
     assert_eq!(v["router"]["usuario"], USER);
     assert_eq!(v["usuarios"], json!([PANEL_USER]));
     assert_eq!(v["solo_lectura"], false);
-    assert_eq!(v.get("dns_preferidos"), None, "es de «Tus preferencias»");
+    assert_eq!(
+        v.get("dns_preferidos"),
+        None,
+        "lo usarán las recomendaciones"
+    );
     // Sin zona guardada, la peninsular.
     assert_eq!(v["zona_horaria"], "Europe/Madrid");
     // La página tampoco la lleva.
@@ -584,7 +588,8 @@ async fn cada_seccion_guarda_solo_lo_suyo() {
         &cookie,
     )
     .await;
-    // «Tus preferencias» no manda la zona ni el idioma.
+    // Guardar solo los parámetros de las recomendaciones no toca la zona
+    // ni el idioma.
     ok(
         &p,
         "guardar_instancia",
@@ -633,8 +638,9 @@ async fn leer_preferencias_exige_sesion() {
     assert_eq!(v["servidor_propio"], Value::Null);
 }
 
-/// Los parámetros que usan prestablecidos y recomendaciones están en
-/// «Recomendaciones → Tus preferencias», no en «Ajustes del panel».
+/// Los parámetros que usarán las recomendaciones no están en «Ajustes del
+/// panel», y su subtítulo no enlaza con Recomendaciones (vuelve en la fase 4
+/// con sus tarjetas).
 #[tokio::test]
 async fn preferencias_fuera_de_ajustes_del_panel() {
     let p = panel().await;
@@ -642,14 +648,8 @@ async fn preferencias_fuera_de_ajustes_del_panel() {
     let html = body_text(get_con_cookie(&p.app, "/panel", &cookie).await).await;
     assert!(html.contains(r#"id="panel-idioma""#), "{html}");
     assert!(!html.contains(r#"id="panel-dns""#), "{html}");
-    let resp = get_con_cookie(&p.app, "/recomendaciones/preferencias", &cookie).await;
-    assert_eq!(resp.status(), 200);
-    let html = body_text(resp).await;
-    assert!(html.contains("Tus preferencias"), "{html}");
-    assert!(html.contains(r#"id="pref-dns""#), "{html}");
-    assert!(html.contains(r#"id="pref-confianza""#), "{html}");
-    assert!(html.contains(r#"id="pref-mantenimiento""#), "{html}");
-    assert!(html.contains(r#"id="pref-servidor""#), "{html}");
+    assert!(!html.contains("/recomendaciones"), "{html}");
+    assert!(!html.contains("Tus preferencias"), "{html}");
 }
 
 /// La conexión con el router vive en «Configuración del router → Conexión

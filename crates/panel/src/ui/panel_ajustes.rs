@@ -1,8 +1,10 @@
 //! «Ajustes del panel» (`/panel`): solo lo del panel. Panel (idioma por
-//! defecto y zona horaria) y usuarios del panel. No está en el menú: se abre
+//! defecto y zona horaria), visualización (el modo de cada usuario,
+//! [`super::vista::SeccionVista`]) y usuarios del panel. No está en el menú: se abre
 //! con el nombre de usuario. Lo del router está en «Configuración del
-//! router» ([`super::router`]) y los parámetros que usan prestablecidos y
-//! recomendaciones, en «Tus preferencias» ([`super::recomendaciones`]).
+//! router» ([`super::router`]). Los demás parámetros de la instancia (DNS
+//! preferidos, dispositivos de confianza…) los pedirán en contexto las
+//! recomendaciones de la fase 4.
 //!
 //! Lo delicado (usuarios aquí; credenciales y firmware en «Configuración del
 //! router») pide la contraseña del panel si no se ha escrito en los últimos
@@ -18,6 +20,7 @@ use crate::panel_ajustes::{
 use crate::t;
 use crate::ui::charts::Zona;
 use crate::ui::i18n::nombre_idioma;
+use crate::ui::vista::SeccionVista;
 use ::i18n::Idioma;
 use leptos::{ev::SubmitEvent, html, prelude::*, task::spawn_local};
 use leptos_router::components::A;
@@ -88,10 +91,6 @@ pub fn PaginaPanel() -> impl IntoView {
                 <p class="pagina-sub">
                     {t!("panel-sub")} " " {t!("panel-sub-router")} " "
                     <A href=super::router::RUTA_CONEXION>{t!("panel-sub-router-enlace")}</A>
-                    " " {t!("panel-sub-preferencias")} " "
-                    <A href=super::recomendaciones::RUTA_PREFERENCIAS>
-                        {t!("panel-sub-preferencias-enlace")}
-                    </A>
                     "."
                 </p>
             </div>
@@ -117,6 +116,7 @@ fn Ajustes(a: AjustesPanel) -> impl IntoView {
     view! {
         <div class="ajustes-panel">
             <SeccionPanel instancia />
+            <SeccionVista />
             <SeccionUsuarios usuarios=a.usuarios.clone() yo=a.yo.clone() />
         </div>
     }
@@ -179,7 +179,7 @@ pub(crate) fn campo(
 // ---- Idioma y zona horaria
 
 /// Idioma por defecto y zona horaria en edición. Solo se guardan estos dos
-/// parámetros de la instancia: los de «Tus preferencias» no se envían.
+/// parámetros de la instancia: los de las recomendaciones no se envían.
 #[derive(Clone, Copy)]
 struct Instancia {
     idioma: RwSignal<IdiomaPorDefecto>,

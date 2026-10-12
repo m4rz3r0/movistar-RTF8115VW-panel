@@ -15,6 +15,16 @@
 //! Las horas se pintan en la zona horaria de la instancia ([`Zona`]), calculada
 //! aquí mismo para que el servidor y el navegador generen el mismo HTML al
 //! hidratar.
+//!
+//! **Modo de visualización.** Toda página con gráficas respeta el del usuario
+//! ([`crate::vista::ModoVista`], en la señal de [`crate::ui::vista::use_vista`]):
+//! en «mixto» (por defecto), indicadores con minigráfica y gráficos; en
+//! «gráfica», los gráficos primero y a todo el ancho y los indicadores sin
+//! minigráfica; en «texto», ningún SVG (tampoco los iconos de estado, con
+//! [`crate::ui::IconosOcultos`]): los mismos datos como pares nombre/valor y
+//! tablas con último, mínimo, media y máximo de la ventana
+//! ([`formato_valor`]). La página de estado es el ejemplo (`ui/estado.rs` y
+//! `ui/estado/texto.rs`).
 
 mod escalas;
 mod franja;

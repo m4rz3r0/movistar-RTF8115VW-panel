@@ -1,5 +1,5 @@
-//! Marco de las páginas con sesión: barra lateral (Estado, Recomendaciones,
-//! Historial, Biblioteca y Configuración del router; debajo, el selector de
+//! Marco de las páginas con sesión: barra lateral (Estado, Historial,
+//! Biblioteca y Configuración del router; debajo, el selector de
 //! idioma y la zona de sesión: el nombre de usuario, que abre «Ajustes del
 //! panel», y «Salir») que en pantallas estrechas pasa a ser una barra
 //! superior con el menú plegable.
@@ -63,8 +63,6 @@ fn icono(d: &'static str) -> impl IntoView {
 
 /// Pulso (Estado).
 const ICONO_ESTADO: &str = "M2 10h3.5l2-5 3.5 10 2-5H18";
-/// Bombilla (Recomendaciones).
-const ICONO_RECOMENDACIONES: &str = "M7.5 15h5M8.25 17.5h3.5M10 2.5a5 5 0 0 0-3 9c.6.5 1 1.2 1 2V15h4v-1.5c0-.8.4-1.5 1-2a5 5 0 0 0-3-9z";
 /// Rejilla de bloques (Biblioteca).
 const ICONO_BIBLIOTECA: &str =
     "M3 3h5.5v5.5H3zM11.5 3H17v5.5h-5.5zM3 11.5h5.5V17H3zM11.5 11.5H17V17h-5.5z";
@@ -144,13 +142,6 @@ pub fn Layout() -> impl IntoView {
                             {icono(ICONO_ESTADO)}
                             <span>{t!("comun-nav-estado")}</span>
                         </A>
-                        <EnlaceSeccion
-                            href=crate::ui::recomendaciones::RUTA_PREFERENCIAS
-                            prefijo="/recomendaciones"
-                        >
-                            {icono(ICONO_RECOMENDACIONES)}
-                            <span>{t!("comun-nav-recomendaciones")}</span>
-                        </EnlaceSeccion>
                         <EnlaceSeccion href="/historial" prefijo="/historial">
                             {icono(ICONO_HISTORIAL)}
                             <span>{t!("comun-nav-historial")}</span>

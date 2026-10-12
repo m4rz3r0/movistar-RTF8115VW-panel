@@ -6,8 +6,6 @@ panel-titulo = Panel settings
 panel-sub = Language, time zone and panel users. They are stored in the panel's database.
 panel-sub-router = The connection to the router is under
 panel-sub-router-enlace = Router settings
-panel-sub-preferencias = and the parameters that presets and recommendations use, under
-panel-sub-preferencias-enlace = Recommendations → Your preferences
 panel-guardar = Save
 panel-guardado = Saved.
 
@@ -24,6 +22,16 @@ panel-zona-utc = UTC
 panel-zona-otra = Other (UTC±HH:MM)
 panel-zona-desfase = Offset from UTC
 
+## Display
+panel-vista = Display
+panel-vista-ayuda = How data with charts is shown, such as on Status. It's yours: each panel user chooses their own. You can also change it in the Status header.
+panel-vista-modo = Display mode
+panel-vista-texto = Text
+panel-vista-texto-ayuda = No charts: indicators as a list of names and values, and the history as tables with the latest value, minimum, average and maximum. Handy with a screen reader or on small screens.
+panel-vista-grafica = Charts
+panel-vista-grafica-ayuda = History charts first and full width; indicators more compact, without sparklines.
+panel-vista-mixto = Mixed
+panel-vista-mixto-ayuda = Indicators with their last-hour sparkline and, below, the history charts. This is the default.
 
 ## Users
 panel-usuarios = Panel users

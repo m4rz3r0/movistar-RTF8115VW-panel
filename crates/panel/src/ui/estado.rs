@@ -2,24 +2,32 @@
 //! selector de intervalo (1 h / 24 h / 7 d), disponibilidad de internet y
 //! tablas de clientes, concesiones DHCP y redes WiFi.
 //!
+//! Respeta el modo de visualización del usuario ([`ModoVista`]): «mixto»
+//! (lo de siempre), «gráfica» (los gráficos primero y a todo el ancho, los
+//! indicadores compactos) y «texto» (sin gráficos: [`texto`]). Se cambia en
+//! la cabecera ([`SelectorVista`]) sin recargar.
+//!
 //! Se refresca cada 10 s en el navegador (no mientras la pestaña está oculta)
 //! sin rehacer la página: los componentes leen señales derivadas de los
 //! recursos, que conservan el dato anterior mientras llega el nuevo, así que
 //! no se mueve nada ni se pierde la lectura de un gráfico al refrescar.
 
 mod datos;
+mod texto;
 
 pub use datos::*;
 
 use crate::t;
 use crate::ui::{
-    Estado, IconoEstado, Insignia,
+    Estado, IconoEstado, IconosOcultos, Insignia,
     charts::{
         Corte, FranjaDisponibilidad, Indicador, Serie, SerieTemporal, Tono, Unidad, formato_bps,
         formato_decimal, formato_duracion, formato_fecha_hora, formato_hora,
     },
     table::{Celda, Columna, Tabla},
+    vista::{SelectorVista, use_vista},
 };
+use crate::vista::ModoVista;
 use leptos::prelude::*;
 use leptos::reactive::computed::ScopedFuture;
 
@@ -159,30 +167,78 @@ fn Contenido(
         .map(|e| (texto_error(&e), super::es_error_de_sesion(&e)))
     });
 
+    // En el modo «texto», ningún gráfico: tampoco los iconos de estado.
+    let modo = use_vista();
+    provide_context(IconosOcultos(Signal::derive(move || {
+        modo.get() == ModoVista::Texto
+    })));
+    let datos = StoredValue::new(indicadores(vista, ultima_hora));
+    let hay_dato = Memo::new(move |_| vista.with(|v| v.as_ref().is_some_and(|v| v.at.is_some())));
+
     let cabecera = cabecera(vista, error_panel);
-    let resumen = move || {
-        let v = vista.get()?;
-        Some(if v.at.is_none() {
-            sin_datos(&v).into_any()
-        } else {
-            view! {
-                <Avisos vista />
-                <Indicadores vista ultima_hora />
-            }
-            .into_any()
-        })
+    // Avisos e indicadores (o la tarjeta de «sin datos»). En «gráfica», los
+    // indicadores van después de los gráficos.
+    let resumen = move |modo: ModoVista| {
+        move || {
+            let v = vista.get()?;
+            Some(if v.at.is_none() {
+                sin_datos(&v).into_any()
+            } else {
+                let datos = datos.get_value();
+                match modo {
+                    ModoVista::Mixto => view! {
+                        <Avisos vista />
+                        <Indicadores datos />
+                    }
+                    .into_any(),
+                    ModoVista::Grafica => view! { <Avisos vista /> }.into_any(),
+                    ModoVista::Texto => view! {
+                        <Avisos vista />
+                        <texto::IndicadoresTexto datos />
+                    }
+                    .into_any(),
+                }
+            })
+        }
     };
     let tablas = move || {
         vista
             .with(|v| v.as_ref().is_some_and(|v| v.at.is_some()))
             .then(|| view! { <Tablas vista /> })
     };
+    // Solo se rehace al cambiar de modo; los datos llegan por señales.
+    let cuerpo = move || match modo.get() {
+        ModoVista::Mixto => view! {
+            {resumen(ModoVista::Mixto)}
+            <Graficas vista muestras cortes rango set_rango />
+            {tablas}
+        }
+        .into_any(),
+        ModoVista::Grafica => {
+            let compactos = move || {
+                hay_dato.get().then(|| {
+                    view! { <Indicadores datos=datos.get_value() compactos=true /> }
+                })
+            };
+            view! {
+                {resumen(ModoVista::Grafica)}
+                <Graficas vista muestras cortes rango set_rango una_columna=true />
+                {compactos}
+                {tablas}
+            }
+            .into_any()
+        }
+        ModoVista::Texto => view! {
+            {resumen(ModoVista::Texto)}
+            <texto::HistoricoTexto vista muestras cortes rango set_rango />
+            {tablas}
+        }
+        .into_any(),
+    };
 
     view! {
         {cabecera}
-        {resumen}
-        <Graficas vista muestras cortes rango set_rango />
-        {tablas}
+        {cuerpo}
     }
     .into_any()
 }
@@ -229,6 +285,7 @@ fn cabecera(
                 <h1>{t!("estado-titulo")}</h1>
                 <p class="pagina-sub">{sub}</p>
             </div>
+            <SelectorVista />
         </header>
         {error}
     }
@@ -296,12 +353,44 @@ fn Avisos(vista: Memo<Option<EstadoVista>>) -> impl IntoView {
     }
 }
 
-/// Fila de indicadores.
-#[component]
-fn Indicadores(
+/// Un indicador de la página: título (sin él no se pinta), valor,
+/// subtítulo, estado y, si la tiene, minigráfica de la última hora con su
+/// color. Lo pintan [`Indicadores`] (tarjetas) y
+/// [`texto::IndicadoresTexto`] (pares nombre/valor).
+#[derive(Clone, Copy)]
+struct DatoIndicador {
+    titulo: Signal<Option<String>>,
+    valor: Signal<String>,
+    sub: Signal<Option<String>>,
+    estado: Signal<Option<Estado>>,
+    mini: Option<(Signal<Vec<Option<f64>>>, Tono)>,
+}
+
+impl DatoIndicador {
+    fn new(titulo: String, valor: Signal<String>, sub: Signal<Option<String>>) -> Self {
+        DatoIndicador {
+            titulo: Signal::stored(Some(titulo)),
+            valor,
+            sub,
+            estado: Signal::stored(None),
+            mini: None,
+        }
+    }
+
+    fn con_mini(self, valores: Signal<Vec<Option<f64>>>, tono: Tono) -> Self {
+        DatoIndicador {
+            mini: Some((valores, tono)),
+            ..self
+        }
+    }
+}
+
+/// Los indicadores de la página, de los datos del estado y de la última
+/// hora.
+fn indicadores(
     vista: Memo<Option<EstadoVista>>,
     ultima_hora: Memo<Vec<SampleVista>>,
-) -> impl IntoView {
+) -> Vec<DatoIndicador> {
     let campo = move |f: fn(&EstadoVista) -> String| {
         Signal::derive(move || vista.with(|v| v.as_ref().map(f).unwrap_or_default()))
     };
@@ -377,16 +466,14 @@ fn Indicadores(
         })
     });
     let titulo_conexion = Memo::new(move |_| conexion.with(|c| c.as_ref().map(|c| c.0.clone())));
-    let indicador_conexion = move || {
-        titulo_conexion.get().map(|titulo| {
-            let valor = Signal::derive(move || {
-                conexion.with(|c| c.as_ref().map(|c| c.1.clone()).unwrap_or_default())
-            });
-            let sub =
-                Signal::derive(move || conexion.with(|c| c.as_ref().and_then(|c| c.2.clone())));
-            let estado = Signal::derive(move || conexion.with(|c| c.as_ref().and_then(|c| c.3)));
-            view! { <Indicador titulo valor sub estado /> }
-        })
+    let indicador_conexion = DatoIndicador {
+        titulo: titulo_conexion.into(),
+        valor: Signal::derive(move || {
+            conexion.with(|c| c.as_ref().map(|c| c.1.clone()).unwrap_or_default())
+        }),
+        sub: Signal::derive(move || conexion.with(|c| c.as_ref().and_then(|c| c.2.clone()))),
+        estado: Signal::derive(move || conexion.with(|c| c.as_ref().and_then(|c| c.3))),
+        mini: None,
     };
 
     // Tasas: la de la última muestra vigente (el servidor la descarta si es
@@ -445,53 +532,108 @@ fn Indicadores(
         t!("estado-clientes-sub", wifi = v.clientes_wifi, cable = cable)
     });
 
+    let con_algo = |s: Signal<String>| Signal::derive(move || Some(s.get()));
+    vec![
+        DatoIndicador {
+            estado: internet_estado,
+            ..DatoIndicador::new(t!("estado-internet"), internet_valor, internet_sub)
+        },
+        indicador_conexion,
+        DatoIndicador::new(
+            t!("estado-bajada"),
+            tasa(|v| v.bajada_bps),
+            tasa_sub(|v| v.bajada_bps, |s| s.rx_bps),
+        )
+        .con_mini(mini(|s| s.rx_bps), Tono::Primario),
+        DatoIndicador::new(
+            t!("estado-subida"),
+            tasa(|v| v.subida_bps),
+            tasa_sub(|v| v.subida_bps, |s| s.tx_bps),
+        )
+        .con_mini(mini(|s| s.tx_bps), Tono::Secundario),
+        DatoIndicador::new(
+            t!("estado-carga"),
+            campo(|v| formato_decimal(f64::from(v.load.0), 2)),
+            con_algo(carga_sub),
+        )
+        .con_mini(mini(|s| Some(f64::from(s.load1))), Tono::default()),
+        DatoIndicador::new(
+            t!("estado-ram-usada"),
+            campo(|v| format!("{} %", formato_decimal(f64::from(v.ram_pct), 1))),
+            con_algo(ram_sub),
+        )
+        .con_mini(mini(|s| Some(f64::from(s.ram_used_pct))), Tono::default()),
+        DatoIndicador::new(
+            t!("estado-clientes"),
+            campo(|v| v.clientes.to_string()),
+            con_algo(clientes_sub),
+        )
+        .con_mini(mini(|s| s.clients.map(f64::from)), Tono::default()),
+    ]
+}
+
+/// Fila de indicadores en tarjetas: con minigráfica y subtítulo (modo
+/// «mixto») o, `compactos`, más pequeñas y sin minigráfica (modo «gráfica»).
+#[component]
+fn Indicadores(datos: Vec<DatoIndicador>, #[prop(optional)] compactos: bool) -> impl IntoView {
+    let tarjetas = datos
+        .into_iter()
+        .map(|d| {
+            move || {
+                d.titulo.get().map(|titulo| {
+                    let DatoIndicador {
+                        valor, estado, sub, ..
+                    } = d;
+                    match d.mini.filter(|_| !compactos) {
+                        Some((minigrafica, tono)) => view! {
+                            <Indicador titulo valor sub estado minigrafica tono />
+                        }
+                        .into_any(),
+                        None => view! { <Indicador titulo valor sub estado /> }.into_any(),
+                    }
+                })
+            }
+        })
+        .collect_view();
+    let clase = if compactos {
+        "rejilla-indicadores compactos"
+    } else {
+        "rejilla-indicadores"
+    };
     view! {
-        <section class="rejilla-indicadores" aria-label=t!("estado-indicadores")>
-            <Indicador
-                titulo=t!("estado-internet")
-                valor=internet_valor
-                sub=internet_sub
-                estado=internet_estado
-            />
-            {indicador_conexion}
-            <Indicador
-                titulo=t!("estado-bajada")
-                valor=tasa(|v| v.bajada_bps)
-                sub=tasa_sub(|v| v.bajada_bps, |s| s.rx_bps)
-                minigrafica=mini(|s| s.rx_bps)
-                tono=Tono::Primario
-            />
-            <Indicador
-                titulo=t!("estado-subida")
-                valor=tasa(|v| v.subida_bps)
-                sub=tasa_sub(|v| v.subida_bps, |s| s.tx_bps)
-                minigrafica=mini(|s| s.tx_bps)
-                tono=Tono::Secundario
-            />
-            <Indicador
-                titulo=t!("estado-carga")
-                valor=campo(|v| formato_decimal(f64::from(v.load.0), 2))
-                sub=carga_sub
-                minigrafica=mini(|s| Some(f64::from(s.load1)))
-            />
-            <Indicador
-                titulo=t!("estado-ram-usada")
-                valor=campo(|v| format!("{} %", formato_decimal(f64::from(v.ram_pct), 1)))
-                sub=ram_sub
-                minigrafica=mini(|s| Some(f64::from(s.ram_used_pct)))
-            />
-            <Indicador
-                titulo=t!("estado-clientes")
-                valor=campo(|v| v.clientes.to_string())
-                sub=clientes_sub
-                minigrafica=mini(|s| s.clients.map(f64::from))
-            />
+        <section class=clase aria-label=t!("estado-indicadores")>
+            {tarjetas}
         </section>
     }
     .into_any()
 }
 
-/// Selector de intervalo, gráficos y disponibilidad.
+/// Botones del intervalo del histórico (1 h, 24 h, 7 d).
+fn selector_rango(rango: ReadSignal<Rango>, set_rango: WriteSignal<Rango>) -> impl IntoView {
+    let botones = Rango::TODOS
+        .into_iter()
+        .map(|r| {
+            view! {
+                <button
+                    type="button"
+                    class="selector-boton"
+                    aria-pressed=move || (rango.get() == r).to_string()
+                    on:click=move |_| set_rango.set(r)
+                >
+                    {r.etiqueta()}
+                </button>
+            }
+        })
+        .collect_view();
+    view! {
+        <div class="selector" role="group" aria-label=t!("estado-intervalo")>
+            {botones}
+        </div>
+    }
+}
+
+/// Selector de intervalo, gráficos y disponibilidad. Con `una_columna`
+/// (modo «gráfica»), cada gráfico a todo el ancho.
 #[component]
 fn Graficas(
     vista: Memo<Option<EstadoVista>>,
@@ -499,6 +641,7 @@ fn Graficas(
     cortes: Memo<Vec<CorteVista>>,
     rango: ReadSignal<Rango>,
     set_rango: WriteSignal<Rango>,
+    #[prop(optional)] una_columna: bool,
 ) -> impl IntoView {
     let ahora = move || vista.with(|v| v.as_ref().map(|v| v.ahora));
     // El intervalo de los datos que se están mostrando (mientras llegan los
@@ -552,30 +695,18 @@ fn Graficas(
     let hasta = Signal::derive(move || ahora().unwrap_or_default());
     let desde = Signal::derive(move || hasta.get() - rango_datos().segundos());
 
-    let botones = Rango::TODOS
-        .into_iter()
-        .map(|r| {
-            view! {
-                <button
-                    type="button"
-                    class="selector-boton"
-                    aria-pressed=move || (rango.get() == r).to_string()
-                    on:click=move |_| set_rango.set(r)
-                >
-                    {r.etiqueta()}
-                </button>
-            }
-        })
-        .collect_view();
+    let rejilla = if una_columna {
+        "rejilla-estado una-columna"
+    } else {
+        "rejilla-estado"
+    };
     let titulo_franja = move || t!("estado-disponibilidad", rango = rango_datos().descripcion());
 
     view! {
         <section class="seccion graficas" aria-labelledby="graficas-titulo">
             <div class="seccion-cabecera">
                 <h2 id="graficas-titulo">{t!("estado-historico")}</h2>
-                <div class="selector" role="group" aria-label=t!("estado-intervalo")>
-                    {botones}
-                </div>
+                {selector_rango(rango, set_rango)}
             </div>
             <SerieTemporal
                 titulo=t!("estado-trafico")
@@ -589,7 +720,7 @@ fn Graficas(
                 <h3 class="franja-titulo">{titulo_franja}</h3>
                 <FranjaDisponibilidad eventos desde hasta />
             </section>
-            <div class="rejilla-estado">
+            <div class=rejilla>
                 <SerieTemporal
                     titulo=t!("estado-carga-router")
                     series=carga

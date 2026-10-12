@@ -3,27 +3,19 @@ import { USUARIO } from "./instancias";
 import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 
 // Menú reorganizado, a 360 y 1440 px, en español y en inglés: el nombre de
-// usuario abre «Ajustes del panel»; Recomendaciones lleva a «Tus
-// preferencias», donde una sugerencia de DNS se guarda y sigue tras recargar.
+// usuario abre «Ajustes del panel», y Recomendaciones no sale en el menú
+// hasta que tenga sus tarjetas (fase 4).
 
 const textos = {
   es: {
     principal: "Principal",
     recomendaciones: "Recomendaciones",
     ajustesPanel: "Ajustes del panel",
-    preferencias: "Tus preferencias",
-    usarQuad9: "Usar Quad9",
-    guardar: "Guardar",
-    guardado: "Guardado.",
   },
   en: {
     principal: "Main",
     recomendaciones: "Recommendations",
     ajustesPanel: "Panel settings",
-    preferencias: "Your preferences",
-    usarQuad9: "Use Quad9",
-    guardar: "Save",
-    guardado: "Saved.",
   },
 } as const;
 
@@ -43,14 +35,22 @@ for (const idioma of ["es", "en"] as const) {
         viewport: { width: ancho, height: 900 },
       });
 
-      test("nombre de usuario, Recomendaciones y Tus preferencias", async ({ page }) => {
+      test("nombre de usuario y sin Recomendaciones", async ({ page }) => {
         const t = textos[idioma];
         const errores = recogerErrores(page);
         await entrar(page);
         await asentar(page);
 
-        // 1-2. El nombre de usuario abre «Ajustes del panel».
+        // 1. Sin Recomendaciones en el menú.
         await abrirMenu(page, ancho);
+        const nav = page.getByRole("navigation", { name: t.principal, exact: true });
+        await expect(nav.getByRole("link").first()).toBeVisible();
+        await expect(nav.getByRole("link", { name: t.recomendaciones })).toHaveCount(0);
+        await expect(page.locator("a[href^='/recomendaciones']")).toHaveCount(0);
+        await sinDesbordamiento(page, `menú ${idioma} ${ancho}`);
+        await page.screenshot({ path: `capturas/menu-${idioma}-${ancho}.png`, fullPage: true });
+
+        // 2. El nombre de usuario abre «Ajustes del panel».
         const usuario = page.locator("a.sesion-usuario");
         await expect(usuario).toContainText(USUARIO);
         await expect(usuario).toHaveAccessibleName(`${USUARIO} ${t.ajustesPanel}`);
@@ -58,44 +58,9 @@ for (const idioma of ["es", "en"] as const) {
         await page.waitForURL((url) => url.pathname === "/panel");
         await expect(page.locator("main h1")).toHaveText(t.ajustesPanel);
         await expect(usuario).toHaveAttribute("aria-current", "page");
-
-        // 3. Recomendaciones lleva a «Tus preferencias».
-        await abrirMenu(page, ancho);
-        const nav = page.getByRole("navigation", { name: t.principal, exact: true });
-        const recomendaciones = nav.getByRole("link", { name: t.recomendaciones });
-        await recomendaciones.click();
-        await page.waitForURL((url) => url.pathname === "/recomendaciones/preferencias");
-        await expect(page.locator("main h1")).toHaveText(t.preferencias);
-        // En móvil el menú se pliega al navegar: el enlace sigue en la página.
-        await expect(page.locator("nav.nav a[href='/recomendaciones/preferencias']")).toHaveAttribute(
-          "aria-current",
-          "page",
-        );
-        await expect(usuario).not.toHaveAttribute("aria-current", "page");
-
-        // 4. Una sugerencia de DNS, guardada.
-        const dns = page.locator("#pref-dns");
-        const guardar = page.getByRole("button", { name: t.guardar, exact: true });
-        await page.getByRole("button", { name: t.usarQuad9 }).click();
-        await expect(dns).toHaveValue("9.9.9.9");
-        await guardar.click();
-        await expect(page.locator(".aviso-formulario")).toHaveText(t.guardado);
-        await sinDesbordamiento(page, `tus preferencias ${idioma} ${ancho}`);
-        await page.screenshot({
-          path: `capturas/preferencias-${idioma}-${ancho}.png`,
-          fullPage: true,
-        });
-
-        // 5. Tras recargar, sigue guardada. Se deja como estaba (vacía).
-        await page.reload();
-        await asentar(page);
-        await expect(dns).toHaveValue("9.9.9.9");
-        await dns.fill("");
-        await guardar.click();
-        await expect(page.locator(".aviso-formulario")).toHaveText(t.guardado);
-        await page.reload();
-        await asentar(page);
-        await expect(dns).toHaveValue("");
+        // Su subtítulo tampoco enlaza con Recomendaciones.
+        await expect(page.locator("a[href^='/recomendaciones']")).toHaveCount(0);
+        await sinDesbordamiento(page, `ajustes del panel ${idioma} ${ancho}`);
 
         expect(errores, "errores o avisos en la consola").toEqual([]);
       });

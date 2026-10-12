@@ -250,3 +250,28 @@ fn sin_texto_literal_en_vistas() {
         "texto sin traducir en vistas: {sueltos:#?}"
     );
 }
+
+/// Sin sugerencias de DNS públicos: los proveedores se elegirán en la fase
+/// 3/4 con fuentes citadas y comprobando que admiten DNS normal (algunos solo
+/// funcionan cifrados, y el router reparte DNS normal por DHCP).
+#[test]
+fn sin_proveedores_de_dns_en_textos_ni_vistas() {
+    let proveedores = Regex::new(r"(?i)quad9|mullvad|cloudflare").unwrap();
+    let mut hallados = Vec::new();
+    for idioma in ["es", "en"] {
+        for f in i18n::FICHEROS {
+            let ruta = raiz().join("locales").join(idioma).join(format!("{f}.ftl"));
+            for (n, l) in fs::read_to_string(&ruta).unwrap().lines().enumerate() {
+                if proveedores.is_match(l) {
+                    hallados.push(format!("{}:{}", ruta.display(), n + 1));
+                }
+            }
+        }
+    }
+    for (ruta, fuente) in fuentes_panel() {
+        if proveedores.is_match(&fuente) {
+            hallados.push(ruta.display().to_string());
+        }
+    }
+    assert!(hallados.is_empty(), "proveedores de DNS: {hallados:#?}");
+}

@@ -21,7 +21,6 @@ const textos = {
     red: "Red del router detectada:",
     telefonia: "Telefonía: sí",
     irEstado: "Ir al estado",
-    irPreferencias: "Tus preferencias",
     estado: "Estado",
     esperando: "Esperando el primer dato",
   },
@@ -34,7 +33,6 @@ const textos = {
     red: "Router network detected:",
     telefonia: "Phone: yes",
     irEstado: "Go to Status",
-    irPreferencias: "Your preferences",
     estado: "Status",
     esperando: "Waiting for the first data",
   },
@@ -86,11 +84,9 @@ for (const { idioma, locale, ancho } of pasadas) {
       await expect(page.getByText(t.red)).toBeVisible();
       await expect(page.locator(".red-resumen")).toContainText("Internet: ip2 (PPPoE)");
       await expect(page.locator(".red-resumen")).toContainText(t.telefonia);
-      // Los parámetros opcionales de la instancia, en «Tus preferencias».
-      await expect(page.getByRole("link", { name: t.irPreferencias })).toHaveAttribute(
-        "href",
-        "/recomendaciones/preferencias",
-      );
+      // El final solo lleva al Estado: nada de «Tus preferencias».
+      await expect(page.locator(".instalar-botones a")).toHaveCount(1);
+      await expect(page.locator("a[href^='/recomendaciones']")).toHaveCount(0);
       await sinDesbordamiento(page, "fin del asistente");
       await page.screenshot({ path: `capturas/instalar-fin-${idioma}-${ancho}.png`, fullPage: true });
 

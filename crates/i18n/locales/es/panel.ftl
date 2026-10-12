@@ -6,8 +6,6 @@ panel-titulo = Ajustes del panel
 panel-sub = Idioma, zona horaria y usuarios del panel. Se guardan en la base de datos del panel.
 panel-sub-router = La conexión con el router está en
 panel-sub-router-enlace = Configuración del router
-panel-sub-preferencias = y los parámetros que usan los prestablecidos y las recomendaciones, en
-panel-sub-preferencias-enlace = Recomendaciones → Tus preferencias
 panel-guardar = Guardar
 panel-guardado = Guardado.
 
@@ -24,6 +22,16 @@ panel-zona-utc = UTC
 panel-zona-otra = Otra (UTC±HH:MM)
 panel-zona-desfase = Desfase respecto a UTC
 
+## Visualización
+panel-vista = Visualización
+panel-vista-ayuda = Cómo se presentan los datos que tienen gráficas, como los de Estado. Es tuyo: cada usuario del panel elige el suyo. También se cambia en la cabecera de Estado.
+panel-vista-modo = Modo de visualización
+panel-vista-texto = Texto
+panel-vista-texto-ayuda = Sin gráficos: los indicadores como una lista de nombre y valor, y el histórico en tablas con el último valor, el mínimo, la media y el máximo. Cómodo con lector de pantalla o en pantallas pequeñas.
+panel-vista-grafica = Gráfica
+panel-vista-grafica-ayuda = Las gráficas del histórico primero y a todo el ancho; los indicadores, más compactos y sin minigráfica.
+panel-vista-mixto = Mixto
+panel-vista-mixto-ayuda = Indicadores con su minigráfica de la última hora y, debajo, las gráficas del histórico. Es el de por defecto.
 
 ## Usuarios
 panel-usuarios = Usuarios del panel

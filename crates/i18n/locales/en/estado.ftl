@@ -39,6 +39,17 @@ estado-clientes = Clients
 ## Charts
 estado-historico = Over time
 estado-intervalo = Chart range
+estado-vista = Display
+estado-vista-error = Couldn't save the display mode: { $error }
+estado-texto-historico = History ({ $rango }): latest value, minimum, average and maximum
+estado-texto-historico-1min = History ({ $rango }): latest value, minimum, average and maximum of the 1-minute averages (the minimum and maximum are of those averages, not peaks)
+estado-texto-historico-15min = History ({ $rango }): latest value, minimum, average and maximum of the 15-minute averages (the minimum and maximum are of those averages, not peaks)
+estado-texto-col-dato = Metric
+estado-texto-col-ultimo = Latest
+estado-texto-col-minimo = Minimum
+estado-texto-col-media = Average
+estado-texto-col-maximo = Maximum
+estado-texto-sin-muestras = No data in this interval
 estado-trafico = Device traffic
 estado-trafico-nota = What the devices on the wired and WiFi network send and receive. Includes traffic between devices plugged into different router ports.
 estado-disponibilidad = Internet availability · { $rango }

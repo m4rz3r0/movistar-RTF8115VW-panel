@@ -41,20 +41,23 @@ test.describe("sección Configuración del router", () => {
     await page.waitForURL((url) => url.pathname === "/");
   });
 
-  test("/recomendaciones lleva a Tus preferencias y Atrás no se queda en ella", async ({ page }) => {
-    await entrar(page);
-    await asentar(page);
-    // Navegación del lado del cliente a /recomendaciones (como un enlace antiguo).
-    await page.evaluate(() => {
-      const a = document.createElement("a");
-      a.href = "/recomendaciones";
-      document.querySelector("main")?.appendChild(a);
-      a.click();
+  for (const ruta of ["/recomendaciones", "/recomendaciones/preferencias"]) {
+    test(`${ruta} lleva al Estado y Atrás no se queda en ella`, async ({ page }) => {
+      await entrar(page);
+      await page.goto("/historial");
+      await asentar(page);
+      // Navegación del lado del cliente (como un enlace antiguo).
+      await page.evaluate((href) => {
+        const a = document.createElement("a");
+        a.href = href;
+        document.querySelector("main")?.appendChild(a);
+        a.click();
+      }, ruta);
+      await page.waitForURL((url) => url.pathname === "/");
+      await page.goBack();
+      await page.waitForURL((url) => url.pathname === "/historial");
     });
-    await page.waitForURL((url) => url.pathname === "/recomendaciones/preferencias");
-    await page.goBack();
-    await page.waitForURL((url) => url.pathname === "/");
-  });
+  }
 
   test("Ajustes del panel enlaza con la conexión", async ({ page }) => {
     await entrar(page);

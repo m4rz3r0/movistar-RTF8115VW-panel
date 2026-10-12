@@ -47,8 +47,6 @@ instalar-fallidas = { $n ->
 instalar-fin-texto = El panel ya está configurado.
 instalar-red = Red del router detectada:
 instalar-red-sin-detectar = No se pudo detectar la red del router: puedes volver a intentarlo en Configuración del router → Conexión con el router.
-instalar-fin-opcional = Puedes ajustar ahora los parámetros opcionales de la instancia (DNS preferidos, dispositivos de confianza, horario de mantenimiento y servidor propio) o hacerlo más tarde en Recomendaciones → Tus preferencias.
-instalar-ir-preferencias = Tus preferencias
 instalar-ir-estado = Ir al estado
 
 ## Errores

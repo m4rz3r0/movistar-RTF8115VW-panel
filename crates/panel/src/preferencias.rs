@@ -1,10 +1,12 @@
-//! Server functions de «Recomendaciones → Tus preferencias»
-//! (`/recomendaciones/preferencias`): los parámetros de la instancia que usan
-//! prestablecidos y recomendaciones (DNS preferidos, dispositivos de
-//! confianza, horario de mantenimiento y servidor propio).
+//! Lectura de los parámetros de la instancia que usarán las recomendaciones
+//! (DNS preferidos, dispositivos de confianza, horario de mantenimiento y
+//! servidor propio) y de los equipos que ve el router.
 //!
-//! Se guardan con la misma función que «Ajustes del panel»
-//! ([`crate::panel_ajustes::guardar_instancia`]), mandando solo estos campos.
+//! Hoy no la usa ninguna página: la usan las recomendaciones (fase 4), cuyas
+//! tarjetas piden en contexto, al aplicarse, solo lo que necesitan y parten
+//! de lo ya guardado. Se conserva con sus pruebas porque es también la única
+//! forma de leer lo que guarda
+//! [`crate::panel_ajustes::guardar_instancia`] para estos campos.
 
 use leptos::prelude::*;
 use leptos::server_fn::codec::Json;
@@ -17,7 +19,7 @@ pub struct EquipoLan {
     pub nombre: String,
 }
 
-/// Lo que muestra «Tus preferencias».
+/// Los parámetros de las recomendaciones y los equipos del router.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Preferencias {
     pub dns_preferidos: Vec<String>,
