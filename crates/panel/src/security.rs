@@ -64,7 +64,7 @@ pub async fn csrf(State(state): State<AppState>, req: Request, next: Next) -> Re
     let safe_method = matches!(*req.method(), Method::GET | Method::HEAD | Method::OPTIONS);
     if !safe_method
         && req.uri().path().starts_with("/api/")
-        && !same_origin(req.headers(), &state.cfg.public_origin)
+        && !same_origin(req.headers(), &state.cfg.public_origins)
     {
         return (StatusCode::FORBIDDEN, "Origen no permitido").into_response();
     }
@@ -72,10 +72,10 @@ pub async fn csrf(State(state): State<AppState>, req: Request, next: Next) -> Re
 }
 
 /// ¿Viene la petición del propio panel? `Sec-Fetch-Site`, si está, manda
-/// (todas sus copias deben ser `same-origin`). Si no está, `Origin` (todas sus
-/// copias) debe ser exactamente `public_origin`; `Origin: null` no vale. Sin
-/// ninguna de las dos, sí.
-fn same_origin(headers: &HeaderMap, public_origin: &str) -> bool {
+/// (todas sus copias deben ser `same-origin`). Si no está, cada copia de
+/// `Origin` debe ser exactamente uno de los `origenes` públicos;
+/// `Origin: null` no vale. Sin ninguna de las dos, sí.
+fn same_origin(headers: &HeaderMap, origenes: &[String]) -> bool {
     let sites = headers.get_all("sec-fetch-site");
     if sites.iter().next().is_some() {
         return sites.iter().all(|v| v.as_bytes() == b"same-origin");
@@ -83,7 +83,7 @@ fn same_origin(headers: &HeaderMap, public_origin: &str) -> bool {
     headers
         .get_all(header::ORIGIN)
         .iter()
-        .all(|v| v.as_bytes() == public_origin.as_bytes())
+        .all(|v| origenes.iter().any(|o| v.as_bytes() == o.as_bytes()))
 }
 
 #[cfg(test)]
@@ -101,8 +101,8 @@ mod tests {
 
     #[test]
     fn mismo_origen_segun_cabeceras() {
-        let o = "https://router.example";
-        let ok = |pairs: &[(&'static str, &'static str)]| same_origin(&headers(pairs), o);
+        let o = ["https://router.example".to_owned()];
+        let ok = |pairs: &[(&'static str, &'static str)]| same_origin(&headers(pairs), &o);
         // Sin ninguna de las dos cabeceras se deja pasar (la sesión sigue
         // siendo obligatoria).
         assert!(ok(&[]));
@@ -128,6 +128,31 @@ mod tests {
             ("origin", "https://router.example"),
             ("origin", "https://otro.example")
         ]));
+    }
+
+    #[test]
+    fn cualquiera_de_los_origenes_vale() {
+        let o = [
+            "https://router.example".to_owned(),
+            "http://router.home.arpa:3000".to_owned(),
+        ];
+        let ok = |pairs: &[(&'static str, &'static str)]| same_origin(&headers(pairs), &o);
+        assert!(ok(&[("origin", "https://router.example")]));
+        assert!(ok(&[("origin", "http://router.home.arpa:3000")]));
+        assert!(ok(&[
+            ("origin", "https://router.example"),
+            ("origin", "http://router.home.arpa:3000")
+        ]));
+        assert!(!ok(&[("origin", "http://router.home.arpa")]));
+        assert!(!ok(&[
+            ("origin", "https://router.example"),
+            ("origin", "https://otro.example")
+        ]));
+        // Sin orígenes configurados, solo pasa sin `Origin`.
+        assert!(!same_origin(
+            &headers(&[("origin", "https://router.example")]),
+            &[]
+        ));
     }
 
     #[test]

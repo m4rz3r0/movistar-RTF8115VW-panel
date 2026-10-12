@@ -7,7 +7,7 @@ mod common;
 use axum::{body::Body, http::Request};
 use common::{
     PANEL_PASS, PANEL_USER, PASS, Panel, USER, body_text, get, get_con_cookie, panel_sin_router,
-    post_json, send, set_cookie,
+    panel_sin_router_ajustado, post_json, send, set_cookie,
 };
 use panel::{
     changes::{CambioError, ChangeManager, ChangeRequest, Tiempos},
@@ -29,7 +29,7 @@ fn fichero_token(p: &Panel) -> PathBuf {
 /// Panel recién instalado (sin usuarios ni router) con el token generado al
 /// arrancar.
 async fn recien_instalado() -> Panel {
-    let p = panel_sin_router("127.0.0.1".parse().unwrap()).await;
+    let p = panel_sin_router().await;
     assert!(instalar::token_inicial(&p.state).await.is_some());
     p
 }
@@ -147,9 +147,32 @@ async fn instalar_sin_token_403() {
     assert!(!p.state.hgu.configurado());
 }
 
+/// `RP_INSTALL_NETS` amplía la red local del asistente (p. ej. con la red de
+/// una VPN): sin ella, un cliente de esa red recibe 403; con ella, pasa.
+#[tokio::test]
+async fn red_de_instalacion_opcional() {
+    const VPN: &str = "203.0.113.5";
+    let crear_desde_la_vpn = |p: Panel| async move {
+        assert!(instalar::token_inicial(&p.state).await.is_some());
+        let token = std::fs::read_to_string(fichero_token(&p)).unwrap();
+        let admin =
+            json!({ "token": token.trim(), "usuario": PANEL_USER, "contrasena": PANEL_PASS });
+        let (status, body, _) = llamar_desde(&p, "crear_admin", admin, None, VPN).await;
+        (status, body, usuarios(&p).await)
+    };
+    let (status, body, n) = crear_desde_la_vpn(panel_sin_router().await).await;
+    assert_eq!((status, n), (403, 0), "{body}");
+    let p = panel_sin_router_ajustado(|c| {
+        c.install_nets = panel::redes::lista("203.0.113.0/24").unwrap();
+    })
+    .await;
+    let (status, body, n) = crear_desde_la_vpn(p).await;
+    assert_eq!((status, n), (200, 1), "{body}");
+}
+
 #[tokio::test]
 async fn con_usuarios_no_hay_asistente() {
-    let p = panel_sin_router("127.0.0.1".parse().unwrap()).await;
+    let p = panel_sin_router().await;
     // Un token que quedó de otra vez.
     std::fs::write(fichero_token(&p), "viejo\n").unwrap();
     panel::auth::create_user(&p.state.db, PANEL_USER, PANEL_PASS)

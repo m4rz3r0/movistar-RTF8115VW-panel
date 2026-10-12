@@ -45,11 +45,7 @@ async fn esperar(que: &str, mut cond: impl FnMut() -> bool) {
 async fn instancia_existente_detecta_ip2_al_arrancar() {
     let sim = Sim::start(common::sim_config()).await;
     let dir = tempfile::tempdir().unwrap();
-    let state = common::estado(
-        common::config_en(dir.path(), "127.0.0.1".parse().unwrap()),
-        dir.path(),
-    )
-    .await;
+    let state = common::estado(common::config_en(dir.path()), dir.path()).await;
     instancia::guardar_credenciales(
         &state.db,
         &state.history_key,
@@ -86,11 +82,7 @@ async fn instancia_existente_detecta_ip2_al_arrancar() {
     assert_eq!(guardada, red);
 
     // Al volver a arrancar, la detección guardada está desde el principio.
-    let otro = common::estado(
-        common::config_en(dir.path(), "127.0.0.1".parse().unwrap()),
-        dir.path(),
-    )
-    .await;
+    let otro = common::estado(common::config_en(dir.path()), dir.path()).await;
     assert_eq!(otro.wan().as_deref(), Some("ip2"));
 }
 
@@ -104,11 +96,7 @@ async fn wan_manual_manda() {
         .await
         .unwrap();
     db.close().await;
-    let state = common::estado(
-        common::config_en(dir.path(), "127.0.0.1".parse().unwrap()),
-        dir.path(),
-    )
-    .await;
+    let state = common::estado(common::config_en(dir.path()), dir.path()).await;
     assert_eq!(state.wan().as_deref(), Some("ip4"));
     instancia::guardar_credenciales(
         &state.db,

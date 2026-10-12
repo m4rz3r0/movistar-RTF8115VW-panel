@@ -236,7 +236,7 @@ async fn sigue_sano_durante_una_pausa() {
 
 #[tokio::test]
 async fn despertar_lee_sin_esperar_al_intervalo() {
-    let p = common::panel_sin_router("127.0.0.1".parse().unwrap()).await;
+    let p = common::panel_sin_router().await;
     let h = Poller::spawn_with(
         p.state.clone(),
         PollerConfig {

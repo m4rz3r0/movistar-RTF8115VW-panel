@@ -67,7 +67,7 @@ pub async fn quien_soy() -> Result<String, ServerFnError> {
 
 #[cfg(feature = "ssr")]
 mod server {
-    use crate::state::AppState;
+    use crate::{redes::RedIp, state::AppState};
     use argon2::{
         Argon2,
         password_hash::{PasswordHasher, PasswordVerifier, phc::PasswordHash},
@@ -482,12 +482,13 @@ mod server {
 
     // ---- Freno de fuerza bruta ----
 
-    /// IP del cliente: la del socket, salvo que el socket sea el proxy de
-    /// confianza; entonces, el último valor de `X-Forwarded-For` (el que añadió
-    /// el proxy). Si el proxy no lo manda o no es una IP, se usa la del proxy.
-    pub fn client_ip(peer: IpAddr, headers: &HeaderMap, trusted_proxy: IpAddr) -> IpAddr {
+    /// IP del cliente: la del socket, salvo que el socket sea uno de los
+    /// proxies de confianza (`proxies`); entonces, el último valor de
+    /// `X-Forwarded-For` (el que añadió el proxy). Si el proxy no lo manda o
+    /// no es una IP, se usa la del proxy.
+    pub fn client_ip(peer: IpAddr, headers: &HeaderMap, proxies: &[RedIp]) -> IpAddr {
         let peer = peer.to_canonical();
-        if peer != trusted_proxy.to_canonical() {
+        if !proxies.iter().any(|red| red.contiene(peer)) {
             return peer;
         }
         headers
@@ -718,7 +719,7 @@ mod server {
         let state = app_state()?;
         let ConnectInfo(peer) = leptos_axum::extract::<ConnectInfo<SocketAddr>>().await?;
         let headers: HeaderMap = leptos_axum::extract().await?;
-        let ip = client_ip(peer.ip(), &headers, state.cfg.trusted_proxy);
+        let ip = client_ip(peer.ip(), &headers, &state.cfg.trusted_proxies);
         match attempt_login(&state, ip, &usuario, &contrasena).await {
             Ok(id) => {
                 if let Err(e) = delete_cookie_session(&state.db, &headers).await {
@@ -783,7 +784,7 @@ mod server {
         let user = require_user().await?;
         let ConnectInfo(peer) = leptos_axum::extract::<ConnectInfo<SocketAddr>>().await?;
         let headers: HeaderMap = leptos_axum::extract().await?;
-        let ip = client_ip(peer.ip(), &headers, state.cfg.trusted_proxy);
+        let ip = client_ip(peer.ip(), &headers, &state.cfg.trusted_proxies);
         match reauthenticate(&state, ip, &user, contrasena).await {
             Ok(()) => {}
             Err(LoginError::Throttled(secs)) => {
@@ -947,28 +948,30 @@ mod server {
         #[test]
         fn ip_del_cliente() {
             let proxy: IpAddr = "192.0.2.100".parse().unwrap();
+            let proxies = ["192.0.2.100".parse::<RedIp>().unwrap()];
+            let proxies = &proxies[..];
             let otro: IpAddr = "192.0.2.101".parse().unwrap();
             let ip = |s: &str| s.parse::<IpAddr>().unwrap();
             // Fuera del proxy, X-Forwarded-For no cuenta.
-            assert_eq!(client_ip(otro, &xff(&["198.51.100.4"]), proxy), otro);
+            assert_eq!(client_ip(otro, &xff(&["198.51.100.4"]), proxies), otro);
             // Desde el proxy, el último valor.
             assert_eq!(
-                client_ip(proxy, &xff(&["9.9.9.9, 198.51.100.4"]), proxy),
+                client_ip(proxy, &xff(&["9.9.9.9, 198.51.100.4"]), proxies),
                 ip("198.51.100.4")
             );
             assert_eq!(
-                client_ip(proxy, &xff(&["9.9.9.9", "198.51.100.8"]), proxy),
+                client_ip(proxy, &xff(&["9.9.9.9", "198.51.100.8"]), proxies),
                 ip("198.51.100.8")
             );
             // Sin cabecera o con basura, la del proxy.
-            assert_eq!(client_ip(proxy, &xff(&[]), proxy), proxy);
+            assert_eq!(client_ip(proxy, &xff(&[]), proxies), proxy);
             assert_eq!(
-                client_ip(proxy, &xff(&["198.51.100.4, nada"]), proxy),
+                client_ip(proxy, &xff(&["198.51.100.4, nada"]), proxies),
                 proxy
             );
             // IPv4 mapeada en IPv6 se compara como IPv4.
             assert_eq!(
-                client_ip(ip("::ffff:192.0.2.100"), &xff(&["198.51.100.4"]), proxy),
+                client_ip(ip("::ffff:192.0.2.100"), &xff(&["198.51.100.4"]), proxies),
                 ip("198.51.100.4")
             );
         }

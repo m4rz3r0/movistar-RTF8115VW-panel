@@ -6,7 +6,10 @@ use axum::{
     body::Body,
     http::{Response, StatusCode},
 };
-use common::{Panel, body_text, get, get_con_cookie, panel, sesion};
+use common::{
+    ORIGIN, PANEL_PASS, PANEL_USER, Panel, body_text, con_usuario, get, get_con_cookie, login_body,
+    panel, panel_ajustado, post_form, send, sesion,
+};
 use panel::poller::{Poller, PollerConfig};
 use std::time::Duration;
 
@@ -181,4 +184,29 @@ async fn migraciones_crean_tablas() {
     ] {
         assert!(tablas.iter().any(|n| n == t), "falta {t}: {tablas:?}");
     }
+}
+
+/// Con varios orígenes en `RP_ORIGIN`, cualquiera de ellos vale en `Origin`;
+/// uno ajeno, no.
+#[tokio::test]
+async fn segundo_origen_aceptado_y_ajeno_rechazado() {
+    const SEGUNDO: &str = "https://panel.example";
+    let p = panel_ajustado(|c| c.public_origins = vec![ORIGIN.into(), SEGUNDO.into()]).await;
+    con_usuario(&p).await;
+    // Sin `Sec-Fetch-Site`, manda `Origin`.
+    let desde = |origen: &'static str| {
+        let mut req = post_form(
+            "/api/login",
+            &login_body(PANEL_USER, PANEL_PASS),
+            "127.0.0.1",
+        );
+        req.headers_mut().remove("sec-fetch-site");
+        req.headers_mut().insert("origin", origen.parse().unwrap());
+        req
+    };
+    assert_eq!(send(&p.app, desde(ORIGIN)).await.status(), StatusCode::OK);
+    assert_eq!(send(&p.app, desde(SEGUNDO)).await.status(), StatusCode::OK);
+    let resp = send(&p.app, desde("https://otro.example")).await;
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    assert!(resp.headers().get("set-cookie").is_none());
 }

@@ -178,7 +178,7 @@ async fn usuario_inexistente_mismo_error() {
 
 #[tokio::test]
 async fn xff_ignorado_si_no_viene_del_proxy() {
-    let p = panel_con_proxy("192.0.2.100".parse().unwrap()).await;
+    let p = panel_con_proxy("192.0.2.100").await;
     let mut req = post_form("/api/login", &login_body("x", "mala"), "127.0.0.1");
     req.headers_mut()
         .insert("x-forwarded-for", "198.51.100.4".parse().unwrap());
@@ -197,6 +197,36 @@ async fn xff_usado_si_viene_del_proxy() {
     assert_eq!(fallos(&p, "ip", "198.51.100.4").await, Some(1));
     assert_eq!(fallos(&p, "ip", "9.9.9.9").await, None);
     assert_eq!(fallos(&p, "ip", "127.0.0.1").await, None);
+}
+
+/// Con una red de proxies (p. ej. la de los contenedores), cuenta
+/// `X-Forwarded-For` si el par está en la red, y no si está fuera.
+#[tokio::test]
+async fn proxy_de_confianza_por_red() {
+    let p = panel_con_proxy("198.51.100.0/24").await;
+    // Un usuario distinto en cada intento, para que su freno no cuente.
+    let intento = |peer: &str, cliente: &'static str| {
+        let mut req = post_form("/api/login", &login_body(peer, "mala"), peer);
+        req.headers_mut()
+            .insert("x-forwarded-for", cliente.parse().unwrap());
+        req
+    };
+    assert_eq!(
+        send(&p.app, intento("198.51.100.5", "203.0.113.4"))
+            .await
+            .status(),
+        401
+    );
+    assert_eq!(fallos(&p, "ip", "203.0.113.4").await, Some(1));
+    assert_eq!(fallos(&p, "ip", "198.51.100.5").await, None);
+    assert_eq!(
+        send(&p.app, intento("192.0.2.5", "203.0.113.8"))
+            .await
+            .status(),
+        401
+    );
+    assert_eq!(fallos(&p, "ip", "192.0.2.5").await, Some(1));
+    assert_eq!(fallos(&p, "ip", "203.0.113.8").await, None);
 }
 
 #[tokio::test]

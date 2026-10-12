@@ -42,7 +42,7 @@ fn config_con_router(dir: &Path, url: &str) -> Config {
         router_url: Some(url.into()),
         router_user: Some(common::USER.into()),
         router_secret_file: Some(secreto),
-        ..common::config_en(dir, "127.0.0.1".parse().unwrap())
+        ..common::config_en(dir)
     }
 }
 
@@ -226,7 +226,7 @@ async fn variables_router_parciales_fallan() {
 }
 
 async fn sin_router() -> Panel {
-    common::panel_sin_router("127.0.0.1".parse().unwrap()).await
+    common::panel_sin_router().await
 }
 
 #[tokio::test]

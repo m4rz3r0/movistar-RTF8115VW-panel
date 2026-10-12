@@ -127,7 +127,7 @@ async fn idioma_por_defecto_de_la_instancia() {
     // Tras reiniciar el panel (otro estado sobre la misma base de datos),
     // sigue igual.
     let dir = p.state.cfg.db_path.parent().unwrap().to_path_buf();
-    let state = common::estado(common::config_en(&dir, "127.0.0.1".parse().unwrap()), &dir).await;
+    let state = common::estado(common::config_en(&dir), &dir).await;
     p.app = panel::build_router(state.clone());
     p.state = state;
     assert_eq!(idiomas_de_login(&p).await, [true, true, false]);

@@ -31,6 +31,8 @@ pub mod instancia;
 #[cfg(feature = "ssr")]
 pub mod poller;
 #[cfg(feature = "ssr")]
+pub mod redes;
+#[cfg(feature = "ssr")]
 pub mod security;
 #[cfg(feature = "ssr")]
 pub mod series;

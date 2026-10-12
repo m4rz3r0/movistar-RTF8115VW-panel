@@ -15,12 +15,13 @@ use panel::changes::{ChangeManager, Tiempos};
 use panel::{
     config::Config,
     instancia::{self, CredencialesRouter},
+    redes,
     state::AppState,
 };
 use router_sim::{Sim, SimConfig, SimHandle};
 use serde_json::{Value, json};
 use std::{
-    net::{IpAddr, SocketAddr},
+    net::SocketAddr,
     path::{Path, PathBuf},
     time::{Duration, Instant},
 };
@@ -42,19 +43,25 @@ pub struct Panel {
     _dir: TempDir,
 }
 
-/// Panel con `trusted_proxy = 127.0.0.1`.
+/// Panel con el proxy de confianza `127.0.0.1`.
 pub async fn panel() -> Panel {
-    panel_con_proxy("127.0.0.1".parse().unwrap()).await
+    panel_con_proxy("127.0.0.1").await
 }
 
-pub async fn panel_con_proxy(trusted_proxy: IpAddr) -> Panel {
-    panel_con_sim(trusted_proxy, sim_config()).await
+/// Panel con los proxies de confianza `proxies` (como `RP_TRUSTED_PROXY`).
+pub async fn panel_con_proxy(proxies: &str) -> Panel {
+    panel_ajustado(|c| c.trusted_proxies = redes::lista(proxies).unwrap()).await
+}
+
+/// Panel con la configuración de serie de las pruebas cambiada por `ajustar`.
+pub async fn panel_ajustado(ajustar: impl FnOnce(&mut Config)) -> Panel {
+    panel_con_sim(ajustar, sim_config()).await
 }
 
 /// Panel contra un simulador con la capa de fixtures `capa` (una variante de
 /// línea, ver [`variante`]).
 pub async fn panel_con_capa(capa: &Path) -> Panel {
-    panel_con_sim("127.0.0.1".parse().unwrap(), sim_config().con_capa(capa)).await
+    panel_con_sim(|_| {}, sim_config().con_capa(capa)).await
 }
 
 /// Directorio de la variante de fixtures `nombre` (`fixtures-variantes/`).
@@ -70,8 +77,8 @@ pub fn sim_config() -> SimConfig {
     SimConfig::new(USER, PASS, fixtures)
 }
 
-async fn panel_con_sim(trusted_proxy: IpAddr, sim: SimConfig) -> Panel {
-    let p = panel_sin_router_con(trusted_proxy, sim).await;
+async fn panel_con_sim(ajustar: impl FnOnce(&mut Config), sim: SimConfig) -> Panel {
+    let p = panel_sin_router_con(ajustar, sim).await;
     let (sim, state, dir) = (p.sim, p.state, p._dir);
     // Las credenciales del simulador, como las dejaría el asistente.
     instancia::guardar_credenciales(
@@ -96,14 +103,21 @@ async fn panel_con_sim(trusted_proxy: IpAddr, sim: SimConfig) -> Panel {
 
 /// Panel recién instalado: sin variables del router y con la base de datos
 /// vacía (el simulador arranca, pero el panel no lo conoce).
-pub async fn panel_sin_router(trusted_proxy: IpAddr) -> Panel {
-    panel_sin_router_con(trusted_proxy, sim_config()).await
+pub async fn panel_sin_router() -> Panel {
+    panel_sin_router_ajustado(|_| {}).await
 }
 
-async fn panel_sin_router_con(trusted_proxy: IpAddr, sim: SimConfig) -> Panel {
+/// Como [`panel_sin_router`], con la configuración cambiada por `ajustar`.
+pub async fn panel_sin_router_ajustado(ajustar: impl FnOnce(&mut Config)) -> Panel {
+    panel_sin_router_con(ajustar, sim_config()).await
+}
+
+async fn panel_sin_router_con(ajustar: impl FnOnce(&mut Config), sim: SimConfig) -> Panel {
     let sim = Sim::start(sim).await;
     let dir = tempfile::tempdir().unwrap();
-    let state = estado(config_en(dir.path(), trusted_proxy), dir.path()).await;
+    let mut cfg = config_en(dir.path());
+    ajustar(&mut cfg);
+    let state = estado(cfg, dir.path()).await;
     instancia::arrancar_router(&state).await.unwrap();
     Panel {
         app: panel::build_router(state.clone()),
@@ -114,8 +128,8 @@ async fn panel_sin_router_con(trusted_proxy: IpAddr, sim: SimConfig) -> Panel {
 }
 
 /// Configuración del panel con la base de datos y la clave en `dir`, sin
-/// variables del router.
-pub fn config_en(dir: &Path, trusted_proxy: IpAddr) -> Config {
+/// variables del router, con el proxy de confianza `127.0.0.1`.
+pub fn config_en(dir: &Path) -> Config {
     Config {
         listen: "127.0.0.1:0".parse().unwrap(),
         db_path: dir.join("panel.db"),
@@ -123,8 +137,9 @@ pub fn config_en(dir: &Path, trusted_proxy: IpAddr) -> Config {
         router_user: None,
         router_secret_file: None,
         history_key_file: dir.join("history.key"),
-        trusted_proxy,
-        public_origin: ORIGIN.into(),
+        trusted_proxies: redes::lista("127.0.0.1").unwrap(),
+        public_origins: vec![ORIGIN.into()],
+        install_nets: Vec::new(),
     }
 }
 

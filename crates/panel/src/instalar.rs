@@ -347,12 +347,13 @@ pub(crate) mod servidor {
         use_context::<AppState>().ok_or_else(|| interno("falta el estado del panel"))
     }
 
-    /// IP del cliente; error 403 si no es de la red local.
+    /// IP del cliente; error 403 si no es de la red local ni de las redes
+    /// añadidas con `RP_INSTALL_NETS`.
     async fn ip_de_la_red_local(state: &AppState) -> Result<IpAddr, ServerFnError> {
         let ConnectInfo(peer) = leptos_axum::extract::<ConnectInfo<SocketAddr>>().await?;
         let headers: HeaderMap = leptos_axum::extract().await?;
-        let ip = auth::client_ip(peer.ip(), &headers, state.cfg.trusted_proxy);
-        if ip_local(ip) {
+        let ip = auth::client_ip(peer.ip(), &headers, &state.cfg.trusted_proxies);
+        if ip_local(ip) || state.cfg.install_nets.iter().any(|red| red.contiene(ip)) {
             Ok(ip)
         } else {
             tracing::warn!("asistente de instalación pedido desde fuera de la red local: {ip}");

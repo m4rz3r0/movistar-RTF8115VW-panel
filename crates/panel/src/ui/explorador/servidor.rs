@@ -875,7 +875,7 @@ async fn ip_cliente(state: &AppState) -> Result<std::net::IpAddr, ServerFnError>
     Ok(crate::auth::client_ip(
         peer.ip(),
         &headers,
-        state.cfg.trusted_proxy,
+        &state.cfg.trusted_proxies,
     ))
 }
 
