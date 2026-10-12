@@ -1,4 +1,8 @@
+# Versión fija, la misma que la imagen de deploy/docker/Dockerfile
+# (RUST_VERSION): CI, Docker y las compilaciones locales usan el mismo
+# compilador, y una Rust nueva no rompe clippy -D warnings por sorpresa. Al
+# subirla, cambiar las dos.
 [toolchain]
-channel = "stable"
+channel = "1.99.0"
 targets = ["wasm32-unknown-unknown"]
 components = ["rustfmt", "clippy"]

@@ -18,8 +18,8 @@ FROM docker.io/library/rust:${RUST_VERSION}-bookworm AS herramientas
 ARG RUST_VERSION
 ARG CARGO_LEPTOS_VERSION=0.3.11
 ARG BINARYEN_VERSION=123
-# El rust-toolchain.toml del repositorio pide «stable», que pediría descargar
-# otra; se usa la de la imagen, con el objetivo wasm.
+# La misma versión que rust-toolchain.toml (cámbiense juntas); se usa la de
+# la imagen, con el objetivo wasm, sin que rustup descargue otra.
 ENV RUSTUP_TOOLCHAIN=${RUST_VERSION}
 RUN rustup target add wasm32-unknown-unknown
 RUN cargo install --locked cargo-leptos --version "${CARGO_LEPTOS_VERSION}"

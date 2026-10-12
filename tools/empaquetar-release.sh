@@ -9,13 +9,17 @@
 # <versión>  vX.Y.Z (solo cifras, sin sufijo: las únicas que se publican)
 # <objetivo> x86_64-unknown-linux-gnu o aarch64-unknown-linux-gnu
 # <panel>    el binario (target/release/panel de `cargo leptos build --release`)
-# <site>     su web (target/site)
+# <site>     su web, la salida de cargo-leptos (target/site, con pkg/panel.js,
+#            pkg/panel.wasm y pkg/panel.css)
 # <salida>   carpeta donde deja routerpanel-<versión>-<objetivo>.tar.gz
 #
 # El archivo tiene una única carpeta, routerpanel-<versión>-<objetivo>/, con
 # panel, site/, LICENSE, AVISO-LEGAL.md y deploy/linux/ (la unidad de systemd
 # apunta a current/deploy/linux/README.md). LICENSE, AVISO-LEGAL.md y
-# deploy/linux/ salen de la raíz del repositorio donde está este script.
+# deploy/linux/ salen del commit HEAD del repositorio donde está este script
+# (git archive), nunca de la copia de trabajo: un fichero sin seguimiento, uno
+# ignorado o un cambio sin confirmar no acaban en la release. Solo site/ (y
+# el binario) vienen de fuera de git, de la salida de cargo-leptos.
 # Dueños, modos y fechas fijos (SOURCE_DATE_EPOCH, o la fecha del último
 # commit): con los mismos ficheros, el mismo archivo.
 #
@@ -61,17 +65,23 @@ x86_64-unknown-linux-gnu | aarch64-unknown-linux-gnu) ;;
 	;;
 esac
 
-for f in "$PANEL" "$RAIZ/LICENSE" "$RAIZ/AVISO-LEGAL.md" "$RAIZ/deploy/linux/README.md" \
-	"$RAIZ/deploy/linux/routerpanel.service" "$RAIZ/deploy/linux/actualizar-release.sh"; do
-	[ -f "$f" ] || {
-		echo "falta $f" >&2
+[ -f "$PANEL" ] || {
+	echo "falta $PANEL" >&2
+	exit 1
+}
+for f in pkg/panel.js pkg/panel.wasm pkg/panel.css; do
+	[ -f "$SITE/$f" ] || {
+		echo "falta $SITE/$f: <site> tiene que ser la salida de cargo leptos build --release" >&2
 		exit 1
 	}
 done
-[ -d "$SITE/pkg" ] || {
-	echo "falta $SITE/pkg (¿cargo leptos build --release?)" >&2
-	exit 1
-}
+DE_GIT="LICENSE AVISO-LEGAL.md deploy/linux/README.md deploy/linux/routerpanel.service deploy/linux/actualizar-release.sh"
+for f in $DE_GIT; do
+	git -C "$RAIZ" cat-file -e "HEAD:$f" 2>/dev/null || {
+		echo "falta $f en el commit HEAD del repositorio" >&2
+		exit 1
+	}
+done
 
 if [ -z "${SOURCE_DATE_EPOCH:-}" ]; then
 	SOURCE_DATE_EPOCH=$(git -C "$RAIZ" log -1 --format=%ct 2>/dev/null || date +%s)
@@ -83,11 +93,12 @@ trap 'rm -rf "$TRABAJO"' EXIT
 trap 'exit 143' INT TERM
 
 D=$TRABAJO/$NOMBRE
-mkdir -p "$D/deploy"
+mkdir -p "$D"
+git -C "$RAIZ" archive --format=tar -o "$TRABAJO/git.tar" HEAD LICENSE AVISO-LEGAL.md deploy/linux
+tar -xf "$TRABAJO/git.tar" -C "$D"
+rm -f "$TRABAJO/git.tar"
 cp "$PANEL" "$D/panel"
 cp -R "$SITE" "$D/site"
-cp "$RAIZ/LICENSE" "$RAIZ/AVISO-LEGAL.md" "$D/"
-cp -R "$RAIZ/deploy/linux" "$D/deploy/linux"
 chmod -R u=rwX,go=rX "$D"
 chmod 755 "$D/panel" "$D/deploy/linux/actualizar-release.sh"
 # Solo ficheros y carpetas: el actualizador rechaza cualquier otra cosa.

@@ -6,7 +6,10 @@
 # 1. Empaqueta una v1.0.0 con tools/empaquetar-release.sh, como el workflow:
 #    el archivo de este equipo con el panel de verdad, otro del otro objetivo
 #    (para que SHA256SUMS tenga las dos líneas) y SHA256SUMS con --sumas.
-#    Empaquetar dos veces da el mismo archivo.
+#    Empaquetar dos veces da el mismo archivo. Se empaqueta desde un clon
+#    del commit HEAD (lo que empaqueta el workflow) con un fichero sin
+#    seguimiento y otro ignorado en deploy/linux/, que no deben acabar en el
+#    archivo; deploy/linux/ trae exactamente lo de git.
 # 2. Los sirve por HTTPS (python3 y un certificado de usar y tirar hecho con
 #    openssl) en un puerto propio (RP_PRUEBA_PUERTO, por defecto 8502), con
 #    las rutas de GitHub: latest/download/SHA256SUMS y download/v1.0.0/….
@@ -22,8 +25,9 @@
 #
 # Necesita el panel compilado: RP_PRUEBA_PANEL (por defecto
 # target/release/panel) y RP_PRUEBA_SITE (por defecto target/site), de
-# `cargo leptos build --release`. Si LICENSE o AVISO-LEGAL.md aún no existen
-# en el repositorio, empaqueta desde una copia con unos de relleno y avisa.
+# `cargo leptos build --release`. Prueba lo confirmado (HEAD), no los cambios
+# sin confirmar. Si LICENSE o AVISO-LEGAL.md aún no están en HEAD, el clon
+# los añade de relleno en un commit propio y avisa.
 #
 # Uso: deploy/pruebas/release-local.sh (desde cualquier sitio).
 
@@ -74,17 +78,29 @@ fallo()
 }
 
 # --- 1. empaquetar como el workflow -----------------------------------------
-EMPAQUETAR=$RAIZ/tools/empaquetar-release.sh
-if [ ! -f "$RAIZ/LICENSE" ] || [ ! -f "$RAIZ/AVISO-LEGAL.md" ]; then
-	echo "aviso: faltan LICENSE o AVISO-LEGAL.md en el repositorio; se empaqueta con unos de relleno" >&2
-	mkdir -p "$TMP/raiz/tools" "$TMP/raiz/deploy"
-	cp "$EMPAQUETAR" "$TMP/raiz/tools/"
-	cp -R "$RAIZ/deploy/linux" "$TMP/raiz/deploy/linux"
-	for f in LICENSE AVISO-LEGAL.md; do
-		if [ -f "$RAIZ/$f" ]; then cp "$RAIZ/$f" "$TMP/raiz/"; else printf 'relleno\n' >"$TMP/raiz/$f"; fi
-	done
-	EMPAQUETAR=$TMP/raiz/tools/empaquetar-release.sh
+CLON=$TMP/repo
+git clone -q "$RAIZ" "$CLON" 2>"$TMP/clon.log" || {
+	cat "$TMP/clon.log" >&2
+	echo "FALLO: no se puede clonar el repositorio" >&2
+	exit 1
+}
+relleno=
+for f in LICENSE AVISO-LEGAL.md; do
+	if [ ! -f "$CLON/$f" ]; then
+		printf 'relleno\n' >"$CLON/$f"
+		relleno="$relleno $f"
+	fi
+done
+if [ -n "$relleno" ]; then
+	echo "aviso: faltan en HEAD$relleno; se empaqueta con unos de relleno" >&2
+	git -C "$CLON" add LICENSE AVISO-LEGAL.md
+	git -C "$CLON" -c user.name=prueba -c user.email=prueba \
+		commit -q -m relleno
 fi
+# Un fichero sin seguimiento y otro ignorado (*.secret) en deploy/linux/.
+printf 'sin seguimiento\n' >"$CLON/deploy/linux/sin-seguimiento.txt"
+printf 'ignorado\n' >"$CLON/deploy/linux/prueba.secret"
+EMPAQUETAR=$CLON/tools/empaquetar-release.sh
 DIST=$TMP/dist
 export SOURCE_DATE_EPOCH=1700000000
 sh "$EMPAQUETAR" "$VER" "$OBJ" "$PANEL" "$SITE" "$DIST" >/dev/null
@@ -105,6 +121,18 @@ cmp -s "$TMP/raiz.txt" "$TMP/esperado.txt" || {
 	diff "$TMP/esperado.txt" "$TMP/raiz.txt" >&2 || true
 	fallo "el archivo no trae exactamente panel, site/, LICENSE, AVISO-LEGAL.md y deploy/"
 }
+# deploy/linux/: exactamente lo que hay en git (sin el fichero sin
+# seguimiento ni el ignorado).
+tar -tzf "$DIST/$ARCHIVO" | sed -n "s|^routerpanel-$VER-$OBJ/\(deploy/linux/..*[^/]\)\$|\1|p" |
+	sort >"$TMP/linux-archivo.txt"
+git -C "$CLON" ls-files deploy/linux | sort >"$TMP/linux-git.txt"
+cmp -s "$TMP/linux-archivo.txt" "$TMP/linux-git.txt" || {
+	diff "$TMP/linux-git.txt" "$TMP/linux-archivo.txt" >&2 || true
+	fallo "deploy/linux/ del archivo no es exactamente el de git"
+}
+if grep -q 'sin-seguimiento\|prueba\.secret' "$TMP/linux-archivo.txt"; then
+	fallo "el archivo trae ficheros sin seguimiento o ignorados de deploy/linux/"
+fi
 
 # --- 2. servir las releases con las rutas de GitHub -------------------------
 SRV=$TMP/srv

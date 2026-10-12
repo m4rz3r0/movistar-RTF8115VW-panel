@@ -3,6 +3,8 @@
 El panel es un binario (`panel`) y su web (`site/`). Las releases para Linux
 (`routerpanel-<versión>-<objetivo>.tar.gz`, con `x86_64-unknown-linux-gnu` o
 `aarch64-unknown-linux-gnu`) los traen ya compilados junto a esta carpeta.
+Se compilan en Ubuntu 22.04 y piden glibc 2.35 o posterior: valen para
+Debian 12, Ubuntu 22.04 y Raspberry Pi OS de 64 bits (bookworm) en adelante.
 
 ## Ficheros
 
