@@ -21,6 +21,8 @@ pub use crate::instalar::{InfoRouter, ResumenRed};
 
 /// Máximo de servidores DNS preferidos.
 pub const MAX_DNS: usize = 4;
+/// Lo más largo de un nombre de conexión que se repite en un error.
+pub const MAX_NOMBRE_CONEXION: usize = 32;
 /// Zona horaria por defecto.
 pub const ZONA_POR_DEFECTO: &str = "UTC";
 
@@ -82,8 +84,9 @@ pub struct AjustesPanel {
     /// Conexión a internet elegida a mano (manda sobre la detectada mientras
     /// exista en el router).
     pub wan_manual: Option<String>,
-    /// Conexiones WAN del router (`name` de `cbGetWanIPIntf`), para elegir la
-    /// de internet a mano.
+    /// Conexiones WAN del router (`name` de `cbGetWanIPIntf`) de la última
+    /// lectura del sondeo, para elegir la de internet a mano. Sin lectura aún,
+    /// solo las que conoce el panel (la detectada y la elegida a mano).
     pub conexiones: Vec<String>,
 }
 
@@ -447,16 +450,20 @@ mod servidor {
                 });
             }
         }
-        // Las conexiones de la última lectura; sin ninguna aún, se preguntan
-        // al router (sin él, ninguna).
+        // Las conexiones de la última lectura del sondeo. Sin ninguna aún, las
+        // que se conocen aquí (la detectada y la elegida a mano): nunca se
+        // pregunta al router desde la página (con el router caído la
+        // retrasaría, y con credenciales malas sumaría intentos de entrada).
         let mut conexiones: Vec<String> = match &foto {
             Some(s) => s.wan.iter().map(|w| w.name.clone()).collect(),
-            None if state.hgu.configurado() => hgu::read::wan(&state.hgu)
-                .await
-                .map(|c| c.into_iter().map(|w| w.name).collect())
-                .unwrap_or_default(),
-            None => Vec::new(),
+            None => state
+                .red()
+                .and_then(|r| r.wan)
+                .into_iter()
+                .chain(state.wan_manual())
+                .collect(),
         };
+        conexiones.sort();
         conexiones.dedup();
         // Sin fijar (o quitado), el del navegador: nunca «español» por omisión,
         // que la página no seguiría.
@@ -515,7 +522,10 @@ mod servidor {
             if !conns.iter().any(|c| &c.name == m) {
                 return Err(fallo(
                     StatusCode::BAD_REQUEST,
-                    t!("router-error-conexion-no-existe", nombre = m.clone()),
+                    t!(
+                        "router-error-conexion-no-existe",
+                        nombre = nombre_para_mostrar(m)
+                    ),
                 ));
             }
         }
@@ -529,6 +539,28 @@ mod servidor {
             None => tracing::info!("conexión a internet: la detectada"),
         }
         Ok(())
+    }
+
+    /// Un nombre de conexión recibido, para repetirlo en un mensaje: solo
+    /// letras, cifras, `-`, `_` y `.`, y como mucho [`MAX_NOMBRE_CONEXION`]
+    /// caracteres (lo demás se cambia por `?`; si es más largo, se corta con
+    /// `…`).
+    pub(super) fn nombre_para_mostrar(n: &str) -> String {
+        let mut v: String = n
+            .chars()
+            .take(MAX_NOMBRE_CONEXION)
+            .map(|c| {
+                if c.is_ascii_alphanumeric() || "-_.".contains(c) {
+                    c
+                } else {
+                    '?'
+                }
+            })
+            .collect();
+        if n.chars().count() > MAX_NOMBRE_CONEXION {
+            v.push('…');
+        }
+        v
     }
 
     pub(super) async fn redetectar() -> Result<ResumenRed, ServerFnError> {
@@ -709,6 +741,18 @@ mod tests {
 
     fn campos() -> CamposInstancia {
         CamposInstancia::default()
+    }
+
+    #[cfg(feature = "ssr")]
+    #[test]
+    fn nombre_de_conexion_acotado_en_los_errores() {
+        use super::servidor::nombre_para_mostrar;
+        assert_eq!(nombre_para_mostrar("ip9"), "ip9");
+        assert_eq!(nombre_para_mostrar("<b>x</b>"), "?b?x??b?");
+        let largo = "a".repeat(500);
+        let v = nombre_para_mostrar(&largo);
+        assert_eq!(v.chars().count(), MAX_NOMBRE_CONEXION + 1);
+        assert!(v.ends_with('…'));
     }
 
     #[test]

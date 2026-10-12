@@ -630,6 +630,22 @@ fn url_sugerida_ignora_redes_docker() {
     }
     // El final de 172.16/12 (172.16 a 172.31), fuera.
     assert!(!instalar::sugerible(Ipv4Addr::new(172, 31, 255, 1)));
+    assert!(!instalar::sugerible(Ipv4Addr::new(172, 20, 1, 1)));
+    // Justo fuera de 172.16/12 ya no es red privada: tampoco (solo se sugiere
+    // una puerta de enlace privada).
+    assert!(!instalar::sugerible(Ipv4Addr::new(172, 15, 255, 254)));
+    assert!(!instalar::sugerible(Ipv4Addr::new(172, 32, 0, 1)));
+    // Ni la red compartida de los operadores, ni la de enlace local, ni el
+    // propio equipo, ni una pública.
+    for no in [
+        Ipv4Addr::new(100, 64, 0, 1),
+        Ipv4Addr::new(169, 254, 1, 1),
+        Ipv4Addr::LOCALHOST,
+        Ipv4Addr::new(8, 8, 8, 8),
+        Ipv4Addr::new(198, 51, 100, 1),
+    ] {
+        assert!(!instalar::sugerible(no), "{no}");
+    }
 }
 
 /// La sugerencia de dirección del router es parte del asistente: con token

@@ -662,7 +662,8 @@ async fn guardar_wan_exige_reautenticacion_y_nombre_valido() {
     let v = ok(&p, "leer_panel", json!({}), &cookie).await;
     assert_eq!(v["red"]["wan"], "ip2", "{v}");
     assert_eq!(v["wan_manual"], Value::Null, "{v}");
-    assert_eq!(v["conexiones"], json!(["ip2", "ip3", "ip4"]), "{v}");
+    // Sin lectura del sondeo, solo la detectada.
+    assert_eq!(v["conexiones"], json!(["ip2"]), "{v}");
 
     let (status, body) = llamar(&p, "guardar_wan", json!({ "manual": "ip4" }), Some(&cookie)).await;
     assert_eq!(status, 401, "{body}");
@@ -757,4 +758,119 @@ async fn guardar_wan_rechazada_con_cambio_activo() {
     }
     ok(&p, "guardar_wan", json!({ "manual": "ip4" }), &cookie).await;
     assert_eq!(p.state.wan().as_deref(), Some("ip4"));
+}
+
+/// Sin ninguna lectura del sondeo, la página no pregunta al router (caído,
+/// la retrasaría; con credenciales malas, sumaría intentos de entrada):
+/// ofrece las conexiones que conoce el panel.
+#[tokio::test]
+async fn leer_panel_sin_sondeo_no_pregunta_al_router() {
+    let p = panel().await;
+    let cookie = sesion(&p).await;
+    assert!(p.state.poller.latest().is_none());
+    p.state.fijar_red(p.state.red(), Some("ip4".into()));
+    p.sim.control.set_unresponsive(true);
+    let antes = Instant::now();
+    let v = tokio::time::timeout(
+        Duration::from_secs(2),
+        ok(&p, "leer_panel", json!({}), &cookie),
+    )
+    .await
+    .expect("leer_panel no espera al router");
+    assert!(antes.elapsed() < Duration::from_secs(2));
+    assert_eq!(v["conexiones"], json!(["ip2", "ip4"]), "{v}");
+    assert_eq!(v["wan_manual"], "ip4", "{v}");
+
+    // Con una lectura del sondeo, todas las del router.
+    p.sim.control.set_unresponsive(false);
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, USER, PASS);
+    cfg.timeout = Duration::from_millis(500);
+    cfg.min_gap = Duration::from_millis(1);
+    let mut state = p.state.clone();
+    state.hgu = hgu::Client::new(cfg);
+    let h = panel::poller::Poller::spawn_with(
+        state,
+        panel::poller::PollerConfig {
+            fast: Duration::from_millis(50),
+            slow: Duration::from_millis(200),
+            backoff_max: Duration::from_millis(200),
+            ..panel::poller::PollerConfig::default()
+        },
+    );
+    let start = Instant::now();
+    while !h.healthy() {
+        assert!(start.elapsed() < Duration::from_secs(5), "sin primer dato");
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    let v = ok(&p, "leer_panel", json!({}), &cookie).await;
+    assert_eq!(v["conexiones"], json!(["ip2", "ip3", "ip4"]), "{v}");
+}
+
+/// Mientras se retoman los cambios del arranque (uno quedó vigilándose), ni
+/// se elige la conexión a internet, ni se vuelve a detectar, ni se anota una
+/// detección que acabe entonces.
+#[tokio::test]
+async fn red_bloqueada_mientras_se_retoman_cambios() {
+    use panel::changes::{ChangeManager, ChangeRequest, Tiempos};
+    let mut p = panel().await;
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, USER, PASS);
+    cfg.timeout = Duration::from_millis(500);
+    cfg.min_gap = Duration::from_millis(1);
+    p.state.hgu = hgu::Client::new(cfg);
+    p.app = panel::build_router(p.state.clone());
+    let cookie = sesion(&p).await;
+    reautenticar(&p, &cookie).await;
+    let tiempos = |vigilancia: Duration| Tiempos {
+        bajo: vigilancia,
+        medio: vigilancia,
+        alto: vigilancia,
+        intervalo: Duration::from_millis(30),
+        fallos_para_revertir: 3,
+        pausa_max: Duration::from_secs(2),
+    };
+    // Un proceso anterior deja un cambio vigilándose.
+    let a = ChangeManager::new(p.state.clone(), tiempos(Duration::from_secs(60)));
+    a.reanudar_pendientes().await;
+    let peticion = ChangeRequest {
+        funcion: "cbSetUpnpCfg".into(),
+        instancia: None,
+        valores: [("adm_state".to_owned(), "1".to_owned())].into(),
+        borrar: false,
+    };
+    let prep = a.preparar(peticion).await.unwrap();
+    a.confirmar(&prep.token, None, "admin").await.unwrap();
+    a.detener();
+
+    // El gestor del proceso nuevo, con el hueco ocupado: retomar espera.
+    let b = ChangeManager::instalar(&p.state, tiempos(Duration::from_millis(300)));
+    let hueco = b.excluir_cambios().unwrap();
+    let retomar = tokio::spawn({
+        let b = b.clone();
+        async move { b.reanudar_pendientes().await }
+    });
+    let start = Instant::now();
+    while !b.ocupado() {
+        assert!(start.elapsed() < Duration::from_secs(5), "no retoma");
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    assert_eq!(b.activo(), None, "aún sin cambio activo: solo retomando");
+
+    let (status, body) = llamar(&p, "guardar_wan", json!({ "manual": "ip4" }), Some(&cookie)).await;
+    assert_eq!(status, 409, "{body}");
+    let (status, body) = llamar(&p, "redetectar", json!({}), Some(&cookie)).await;
+    assert_eq!(status, 409, "{body}");
+    let mut anterior = p.state.red().unwrap();
+    anterior.wan = Some("ip4".into());
+    p.state.fijar_red(Some(anterior.clone()), None);
+    assert!(instancia::detectar_y_guardar(&p.state).await.is_err());
+    assert_eq!(p.state.red(), Some(anterior), "detección descartada");
+
+    drop(hueco);
+    retomar.await.unwrap();
+    let start = Instant::now();
+    while b.ocupado() {
+        assert!(start.elapsed() < Duration::from_secs(10), "no termina");
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    ok(&p, "guardar_wan", json!({ "manual": "ip4" }), &cookie).await;
 }
