@@ -27,6 +27,7 @@ dominio crates.io — registro de paquetes de Rust
 dominio github.com — alojamiento de dependencias y del repositorio
 dominio rust-lang.org — documentación de Rust
 dominio npmjs.org — registro de paquetes de las pruebas e2e
+dominio docker.io — registro de las imágenes oficiales de deploy/docker
 dominio sil.org — licencia OFL de las tipografías
 dominio quad9.net — proveedor de DNS de las sugerencias
 dominio mullvad.net — proveedor de DNS de las sugerencias

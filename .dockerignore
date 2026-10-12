@@ -1,0 +1,18 @@
+# Contexto de deploy/docker/Dockerfile: el código que se compila y nada más.
+# Fuera lo compilado, lo local (config.local, secretos, bases de datos), git,
+# y lo que no entra en la compilación (deploy/, docs/, e2e/): así, cambiarlos
+# no obliga a recompilar la imagen.
+.git
+.superpowers
+target
+**/node_modules
+e2e
+deploy
+docs
+**/*.secret
+**/*.key
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/instalar.token
+real-secrets*.txt

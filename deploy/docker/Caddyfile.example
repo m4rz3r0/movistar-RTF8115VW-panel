@@ -1,0 +1,33 @@
+# Proxy inverso de ejemplo delante del panel (deploy/docker/compose.yaml,
+# que lo mete en la imagen con proxy.Dockerfile: si lo cambias, --build).
+#
+# - HTTPS con una CA interna (`tls internal`): el navegador avisará hasta que
+#   instales su certificado raíz, que está en el volumen proxy-datos
+#   (pki/authorities/local/root.crt). Con un dominio público, quita
+#   `tls internal` y el proxy pedirá un certificado de verdad.
+# - Solo red local: cualquier conexión que no venga de una IP privada se
+#   corta. Se mira la IP de la conexión (remote_ip), nunca X-Forwarded-For.
+# - Al panel le llega X-Forwarded-For con la IP de la conexión: el proxy no
+#   se fía de la cabecera que trae el cliente salvo que venga de uno de sus
+#   trusted_proxies (abajo, desactivado).
+
+{
+	# Si pones otro proxy delante de este, dale su IP aquí para que este
+	# conserve la IP del cliente que ese proxy pone en X-Forwarded-For. Sin
+	# otro proxy, déjalo así: confiar en una red sería dejar que cualquiera de
+	# ella dijera ser otra IP.
+	#servers {
+	#	trusted_proxies static 192.0.2.10/32
+	#}
+}
+
+{$PANEL_DOMINIO:panel.home.arpa} {
+	tls internal
+
+	# PROXY_REDES_EXTRA: redes que también pasan (vacía por defecto; ver
+	# README.md, «podman sin root»).
+	@fuera not remote_ip private_ranges {$PROXY_REDES_EXTRA}
+	abort @fuera
+
+	reverse_proxy panel:3000
+}

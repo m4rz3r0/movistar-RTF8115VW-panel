@@ -1,0 +1,89 @@
+# Panel del router con Compose (docker compose o podman compose), desde la
+# raíz del repositorio:
+#
+#   RP_ORIGIN=https://panel.home.arpa PANEL_DOMINIO=panel.home.arpa \
+#     docker compose -f deploy/docker/compose.yaml up -d --build
+#
+# Variables (en el entorno o en un .env junto a este fichero):
+#   RP_ORIGIN          obligatoria: la dirección del panel tal como la escribe
+#                      el navegador (https://equipo[:puerto]; varias, con comas)
+#   PANEL_DOMINIO      nombre del sitio en el proxy (por defecto panel.home.arpa)
+#   RP_PUERTO_HTTPS    puerto de este equipo donde escucha el proxy (443)
+#   RP_RED_INTERNA     subred de la red de Compose (198.51.100.0/24)
+#   RP_IP_PROXY        IP fija del proxy en esa red (198.51.100.10): la única
+#                      en la que confía el panel para X-Forwarded-For
+#   PROXY_REDES_EXTRA  redes que el proxy deja pasar además de las privadas
+#                      (vacía; ver README.md, «podman sin root»)
+#   RP_INSTALL_NETS    redes desde las que el asistente acepta peticiones
+#                      además de las privadas (vacía)
+#
+# La subred y la IP por defecto son de documentación (RFC 5737): no chocan con
+# ninguna red real, pero cámbialas si quieres por una privada libre en tu
+# equipo, siempre las dos a la vez.
+#
+# Perfil «prueba»: añade router-sim (un router simulado, en
+# http://router-sim:8081, usuario y contraseña «sim») para probar el panel sin
+# router (deploy/pruebas/docker.sh).
+
+services:
+  panel:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      target: panel
+    restart: unless-stopped
+    # Sin puertos publicados: solo se llega al panel por el proxy.
+    environment:
+      RP_ORIGIN: ${RP_ORIGIN:?falta RP_ORIGIN, la dirección del panel en el navegador}
+      # Solo el proxy, por su IP fija: confiar en la subred entera sería confiar
+      # también en la puerta de enlace de la red (por donde llega cualquier
+      # conexión desde este equipo) y en cualquier otro contenedor de la red.
+      RP_TRUSTED_PROXY: ${RP_IP_PROXY:-198.51.100.10}
+      RP_INSTALL_NETS: ${RP_INSTALL_NETS:-}
+      RP_LOG: info
+    volumes:
+      - datos:/data
+    networks:
+      - interna
+
+  # Proxy inverso de ejemplo (proxy.Dockerfile con Caddyfile.example): HTTPS
+  # con una CA interna y solo para la red local. Si ya tienes un proxy, quita
+  # este servicio y apunta el tuyo a panel:3000 en esta red (y su IP a
+  # RP_TRUSTED_PROXY).
+  proxy:
+    build:
+      context: .
+      dockerfile: proxy.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - panel
+    ports:
+      - "${RP_PUERTO_HTTPS:-443}:443"
+    environment:
+      PANEL_DOMINIO: ${PANEL_DOMINIO:-panel.home.arpa}
+      PROXY_REDES_EXTRA: ${PROXY_REDES_EXTRA:-}
+    volumes:
+      - proxy-datos:/data
+    networks:
+      interna:
+        ipv4_address: ${RP_IP_PROXY:-198.51.100.10}
+
+  router-sim:
+    profiles:
+      - prueba
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      target: router-sim
+    networks:
+      - interna
+
+networks:
+  interna:
+    ipam:
+      config:
+        - subnet: ${RP_RED_INTERNA:-198.51.100.0/24}
+
+volumes:
+  datos:
+  proxy-datos:

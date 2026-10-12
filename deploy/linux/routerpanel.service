@@ -1,0 +1,68 @@
+# Panel del router como servicio de systemd. Se instala en
+# /etc/systemd/system/routerpanel.service; ver deploy/linux/README.md.
+#
+# Versiones en /opt/routerpanel/releases/<versión> y la desplegada en el
+# enlace /opt/routerpanel/current (lo cambia actualizar-release.sh).
+# Configuración en /etc/routerpanel/env (copia de env.example) y datos en
+# /var/lib/routerpanel (panel.db, history.key e instalar.token).
+
+[Unit]
+Description=Panel del router Askey RTF8115VW
+Documentation=file:///opt/routerpanel/current/deploy/linux/README.md
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=exec
+ExecStart=/opt/routerpanel/current/panel
+EnvironmentFile=/etc/routerpanel/env
+Environment=LEPTOS_OUTPUT_NAME=panel
+Environment=LEPTOS_SITE_ROOT=/opt/routerpanel/current/site
+Environment=LEPTOS_SITE_PKG_DIR=pkg
+Environment=LEPTOS_ENV=PROD
+Restart=on-failure
+RestartSec=5
+
+# Usuario propio creado al arrancar, sin cuenta en el sistema. Solo puede
+# escribir en /var/lib/routerpanel (StateDirectory); /etc/routerpanel
+# (ConfigurationDirectory) es de root y para el servicio, de solo lectura.
+DynamicUser=yes
+StateDirectory=routerpanel
+StateDirectoryMode=0700
+ConfigurationDirectory=routerpanel
+ConfigurationDirectoryMode=0755
+UMask=0077
+
+# Endurecimiento.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+# Red: el panel solo habla con el router y con quien le hace peticiones.
+# Ajusta a la IP del router y del proxy: IPAddressAllow es para la entrada y
+# la salida, así que si el proxy inverso no está en este mismo equipo, añade
+# también su IP (p. ej. «IPAddressAllow=localhost 192.168.1.1/32 192.0.2.10/32»).
+IPAddressDeny=any
+IPAddressAllow=localhost 192.168.1.1/32
+
+[Install]
+WantedBy=multi-user.target

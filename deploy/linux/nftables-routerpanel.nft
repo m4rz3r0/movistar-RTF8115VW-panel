@@ -1,0 +1,52 @@
+#!/usr/sbin/nft -f
+# Ejemplo: el panel solo puede abrir conexiones hacia el router.
+#
+# Es una tabla propia (inet routerpanel): no toca el resto de tus reglas. En
+# nftables un «drop» de cualquier tabla es definitivo, así que funciona junto
+# a las reglas de Docker o de firewalld. Cárgala con
+#   nft -f /etc/nftables.d/routerpanel.nft
+# y bórrala con «nft delete table inet routerpanel».
+#
+# Ajusta los valores de abajo. Los de ejemplo son la IP de fábrica del router
+# y la red y la IP del proxy por defecto de deploy/docker/compose.yaml.
+
+define ROUTER = 192.168.1.1
+# Red de Compose (RP_RED_INTERNA) e IP del proxy en ella (RP_IP_PROXY).
+define RED_COMPOSE = 198.51.100.0/24
+define IP_PROXY = 198.51.100.10
+
+table inet routerpanel
+delete table inet routerpanel
+
+table inet routerpanel {
+	# --- servicio de systemd (routerpanel.service) --------------------------
+	# Además de IPAddressDeny/IPAddressAllow de la unidad. nft busca el cgroup
+	# al cargar la regla: el servicio tiene que estar en marcha (si no, la
+	# carga falla). Para cargarlo con el servicio, una ampliación de la unidad
+	# (systemctl edit routerpanel) con
+	#   [Service]
+	#   ExecStartPost=+/usr/sbin/nft -f /etc/nftables.d/routerpanel.nft
+	chain salida {
+		type filter hook output priority filter; policy accept;
+		ct state established,related accept
+		socket cgroupv2 level 2 "system.slice/routerpanel.service" ip daddr { 127.0.0.0/8, $ROUTER } accept
+		socket cgroupv2 level 2 "system.slice/routerpanel.service" ip6 daddr ::1 accept
+		socket cgroupv2 level 2 "system.slice/routerpanel.service" counter drop
+	}
+
+	# --- contenedor (Docker o podman con root) ------------------------------
+	# Conexiones nuevas que salen de la red de Compose: dentro de la red, sí;
+	# hacia el router, sí; el resto, no. El proxy queda fuera de la regla por si
+	# usas un certificado público (Let's Encrypt necesita salir a internet);
+	# con «tls internal», quita la excepción.
+	#
+	# Con podman sin root no sirve: el tráfico de los contenedores sale como
+	# un proceso más de tu usuario (pasta), no por el reenvío del kernel.
+	chain reenvio {
+		type filter hook forward priority filter; policy accept;
+		ip saddr $RED_COMPOSE ct state established,related accept
+		ip saddr $RED_COMPOSE ip daddr { $RED_COMPOSE, $ROUTER } accept
+		ip saddr $IP_PROXY accept
+		ip saddr $RED_COMPOSE counter drop
+	}
+}
