@@ -5,7 +5,9 @@
 mod common;
 
 use axum::http::header;
-use common::{Panel, llamar, ok, panel, post_json, send, sesion};
+use common::{
+    Panel, body_text, llamar, ok, panel, panel_con_capa, post_json, send, sesion, variante,
+};
 use serde_json::{Value, json};
 
 /// Ajuste `id` de la respuesta de `leer_tema`.
@@ -51,11 +53,33 @@ async fn escribir_red_24(p: &Panel, pares: &[(&str, &str)]) {
         .unwrap();
 }
 
+/// `leer_tema` con la sesión `cookie` (o sin ella): estado, `Cache-Control`
+/// y cuerpo.
+async fn peticion(p: &Panel, tema: &str, cookie: Option<&str>) -> (u16, String, String) {
+    let mut req = post_json(
+        "/api/leer_tema",
+        &json!({ "tema": tema }).to_string(),
+        "127.0.0.1",
+    );
+    if let Some(c) = cookie {
+        req.headers_mut().insert("cookie", c.parse().unwrap());
+    }
+    let resp = send(&p.app, req).await;
+    let status = resp.status().as_u16();
+    let cache = resp
+        .headers()
+        .get(header::CACHE_CONTROL)
+        .map(|v| v.to_str().unwrap().to_owned())
+        .unwrap_or_default();
+    (status, cache, body_text(resp).await)
+}
+
 #[tokio::test]
 async fn leer_tema_exige_sesion() {
     let p = panel().await;
-    let (status, body) = llamar(&p, "leer_tema", json!({ "tema": "wifi" }), None).await;
+    let (status, cache, body) = peticion(&p, "wifi", None).await;
     assert_eq!(status, 401, "{body}");
+    assert_eq!(cache, "no-store");
 }
 
 #[tokio::test]
@@ -248,8 +272,9 @@ async fn opcion_desconocida_se_muestra_y_se_conserva() {
 async fn tema_desconocido_404() {
     let p = panel().await;
     let cookie = sesion(&p).await;
-    let (status, body) = llamar(&p, "leer_tema", json!({ "tema": "nada" }), Some(&cookie)).await;
+    let (status, cache, body) = peticion(&p, "nada", Some(&cookie)).await;
     assert_eq!(status, 404, "{body}");
+    assert_eq!(cache, "no-store");
     assert!(body.contains("no existe"), "{body}");
 }
 
@@ -309,15 +334,159 @@ async fn claves_de_la_vista_existen() {
 async fn respuesta_no_store() {
     let p = panel().await;
     let cookie = sesion(&p).await;
-    let mut req = post_json(
-        "/api/leer_tema",
-        &json!({ "tema": "puertos" }).to_string(),
-        "127.0.0.1",
+    let (status, cache, body) = peticion(&p, "puertos", Some(&cookie)).await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(cache, "no-store");
+}
+
+/// Cada lectura distinta (función y parámetros) se hace una sola vez por
+/// petición, aunque la compartan varios ajustes (`wifi.red_24` y
+/// `wifi.red_24_avanzado`).
+#[tokio::test]
+async fn cada_lectura_una_sola_vez() {
+    let p = panel().await;
+    let cookie = sesion(&p).await;
+    for tema in ["wifi", "seguridad"] {
+        let antes = p.sim.control.reads().len();
+        leer(&p, &cookie, tema).await;
+        let leidas: Vec<_> = p.sim.control.reads().into_iter().skip(antes).collect();
+        assert!(!leidas.is_empty(), "{tema}: ninguna lectura");
+        let mut vistas = Vec::new();
+        for l in &leidas {
+            assert!(!vistas.contains(l), "{tema}: {l:?} repetida");
+            vistas.push(l.clone());
+        }
+        let distintas: std::collections::BTreeSet<_> = p
+            .state
+            .ajustes
+            .por_tema(ajustes::Tema::from_slug(tema).unwrap())
+            .map(|a| (a.leer.funcion.clone(), a.leer.params.clone()))
+            .collect();
+        assert_eq!(leidas.len(), distintas.len(), "{tema}: {leidas:#?}");
+    }
+    let red_24 = (
+        "cbGetWifiAccPt".to_owned(),
+        vec![("dpm_cfg_wifi_acc_pt_id".to_owned(), "0".to_owned())],
     );
-    req.headers_mut().insert("cookie", cookie.parse().unwrap());
-    let resp = send(&p.app, req).await;
-    assert_eq!(resp.status(), 200);
-    assert_eq!(resp.headers()[header::CACHE_CONTROL], "no-store");
+    let veces = p
+        .sim
+        .control
+        .reads()
+        .iter()
+        .filter(|l| **l == red_24)
+        .count();
+    assert_eq!(veces, 1);
+}
+
+/// El id de una instancia es el del router, no su posición: borrada la
+/// primera reserva, la que queda conserva el suyo.
+#[tokio::test]
+async fn ids_de_instancia_no_son_la_posicion() {
+    let p = panel().await;
+    let cookie = sesion(&p).await;
+    p.state
+        .hgu
+        .write(
+            "dhcp.asp",
+            "cbDhcpV4SvrPoolSetStatic",
+            &[
+                ("rtm_cfg_dhcpv4_svr_pool_id", "0"),
+                ("rtm_dhcpv4_svr_pool_static_id", "0"),
+                ("del", "DEL"),
+            ],
+        )
+        .await
+        .unwrap();
+    let tema = leer(&p, &cookie, "red_local").await;
+    let reservas = ajuste(&tema, "red_local.reservas");
+    let ids: Vec<&Value> = reservas["instancias"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| &i["id"])
+        .collect();
+    assert_eq!(ids, [&json!("1")], "{reservas}");
+}
+
+/// En una lista que se escribe, una respuesta sin el id de las instancias
+/// deja el ajuste sin leer: editar o borrar por posición podría tocar otra
+/// instancia. El resto del tema se lee.
+#[tokio::test]
+async fn lista_escrita_sin_id_queda_sin_leer() {
+    let p = panel_con_capa(&variante("listas-irregulares")).await;
+    let cookie = sesion(&p).await;
+    let tema = leer(&p, &cookie, "red_local").await;
+    let reservas = ajuste(&tema, "red_local.reservas");
+    assert!(reservas["estado"]["SinLeer"].is_string(), "{reservas}");
+    assert!(reservas["instancias"].as_array().unwrap().is_empty());
+    assert!(reservas["campos"].as_array().unwrap().is_empty());
+    assert_eq!(ajuste(&tema, "red_local.dhcp")["estado"], "Leido");
+}
+
+/// Los usuarios del router se emparejan solo con los elementos de sus
+/// campos: una hoja suelta en la respuesta no crea un usuario de más.
+#[tokio::test]
+async fn usuarios_emparejados_solo_por_sus_elementos() {
+    let p = panel_con_capa(&variante("listas-irregulares")).await;
+    let cookie = sesion(&p).await;
+    let tema = leer(&p, &cookie, "seguridad").await;
+    let usuarios = ajuste(&tema, "seguridad.usuarios_router");
+    let instancias = usuarios["instancias"].as_array().unwrap();
+    let papeles: Vec<&Value> = instancias
+        .iter()
+        .map(|i| &campo(i, "papel")["valor"])
+        .collect();
+    assert_eq!(
+        papeles,
+        [
+            &json!({ "Opcion": "operador" }),
+            &json!({ "Opcion": "administrador" }),
+            &json!({ "Opcion": "usuario" }),
+        ],
+        "{usuarios}"
+    );
+    let ids: Vec<&Value> = instancias.iter().map(|i| &i["id"]).collect();
+    assert_eq!(ids, [&json!("0"), &json!("1"), &json!("2")]);
+}
+
+/// La plantilla de una lista nunca dice «valor no reconocido»: una opción
+/// empieza en la recomendada o la primera, un sí/no en el recomendado o en
+/// no, y el resto vacío.
+#[tokio::test]
+async fn plantilla_de_lista_sin_desconocidos() {
+    let p = panel().await;
+    let cookie = sesion(&p).await;
+    let tema = leer(&p, &cookie, "puertos").await;
+    let reglas = ajuste(&tema, "puertos.reglas");
+    assert_eq!(
+        campo(reglas, "protocolo")["valor"],
+        json!({ "Opcion": "tcp" })
+    );
+    assert_eq!(
+        campo(reglas, "activa")["valor"],
+        json!({ "Booleano": false })
+    );
+    assert_eq!(campo(reglas, "nombre")["valor"], json!({ "Texto": "" }));
+    assert_eq!(campo(reglas, "destino")["valor"], json!({ "Texto": "" }));
+    for tema in [
+        "internet",
+        "wifi",
+        "red_local",
+        "puertos",
+        "seguridad",
+        "telefono",
+        "sistema",
+    ] {
+        let t = leer(&p, &cookie, tema).await;
+        for a in t["ajustes"].as_array().unwrap() {
+            if a["lista"] != true {
+                continue;
+            }
+            for c in a["campos"].as_array().unwrap() {
+                assert!(c["valor"].get("Desconocido").is_none(), "{}: {c}", a["id"]);
+            }
+        }
+    }
 }
 
 /// Un catálogo de ajustes que no cuadra con el de funciones no deja

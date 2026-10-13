@@ -303,14 +303,11 @@ fn claves_de_error() {
         ErrorValor::Largo { max: 1 }.clave_i18n(),
         "ajustes-error-largo"
     );
-    assert_eq!(
-        ErrorValor::FueraDeRango {
-            min: None,
-            max: None
-        }
-        .clave_i18n(),
-        "ajustes-error-fuera-de-rango"
-    );
+    let rango = |min, max| ErrorValor::FueraDeRango { min, max }.clave_i18n();
+    assert_eq!(rango(Some(1), Some(9)), "ajustes-error-fuera-de-rango");
+    assert_eq!(rango(Some(1), None), "ajustes-error-fuera-de-rango-desde");
+    assert_eq!(rango(None, Some(9)), "ajustes-error-fuera-de-rango-hasta");
+    assert_eq!(rango(None, None), "ajustes-error-numero");
     assert_eq!(ErrorValor::Ip.clave_i18n(), "ajustes-error-ip");
     assert_eq!(ErrorValor::Mac.clave_i18n(), "ajustes-error-mac");
     assert_eq!(ErrorValor::Opcion.clave_i18n(), "ajustes-error-opcion");
@@ -460,4 +457,73 @@ fn mensaje_de_fuera_de_rango_legible() {
     assert_eq!(e(Some(1), None), "número fuera de rango: al menos 1");
     assert_eq!(e(None, Some(64)), "número fuera de rango: como mucho 64");
     assert_eq!(e(None, None), "no es un número");
+}
+
+/// Cada error tiene su texto en los dos idiomas, y los de longitud y rango
+/// dicen el límite (con sus valores) sin hablar de bytes.
+#[test]
+fn textos_de_error_con_sus_limites() {
+    use i18n::{FluentArgs, Idioma, existe, tr};
+    let errores = [
+        ErrorValor::Vacio,
+        ErrorValor::Corto { min: 8 },
+        ErrorValor::Largo { max: 32 },
+        ErrorValor::FueraDeRango {
+            min: Some(1),
+            max: Some(65535),
+        },
+        ErrorValor::FueraDeRango {
+            min: Some(1),
+            max: None,
+        },
+        ErrorValor::FueraDeRango {
+            min: None,
+            max: Some(65535),
+        },
+        ErrorValor::FueraDeRango {
+            min: None,
+            max: None,
+        },
+        ErrorValor::Ip,
+        ErrorValor::Mac,
+        ErrorValor::Opcion,
+        ErrorValor::Control,
+        ErrorValor::Ascii,
+        ErrorValor::SoloLectura,
+    ];
+    for idioma in Idioma::TODOS {
+        for e in &errores {
+            let clave = e.clave_i18n();
+            assert!(existe(idioma, clave), "{idioma:?}: falta {clave}");
+            let mut args = FluentArgs::new();
+            let (min, max) = match e {
+                ErrorValor::Corto { min } => (Some(*min), None),
+                ErrorValor::Largo { max } => (None, Some(*max)),
+                ErrorValor::FueraDeRango { min, max } => (*min, *max),
+                _ => (None, None),
+            };
+            if let Some(min) = min {
+                args.set("min", min);
+            }
+            if let Some(max) = max {
+                args.set("max", max);
+            }
+            let texto = tr(idioma, clave, Some(&args));
+            for limite in min.iter().chain(max.iter()) {
+                assert!(
+                    texto.contains(&limite.to_string()),
+                    "{idioma:?} {clave}: «{texto}» no dice {limite}"
+                );
+            }
+            assert!(!texto.contains('{'), "{idioma:?} {clave}: «{texto}»");
+            assert!(
+                !texto.to_lowercase().contains("byte"),
+                "{idioma:?} {clave}: «{texto}»"
+            );
+            if matches!(e, ErrorValor::Corto { .. } | ErrorValor::Largo { .. }) {
+                // Explica cuánto ocupan las letras con tilde y los emoji.
+                assert!(texto.contains("emoji"), "{idioma:?} {clave}: «{texto}»");
+            }
+        }
+    }
 }

@@ -520,6 +520,41 @@ fn rechaza_lista_sin_lista() {
     assert!(f.is_empty(), "{f:#?}");
 }
 
+/// El id de una instancia sale tal cual hacia la interfaz: el parámetro de
+/// instancia de una lista (de su escritura o de su lectura) no puede ser
+/// secreto.
+#[test]
+fn rechaza_id_de_lista_secreto() {
+    let lista = WIFI.replace("nivel = \"avanzado\"", "nivel = \"avanzado\"\nlista = true");
+    // De la escritura.
+    let escritura = Catalogo::from_toml(&FUNCIONES.replace(
+        "riesgo = \"medio\"",
+        "riesgo = \"medio\"\nlista = { id_param = \"key_phrase\" }",
+    ))
+    .unwrap();
+    let f = comprobar(&cargar(&[("wifi", &lista)], ""), &escritura, &mascara());
+    falla_con(&f, "wifi.avanzado", "key_phrase");
+    // De la lectura (con la de la escritura válida).
+    let lectura = Catalogo::from_toml(
+        &FUNCIONES
+            .replace(
+                "riesgo = \"medio\"",
+                "riesgo = \"medio\"\nlista = { id_param = \"max_clientes\" }",
+            )
+            .replacen(
+                "riesgo = \"bajo\"",
+                "riesgo = \"bajo\"\nlista = { id_param = \"x_psk\" }",
+                1,
+            ),
+    )
+    .unwrap();
+    let f = comprobar(&cargar(&[("wifi", &lista)], ""), &lectura, &mascara());
+    falla_con(&f, "wifi.avanzado", "x_psk");
+    // Sin `lista = true` en el ajuste, la regla no aplica.
+    let f = comprobar(&cargar(&[("wifi", WIFI)], ""), &lectura, &mascara());
+    assert!(f.is_empty(), "{f:#?}");
+}
+
 #[test]
 fn secreto_de_web_basica_exige_solo_lectura() {
     let malo = WIFI.replace("solo_lectura = \"ajustes-solo-lectura-basica\"\n", "");

@@ -309,6 +309,13 @@ impl SimControl {
     pub fn writes(&self) -> Vec<(String, Vec<(String, String)>)> {
         self.inner.state().writes.clone()
     }
+
+    /// Lecturas avanzadas (`cb*.xml`) recibidas con sesión válida, con sus
+    /// parámetros, en orden; también las que fallan con
+    /// [`SimControl::fail_reads`].
+    pub fn reads(&self) -> Vec<(String, Vec<(String, String)>)> {
+        self.inner.state().reads.clone()
+    }
 }
 
 type Params = Vec<(String, String)>;
@@ -398,6 +405,8 @@ struct SimState {
     /// Bytes sumados a cada interfaz de `cbGetStatistic`: nombre → (rx, tx).
     counters_extra: HashMap<String, (u64, u64)>,
     writes: Vec<(String, Params)>,
+    /// Lecturas avanzadas recibidas con sesión válida (`reads`).
+    reads: Vec<(String, Params)>,
     /// Escrituras por instancia de lecturas que no son listas.
     ediciones: Vec<Edicion>,
     /// Listas materializadas por función de lectura.
@@ -764,6 +773,9 @@ fn cgi_sync(s: &Inner, name: &str, headers: &HeaderMap, body: &Bytes) -> (Respon
             .is_some_and(|sid| st.advanced.contains(sid));
     if !valid {
         return (LOGGED_OUT.into_response(), false);
+    }
+    if is_read(name) {
+        st.reads.push((name.to_owned(), params.clone()));
     }
     if is_read(name) && st.failing_reads.contains(name) {
         (xml(failure(name, "lectura fallida (simulado)")), false)

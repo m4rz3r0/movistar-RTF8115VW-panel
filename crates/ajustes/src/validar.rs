@@ -1,7 +1,7 @@
 //! Reglas del catálogo de ajustes contra el de funciones, claves de
 //! traducción y riesgo.
 
-use catalogo::{Catalogo, Origen, Parametro, Riesgo, Tipo, TipoParam, mask::Mascara};
+use catalogo::{Catalogo, Funcion, Origen, Parametro, Riesgo, Tipo, TipoParam, mask::Mascara};
 use std::collections::HashSet;
 
 use crate::carga::CatalogoAjustes;
@@ -119,6 +119,9 @@ fn comprobar_ajuste(a: &Ajuste, f: &Catalogo, m: &Mascara, fallos: &mut Vec<Stri
             fallos.push(format!("{id}: {} no es una lectura", a.leer.funcion));
         }
         Some(l) => {
+            if a.lista {
+                comprobar_id_de_lista(a, l, m, fallos);
+            }
             for (k, _) in &a.leer.params {
                 match l.parametro(k) {
                     None => fallos.push(format!(
@@ -140,6 +143,10 @@ fn comprobar_ajuste(a: &Ajuste, f: &Catalogo, m: &Mascara, fallos: &mut Vec<Stri
             fallos.push(format!("{id}: campo {} repetido", campo.id));
         }
         comprobar_campo(a, campo, f, m, fallos);
+        let escritura = campo.escribe.as_ref().and_then(|e| f.funcion(&e.funcion));
+        if let Some(func) = escritura.filter(|_| a.lista) {
+            comprobar_id_de_lista(a, func, m, fallos);
+        }
     }
 }
 
@@ -181,6 +188,20 @@ fn comprobar_fijos(a: &Ajuste, f: &Catalogo, m: &Mascara, fallos: &mut Vec<Strin
                 }
                 Some(_) => {}
             }
+        }
+    }
+}
+
+/// El parámetro de instancia de una lista (el id que identifica cada
+/// instancia en la interfaz) no es secreto.
+fn comprobar_id_de_lista(a: &Ajuste, func: &Funcion, m: &Mascara, fallos: &mut Vec<String>) {
+    if let Some(l) = func.lista.as_ref().filter(|l| m.es_secreto(&l.id_param)) {
+        let fallo = format!(
+            "{}: el parámetro de instancia {} de {} es secreto",
+            a.id, l.id_param, func.name
+        );
+        if !fallos.contains(&fallo) {
+            fallos.push(fallo);
         }
     }
 }

@@ -196,37 +196,42 @@ pub(crate) mod servidor {
     /// Vista de un ajuste con la respuesta de su lectura (`None` si falló).
     fn vista(f: &Catalogo, a: &Ajuste, nodo: Option<&XmlNode>) -> AjusteVista {
         let prefijo = prefijo_i18n(a);
-        let campos = |leidos: &Leidos| -> Vec<CampoVista> {
-            a.campos
-                .iter()
-                .map(|c| campo(&prefijo, c, leidos))
-                .collect()
-        };
-        let (estado, campos, instancias) = match nodo {
-            None => (
+        let sin_leer = || {
+            (
                 EstadoLectura::SinLeer(t!("ajustes-error-lectura")),
                 Vec::new(),
                 Vec::new(),
-            ),
-            Some(n) if a.lista => {
-                let id_param = id_instancia(f, a);
-                let instancias = instancias(n)
-                    .iter()
-                    .enumerate()
-                    .map(|(i, leidos)| InstanciaVista {
-                        id: id_param
-                            .and_then(|p| leidos.get(p))
-                            .cloned()
-                            .unwrap_or_else(|| i.to_string()),
-                        campos: campos(leidos),
-                    })
-                    .collect();
-                (EstadoLectura::Leido, campos(&Leidos::new()), instancias)
-            }
+            )
+        };
+        let (estado, campos, instancias) = match nodo {
+            None => sin_leer(),
+            Some(n) if a.lista => match lista(f, a, &prefijo, n) {
+                Some(instancias) => {
+                    let plantilla = a
+                        .campos
+                        .iter()
+                        .map(|c| campo(&prefijo, c, valor_inicial(c)))
+                        .collect();
+                    (EstadoLectura::Leido, plantilla, instancias)
+                }
+                None => {
+                    tracing::warn!(
+                        "ajustes: {} ({}) trae instancias sin su id: no se ofrecen",
+                        a.id,
+                        a.leer.funcion
+                    );
+                    sin_leer()
+                }
+            },
             Some(n) => {
                 let mut leidos = Leidos::new();
                 hojas(n, &mut leidos);
-                (EstadoLectura::Leido, campos(&leidos), Vec::new())
+                let campos = a
+                    .campos
+                    .iter()
+                    .map(|c| campo(&prefijo, c, a_legible(c, &leidos)))
+                    .collect();
+                (EstadoLectura::Leido, campos, Vec::new())
             }
         };
         AjusteVista {
@@ -244,9 +249,68 @@ pub(crate) mod servidor {
         }
     }
 
-    /// Vista de un campo con los elementos de su lectura. Las claves de
-    /// traducción siguen las de `ajustes::claves_requeridas`.
-    fn campo(prefijo: &str, c: &Campo, leidos: &Leidos) -> CampoVista {
+    /// Instancias de una lista con sus valores. El id de cada una es el del
+    /// router (el elemento de [`id_instancia`]); solo en una lista que no se
+    /// escribe (como los usuarios del router) cae a su posición. En una que
+    /// se escribe, `None` si alguna instancia no trae el suyo: la Tarea 7
+    /// escribe por ese id, y una posición tomada por id editaría o borraría
+    /// otra instancia.
+    fn lista(f: &Catalogo, a: &Ajuste, prefijo: &str, n: &XmlNode) -> Option<Vec<InstanciaVista>> {
+        let se_escribe = a.campos.iter().any(|c| c.escribible().is_some());
+        let id_param = id_instancia(f, a);
+        let mut elementos: Vec<&str> = a
+            .campos
+            .iter()
+            .flat_map(|c| std::iter::once(&c.lee).chain(c.ademas.iter().map(|ad| &ad.lee)))
+            .map(String::as_str)
+            .collect();
+        elementos.extend(id_param);
+        instancias(n, &elementos)
+            .into_iter()
+            .enumerate()
+            .map(|(i, leidos)| {
+                let id = match id_param
+                    .and_then(|p| leidos.get(p))
+                    .filter(|v| !v.is_empty())
+                {
+                    Some(id) => id.clone(),
+                    None if !se_escribe => i.to_string(),
+                    None => return None,
+                };
+                let campos = a
+                    .campos
+                    .iter()
+                    .map(|c| campo(prefijo, c, a_legible(c, &leidos)))
+                    .collect();
+                Some(InstanciaVista { id, campos })
+            })
+            .collect()
+    }
+
+    /// Valor con que empieza un campo en la plantilla de una instancia
+    /// nueva: la opción recomendada o la primera; en un sí/no, el
+    /// recomendado o no; en el resto, el recomendado o vacío. Nunca
+    /// [`ValorLegible::Desconocido`] (no hay valor del router) ni
+    /// [`ValorLegible::Secreto`] (no hay nada oculto).
+    fn valor_inicial(c: &Campo) -> ValorLegible {
+        match c.tipo {
+            TipoCampo::Opcion => c
+                .opciones
+                .iter()
+                .find(|o| o.recomendada)
+                .or_else(|| c.opciones.first())
+                .map_or_else(
+                    || ValorLegible::Texto(String::new()),
+                    |o| ValorLegible::Opcion(o.clave.clone()),
+                ),
+            TipoCampo::Booleano => ValorLegible::Booleano(c.recomendado.as_deref() == Some("true")),
+            _ => ValorLegible::Texto(c.recomendado.clone().unwrap_or_default()),
+        }
+    }
+
+    /// Vista de un campo con su valor. Las claves de traducción siguen las
+    /// de `ajustes::claves_requeridas`.
+    fn campo(prefijo: &str, c: &Campo, valor: ValorLegible) -> CampoVista {
         let clave = format!("{prefijo}-{}", c.id);
         let recomendado = c
             .opciones
@@ -257,7 +321,7 @@ pub(crate) mod servidor {
         CampoVista {
             id: c.id.clone(),
             tipo: c.tipo,
-            valor: a_legible(c, leidos),
+            valor,
             opciones: c
                 .opciones
                 .iter()
@@ -294,11 +358,14 @@ pub(crate) mod servidor {
     }
 
     /// Elementos de cada instancia de una lista, en orden. Normalmente cada
-    /// instancia es un elemento con hijos; si la respuesta trae los valores
+    /// instancia es un elemento con hijos. Si la respuesta trae los valores
     /// seguidos sin elemento que los agrupe (como los pares nombre/papel de
-    /// los usuarios del router), empieza una instancia cada vez que se
-    /// repite un elemento.
-    fn instancias(n: &XmlNode) -> Vec<Leidos> {
+    /// los usuarios del router), solo cuentan las hojas de `elementos` (los
+    /// que leen los campos y el id) y empieza una instancia cada vez que se
+    /// repite una. Supone que el router da los elementos de cada instancia
+    /// juntos y antes que los de la siguiente; si a una le faltase alguno,
+    /// ese campo se vería vacío o desconocido, sin mezclarse con otra.
+    fn instancias(n: &XmlNode, elementos: &[&str]) -> Vec<Leidos> {
         let grupos: Vec<&XmlNode> = n
             .children
             .iter()
@@ -317,7 +384,9 @@ pub(crate) mod servidor {
         let mut out = Vec::new();
         let mut actual = Leidos::new();
         for c in &n.children {
-            if c.tag == "Result" || c.tag == "ErrorString" {
+            let es_suyo =
+                c.children.is_empty() && elementos.iter().any(|e| e.eq_ignore_ascii_case(&c.tag));
+            if !es_suyo {
                 continue;
             }
             if actual.contains_key(&c.tag) {

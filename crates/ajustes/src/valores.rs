@@ -47,13 +47,20 @@ fn rango(min: Option<i64>, max: Option<i64>) -> String {
 }
 
 impl ErrorValor {
-    /// Clave de traducción del mensaje (`ajustes-error-…`).
+    /// Clave de traducción del mensaje (`ajustes-error-…`). Sus argumentos
+    /// son los campos del error (`min`, `max`); fuera de rango tiene una
+    /// clave por cada combinación de límites, con solo los que hay.
     pub fn clave_i18n(&self) -> &'static str {
         match self {
             ErrorValor::Vacio => "ajustes-error-vacio",
             ErrorValor::Corto { .. } => "ajustes-error-corto",
             ErrorValor::Largo { .. } => "ajustes-error-largo",
-            ErrorValor::FueraDeRango { .. } => "ajustes-error-fuera-de-rango",
+            ErrorValor::FueraDeRango { min, max } => match (min, max) {
+                (Some(_), Some(_)) => "ajustes-error-fuera-de-rango",
+                (Some(_), None) => "ajustes-error-fuera-de-rango-desde",
+                (None, Some(_)) => "ajustes-error-fuera-de-rango-hasta",
+                (None, None) => "ajustes-error-numero",
+            },
             ErrorValor::Ip => "ajustes-error-ip",
             ErrorValor::Mac => "ajustes-error-mac",
             ErrorValor::Opcion => "ajustes-error-opcion",

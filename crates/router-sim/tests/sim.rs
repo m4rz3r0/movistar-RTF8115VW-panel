@@ -726,6 +726,38 @@ fn valor(n: &XmlNode, campo: &str) -> Option<String> {
         .or_else(|| n.children.iter().find_map(|c| valor(c, campo)))
 }
 
+/// `reads()` anota cada lectura con sus parámetros, también las que fallan,
+/// y no las escrituras.
+#[tokio::test]
+async fn lecturas_anotadas() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    let antes = sim.control.reads().len();
+    c.call("cbGetTimeNtp", &[]).await.unwrap();
+    c.call("cbGetWifiAccPt", &[("dpm_cfg_wifi_acc_pt_id", "0")])
+        .await
+        .unwrap();
+    sim.control.fail_reads("cbGetUpnpCfg", true);
+    assert!(c.call("cbGetUpnpCfg", &[]).await.is_err());
+    c.write("ntp.asp", "cbSetTimeNtp", &[("ntp_svr_2", "ntp.example")])
+        .await
+        .unwrap();
+    let leidas: Vec<(String, Vec<(String, String)>)> =
+        sim.control.reads().into_iter().skip(antes).collect();
+    let par = |k: &str, v: &str| (k.to_owned(), v.to_owned());
+    assert_eq!(
+        leidas,
+        vec![
+            ("cbGetTimeNtp".to_owned(), vec![]),
+            (
+                "cbGetWifiAccPt".to_owned(),
+                vec![par("dpm_cfg_wifi_acc_pt_id", "0")]
+            ),
+            ("cbGetUpnpCfg".to_owned(), vec![]),
+        ]
+    );
+}
+
 #[tokio::test]
 async fn escritura_generica_se_lee() {
     let sim = start().await;
