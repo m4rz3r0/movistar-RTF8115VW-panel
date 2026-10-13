@@ -147,3 +147,7 @@ required-features = ["ssr"]
 [[test]]
 name = "vista"
 required-features = ["ssr"]
+
+[[test]]
+name = "ajustes"
+required-features = ["ssr"]

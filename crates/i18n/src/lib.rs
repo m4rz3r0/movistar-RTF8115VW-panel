@@ -41,6 +41,7 @@ locales!(
     "instalar",
     "panel",
     "router",
+    "ajustes",
     "ajustes-internet",
     "ajustes-wifi",
     "ajustes-red_local",

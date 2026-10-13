@@ -3,6 +3,7 @@
 use crate::{
     changes, config::Config, crypto::HistoryKey, db, poller::PollerHandle, ui::charts::Zona,
 };
+use ajustes::CatalogoAjustes;
 use axum::extract::FromRef;
 use catalogo::{Catalogo, mask::Mascara};
 use hgu::{deteccion::RedDetectada, models::WanConn};
@@ -74,6 +75,9 @@ pub struct AppState {
     pub hgu: hgu::Client,
     pub catalogo: Arc<Catalogo>,
     pub mascara: Arc<Mascara>,
+    /// Catálogo de ajustes, ya comprobado contra `catalogo` y `mascara`
+    /// ([`comprobar_ajustes`]).
+    pub ajustes: Arc<CatalogoAjustes>,
     pub leptos: LeptosOptions,
     /// Serializa los intentos de login: el freno de fuerza bruta se comprueba
     /// y se actualiza sin carreras entre peticiones simultáneas.
@@ -181,6 +185,11 @@ impl AppState {
             .map_err(|e| e.to_string())?;
         let catalogo = Catalogo::load().map_err(|e| e.to_string())?;
         let mascara = Mascara::load().map_err(|e| e.to_string())?;
+        let ajustes = comprobar_ajustes(
+            CatalogoAjustes::load().map_err(|e| e.to_string())?,
+            &catalogo,
+            &mascara,
+        )?;
         let history_key = HistoryKey::load_or_create(&cfg.history_key_file)?;
         let hgu = hgu::Client::sin_configurar();
         let db = db::open(&cfg.db_path).await.map_err(|e| {
@@ -213,6 +222,7 @@ impl AppState {
             hgu,
             catalogo: Arc::new(catalogo),
             mascara: Arc::new(mascara),
+            ajustes: Arc::new(ajustes),
             leptos,
             login_lock: Arc::new(Mutex::new(())),
             poller: PollerHandle::default(),
@@ -224,6 +234,28 @@ impl AppState {
             red,
         })
     }
+}
+
+/// El catálogo de ajustes `c` si cuadra con el de funciones y la máscara de
+/// secretos ([`ajustes::comprobar`]). Si no, registra cada fallo y devuelve
+/// el error con todos: un catálogo roto es un fallo del proyecto, no de
+/// quien instala, y el panel no arranca con él.
+pub fn comprobar_ajustes(
+    c: CatalogoAjustes,
+    f: &Catalogo,
+    m: &Mascara,
+) -> Result<CatalogoAjustes, String> {
+    let fallos = ajustes::comprobar(&c, f, m);
+    if fallos.is_empty() {
+        return Ok(c);
+    }
+    for fallo in &fallos {
+        tracing::error!("catálogo de ajustes: {fallo}");
+    }
+    Err(format!(
+        "el catálogo de ajustes no cuadra con el de funciones: {}",
+        fallos.join("; ")
+    ))
 }
 
 impl FromRef<AppState> for LeptosOptions {

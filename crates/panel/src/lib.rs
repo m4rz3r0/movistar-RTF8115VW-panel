@@ -8,6 +8,7 @@
 // release; sin esto `cargo leptos build --release` no compila.
 #![recursion_limit = "256"]
 
+pub mod ajustes_router;
 pub mod app;
 pub mod auth;
 pub mod instalar;
