@@ -577,3 +577,54 @@ opciones = [{ valor = "1", clave = "puerto_1" }, { valor = "2", clave = "puerto_
     assert_eq!(pedir(&[("espejo", "false")]), None);
     assert_eq!(pedir(&[("puerto", "puerto_1")]), None);
 }
+
+/// La toma 0 del espejo apagado se lee como «ninguna», no se escribe y no
+/// cumple el `requiere` del espejo.
+#[test]
+fn sin_eleccion_se_lee_como_ninguna_y_no_cuenta() {
+    let toml = r#"
+[[ajuste]]
+id = "sistema.prueba"
+tema = "sistema"
+nivel = "oculto"
+leer = { funcion = "cbGetX" }
+
+[[ajuste.campo]]
+id = "espejo"
+escribe = { funcion = "cbSetX", parametro = "espejo" }
+lee = "espejo"
+tipo = "booleano"
+requiere = { campo = "puerto", cuando = "true" }
+
+[[ajuste.campo]]
+id = "puerto"
+escribe = { funcion = "cbSetX", parametro = "puerto" }
+lee = "puerto"
+tipo = "opcion"
+sin_eleccion = "0"
+opciones = [{ valor = "1", clave = "puerto_1" }]
+"#;
+    let c = CatalogoAjustes::from_toml(&[("sistema", toml)], "").unwrap();
+    let a = c.ajuste("sistema.prueba").unwrap();
+    let puerto = a.campo("puerto").unwrap();
+    assert_eq!(
+        a_legible(puerto, &leidos(&[("puerto", "0")])),
+        ValorLegible::Opcion(ajustes::SIN_ELECCION.into())
+    );
+    assert_eq!(
+        a_legible(puerto, &leidos(&[("puerto", "5")])),
+        ValorLegible::Desconocido("5".into())
+    );
+    assert_eq!(
+        a_router(puerto, ajustes::SIN_ELECCION),
+        Err(ErrorValor::Opcion)
+    );
+    let v: BTreeMap<String, String> = [("espejo", "true"), ("puerto", ajustes::SIN_ELECCION)]
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+    assert!(
+        falta_requerido(a, &v).is_some(),
+        "«ninguna» no cuenta como elegida"
+    );
+}

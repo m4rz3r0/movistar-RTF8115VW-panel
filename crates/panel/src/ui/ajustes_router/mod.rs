@@ -24,6 +24,10 @@ use leptos_router::{
 };
 use tarjeta::Tarjeta;
 
+/// Id de la nota que dice qué significa «Oculto» (una por página; la
+/// describen todos sus chips).
+pub(crate) const NOTA_OCULTO: &str = "ajustes-nota-oculto";
+
 /// Primera página de la sección (la del menú).
 pub const RUTA_AJUSTES: &str = "/ajustes/internet";
 
@@ -66,10 +70,13 @@ fn pestanas(slug: Memo<String>) -> impl IntoView {
             view! { <a href=ruta(t) aria-current=actual>{nombre(t)}</a> }
         })
         .collect_view();
+    // `selected` da el valor del HTML del servidor; después manda
+    // `prop:value`, que sigue a la ruta (también al volver atrás).
+    let inicial = slug.get_untracked();
     let opciones = Tema::TODOS
         .into_iter()
         .map(|t| {
-            let elegido = move || slug.get() == t.slug();
+            let elegido = inicial == t.slug();
             view! { <option value=t.slug() selected=elegido>{nombre(t)}</option> }
         })
         .collect_view();
@@ -83,7 +90,9 @@ fn pestanas(slug: Memo<String>) -> impl IntoView {
         <nav class="temas" aria-label=t!("ajustes-temas")>{enlaces}</nav>
         <p class="campo temas-selector">
             <label for="ajustes-tema">{t!("ajustes-tema-elegir")}</label>
-            <select id="ajustes-tema" on:change=cambiar>{opciones}</select>
+            <select id="ajustes-tema" prop:value=move || slug.get() on:change=cambiar>
+                {opciones}
+            </select>
         </p>
     }
 }
@@ -194,22 +203,49 @@ fn ContenidoTema(t: TemaVista, recargar: Callback<()>) -> impl IntoView {
         }
     });
     let tema = format!("ajustes-tema-{}-desc", t.tema);
-    let hay_basicos = !basicos.is_empty();
-    let mas = (!otros.is_empty()).then(|| {
+    // Qué significa «Oculto», una sola vez, delante de las tarjetas ocultas.
+    let nota_oculto = |hay: bool| {
+        hay.then(|| {
+            view! {
+                <p class="nota-oculto" id=NOTA_OCULTO>
+                    <span class="chip chip-nivel">{t!("ajustes-nivel-oculto")}</span>
+                    " "
+                    {t!("ajustes-nivel-oculto-desc")}
+                </p>
+            }
+        })
+    };
+    let hay_oculto = otros.iter().any(|a| a.nivel == Nivel::Oculto);
+    // Sin nada esencial (Sistema), plegarlo todo dejaría la página vacía:
+    // sus tarjetas se ven directamente, cada una con su etiqueta de nivel.
+    let cuerpo = if basicos.is_empty() {
         view! {
-            <details class="mas-opciones">
-                <summary>
-                    <span class="mas-opciones-titulo">{t!("ajustes-mas-opciones")}</span>
-                    <span class="mas-opciones-desc">{t!("ajustes-mas-opciones-desc")}</span>
-                </summary>
-                <div class="ajustes-lista">{tarjetas(otros)}</div>
-            </details>
+            {nota_oculto(hay_oculto)}
+            <div class="ajustes-lista">{tarjetas(otros)}</div>
         }
-    });
+        .into_any()
+    } else {
+        let mas = (!otros.is_empty()).then(|| {
+            view! {
+                <details class="mas-opciones">
+                    <summary>
+                        <span class="mas-opciones-titulo">{t!("ajustes-mas-opciones")}</span>
+                        <span class="mas-opciones-desc">{t!("ajustes-mas-opciones-desc")}</span>
+                    </summary>
+                    {nota_oculto(hay_oculto)}
+                    <div class="ajustes-lista">{tarjetas(otros)}</div>
+                </details>
+            }
+        });
+        view! {
+            <div class="ajustes-lista">{tarjetas(basicos)}</div>
+            {mas}
+        }
+        .into_any()
+    };
     view! {
         <p class="tema-desc">{traducir(&tema, None)}</p>
         {aviso}
-        {hay_basicos.then(|| view! { <div class="ajustes-lista">{tarjetas(basicos)}</div> })}
-        {mas}
+        {cuerpo}
     }
 }

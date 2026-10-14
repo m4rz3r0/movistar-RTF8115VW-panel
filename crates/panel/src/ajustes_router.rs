@@ -95,6 +95,10 @@ pub struct CampoVista {
     /// Otro campo del ajuste que hace falta cuando este toma un valor (la
     /// toma del espejo al encenderlo): la página lo pide junto a ese campo.
     pub requiere: Option<Requiere>,
+    /// El campo `opcion` tiene un valor «sin elegir» ([`ajustes::SIN_ELECCION`],
+    /// la toma del espejo apagado): se ve como una opción más, pero no se
+    /// escribe ni cuenta como elegida.
+    pub sin_eleccion: bool,
 }
 
 /// Una opción de un campo `opcion`.
@@ -489,6 +493,7 @@ pub(crate) mod servidor {
             motivo_recomendado: recomendado.as_ref().map(|_| format!("{clave}-recomendado")),
             recomendado,
             requiere: c.requiere.clone(),
+            sin_eleccion: c.sin_eleccion.is_some(),
             clave,
         }
     }
@@ -865,16 +870,24 @@ pub(crate) mod servidor {
             return Err(fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-invalida")));
         }
         let prefijo = prefijo_i18n(a);
-        for (id, v) in &p.valores {
-            let c = a
-                .campo(id)
-                .ok_or_else(|| fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-campo")))?;
-            pares(c, v).map_err(|e| error_valor(&prefijo, c, &e))?;
-        }
+        let campos = p
+            .valores
+            .iter()
+            .map(|(id, v)| {
+                a.campo(id)
+                    .map(|c| (c, v))
+                    .ok_or_else(|| fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-campo")))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        // Antes que los valores: «sin elegir» en el campo exigido es que
+        // falta, no una opción que no vale.
         if !p.borrar
             && let Some((pide, falta)) = falta_requerido(a, &p.valores)
         {
             return Err(error_requiere(&prefijo, pide, falta));
+        }
+        for (c, v) in campos {
+            pares(c, v).map_err(|e| error_valor(&prefijo, c, &e))?;
         }
         let g = gestor(&state)?;
         libre(&g)?;

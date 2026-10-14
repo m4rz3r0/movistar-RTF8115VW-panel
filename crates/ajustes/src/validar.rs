@@ -6,7 +6,7 @@ use std::collections::HashSet;
 
 use crate::carga::CatalogoAjustes;
 use crate::legible::admite_opcional;
-use crate::modelo::{Ajuste, Campo, TipoCampo};
+use crate::modelo::{Ajuste, Campo, SIN_ELECCION, TipoCampo};
 use crate::valores::traducir;
 
 /// Prefijo de las claves de traducción de un ajuste: `ajuste-` más el id con
@@ -37,6 +37,10 @@ pub fn claves_requeridas(a: &Ajuste) -> Vec<String> {
             claves.push(format!("{pc}-{}", o.clave));
             claves.push(format!("{pc}-{}-desc", o.clave));
             claves.extend(o.aviso.iter().map(|av| format!("aviso-{av}")));
+        }
+        if c.sin_eleccion.is_some() {
+            claves.push(format!("{pc}-{SIN_ELECCION}"));
+            claves.push(format!("{pc}-{SIN_ELECCION}-desc"));
         }
         if c.recomendado.is_some() || c.opciones.iter().any(|o| o.recomendada) {
             claves.push(format!("{pc}-recomendado"));
@@ -152,13 +156,19 @@ fn comprobar_ajuste(a: &Ajuste, f: &Catalogo, m: &Mascara, fallos: &mut Vec<Stri
     }
 }
 
-/// `requiere`: el campo exigido es otro del mismo ajuste y se puede
-/// escribir, y `cuando` es un valor válido del campo que lo pide.
+/// `requiere`: el campo que lo pide se puede escribir (si no, nunca se
+/// cumpliría), el exigido es otro del mismo ajuste y se puede escribir, y
+/// `cuando` es un valor válido del campo que lo pide.
 fn comprobar_requiere(a: &Ajuste, c: &Campo, fallos: &mut Vec<String>) {
     let Some(r) = &c.requiere else {
         return;
     };
     let donde = format!("{}.{}", a.id, c.id);
+    if c.escribible().is_none() {
+        fallos.push(format!(
+            "{donde}: requiere en un campo que no se puede escribir"
+        ));
+    }
     match a.campo(&r.campo) {
         None => fallos.push(format!(
             "{donde}: requiere {}, que no es un campo del ajuste",
@@ -446,6 +456,19 @@ fn comprobar_forma(c: &Campo, mal: &mut impl FnMut(String)) {
             mal(format!(
                 "la opción {} da valor a {k}, que no está en el `ademas` del campo",
                 o.clave
+            ));
+        }
+    }
+    if let Some(v) = &c.sin_eleccion {
+        if c.tipo != TipoCampo::Opcion {
+            mal("`sin_eleccion` solo vale en un campo `opcion`".into());
+        }
+        if c.opciones.iter().any(|o| o.valor == *v) {
+            mal(format!("`sin_eleccion` {v} es el valor de una opción"));
+        }
+        if c.opciones.iter().any(|o| o.clave == SIN_ELECCION) {
+            mal(format!(
+                "con `sin_eleccion`, la clave de opción {SIN_ELECCION} está reservada"
             ));
         }
     }

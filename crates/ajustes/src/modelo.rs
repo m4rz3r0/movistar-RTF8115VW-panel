@@ -90,6 +90,11 @@ pub enum ValorLegible {
     Secreto,
 }
 
+/// Clave legible del valor «sin elegir» de un campo `opcion` que lo declara
+/// (`sin_eleccion`): la toma del espejo apagado. No se escribe y no cumple un
+/// `requiere`.
+pub const SIN_ELECCION: &str = "ninguna";
+
 /// Otro campo del mismo ajuste que hace falta cuando este toma un valor: al
 /// encender el espejo de puerto hay que elegir la toma. Lo comprueban el
 /// servidor al guardar y la página junto al campo exigido.
@@ -248,6 +253,12 @@ mod catalogo_toml {
         /// recomendada en la propia opción).
         #[serde(default)]
         pub recomendado: Option<String>,
+        /// Valor del router que en un campo `opcion` significa que no hay
+        /// ninguna elegida (la toma 0 del espejo apagado): se lee como
+        /// [`SIN_ELECCION`](super::SIN_ELECCION), no se escribe y no cumple
+        /// un `requiere`.
+        #[serde(default)]
+        pub sin_eleccion: Option<String>,
         /// Otro campo que hace falta cuando este toma un valor
         /// (`requiere = { campo = "puerto", cuando = "true" }`).
         #[serde(default)]

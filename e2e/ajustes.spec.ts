@@ -5,7 +5,9 @@ import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 // inglés, contra router-sim: abrir WiFi, cambiar el nombre de la red de
 // 5 GHz, ver el resumen «antes → después» sin nombres de la API, «Más
 // opciones» y, en móvil, el selector de temas. El diálogo: el foco entra en
-// su título y vuelve a «Guardar»; Escape no lo cierra mientras confirma.
+// su título y vuelve a «Guardar»; Escape no lo cierra mientras aplica ni
+// mientras prepara el deshacer. «Cancelar» de la tarjeta deja los controles
+// (también un <select> tocado varias veces) como los leyó la página.
 //
 // Aplicar, esperar «aplicado» y deshacer se hace en una sola combinación
 // (inglés, 1440 px, la última, para que un fallo no deje un cambio vigilándose
@@ -17,6 +19,9 @@ const textos = {
   es: {
     red5: "Red WiFi 5 GHz",
     nombre: "Nombre de la red",
+    seguridad: "Seguridad",
+    aplicando: "Aplicando…",
+    preparando: "Preparando…",
     editar: "Editar",
     guardar: "Guardar",
     cancelar: "Cancelar",
@@ -33,6 +38,9 @@ const textos = {
   en: {
     red5: "5 GHz WiFi network",
     nombre: "Network name",
+    seguridad: "Security",
+    aplicando: "Applying…",
+    preparando: "Preparing…",
     editar: "Edit",
     guardar: "Save",
     cancelar: "Cancel",
@@ -135,10 +143,23 @@ for (const idioma of ["es", "en"] as const) {
             { times: 1 },
           );
           await dialogo.getByRole("button", { name: t.aplicar }).click();
+          await expect(dialogo.getByRole("button", { name: t.aplicando })).toBeVisible();
           await page.keyboard.press("Escape");
           await expect(dialogo).toBeVisible();
           await expect(dialogo.getByText(t.hecho)).toBeVisible({ timeout: 200_000 });
+          // Deshacer: mientras prepara, Escape tampoco cierra.
+          await page.route(
+            "**/api/deshacer_ajuste",
+            async (r) => {
+              await new Promise((ok) => setTimeout(ok, 1_500));
+              await r.continue();
+            },
+            { times: 1 },
+          );
           await dialogo.getByRole("button", { name: t.deshacer }).click();
+          await expect(dialogo.getByRole("button", { name: t.preparando })).toBeVisible();
+          await page.keyboard.press("Escape");
+          await expect(dialogo).toBeVisible();
           await expect(dialogo.locator("#grupo-titulo")).toHaveText(t.volver);
           await expect(dialogo.locator("#grupo-titulo")).toBeFocused();
           await expect(dialogo.locator("tbody td").nth(0)).toHaveText(nuevo);
@@ -147,8 +168,8 @@ for (const idioma of ["es", "en"] as const) {
           await expect(dialogo.getByText(t.hecho)).toBeVisible({ timeout: 200_000 });
           await dialogo.getByRole("button", { name: t.cerrar }).click();
           await expect(page.locator("dialog[open]")).toHaveCount(0);
-          // La página relee el tema: vuelve el nombre de antes y el foco va
-          // al título de la tarjeta.
+          // La página relee el tema y el foco va al título de la tarjeta (eso
+          // prueba la relectura: el nombre de antes ya estaba antes de aplicar).
           await expect(red5.locator(".ajuste-fila dd").first()).toHaveText(antes);
           await expect(red5.getByRole("heading", { level: 2 })).toBeFocused();
         } else {
@@ -156,8 +177,18 @@ for (const idioma of ["es", "en"] as const) {
           await dialogo.getByRole("button", { name: t.cancelar }).click();
           await expect(page.locator("dialog[open]")).toHaveCount(0);
           await expect(guardar).toBeFocused();
+          // Con el nombre aún cambiado, la seguridad tocada varias veces.
+          const seguridad = red5.getByLabel(t.seguridad, { exact: true });
+          await seguridad.selectOption("abierta");
+          await seguridad.selectOption("wpa2");
+          await seguridad.selectOption("abierta");
+          // «Cancelar» de la tarjeta: al volver a editar, los controles
+          // tienen lo que leyó la página.
           await red5.getByRole("button", { name: t.cancelar }).click();
-          await expect(red5.locator(".ajuste-fila dd").first()).toHaveText(antes);
+          await red5.getByRole("button", { name: t.editar }).click();
+          await expect(nombre).toHaveValue(antes);
+          await expect(seguridad).toHaveValue("wpa2");
+          await red5.getByRole("button", { name: t.cancelar }).click();
         }
 
         // 5. «Más opciones» abre y cierra.

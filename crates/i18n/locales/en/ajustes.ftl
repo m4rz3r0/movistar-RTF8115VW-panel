@@ -32,7 +32,6 @@ ajustes-cancelar = Cancel
 ajustes-recomendado-valor = Recommended: { $valor }
 ajustes-recomendado-pros = Pros and cons
 ajustes-recomendado-marca = Pros:
-ajustes-opcion-recomendada = { $opcion } (recommended)
 ajustes-secreto-placeholder = Leave it empty to keep it
 ajustes-hueco = This setting will have its own screen here; it is not ready yet.
 ajustes-lista-vacia = None set up.

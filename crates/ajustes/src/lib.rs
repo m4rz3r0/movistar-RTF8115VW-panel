@@ -16,7 +16,7 @@
 mod legible;
 mod modelo;
 pub use legible::{ErrorValor, Limites, validar_legible};
-pub use modelo::{Nivel, Requiere, Tema, TipoCampo, ValorLegible};
+pub use modelo::{Nivel, Requiere, SIN_ELECCION, Tema, TipoCampo, ValorLegible};
 
 #[cfg(feature = "catalogo")]
 mod carga;

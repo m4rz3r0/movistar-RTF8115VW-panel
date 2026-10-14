@@ -1014,3 +1014,52 @@ fn requiere_otro_campo_del_mismo_ajuste() {
         "requiere",
     );
 }
+
+/// `requiere` en un campo que no se puede escribir nunca se cumpliría:
+/// `comprobar` lo rechaza.
+#[test]
+fn requiere_desde_un_campo_de_solo_lectura() {
+    let en_solo_lectura = WIFI.replace(
+        "solo_lectura = \"ajustes-solo-lectura-basica\"",
+        "solo_lectura = \"ajustes-solo-lectura-basica\"\n\
+         requiere = { campo = \"seguridad\", cuando = \"clave-larga\" }",
+    );
+    falla_con(
+        &fallos(&en_solo_lectura, ""),
+        "wifi.red.clave_basica",
+        "requiere",
+    );
+}
+
+/// `sin_eleccion`: el valor del router que significa «ninguna» (la toma del
+/// espejo apagado) solo vale en un campo `opcion` y no puede ser el de una
+/// opción.
+#[test]
+fn sin_eleccion_solo_en_opciones_y_distinto() {
+    let con = |campo: &str, valor: &str| {
+        WIFI.replace(
+            &format!("lee = \"{campo}\"\n"),
+            &format!("lee = \"{campo}\"\nsin_eleccion = \"{valor}\"\n"),
+        )
+    };
+    let bien = con("seguridad", "7");
+    let f = fallos(&bien, "");
+    assert!(f.is_empty(), "{f:#?}");
+    let c = cargar(&[("wifi", &bien)], "");
+    let a = c.ajuste("wifi.red").unwrap();
+    assert!(
+        claves_requeridas(a).contains(&"ajuste-wifi-red-seguridad-ninguna".to_owned()),
+        "{:?}",
+        claves_requeridas(a)
+    );
+    falla_con(
+        &fallos(&con("seguridad", "3"), ""),
+        "wifi.red.seguridad",
+        "sin_eleccion",
+    );
+    falla_con(
+        &fallos(&con("nombre", "0"), ""),
+        "wifi.red.nombre",
+        "sin_eleccion",
+    );
+}

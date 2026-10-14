@@ -32,7 +32,6 @@ ajustes-cancelar = Cancelar
 ajustes-recomendado-valor = Recomendado: { $valor }
 ajustes-recomendado-pros = A favor y en contra
 ajustes-recomendado-marca = A favor:
-ajustes-opcion-recomendada = { $opcion } (recomendada)
 ajustes-secreto-placeholder = Déjala vacía para no cambiarla
 ajustes-hueco = Este ajuste tendrá aquí su propia pantalla; todavía no está lista.
 ajustes-lista-vacia = No hay ninguno configurado.

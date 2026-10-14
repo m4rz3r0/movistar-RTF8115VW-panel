@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::net::Ipv4Addr;
 
 use crate::legible::{ErrorValor, Limites, admite_opcional, mac, validar_legible};
-use crate::modelo::{Ajuste, Campo, Opcion, TipoCampo, ValorLegible};
+use crate::modelo::{Ajuste, Campo, Opcion, SIN_ELECCION, TipoCampo, ValorLegible};
 
 /// Elemento `nombre` de una lectura: primero exacto, luego sin distinguir
 /// mayúsculas.
@@ -42,6 +42,9 @@ pub fn a_legible(c: &Campo, leidos: &BTreeMap<String, String>) -> ValorLegible {
     }
     match c.tipo {
         TipoCampo::Secreto => ValorLegible::Secreto,
+        TipoCampo::Opcion if c.sin_eleccion.as_deref() == Some(crudo) => {
+            ValorLegible::Opcion(SIN_ELECCION.to_owned())
+        }
         TipoCampo::Opcion => c
             .opciones
             .iter()
@@ -159,8 +162,8 @@ pub(crate) fn traducir<'c>(
 }
 
 /// Primer campo de `a` que, con los `valores` pedidos (id → legible), exige
-/// otro que no viene o viene vacío (su `requiere`): `(el que lo pide, el que
-/// falta)`. Un campo que no se toca no exige nada.
+/// otro que no viene, viene vacío o viene «sin elegir» ([`SIN_ELECCION`]):
+/// `(el que lo pide, el que falta)`. Un campo que no se toca no exige nada.
 pub fn falta_requerido<'a>(
     a: &'a Ajuste,
     valores: &BTreeMap<String, String>,
@@ -173,7 +176,9 @@ pub fn falta_requerido<'a>(
         let exigido = a.campo(&r.campo)?;
         valores
             .get(&exigido.id)
-            .is_none_or(|v| v.trim().is_empty())
+            .is_none_or(|v| {
+                v.trim().is_empty() || (exigido.sin_eleccion.is_some() && v == SIN_ELECCION)
+            })
             .then_some((c, exigido))
     })
 }

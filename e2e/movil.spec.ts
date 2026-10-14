@@ -13,6 +13,8 @@ const paginas = [
   },
   { nombre: "historial", ruta: "/historial", listo: "main h1" },
   { nombre: "ajustes-wifi", ruta: "/ajustes/wifi", listo: "article.ajuste" },
+  { nombre: "ajustes-sistema", ruta: "/ajustes/sistema", listo: "article.ajuste" },
+  { nombre: "ajustes-seguridad", ruta: "/ajustes/seguridad", listo: "article.ajuste" },
   { nombre: "ajustes-del-panel", ruta: "/panel", listo: "#panel-idioma" },
   { nombre: "router-conexion", ruta: "/router/conexion", listo: "#panel-router-url" },
 ];

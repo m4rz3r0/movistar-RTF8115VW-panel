@@ -1119,3 +1119,96 @@ async fn tema_desconocido_no_encontrada() {
     assert!(html.contains("Página no encontrada"), "{html}");
     assert!(p.sim.control.writes().is_empty());
 }
+
+/// Con el espejo apagado, la toma se ve como «Ninguna» (no como un valor
+/// no reconocido) y no cuenta como elegida al encenderlo.
+#[tokio::test]
+async fn espejo_apagado_es_ninguna() {
+    let (p, cookie) = panel_con_gestor().await;
+    let tema = leer(&p, &cookie, "sistema").await;
+    let puerto = campo(ajuste(&tema, "sistema.diagnostico"), "puerto");
+    assert_eq!(puerto["valor"], json!({ "Opcion": "ninguna" }), "{puerto}");
+    assert_eq!(puerto["sin_eleccion"], true, "{puerto}");
+    let (status, body) = preparar_ajuste(
+        &p,
+        &cookie,
+        "sistema.diagnostico",
+        json!({ "espejo": "true", "puerto": "ninguna" }),
+    )
+    .await;
+    assert_eq!(status, 400, "{body}");
+    assert!(body.contains("Hace falta elegirlo"), "{body}");
+    let (_, _, html) = pagina(&p, &cookie, "/ajustes/sistema").await;
+    assert!(!html.contains("Valor no reconocido (0)"), "{html}");
+}
+
+/// Un tema sin ajustes básicos (Sistema) no esconde todo bajo «Más
+/// opciones»: sus tarjetas se ven directamente.
+#[tokio::test]
+async fn tema_sin_basicos_sin_plegar() {
+    let (p, cookie) = panel_con_gestor().await;
+    let (_, _, html) = pagina(&p, &cookie, "/ajustes/sistema").await;
+    assert!(html.contains("Hora del router"), "{html}");
+    assert!(!html.contains(r#"<details class="mas-opciones""#), "{html}");
+    let (_, _, html) = pagina(&p, &cookie, "/ajustes/wifi").await;
+    assert!(html.contains(r#"<details class="mas-opciones""#), "{html}");
+}
+
+/// La nota de «Oculto» va una sola vez por página, aunque haya varias
+/// tarjetas ocultas (Teléfono tiene dos).
+#[tokio::test]
+async fn nota_de_oculto_una_vez() {
+    let (p, cookie) = panel_con_gestor().await;
+    let (_, _, html) = pagina(&p, &cookie, "/ajustes/telefono").await;
+    let (visible, _) = partir(&html, "<script", "</script>");
+    assert!(visible.matches("chip-oculto").count() >= 2, "{visible}");
+    assert_eq!(
+        visible.matches("No aparece en la web del operador").count(),
+        1,
+        "{visible}"
+    );
+}
+
+/// En la vista resumida, «Recomendado: …» deja ver para quién es sin entrar
+/// en «Editar»; la opción del selector no repite la marca.
+#[tokio::test]
+async fn recomendacion_visible_en_el_resumen() {
+    let (p, cookie) = panel_con_gestor().await;
+    let (_, _, html) = pagina(&p, &cookie, "/ajustes/wifi").await;
+    let (visible, _) = partir(&html, "<script", "</script>");
+    let (_, resumenes) = partir(
+        &visible,
+        r#"<details class="recomendacion-resumen""#,
+        "</details>",
+    );
+    assert!(
+        resumenes
+            .iter()
+            .any(|r| r.contains("Recomendado si conectas tus aparatos escribiendo la contraseña")),
+        "{resumenes:#?}"
+    );
+    assert!(
+        !visible.contains("(recomendada)"),
+        "marca repetida en el selector"
+    );
+}
+
+/// La descripción de la opción elegida forma parte de la descripción del
+/// `<select>` (`aria-describedby`).
+#[tokio::test]
+async fn descripcion_de_la_opcion_en_el_selector() {
+    let (p, cookie) = panel_con_gestor().await;
+    let (_, _, html) = pagina(&p, &cookie, "/ajustes/wifi").await;
+    let (visible, _) = partir(&html, "<script", "</script>");
+    let describe = regex::Regex::new(r#"<select[^>]*aria-describedby="([^"]*)""#).unwrap();
+    let mut vistos = 0;
+    for c in describe.captures_iter(&visible) {
+        let opcion = c[1]
+            .split(' ')
+            .find(|id| id.ends_with("-opcion"))
+            .unwrap_or_else(|| panic!("sin la descripción de la opción: {}", &c[1]));
+        assert!(visible.contains(&format!(r#"id="{opcion}""#)), "{opcion}");
+        vistos += 1;
+    }
+    assert!(vistos > 0, "sin <select> en WiFi");
+}

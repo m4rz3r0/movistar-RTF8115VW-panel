@@ -12,7 +12,7 @@ use crate::t;
 use crate::ui::explorador::MASCARA;
 use crate::ui::i18n::traducir;
 use crate::ui::{Estado, IconoEstado};
-use ajustes::{Limites, TipoCampo, ValorLegible, validar_legible};
+use ajustes::{Limites, SIN_ELECCION, TipoCampo, ValorLegible, validar_legible};
 use leptos::prelude::*;
 
 /// Valor en edición de un campo cuyo valor del router no se reconoce. No es
@@ -39,9 +39,9 @@ pub(crate) fn cambiado(c: &CampoVista, v: &str) -> bool {
 }
 
 /// ¿El valor en edición sirve como valor de un campo exigido por otro (la
-/// toma del espejo)? Uno no reconocido o vacío, no.
-pub(crate) fn elegido(v: &str) -> bool {
-    v != DESCONOCIDO && !v.trim().is_empty()
+/// toma del espejo)? Uno no reconocido, vacío o «sin elegir», no.
+pub(crate) fn elegido(c: &CampoVista, v: &str) -> bool {
+    v != DESCONOCIDO && !v.trim().is_empty() && !(c.sin_eleccion && v == SIN_ELECCION)
 }
 
 /// Comprueba el valor como lo hará el servidor (mismos límites, en bytes) y
@@ -175,9 +175,13 @@ pub(crate) fn Campo(
     let desc_id = format!("{dom}-desc");
     let error_id = format!("{dom}-error");
     let reco_id = format!("{dom}-reco");
+    let opcion_id = format!("{dom}-opcion");
     let tiene_reco = c.recomendado.is_some();
     let descrito = {
         let mut ids = vec![desc_id.clone()];
+        if c.tipo == TipoCampo::Opcion {
+            ids.push(opcion_id.clone());
+        }
         if tiene_reco {
             ids.push(reco_id.clone());
         }
@@ -213,25 +217,34 @@ pub(crate) fn Campo(
         }
         .into_any(),
         TipoCampo::Opcion => {
-            let desconocido = match &c.valor {
-                ValorLegible::Desconocido(x) => Some(x.clone()),
+            // Opciones extra, solo si es el valor actual: uno que el panel no
+            // reconoce o «sin elegir» (la toma del espejo apagado).
+            let extra = match &c.valor {
+                ValorLegible::Desconocido(x) => Some((
+                    DESCONOCIDO.to_owned(),
+                    t!("ajustes-valor-desconocido", valor = x.clone()),
+                )),
+                ValorLegible::Opcion(k) if c.sin_eleccion && k == SIN_ELECCION => {
+                    Some((SIN_ELECCION.to_owned(), texto_opcion(&c, SIN_ELECCION)))
+                }
                 _ => None,
             };
-            let opciones = c
-                .opciones
-                .iter()
-                .map(|o| {
-                    let clave = o.clave.clone();
-                    let mut texto = texto_opcion(&c, &o.clave);
-                    if o.recomendada {
-                        texto = t!("ajustes-opcion-recomendada", opcion = texto);
-                    }
-                    let elegida = {
-                        let clave = clave.clone();
-                        move || valor.with(|v| *v == clave)
-                    };
-                    view! { <option value=clave selected=elegida>{texto}</option> }
-                })
+            // El atributo `selected` da el valor del HTML del servidor; luego
+            // manda `prop:value` (una opción que la persona ha elegido ya no
+            // hace caso al atributo, y «Cancelar» tiene que poder volver).
+            let inicial = inicial(&c.valor);
+            let opcion = |clave: String, texto: String| {
+                let elegida = clave == inicial;
+                view! { <option value=clave selected=elegida>{texto}</option> }
+            };
+            let lista = extra
+                .into_iter()
+                .chain(
+                    c.opciones
+                        .iter()
+                        .map(|o| (o.clave.clone(), texto_opcion(&c, &o.clave))),
+                )
+                .map(|(clave, texto)| opcion(clave, texto))
                 .collect_view();
             view! {
                 <select
@@ -239,16 +252,10 @@ pub(crate) fn Campo(
                     aria-describedby=descrito.clone()
                     aria-invalid=invalido
                     disabled=move || bloqueado.get()
+                    prop:value=move || valor.get()
                     on:change=al_cambiar
                 >
-                    {desconocido.map(|x| {
-                        view! {
-                            <option value=DESCONOCIDO selected=move || valor.with(|v| v == DESCONOCIDO)>
-                                {t!("ajustes-valor-desconocido", valor = x)}
-                            </option>
-                        }
-                    })}
-                    {opciones}
+                    {lista}
                 </select>
             }
             .into_any()
@@ -295,8 +302,10 @@ pub(crate) fn Campo(
         move || {
             let v = valor.get();
             if v == DESCONOCIDO {
-                return view! { <p class="ayuda">{t!("ajustes-valor-desconocido-desc")}</p> }
-                    .into_any();
+                return view! {
+                    <p class="ayuda" id=opcion_id.clone()>{t!("ajustes-valor-desconocido-desc")}</p>
+                }
+                .into_any();
             }
             let desc = traducir(&format!("{clave_opcion}-{v}-desc"), None);
             let aviso = aviso_de(&opciones, &v).map(|a| {
@@ -308,7 +317,7 @@ pub(crate) fn Campo(
                 }
             });
             view! {
-                <p class="ayuda opcion-elegida">{desc}</p>
+                <p class="ayuda opcion-elegida" id=opcion_id.clone()>{desc}</p>
                 {aviso}
             }
             .into_any()
@@ -370,6 +379,7 @@ mod tests {
             recomendado: Some("wpa2".into()),
             motivo_recomendado: None,
             requiere: None,
+            sin_eleccion: false,
         }
     }
 

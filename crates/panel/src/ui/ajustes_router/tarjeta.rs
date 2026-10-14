@@ -51,10 +51,12 @@ fn nivel(n: Nivel) -> Option<AnyView> {
             view! { <span class="chip chip-nivel">{t!("ajustes-nivel-avanzado")}</span> }
                 .into_any(),
         ),
+        // Lo que significa va una sola vez en la página (`NOTA_OCULTO`).
         Nivel::Oculto => Some(
             view! {
-                <span class="chip chip-nivel chip-oculto">{t!("ajustes-nivel-oculto")}</span>
-                <span class="nivel-nota">{t!("ajustes-nivel-oculto-desc")}</span>
+                <span class="chip chip-nivel chip-oculto" aria-describedby=super::NOTA_OCULTO>
+                    {t!("ajustes-nivel-oculto")}
+                </span>
             }
             .into_any(),
         ),
@@ -158,13 +160,15 @@ fn detalles_tecnicos(clave: &str, d: &DetallesTecnicos) -> impl IntoView + use<>
     }
 }
 
+/// `claves` sin repetir, en el orden en que aparecen por primera vez.
+fn sin_repetidos<'a>(claves: impl IntoIterator<Item = &'a String>) -> Vec<&'a String> {
+    let mut vistas = std::collections::HashSet::new();
+    claves.into_iter().filter(|k| vistas.insert(*k)).collect()
+}
+
 /// Motivos (sin repetir) de los campos que solo se pueden consultar.
 fn motivos(campos: &[CampoVista]) -> Option<impl IntoView + use<>> {
-    let mut claves: Vec<&String> = campos
-        .iter()
-        .filter_map(|c| c.solo_lectura.as_ref())
-        .collect();
-    claves.dedup();
+    let claves = sin_repetidos(campos.iter().filter_map(|c| c.solo_lectura.as_ref()));
     (!claves.is_empty()).then(|| {
         claves
             .into_iter()
@@ -258,14 +262,21 @@ fn lista(a: &AjusteVista) -> impl IntoView + use<> {
 }
 
 /// Una fila de la vista resumida: etiqueta, valor y, si no es el
-/// recomendado, cuál lo es (cuando coincide no se marca: menos ruido).
+/// recomendado, cuál lo es (cuando coincide no se marca: menos ruido). La
+/// marca se despliega con para quién es y sus pros y contras.
 fn fila(c: &CampoVista) -> impl IntoView + use<> {
     let marca = (es_recomendado(c) == Some(false)).then(|| {
         let r = c.recomendado.clone().unwrap_or_default();
-        view! {
-            <span class="chip chip-sugerencia">
-                {t!("ajustes-recomendado-valor", valor = texto_legible(c, &r))}
-            </span>
+        let chip = t!("ajustes-recomendado-valor", valor = texto_legible(c, &r));
+        match &c.motivo_recomendado {
+            Some(m) => view! {
+                <details class="recomendacion-resumen">
+                    <summary class="chip chip-sugerencia">{chip}</summary>
+                    <p>{traducir(m, None)}</p>
+                </details>
+            }
+            .into_any(),
+            None => view! { <span class="chip chip-sugerencia">{chip}</span> }.into_any(),
         }
     });
     view! {
@@ -374,7 +385,7 @@ fn TarjetaAjuste(a: AjusteVista, solo_lectura: bool, recargar: Callback<()>) -> 
                     let Some(q) = cs.iter().position(|x| x.id == r.campo) else {
                         continue;
                     };
-                    if elegido(&v(q)) {
+                    if elegido(&cs[q], &v(q)) {
                         pedir.entry(r.campo.clone()).or_insert_with(|| v(q));
                     } else {
                         marcar(q, t!("ajustes-error-requiere", campo = etiqueta(c)));
@@ -517,5 +528,16 @@ fn TarjetaAjuste(a: AjusteVista, solo_lectura: bool, recargar: Callback<()>) -> 
         })}
         {detalles_tecnicos(&a.clave, &a.tecnico)}
         {move || grupo.get().map(|g| view! { <DialogoGrupo grupo=g on_cerrar=cerrar /> })}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sin_repetidos;
+
+    #[test]
+    fn sin_repetidos_aunque_no_vayan_seguidos() {
+        let (a, b) = ("motivo-a".to_owned(), "motivo-b".to_owned());
+        assert_eq!(sin_repetidos([&a, &b, &a, &b, &a]), [&a, &b]);
     }
 }

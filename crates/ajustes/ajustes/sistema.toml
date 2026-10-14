@@ -30,9 +30,10 @@ opcional = true
 validar = { max = 253, ascii = true }
 
 # El espejo copia todo lo que entra y sale de internet a un puerto de la
-# red de casa. Con el espejo apagado el router da puerto 0, que no es una
-# opción: se ve como valor desconocido. Encenderlo exige elegir la toma
-# (`requiere`): si no, se escribiría la toma 0.
+# red de casa. Con el espejo apagado el router da la toma 0, que no es una
+# opción que se pueda escribir: se lee como «Ninguna» (`sin_eleccion`).
+# Encenderlo exige elegir una toma (`requiere`; «Ninguna» no cuenta): si no,
+# se escribiría la toma 0.
 [[ajuste]]
 id = "sistema.diagnostico"
 tema = "sistema"
@@ -52,6 +53,7 @@ id = "puerto"
 escribe = { funcion = "cbSetDiagConfig", parametro = "dst_lan_port" }
 lee = "dst_lan_port"
 tipo = "opcion"
+sin_eleccion = "0"
 opciones = [
   { valor = "1", clave = "puerto_1" },
   { valor = "2", clave = "puerto_2" },

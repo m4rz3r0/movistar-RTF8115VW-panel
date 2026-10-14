@@ -469,8 +469,11 @@ button {
 }
 
 @media (max-width: 860px) {
+  /* La barra superior, a su altura; el contenido se queda el resto (en una
+     página corta, la barra no se estira). */
   .marco {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
   }
 
   .barra {
@@ -2640,9 +2643,11 @@ summary.hist-cabeza:hover {
   color: var(--texto-1);
 }
 
-.nivel-nota {
+.nota-oculto {
+  max-width: 880px;
+  margin-bottom: var(--esp-3);
   color: var(--texto-2);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .ajuste-desc {
@@ -2717,6 +2722,40 @@ summary.hist-cabeza:hover {
   background: var(--acento-suave);
   color: var(--texto-1);
   white-space: normal;
+}
+
+.recomendacion-resumen {
+  min-width: 0;
+}
+
+.recomendacion-resumen > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.recomendacion-resumen > summary::-webkit-details-marker {
+  display: none;
+}
+
+.recomendacion-resumen > summary::after {
+  content: "";
+  width: 5px;
+  height: 5px;
+  margin-left: var(--esp-2);
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+}
+
+.recomendacion-resumen[open] > summary::after {
+  transform: rotate(-135deg) translateY(-1px);
+}
+
+.recomendacion-resumen > p {
+  max-width: 60ch;
+  margin-top: var(--esp-2);
+  color: var(--texto-2);
+  font-size: 13px;
 }
 
 .chip-sugerencia {
