@@ -1,6 +1,6 @@
 [package]
 name = "ajustes"
-version = "0.2.2"
+version = "0.2.5"
 description = "Catálogo de ajustes del panel: cada ajuste humano y las funciones del router que lo leen y lo escriben"
 edition.workspace = true
 rust-version.workspace = true
