@@ -1,0 +1,112 @@
+# Puertos: reglas de apertura, UPnP y ayudantes de protocolos (ALG).
+
+[[ajuste]]
+id = "puertos.reglas"
+tema = "puertos"
+nivel = "basico"
+lista = true
+componente = "puertos"
+leer = { funcion = "cbGetNatPortMapping" }
+
+[[ajuste.campo]]
+id = "nombre"
+escribe = { funcion = "cbSetNatPortMapping", parametro = "desc" }
+lee = "desc"
+tipo = "texto"
+validar = { min = 1, max = 64 }
+
+[[ajuste.campo]]
+id = "protocolo"
+escribe = { funcion = "cbSetNatPortMapping", parametro = "l4_protocol_value" }
+lee = "l4_protocol_value"
+tipo = "opcion"
+opciones = [
+  { valor = "6", clave = "tcp" },
+  { valor = "17", clave = "udp" },
+]
+
+[[ajuste.campo]]
+id = "externo_desde"
+escribe = { funcion = "cbSetNatPortMapping", parametro = "ext_l4_port_min_value" }
+lee = "ext_l4_port_min_value"
+tipo = "numero"
+validar = { min = 1, max = 65535 }
+
+[[ajuste.campo]]
+id = "externo_hasta"
+escribe = { funcion = "cbSetNatPortMapping", parametro = "ext_l4_port_max_value" }
+lee = "ext_l4_port_max_value"
+tipo = "numero"
+validar = { min = 1, max = 65535 }
+
+[[ajuste.campo]]
+id = "destino"
+escribe = { funcion = "cbSetNatPortMapping", parametro = "int_ip_addr" }
+lee = "int_ip_addr"
+tipo = "ip"
+
+[[ajuste.campo]]
+id = "interno_desde"
+escribe = { funcion = "cbSetNatPortMapping", parametro = "int_l4_port_min_value" }
+lee = "int_l4_port_min_value"
+tipo = "numero"
+validar = { min = 1, max = 65535 }
+
+[[ajuste.campo]]
+id = "interno_hasta"
+escribe = { funcion = "cbSetNatPortMapping", parametro = "int_l4_port_max_value" }
+lee = "int_l4_port_max_value"
+tipo = "numero"
+validar = { min = 1, max = 65535 }
+
+[[ajuste.campo]]
+id = "activa"
+escribe = { funcion = "cbSetNatPortMapping", parametro = "adm_state" }
+lee = "adm_state"
+tipo = "booleano"
+
+[[ajuste]]
+id = "puertos.upnp"
+tema = "puertos"
+nivel = "basico"
+leer = { funcion = "cbGetUpnpCfg" }
+
+[[ajuste.campo]]
+id = "activo"
+escribe = { funcion = "cbSetUpnpCfg", parametro = "adm_state" }
+lee = "adm_state"
+tipo = "booleano"
+recomendado = "false"
+
+# Solo lectura: al escribir, el router necesita un dato que no devuelve al
+# leer, así que el panel no podría deshacer el cambio (`cbSetNatConfig` está
+# en `excluidas.toml`). Se revisará al probar con el router real (fase 3).
+[[ajuste]]
+id = "puertos.alg"
+tema = "puertos"
+nivel = "oculto"
+leer = { funcion = "cbGetNatConfig" }
+
+[[ajuste.campo]]
+id = "ftp"
+lee = "ftp_enable"
+tipo = "booleano"
+solo_lectura = "ajuste-puertos-alg-motivo"
+
+[[ajuste.campo]]
+id = "sip"
+lee = "sip_enable"
+tipo = "booleano"
+solo_lectura = "ajuste-puertos-alg-motivo"
+
+[[ajuste.campo]]
+id = "pptp"
+lee = "pptp_enable"
+tipo = "booleano"
+solo_lectura = "ajuste-puertos-alg-motivo"
+
+[[ajuste.campo]]
+id = "h323"
+lee = "h323_enable"
+tipo = "booleano"
+solo_lectura = "ajuste-puertos-alg-motivo"

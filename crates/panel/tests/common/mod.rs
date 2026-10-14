@@ -266,24 +266,47 @@ pub async fn panel_con_gestor_y_capa(capa: &Path) -> (Panel, String) {
     gestor_y_sesion(panel_con_capa(capa).await).await
 }
 
-async fn gestor_y_sesion(mut p: Panel) -> (Panel, String) {
+/// Tiempos rápidos del gestor en las pruebas: vigilancia de 300 ms (600 ms
+/// en riesgo alto).
+pub fn tiempos_rapidos() -> Tiempos {
+    Tiempos {
+        bajo: Duration::from_millis(300),
+        medio: Duration::from_millis(300),
+        alto: Duration::from_millis(600),
+        intervalo: Duration::from_millis(30),
+        fallos_para_revertir: 3,
+        pausa_max: Duration::from_secs(2),
+    }
+}
+
+/// Como [`panel_con_gestor`], con los tiempos del gestor `t` (p. ej. una
+/// vigilancia larga para probar lo que pasa mientras dura).
+pub async fn panel_con_tiempos(t: Tiempos) -> (Panel, String) {
+    gestor_y_sesion_con(panel().await, t).await
+}
+
+/// Como [`panel_con_gestor`], con el catálogo de ajustes sustituido por el
+/// del TOML `toml` (un fichero de ajustes; sin excluidas ni comprobación
+/// contra el catálogo de funciones, que pide cubrir todas las escrituras).
+pub async fn panel_con_ajustes(toml: &str) -> (Panel, String) {
+    let mut p = panel().await;
+    let c = ajustes::CatalogoAjustes::from_toml(&[("prueba", toml)], "").unwrap();
+    p.state.ajustes = std::sync::Arc::new(c);
+    gestor_y_sesion(p).await
+}
+
+async fn gestor_y_sesion(p: Panel) -> (Panel, String) {
+    gestor_y_sesion_con(p, tiempos_rapidos()).await
+}
+
+async fn gestor_y_sesion_con(mut p: Panel, t: Tiempos) -> (Panel, String) {
     let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, USER, PASS);
     cfg.timeout = Duration::from_millis(500);
     cfg.min_gap = Duration::from_millis(1);
     p.state.hgu = hgu::Client::new(cfg);
     // Un solo cliente del router para las server functions y el gestor.
     p.app = panel::build_router(p.state.clone());
-    let m = ChangeManager::instalar(
-        &p.state,
-        Tiempos {
-            bajo: Duration::from_millis(300),
-            medio: Duration::from_millis(300),
-            alto: Duration::from_millis(600),
-            intervalo: Duration::from_millis(30),
-            fallos_para_revertir: 3,
-            pausa_max: Duration::from_secs(2),
-        },
-    );
+    let m = ChangeManager::instalar(&p.state, t);
     m.reanudar_pendientes().await;
     let cookie = sesion(&p).await;
     (p, cookie)
@@ -369,5 +392,19 @@ pub async fn esperar_final(p: &Panel, cookie: &str, id: i64) -> Value {
         }
         assert!(start.elapsed() < Duration::from_secs(10), "sin final: {c}");
         tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+}
+
+/// Espera a que el gestor suelte el cambio activo: lo hace justo después de
+/// guardarlo en su estado final.
+pub async fn esperar_libre(p: &Panel) {
+    let g = p.state.cambios().unwrap();
+    let inicio = Instant::now();
+    while g.activo().is_some() {
+        assert!(
+            inicio.elapsed() < Duration::from_secs(5),
+            "el gestor sigue ocupado"
+        );
+        tokio::time::sleep(Duration::from_millis(5)).await;
     }
 }

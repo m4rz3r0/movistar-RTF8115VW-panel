@@ -28,6 +28,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ajustes"
+version = "0.2.2"
+dependencies = [
+ "catalogo",
+ "i18n",
+ "regex",
+ "serde",
+ "thiserror 2.0.21",
+ "toml",
+]
+
+[[package]]
 name = "allocator-api2"
 version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1934,6 +1946,7 @@ checksum = "8c04f5d74368e4d0dfe06c45c8627c81bd7c317d52762d118fb9b3076f6420fd"
 name = "panel"
 version = "0.2.4"
 dependencies = [
+ "ajustes",
  "argon2",
  "axum",
  "base64 0.22.1",
@@ -1948,6 +1961,7 @@ dependencies = [
  "leptos_axum",
  "leptos_meta",
  "leptos_router",
+ "regex",
  "router-sim",
  "rpassword",
  "serde",
@@ -2418,7 +2432,9 @@ dependencies = [
 name = "router-sim"
 version = "0.2.4"
 dependencies = [
+ "ajustes",
  "axum",
+ "catalogo",
  "hgu",
  "regex",
  "roxmltree",

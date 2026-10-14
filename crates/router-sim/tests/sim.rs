@@ -716,3 +716,858 @@ async fn contrasena_cambiable() {
     cfg.min_gap = Duration::from_millis(1);
     Client::new(cfg).call("cbGetSummary", &[]).await.unwrap();
 }
+
+// ------------------------------------------------ escritura genérica
+
+/// Valor del primer nodo con hijo `campo` en `n` (o en sus descendientes).
+fn valor(n: &XmlNode, campo: &str) -> Option<String> {
+    n.text_of(campo)
+        .map(str::to_owned)
+        .or_else(|| n.children.iter().find_map(|c| valor(c, campo)))
+}
+
+/// `reads()` anota cada lectura con sus parámetros, también las que fallan,
+/// y no las escrituras.
+#[tokio::test]
+async fn lecturas_anotadas() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    let antes = sim.control.reads().len();
+    c.call("cbGetTimeNtp", &[]).await.unwrap();
+    c.call("cbGetWifiAccPt", &[("dpm_cfg_wifi_acc_pt_id", "0")])
+        .await
+        .unwrap();
+    sim.control.fail_reads("cbGetUpnpCfg", true);
+    assert!(c.call("cbGetUpnpCfg", &[]).await.is_err());
+    c.write("ntp.asp", "cbSetTimeNtp", &[("ntp_svr_2", "ntp.example")])
+        .await
+        .unwrap();
+    let leidas: Vec<(String, Vec<(String, String)>)> =
+        sim.control.reads().into_iter().skip(antes).collect();
+    let par = |k: &str, v: &str| (k.to_owned(), v.to_owned());
+    assert_eq!(
+        leidas,
+        vec![
+            ("cbGetTimeNtp".to_owned(), vec![]),
+            (
+                "cbGetWifiAccPt".to_owned(),
+                vec![par("dpm_cfg_wifi_acc_pt_id", "0")]
+            ),
+            ("cbGetUpnpCfg".to_owned(), vec![]),
+        ]
+    );
+}
+
+#[tokio::test]
+async fn escritura_generica_se_lee() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    let antes = c.call("cbGetTimeNtp", &[]).await.unwrap();
+    assert_eq!(valor(&antes, "ntp_svr_2").as_deref(), Some(""));
+    c.write(
+        "ntp.asp",
+        "cbSetTimeNtp",
+        &[("ntp_svr_2", "ntp.example"), ("campo_inexistente", "x")],
+    )
+    .await
+    .unwrap();
+    let despues = c.call("cbGetTimeNtp", &[]).await.unwrap();
+    assert_eq!(valor(&despues, "ntp_svr_2").as_deref(), Some("ntp.example"));
+    assert_eq!(valor(&despues, "ntp_svr_1"), valor(&antes, "ntp_svr_1"));
+    assert_eq!(
+        valor(&despues, "campo_inexistente"),
+        None,
+        "no se inventan hijos"
+    );
+
+    assert_eq!(
+        valor(&c.call("cbGetTr69Config", &[]).await.unwrap(), "enableCWMP").as_deref(),
+        Some("1")
+    );
+    c.write("cwmp.asp", "cbSetTr69Config", &[("enableCWMP", "0")])
+        .await
+        .unwrap();
+    assert_eq!(
+        valor(&c.call("cbGetTr69Config", &[]).await.unwrap(), "enableCWMP").as_deref(),
+        Some("0")
+    );
+    assert_eq!(
+        sim.control.fixture_valor("cbGetTr69Config", "enableCWMP"),
+        Some("0".into())
+    );
+    assert_eq!(
+        sim.control.fixture_valor("cbGetTr69Config", "no_existe"),
+        None
+    );
+}
+
+#[tokio::test]
+async fn escritura_por_instancia_no_toca_otra() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    let ssid = |n: &XmlNode| valor(n, "ssid").unwrap();
+    let uno = [("dpm_cfg_wifi_acc_pt_id", "1")];
+    let otro = c
+        .call("cbListWifiAccPt", &[("dpm_cfg_wifi_id", "0")])
+        .await
+        .unwrap();
+    let id_otro = valor(&otro, "dpm_cfg_wifi_acc_pt_id").unwrap();
+    assert_ne!(id_otro, "1", "la fixture tiene un segundo punto de acceso");
+    let ssid_otro = ssid(&otro);
+    c.write(
+        "wifi.asp",
+        "cbSetWifiAccPt",
+        &[("dpm_cfg_wifi_acc_pt_id", "1"), ("ssid", "RED-solo-uno")],
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        ssid(&c.call("cbGetWifiAccPt", &uno).await.unwrap()),
+        "RED-solo-uno"
+    );
+    let lista = c
+        .call("cbListWifiAccPt", &[("dpm_cfg_wifi_id", "1")])
+        .await
+        .unwrap();
+    assert_eq!(
+        ssid(&lista),
+        "RED-solo-uno",
+        "la lista por radio también lo refleja"
+    );
+    let otro = c
+        .call("cbListWifiAccPt", &[("dpm_cfg_wifi_id", "0")])
+        .await
+        .unwrap();
+    assert_eq!(ssid(&otro), ssid_otro, "la otra instancia no cambia");
+}
+
+fn ids_nat(n: &XmlNode) -> Vec<(String, String)> {
+    n.all("rtm_cfg_nat_port_mapping")
+        .into_iter()
+        .map(|e| {
+            (
+                e.text_of("nat_port_mapping_id").unwrap().to_owned(),
+                e.text_of("desc").unwrap().to_owned(),
+            )
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn lista_crear_editar_borrar() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    let todas = [("all", "ALL")];
+    let inicial = ids_nat(&c.call("cbGetNatPortMapping", &todas).await.unwrap());
+    assert_eq!(inicial.len(), 1);
+    let id0 = inicial[0].0.clone();
+
+    // Crear: sin id.
+    c.write(
+        "natportmap.asp",
+        "cbSetNatPortMapping",
+        &[("desc", "nueva"), ("int_ip_addr", "192.0.2.10")],
+    )
+    .await
+    .unwrap();
+    let tras = c.call("cbGetNatPortMapping", &todas).await.unwrap();
+    let ids = ids_nat(&tras);
+    assert_eq!(ids.len(), 2);
+    let nuevo = ids.iter().find(|(_, d)| d == "nueva").unwrap().0.clone();
+    assert_eq!(
+        nuevo,
+        (id0.parse::<u32>().unwrap() + 1).to_string(),
+        "max + 1"
+    );
+    let por_indice = c
+        .call("cbGetNatPortMapping", &[("nat_port_mapping_0i", "1")])
+        .await
+        .unwrap();
+    assert_eq!(
+        valor(&por_indice, "int_ip_addr").as_deref(),
+        Some("192.0.2.10")
+    );
+
+    // Editar la existente.
+    c.write(
+        "natportmap.asp",
+        "cbSetNatPortMapping",
+        &[("nat_port_mapping_id", &id0), ("desc", "editada")],
+    )
+    .await
+    .unwrap();
+    let ids = ids_nat(&c.call("cbGetNatPortMapping", &todas).await.unwrap());
+    assert_eq!(ids.len(), 2, "editar no crea");
+    assert!(ids.contains(&(id0.clone(), "editada".into())));
+
+    // Borrar la primera.
+    c.write(
+        "natportmap.asp",
+        "cbSetNatPortMapping",
+        &[("nat_port_mapping_id", &id0), ("del", "DEL")],
+    )
+    .await
+    .unwrap();
+    let ids = ids_nat(&c.call("cbGetNatPortMapping", &todas).await.unwrap());
+    assert_eq!(ids, vec![(nuevo.clone(), "nueva".into())]);
+    let r = c
+        .call("cbGetNatPortMapping", &[("nat_port_mapping_id", &id0)])
+        .await;
+    assert!(r.is_err(), "una instancia borrada ya no se lee");
+}
+
+// ------------------------------------------------ cbModifyPwd y login
+
+fn cliente_con(sim: &SimHandle, password: &str) -> Client {
+    Client::new(ClientConfig {
+        base_url: sim.base_url.clone(),
+        user: USER.into(),
+        password: password.into(),
+        timeout: Duration::from_secs(5),
+        min_gap: Duration::from_millis(1),
+    })
+}
+
+fn cambio_pwd<'a>(actual: &'a str, nueva: &'a str) -> [(&'a str, &'a str); 3] {
+    [("rqUser", USER), ("rqOPwd", actual), ("rqNPwd", nueva)]
+}
+
+#[tokio::test]
+async fn modify_pwd_cambia_y_el_login_nuevo_entra() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    c.call("cbGetSummary", &[]).await.unwrap();
+    c.write(
+        "user_profile.asp",
+        "cbModifyPwd",
+        &cambio_pwd(PASS, "clave-nueva"),
+    )
+    .await
+    .unwrap();
+    // La sesión abierta sigue valiendo.
+    c.call("cbGetSummary", &[]).await.unwrap();
+    // La nueva entra; la vieja ya no.
+    cliente_con(&sim, "clave-nueva")
+        .call("cbGetSummary", &[])
+        .await
+        .unwrap();
+    assert!(
+        cliente_con(&sim, PASS)
+            .call("cbGetSummary", &[])
+            .await
+            .is_err()
+    );
+}
+
+#[tokio::test]
+async fn modify_pwd_con_actual_mala_falla() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    let e = c
+        .write(
+            "user_profile.asp",
+            "cbModifyPwd",
+            &cambio_pwd("otra", "clave-nueva"),
+        )
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(&e, Error::CallFailed { result, .. } if result != "0"),
+        "{e:?}"
+    );
+    let e = c
+        .write(
+            "user_profile.asp",
+            "cbModifyPwd",
+            &[("rqUser", "otro"), ("rqOPwd", PASS), ("rqNPwd", "x")],
+        )
+        .await
+        .unwrap_err();
+    assert!(matches!(e, Error::CallFailed { .. }));
+    cliente_con(&sim, PASS)
+        .call("cbGetSummary", &[])
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn modify_pwd_sin_efecto_responde_ok_y_no_cambia() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    sim.control.modify_pwd_sin_efecto();
+    c.write(
+        "user_profile.asp",
+        "cbModifyPwd",
+        &cambio_pwd(PASS, "clave-nueva"),
+    )
+    .await
+    .unwrap();
+    cliente_con(&sim, PASS)
+        .call("cbGetSummary", &[])
+        .await
+        .unwrap();
+    // Solo la próxima: la siguiente sí cambia.
+    c.write(
+        "user_profile.asp",
+        "cbModifyPwd",
+        &cambio_pwd(PASS, "clave-nueva"),
+    )
+    .await
+    .unwrap();
+    cliente_con(&sim, "clave-nueva")
+        .call("cbGetSummary", &[])
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn login_falla_con_aunque_sea_la_vigente() {
+    let sim = start().await;
+    sim.control.login_falla_con(PASS);
+    assert!(
+        client(&sim, Duration::from_secs(5))
+            .call("cbGetSummary", &[])
+            .await
+            .is_err()
+    );
+    sim.control.set_password("otra-clave");
+    cliente_con(&sim, "otra-clave")
+        .call("cbGetSummary", &[])
+        .await
+        .unwrap();
+}
+
+// ------------------------------------------------ ronda de corrección 1
+
+fn campo_de(n: &XmlNode, instancia: &str, campo: &str) -> Option<String> {
+    n.get(instancia)?.text_of(campo).map(str::to_owned)
+}
+
+const NAT: &str = "rtm_cfg_nat_port_mapping";
+
+/// Crea una redirección con ese `desc` (sin id) y devuelve el id asignado.
+async fn crear_nat(c: &Client, desc: &str) -> String {
+    c.write("natportmap.asp", "cbSetNatPortMapping", &[("desc", desc)])
+        .await
+        .unwrap();
+    let todas = c
+        .call("cbGetNatPortMapping", &[("all", "ALL")])
+        .await
+        .unwrap();
+    todas
+        .all(NAT)
+        .into_iter()
+        .find(|e| e.text_of("desc") == Some(desc))
+        .and_then(|e| e.text_of("nat_port_mapping_id"))
+        .unwrap()
+        .to_owned()
+}
+
+#[tokio::test]
+async fn lectura_pareada_por_0i_sigue_valida_tras_borrar_en_medio() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    let pareada = |id: &str| [("nat_port_mapping_0i", id.to_owned())];
+    let leer = |id: String| {
+        let c = c.clone();
+        async move {
+            let p = pareada(&id);
+            let p: Vec<(&str, &str)> = p.iter().map(|(k, v)| (*k, v.as_str())).collect();
+            c.call("cbGetNatPortMapping", &p).await
+        }
+    };
+    let primera = crear_nat(&c, "primera").await;
+    let segunda = crear_nat(&c, "segunda").await;
+    let tercera = crear_nat(&c, "tercera").await;
+    let mut ids = [primera.clone(), segunda.clone(), tercera.clone()];
+    ids.sort();
+    assert_eq!(ids.len(), 3);
+    // Borra la del medio y edita la tercera.
+    c.write(
+        "natportmap.asp",
+        "cbSetNatPortMapping",
+        &[("nat_port_mapping_id", &segunda), ("del", "DEL")],
+    )
+    .await
+    .unwrap();
+    c.write(
+        "natportmap.asp",
+        "cbSetNatPortMapping",
+        &[
+            ("nat_port_mapping_id", &tercera),
+            ("desc", "tercera-editada"),
+        ],
+    )
+    .await
+    .unwrap();
+    // La lectura pareada `…_0i={id}` lee la instancia escrita, no otra.
+    let n = leer(tercera.clone()).await.unwrap();
+    assert_eq!(
+        campo_de(&n, NAT, "nat_port_mapping_id"),
+        Some(tercera.clone())
+    );
+    assert_eq!(
+        campo_de(&n, NAT, "desc").as_deref(),
+        Some("tercera-editada")
+    );
+    let n = leer(primera.clone()).await.unwrap();
+    assert_eq!(campo_de(&n, NAT, "desc").as_deref(), Some("primera"));
+    assert!(leer(segunda).await.is_err(), "la borrada ya no se lee");
+    // El 0i de la instancia de las fixtures no cambia; el de las nuevas es su id.
+    let todas = c
+        .call("cbGetNatPortMapping", &[("all", "ALL")])
+        .await
+        .unwrap();
+    let indices: Vec<(String, String)> = todas
+        .all(NAT)
+        .into_iter()
+        .map(|e| {
+            (
+                e.text_of("nat_port_mapping_id").unwrap().to_owned(),
+                e.text_of("nat_port_mapping_0i").unwrap().to_owned(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        indices,
+        vec![
+            ("0".into(), "0".into()),
+            (primera.clone(), primera),
+            (tercera.clone(), tercera)
+        ]
+    );
+}
+
+#[tokio::test]
+async fn reserva_leida_por_id_conserva_el_0i_menos_uno_de_las_fixtures() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    c.write(
+        "dhcp.asp",
+        "cbDhcpV4SvrPoolSetStatic",
+        &add_static("02:00:00:00:aa:07", "192.0.2.7"),
+    )
+    .await
+    .unwrap();
+    let por_id = |id: &'static str| {
+        [
+            ("rtm_cfg_dhcpv4_svr_pool_id", "0"),
+            ("rtm_dhcpv4_svr_pool_static_id", id),
+        ]
+    };
+    for id in ["0", "2"] {
+        let n = c
+            .call("cbDhcpV4SvrPoolGetStatic", &por_id(id))
+            .await
+            .unwrap();
+        assert_eq!(
+            campo_de(
+                &n,
+                "rtm_dhcpv4_svr_pool_static",
+                "rtm_dhcpv4_svr_pool_static_0i"
+            )
+            .as_deref(),
+            Some("-1"),
+            "lectura de una reserva (id {id}): como el router real"
+        );
+    }
+    let todas = c
+        .call("cbDhcpV4SvrPoolGetStatic", LIST_STATIC)
+        .await
+        .unwrap();
+    let indices: Vec<&str> = todas
+        .all("rtm_dhcpv4_svr_pool_static")
+        .into_iter()
+        .map(|e| e.text_of("rtm_dhcpv4_svr_pool_static_0i").unwrap())
+        .collect();
+    assert_eq!(indices, ["0", "1", "2"], "la lista conserva los índices");
+}
+
+#[tokio::test]
+async fn reservas_dhcp_incompletas_o_de_otro_pool_se_rechazan() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    let escribir = |p: Vec<(&'static str, &'static str)>| {
+        let c = c.clone();
+        async move { c.write("dhcp.asp", "cbDhcpV4SvrPoolSetStatic", &p).await }
+    };
+    let antes = leases(
+        &c.call("cbDhcpV4SvrPoolGetStatic", LIST_STATIC)
+            .await
+            .unwrap(),
+    );
+    let casos: Vec<(&str, Vec<(&'static str, &'static str)>)> = vec![
+        (
+            "pool desconocido",
+            vec![
+                ("rtm_cfg_dhcpv4_svr_pool_id", "1"),
+                ("rtm_dhcpv4_svr_pool_static_id", "-1"),
+                ("mac_addr", "02:00:00:00:aa:08"),
+                ("ipv4_addr", "192.0.2.8"),
+            ],
+        ),
+        (
+            "falta el id",
+            vec![
+                ("rtm_cfg_dhcpv4_svr_pool_id", "0"),
+                ("mac_addr", "02:00:00:00:aa:08"),
+                ("ipv4_addr", "192.0.2.8"),
+            ],
+        ),
+        (
+            "falta mac_addr",
+            vec![
+                ("rtm_cfg_dhcpv4_svr_pool_id", "0"),
+                ("rtm_dhcpv4_svr_pool_static_id", "-1"),
+                ("ipv4_addr", "192.0.2.8"),
+            ],
+        ),
+        (
+            "falta ipv4_addr",
+            vec![
+                ("rtm_cfg_dhcpv4_svr_pool_id", "0"),
+                ("rtm_dhcpv4_svr_pool_static_id", "-1"),
+                ("mac_addr", "02:00:00:00:aa:08"),
+            ],
+        ),
+        (
+            "no existe",
+            vec![
+                ("rtm_cfg_dhcpv4_svr_pool_id", "0"),
+                ("rtm_dhcpv4_svr_pool_static_id", "99"),
+                ("ipv4_addr", "192.0.2.8"),
+            ],
+        ),
+    ];
+    for (esperado, p) in casos {
+        match escribir(p).await.unwrap_err() {
+            Error::CallFailed { error, .. } => assert_eq!(error, esperado),
+            e => panic!("{esperado}: {e:?}"),
+        }
+    }
+    let despues = leases(
+        &c.call("cbDhcpV4SvrPoolGetStatic", LIST_STATIC)
+            .await
+            .unwrap(),
+    );
+    assert_eq!(despues, antes, "nada de eso cambia el estado");
+    // La creación válida sin adm_state lo deja activado, como antes.
+    c.write(
+        "dhcp.asp",
+        "cbDhcpV4SvrPoolSetStatic",
+        &[
+            ("rtm_cfg_dhcpv4_svr_pool_id", "0"),
+            ("rtm_dhcpv4_svr_pool_static_id", "-1"),
+            ("mac_addr", "02:00:00:00:aa:09"),
+            ("ipv4_addr", "192.0.2.9"),
+        ],
+    )
+    .await
+    .unwrap();
+    let n = c
+        .call("cbDhcpV4SvrPoolGetStatic", LIST_STATIC)
+        .await
+        .unwrap();
+    let nueva = n.all("rtm_dhcpv4_svr_pool_static").pop().unwrap();
+    assert_eq!(nueva.text_of("adm_state"), Some("1"));
+}
+
+#[tokio::test]
+async fn edicion_sin_instancia_solo_toca_los_hijos_directos() {
+    let capa = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("capa-ntp-anidado");
+    std::fs::create_dir_all(&capa).unwrap();
+    std::fs::write(
+        capa.join("cbGetTimeNtp.xml"),
+        "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\r\n<Response><cbGetTimeNtp><rtm_time_ntp>\
+         <ntp_svr_1>a.example</ntp_svr_1><extra><ntp_svr_1>b.example</ntp_svr_1></extra>\
+         </rtm_time_ntp><Result>0</Result></cbGetTimeNtp></Response>",
+    )
+    .unwrap();
+    let sim = Sim::start(SimConfig::new(USER, PASS, fixtures_dir()).con_capa(&capa)).await;
+    let c = client(&sim, Duration::from_secs(5));
+    c.write("ntp.asp", "cbSetTimeNtp", &[("ntp_svr_1", "c.example")])
+        .await
+        .unwrap();
+    let n = c.call("cbGetTimeNtp", &[]).await.unwrap();
+    let ntp = n.get("rtm_time_ntp").unwrap();
+    assert_eq!(ntp.text_of("ntp_svr_1"), Some("c.example"));
+    assert_eq!(
+        ntp.get("extra").unwrap().text_of("ntp_svr_1"),
+        Some("b.example"),
+        "el nodo anidado no se toca"
+    );
+}
+
+#[tokio::test]
+async fn id_que_no_existe_crea_con_max_mas_uno() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    c.write(
+        "natportmap.asp",
+        "cbSetNatPortMapping",
+        &[("nat_port_mapping_id", "42"), ("desc", "con-id-ajeno")],
+    )
+    .await
+    .unwrap();
+    let todas = c
+        .call("cbGetNatPortMapping", &[("all", "ALL")])
+        .await
+        .unwrap();
+    let ids: Vec<(&str, &str)> = todas
+        .all(NAT)
+        .into_iter()
+        .map(|e| {
+            (
+                e.text_of("nat_port_mapping_id").unwrap(),
+                e.text_of("desc").unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(ids.len(), 2);
+    assert_eq!(ids[1], ("1", "con-id-ajeno"), "id max + 1, no el escrito");
+}
+
+#[tokio::test]
+async fn creacion_doble_en_la_lista_generica() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    sim.control.create_twice_next_write();
+    c.write(
+        "natportmap.asp",
+        "cbSetNatPortMapping",
+        &[("desc", "doble")],
+    )
+    .await
+    .unwrap();
+    let todas = c
+        .call("cbGetNatPortMapping", &[("all", "ALL")])
+        .await
+        .unwrap();
+    let dobles: Vec<&str> = todas
+        .all(NAT)
+        .into_iter()
+        .filter(|e| e.text_of("desc") == Some("doble"))
+        .map(|e| e.text_of("nat_port_mapping_id").unwrap())
+        .collect();
+    assert_eq!(dobles, ["1", "2"]);
+    // Solo la próxima creación.
+    c.write(
+        "natportmap.asp",
+        "cbSetNatPortMapping",
+        &[("desc", "simple")],
+    )
+    .await
+    .unwrap();
+    let todas = c
+        .call("cbGetNatPortMapping", &[("all", "ALL")])
+        .await
+        .unwrap();
+    assert_eq!(todas.all(NAT).len(), 4);
+}
+
+/// Petición HTTP mínima (sin cliente): devuelve el cuerpo.
+fn http(base: &str, metodo: &str, ruta: &str, cookie: &str, cuerpo: &str) -> (String, String) {
+    use std::io::{Read, Write};
+    let dir = base.trim_start_matches("http://");
+    let mut s = std::net::TcpStream::connect(dir).unwrap();
+    let peticion = format!(
+        "{metodo} {ruta} HTTP/1.1\r\nHost: {dir}\r\nCookie: {cookie}\r\nContent-Type: \
+         application/x-www-form-urlencoded\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{cuerpo}",
+        cuerpo.len()
+    );
+    s.write_all(peticion.as_bytes()).unwrap();
+    let mut r = String::new();
+    s.read_to_string(&mut r).unwrap();
+    let cabeceras = r.split("\r\n\r\n").next().unwrap().to_owned();
+    (
+        cabeceras,
+        r.split_once("\r\n\r\n")
+            .map_or(String::new(), |x| x.1.to_owned()),
+    )
+}
+
+fn codificar(s: &str) -> String {
+    hgu::fmt::mess_userpass(s)
+        .bytes()
+        .map(|b| format!("%{b:02X}"))
+        .collect()
+}
+
+#[tokio::test]
+async fn login_falla_con_tambien_en_el_avanzado_aunque_el_basico_pase() {
+    let sim = start().await;
+    let base = sim.base_url.clone();
+    let (usuario, vigente) = (codificar(USER), codificar(PASS));
+    let b2 = base.clone();
+    let (cabeceras, _) = tokio::task::spawn_blocking(move || http(&b2, "GET", "/", "", ""))
+        .await
+        .unwrap();
+    let cookie = cabeceras
+        .lines()
+        .find_map(|l| l.strip_prefix("set-cookie: "))
+        .and_then(|c| c.split(';').next())
+        .unwrap()
+        .to_owned();
+    let (c1, u1, v1) = (cookie.clone(), usuario.clone(), vigente.clone());
+    let b2 = base.clone();
+    // El login básico entra antes de armar el fallo.
+    let (_, cuerpo) = tokio::task::spawn_blocking(move || {
+        http(
+            &b2,
+            "POST",
+            "/cgi-bin/te_acceso_router.cgi",
+            &c1,
+            &format!("loginUsername={u1}&loginPassword={v1}"),
+        )
+    })
+    .await
+    .unwrap();
+    assert!(cuerpo.contains("te_wifi.asp"), "el básico entra: {cuerpo}");
+    let avanzado = move |base: String, cookie: String| {
+        let cuerpo = format!("rqUsername={usuario}&rqPasswd={vigente}");
+        tokio::task::spawn_blocking(move || {
+            http(&base, "POST", "/cgi-bin/cbCheckLogin.xml", &cookie, &cuerpo).1
+        })
+    };
+    let ok = avanzado(base.clone(), cookie.clone()).await.unwrap();
+    assert!(
+        ok.contains("<SessionID>"),
+        "sin armar, el avanzado entra: {ok}"
+    );
+    sim.control.login_falla_con(PASS);
+    let mal = avanzado(base, cookie).await.unwrap();
+    assert!(
+        !mal.contains("<SessionID>") && mal.contains("<Result>1</Result>"),
+        "{mal}"
+    );
+}
+
+/// Cualquier punto de acceso se lee por id, aunque solo esté en la lista por
+/// radio (los ids 0 y 2 no tienen fixture propia), y una escritura en uno se
+/// lee en ese y no en los demás.
+#[tokio::test]
+async fn cualquier_punto_de_acceso_se_lee_por_id() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    let leer = async |id: &str| {
+        c.call("cbGetWifiAccPt", &[("dpm_cfg_wifi_acc_pt_id", id)])
+            .await
+            .unwrap_or_else(|e| panic!("punto de acceso {id}: {e}"))
+    };
+    let mut antes = Vec::new();
+    for id in ["0", "1", "2"] {
+        let n = leer(id).await;
+        assert_eq!(valor(&n, "dpm_cfg_wifi_acc_pt_id").as_deref(), Some(id));
+        assert_eq!(
+            valor(&n, "dpm_cfg_wifi_acc_pt_0i").as_deref(),
+            Some("-1"),
+            "leído por id, como el router"
+        );
+        assert!(valor(&n, "authentication").is_some(), "{id}");
+        antes.push(valor(&n, "ssid").unwrap());
+    }
+    // Por índice también.
+    let n = c
+        .call("cbGetWifiAccPt", &[("dpm_cfg_wifi_acc_pt_0i", "2")])
+        .await
+        .unwrap();
+    assert_eq!(valor(&n, "ssid").as_deref(), Some(antes[2].as_str()));
+    // Un id que no existe sigue fallando.
+    assert!(
+        c.call("cbGetWifiAccPt", &[("dpm_cfg_wifi_acc_pt_id", "99")])
+            .await
+            .is_err()
+    );
+    c.write(
+        "wifi.asp",
+        "cbSetWifiAccPt",
+        &[("dpm_cfg_wifi_acc_pt_id", "2"), ("ssid", "RED-invitados")],
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        valor(&leer("2").await, "ssid").as_deref(),
+        Some("RED-invitados")
+    );
+    assert_eq!(valor(&leer("0").await, "ssid").unwrap(), antes[0]);
+    assert_eq!(valor(&leer("1").await, "ssid").unwrap(), antes[1]);
+}
+
+/// Cada ajuste del catálogo se lee en el sim con su lectura y sus
+/// parámetros, y la respuesta trae el elemento de cada campo (salvo en una
+/// lista vacía, como la de DNS dinámico de las fixtures).
+#[tokio::test]
+async fn cada_ajuste_del_catalogo_se_lee() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    let catalogo = ajustes::CatalogoAjustes::load().unwrap();
+    let mut fallos = Vec::new();
+    for a in catalogo.todos() {
+        let params: Vec<(&str, &str)> = a
+            .leer
+            .params
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_str()))
+            .collect();
+        let n = match c.call(&a.leer.funcion, &params).await {
+            Ok(n) => n,
+            Err(e) => {
+                fallos.push(format!("{}: {e}", a.id));
+                continue;
+            }
+        };
+        let vacia = a.lista && n.children.iter().all(|h| h.tag == "Result");
+        if vacia {
+            continue;
+        }
+        for campo in &a.campos {
+            let elementos =
+                std::iter::once(&campo.lee).chain(campo.ademas.iter().map(|ad| &ad.lee));
+            for lee in elementos {
+                if valor(&n, lee).is_none() {
+                    fallos.push(format!("{}.{}: falta {lee}", a.id, campo.id));
+                }
+            }
+        }
+    }
+    assert!(fallos.is_empty(), "{fallos:#?}");
+}
+
+/// El pool DHCP es una lista cuya fixture sin parámetros solo trae el índice
+/// (ninguna instancia): una escritura del pool 0 se ve en su lectura, sin
+/// tocar el resto del pool.
+#[tokio::test]
+async fn escritura_del_pool_dhcp_se_lee() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    let leer = || {
+        c.call(
+            "cbGetDhcpv4ServerPool",
+            &[("rtm_cfg_dhcpv4_svr_pool_0i", "0")],
+        )
+    };
+    let antes = leer().await.unwrap();
+    c.write(
+        "dhcp.asp",
+        "cbSetDhcpv4ServerPool",
+        &[
+            ("rtm_cfg_dhcpv4_svr_pool_id", "0"),
+            ("ipv4_addr_min", "192.0.2.10"),
+        ],
+    )
+    .await
+    .unwrap();
+    let despues = leer().await.unwrap();
+    assert_eq!(
+        valor(&despues, "ipv4_addr_min").as_deref(),
+        Some("192.0.2.10")
+    );
+    assert_eq!(
+        valor(&despues, "ipv4_addr_max"),
+        valor(&antes, "ipv4_addr_max")
+    );
+    assert_eq!(
+        valor(&despues, "rtm_cfg_dhcpv4_svr_pool_id").as_deref(),
+        Some("0")
+    );
+}

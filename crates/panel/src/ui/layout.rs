@@ -1,5 +1,5 @@
-//! Marco de las páginas con sesión: barra lateral (Estado, Historial,
-//! Biblioteca y Configuración del router; debajo, el selector de
+//! Marco de las páginas con sesión: barra lateral (Estado, Ajustes,
+//! Historial, Biblioteca y Configuración del router; debajo, el selector de
 //! idioma y la zona de sesión: el nombre de usuario, que abre «Ajustes del
 //! panel», y «Salir») que en pantallas estrechas pasa a ser una barra
 //! superior con el menú plegable.
@@ -63,6 +63,8 @@ fn icono(d: &'static str) -> impl IntoView {
 
 /// Pulso (Estado).
 const ICONO_ESTADO: &str = "M2 10h3.5l2-5 3.5 10 2-5H18";
+/// Reguladores (Ajustes).
+const ICONO_AJUSTES: &str = "M3 6h9M16 6h1M3 14h1M8 14h9M14 4v4M6 12v4";
 /// Rejilla de bloques (Biblioteca).
 const ICONO_BIBLIOTECA: &str =
     "M3 3h5.5v5.5H3zM11.5 3H17v5.5h-5.5zM3 11.5h5.5V17H3zM11.5 11.5H17V17h-5.5z";
@@ -142,6 +144,10 @@ pub fn Layout() -> impl IntoView {
                             {icono(ICONO_ESTADO)}
                             <span>{t!("comun-nav-estado")}</span>
                         </A>
+                        <EnlaceSeccion href=crate::ui::ajustes_router::RUTA_AJUSTES prefijo="/ajustes">
+                            {icono(ICONO_AJUSTES)}
+                            <span>{t!("comun-nav-ajustes")}</span>
+                        </EnlaceSeccion>
                         <EnlaceSeccion href="/historial" prefijo="/historial">
                             {icono(ICONO_HISTORIAL)}
                             <span>{t!("comun-nav-historial")}</span>

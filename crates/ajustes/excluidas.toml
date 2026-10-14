@@ -1,0 +1,204 @@
+# Funciones de escritura que ningún ajuste cubre, y por qué. Junto con los
+# campos de `ajustes/*.toml`, cubren todas las escrituras no bloqueadas del
+# catálogo de funciones (prueba `cobertura_de_escrituras`). Las acciones
+# (reinicio, guardado…) no entran: son de los prestablecidos (fase 4).
+
+# ---- Duplicados de la web básica: el ajuste usa la función de la avanzada.
+# Las de IPv6 de la web básica (`te_ipv6.cmd`) no son duplicados: van con
+# las de fuera de las familias, más abajo.
+
+[[excluida]]
+funcion = "te_wifi.wl"
+motivo = "duplicado de la web básica de wifi.red_24 y wifi.radio_24, salvo el filtro por MAC, que ningún ajuste ofrece (formato por validar con el router real; fase 3)"
+
+[[excluida]]
+funcion = "te_wifi_5ghz.wl"
+motivo = "duplicado de la web básica de wifi.red_5 y wifi.radio_5, salvo el filtro por MAC, que ningún ajuste ofrece (formato por validar con el router real; fase 3)"
+
+[[excluida]]
+funcion = "te_wifi_guest.wl"
+motivo = "duplicado de la web básica de wifi.invitados"
+
+[[excluida]]
+funcion = "te_ppp_pm.cmd?action=create"
+motivo = "duplicado de la web básica de puertos.reglas"
+
+[[excluida]]
+funcion = "te_ppp_pm.cmd?action=update"
+motivo = "duplicado de la web básica de puertos.reglas"
+
+[[excluida]]
+funcion = "te_ppp_pm.cmd?action=delete"
+motivo = "duplicado de la web básica de puertos.reglas"
+
+[[excluida]]
+funcion = "te_puertos.cmd?action=active"
+motivo = "duplicado de la web básica de puertos.reglas (formato antiguo)"
+
+[[excluida]]
+funcion = "te_puertos.cmd?action=delete"
+motivo = "duplicado de la web básica de puertos.reglas (formato antiguo)"
+
+[[excluida]]
+funcion = "te_upnp.cmd"
+motivo = "duplicado de la web básica de puertos.upnp"
+
+# ---- Las de CAMBIAN_IP_LAN del gestor: pueden cortar la conexión del panel.
+
+[[excluida]]
+funcion = "cbSetLanIPv4Addr"
+motivo = "cambia la IP del router: puede cortar la conexión del panel con el router"
+
+[[excluida]]
+funcion = "cbSetLanIPv4Intf"
+motivo = "activa o desactiva la interfaz de la red de casa: puede cortar la conexión del panel con el router"
+
+[[excluida]]
+funcion = "te_red_local.cgi"
+motivo = "cambia la IP del router: puede cortar la conexión del panel con el router"
+
+[[excluida]]
+funcion = "te_mapa_red_local.cgi"
+motivo = "cambia la IP del router: puede cortar la conexión del panel con el router"
+
+# ---- Configuración del operador.
+
+[[excluida]]
+funcion = "cbSetRoutingV4Rule"
+motivo = "configuración del operador (VLAN, IPTV, VoIP, rutas, QoS, multicast): cambiarla corta servicios; solo en la Biblioteca"
+
+[[excluida]]
+funcion = "cbSetRoutingV6Rule"
+motivo = "configuración del operador (VLAN, IPTV, VoIP, rutas, QoS, multicast): cambiarla corta servicios; solo en la Biblioteca"
+
+[[excluida]]
+funcion = "cbSetRipIntf"
+motivo = "configuración del operador (VLAN, IPTV, VoIP, rutas, QoS, multicast): cambiarla corta servicios; solo en la Biblioteca"
+
+[[excluida]]
+funcion = "cbSetTR98L2Bridge"
+motivo = "configuración del operador (VLAN, IPTV, VoIP, rutas, QoS, multicast): cambiarla corta servicios; solo en la Biblioteca"
+
+[[excluida]]
+funcion = "cbSetTR98L2Filtering"
+motivo = "configuración del operador (VLAN, IPTV, VoIP, rutas, QoS, multicast): cambiarla corta servicios; solo en la Biblioteca"
+
+[[excluida]]
+funcion = "cbSetTR98L2Marking"
+motivo = "configuración del operador (VLAN, IPTV, VoIP, rutas, QoS, multicast): cambiarla corta servicios; solo en la Biblioteca"
+
+[[excluida]]
+funcion = "cbSetClassification"
+motivo = "configuración del operador (VLAN, IPTV, VoIP, rutas, QoS, multicast): cambiarla corta servicios; solo en la Biblioteca"
+
+[[excluida]]
+funcion = "cbSetQueue"
+motivo = "configuración del operador (VLAN, IPTV, VoIP, rutas, QoS, multicast): cambiarla corta servicios; solo en la Biblioteca"
+
+[[excluida]]
+funcion = "cbSetMcastIgmpSetting"
+motivo = "configuración del operador (VLAN, IPTV, VoIP, rutas, QoS, multicast): cambiarla corta servicios; solo en la Biblioteca"
+
+[[excluida]]
+funcion = "cbSetMcastIntf"
+motivo = "configuración del operador (VLAN, IPTV, VoIP, rutas, QoS, multicast): cambiarla corta servicios; solo en la Biblioteca"
+
+# Las opciones DHCP del pool llevan las que necesitan los descodificadores
+# de televisión.
+[[excluida]]
+funcion = "cbDhcpV4SvrPoolSetOpt"
+motivo = "configuración del operador (VLAN, IPTV, VoIP, rutas, QoS, multicast): cambiarla corta servicios; solo en la Biblioteca"
+
+# ---- Conexión a internet.
+
+[[excluida]]
+funcion = "cbSetWanIPIntf"
+motivo = "conexión a internet: depende de la detectada; fase 3"
+
+[[excluida]]
+funcion = "te_mm.cmd?action=Apply"
+motivo = "conexión a internet: depende de la detectada; fase 3"
+
+[[excluida]]
+funcion = "te_mrl.cmd?action=wanApply"
+motivo = "conexión a internet: depende de la detectada; fase 3"
+
+[[excluida]]
+funcion = "cbSetNatIntf"
+motivo = "conexión a internet: depende de la detectada; fase 3"
+
+[[excluida]]
+funcion = "cbSetDnsRelayServer"
+motivo = "conexión a internet: depende de la detectada; fase 3"
+
+# ---- Cortafuegos.
+
+[[excluida]]
+funcion = "scbidirectionalflt.cmd?action=add"
+motivo = "cortafuegos de la web oculta: formato por validar con el router real; fase 3"
+
+[[excluida]]
+funcion = "scbidirectionalflt.cmd?action=modify"
+motivo = "cortafuegos de la web oculta: formato por validar con el router real; fase 3"
+
+[[excluida]]
+funcion = "scbidirectionalflt.cmd?action=remove"
+motivo = "cortafuegos de la web oculta: formato por validar con el router real; fase 3"
+
+[[excluida]]
+funcion = "scbidirectionalfwl.cmd?action=create"
+motivo = "cortafuegos IPv6 de la web básica: formato por validar con el router real; fase 3"
+
+[[excluida]]
+funcion = "scbidirectionalfwl.cmd?action=delete"
+motivo = "cortafuegos IPv6 de la web básica: formato por validar con el router real; fase 3"
+
+[[excluida]]
+funcion = "scbidirectionalfwl.cmd?action=save"
+motivo = "cortafuegos IPv6 de la web básica: formato por validar con el router real; fase 3"
+
+# ---- Fuera de las familias del plan (ver el informe de la Tarea 5).
+
+[[excluida]]
+funcion = "te_wifi.cmd?action=save"
+motivo = "filtro por MAC de la WiFi: solo en la web básica, formato por validar con el router real; fase 3"
+
+[[excluida]]
+funcion = "te_wifi_5ghz.cmd?action=save"
+motivo = "filtro por MAC de la WiFi: solo en la web básica, formato por validar con el router real; fase 3"
+
+[[excluida]]
+funcion = "te_mrl.cmd?action=setpc"
+motivo = "nombre e icono de un equipo en el mapa de la web básica: no cambia la red"
+
+[[excluida]]
+funcion = "cbAddUser"
+motivo = "usuarios de la web del router: crear uno fija una contraseña que el panel no puede comprobar ni deshacer; fase 3, con las contraseñas de otros usuarios"
+
+[[excluida]]
+funcion = "cbDeleteUser"
+motivo = "usuarios de la web del router: puede borrar el usuario con el que entra el panel y dejarlo fuera; fase 3, con las contraseñas de otros usuarios"
+
+[[excluida]]
+funcion = "cbSetWifiWds"
+motivo = "enlace WiFi con otro punto de acceso (WDS): hay que configurar los dos aparatos a la vez"
+
+[[excluida]]
+funcion = "cbSetNTPInfo"
+motivo = "restos sin terminar de la web del router: responde 404; la hora se cambia con sistema.hora"
+
+[[excluida]]
+funcion = "cbSetSystemTimeZone"
+motivo = "restos sin terminar de la web del router: responde 404"
+
+[[excluida]]
+funcion = "te_ipv6.cmd?action=lanapply"
+motivo = "prefijo IPv6 de la red de casa desde la web básica: ningún ajuste lo ofrece en esta fase (red_local.ipv6 solo activa IPv6 y los anuncios); formato por validar con el router real; fase 3"
+
+[[excluida]]
+funcion = "te_ipv6.cmd?action=dhcpapply"
+motivo = "modo y rango de DHCPv6 desde la web básica: ningún ajuste lo ofrece en esta fase (red_local.ipv6 solo activa IPv6 y los anuncios); formato por validar con el router real; fase 3"
+
+[[excluida]]
+funcion = "cbSetNatConfig"
+motivo = "ayudantes de protocolos (puertos.alg, de solo lectura): la escritura exige set_nf_conntrack = 1, que la lectura no devuelve, así que el gestor no podría deshacer el cambio; se revisará con el router real (fase 3)"

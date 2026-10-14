@@ -40,7 +40,15 @@ locales!(
     "biblioteca",
     "instalar",
     "panel",
-    "router"
+    "router",
+    "ajustes",
+    "ajustes-internet",
+    "ajustes-wifi",
+    "ajustes-red_local",
+    "ajustes-puertos",
+    "ajustes-seguridad",
+    "ajustes-telefono",
+    "ajustes-sistema"
 );
 
 /// Idioma de la interfaz.
@@ -166,6 +174,15 @@ pub fn tr(idioma: Idioma, clave: &str, args: Option<&FluentArgs>) -> String {
         return t;
     }
     clave.to_owned()
+}
+
+/// `true` si `clave` tiene texto en `idioma` (sin recurrir al español). Lo
+/// usan las pruebas del catálogo de ajustes, cuyas claves se construyen a
+/// partir de los ids.
+pub fn existe(idioma: Idioma, clave: &str) -> bool {
+    bundle(idioma)
+        .get_message(clave)
+        .is_some_and(|m| m.value().is_some())
 }
 
 fn formatear(idioma: Idioma, clave: &str, args: Option<&FluentArgs>) -> Option<String> {

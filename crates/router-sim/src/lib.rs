@@ -2,7 +2,8 @@
 //!
 //! Sirve las fixtures saneadas con el mismo protocolo que el router real
 //! (login básico y avanzado, cookies, `sessionKey` en las páginas `.asp`) y
-//! mantiene un estado mínimo en memoria para las escrituras más habituales.
+//! refleja en memoria cualquier escritura avanzada en su lectura pareada del
+//! catálogo (`catalogo`), con listas (crear, editar y borrar) y `cbModifyPwd`.
 
 pub mod sanitize;
 
@@ -15,6 +16,7 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{get, post},
 };
+use catalogo::{Catalogo, Lista};
 use hgu::{fmt::mess_userpass, xml::XmlNode};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
@@ -94,12 +96,12 @@ impl Sim {
         if let Some(capa) = &cfg.capa {
             fixtures.extend(cargar(capa));
         }
-        let leases = initial_leases(&fixtures);
         let wan = wan_de_las_fixtures(&fixtures);
         let inner = Arc::new(Inner {
             user: cfg.user,
             password: Mutex::new(cfg.password),
             fixtures,
+            catalogo: Catalogo::load().expect("el catálogo de funciones carga"),
             wan,
             unresponsive: AtomicBool::new(false),
             state: Mutex::new(SimState {
@@ -107,7 +109,6 @@ impl Sim {
                     .duration_since(UNIX_EPOCH)
                     .map_or(0, |d| d.subsec_nanos()),
                 wan_up: true,
-                leases,
                 ..SimState::default()
             }),
         });
@@ -275,6 +276,27 @@ impl SimControl {
             .unwrap_or_else(|e| e.into_inner()) = password.to_owned();
     }
 
+    /// El próximo `cbModifyPwd` responde OK sin cambiar nada (el router lo
+    /// acepta pero la contraseña sigue siendo la anterior).
+    pub fn modify_pwd_sin_efecto(&self) {
+        self.inner.state().modify_pwd_sin_efecto = true;
+    }
+
+    /// El inicio de sesión (básico y avanzado) con `password` falla aunque
+    /// sea la vigente: simula un formato que el router no acepta al entrar.
+    pub fn login_falla_con(&self, password: &str) {
+        self.inner.state().login_falla_con = Some(password.to_owned());
+    }
+
+    /// Valor actual de `campo` en la lectura `lectura` (sin parámetros), con
+    /// lo escrito hasta ahora: el primer nodo que lo tiene. Para las pruebas
+    /// que buscan secretos en el HTML.
+    pub fn fixture_valor(&self, lectura: &str, campo: &str) -> Option<String> {
+        let st = self.inner.state();
+        let nodo = read_node(&self.inner, &st, lectura, &[]).ok()?;
+        valor_de(&nodo, campo)
+    }
+
     /// Cambia la versión de firmware (`SWVersion`) que da `cbGetSummary`.
     pub fn set_firmware(&self, firmware: &str) {
         self.inner.state().firmware = Some(firmware.to_owned());
@@ -287,6 +309,13 @@ impl SimControl {
     pub fn writes(&self) -> Vec<(String, Vec<(String, String)>)> {
         self.inner.state().writes.clone()
     }
+
+    /// Lecturas avanzadas (`cb*.xml`) recibidas con sesión válida, con sus
+    /// parámetros, en orden; también las que fallan con
+    /// [`SimControl::fail_reads`].
+    pub fn reads(&self) -> Vec<(String, Vec<(String, String)>)> {
+        self.inner.state().reads.clone()
+    }
 }
 
 type Params = Vec<(String, String)>;
@@ -297,6 +326,8 @@ struct Inner {
     /// Contraseña aceptada (cambiable con [`SimControl::set_password`]).
     password: Mutex<String>,
     fixtures: HashMap<FixtureKey, String>,
+    /// Catálogo de funciones (lecturas pareadas y listas).
+    catalogo: Catalogo,
     /// Conexión a internet de las fixtures (ver [`wan_de_las_fixtures`]).
     wan: Option<String>,
     unresponsive: AtomicBool,
@@ -316,12 +347,22 @@ impl Inner {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-struct Lease {
-    id: u32,
-    adm_state: String,
-    mac_addr: String,
-    ipv4_addr: String,
+/// Lo escrito en una instancia de una lectura que no es una lista: campos
+/// que sustituyen a los de la respuesta de la fixture.
+struct Edicion {
+    /// Función de lectura pareada.
+    lectura: String,
+    /// `(hijo, valor)` que identifican la instancia (vacío: la única).
+    ident: Params,
+    campos: BTreeMap<String, String>,
+}
+
+/// Lista materializada de una lectura (la primera escritura la crea a partir
+/// de las fixtures).
+struct ListaViva {
+    /// Primera instancia de las fixtures: molde de las nuevas.
+    plantilla: XmlNode,
+    nodos: Vec<XmlNode>,
 }
 
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
@@ -364,10 +405,16 @@ struct SimState {
     /// Bytes sumados a cada interfaz de `cbGetStatistic`: nombre → (rx, tx).
     counters_extra: HashMap<String, (u64, u64)>,
     writes: Vec<(String, Params)>,
-    leases: Vec<Lease>,
-    upnp_adm_state: Option<String>,
-    /// Campos escritos por punto de acceso (`dpm_cfg_wifi_acc_pt_id`).
-    wifi: BTreeMap<String, BTreeMap<String, String>>,
+    /// Lecturas avanzadas recibidas con sesión válida (`reads`).
+    reads: Vec<(String, Params)>,
+    /// Escrituras por instancia de lecturas que no son listas.
+    ediciones: Vec<Edicion>,
+    /// Listas materializadas por función de lectura.
+    listas: HashMap<String, ListaViva>,
+    /// `modify_pwd_sin_efecto`.
+    modify_pwd_sin_efecto: bool,
+    /// `login_falla_con`.
+    login_falla_con: Option<String>,
     /// Último `cbReboot`: `SysUptime` cuenta desde aquí.
     rebooted: Option<Instant>,
     /// `SWVersion` de `cbGetSummary` (`set_firmware`).
@@ -435,33 +482,6 @@ fn wan_de_las_fixtures(fixtures: &HashMap<FixtureKey, String>) -> Option<String>
     let ruta = leer("cbGetRoutingV4Rule", &[("all", "ALL"), ("desc", "Default")])
         .and_then(|n| hgu::read::regla_por_defecto(&n));
     hgu::deteccion::elegir_wan(&conns, ruta.as_deref()).map(|w| w.name.clone())
-}
-
-fn initial_leases(fixtures: &HashMap<FixtureKey, String>) -> Vec<Lease> {
-    let key = fixture_key(
-        "cbDhcpV4SvrPoolGetStatic",
-        &[
-            ("rtm_cfg_dhcpv4_svr_pool_id".into(), "0".into()),
-            ("all".into(), "ALL".into()),
-        ],
-    );
-    let Some(node) = fixtures
-        .get(&key)
-        .and_then(|raw| hgu::xml::parse_response("cbDhcpV4SvrPoolGetStatic", raw).ok())
-    else {
-        return Vec::new();
-    };
-    node.all("rtm_dhcpv4_svr_pool_static")
-        .into_iter()
-        .filter_map(|e| {
-            Some(Lease {
-                id: e.text_of("rtm_dhcpv4_svr_pool_static_id")?.parse().ok()?,
-                adm_state: e.text_of("adm_state")?.to_owned(),
-                mac_addr: e.text_of("mac_addr")?.to_owned(),
-                ipv4_addr: e.text_of("ipv4_addr")?.to_owned(),
-            })
-        })
-        .collect()
 }
 
 // ---------------------------------------------------------------- XML
@@ -613,8 +633,10 @@ async fn root(State(s): State<Arc<Inner>>) -> Response {
 
 async fn basic_login(State(s): State<Arc<Inner>>, headers: HeaderMap, body: Bytes) -> Response {
     let f = form(&body);
+    let rechazada = s.state().login_falla_con.clone();
     let good = param(&f, "loginUsername") == Some(mess_userpass(&s.user).as_str())
-        && param(&f, "loginPassword") == Some(mess_userpass(&s.password()).as_str());
+        && param(&f, "loginPassword") == Some(mess_userpass(&s.password()).as_str())
+        && rechazada.is_none_or(|r| param(&f, "loginPassword") != Some(mess_userpass(&r).as_str()));
     if !good {
         return "<script>location.href = \"/te_acceso_router.asp\"</script>".into_response();
     }
@@ -752,13 +774,16 @@ fn cgi_sync(s: &Inner, name: &str, headers: &HeaderMap, body: &Bytes) -> (Respon
     if !valid {
         return (LOGGED_OUT.into_response(), false);
     }
+    if is_read(name) {
+        st.reads.push((name.to_owned(), params.clone()));
+    }
     if is_read(name) && st.failing_reads.contains(name) {
         (xml(failure(name, "lectura fallida (simulado)")), false)
     } else if is_read(name) {
         (xml(read(s, &st, name, &params)), false)
     } else {
         let real = param(&params, "validation_only") != Some("1");
-        let body = write(&mut st, name, &params);
+        let body = write(s, &mut st, name, &params);
         if st.hang_after_write == HangAfterWrite::Now {
             st.hang_after_write = HangAfterWrite::Off;
             s.unresponsive.store(true, Ordering::SeqCst);
@@ -778,7 +803,11 @@ fn advanced_login(
         return LOGGED_OUT.into();
     }
     let good = param(params, "rqUsername") == Some(mess_userpass(&s.user).as_str())
-        && param(params, "rqPasswd") == Some(mess_userpass(&s.password()).as_str());
+        && param(params, "rqPasswd") == Some(mess_userpass(&s.password()).as_str())
+        && st
+            .login_falla_con
+            .as_deref()
+            .is_none_or(|r| param(params, "rqPasswd") != Some(mess_userpass(r).as_str()));
     if !good {
         return failure("cbCheckLogin", "login");
     }
@@ -799,28 +828,207 @@ fn is_read(name: &str) -> bool {
 // ---------------------------------------------------------------- lecturas
 
 fn read(s: &Inner, st: &SimState, name: &str, params: &[(String, String)]) -> String {
-    if name == "cbDhcpV4SvrPoolGetStatic"
-        && param(params, "rtm_cfg_dhcpv4_svr_pool_id") == Some("0")
+    match read_node(s, st, name, params) {
+        Ok(node) => response(&node),
+        Err(e) => failure(name, &e),
+    }
+}
+
+/// La respuesta de la lectura `name` como nodo, con lo escrito aplicado.
+fn read_node(
+    s: &Inner,
+    st: &SimState,
+    name: &str,
+    params: &[(String, String)],
+) -> Result<XmlNode, String> {
+    if let Some(viva) = st.listas.get(name)
+        && let Some(r) = read_lista(viva, name, params)
     {
-        return read_leases(st, params);
+        return r;
     }
     let raw = s
         .fixtures
         .get(&fixture_key(name, params))
         .or_else(|| s.fixtures.get(&(name.to_owned(), Vec::new())));
-    let mut node = match raw {
-        Some(raw) => match hgu::xml::parse_response(name, raw) {
-            Ok(n) => n,
-            Err(e) => return failure(name, &format!("fixture no válida: {e}")),
-        },
-        None if params.is_empty() => match all_instances(s, name) {
-            Some(n) => n,
-            None => return failure(name, "no fixture"),
-        },
-        None => return failure(name, "no fixture"),
+    // Una lista que se puede escribir y todavía no se ha tocado atiende
+    // también las lecturas de una instancia que solo existe en `all=ALL`.
+    if raw.is_none()
+        && es_lectura_de_lista(s, name)
+        && let Some(r) = construir_lista(s, name)
+            .ok()
+            .and_then(|viva| read_lista(&viva, name, params))
+    {
+        return r;
+    }
+    let mut node = if let Some(raw) = raw {
+        hgu::xml::parse_response(name, raw).map_err(|e| format!("fixture no válida: {e}"))?
+    } else if let Some(n) = instancia_de_la_lista(s, name, params) {
+        n
+    } else if params.is_empty() {
+        all_instances(s, name).ok_or_else(|| "no fixture".to_owned())?
+    } else {
+        return Err("no fixture".to_owned());
     };
+    aplicar_ediciones(st, name, &mut node);
     patch(s, st, name, &mut node);
-    response(&node)
+    Ok(node)
+}
+
+/// Valor de `campo` en el primer nodo (en preorden) que lo tiene.
+fn valor_de(n: &XmlNode, campo: &str) -> Option<String> {
+    n.text_of(campo)
+        .map(str::to_owned)
+        .or_else(|| n.children.iter().find_map(|c| valor_de(c, campo)))
+}
+
+/// Lecturas que comparten instancias con la lectura pareada de una
+/// escritura: la lista por radio de puntos de acceso WiFi muestra los mismos
+/// puntos que `cbGetWifiAccPt`.
+fn lecturas_hermanas(name: &str) -> &'static [&'static str] {
+    match name {
+        "cbListWifiAccPt" => &["cbGetWifiAccPt"],
+        _ => &[],
+    }
+}
+
+/// Lista que contiene las mismas instancias que una lectura de una sola:
+/// `cbGetWifiAccPt` (un punto de acceso) sale de `cbListWifiAccPt` (los de
+/// una radio) cuando no hay fixture para ese punto de acceso.
+fn lista_de_instancias(name: &str) -> Option<&'static str> {
+    match name {
+        "cbGetWifiAccPt" => Some("cbListWifiAccPt"),
+        _ => None,
+    }
+}
+
+/// Lectura de una instancia de `name` construida desde las fixtures de su
+/// lista ([`lista_de_instancias`]): la instancia cuyos hijos casan con los
+/// parámetros (`X_0i=v` elige la de `X_id=v`). Leída por `*_id`, devuelve
+/// `*_0i = -1`, como el router. Las ediciones se aplican después, como a
+/// cualquier lectura. `None` si no hay lista o ninguna instancia casa.
+fn instancia_de_la_lista(s: &Inner, name: &str, params: &[(String, String)]) -> Option<XmlNode> {
+    let lista = lista_de_instancias(name)?;
+    let filtros: Vec<(String, &str, bool)> = params
+        .iter()
+        .filter(|(k, _)| k != "sessionKey")
+        .map(|(k, v)| match k.strip_suffix("_0i") {
+            Some(base) => (format!("{base}_id"), v.as_str(), true),
+            None => (k.clone(), v.as_str(), false),
+        })
+        .collect();
+    if filtros.is_empty() {
+        return None;
+    }
+    let mut claves: Vec<&FixtureKey> = s.fixtures.keys().filter(|(n, _)| n == lista).collect();
+    claves.sort();
+    let mut nodo = claves.into_iter().find_map(|k| {
+        let n = hgu::xml::parse_response(lista, &s.fixtures[k]).ok()?;
+        n.children
+            .into_iter()
+            .find(|c| filtros.iter().all(|(k, v, _)| c.text_of(k) == Some(*v)))
+    })?;
+    for (hijo, _, indice) in &filtros {
+        if let (false, Some(base)) = (indice, hijo.strip_suffix("_id")) {
+            set_child(&mut nodo, &format!("{base}_0i"), "-1");
+        }
+    }
+    Some(result_node(name, vec![nodo], "0", ""))
+}
+
+/// Aplica sobre la respuesta lo escrito en sus instancias: solo cambia hijos
+/// que ya existen. Una edición con instancia busca esos nodos a cualquier
+/// profundidad.
+fn aplicar_ediciones(st: &SimState, name: &str, node: &mut XmlNode) {
+    let hermanas = lecturas_hermanas(name);
+    for e in &st.ediciones {
+        if e.lectura == name || hermanas.contains(&e.lectura.as_str()) {
+            if e.ident.is_empty() {
+                // Sin instancia: solo la respuesta y sus hijos directos
+                // (el contenedor de los campos), no nodos más profundos.
+                aplicar_campos(node, &[], &e.campos);
+                for c in &mut node.children {
+                    aplicar_campos(c, &[], &e.campos);
+                }
+            } else {
+                for_each_node(node, &mut |n| aplicar_campos(n, &e.ident, &e.campos));
+            }
+        }
+    }
+}
+
+/// Escribe `campos` en `n` si es la instancia que `ident` identifica.
+fn aplicar_campos(n: &mut XmlNode, ident: &[(String, String)], campos: &BTreeMap<String, String>) {
+    if ident.iter().all(|(k, v)| n.text_of(k) == Some(v.as_str())) {
+        for (k, v) in campos {
+            set_child(n, k, v);
+        }
+    }
+}
+
+/// `true` si alguna escritura del catálogo con lista tiene `name` por lectura
+/// pareada.
+fn es_lectura_de_lista(s: &Inner, name: &str) -> bool {
+    s.catalogo.todas().iter().any(|f| {
+        f.lista.is_some()
+            && f.lectura_pareada
+                .as_ref()
+                .is_some_and(|l| l.funcion == name)
+    })
+}
+
+/// Lectura servida desde la lista materializada de `name`, si la hay y la
+/// lectura pide todas (`all=ALL`, o sin parámetros) o filtra por un campo de
+/// la instancia; `None` si no aplica.
+///
+/// Un parámetro `X_0i=v` elige la instancia cuyo `X_id` vale `v` (así lo usan
+/// las lecturas pareadas: `X_0i={X_id}`). Una lectura por `*_id` devuelve
+/// `*_0i = -1`, como el router real; con `all=ALL` o por `*_0i`, el de la
+/// instancia.
+fn read_lista(
+    lista: &ListaViva,
+    name: &str,
+    params: &[(String, String)],
+) -> Option<Result<XmlNode, String>> {
+    // (hijo que se compara, valor, el parámetro era un índice)
+    let mut filtros: Vec<(String, &str, bool)> = Vec::new();
+    for (k, v) in params
+        .iter()
+        .filter(|(k, _)| k != "all" && k != "sessionKey")
+    {
+        let por_id = k
+            .strip_suffix("_0i")
+            .map(|b| format!("{b}_id"))
+            .filter(|id| lista.plantilla.get(id).is_some());
+        if let Some(id) = por_id {
+            filtros.push((id, v, true));
+        } else if lista.plantilla.get(k).is_some() {
+            filtros.push((k.clone(), v, false));
+        }
+    }
+    let todas = param(params, "all") == Some("ALL");
+    let sin_parametros = params.iter().all(|(k, _)| k == "sessionKey");
+    if !(todas || sin_parametros || !filtros.is_empty()) {
+        return None;
+    }
+    let mut nodos: Vec<XmlNode> = lista
+        .nodos
+        .iter()
+        .filter(|n| filtros.iter().all(|(k, v, _)| n.text_of(k) == Some(*v)))
+        .cloned()
+        .collect();
+    if !filtros.is_empty() && nodos.is_empty() {
+        return Some(Err("no existe".to_owned()));
+    }
+    if !todas {
+        for (hijo, _, indice) in &filtros {
+            if let (false, Some(base)) = (indice, hijo.strip_suffix("_id")) {
+                for n in &mut nodos {
+                    set_child(n, &format!("{base}_0i"), "-1");
+                }
+            }
+        }
+    }
+    Some(Ok(result_node(name, nodos, "0", "")))
 }
 
 /// Lista leída sin elegir instancia y sin `<name>.xml`: el router devuelve
@@ -850,56 +1058,9 @@ fn all_instances(s: &Inner, name: &str) -> Option<XmlNode> {
     Some(result_node(name, children, "0", ""))
 }
 
-fn read_leases(st: &SimState, params: &[(String, String)]) -> String {
-    const NAME: &str = "cbDhcpV4SvrPoolGetStatic";
-    let wanted = param(params, "rtm_dhcpv4_svr_pool_static_id");
-    if param(params, "all") != Some("ALL") && wanted.is_none() {
-        return failure(NAME, "faltan parámetros");
-    }
-    let entries: Vec<XmlNode> = st
-        .leases
-        .iter()
-        .enumerate()
-        .filter(|(_, l)| wanted.is_none_or(|w| w == l.id.to_string()))
-        .map(|(i, l)| XmlNode {
-            tag: "rtm_dhcpv4_svr_pool_static".into(),
-            text: String::new(),
-            children: vec![
-                leaf("rtm_dhcpv4_svr_pool_static_0i", &i.to_string()),
-                leaf("rtm_dhcpv4_svr_pool_static_id", &l.id.to_string()),
-                leaf("adm_state", &l.adm_state),
-                leaf("mac_addr", &l.mac_addr),
-                leaf("ipv4_addr", &l.ipv4_addr),
-            ],
-        })
-        .collect();
-    if wanted.is_some() && entries.is_empty() {
-        return failure(NAME, "no existe");
-    }
-    response(&result_node(NAME, entries, "0", ""))
-}
-
 /// Refleja el estado en memoria sobre la respuesta de la fixture.
 fn patch(s: &Inner, st: &SimState, name: &str, node: &mut XmlNode) {
     match name {
-        "cbGetUpnpCfg" => {
-            if let Some(v) = &st.upnp_adm_state {
-                for_each_node(node, &mut |n| {
-                    if n.tag == "upnp_cfg" {
-                        set_child(n, "adm_state", v);
-                    }
-                });
-            }
-        }
-        "cbGetWifiAccPt" | "cbListWifiAccPt" => for_each_node(node, &mut |n| {
-            let fields = n
-                .text_of("dpm_cfg_wifi_acc_pt_id")
-                .and_then(|id| st.wifi.get(id))
-                .cloned();
-            for (k, v) in fields.iter().flatten() {
-                set_child(n, k, v);
-            }
-        }),
         "cbGetSummary" => {
             if let Some(t) = st.rebooted {
                 set_child(node, "SysUptime", &t.elapsed().as_secs().to_string());
@@ -931,7 +1092,7 @@ fn patch(s: &Inner, st: &SimState, name: &str, node: &mut XmlNode) {
 
 // ---------------------------------------------------------------- escrituras
 
-fn write(st: &mut SimState, name: &str, params: &[(String, String)]) -> String {
+fn write(s: &Inner, st: &mut SimState, name: &str, params: &[(String, String)]) -> String {
     let key_ok = st
         .session_key
         .as_deref()
@@ -977,9 +1138,7 @@ fn write(st: &mut SimState, name: &str, params: &[(String, String)]) -> String {
         return ok(name);
     }
     let result = match name {
-        "cbDhcpV4SvrPoolSetStatic" => set_static_lease(st, &clean),
-        "cbSetUpnpCfg" => set_upnp(st, &clean),
-        "cbSetWifiAccPt" => set_wifi_acc_pt(st, &clean),
+        "cbModifyPwd" => modify_pwd(s, st, &clean),
         "cbReboot" => {
             st.invalidate_sessions();
             st.rebooted = Some(Instant::now());
@@ -990,77 +1149,219 @@ fn write(st: &mut SimState, name: &str, params: &[(String, String)]) -> String {
                 "",
             ));
         }
-        _ => Ok(()),
+        _ => escritura_generica(s, st, name, &clean),
     };
     match result {
         Ok(()) => ok(name),
-        Err(e) => failure(name, e),
+        Err(e) => failure(name, &e),
     }
 }
 
-fn set_static_lease(st: &mut SimState, p: &[(String, String)]) -> Result<(), &'static str> {
+/// Cambia la contraseña del usuario del sim (`rqUser`, `rqOPwd`, `rqNPwd`).
+/// Las sesiones abiertas siguen valiendo, como en el router.
+fn modify_pwd(s: &Inner, st: &mut SimState, p: &[(String, String)]) -> Result<(), String> {
+    let nueva = param(p, "rqNPwd").ok_or("falta rqNPwd")?;
+    let actual = s.password();
+    if param(p, "rqUser") != Some(s.user.as_str()) || param(p, "rqOPwd") != Some(actual.as_str()) {
+        return Err("usuario o contraseña actual incorrectos".to_owned());
+    }
+    if !std::mem::take(&mut st.modify_pwd_sin_efecto) {
+        *s.password.lock().unwrap_or_else(|e| e.into_inner()) = nueva.to_owned();
+    }
+    Ok(())
+}
+
+/// Refleja una escritura avanzada en su lectura pareada del catálogo. Una
+/// función sin lectura pareada no cambia nada.
+fn escritura_generica(
+    s: &Inner,
+    st: &mut SimState,
+    name: &str,
+    p: &[(String, String)],
+) -> Result<(), String> {
+    let Some(f) = s.catalogo.funcion(name) else {
+        return Ok(());
+    };
+    let Some(pareada) = &f.lectura_pareada else {
+        return Ok(());
+    };
+    let lectura = pareada.funcion.as_str();
+    if let Some(lista) = &f.lista {
+        if name == "cbDhcpV4SvrPoolSetStatic" {
+            let p = validar_reserva(s, st, lectura, p)?;
+            return escribir_lista(s, st, lectura, lista, &p);
+        }
+        return escribir_lista(s, st, lectura, lista, p);
+    }
+    // La instancia: los `{x}` de la lectura pareada, con el valor escrito.
+    let mut ident = Params::new();
+    for (_, v) in &pareada.params {
+        if let Some(x) = v.strip_prefix('{').and_then(|v| v.strip_suffix('}')) {
+            let valor = param(p, x).ok_or_else(|| format!("falta {x}"))?;
+            ident.push((x.to_owned(), valor.to_owned()));
+        }
+    }
+    let campos = campos_escritos(p, &[]);
+    match st
+        .ediciones
+        .iter_mut()
+        .find(|e| e.lectura == lectura && e.ident == ident)
+    {
+        Some(e) => e.campos.extend(campos),
+        None => st.ediciones.push(Edicion {
+            lectura: lectura.to_owned(),
+            ident,
+            campos,
+        }),
+    }
+    Ok(())
+}
+
+/// Reglas de una reserva DHCP que el router aplica y el catálogo no recoge:
+/// un solo pool (el 0), id obligatorio (`-1` crea; otro que no existe, no),
+/// MAC e IP al crear. Devuelve los parámetros con `adm_state` activado si se
+/// crea sin él.
+fn validar_reserva(
+    s: &Inner,
+    st: &mut SimState,
+    lectura: &str,
+    p: &[(String, String)],
+) -> Result<Params, String> {
     if param(p, "rtm_cfg_dhcpv4_svr_pool_id") != Some("0") {
-        return Err("pool desconocido");
+        return Err("pool desconocido".to_owned());
     }
     let id = param(p, "rtm_dhcpv4_svr_pool_static_id").ok_or("falta el id")?;
-    if param(p, "del") == Some("DEL") {
-        let before = st.leases.len();
-        st.leases.retain(|l| l.id.to_string() != id);
-        return if st.leases.len() < before {
-            Ok(())
-        } else {
-            Err("no existe")
-        };
+    let mut p = p.to_vec();
+    if param(&p, "del") == Some("DEL") {
+        return Ok(p);
     }
     if id == "-1" {
-        let lease = Lease {
-            id: st.leases.iter().map(|l| l.id + 1).max().unwrap_or(0),
-            adm_state: param(p, "adm_state").unwrap_or("1").to_owned(),
-            mac_addr: param(p, "mac_addr").ok_or("falta mac_addr")?.to_owned(),
-            ipv4_addr: param(p, "ipv4_addr").ok_or("falta ipv4_addr")?.to_owned(),
-        };
-        if std::mem::take(&mut st.create_twice) {
-            let mut otra = lease.clone();
-            otra.id += 1;
-            st.leases.push(lease);
-            st.leases.push(otra);
-        } else {
-            st.leases.push(lease);
+        for campo in ["mac_addr", "ipv4_addr"] {
+            param(&p, campo).ok_or_else(|| format!("falta {campo}"))?;
         }
-        return Ok(());
+        if param(&p, "adm_state").is_none() {
+            p.push(("adm_state".to_owned(), "1".to_owned()));
+        }
+    } else {
+        materializar_lista(s, st, lectura)?;
+        let existe = st.listas[lectura]
+            .nodos
+            .iter()
+            .any(|n| n.text_of("rtm_dhcpv4_svr_pool_static_id") == Some(id));
+        if !existe {
+            return Err("no existe".to_owned());
+        }
     }
-    let lease = st
-        .leases
-        .iter_mut()
-        .find(|l| l.id.to_string() == id)
-        .ok_or("no existe")?;
-    if let Some(v) = param(p, "adm_state") {
-        lease.adm_state = v.to_owned();
+    Ok(p)
+}
+
+/// Parámetros que llevan valor a la instancia (todos menos los de control y
+/// los que ella excluye).
+fn campos_escritos(p: &[(String, String)], excluir: &[&str]) -> BTreeMap<String, String> {
+    p.iter()
+        .filter(|(k, _)| k != "validation_only" && !excluir.contains(&k.as_str()))
+        .cloned()
+        .collect()
+}
+
+/// Crea, edita o borra una instancia de la lista de la lectura `lectura`.
+fn escribir_lista(
+    s: &Inner,
+    st: &mut SimState,
+    lectura: &str,
+    lista: &Lista,
+    p: &[(String, String)],
+) -> Result<(), String> {
+    materializar_lista(s, st, lectura)?;
+    let create_twice = st.create_twice;
+    let viva = st.listas.get_mut(lectura).ok_or("lista sin materializar")?;
+    let id_param = lista.id_param.as_str();
+    let pos = param(p, id_param).and_then(|id| {
+        viva.nodos
+            .iter()
+            .position(|n| n.text_of(id_param) == Some(id))
+    });
+    if param(p, "del") == Some("DEL") {
+        if !lista.del {
+            return Err("esta lista no admite borrar".to_owned());
+        }
+        viva.nodos.remove(pos.ok_or("no existe")?);
+    } else {
+        let campos = campos_escritos(p, &[id_param, "del"]);
+        match pos {
+            Some(i) => aplicar_campos(&mut viva.nodos[i], &[], &campos),
+            None => {
+                let id = viva
+                    .nodos
+                    .iter()
+                    .filter_map(|n| n.text_of(id_param)?.parse::<u64>().ok())
+                    .max()
+                    .map_or(0, |m| m + 1);
+                let mut nuevo = viva.plantilla.clone();
+                aplicar_campos(&mut nuevo, &[], &campos);
+                let con_id = |mut n: XmlNode, id: u64| {
+                    set_child(&mut n, id_param, &id.to_string());
+                    // El índice de una instancia nueva es su id; el de las
+                    // existentes no se toca (aunque se borren otras).
+                    if let Some(base) = id_param.strip_suffix("_id") {
+                        set_child(&mut n, &format!("{base}_0i"), &id.to_string());
+                    }
+                    n
+                };
+                if create_twice {
+                    viva.nodos.push(con_id(nuevo.clone(), id));
+                    viva.nodos.push(con_id(nuevo, id + 1));
+                } else {
+                    viva.nodos.push(con_id(nuevo, id));
+                }
+            }
+        }
     }
-    if let Some(v) = param(p, "mac_addr") {
-        lease.mac_addr = v.to_owned();
-    }
-    if let Some(v) = param(p, "ipv4_addr") {
-        lease.ipv4_addr = v.to_owned();
+    if pos.is_none() && param(p, "del") != Some("DEL") {
+        st.create_twice = false;
     }
     Ok(())
 }
 
-fn set_upnp(st: &mut SimState, p: &[(String, String)]) -> Result<(), &'static str> {
-    let v = param(p, "adm_state").ok_or("falta adm_state")?;
-    st.upnp_adm_state = Some(v.to_owned());
+/// Crea la lista viva de `lectura` (si no existe) a partir de la fixture `all=ALL` (o, sin
+/// ella, la de sin parámetros o la suma de las fixtures por instancia).
+fn materializar_lista(s: &Inner, st: &mut SimState, lectura: &str) -> Result<(), String> {
+    if !st.listas.contains_key(lectura) {
+        let viva = construir_lista(s, lectura)?;
+        st.listas.insert(lectura.to_owned(), viva);
+    }
     Ok(())
 }
 
-fn set_wifi_acc_pt(st: &mut SimState, p: &[(String, String)]) -> Result<(), &'static str> {
-    let id = param(p, "dpm_cfg_wifi_acc_pt_id").ok_or("falta dpm_cfg_wifi_acc_pt_id")?;
-    let fields = st.wifi.entry(id.to_owned()).or_default();
-    for (k, v) in p {
-        if k != "dpm_cfg_wifi_acc_pt_id" && k != "validation_only" {
-            fields.insert(k.clone(), v.clone());
-        }
+/// La lista de `lectura` tal como la dan las fixtures.
+fn construir_lista(s: &Inner, lectura: &str) -> Result<ListaViva, String> {
+    let todas = s
+        .fixtures
+        .iter()
+        .filter(|((n, p), _)| n == lectura && param(p, "all") == Some("ALL"))
+        .min_by_key(|((_, p), _)| p.clone())
+        .map(|(_, raw)| raw)
+        .or_else(|| s.fixtures.get(&(lectura.to_owned(), Vec::new())));
+    // Una respuesta sin ninguna instancia (la del pool DHCP sin parámetros
+    // solo trae el índice) no sirve de lista: se juntan las de las fixtures
+    // por instancia.
+    let node = match todas {
+        Some(raw) => Some(hgu::xml::parse_response(lectura, raw).map_err(|e| e.to_string())?),
+        None => None,
     }
-    Ok(())
+    .filter(|n| n.children.iter().any(|c| !c.children.is_empty()))
+    .or_else(|| all_instances(s, lectura))
+    .ok_or("la lista no tiene fixture")?;
+    let nodos: Vec<XmlNode> = node
+        .children
+        .into_iter()
+        .filter(|c| c.tag != "Result" && c.tag != "ErrorString")
+        .collect();
+    let plantilla = nodos
+        .first()
+        .cloned()
+        .ok_or("la lista no tiene ninguna instancia de molde")?;
+    Ok(ListaViva { plantilla, nodos })
 }
 
 #[cfg(test)]
@@ -1079,5 +1380,59 @@ mod tests {
                 ("p".to_owned(), "%zz".to_owned())
             ]
         );
+    }
+
+    fn inner_de_prueba() -> Inner {
+        let lista = "<?xml version=\"1.0\" ?><Response><cbGetX><x><x_0i>0</x_0i><x_id>0</x_id>\
+                     <v>a</v></x><Result>0</Result></cbGetX></Response>";
+        Inner {
+            user: "u".into(),
+            password: Mutex::new("p".into()),
+            fixtures: HashMap::from([(
+                fixture_key("cbGetX", &[("all".into(), "ALL".into())]),
+                lista.to_owned(),
+            )]),
+            catalogo: Catalogo::load().unwrap(),
+            wan: None,
+            unresponsive: AtomicBool::new(false),
+            state: Mutex::new(SimState::default()),
+        }
+    }
+
+    fn p(kv: &[(&str, &str)]) -> Params {
+        kv.iter().map(|(k, v)| ((*k).into(), (*v).into())).collect()
+    }
+
+    #[test]
+    fn lista_sin_del_rechaza_borrar() {
+        let s = inner_de_prueba();
+        let mut st = SimState::default();
+        let sin_del = Lista {
+            id_param: "x_id".into(),
+            all: false,
+            del: false,
+        };
+        let r = escribir_lista(
+            &s,
+            &mut st,
+            "cbGetX",
+            &sin_del,
+            &p(&[("x_id", "0"), ("del", "DEL")]),
+        );
+        assert!(r.is_err(), "{r:?}");
+        assert_eq!(st.listas["cbGetX"].nodos.len(), 1, "no se borra nada");
+        let con_del = Lista {
+            del: true,
+            ..sin_del
+        };
+        escribir_lista(
+            &s,
+            &mut st,
+            "cbGetX",
+            &con_del,
+            &p(&[("x_id", "0"), ("del", "DEL")]),
+        )
+        .unwrap();
+        assert!(st.listas["cbGetX"].nodos.is_empty());
     }
 }

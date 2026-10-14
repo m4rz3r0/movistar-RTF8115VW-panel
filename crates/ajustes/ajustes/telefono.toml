@@ -1,0 +1,163 @@
+# Teléfono fijo (voz por internet). Lo configura el operador: todo va bajo
+# «Más opciones». Línea 0 y puerto de teléfono 0, los únicos de las
+# fixtures. Los números, las cuentas y las direcciones de los servidores son
+# secretos de la web avanzada (`voiceadvance.asp`): se pueden editar.
+
+[[ajuste]]
+id = "telefono.linea"
+tema = "telefono"
+nivel = "avanzado"
+leer = { funcion = "cbGetVoiceLine", params = { interwork_id = "0" } }
+fijos = { interwork_id = "0" }
+
+[[ajuste.campo]]
+id = "activa"
+escribe = { funcion = "cbSetVoiceLine", parametro = "adm_state" }
+lee = "adm_state"
+tipo = "booleano"
+recomendado = "true"
+
+[[ajuste.campo]]
+id = "silencio"
+escribe = { funcion = "cbSetVoiceLine", parametro = "vad_state" }
+lee = "vad_state"
+tipo = "booleano"
+recomendado = "false"
+
+# La contraseña de la línea (`auth_password`) no está: el router la devuelve
+# vacía, así que el panel no tendría valor anterior al que volver. La fase 3
+# debe comprobar, antes de la primera escritura de voz, que reenviar ese
+# secreto vacío (el gestor completa cada escritura con la lectura) no borra
+# la contraseña de la línea, o hacer que el gestor no lo envíe.
+[[ajuste]]
+id = "telefono.linea_oculto"
+tema = "telefono"
+nivel = "oculto"
+leer = { funcion = "cbGetVoiceLine", params = { interwork_id = "0" } }
+fijos = { interwork_id = "0" }
+
+[[ajuste.campo]]
+id = "usuario"
+escribe = { funcion = "cbSetVoiceLine", parametro = "auth_username" }
+lee = "auth_username"
+tipo = "secreto"
+validar = { min = 1 }
+
+[[ajuste.campo]]
+id = "linea_directa"
+escribe = { funcion = "cbSetVoiceLine", parametro = "warmline_hotline" }
+lee = "warmline_hotline"
+tipo = "booleano"
+
+[[ajuste.campo]]
+id = "numero_directo"
+escribe = { funcion = "cbSetVoiceLine", parametro = "warmline_hotline_number" }
+lee = "warmline_hotline_number"
+tipo = "secreto"
+validar = { min = 1 }
+
+[[ajuste]]
+id = "telefono.sip"
+tema = "telefono"
+nivel = "avanzado"
+leer = { funcion = "cbGetVoiceSip" }
+
+[[ajuste.campo]]
+id = "tonos"
+escribe = { funcion = "cbSetVoiceSip", parametro = "dtmf_method" }
+lee = "dtmf_method"
+tipo = "opcion"
+opciones = [
+  { valor = "2", clave = "aparte", recomendada = true },
+  { valor = "1", clave = "en_la_voz" },
+  { valor = "3", clave = "mensajes" },
+]
+
+[[ajuste.campo]]
+id = "fax"
+escribe = { funcion = "cbSetVoiceSip", parametro = "t38_enable" }
+lee = "t38_enable"
+tipo = "booleano"
+
+[[ajuste]]
+id = "telefono.sip_oculto"
+tema = "telefono"
+nivel = "oculto"
+leer = { funcion = "cbGetVoiceSip" }
+
+[[ajuste.campo]]
+id = "activo"
+escribe = { funcion = "cbSetVoiceSip", parametro = "adm_state" }
+lee = "adm_state"
+tipo = "booleano"
+recomendado = "true"
+
+[[ajuste.campo]]
+id = "dominio"
+escribe = { funcion = "cbSetVoiceSip", parametro = "user_agent_domain" }
+lee = "user_agent_domain"
+tipo = "secreto"
+validar = { min = 1, max = 253, ascii = true }
+
+[[ajuste.campo]]
+id = "servidor"
+escribe = { funcion = "cbSetVoiceSip", parametro = "proxy_server_cfg" }
+lee = "proxy_server_cfg"
+tipo = "secreto"
+validar = { min = 1, max = 253, ascii = true }
+
+[[ajuste.campo]]
+id = "servidor_puerto"
+escribe = { funcion = "cbSetVoiceSip", parametro = "proxy_server_port" }
+lee = "proxy_server_port"
+tipo = "numero"
+validar = { min = 1, max = 65535 }
+
+[[ajuste.campo]]
+id = "registro"
+escribe = { funcion = "cbSetVoiceSip", parametro = "registrar_server_cfg" }
+lee = "registrar_server_cfg"
+tipo = "secreto"
+validar = { min = 1, max = 253, ascii = true }
+
+[[ajuste.campo]]
+id = "registro_puerto"
+escribe = { funcion = "cbSetVoiceSip", parametro = "registrar_server_port" }
+lee = "registrar_server_port"
+tipo = "numero"
+validar = { min = 1, max = 65535 }
+
+[[ajuste.campo]]
+id = "salida"
+escribe = { funcion = "cbSetVoiceSip", parametro = "outbound_proxy_cfg" }
+lee = "outbound_proxy_cfg"
+tipo = "secreto"
+validar = { min = 1, max = 253, ascii = true }
+
+[[ajuste.campo]]
+id = "salida_puerto"
+escribe = { funcion = "cbSetVoiceSip", parametro = "outbound_proxy_port" }
+lee = "outbound_proxy_port"
+tipo = "numero"
+validar = { min = 1, max = 65535 }
+
+# Puerto de teléfono 0: paso directo de fax y módem. Las ganancias se dejan
+# fuera hasta saber su rango y su signo en este router.
+[[ajuste]]
+id = "telefono.fisico"
+tema = "telefono"
+nivel = "avanzado"
+leer = { funcion = "cbGetVoicePhysical" }
+fijos = { fxs_id = "0" }
+
+[[ajuste.campo]]
+id = "fax"
+escribe = { funcion = "cbSetVoicePhysical", parametro = "fax_passthrough_adm_state" }
+lee = "fax_passthrough_adm_state"
+tipo = "booleano"
+
+[[ajuste.campo]]
+id = "modem"
+escribe = { funcion = "cbSetVoicePhysical", parametro = "modem_passthrough_adm_state" }
+lee = "modem_passthrough_adm_state"
+tipo = "booleano"

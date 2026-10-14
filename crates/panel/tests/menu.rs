@@ -68,7 +68,13 @@ async fn menu_en_orden() {
         .collect();
     assert_eq!(
         hrefs,
-        ["/", "/historial", "/explorador", "/router/conexion"]
+        [
+            "/",
+            "/ajustes/internet",
+            "/historial",
+            "/explorador",
+            "/router/conexion"
+        ]
     );
     assert!(!html.contains(r#"href="/prestablecidos""#), "{html}");
     // Recomendaciones vuelve con sus tarjetas (fase 4).
@@ -96,6 +102,7 @@ async fn seccion_marcada_en_subrutas() {
     let actual = |a: &str| atributo(a, "aria-current") == Some("page");
     for (ruta, href) in [
         ("/", "/"),
+        ("/ajustes/wifi", "/ajustes/internet"),
         ("/historial", "/historial"),
         ("/explorador/lan_dhcp", "/explorador"),
         ("/router/conexion", "/router/conexion"),

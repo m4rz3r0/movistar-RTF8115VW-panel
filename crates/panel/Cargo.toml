@@ -18,6 +18,8 @@ leptos_router.workspace = true
 serde.workspace = true
 # Textos de la interfaz en español e inglés.
 i18n = { path = "../i18n" }
+# Catálogo de ajustes: los tipos en las vistas; con `ssr`, carga y validación.
+ajustes = { path = "../ajustes" }
 # Posición del puntero en los gráficos (`getBoundingClientRect`); ya la trae
 # Leptos, aquí solo se activa `DomRect`.
 web-sys = { workspace = true, features = ["DomRect", "HtmlDetailsElement"] }
@@ -49,6 +51,8 @@ tempfile.workspace = true
 tower = { workspace = true, features = ["util"] }
 # Registro capturado en las pruebas que comprueban lo que se anota.
 tracing.workspace = true
+# Nombres de la API en el HTML de las páginas de Ajustes.
+regex.workspace = true
 tracing-subscriber.workspace = true
 
 [features]
@@ -72,6 +76,7 @@ ssr = [
     "dep:tracing",
     "dep:tracing-subscriber",
     "i18n/tracing",
+    "ajustes/catalogo",
     "leptos/ssr",
     "leptos_meta/ssr",
     "leptos_router/ssr",
@@ -126,6 +131,10 @@ name = "panel_ajustes"
 required-features = ["ssr"]
 
 [[test]]
+name = "ajustes_catalogo"
+required-features = ["ssr"]
+
+[[test]]
 name = "menu"
 required-features = ["ssr"]
 
@@ -139,4 +148,12 @@ required-features = ["ssr"]
 
 [[test]]
 name = "vista"
+required-features = ["ssr"]
+
+[[test]]
+name = "ajustes"
+required-features = ["ssr"]
+
+[[test]]
+name = "ajustes_ida_y_vuelta"
 required-features = ["ssr"]

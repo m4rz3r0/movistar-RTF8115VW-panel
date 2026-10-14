@@ -1,0 +1,94 @@
+# Red local: aparatos conectados, IP fijas (reservas), reparto de
+# direcciones (DHCP) e IPv6 en casa. Pool DHCP 0: el de la red de casa.
+
+[[ajuste]]
+id = "red_local.dispositivos"
+tema = "red_local"
+nivel = "basico"
+componente = "dispositivos"
+leer = { funcion = "cbGetLanHostList" }
+
+[[ajuste]]
+id = "red_local.reservas"
+tema = "red_local"
+nivel = "basico"
+lista = true
+componente = "reservas"
+leer = { funcion = "cbDhcpV4SvrPoolGetStatic", params = { rtm_cfg_dhcpv4_svr_pool_id = "0", all = "ALL" } }
+fijos = { rtm_cfg_dhcpv4_svr_pool_id = "0" }
+
+[[ajuste.campo]]
+id = "mac"
+escribe = { funcion = "cbDhcpV4SvrPoolSetStatic", parametro = "mac_addr" }
+lee = "mac_addr"
+tipo = "mac"
+
+[[ajuste.campo]]
+id = "ip"
+escribe = { funcion = "cbDhcpV4SvrPoolSetStatic", parametro = "ipv4_addr" }
+lee = "ipv4_addr"
+tipo = "ip"
+
+[[ajuste.campo]]
+id = "activa"
+escribe = { funcion = "cbDhcpV4SvrPoolSetStatic", parametro = "adm_state" }
+lee = "adm_state"
+tipo = "booleano"
+
+[[ajuste]]
+id = "red_local.dhcp"
+tema = "red_local"
+nivel = "avanzado"
+leer = { funcion = "cbGetDhcpv4ServerPool", params = { rtm_cfg_dhcpv4_svr_pool_0i = "0" } }
+fijos = { rtm_cfg_dhcpv4_svr_pool_id = "0" }
+
+[[ajuste.campo]]
+id = "activo"
+escribe = { funcion = "cbSetDhcpv4ServerPool", parametro = "adm_state" }
+lee = "adm_state"
+tipo = "booleano"
+recomendado = "true"
+
+[[ajuste.campo]]
+id = "inicio"
+escribe = { funcion = "cbSetDhcpv4ServerPool", parametro = "ipv4_addr_min" }
+lee = "ipv4_addr_min"
+tipo = "ip"
+
+[[ajuste.campo]]
+id = "fin"
+escribe = { funcion = "cbSetDhcpv4ServerPool", parametro = "ipv4_addr_max" }
+lee = "ipv4_addr_max"
+tipo = "ip"
+
+# Duración en segundos; otro valor del router se ve como desconocido.
+[[ajuste.campo]]
+id = "concesion"
+escribe = { funcion = "cbSetDhcpv4ServerPool", parametro = "lease_time" }
+lee = "lease_time"
+tipo = "opcion"
+opciones = [
+  { valor = "3600", clave = "hora" },
+  { valor = "43200", clave = "doce_horas", recomendada = true },
+  { valor = "86400", clave = "dia" },
+  { valor = "604800", clave = "semana" },
+]
+
+[[ajuste]]
+id = "red_local.ipv6"
+tema = "red_local"
+nivel = "avanzado"
+leer = { funcion = "cbGetLanIPv6Config" }
+
+[[ajuste.campo]]
+id = "ipv6"
+escribe = { funcion = "cbSetLanIPv6Config", parametro = "ipv6_adm_state" }
+lee = "ipv6_adm_state"
+tipo = "booleano"
+
+[[ajuste.campo]]
+id = "anuncios"
+escribe = { funcion = "cbSetLanIPv6Config", parametro = "radv_adm_state" }
+lee = "radv_adm_state"
+tipo = "booleano"
+recomendado = "true"

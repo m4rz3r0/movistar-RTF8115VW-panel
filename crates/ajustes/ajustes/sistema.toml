@@ -1,0 +1,62 @@
+# Sistema: hora del router (servidores de hora) y espejo de la conexión a
+# internet para diagnóstico.
+
+[[ajuste]]
+id = "sistema.hora"
+tema = "sistema"
+nivel = "avanzado"
+leer = { funcion = "cbGetTimeNtp" }
+
+[[ajuste.campo]]
+id = "activa"
+escribe = { funcion = "cbSetTimeNtp", parametro = "adm_state" }
+lee = "adm_state"
+tipo = "booleano"
+recomendado = "true"
+
+[[ajuste.campo]]
+id = "servidor_1"
+escribe = { funcion = "cbSetTimeNtp", parametro = "ntp_svr_1" }
+lee = "ntp_svr_1"
+tipo = "texto"
+validar = { min = 1, max = 253, ascii = true }
+
+[[ajuste.campo]]
+id = "servidor_2"
+escribe = { funcion = "cbSetTimeNtp", parametro = "ntp_svr_2" }
+lee = "ntp_svr_2"
+tipo = "texto"
+opcional = true
+validar = { max = 253, ascii = true }
+
+# El espejo copia todo lo que entra y sale de internet a un puerto de la
+# red de casa. Con el espejo apagado el router da la toma 0, que no es una
+# opción que se pueda escribir: se lee como «Ninguna» (`sin_eleccion`).
+# Encenderlo exige elegir una toma (`requiere`; «Ninguna» no cuenta): si no,
+# se escribiría la toma 0.
+[[ajuste]]
+id = "sistema.diagnostico"
+tema = "sistema"
+nivel = "oculto"
+leer = { funcion = "cbGetDiagConfig" }
+
+[[ajuste.campo]]
+id = "espejo"
+escribe = { funcion = "cbSetDiagConfig", parametro = "wan_mirror" }
+lee = "wan_mirror"
+tipo = "booleano"
+recomendado = "false"
+requiere = { campo = "puerto", cuando = "true" }
+
+[[ajuste.campo]]
+id = "puerto"
+escribe = { funcion = "cbSetDiagConfig", parametro = "dst_lan_port" }
+lee = "dst_lan_port"
+tipo = "opcion"
+sin_eleccion = "0"
+opciones = [
+  { valor = "1", clave = "puerto_1" },
+  { valor = "2", clave = "puerto_2" },
+  { valor = "4", clave = "puerto_3" },
+  { valor = "8", clave = "puerto_4" },
+]

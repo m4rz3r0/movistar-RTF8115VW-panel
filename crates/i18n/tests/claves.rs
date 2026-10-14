@@ -113,6 +113,14 @@ fn claves_iguales_en_es_y_en() {
 }
 
 #[test]
+fn existe_distingue_claves() {
+    for idioma in i18n::Idioma::TODOS {
+        assert!(i18n::existe(idioma, "comun-salir"), "{idioma:?}");
+        assert!(!i18n::existe(idioma, "no-existe"), "{idioma:?}");
+    }
+}
+
+#[test]
 fn claves_usadas_existen() {
     let claves = claves_es();
     let t = Regex::new(r#"\bt!\(\s*"([^"]+)""#).unwrap();
