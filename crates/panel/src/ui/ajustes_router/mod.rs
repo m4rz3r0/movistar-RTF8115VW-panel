@@ -5,8 +5,9 @@
 //! un selector), el aviso de solo lectura si el panel aún no escribe, las
 //! tarjetas de lo esencial arriba y el resto bajo «Más opciones». Las
 //! tarjetas ([`tarjeta::Tarjeta`]) se editan en el sitio y guardan con el
-//! diálogo de grupo; los aparatos y las IP fijas de Red local tienen su
-//! propio componente ([`dispositivos`], [`reservas`]). Un tema que no existe es «página no encontrada».
+//! diálogo de grupo; los dispositivos y las IP fijas de Red local tienen su
+//! propio componente ([`dispositivos`], [`reservas`]). Un tema que no
+//! existe es «página no encontrada».
 
 mod campo;
 mod dispositivos;
@@ -189,10 +190,16 @@ pub fn PaginaTema() -> impl IntoView {
 #[component]
 fn ContenidoTema(t: TemaVista, recargar: Callback<()>) -> impl IntoView {
     let solo_lectura = t.solo_lectura;
-    // Los aparatos y las IP fijas leen la red de casa una vez para los dos.
+    // Los dispositivos y las IP fijas leen la red de casa una vez para los dos.
     let de_red = |c: &Option<String>| matches!(c.as_deref(), Some(DISPOSITIVOS | RESERVAS));
     if t.ajustes.iter().any(|a| de_red(&a.componente)) {
-        provide_context(dispositivos::DatosRed::nuevo());
+        let existentes = t
+            .ajustes
+            .iter()
+            .find(|a| a.componente.as_deref() == Some(RESERVAS))
+            .map(|a| reservas::existentes(&a.instancias))
+            .unwrap_or_default();
+        provide_context(dispositivos::DatosRed::nuevo(existentes));
     }
     let (basicos, otros): (Vec<_>, Vec<_>) = t
         .ajustes

@@ -149,6 +149,12 @@ pub struct PeticionAjuste {
     /// Campos que se cambian: id del campo → valor legible (la clave de una
     /// opción, `true`/`false`, el texto). Un secreto sin tocar no va.
     pub valores: BTreeMap<String, String>,
+    /// Lo que la página espera que tenga la instancia que edita o borra
+    /// (id del campo → valor legible): si el router ya tiene otra cosa
+    /// (otra sesión la cambió), 409. Por ahora lo comprueban las reservas
+    /// (su MAC).
+    #[serde(default)]
+    pub esperados: BTreeMap<String, String>,
 }
 
 impl std::fmt::Debug for PeticionAjuste {
@@ -158,6 +164,7 @@ impl std::fmt::Debug for PeticionAjuste {
             .field("instancia", &self.instancia)
             .field("borrar", &self.borrar)
             .field("valores", &self.valores.keys().collect::<Vec<_>>())
+            .field("esperados", &self.esperados.keys().collect::<Vec<_>>())
             .finish()
     }
 }
@@ -179,6 +186,8 @@ pub struct GrupoVista {
     pub efecto: Option<String>,
     /// Segundos que se vigila el router tras aplicarlo.
     pub vigilancia_s: u64,
+    /// A qué se refiere, si el título no basta (el dispositivo de una IP fija).
+    pub detalle: Option<String>,
 }
 
 /// Un paso del grupo: los campos de una misma escritura del router.
@@ -207,10 +216,10 @@ pub struct CambioLegible {
     pub tipo: TipoCampo,
 }
 
-/// Un aparato que el router conoce en la red de casa.
+/// Un dispositivo que el router conoce en la red de casa.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DispositivoVista {
-    /// Nombre que da el aparato; vacío si no da ninguno.
+    /// Nombre que da el dispositivo; vacío si no da ninguno.
     pub nombre: String,
     pub ip: String,
     pub mac: String,
@@ -219,9 +228,11 @@ pub struct DispositivoVista {
     pub activo: bool,
     /// Id de su reserva (IP fija), si tiene.
     pub reserva: Option<String>,
+    /// La IP de su reserva (puede no ser la que tiene ahora).
+    pub ip_fija: Option<String>,
 }
 
-/// Por dónde está conectado un aparato.
+/// Por dónde está conectado un dispositivo.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Conexion {
     /// Por cable: la interfaz del router tal como la da (`tipo:id`). Qué
@@ -245,7 +256,7 @@ pub enum ErrorReserva {
     IpDelRouter,
     /// Otra reserva ya tiene esa IP.
     IpRepetida,
-    /// El aparato (su MAC) ya tiene otra reserva.
+    /// El dispositivo (su MAC) ya tiene otra reserva.
     MacRepetida,
     /// La primera o la última dirección de la red, que son de toda la red.
     Difusion,
@@ -277,7 +288,7 @@ impl ErrorReserva {
 }
 
 /// MAC comparable: normalizada si es válida; si no, en minúsculas.
-fn mac_comparable(mac: &str) -> String {
+pub(crate) fn mac_comparable(mac: &str) -> String {
     ajustes::normalizar_mac(mac.trim()).unwrap_or_else(|| mac.trim().to_ascii_lowercase())
 }
 
@@ -317,6 +328,20 @@ pub fn validar_reserva(
         return Err(ErrorReserva::MacRepetida);
     }
     Ok(())
+}
+
+/// ¿Hay que validar la reserva que pide `p` ([`validar_reserva`])? Una
+/// nueva, o una que cambia de MAC o de IP o se activa. Desactivarla o
+/// borrarla, no: así se puede apagar una reserva que ya no valdría (su IP
+/// quedó fuera de la red, o la comparte con otra) sin corregirla antes.
+pub fn valida_la_reserva(p: &PeticionAjuste) -> bool {
+    if p.borrar {
+        return false;
+    }
+    p.instancia.is_none()
+        || p.valores.contains_key("mac")
+        || p.valores.contains_key("ip")
+        || p.valores.get("activa").map(|v| v.trim()) == Some("true")
 }
 
 /// Texto traducido de un valor que no vale, con sus límites: el mismo en el
@@ -369,7 +394,7 @@ pub async fn leer_tema(tema: String) -> Result<TemaVista, ServerFnError> {
     servidor::leer_tema(tema).await
 }
 
-/// Los aparatos que el router conoce en la red de casa, los conectados
+/// Los dispositivos que el router conoce en la red de casa, los conectados
 /// primero y por IP, con su conexión y su reserva. Exige sesión; la
 /// respuesta va con `no-store`.
 #[server(endpoint = "leer_dispositivos", input = Json)]
@@ -395,6 +420,7 @@ mod tests {
             instancia: None,
             borrar: false,
             valores: [("contrasena".to_owned(), "clave-de-prueba-9".to_owned())].into(),
+            esperados: BTreeMap::new(),
         };
         let d = format!("{p:?}");
         assert!(!d.contains("clave-de-prueba-9"), "{d}");
@@ -924,6 +950,7 @@ pub(crate) mod servidor {
             riesgo: riesgo(r),
             efecto: a.efecto.as_ref().map(|e| format!("efecto-{e}")),
             vigilancia_s: g.tiempos().vigilancia(r).as_secs(),
+            detalle: None,
         }
     }
 
@@ -995,7 +1022,7 @@ pub(crate) mod servidor {
 
     // --------------------------------------------------- red local
 
-    /// Lectura del router que falla al leer los aparatos o la red: 502 con
+    /// Lectura del router que falla al leer los dispositivos o la red: 502 con
     /// el mensaje de siempre (el detalle va al registro).
     fn sin_leer(que: &str, e: hgu::Error) -> ServerFnError {
         tracing::warn!("ajustes: no se puede leer {que}: {e}");
@@ -1020,7 +1047,7 @@ pub(crate) mod servidor {
                     (true, "0") => Conexion::Wifi24,
                     (true, _) => Conexion::Wifi5,
                 };
-                out.insert(st.mac.to_ascii_lowercase(), conexion);
+                out.insert(mac_comparable(&st.mac), conexion);
             }
         }
         Some(out)
@@ -1038,7 +1065,7 @@ pub(crate) mod servidor {
         let c = &state.hgu;
         let hosts = hgu::read::lan_hosts(c)
             .await
-            .map_err(|e| sin_leer("los aparatos", e))?;
+            .map_err(|e| sin_leer("los dispositivos", e))?;
         let reservas = hgu::read::static_leases(c)
             .await
             .map_err(|e| sin_leer("las reservas", e))?;
@@ -1050,14 +1077,14 @@ pub(crate) mod servidor {
                     _ if !h.active => Conexion::Desconocida,
                     None => Conexion::Desconocida,
                     Some(w) => w
-                        .get(&h.mac.to_ascii_lowercase())
+                        .get(&mac_comparable(&h.mac))
                         .cloned()
                         .unwrap_or_else(|| Conexion::Cable(h.iface.clone())),
                 };
-                let reserva = reservas
+                let fija = reservas
                     .iter()
-                    .find(|r| mac_comparable(&r.mac) == mac_comparable(&h.mac))
-                    .map(|r| r.id.clone());
+                    .find(|r| mac_comparable(&r.mac) == mac_comparable(&h.mac));
+                let (reserva, ip_fija) = (fija.map(|r| r.id.clone()), fija.map(|r| r.ip.clone()));
                 DispositivoVista {
                     nombre: h.hostname,
                     ip: h.ip,
@@ -1065,6 +1092,7 @@ pub(crate) mod servidor {
                     conexion,
                     activo: h.active,
                     reserva,
+                    ip_fija,
                 }
             })
             .collect();
@@ -1079,18 +1107,35 @@ pub(crate) mod servidor {
             .map_err(|e| sin_leer("la red de casa", e))
     }
 
-    /// Comprueba una reserva de `p` como la página ([`validar_reserva`]),
-    /// con la red y las reservas que tiene ahora el router. Al editar, lo
-    /// que no se cambia es lo de la reserva. Una nueva necesita MAC e IP.
-    /// Los formatos ya están validados. Error 400 junto al campo.
+    /// Nombre del dispositivo con la MAC `mac` en la lista del router, si lo
+    /// da (`None` también si no se puede leer: solo es para el resumen).
+    async fn nombre_del_dispositivo(state: &AppState, mac: &str) -> Option<String> {
+        let hosts = hgu::read::lan_hosts(&state.hgu)
+            .await
+            .inspect_err(|e| tracing::warn!("ajustes: no se pueden leer los dispositivos: {e}"))
+            .ok()?;
+        let mac = mac_comparable(mac);
+        hosts
+            .into_iter()
+            .find(|h| mac_comparable(&h.mac) == mac)
+            .map(|h| h.hostname)
+            .filter(|n| !n.trim().is_empty())
+    }
+
+    /// Comprueba una reserva de `p` con lo que tiene ahora el router y
+    /// devuelve el nombre de su dispositivo, si se conoce (para el resumen).
+    /// - Al editar o borrar, la reserva tiene que existir (400) y ser la que
+    ///   la página espera (`esperados`, su MAC; si no, 409: otra sesión la
+    ///   cambió).
+    /// - Si hay que validarla ([`valida_la_reserva`]), como la página
+    ///   ([`validar_reserva`]), con la red y las reservas del router; lo que
+    ///   no se cambia es lo de la reserva. Una nueva necesita MAC e IP.
+    ///   Error 400 junto al campo. Los formatos ya están validados.
     async fn comprobar_reserva(
         state: &AppState,
         a: &Ajuste,
         p: &PeticionAjuste,
-    ) -> Result<(), ServerFnError> {
-        if p.borrar {
-            return Ok(());
-        }
+    ) -> Result<Option<String>, ServerFnError> {
         let prefijo = prefijo_i18n(a);
         let reservas = hgu::read::static_leases(&state.hgu)
             .await
@@ -1104,9 +1149,18 @@ pub(crate) mod servidor {
                     .ok_or_else(|| fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-invalida")))?,
             ),
         };
+        if let (Some(r), Some(esperada)) = (actual, p.esperados.get("mac"))
+            && mac_comparable(&r.mac) != mac_comparable(esperada)
+        {
+            return Err(fallo(
+                StatusCode::CONFLICT,
+                t!("ajuste-red_local-reservas-error-cambiada"),
+            ));
+        }
         let valor = |campo: &str, de_la_reserva: Option<&str>| {
             p.valores
                 .get(campo)
+                .filter(|_| !p.borrar)
                 .map(|v| v.trim().to_owned())
                 .or_else(|| de_la_reserva.map(str::to_owned))
                 .filter(|v| !v.is_empty())
@@ -1116,6 +1170,10 @@ pub(crate) mod servidor {
                 })
         };
         let mac = valor("mac", actual.map(|r| r.mac.as_str()))?;
+        let detalle = nombre_del_dispositivo(state, &mac).await;
+        if !valida_la_reserva(p) {
+            return Ok(detalle);
+        }
         let ip = valor("ip", actual.map(|r| r.ip.as_str()))?;
         let ip: Ipv4Addr = ip.parse().map_err(|_| {
             let c = a.campo("ip").expect("campo de la reserva");
@@ -1136,7 +1194,8 @@ pub(crate) mod servidor {
                 StatusCode::BAD_REQUEST,
                 format!("{etiqueta}: {}", e.texto(lan.0)),
             )
-        })
+        })?;
+        Ok(detalle)
     }
 
     pub(super) async fn preparar_ajuste(p: PeticionAjuste) -> Result<GrupoVista, ServerFnError> {
@@ -1167,9 +1226,11 @@ pub(crate) mod servidor {
         }
         let g = gestor(&state)?;
         libre(&g)?;
-        if a.componente == Some(Componente::Reservas) {
-            comprobar_reserva(&state, a, &p).await?;
-        }
+        let detalle = if a.componente == Some(Componente::Reservas) {
+            comprobar_reserva(&state, a, &p).await?
+        } else {
+            None
+        };
         let mut grupo = grupo_de(a, &p).map_err(|e| {
             tracing::warn!("ajustes: {}: valor no válido tras validarlo: {e}", a.id);
             fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-invalida"))
@@ -1187,14 +1248,12 @@ pub(crate) mod servidor {
         let pedidos: Vec<BTreeMap<String, String>> =
             grupo.pasos.iter().map(|p| p.req.valores.clone()).collect();
         let prep = g.preparar_grupo(grupo).await.map_err(error_ajuste)?;
-        Ok(vista_grupo(
-            &g,
-            a,
-            prep.token,
-            &prep.pasos,
-            prep.riesgo,
-            &|i, param| buscar(&pedidos[i], param).map(str::to_owned),
-        ))
+        Ok(GrupoVista {
+            detalle,
+            ..vista_grupo(&g, a, prep.token, &prep.pasos, prep.riesgo, &|i, param| {
+                buscar(&pedidos[i], param).map(str::to_owned)
+            })
+        })
     }
 
     pub(super) async fn confirmar_ajuste(
@@ -1292,6 +1351,7 @@ pub(crate) mod servidor {
                     .iter()
                     .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
                     .collect(),
+                esperados: BTreeMap::new(),
             }
         }
 

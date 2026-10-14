@@ -1,7 +1,7 @@
 # WiFi: las tres redes (2,4 GHz, 5 GHz e invitados) y las dos radios.
 #
 # Efectos: `wifi_red` en la tarjeta básica de cada red (cambiar el nombre,
-# la contraseña o la seguridad obliga a volver a conectar los aparatos) y
+# la contraseña o la seguridad obliga a volver a conectar los dispositivos) y
 # `wifi_corte` en el resto.
 #
 # Cada red y cada radio se parte en dos ajustes: lo esencial (nivel básico) y

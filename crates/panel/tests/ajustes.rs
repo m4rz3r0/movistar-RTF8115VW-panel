@@ -1184,7 +1184,8 @@ async fn recomendacion_visible_en_el_resumen() {
     assert!(
         resumenes
             .iter()
-            .any(|r| r.contains("Recomendado si conectas tus aparatos escribiendo la contraseña")),
+            .any(|r| r
+                .contains("Recomendado si conectas tus dispositivos escribiendo la contraseña")),
         "{resumenes:#?}"
     );
     assert!(

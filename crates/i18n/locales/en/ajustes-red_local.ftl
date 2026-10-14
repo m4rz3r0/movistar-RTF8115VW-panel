@@ -14,8 +14,10 @@ ajuste-red_local-dispositivos-invitados = Guest WiFi
 ajuste-red_local-dispositivos-desconocida = Unknown
 ajuste-red_local-dispositivos-desconectado = Not connected now
 ajuste-red_local-dispositivos-fijar = Fix this IP
-ajuste-red_local-dispositivos-fijar-de = Fix the IP { $ip } for { $equipo }
-ajuste-red_local-dispositivos-ya-fija = Already has a fixed IP
+ajuste-red_local-dispositivos-fijar-de = Fix this IP: { $ip } ({ $equipo })
+ajuste-red_local-dispositivos-ya-fija = Already has a fixed IP: { $ip }
+ajuste-red_local-dispositivos-no-fijable = This IP can't be fixed
+ajuste-red_local-dispositivos-fijar-desconectado = Connect it to fix its IP
 ajuste-red_local-dispositivos-vacia = The router doesn't know any device on your network yet.
 
 ## Fixed IPs
@@ -43,6 +45,7 @@ ajuste-red_local-reservas-error-router = That's the router's IP: choose another 
 ajuste-red_local-reservas-error-ip-repetida = That IP is already another device's fixed IP: choose another one.
 ajuste-red_local-reservas-error-mac-repetida = That device already has a fixed IP: change it in its row instead of adding another.
 ajuste-red_local-reservas-error-difusion = That IP belongs to the whole network (the first and last ones can't be given to a device): choose another one.
+ajuste-red_local-reservas-error-cambiada = That fixed IP has changed since you opened the page (maybe from another window). Reload the page and try again.
 
 ## Address handout (DHCP)
 ajuste-red_local-dhcp-titulo = Address handout (DHCP)

@@ -1,5 +1,5 @@
 //! «IP fijas» ([`Reservas`]): las reservas DHCP en una tabla (apilada en
-//! pantallas estrechas) con el aparato si se conoce, su MAC, su IP y si está
+//! pantallas estrechas) con el dispositivo si se conoce, su MAC, su IP y si está
 //! activa. «Añadir IP fija», «Editar» y «Borrar» preparan el cambio y lo
 //! guardan con el diálogo de grupo. Antes de enviar, la página comprueba la
 //! reserva como el servidor ([`validar_reserva`]) y dice el error junto al
@@ -11,7 +11,7 @@ use super::dispositivos::{DatosRed, RedLocal, aviso_error, nombre};
 use super::tarjeta::{ayuda, cabecera, detalles_tecnicos, dom, enfocar};
 use crate::ajustes_router::{
     AjusteVista, CampoVista, EstadoLectura, GrupoVista, InstanciaVista, PeticionAjuste,
-    preparar_ajuste, validar_reserva,
+    mac_comparable, preparar_ajuste, valida_la_reserva, validar_reserva,
 };
 use crate::t;
 use crate::ui::explorador::texto_error;
@@ -37,7 +37,7 @@ fn valor(campos: &[CampoVista], id: &str) -> String {
 }
 
 /// Reservas como triples `(id, mac, ip)`.
-fn existentes(instancias: &[InstanciaVista]) -> Vec<(String, String, String)> {
+pub(super) fn existentes(instancias: &[InstanciaVista]) -> Vec<(String, String, String)> {
     instancias
         .iter()
         .map(|i| {
@@ -51,11 +51,16 @@ fn existentes(instancias: &[InstanciaVista]) -> Vec<(String, String, String)> {
 }
 
 /// Formulario de una reserva, nueva (con la plantilla) o existente. Llama a
-/// `preparado` con el resumen del cambio y a `cancelar` al dejarlo.
+/// `preparado` con el resumen del cambio y a `cancelar` al dejarlo. Su error
+/// general va a `error`, la única región de alerta de la tarjeta. Al editar,
+/// envía la MAC que espera (`esperada`): si otra sesión cambió la reserva,
+/// el servidor no la toca.
 #[component]
 fn FormReserva(
     campos: Vec<CampoVista>,
     modo: Modo,
+    esperada: Option<String>,
+    error: RwSignal<Option<String>>,
     existentes: Vec<(String, String, String)>,
     lan: Option<(Ipv4Addr, Ipv4Addr)>,
     dom: String,
@@ -69,7 +74,6 @@ fn FormReserva(
     let errores: Vec<RwSignal<Option<String>>> =
         campos.iter().map(|_| RwSignal::new(None)).collect();
     let preparando = RwSignal::new(false);
-    let error = RwSignal::new(None::<String>);
     let control = {
         let dom = dom.clone();
         move |i: usize| format!("{dom}-c{i}-control")
@@ -119,9 +123,18 @@ fn FormReserva(
                         }
                     }
                 }
-                // Lo mismo que comprobará el servidor, junto al campo.
+                // Lo mismo que comprobará el servidor, junto al campo (no al
+                // desactivarla: se puede apagar aunque ya no valdría).
+                let validar_todo = valida_la_reserva(&PeticionAjuste {
+                    ajuste: String::new(),
+                    instancia: instancia.clone(),
+                    borrar: false,
+                    valores: pedir.clone(),
+                    esperados: BTreeMap::new(),
+                });
                 let pos = |id: &str| cs.iter().position(|c| c.id == id);
                 if primero_mal.is_none()
+                    && validar_todo
                     && let (Some(lan), Some(m), Some(p)) = (lan, pos("mac"), pos("ip"))
                     && let Ok(ip) = v(p).trim().parse::<Ipv4Addr>()
                     && let Err(e) =
@@ -146,6 +159,10 @@ fn FormReserva(
                 instancia: instancia.clone(),
                 borrar: false,
                 valores: pedir,
+                esperados: esperada
+                    .iter()
+                    .map(|m| ("mac".to_owned(), m.clone()))
+                    .collect(),
             };
             spawn_local(async move {
                 match preparar_ajuste(p).await {
@@ -176,7 +193,6 @@ fn FormReserva(
         <form class="ajuste-formulario reserva-formulario" novalidate=true on:submit=guardar>
             <h3>{titulo}</h3>
             <div class="ajuste-campos">{filas}</div>
-            <p class="error-formulario" role="alert">{move || error.get()}</p>
             <div class="ajuste-acciones">
                 <button
                     class="boton-sutil"
@@ -252,7 +268,7 @@ pub(crate) fn Reservas(
             recargar.run(());
         }
     });
-    let borrar = Callback::new(move |id: String| {
+    let borrar = Callback::new(move |(id, mac): (String, String)| {
         if borrando.get_untracked().is_some() {
             return;
         }
@@ -264,6 +280,7 @@ pub(crate) fn Reservas(
             instancia: Some(id),
             borrar: true,
             valores: BTreeMap::new(),
+            esperados: [("mac".to_owned(), mac)].into(),
         };
         spawn_local(async move {
             match preparar_ajuste(p).await {
@@ -296,18 +313,16 @@ pub(crate) fn Reservas(
     };
     let dom_form = format!("{id_dom}-form");
 
-    let cuerpo = move |lectura: Option<RedLocal>| {
-        let (dispositivos, lan) = match lectura {
-            Some(RedLocal { dispositivos, lan }) => (dispositivos, lan),
-            None => (Vec::new(), None),
-        };
+    let cuerpo = move |RedLocal { dispositivos, lan }: RedLocal| {
+        // Sin dispositivos leídos, las reservas se ven igual, sin su nombre.
+        let dispositivos = dispositivos.unwrap_or_default();
         let lista = instancias.get_value();
         let equipo = |mac: &str| {
-            let m = mac.to_ascii_lowercase();
+            let m = mac_comparable(mac);
             nombre(
                 dispositivos
                     .iter()
-                    .find(|d| d.mac.to_ascii_lowercase() == m)
+                    .find(|d| mac_comparable(&d.mac) == m)
                     .map_or("", |d| d.nombre.as_str()),
             )
         };
@@ -327,8 +342,10 @@ pub(crate) fn Reservas(
                     texto_legible(c, &inicial(&c.valor))
                 });
                 let id = i.id.clone();
+                let mac = valor(&i.campos, "mac");
                 let acciones = editable.then(|| {
                     let (id_e, id_b) = (id.clone(), id.clone());
+                    let mac_b = mac.clone();
                     let ocupado = {
                         let id = id.clone();
                         move || borrando.with(|b| b.as_deref() == Some(id.as_str()))
@@ -352,7 +369,7 @@ pub(crate) fn Reservas(
                                 type="button"
                                 aria-label=t!("ajuste-red_local-reservas-borrar-de", equipo = quien.clone())
                                 aria-disabled=move || ocupado().then_some("true")
-                                on:click=move |_| borrar.run(id_b.clone())
+                                on:click=move |_| borrar.run((id_b.clone(), mac_b.clone()))
                             >
                                 {t!("ajuste-red_local-reservas-borrar")}
                             </button>
@@ -387,12 +404,12 @@ pub(crate) fn Reservas(
         let dom_form = dom_form.clone();
         let formulario = move || {
             modo.get().map(|m| {
-                let campos = match &m {
-                    Modo::Nueva => plantilla.get_value(),
+                let (campos, esperada) = match &m {
+                    Modo::Nueva => (plantilla.get_value(), None),
                     Modo::Editar(id) => instancias.with_value(|is| {
                         is.iter()
                             .find(|i| i.id == *id)
-                            .map(|i| i.campos.clone())
+                            .map(|i| (i.campos.clone(), Some(valor(&i.campos, "mac"))))
                             .unwrap_or_default()
                     }),
                 };
@@ -400,6 +417,8 @@ pub(crate) fn Reservas(
                     <FormReserva
                         campos
                         modo=m
+                        esperada
+                        error
                         existentes=todas.clone()
                         lan
                         dom=dom_form.clone()
@@ -427,11 +446,13 @@ pub(crate) fn Reservas(
                 </div>
             }
         });
+        // La única región de alerta de la tarjeta: errores de borrar y del
+        // formulario.
         view! {
             {tabla}
-            <p class="error-formulario" role="alert">{move || error.get()}</p>
             {anadir}
             {formulario}
+            <p class="error-formulario" role="alert">{move || error.get()}</p>
         }
         .into_any()
     };
@@ -444,7 +465,7 @@ pub(crate) fn Reservas(
                     let cuerpo = cuerpo.clone();
                     move || {
                         let cuerpo = cuerpo.clone();
-                        Suspend::new(async move { cuerpo(datos.leer().await.ok()) })
+                        Suspend::new(async move { cuerpo(datos.leer().await) })
                     }
                 }
             </Transition>

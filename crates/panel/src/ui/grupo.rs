@@ -280,7 +280,17 @@ pub fn DialogoGrupo(
             t!("ajustes-grupo-revisar")
         }
     };
-    let ajuste = move || grupo.with(|g| traducir(&g.titulo, None));
+    // El ajuste y, si el título no basta, a qué se refiere («IP fijas:
+    // host-2»).
+    let ajuste = move || {
+        grupo.with(|g| {
+            let titulo = traducir(&g.titulo, None);
+            match &g.detalle {
+                Some(d) => format!("{titulo}: {d}"),
+                None => titulo,
+            }
+        })
+    };
     let cabecera_riesgo = move || {
         let (texto, desc) = riesgo(grupo.with(|g| g.riesgo));
         view! {
@@ -499,11 +509,24 @@ mod tests {
             riesgo: RiesgoCambio::Medio,
             efecto: Some("efecto-wifi_red".into()),
             vigilancia_s: 120,
+            detalle: None,
         }
     }
 
     fn html(g: GrupoVista) -> String {
         Owner::new().with(|| view! { <DialogoGrupo grupo=g on_cerrar=|_| {} /> }.to_html())
+    }
+
+    /// El resumen nombra a qué se refiere el cambio si el título no basta
+    /// (el dispositivo de una IP fija).
+    #[test]
+    fn el_resumen_lleva_el_detalle() {
+        let mut g = grupo(Vec::new());
+        g.titulo = "ajuste-red_local-reservas-titulo".into();
+        g.detalle = Some("host-2".into());
+        let h = html(g);
+        let titulo = traducir("ajuste-red_local-reservas-titulo", None);
+        assert!(h.contains(&format!("{titulo}: host-2")), "{h}");
     }
 
     /// Al crear o borrar una instancia, un sí/no o una opción sin valor se

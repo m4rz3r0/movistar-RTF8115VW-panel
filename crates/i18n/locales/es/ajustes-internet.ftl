@@ -2,10 +2,10 @@
 
 ## Relé DNS
 ajuste-internet-dns-titulo = Relé DNS
-ajuste-internet-dns-desc = El DNS traduce los nombres de las páginas web a direcciones. Con el relé, el router reenvía esas consultas de tus aparatos a los servidores DNS de tu conexión.
-ajuste-internet-dns-ayuda = Si no sabes para qué lo quieres cambiar, déjalo como está. Un cambio aquí puede hacer que los aparatos de tu red dejen de encontrar las páginas web aunque internet siga conectado; si pasa, vuelve al valor anterior.
+ajuste-internet-dns-desc = El DNS traduce los nombres de las páginas web a direcciones. Con el relé, el router reenvía esas consultas de tus dispositivos a los servidores DNS de tu conexión.
+ajuste-internet-dns-ayuda = Si no sabes para qué lo quieres cambiar, déjalo como está. Un cambio aquí puede hacer que los dispositivos de tu red dejen de encontrar las páginas web aunque internet siga conectado; si pasa, vuelve al valor anterior.
 ajuste-internet-dns-rele = Relé DNS activado
-ajuste-internet-dns-rele-desc = En principio, el router pasa las consultas de tus aparatos a los servidores DNS de tu conexión. Con el relé apagado ya las contesta él; qué cambia al encenderlo está aún por comprobar con este router.
+ajuste-internet-dns-rele-desc = En principio, el router pasa las consultas de tus dispositivos a los servidores DNS de tu conexión. Con el relé apagado ya las contesta él; qué cambia al encenderlo está aún por comprobar con este router.
 
 ## Nombre fijo para tu conexión (DNS dinámico)
 ajuste-internet-ddns-titulo = Nombre fijo para tu conexión (DNS dinámico)

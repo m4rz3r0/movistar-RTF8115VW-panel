@@ -2970,11 +2970,11 @@ summary.hist-cabeza:hover {
   margin-bottom: var(--esp-4);
 }
 
-/* Red local: aparatos conectados. Cada aparato es una fila: quién es y por
+/* Red local: dispositivos conectados. Cada dispositivo es una fila: quién es y por
    dónde se conecta, su IP (lo que se fija, en grande), su MAC y la acción,
    en columnas alineadas bajo una cabecera. En pantallas estrechas, uno bajo
    otro y cada dato con su etiqueta. */
-.aparatos {
+.dispositivos {
   display: flex;
   flex-direction: column;
   margin: 0;
@@ -2985,17 +2985,17 @@ summary.hist-cabeza:hover {
   background: var(--superficie-1);
 }
 
-.aparato,
-.aparatos-cabecera {
+.dispositivo,
+.dispositivos-cabecera {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 9.5em 12em 11em;
+  grid-template-columns: minmax(0, 1fr) 9.5em 12em 13.5em;
   align-items: center;
   gap: var(--esp-2) var(--esp-4);
   padding: var(--esp-3) var(--esp-4);
   border-bottom: 1px solid var(--borde);
 }
 
-.aparatos-cabecera {
+.dispositivos-cabecera {
   padding-block: var(--esp-2);
   background: var(--superficie-2);
   color: var(--texto-2);
@@ -3003,11 +3003,11 @@ summary.hist-cabeza:hover {
   font-weight: 500;
 }
 
-.aparato:last-child {
+.dispositivo:last-child {
   border-bottom: 0;
 }
 
-.aparato-quien {
+.dispositivo-quien {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -3015,12 +3015,12 @@ summary.hist-cabeza:hover {
   min-width: 0;
 }
 
-.aparato-nombre {
+.dispositivo-nombre {
   font-weight: 600;
   overflow-wrap: anywhere;
 }
 
-.aparato-nombre.ajuste-vacio {
+.dispositivo-nombre.ajuste-vacio {
   font-weight: 400;
 }
 
@@ -3028,21 +3028,21 @@ summary.hist-cabeza:hover {
   border-style: dashed;
 }
 
-.aparato-apagado .aparato-nombre,
-.aparato-apagado .aparato-ip {
+.dispositivo-apagado .dispositivo-nombre,
+.dispositivo-apagado .dispositivo-ip {
   color: var(--texto-2);
 }
 
 /* En pantallas anchas, cada dato es una columna de la fila. */
-.aparato-datos {
+.dispositivo-datos {
   display: contents;
 }
 
-.aparato-datos > div {
+.dispositivo-datos > div {
   min-width: 0;
 }
 
-.aparato-datos dt {
+.dispositivo-datos dt {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -3050,17 +3050,22 @@ summary.hist-cabeza:hover {
   clip-path: inset(50%);
 }
 
-.aparato-datos dd {
+.dispositivo-datos dd {
   margin: 0;
   white-space: nowrap;
 }
 
-.aparato-ip {
+.dispositivo-ip {
   font-size: 15px;
   color: var(--texto-1);
 }
 
-.aparato-accion {
+.nota-fijar {
+  color: var(--texto-2);
+  font-size: 12px;
+}
+
+.dispositivo-accion {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -3068,23 +3073,23 @@ summary.hist-cabeza:hover {
 }
 
 @media (max-width: 720px) {
-  .aparatos-cabecera {
+  .dispositivos-cabecera {
     display: none;
   }
 
-  .aparato {
+  .dispositivo {
     grid-template-columns: minmax(0, 1fr);
     align-items: start;
   }
 
-  .aparato-datos {
+  .dispositivo-datos {
     display: flex;
     flex-wrap: wrap;
     gap: var(--esp-1) var(--esp-4);
     margin: 0;
   }
 
-  .aparato-datos dt {
+  .dispositivo-datos dt {
     position: static;
     width: auto;
     height: auto;
@@ -3094,7 +3099,7 @@ summary.hist-cabeza:hover {
     font-size: 12px;
   }
 
-  .aparato-accion {
+  .dispositivo-accion {
     align-items: flex-start;
   }
 }

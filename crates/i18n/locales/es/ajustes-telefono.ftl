@@ -63,8 +63,8 @@ ajuste-telefono-sip_oculto-salida_puerto-desc = Un número del 1 al 65535 que da
 
 ## Toma de teléfono
 ajuste-telefono-fisico-titulo = Fax, módem y alarmas
-ajuste-telefono-fisico-desc = Para aparatos que no son teléfonos y usan la toma de teléfono del router.
-ajuste-telefono-fisico-ayuda = Algunos aparatos se comunican por la línea de teléfono con pitidos: faxes, alarmas, datáfonos o módems antiguos. Si tienes uno y no consigue conectar, comprueba que su opción está encendida.
+ajuste-telefono-fisico-desc = Para dispositivos que no son teléfonos y usan la toma de teléfono del router.
+ajuste-telefono-fisico-ayuda = Algunos dispositivos se comunican por la línea de teléfono con pitidos: faxes, alarmas, datáfonos o módems antiguos. Si tienes uno y no consigue conectar, comprueba que su opción está encendida.
 ajuste-telefono-fisico-fax = Paso directo del fax
 ajuste-telefono-fisico-fax-desc = Trata los faxes como sonido sin tocar, para que lleguen enteros.
 ajuste-telefono-fisico-modem = Paso directo de módems

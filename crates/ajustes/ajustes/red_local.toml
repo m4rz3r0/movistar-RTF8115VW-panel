@@ -1,4 +1,4 @@
-# Red local: aparatos conectados, IP fijas (reservas), reparto de
+# Red local: dispositivos conectados, IP fijas (reservas), reparto de
 # direcciones (DHCP) e IPv6 en casa. Pool DHCP 0: el de la red de casa.
 
 [[ajuste]]

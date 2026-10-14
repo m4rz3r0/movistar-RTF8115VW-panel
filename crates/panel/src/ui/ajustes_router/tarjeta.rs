@@ -5,7 +5,7 @@
 //! único que nombra la API.
 //!
 //! Un ajuste que no se pudo leer muestra el motivo y no se edita. Los
-//! aparatos y las IP fijas tienen su componente ([`Dispositivos`],
+//! dispositivos y las IP fijas tienen su componente ([`Dispositivos`],
 //! [`Reservas`]); otro componente propio (puertos…) es por ahora un hueco
 //! con su título y descripción; una lista sin componente se ve como tabla.
 
@@ -415,6 +415,7 @@ fn TarjetaAjuste(a: AjusteVista, solo_lectura: bool, recargar: Callback<()>) -> 
                 instancia: None,
                 borrar: false,
                 valores: pedir,
+                esperados: BTreeMap::new(),
             };
             spawn_local(async move {
                 match preparar_ajuste(p).await {

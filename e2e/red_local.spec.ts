@@ -2,22 +2,22 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 
 // Red local (/ajustes/red_local) a 360 y 1440 px, en español y en inglés,
-// contra router-sim: los aparatos conectados con «Fijar esta IP» y las IP
+// contra router-sim: los dispositivos conectados con «Fijar esta IP» y las IP
 // fijas con su tabla (apilada en móvil) y el formulario de añadir, que dice
 // junto al campo por qué no vale una IP (la del router).
 //
 // «Fijar esta IP» → aplicado → aparece en IP fijas se hace en una sola
 // combinación (inglés, 1440 px, la última): cada aplicación se vigila 30 s y
-// el aparato queda con su IP fija, así que después se borra (otra
+// el dispositivo queda con su IP fija, así que después se borra (otra
 // aplicación) para dejar el simulador como estaba. Las demás abren el
 // resumen y lo cancelan.
 
 const textos = {
   es: {
-    aparatos: "Aparatos conectados",
+    dispositivos: "Dispositivos conectados",
     fijas: "IP fijas",
     fijar: "Fijar esta IP",
-    fijarHost2: "Fijar la IP 192.168.1.62 para host-2",
+    fijarHost2: "Fijar esta IP: 192.168.1.62 (host-2)",
     yaFija: "Ya tiene IP fija",
     anadir: "Añadir IP fija",
     mac: "Dirección física (MAC)",
@@ -32,10 +32,10 @@ const textos = {
     ipRouter: "Esa es la IP del router: elige otra.",
   },
   en: {
-    aparatos: "Connected devices",
+    dispositivos: "Connected devices",
     fijas: "Fixed IPs",
     fijar: "Fix this IP",
-    fijarHost2: "Fix the IP 192.168.1.62 for host-2",
+    fijarHost2: "Fix this IP: 192.168.1.62 (host-2)",
     yaFija: "Already has a fixed IP",
     anadir: "Add fixed IP",
     mac: "Physical address (MAC)",
@@ -82,21 +82,21 @@ for (const idioma of ["es", "en"] as const) {
         viewport: { width: ancho, height: 900 },
       });
 
-      test("aparatos e IP fijas", async ({ page }) => {
+      test("dispositivos e IP fijas", async ({ page }) => {
         if (aplicaDeVerdad) test.setTimeout(300_000);
         const t = textos[idioma];
         const errores = recogerErrores(page);
         await entrar(page);
         await page.goto("/ajustes/red_local");
         await asentar(page);
-        const aparatos = tarjeta(page, t.aparatos);
+        const dispositivos = tarjeta(page, t.dispositivos);
         const fijas = tarjeta(page, t.fijas);
-        await expect(aparatos).toBeVisible();
+        await expect(dispositivos).toBeVisible();
         await expect(fijas).toBeVisible();
         await sinDesbordamiento(page, `red local ${idioma} ${ancho}`);
-        // Un aparato con reserva no se puede fijar otra vez.
-        await expect(aparatos.getByRole("button", { name: t.yaFija }).first()).toBeDisabled();
-        sinApi(await aparatos.innerText());
+        // Un dispositivo con reserva no se puede fijar otra vez.
+        await expect(dispositivos.getByRole("button", { name: t.yaFija }).first()).toBeDisabled();
+        sinApi(await dispositivos.innerText());
         sinApi(await fijas.innerText());
         await page.screenshot({
           path: `capturas/red_local-${idioma}-${ancho}.png`,
@@ -127,12 +127,15 @@ for (const idioma of ["es", "en"] as const) {
         await expect(anadir).toBeFocused();
 
         // «Fijar esta IP»: el resumen con la MAC y la IP actuales.
-        const fijar = aparatos.getByRole("button", { name: t.fijarHost2 });
+        // El nombre accesible empieza por lo que se ve (WCAG 2.5.3).
+        const fijar = dispositivos.getByRole("button", { name: t.fijarHost2, exact: true });
         await expect(fijar).toHaveText(t.fijar);
         await fijar.click();
         const dialogo = page.locator("dialog[open]");
         await expect(dialogo).toBeVisible();
         await expect(dialogo.locator("#grupo-titulo")).toHaveText(t.revisar);
+        // Nombra el dispositivo.
+        await expect(dialogo).toContainText(`${t.fijas}: host-2`);
         await expect(dialogo.getByText("02:00:00:00:00:03")).toBeVisible();
         await expect(dialogo.getByText("192.168.1.62")).toBeVisible();
         sinApi(await dialogo.innerText());
@@ -141,19 +144,22 @@ for (const idioma of ["es", "en"] as const) {
 
         if (aplicaDeVerdad) {
           await aplicar(page, t);
-          // La reserva nueva, en IP fijas; el aparato ya no se puede fijar.
+          // La reserva nueva, en IP fijas; el dispositivo ya no se puede fijar.
           const fila = fijas.locator("tbody tr").filter({ hasText: "192.168.1.62" });
           await expect(fila).toHaveCount(1);
           await expect(fila).toContainText("host-2");
           await expect(fila).toContainText("02:00:00:00:00:03");
-          await expect(aparatos.getByRole("button", { name: t.fijarHost2 })).toHaveCount(0);
-          await expect(aparatos.getByRole("heading", { level: 2 })).toBeFocused();
+          await expect(dispositivos.getByRole("button", { name: t.fijarHost2 })).toHaveCount(0);
+          await expect(
+            dispositivos.getByRole("button", { name: `${t.yaFija}: 192.168.1.62` }),
+          ).toBeDisabled();
+          await expect(dispositivos.getByRole("heading", { level: 2 })).toBeFocused();
           // Borrarla deja el simulador como estaba.
           await fijas.getByRole("button", { name: t.borrarHost2 }).click();
           await expect(page.locator("dialog[open]")).toBeVisible();
           await aplicar(page, t);
           await expect(fijas.locator("tbody tr").filter({ hasText: "192.168.1.62" })).toHaveCount(0);
-          await expect(aparatos.getByRole("button", { name: t.fijarHost2 })).toBeVisible();
+          await expect(dispositivos.getByRole("button", { name: t.fijarHost2 })).toBeVisible();
         } else {
           await dialogo.getByRole("button", { name: t.cancelar }).click();
           await expect(page.locator("dialog[open]")).toHaveCount(0);

@@ -1,4 +1,4 @@
-//! Red local: los aparatos conectados (`leer_dispositivos`) y las IP fijas
+//! Red local: los dispositivos conectados (`leer_dispositivos`) y las IP fijas
 //! (reservas DHCP) creadas, borradas y deshechas como grupos de cambios,
 //! con la validación de una reserva (`validar_reserva`) igual en el
 //! servidor y en la página.
@@ -10,6 +10,7 @@ use common::{
     sesion, variante,
 };
 use panel::ajustes_router::{ErrorReserva, validar_reserva};
+use panel::ajustes_router::{PeticionAjuste, valida_la_reserva};
 use serde_json::{Value, json};
 use std::net::Ipv4Addr;
 
@@ -227,7 +228,7 @@ async fn deshacer(p: &Panel, cookie: &str, id: i64) {
 }
 
 /// «Fijar esta IP»: la reserva nueva con la MAC y la IP actuales del
-/// aparato, activa. Aparece en las reservas y en el aparato; deshacerla la
+/// dispositivo, activa. Aparece en las reservas y en el dispositivo; deshacerla la
 /// borra.
 #[tokio::test]
 async fn fijar_ip_crea_reserva_y_deshacer_la_borra() {
@@ -347,7 +348,7 @@ async fn reserva_invalida_da_400() {
         (
             Some("0"),
             json!({ "ip": "192.168.1.69" }),
-            "IP fija de otro aparato",
+            "IP fija de otro dispositivo",
         ),
     ] {
         let (status, body) = preparar(&p, &cookie, instancia, false, valores).await;
@@ -372,7 +373,7 @@ async fn reserva_invalida_da_400() {
     assert_eq!(status, 200, "{body}");
 }
 
-/// Cada aparato con su nombre, su conexión (la banda por el punto de acceso
+/// Cada dispositivo con su nombre, su conexión (la banda por el punto de acceso
 /// al que está asociado; si no, el cable) y su reserva.
 #[tokio::test]
 async fn leer_dispositivos_con_banda() {
@@ -418,4 +419,333 @@ async fn pagina_red_local_con_dispositivos_y_reservas() {
     assert!(html.contains("Añadir IP fija"), "{html}");
     assert!(html.contains("192.168.1.62"), "{html}");
     assert!(!html.contains("todavía no está lista"), "{html}");
+}
+
+// ------------------------------------------- ronda de corrección 1
+
+/// HTML de `/ajustes/red_local`.
+async fn pagina(p: &Panel, cookie: &str) -> String {
+    let resp = common::get_con_cookie(&p.app, "/ajustes/red_local", cookie).await;
+    assert_eq!(resp.status(), 200);
+    common::body_text(resp).await
+}
+
+/// El `<article>` de la página cuyo título es `titulo` (sin lo que llega
+/// después por streaming).
+fn tarjeta<'a>(html: &'a str, titulo: &str) -> &'a str {
+    html.split("<article")
+        .find(|a| a.contains(&format!(">{titulo}</h2>")))
+        .unwrap_or_else(|| panic!("sin la tarjeta {titulo}"))
+        .split("</article>")
+        .next()
+        .unwrap()
+}
+
+/// El fragmento que el servidor envía aparte (streaming fuera de orden, un
+/// `<template>`) con `marca`: lo que pinta una tarjeta tras leer la red.
+fn fragmento<'a>(html: &'a str, marca: &str) -> &'a str {
+    html.split("<template")
+        .map(|t| t.split("</template>").next().unwrap())
+        .find(|t| t.contains(marca) && !t.contains("<article"))
+        .unwrap_or_else(|| panic!("sin el fragmento con {marca}"))
+}
+
+/// Lo que se ve de los dispositivos y de las IP fijas, ya leídos.
+fn lista_de_dispositivos(html: &str) -> &str {
+    fragmento(html, r#"class="dispositivos""#)
+}
+
+fn ip_fijas(html: &str) -> &str {
+    fragmento(html, "tabla-apilada")
+}
+
+/// El nombre accesible de «Fijar esta IP» empieza por lo que se ve
+/// (WCAG 2.5.3): quien lo pide por voz lo encuentra.
+#[tokio::test]
+async fn fijar_esta_ip_se_nombra_como_se_ve() {
+    let (p, cookie) = panel_con_gestor().await;
+    let html = pagina(&p, &cookie).await;
+    assert!(
+        html.contains(r#"aria-label="Fijar esta IP: 192.168.1.62 (host-2)""#),
+        "{html}"
+    );
+}
+
+/// Un dispositivo con IP fija dice cuál es, aunque ahora tenga otra.
+#[tokio::test]
+async fn ya_tiene_ip_fija_dice_la_reservada() {
+    let (p, cookie) = panel_con_gestor().await;
+    let d = dispositivos(&p, &cookie).await;
+    assert_eq!(por_mac(&d, "02:00:00:00:00:01")["ip"], "192.168.1.60");
+    assert_eq!(por_mac(&d, "02:00:00:00:00:01")["ip_fija"], "192.168.1.69");
+    assert_eq!(por_mac(&d, "02:00:00:00:00:03")["ip_fija"], Value::Null);
+    let html = pagina(&p, &cookie).await;
+    assert!(html.contains("Ya tiene IP fija: 192.168.1.69"), "{html}");
+}
+
+/// Sin «Fijar esta IP» donde el servidor la rechazaría siempre (una IP de
+/// otra red, la de otra reserva) ni para un dispositivo desconectado (su última
+/// IP puede tenerla ya otro): una nota breve en su lugar.
+#[tokio::test]
+async fn sin_fijar_si_no_se_puede() {
+    let (p, cookie) = panel_con_gestor_y_capa(&variante("dispositivos-irregulares")).await;
+    // Otra reserva con la IP de host-2.
+    p.state
+        .hgu
+        .write(
+            "dhcp.asp",
+            "cbDhcpV4SvrPoolSetStatic",
+            &[
+                ("rtm_cfg_dhcpv4_svr_pool_id", "0"),
+                ("rtm_dhcpv4_svr_pool_static_id", "-1"),
+                ("mac_addr", "02:00:00:00:00:0b"),
+                ("ipv4_addr", "192.168.1.62"),
+                ("adm_state", "1"),
+            ],
+        )
+        .await
+        .unwrap();
+    let html = pagina(&p, &cookie).await;
+    let dispositivos = lista_de_dispositivos(&html);
+    for ip in ["198.51.100.76", "192.168.1.61", "192.168.1.62"] {
+        assert!(
+            !dispositivos.contains(&format!("Fijar esta IP: {ip} ")),
+            "{ip}: {dispositivos}"
+        );
+    }
+    assert!(dispositivos.contains("Fijar esta IP: 192.168.1.64 (host-4)"));
+    assert_eq!(dispositivos.matches("Esta IP no se puede fijar").count(), 2);
+    assert_eq!(
+        dispositivos.matches("Conéctalo para fijar su IP").count(),
+        1
+    );
+}
+
+/// El nombre del dispositivo de una reserva se busca con las MAC normalizadas.
+#[tokio::test]
+async fn nombre_de_la_reserva_con_mac_normalizada() {
+    let (p, cookie) = panel_con_gestor_y_capa(&variante("dispositivos-irregulares")).await;
+    let html = pagina(&p, &cookie).await;
+    let fijas = ip_fijas(&html);
+    let fila = fijas
+        .split("<tr")
+        .find(|f| f.contains("02:00:00:00:00:04"))
+        .unwrap_or_else(|| panic!("{fijas}"));
+    assert!(fila.contains("host-3"), "{fila}");
+}
+
+/// Una sola región de alerta por tarjeta, no una por dispositivo.
+#[tokio::test]
+async fn una_alerta_por_tarjeta() {
+    let (p, cookie) = panel_con_gestor().await;
+    let html = pagina(&p, &cookie).await;
+    let alertas = |t: &str| t.matches(r#"role="alert""#).count();
+    let n =
+        alertas(tarjeta(&html, "Dispositivos conectados")) + alertas(lista_de_dispositivos(&html));
+    assert_eq!(n, 1, "dispositivos");
+    let n = alertas(tarjeta(&html, "IP fijas")) + alertas(ip_fijas(&html));
+    assert_eq!(n, 1, "IP fijas");
+}
+
+/// Desactivar una reserva que ya no valdría (comparte IP con otra) no exige
+/// corregir la IP; activarla, sí.
+#[tokio::test]
+async fn desactivar_sin_corregir_la_ip() {
+    let (p, cookie) = panel_con_gestor().await;
+    p.state
+        .hgu
+        .write(
+            "dhcp.asp",
+            "cbDhcpV4SvrPoolSetStatic",
+            &[
+                ("rtm_cfg_dhcpv4_svr_pool_id", "0"),
+                ("rtm_dhcpv4_svr_pool_static_id", "0"),
+                ("ipv4_addr", "192.168.1.69"),
+                ("adm_state", "1"),
+            ],
+        )
+        .await
+        .unwrap();
+    let (status, body) =
+        preparar(&p, &cookie, Some("0"), false, json!({ "activa": "false" })).await;
+    assert_eq!(status, 200, "{body}");
+    p.state
+        .hgu
+        .write(
+            "dhcp.asp",
+            "cbDhcpV4SvrPoolSetStatic",
+            &[
+                ("rtm_cfg_dhcpv4_svr_pool_id", "0"),
+                ("rtm_dhcpv4_svr_pool_static_id", "0"),
+                ("adm_state", "0"),
+            ],
+        )
+        .await
+        .unwrap();
+    let (status, body) = preparar(&p, &cookie, Some("0"), false, json!({ "activa": "true" })).await;
+    assert_eq!(status, 400, "{body}");
+    assert!(body.contains("IP fija de otro dispositivo"), "{body}");
+}
+
+/// Qué peticiones de una reserva se validan: una nueva, cambiar la MAC o la
+/// IP y activarla; desactivarla o borrarla, no.
+#[test]
+fn que_se_valida_de_una_reserva() {
+    let p = |instancia: Option<&str>, borrar: bool, valores: &[(&str, &str)]| PeticionAjuste {
+        ajuste: "red_local.reservas".into(),
+        instancia: instancia.map(str::to_owned),
+        borrar,
+        valores: valores
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+            .collect(),
+        esperados: Default::default(),
+    };
+    assert!(valida_la_reserva(&p(
+        None,
+        false,
+        &[("mac", "x"), ("ip", "y")]
+    )));
+    assert!(valida_la_reserva(&p(Some("0"), false, &[("ip", "y")])));
+    assert!(valida_la_reserva(&p(Some("0"), false, &[("mac", "x")])));
+    assert!(valida_la_reserva(&p(
+        Some("0"),
+        false,
+        &[("activa", "true")]
+    )));
+    assert!(!valida_la_reserva(&p(
+        Some("0"),
+        false,
+        &[("activa", "false")]
+    )));
+    assert!(!valida_la_reserva(&p(Some("0"), true, &[])));
+}
+
+/// El resumen de una reserva nombra el dispositivo, si se conoce.
+#[tokio::test]
+async fn el_resumen_nombra_el_dispositivo() {
+    let (p, cookie) = panel_con_gestor().await;
+    let (status, body) = preparar(
+        &p,
+        &cookie,
+        None,
+        false,
+        json!({ "mac": "02:00:00:00:00:03", "ip": "192.168.1.62", "activa": "true" }),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    let g: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(g["detalle"], "host-2", "{g}");
+    let (status, body) = preparar(&p, &cookie, Some("0"), true, json!({})).await;
+    assert_eq!(status, 200, "{body}");
+    let g: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(g["detalle"], "host-3", "{g}");
+}
+
+/// `preparar_ajuste` con lo que la página espera de la instancia.
+async fn preparar_esperando(
+    p: &Panel,
+    cookie: &str,
+    instancia: &str,
+    borrar: bool,
+    valores: Value,
+    mac: &str,
+) -> (u16, String) {
+    llamar(
+        p,
+        "preparar_ajuste",
+        json!({ "p": {
+            "ajuste": "red_local.reservas",
+            "instancia": instancia,
+            "borrar": borrar,
+            "valores": valores,
+            "esperados": { "mac": mac },
+        } }),
+        Some(cookie),
+    )
+    .await
+}
+
+/// Editar o borrar una reserva que otra sesión ha cambiado entretanto (se
+/// borró la de id máximo y se creó otra, que el router numera igual): 409
+/// y nada escrito. Con la que se esperaba, sí se prepara.
+#[tokio::test]
+async fn editar_o_borrar_otra_reserva_da_409() {
+    let (p, cookie) = panel_con_gestor().await;
+    let base = &[("rtm_cfg_dhcpv4_svr_pool_id", "0")];
+    let escribir = |extra: &[(&'static str, &'static str)]| {
+        let mut params = base.to_vec();
+        params.extend_from_slice(extra);
+        params
+    };
+    p.state
+        .hgu
+        .write(
+            "dhcp.asp",
+            "cbDhcpV4SvrPoolSetStatic",
+            &escribir(&[("rtm_dhcpv4_svr_pool_static_id", "1"), ("del", "DEL")]),
+        )
+        .await
+        .unwrap();
+    p.state
+        .hgu
+        .write(
+            "dhcp.asp",
+            "cbDhcpV4SvrPoolSetStatic",
+            &escribir(&[
+                ("rtm_dhcpv4_svr_pool_static_id", "-1"),
+                ("mac_addr", "02:00:00:00:00:0b"),
+                ("ipv4_addr", "192.168.1.90"),
+            ]),
+        )
+        .await
+        .unwrap();
+    assert!(
+        reservas(&p, &cookie).await.contains(&(
+            "1".into(),
+            "02:00:00:00:00:0b".into(),
+            "192.168.1.90".into()
+        )),
+        "el sim reutiliza el id"
+    );
+    let escritas = p.sim.control.writes().len();
+    let (status, body) =
+        preparar_esperando(&p, &cookie, "1", true, json!({}), "02:00:00:00:00:01").await;
+    assert_eq!(status, 409, "{body}");
+    assert!(body.contains("ha cambiado"), "{body}");
+    let (status, body) = preparar_esperando(
+        &p,
+        &cookie,
+        "1",
+        false,
+        json!({ "activa": "false" }),
+        "02-00-00-00-00-01",
+    )
+    .await;
+    assert_eq!(status, 409, "{body}");
+    assert_eq!(p.sim.control.writes().len(), escritas);
+    let (status, body) =
+        preparar_esperando(&p, &cookie, "1", true, json!({}), "02-00-00-00-00-0B").await;
+    assert_eq!(status, 200, "{body}");
+}
+
+/// Editar una reserva que no existe y crear una con la IP de difusión.
+#[tokio::test]
+async fn reserva_inexistente_o_de_difusion_da_400() {
+    let (p, cookie) = panel_con_gestor().await;
+    let (status, body) =
+        preparar(&p, &cookie, Some("77"), false, json!({ "activa": "false" })).await;
+    assert_eq!(status, 400, "{body}");
+    assert!(body.contains("no ha podido preparar"), "{body}");
+    let (status, body) = preparar(
+        &p,
+        &cookie,
+        None,
+        false,
+        json!({ "mac": "02:00:00:00:00:03", "ip": "192.168.1.0", "activa": "true" }),
+    )
+    .await;
+    assert_eq!(status, 400, "{body}");
+    assert!(body.contains("es de toda la red"), "{body}");
+    assert!(p.sim.control.writes().is_empty());
 }

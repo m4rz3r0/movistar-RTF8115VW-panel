@@ -227,6 +227,8 @@ mod catalogo_toml {
                     "fijar",
                     "fijar-de",
                     "ya-fija",
+                    "no-fijable",
+                    "fijar-desconectado",
                     "vacia",
                 ],
                 Componente::Reservas => &[
@@ -244,6 +246,7 @@ mod catalogo_toml {
                     "error-ip-repetida",
                     "error-mac-repetida",
                     "error-difusion",
+                    "error-cambiada",
                 ],
                 Componente::Puertos | Componente::ContrasenaRouter => &[],
             }
