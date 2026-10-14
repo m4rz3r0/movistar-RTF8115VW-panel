@@ -2,8 +2,21 @@
 
 ## Aparatos conectados
 ajuste-red_local-dispositivos-titulo = Aparatos conectados
-ajuste-red_local-dispositivos-desc = Los aparatos que el router conoce en tu red de casa, con su dirección y si están conectados ahora.
-ajuste-red_local-dispositivos-ayuda = Esta lista solo se consulta: no cambia nada en el router. Te sirve para saber qué hay conectado y para dar una IP fija a un aparato.
+ajuste-red_local-dispositivos-desc = Los aparatos que el router conoce en tu red de casa: cómo se llaman, su dirección y por dónde se conectan. Con «Fijar esta IP», un aparato recibe siempre la misma dirección.
+ajuste-red_local-dispositivos-ayuda = Ver esta lista no cambia nada en el router. «Fijar esta IP» guarda la dirección que tiene ahora el aparato como su IP fija (la verás en «IP fijas»); antes de aplicarlo te enseña el cambio. Desde aquí no se puede bloquear un aparato ni ponerle control parental: el router no ofrece al panel una forma segura de hacerlo, y se está investigando.
+ajuste-red_local-dispositivos-col-ip = Dirección IP
+ajuste-red_local-dispositivos-col-mac = Dirección física (MAC)
+ajuste-red_local-dispositivos-sin-nombre = Sin nombre
+ajuste-red_local-dispositivos-cable = Por cable
+ajuste-red_local-dispositivos-wifi24 = WiFi 2,4 GHz
+ajuste-red_local-dispositivos-wifi5 = WiFi 5 GHz
+ajuste-red_local-dispositivos-invitados = WiFi de invitados
+ajuste-red_local-dispositivos-desconocida = No se sabe
+ajuste-red_local-dispositivos-desconectado = No conectado ahora
+ajuste-red_local-dispositivos-fijar = Fijar esta IP
+ajuste-red_local-dispositivos-fijar-de = Fijar la IP { $ip } para { $equipo }
+ajuste-red_local-dispositivos-ya-fija = Ya tiene IP fija
+ajuste-red_local-dispositivos-vacia = El router todavía no conoce ningún aparato en tu red.
 
 ## IP fijas
 ajuste-red_local-reservas-titulo = IP fijas
@@ -15,6 +28,21 @@ ajuste-red_local-reservas-ip = Dirección IP
 ajuste-red_local-reservas-ip-desc = La dirección que tendrá siempre el aparato, dentro de tu red (por ejemplo 192.168.1.60) y que no use ya otro aparato.
 ajuste-red_local-reservas-activa = Activa
 ajuste-red_local-reservas-activa-desc = Si la desactivas, la reserva se guarda pero el aparato vuelve a recibir una dirección cualquiera.
+ajuste-red_local-reservas-activa-recomendado = Recomendado si quieres que el aparato tenga ya su IP fija. A favor: la recibe la próxima vez que se conecte. En contra: ninguno importante; desactívala solo si quieres guardarla para más adelante sin usarla.
+ajuste-red_local-reservas-col-equipo = Aparato
+ajuste-red_local-reservas-col-acciones = Qué hacer
+ajuste-red_local-reservas-anadir = Añadir IP fija
+ajuste-red_local-reservas-nueva = Nueva IP fija
+ajuste-red_local-reservas-cambiar = Cambiar la IP fija
+ajuste-red_local-reservas-editar-de = Editar la IP fija de { $equipo }
+ajuste-red_local-reservas-borrar = Borrar
+ajuste-red_local-reservas-borrar-de = Borrar la IP fija de { $equipo }
+ajuste-red_local-reservas-vacia = Todavía no hay ninguna IP fija. Añádela aquí o con «Fijar esta IP» en la lista de aparatos.
+ajuste-red_local-reservas-error-fuera = Esa IP no es de tu red. Tiene que ser de la misma red que el router ({ $router }).
+ajuste-red_local-reservas-error-router = Esa es la IP del router: elige otra.
+ajuste-red_local-reservas-error-ip-repetida = Esa IP ya es la IP fija de otro aparato: elige otra.
+ajuste-red_local-reservas-error-mac-repetida = Ese aparato ya tiene una IP fija: cámbiala en su fila en vez de añadir otra.
+ajuste-red_local-reservas-error-difusion = Esa IP es de toda la red (la primera y la última no se pueden dar a un aparato): elige otra.
 
 ## Reparto de direcciones (DHCP)
 ajuste-red_local-dhcp-titulo = Reparto de direcciones (DHCP)

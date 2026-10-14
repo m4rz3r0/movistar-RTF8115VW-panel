@@ -28,6 +28,9 @@ pub fn claves_requeridas(a: &Ajuste) -> Vec<String> {
         format!("{p}-ayuda"),
     ];
     claves.extend(a.efecto.iter().map(|e| format!("efecto-{e}")));
+    if let Some(c) = a.componente {
+        claves.extend(c.claves().iter().map(|k| format!("{p}-{k}")));
+    }
     for c in &a.campos {
         let pc = format!("{p}-{}", c.id);
         claves.push(pc.clone());

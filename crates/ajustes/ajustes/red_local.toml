@@ -34,6 +34,8 @@ id = "activa"
 escribe = { funcion = "cbDhcpV4SvrPoolSetStatic", parametro = "adm_state" }
 lee = "adm_state"
 tipo = "booleano"
+# Una reserva nueva nace activa (la plantilla parte del recomendado).
+recomendado = "true"
 
 [[ajuste]]
 id = "red_local.dhcp"

@@ -169,7 +169,7 @@ pub fn validar_legible(
 }
 
 /// MAC con `:` o con `-` (el mismo en toda ella), en minúsculas con `:`.
-pub(crate) fn mac(v: &str) -> Option<String> {
+pub fn mac(v: &str) -> Option<String> {
     let sep = if v.contains('-') { '-' } else { ':' };
     let partes: Vec<&str> = v.split(sep).collect();
     let valida = partes.len() == 6

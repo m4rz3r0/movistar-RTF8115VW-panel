@@ -208,6 +208,46 @@ mod catalogo_toml {
                 Componente::ContrasenaRouter => "contrasena_router",
             }
         }
+
+        /// Textos propios del componente: finales de claves de traducción
+        /// que, tras el prefijo del ajuste (`ajuste-red_local-reservas`),
+        /// van en el `.ftl` de su tema.
+        pub fn claves(self) -> &'static [&'static str] {
+            match self {
+                Componente::Dispositivos => &[
+                    "col-ip",
+                    "col-mac",
+                    "sin-nombre",
+                    "cable",
+                    "wifi24",
+                    "wifi5",
+                    "invitados",
+                    "desconocida",
+                    "desconectado",
+                    "fijar",
+                    "fijar-de",
+                    "ya-fija",
+                    "vacia",
+                ],
+                Componente::Reservas => &[
+                    "col-equipo",
+                    "col-acciones",
+                    "anadir",
+                    "nueva",
+                    "cambiar",
+                    "editar-de",
+                    "borrar",
+                    "borrar-de",
+                    "vacia",
+                    "error-fuera",
+                    "error-router",
+                    "error-ip-repetida",
+                    "error-mac-repetida",
+                    "error-difusion",
+                ],
+                Componente::Puertos | Componente::ContrasenaRouter => &[],
+            }
+        }
     }
 
     /// Un campo del ajuste: un parámetro de una función de escritura (o un

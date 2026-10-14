@@ -9,12 +9,14 @@
 //! de `<details class="detalles-tecnicos">`. Un secreto llega como
 //! [`ValorLegible::Secreto`]: su valor nunca sale del servidor.
 
+use crate::t;
 use crate::ui::explorador::RiesgoCambio;
 use ajustes::{Nivel, Requiere, TipoCampo, ValorLegible};
 use leptos::prelude::*;
 use leptos::server_fn::codec::Json;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::net::Ipv4Addr;
 
 /// Los ajustes de un tema, leídos del router.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -205,6 +207,118 @@ pub struct CambioLegible {
     pub tipo: TipoCampo,
 }
 
+/// Un aparato que el router conoce en la red de casa.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DispositivoVista {
+    /// Nombre que da el aparato; vacío si no da ninguno.
+    pub nombre: String,
+    pub ip: String,
+    pub mac: String,
+    pub conexion: Conexion,
+    /// Conectado ahora.
+    pub activo: bool,
+    /// Id de su reserva (IP fija), si tiene.
+    pub reserva: Option<String>,
+}
+
+/// Por dónde está conectado un aparato.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Conexion {
+    /// Por cable: la interfaz del router tal como la da (`tipo:id`). Qué
+    /// toma física es cada id está sin comprobar en el router real, así que
+    /// la página solo dice «por cable».
+    Cable(String),
+    Wifi24,
+    Wifi5,
+    /// Asociado a una red de invitados.
+    Invitados,
+    /// No se sabe: no está conectado ahora o no se pudo leer la WiFi.
+    Desconocida,
+}
+
+/// Por qué no vale una reserva (IP fija).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ErrorReserva {
+    /// La IP no es de la red de casa.
+    FueraDeLaRed,
+    /// La IP es la del router.
+    IpDelRouter,
+    /// Otra reserva ya tiene esa IP.
+    IpRepetida,
+    /// El aparato (su MAC) ya tiene otra reserva.
+    MacRepetida,
+    /// La primera o la última dirección de la red, que son de toda la red.
+    Difusion,
+}
+
+impl ErrorReserva {
+    /// Campo de la reserva junto al que va el mensaje.
+    pub fn campo(self) -> &'static str {
+        match self {
+            ErrorReserva::MacRepetida => "mac",
+            _ => "ip",
+        }
+    }
+
+    /// Mensaje traducido; `router` es la IP del router (la cita al decir
+    /// que una IP no es de la red).
+    pub fn texto(self, router: Ipv4Addr) -> String {
+        match self {
+            ErrorReserva::FueraDeLaRed => t!(
+                "ajuste-red_local-reservas-error-fuera",
+                router = router.to_string()
+            ),
+            ErrorReserva::IpDelRouter => t!("ajuste-red_local-reservas-error-router"),
+            ErrorReserva::IpRepetida => t!("ajuste-red_local-reservas-error-ip-repetida"),
+            ErrorReserva::MacRepetida => t!("ajuste-red_local-reservas-error-mac-repetida"),
+            ErrorReserva::Difusion => t!("ajuste-red_local-reservas-error-difusion"),
+        }
+    }
+}
+
+/// MAC comparable: normalizada si es válida; si no, en minúsculas.
+fn mac_comparable(mac: &str) -> String {
+    ajustes::normalizar_mac(mac.trim()).unwrap_or_else(|| mac.trim().to_ascii_lowercase())
+}
+
+/// ¿Vale la reserva de `mac` a `ip` en la red `lan` (IP y máscara del
+/// router), con las reservas `existentes` (`(id, mac, ip)`)? Al editar la
+/// reserva `editando`, la suya no cuenta como repetida. La MAC y la IP ya
+/// tienen buen formato (lo comprueba `validar_legible`).
+pub fn validar_reserva(
+    mac: &str,
+    ip: Ipv4Addr,
+    lan: (Ipv4Addr, Ipv4Addr),
+    existentes: &[(String, String, String)],
+    editando: Option<&str>,
+) -> Result<(), ErrorReserva> {
+    let (router, mascara) = lan;
+    let (m, n) = (u32::from(mascara), u32::from(ip));
+    if n & m != u32::from(router) & m {
+        return Err(ErrorReserva::FueraDeLaRed);
+    }
+    if ip == router {
+        return Err(ErrorReserva::IpDelRouter);
+    }
+    let anfitrion = n & !m;
+    if anfitrion == 0 || anfitrion == !m {
+        return Err(ErrorReserva::Difusion);
+    }
+    let otras = || {
+        existentes
+            .iter()
+            .filter(|(id, _, _)| Some(id.as_str()) != editando)
+    };
+    if otras().any(|(_, _, otra)| otra.trim().parse::<Ipv4Addr>().ok() == Some(ip)) {
+        return Err(ErrorReserva::IpRepetida);
+    }
+    let mac = mac_comparable(mac);
+    if otras().any(|(_, otra, _)| mac_comparable(otra) == mac) {
+        return Err(ErrorReserva::MacRepetida);
+    }
+    Ok(())
+}
+
 /// Texto traducido de un valor que no vale, con sus límites: el mismo en el
 /// servidor y en la página.
 pub fn texto_error_valor(e: &ajustes::ErrorValor) -> String {
@@ -255,6 +369,21 @@ pub async fn leer_tema(tema: String) -> Result<TemaVista, ServerFnError> {
     servidor::leer_tema(tema).await
 }
 
+/// Los aparatos que el router conoce en la red de casa, los conectados
+/// primero y por IP, con su conexión y su reserva. Exige sesión; la
+/// respuesta va con `no-store`.
+#[server(endpoint = "leer_dispositivos", input = Json)]
+pub async fn leer_dispositivos() -> Result<Vec<DispositivoVista>, ServerFnError> {
+    servidor::leer_dispositivos().await
+}
+
+/// IP y máscara del router en la red de casa (`None` si no da ninguna
+/// legible): la página valida con ellas una reserva antes de enviarla.
+#[server(endpoint = "leer_red_casa", input = Json)]
+pub async fn leer_red_casa() -> Result<Option<(Ipv4Addr, Ipv4Addr)>, ServerFnError> {
+    servidor::leer_red_casa().await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -292,7 +421,8 @@ pub(crate) mod servidor {
         },
     };
     use ajustes::{
-        Ajuste, Campo, ErrorValor, Tema, a_legible, a_router, falta_requerido, prefijo_i18n,
+        Ajuste, Campo, Componente, ErrorValor, Tema, a_legible, a_router, falta_requerido,
+        prefijo_i18n,
     };
     use axum::http::StatusCode;
     use catalogo::{Catalogo, Riesgo};
@@ -863,6 +993,152 @@ pub(crate) mod servidor {
         }
     }
 
+    // --------------------------------------------------- red local
+
+    /// Lectura del router que falla al leer los aparatos o la red: 502 con
+    /// el mensaje de siempre (el detalle va al registro).
+    fn sin_leer(que: &str, e: hgu::Error) -> ServerFnError {
+        tracing::warn!("ajustes: no se puede leer {que}: {e}");
+        fallo(StatusCode::BAD_GATEWAY, t!("ajustes-error-lectura"))
+    }
+
+    /// Conexión de cada MAC asociada a la WiFi (en minúsculas), por los
+    /// puntos de acceso de cada radio: la radio 0 es la de 2,4 GHz y la 1
+    /// la de 5 GHz; en cada una, el punto de acceso con su mismo id es la
+    /// red principal y los demás son de invitados. `None` si no se pudo
+    /// leer alguna radio.
+    async fn asociados(c: &hgu::Client) -> Option<HashMap<String, Conexion>> {
+        let mut out = HashMap::new();
+        for radio in hgu::read::RADIOS_POR_DEFECTO {
+            let estaciones = hgu::read::wifi_stations(c, radio)
+                .await
+                .inspect_err(|e| tracing::warn!("ajustes: no se puede leer la WiFi {radio}: {e}"))
+                .ok()?;
+            for st in estaciones {
+                let conexion = match (st.ap_id == radio, radio) {
+                    (false, _) => Conexion::Invitados,
+                    (true, "0") => Conexion::Wifi24,
+                    (true, _) => Conexion::Wifi5,
+                };
+                out.insert(st.mac.to_ascii_lowercase(), conexion);
+            }
+        }
+        Some(out)
+    }
+
+    /// Orden de la lista: los conectados primero y, dentro, por IP (las que
+    /// no son IPv4, al final).
+    fn orden(d: &DispositivoVista) -> (bool, u32, String) {
+        let ip = d.ip.parse::<Ipv4Addr>().map_or(u32::MAX, u32::from);
+        (!d.activo, ip, d.ip.clone())
+    }
+
+    pub(super) async fn leer_dispositivos() -> Result<Vec<DispositivoVista>, ServerFnError> {
+        let (state, _) = preparar().await?;
+        let c = &state.hgu;
+        let hosts = hgu::read::lan_hosts(c)
+            .await
+            .map_err(|e| sin_leer("los aparatos", e))?;
+        let reservas = hgu::read::static_leases(c)
+            .await
+            .map_err(|e| sin_leer("las reservas", e))?;
+        let wifi = asociados(c).await;
+        let mut lista: Vec<DispositivoVista> = hosts
+            .into_iter()
+            .map(|h| {
+                let conexion = match &wifi {
+                    _ if !h.active => Conexion::Desconocida,
+                    None => Conexion::Desconocida,
+                    Some(w) => w
+                        .get(&h.mac.to_ascii_lowercase())
+                        .cloned()
+                        .unwrap_or_else(|| Conexion::Cable(h.iface.clone())),
+                };
+                let reserva = reservas
+                    .iter()
+                    .find(|r| mac_comparable(&r.mac) == mac_comparable(&h.mac))
+                    .map(|r| r.id.clone());
+                DispositivoVista {
+                    nombre: h.hostname,
+                    ip: h.ip,
+                    mac: h.mac,
+                    conexion,
+                    activo: h.active,
+                    reserva,
+                }
+            })
+            .collect();
+        lista.sort_by_key(orden);
+        Ok(lista)
+    }
+
+    pub(super) async fn leer_red_casa() -> Result<Option<(Ipv4Addr, Ipv4Addr)>, ServerFnError> {
+        let (state, _) = preparar().await?;
+        hgu::read::lan_ipv4(&state.hgu)
+            .await
+            .map_err(|e| sin_leer("la red de casa", e))
+    }
+
+    /// Comprueba una reserva de `p` como la página ([`validar_reserva`]),
+    /// con la red y las reservas que tiene ahora el router. Al editar, lo
+    /// que no se cambia es lo de la reserva. Una nueva necesita MAC e IP.
+    /// Los formatos ya están validados. Error 400 junto al campo.
+    async fn comprobar_reserva(
+        state: &AppState,
+        a: &Ajuste,
+        p: &PeticionAjuste,
+    ) -> Result<(), ServerFnError> {
+        if p.borrar {
+            return Ok(());
+        }
+        let prefijo = prefijo_i18n(a);
+        let reservas = hgu::read::static_leases(&state.hgu)
+            .await
+            .map_err(|e| sin_leer("las reservas", e))?;
+        let actual = match &p.instancia {
+            None => None,
+            Some(id) => Some(
+                reservas
+                    .iter()
+                    .find(|r| r.id == *id)
+                    .ok_or_else(|| fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-invalida")))?,
+            ),
+        };
+        let valor = |campo: &str, de_la_reserva: Option<&str>| {
+            p.valores
+                .get(campo)
+                .map(|v| v.trim().to_owned())
+                .or_else(|| de_la_reserva.map(str::to_owned))
+                .filter(|v| !v.is_empty())
+                .ok_or_else(|| {
+                    let c = a.campo(campo).expect("campo de la reserva");
+                    error_valor(&prefijo, c, &ErrorValor::Vacio)
+                })
+        };
+        let mac = valor("mac", actual.map(|r| r.mac.as_str()))?;
+        let ip = valor("ip", actual.map(|r| r.ip.as_str()))?;
+        let ip: Ipv4Addr = ip.parse().map_err(|_| {
+            let c = a.campo("ip").expect("campo de la reserva");
+            error_valor(&prefijo, c, &ErrorValor::Ip)
+        })?;
+        let lan = hgu::read::lan_ipv4(&state.hgu)
+            .await
+            .map_err(|e| sin_leer("la red de casa", e))?
+            .ok_or_else(|| {
+                tracing::warn!("ajustes: el router no da su IP en la red de casa");
+                fallo(StatusCode::BAD_GATEWAY, t!("ajustes-error-lectura"))
+            })?;
+        let existentes: Vec<(String, String, String)> =
+            reservas.into_iter().map(|r| (r.id, r.mac, r.ip)).collect();
+        validar_reserva(&mac, ip, lan, &existentes, p.instancia.as_deref()).map_err(|e| {
+            let etiqueta = crate::ui::i18n::traducir(&format!("{prefijo}-{}", e.campo()), None);
+            fallo(
+                StatusCode::BAD_REQUEST,
+                format!("{etiqueta}: {}", e.texto(lan.0)),
+            )
+        })
+    }
+
     pub(super) async fn preparar_ajuste(p: PeticionAjuste) -> Result<GrupoVista, ServerFnError> {
         let (state, _) = preparar().await?;
         let a = ajuste_por_id(&state, &p.ajuste)?;
@@ -891,6 +1167,9 @@ pub(crate) mod servidor {
         }
         let g = gestor(&state)?;
         libre(&g)?;
+        if a.componente == Some(Componente::Reservas) {
+            comprobar_reserva(&state, a, &p).await?;
+        }
         let mut grupo = grupo_de(a, &p).map_err(|e| {
             tracing::warn!("ajustes: {}: valor no válido tras validarlo: {e}", a.id);
             fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-invalida"))

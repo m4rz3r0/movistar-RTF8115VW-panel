@@ -41,6 +41,11 @@ enum Fase {
 /// tal cual.
 fn texto_valor(c: &CambioLegible, v: &str) -> String {
     let desconocido = || t!("ajustes-valor-desconocido", valor = v);
+    // Sin valor (antes de crear una instancia o tras borrarla): vacío, en
+    // cualquier tipo, no «valor no reconocido».
+    if v.is_empty() {
+        return t!("ajustes-grupo-vacio");
+    }
     match c.tipo {
         TipoCampo::Opcion => {
             let clave = format!("{}-{v}", c.campo);
@@ -55,7 +60,6 @@ fn texto_valor(c: &CambioLegible, v: &str) -> String {
             "false" => t!("comun-no"),
             _ => desconocido(),
         },
-        _ if v.is_empty() => t!("ajustes-grupo-vacio"),
         _ => v.to_owned(),
     }
 }
@@ -500,6 +504,16 @@ mod tests {
 
     fn html(g: GrupoVista) -> String {
         Owner::new().with(|| view! { <DialogoGrupo grupo=g on_cerrar=|_| {} /> }.to_html())
+    }
+
+    /// Al crear o borrar una instancia, un sí/no o una opción sin valor se
+    /// ve vacío, no como «valor no reconocido».
+    #[test]
+    fn sin_valor_es_vacio_en_cualquier_tipo() {
+        for tipo in [TipoCampo::Booleano, TipoCampo::Opcion, TipoCampo::Ip] {
+            let c = cambio("ajuste-red_local-reservas-activa", "", "true", tipo);
+            assert_eq!(texto_valor(&c, ""), t!("ajustes-grupo-vacio"), "{tipo:?}");
+        }
     }
 
     #[test]

@@ -2969,3 +2969,231 @@ summary.hist-cabeza:hover {
 .mas-opciones[open] > summary {
   margin-bottom: var(--esp-4);
 }
+
+/* Red local: aparatos conectados. Cada aparato es una fila: quién es y por
+   dónde se conecta, su IP (lo que se fija, en grande), su MAC y la acción,
+   en columnas alineadas bajo una cabecera. En pantallas estrechas, uno bajo
+   otro y cada dato con su etiqueta. */
+.aparatos {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie-1);
+}
+
+.aparato,
+.aparatos-cabecera {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 9.5em 12em 11em;
+  align-items: center;
+  gap: var(--esp-2) var(--esp-4);
+  padding: var(--esp-3) var(--esp-4);
+  border-bottom: 1px solid var(--borde);
+}
+
+.aparatos-cabecera {
+  padding-block: var(--esp-2);
+  background: var(--superficie-2);
+  color: var(--texto-2);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.aparato:last-child {
+  border-bottom: 0;
+}
+
+.aparato-quien {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-1) var(--esp-2);
+  min-width: 0;
+}
+
+.aparato-nombre {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.aparato-nombre.ajuste-vacio {
+  font-weight: 400;
+}
+
+.chip-conexion.chip-desconectado {
+  border-style: dashed;
+}
+
+.aparato-apagado .aparato-nombre,
+.aparato-apagado .aparato-ip {
+  color: var(--texto-2);
+}
+
+/* En pantallas anchas, cada dato es una columna de la fila. */
+.aparato-datos {
+  display: contents;
+}
+
+.aparato-datos > div {
+  min-width: 0;
+}
+
+.aparato-datos dt {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.aparato-datos dd {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.aparato-ip {
+  font-size: 15px;
+  color: var(--texto-1);
+}
+
+.aparato-accion {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--esp-1);
+}
+
+@media (max-width: 720px) {
+  .aparatos-cabecera {
+    display: none;
+  }
+
+  .aparato {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .aparato-datos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--esp-1) var(--esp-4);
+    margin: 0;
+  }
+
+  .aparato-datos dt {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    color: var(--texto-2);
+    font-size: 12px;
+  }
+
+  .aparato-accion {
+    align-items: flex-start;
+  }
+}
+
+/* Red local: IP fijas. La tabla se apila en pantallas estrechas: cada
+   reserva es un bloque con la etiqueta de cada dato delante. */
+.tabla-apilada td.mono {
+  font-size: 13px;
+}
+
+.tabla .acciones-fila {
+  text-align: right;
+}
+
+.reservas-acciones.oculto {
+  display: none;
+}
+
+.reserva-formulario {
+  padding: var(--esp-4);
+  border: 1px solid var(--borde);
+  border-left: 2px solid var(--acento);
+  border-radius: var(--radio);
+  background: var(--superficie-2);
+}
+
+.reserva-formulario h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+@media (max-width: 560px) {
+  .tabla-apilable {
+    overflow-x: visible;
+  }
+
+  .tabla-apilada thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .tabla-apilada,
+  .tabla-apilada tbody,
+  .tabla-apilada tr,
+  .tabla-apilada th,
+  .tabla-apilada td {
+    display: block;
+    width: 100%;
+  }
+
+  .tabla-apilada tr {
+    padding: var(--esp-2) 0;
+    border-bottom: 1px solid var(--borde);
+  }
+
+  .tabla-apilada tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .tabla-apilada tbody th[scope="row"],
+  .tabla-apilada td {
+    display: grid;
+    grid-template-columns: 9em minmax(0, 1fr);
+    gap: var(--esp-2);
+    padding: 3px var(--esp-3);
+    border-bottom: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: left;
+  }
+
+  .tabla-apilada tbody th[scope="row"] {
+    font-weight: 600;
+  }
+
+  .tabla-apilada td::before,
+  .tabla-apilada th[scope="row"]::before {
+    content: attr(data-etiqueta);
+    color: var(--texto-2);
+    font-family: var(--fuente-ui);
+    font-size: 12px;
+    font-weight: 400;
+  }
+
+  /* Las acciones no necesitan etiqueta: los botones ya dicen qué hacen. */
+  .tabla-apilada td.acciones-fila {
+    display: flex;
+    gap: var(--esp-2);
+    padding-top: var(--esp-2);
+  }
+
+  .tabla-apilada td.acciones-fila::before {
+    content: none;
+  }
+
+  .tabla .acciones-fila .boton-mini + .boton-mini {
+    margin-left: 0;
+  }
+}

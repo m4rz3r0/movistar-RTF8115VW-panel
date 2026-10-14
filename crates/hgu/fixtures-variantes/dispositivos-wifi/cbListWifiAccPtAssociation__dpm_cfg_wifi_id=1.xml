@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- variante sintética: una estación en la red de 5 GHz (1) -->
+<Response><cbListWifiAccPtAssociation><wifi_association_group><dpm_cfg_wifi_acc_pt_0i>1</dpm_cfg_wifi_acc_pt_0i><dpm_cfg_wifi_acc_pt_id>1</dpm_cfg_wifi_acc_pt_id><ssid>RED-1</ssid><wifi_association><mac_addr>02:00:00:00:00:06</mac_addr><rssi>-48</rssi></wifi_association></wifi_association_group><Result>0</Result></cbListWifiAccPtAssociation></Response>

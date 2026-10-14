@@ -5,9 +5,12 @@
 //! un selector), el aviso de solo lectura si el panel aún no escribe, las
 //! tarjetas de lo esencial arriba y el resto bajo «Más opciones». Las
 //! tarjetas ([`tarjeta::Tarjeta`]) se editan en el sitio y guardan con el
-//! diálogo de grupo. Un tema que no existe es «página no encontrada».
+//! diálogo de grupo; los aparatos y las IP fijas de Red local tienen su
+//! propio componente ([`dispositivos`], [`reservas`]). Un tema que no existe es «página no encontrada».
 
 mod campo;
+mod dispositivos;
+mod reservas;
 mod tarjeta;
 
 use crate::ajustes_router::{TemaVista, leer_tema};
@@ -27,6 +30,11 @@ use tarjeta::Tarjeta;
 /// Id de la nota que dice qué significa «Oculto» (una por página; la
 /// describen todos sus chips).
 pub(crate) const NOTA_OCULTO: &str = "ajustes-nota-oculto";
+
+/// Componentes de Red local (los nombres de `ajustes::Componente::slug`,
+/// que en el navegador no está).
+pub(crate) const DISPOSITIVOS: &str = "dispositivos";
+pub(crate) const RESERVAS: &str = "reservas";
 
 /// Primera página de la sección (la del menú).
 pub const RUTA_AJUSTES: &str = "/ajustes/internet";
@@ -181,6 +189,11 @@ pub fn PaginaTema() -> impl IntoView {
 #[component]
 fn ContenidoTema(t: TemaVista, recargar: Callback<()>) -> impl IntoView {
     let solo_lectura = t.solo_lectura;
+    // Los aparatos y las IP fijas leen la red de casa una vez para los dos.
+    let de_red = |c: &Option<String>| matches!(c.as_deref(), Some(DISPOSITIVOS | RESERVAS));
+    if t.ajustes.iter().any(|a| de_red(&a.componente)) {
+        provide_context(dispositivos::DatosRed::nuevo());
+    }
     let (basicos, otros): (Vec<_>, Vec<_>) = t
         .ajustes
         .into_iter()
