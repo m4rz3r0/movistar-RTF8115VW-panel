@@ -8,6 +8,7 @@
 pub mod charts;
 pub mod estado;
 pub mod explorador;
+pub mod grupo;
 pub mod historial;
 pub mod i18n;
 pub mod instalar;

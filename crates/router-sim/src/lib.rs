@@ -1342,10 +1342,16 @@ fn construir_lista(s: &Inner, lectura: &str) -> Result<ListaViva, String> {
         .min_by_key(|((_, p), _)| p.clone())
         .map(|(_, raw)| raw)
         .or_else(|| s.fixtures.get(&(lectura.to_owned(), Vec::new())));
+    // Una respuesta sin ninguna instancia (la del pool DHCP sin parámetros
+    // solo trae el índice) no sirve de lista: se juntan las de las fixtures
+    // por instancia.
     let node = match todas {
-        Some(raw) => hgu::xml::parse_response(lectura, raw).map_err(|e| e.to_string())?,
-        None => all_instances(s, lectura).ok_or("la lista no tiene fixture")?,
-    };
+        Some(raw) => Some(hgu::xml::parse_response(lectura, raw).map_err(|e| e.to_string())?),
+        None => None,
+    }
+    .filter(|n| n.children.iter().any(|c| !c.children.is_empty()))
+    .or_else(|| all_instances(s, lectura))
+    .ok_or("la lista no tiene fixture")?;
     let nodos: Vec<XmlNode> = node
         .children
         .into_iter()

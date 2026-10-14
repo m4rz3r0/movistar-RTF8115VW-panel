@@ -1532,3 +1532,42 @@ async fn cada_ajuste_del_catalogo_se_lee() {
     }
     assert!(fallos.is_empty(), "{fallos:#?}");
 }
+
+/// El pool DHCP es una lista cuya fixture sin parámetros solo trae el índice
+/// (ninguna instancia): una escritura del pool 0 se ve en su lectura, sin
+/// tocar el resto del pool.
+#[tokio::test]
+async fn escritura_del_pool_dhcp_se_lee() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    let leer = || {
+        c.call(
+            "cbGetDhcpv4ServerPool",
+            &[("rtm_cfg_dhcpv4_svr_pool_0i", "0")],
+        )
+    };
+    let antes = leer().await.unwrap();
+    c.write(
+        "dhcp.asp",
+        "cbSetDhcpv4ServerPool",
+        &[
+            ("rtm_cfg_dhcpv4_svr_pool_id", "0"),
+            ("ipv4_addr_min", "192.0.2.10"),
+        ],
+    )
+    .await
+    .unwrap();
+    let despues = leer().await.unwrap();
+    assert_eq!(
+        valor(&despues, "ipv4_addr_min").as_deref(),
+        Some("192.0.2.10")
+    );
+    assert_eq!(
+        valor(&despues, "ipv4_addr_max"),
+        valor(&antes, "ipv4_addr_max")
+    );
+    assert_eq!(
+        valor(&despues, "rtm_cfg_dhcpv4_svr_pool_id").as_deref(),
+        Some("0")
+    );
+}

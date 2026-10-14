@@ -1,5 +1,7 @@
 //! Ajustes del router por tema: lectura con valores legibles
-//! ([`leer_tema`]).
+//! ([`leer_tema`]) y escritura de un ajuste como un grupo de cambios del
+//! gestor ([`preparar_ajuste`], [`confirmar_ajuste`], [`deshacer_ajuste`]),
+//! con un resumen legible «antes → después» ([`GrupoVista`]).
 //!
 //! Los tipos de aquí los usan las páginas de Ajustes en el navegador. Solo
 //! llevan ids, claves de traducción y valores legibles: ningún nombre de la
@@ -12,6 +14,7 @@ use ajustes::{Nivel, TipoCampo, ValorLegible};
 use leptos::prelude::*;
 use leptos::server_fn::codec::Json;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 /// Los ajustes de un tema, leídos del router.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -123,6 +126,93 @@ pub struct DetallesTecnicos {
     pub parametros: Vec<(String, String)>,
 }
 
+/// Lo que la página pide guardar de un ajuste.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PeticionAjuste {
+    /// Id del ajuste (`wifi.red_24`).
+    pub ajuste: String,
+    /// Id de la instancia que se edita o borra en una lista; `None` crea
+    /// una nueva. No cuenta en un ajuste que no es lista.
+    pub instancia: Option<String>,
+    /// Borra la instancia (solo en una lista).
+    pub borrar: bool,
+    /// Campos que se cambian: id del campo → valor legible (la clave de una
+    /// opción, `true`/`false`, el texto). Un secreto sin tocar no va.
+    pub valores: BTreeMap<String, String>,
+}
+
+/// Resumen de un ajuste preparado para guardarlo: lo que cambia en cada paso
+/// y lo que hace falta para confirmarlo. Sin nombres de la API y con los
+/// secretos como [`MASCARA`](crate::ui::explorador::MASCARA).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GrupoVista {
+    /// Token para [`confirmar_ajuste`] (un solo uso, 10 min).
+    pub token: String,
+    /// Clave de traducción del título del ajuste (`ajuste-wifi-red_24-titulo`).
+    pub titulo: String,
+    /// Un paso por función de escritura, en orden.
+    pub pasos: Vec<PasoVista>,
+    /// El mayor de los pasos con cambios: marca la vigilancia.
+    pub riesgo: RiesgoCambio,
+    /// Clave de traducción del efecto al aplicarlo (`efecto-wifi_red`).
+    pub efecto: Option<String>,
+    /// Segundos que se vigila el router tras aplicarlo.
+    pub vigilancia_s: u64,
+}
+
+/// Un paso del grupo: los campos de una misma escritura del router.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PasoVista {
+    /// Posición en el grupo (desde 0): la que se desmarca al confirmar.
+    pub indice: usize,
+    /// El router ya está así: no se escribirá.
+    pub sin_cambios: bool,
+    pub campos: Vec<CambioLegible>,
+}
+
+/// Un campo que cambia, con sus valores legibles. Si es `secreto`, `antes`
+/// y `despues` valen [`MASCARA`](crate::ui::explorador::MASCARA).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CambioLegible {
+    /// Clave de traducción del campo (`ajuste-wifi-red_24-nombre`).
+    pub campo: String,
+    /// Valor legible: la clave de una opción (con `campo` da su texto,
+    /// `<campo>-<opción>`), `true`/`false` en un sí/no o el texto tal cual.
+    /// Un valor que el panel no reconoce va tal cual lo da el router.
+    pub antes: String,
+    pub despues: String,
+    pub secreto: bool,
+    /// Tipo del campo: dice cómo se pintan `antes` y `despues`.
+    pub tipo: TipoCampo,
+}
+
+/// Prepara el guardado de un ajuste: lee el router, calcula lo que cambia
+/// en cada paso y devuelve el resumen con su token. Errores con el mensaje
+/// traducido: 409 si ya está así o hay otro cambio en curso, 403 en solo
+/// lectura, 400 si un valor no vale. Exige sesión.
+#[server(endpoint = "preparar_ajuste", input = Json)]
+pub async fn preparar_ajuste(p: PeticionAjuste) -> Result<GrupoVista, ServerFnError> {
+    servidor::preparar_ajuste(p).await
+}
+
+/// Aplica el ajuste preparado con `token` sin los pasos de `desmarcados`
+/// (índices). Devuelve el id del cambio para seguirlo con
+/// [`estado_cambio`](crate::ui::explorador::estado_cambio).
+#[server(endpoint = "confirmar_ajuste", input = Json)]
+pub async fn confirmar_ajuste(
+    token: String,
+    desmarcados: Vec<usize>,
+) -> Result<i64, ServerFnError> {
+    servidor::confirmar_ajuste(token, desmarcados).await
+}
+
+/// Prepara el cambio que deshace `cambio` (uno aplicado desde Ajustes) y
+/// devuelve su resumen, que se confirma con [`confirmar_ajuste`].
+#[server(endpoint = "deshacer_ajuste", input = Json)]
+pub async fn deshacer_ajuste(cambio: i64) -> Result<GrupoVista, ServerFnError> {
+    servidor::deshacer_ajuste(cambio).await
+}
+
 /// Los ajustes del tema `tema` (`wifi`, `puertos`…) con su valor actual
 /// del router. Cada lectura distinta se hace una sola vez; si una falla,
 /// solo sus ajustes quedan [`EstadoLectura::SinLeer`]. 404 si el tema no
@@ -136,14 +226,25 @@ pub async fn leer_tema(tema: String) -> Result<TemaVista, ServerFnError> {
 pub(crate) mod servidor {
     use super::*;
     use crate::{
-        instalar::servidor::fallo, instancia, panel_ajustes::servidor::preparar, state::AppState,
-        t, ui::explorador::servidor::riesgo,
+        changes::{
+            BLOQUEO_SOLO_LECTURA, CambioError, ChangeManager, ChangeRequest, Diff, GrupoRequest,
+            Paso, PasoPreparado, buscar,
+        },
+        instalar::servidor::fallo,
+        instancia,
+        panel_ajustes::servidor::preparar,
+        state::AppState,
+        t,
+        ui::explorador::{
+            MASCARA,
+            servidor::{error_cambio, gestor, riesgo},
+        },
     };
-    use ajustes::{Ajuste, Campo, Tema, a_legible, prefijo_i18n};
+    use ajustes::{Ajuste, Campo, ErrorValor, Tema, a_legible, a_router, prefijo_i18n};
     use axum::http::StatusCode;
-    use catalogo::Catalogo;
+    use catalogo::{Catalogo, Riesgo};
     use hgu::xml::XmlNode;
-    use std::collections::{BTreeMap, HashMap};
+    use std::collections::HashMap;
 
     /// Elementos de una lectura: nombre → valor.
     type Leidos = BTreeMap<String, String>;
@@ -447,6 +548,527 @@ pub(crate) mod servidor {
             lectura,
             escrituras,
             parametros,
+        }
+    }
+
+    // ------------------------------------------------------------ guardar
+
+    /// Pares `(parámetro, valor)` que escribe el campo `c` con el legible
+    /// `v`, validado; `None` si es un secreto sin tocar ([`MASCARA`]).
+    fn pares(c: &Campo, v: &str) -> Result<Option<Vec<(String, String)>>, ErrorValor> {
+        if c.tipo == TipoCampo::Secreto && v == MASCARA {
+            return Ok(None);
+        }
+        a_router(c, v).map(Some)
+    }
+
+    /// Grupo de cambios que guarda `p` en el ajuste `a`: un paso por función
+    /// de escritura de los campos tocados, en el orden de los campos (al
+    /// borrar, de todos los campos que se escriben). Cada paso lleva los
+    /// `fijos` del ajuste y los parámetros de sus campos tocados en formato
+    /// del router; lo no tocado lo completa el gestor con lo que lea. Los
+    /// ids de `p.valores` que no son campos del ajuste no cuentan (los
+    /// rechaza quien llama). Sin campos tocados, el grupo no tiene pasos.
+    pub(crate) fn grupo_de(a: &Ajuste, p: &PeticionAjuste) -> Result<GrupoRequest, ErrorValor> {
+        let titulo = format!("{}-titulo", prefijo_i18n(a));
+        let mut pasos: Vec<(String, BTreeMap<String, String>)> = Vec::new();
+        for c in &a.campos {
+            let tocados = match p.valores.get(&c.id) {
+                Some(v) if !p.borrar => pares(c, v)?,
+                _ => None,
+            };
+            let Some(e) = c.escribible() else {
+                continue;
+            };
+            if tocados.is_none() && !p.borrar {
+                continue;
+            }
+            let i = match pasos.iter().position(|(f, _)| *f == e.funcion) {
+                Some(i) => i,
+                None => {
+                    pasos.push((e.funcion.clone(), a.fijos.clone()));
+                    pasos.len() - 1
+                }
+            };
+            pasos[i].1.extend(tocados.unwrap_or_default());
+        }
+        Ok(GrupoRequest {
+            pasos: pasos
+                .into_iter()
+                .map(|(funcion, valores)| Paso {
+                    req: ChangeRequest {
+                        funcion,
+                        instancia: p.instancia.clone().filter(|_| a.lista),
+                        valores,
+                        borrar: p.borrar && a.lista,
+                    },
+                    etiqueta: Some(titulo.clone()),
+                })
+                .collect(),
+            titulo: Some(titulo),
+        })
+    }
+
+    /// En un ajuste que no es lista pero escribe con una función de lista
+    /// (un pool DHCP concreto), la instancia de cada paso es el id de la
+    /// lista que fijan sus `fijos`: sin ella, el gestor crearía una
+    /// instancia nueva. `Err` con la función si los `fijos` no lo traen.
+    fn instancias_fijas(f: &Catalogo, a: &Ajuste, g: &mut GrupoRequest) -> Result<(), String> {
+        if a.lista {
+            return Ok(());
+        }
+        for paso in &mut g.pasos {
+            let Some(l) = f.funcion(&paso.req.funcion).and_then(|f| f.lista.as_ref()) else {
+                continue;
+            };
+            paso.req.instancia = Some(
+                a.fijos
+                    .get(&l.id_param)
+                    .cloned()
+                    .ok_or_else(|| paso.req.funcion.clone())?,
+            );
+        }
+        Ok(())
+    }
+
+    /// Texto legible de un valor para el resumen.
+    fn texto(v: ValorLegible) -> String {
+        match v {
+            ValorLegible::Texto(t) | ValorLegible::Opcion(t) | ValorLegible::Desconocido(t) => t,
+            ValorLegible::Booleano(b) => b.to_string(),
+            ValorLegible::Secreto => MASCARA.to_owned(),
+        }
+    }
+
+    /// Cambio legible del campo `c` según el diff de su paso, o `None` si
+    /// ninguno de sus parámetros cambia. Un parámetro del campo que no está
+    /// en el diff no cambia: su valor lo da `completar` (lo pedido o lo que
+    /// muestra el router), así una opción con `ademas` se reconoce entera.
+    fn cambio_legible(
+        prefijo: &str,
+        c: &Campo,
+        diff: &Diff,
+        completar: &dyn Fn(&str) -> Option<String>,
+    ) -> Option<CambioLegible> {
+        let e = c.escribe.as_ref()?;
+        let params: Vec<(&str, &str)> = std::iter::once((e.parametro.as_str(), c.lee.as_str()))
+            .chain(
+                c.ademas
+                    .iter()
+                    .map(|ad| (ad.parametro.as_str(), ad.lee.as_str())),
+            )
+            .collect();
+        let en_diff = |param: &str| {
+            diff.campos
+                .iter()
+                .find(|d| d.nombre.eq_ignore_ascii_case(param))
+        };
+        if !params.iter().any(|(param, _)| en_diff(param).is_some()) {
+            return None;
+        }
+        let campo = format!("{prefijo}-{}", c.id);
+        let secreto = c.tipo == TipoCampo::Secreto
+            || params
+                .iter()
+                .any(|(param, _)| en_diff(param).is_some_and(|d| d.secreto));
+        if secreto {
+            return Some(CambioLegible {
+                campo,
+                antes: MASCARA.to_owned(),
+                despues: MASCARA.to_owned(),
+                secreto: true,
+                tipo: c.tipo,
+            });
+        }
+        let (mut antes, mut despues) = (Leidos::new(), Leidos::new());
+        for (param, lee) in params {
+            let (a, d) = match en_diff(param) {
+                Some(d) => (d.antes.clone(), d.despues.clone()),
+                None => {
+                    let v = completar(param).unwrap_or_default();
+                    (v.clone(), v)
+                }
+            };
+            antes.insert(lee.to_owned(), a);
+            despues.insert(lee.to_owned(), d);
+        }
+        Some(CambioLegible {
+            campo,
+            antes: texto(a_legible(c, &antes)),
+            despues: texto(a_legible(c, &despues)),
+            secreto: false,
+            tipo: c.tipo,
+        })
+    }
+
+    /// Resumen de un grupo preparado del ajuste `a`. `completar(paso,
+    /// parámetro)` da el valor de un parámetro que no cambia en ese paso.
+    fn vista_grupo(
+        g: &ChangeManager,
+        a: &Ajuste,
+        token: String,
+        pasos: &[PasoPreparado],
+        r: Riesgo,
+        completar: &dyn Fn(usize, &str) -> Option<String>,
+    ) -> GrupoVista {
+        let prefijo = prefijo_i18n(a);
+        GrupoVista {
+            token,
+            titulo: format!("{prefijo}-titulo"),
+            pasos: pasos
+                .iter()
+                .map(|paso| PasoVista {
+                    indice: paso.indice,
+                    sin_cambios: paso.sin_cambios,
+                    campos: a
+                        .campos
+                        .iter()
+                        .filter(|c| {
+                            c.escribe
+                                .as_ref()
+                                .is_some_and(|e| e.funcion == paso.funcion)
+                        })
+                        .filter_map(|c| {
+                            cambio_legible(&prefijo, c, &paso.diff, &|param| {
+                                completar(paso.indice, param)
+                            })
+                        })
+                        .collect(),
+                })
+                .collect(),
+            riesgo: riesgo(r),
+            efecto: a.efecto.as_ref().map(|e| format!("efecto-{e}")),
+            vigilancia_s: g.tiempos().vigilancia(r).as_secs(),
+        }
+    }
+
+    /// Error del gestor al guardar un ajuste, con el mensaje traducido y sin
+    /// nombres de la API (el detalle técnico va al registro).
+    fn error_ajuste(e: CambioError) -> ServerFnError {
+        use CambioError as E;
+        match e {
+            E::SinCambios => fallo(StatusCode::CONFLICT, t!("ajustes-error-sin-cambios")),
+            E::EnCurso => fallo(StatusCode::CONFLICT, t!("biblioteca-error-en-curso")),
+            E::Bloqueada(m) if m == BLOQUEO_SOLO_LECTURA => {
+                fallo(StatusCode::FORBIDDEN, t!("ajustes-solo-lectura"))
+            }
+            E::Bloqueada(m) => {
+                tracing::warn!("ajustes: escritura bloqueada: {m}");
+                fallo(StatusCode::FORBIDDEN, t!("ajustes-error-bloqueada"))
+            }
+            E::Router(_) | E::Verificacion(_) => {
+                tracing::warn!("ajustes: el router no hizo el cambio: {e}");
+                fallo(StatusCode::BAD_GATEWAY, t!("ajustes-error-router"))
+            }
+            E::Invalida(_) => {
+                tracing::warn!("ajustes: petición no válida: {e}");
+                fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-invalida"))
+            }
+            e => error_cambio(e),
+        }
+    }
+
+    /// Mensaje traducido de un valor que no vale, con la etiqueta del campo.
+    fn error_valor(prefijo: &str, c: &Campo, e: &ErrorValor) -> ServerFnError {
+        let mut args = i18n::FluentArgs::new();
+        if let ErrorValor::Corto { min } | ErrorValor::FueraDeRango { min: Some(min), .. } = e {
+            args.set("min", *min);
+        }
+        if let ErrorValor::Largo { max } | ErrorValor::FueraDeRango { max: Some(max), .. } = e {
+            args.set("max", *max);
+        }
+        let traducir = crate::ui::i18n::traducir;
+        let etiqueta = traducir(&format!("{prefijo}-{}", c.id), None);
+        let msg = traducir(e.clave_i18n(), Some(&args));
+        fallo(StatusCode::BAD_REQUEST, format!("{etiqueta}: {msg}"))
+    }
+
+    /// Ajuste `id` del catálogo (404 si no existe).
+    fn ajuste_por_id<'a>(state: &'a AppState, id: &str) -> Result<&'a Ajuste, ServerFnError> {
+        state
+            .ajustes
+            .ajuste(id)
+            .ok_or_else(|| fallo(StatusCode::NOT_FOUND, t!("ajustes-error-ajuste")))
+    }
+
+    /// Un cambio a la vez: con otro aplicándose o vigilándose no se prepara
+    /// nada (409), tampoco en otro ajuste que escribe la misma instancia.
+    fn libre(g: &ChangeManager) -> Result<(), ServerFnError> {
+        match g.activo() {
+            Some(_) => Err(error_ajuste(CambioError::EnCurso)),
+            None => Ok(()),
+        }
+    }
+
+    pub(super) async fn preparar_ajuste(p: PeticionAjuste) -> Result<GrupoVista, ServerFnError> {
+        let (state, _) = preparar().await?;
+        let a = ajuste_por_id(&state, &p.ajuste)?;
+        let prefijo = prefijo_i18n(a);
+        for (id, v) in &p.valores {
+            let c = a
+                .campo(id)
+                .ok_or_else(|| fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-campo")))?;
+            pares(c, v).map_err(|e| error_valor(&prefijo, c, &e))?;
+        }
+        let g = gestor(&state)?;
+        libre(&g)?;
+        let mut grupo = grupo_de(a, &p).map_err(|e| {
+            tracing::warn!("ajustes: {}: valor no válido tras validarlo: {e}", a.id);
+            fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-invalida"))
+        })?;
+        instancias_fijas(&state.catalogo, a, &mut grupo).map_err(|funcion| {
+            tracing::warn!(
+                "ajustes: {}: los fijos no dan la instancia de {funcion}",
+                a.id
+            );
+            fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-invalida"))
+        })?;
+        if grupo.pasos.is_empty() {
+            return Err(error_ajuste(CambioError::SinCambios));
+        }
+        let pedidos: Vec<BTreeMap<String, String>> =
+            grupo.pasos.iter().map(|p| p.req.valores.clone()).collect();
+        let prep = g.preparar_grupo(grupo).await.map_err(error_ajuste)?;
+        Ok(vista_grupo(
+            &g,
+            a,
+            prep.token,
+            &prep.pasos,
+            prep.riesgo,
+            &|i, param| buscar(&pedidos[i], param).map(str::to_owned),
+        ))
+    }
+
+    pub(super) async fn confirmar_ajuste(
+        token: String,
+        desmarcados: Vec<usize>,
+    ) -> Result<i64, ServerFnError> {
+        let (state, user) = preparar().await?;
+        let g = gestor(&state)?;
+        g.confirmar_grupo(&token, &desmarcados, &user.username)
+            .await
+            .map_err(error_ajuste)
+    }
+
+    /// Ajuste e instancia del cambio `id`, hecho desde Ajustes: por su
+    /// título o, si es un deshacer (que no lo lleva), por el del cambio que
+    /// deshace.
+    async fn ajuste_del_cambio<'a>(
+        state: &'a AppState,
+        g: &ChangeManager,
+        id: i64,
+    ) -> Option<(&'a Ajuste, Option<String>)> {
+        let mut actual = id;
+        // Una cadena de deshacer no debería ser larga; el tope evita un
+        // bucle si el historial tuviera un ciclo.
+        for _ in 0..32 {
+            let c = g.cambio(actual).await?;
+            if let Some(titulo) = &c.titulo {
+                let a = state
+                    .ajustes
+                    .todos()
+                    .iter()
+                    .find(|a| format!("{}-titulo", prefijo_i18n(a)) == *titulo)?;
+                let instancia = c.pasos.iter().find_map(|p| p.instancia.clone());
+                return Some((a, instancia.or(c.instancia)));
+            }
+            actual = g.enlaces_deshacer(actual).await.1?;
+        }
+        None
+    }
+
+    pub(super) async fn deshacer_ajuste(cambio: i64) -> Result<GrupoVista, ServerFnError> {
+        let (state, _) = preparar().await?;
+        let g = gestor(&state)?;
+        let (a, instancia) = ajuste_del_cambio(&state, &g, cambio)
+            .await
+            .ok_or_else(|| fallo(StatusCode::NOT_FOUND, t!("ajustes-error-cambio")))?;
+        libre(&g)?;
+        let prep = g.deshacer(cambio).await.map_err(error_ajuste)?;
+        // Lo que no cambia en cada paso, como lo muestra ahora el router
+        // (una lectura por paso con cambios).
+        let mut actuales: Vec<BTreeMap<String, String>> = Vec::new();
+        for paso in &prep.pasos {
+            let leidos = if paso.sin_cambios {
+                None
+            } else {
+                g.valores_actuales(&paso.funcion, instancia.as_deref(), &a.fijos)
+                    .await
+                    .inspect_err(|e| {
+                        tracing::warn!("ajustes: {}: no se puede leer para el resumen: {e}", a.id);
+                    })
+                    .ok()
+                    .flatten()
+            };
+            actuales.push(leidos.unwrap_or_default());
+        }
+        Ok(vista_grupo(
+            &g,
+            a,
+            prep.token,
+            &prep.pasos,
+            prep.riesgo,
+            &|i, param| buscar(&actuales[i], param).map(str::to_owned),
+        ))
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use ajustes::CatalogoAjustes;
+
+        fn peticion(ajuste: &str, valores: &[(&str, &str)], borrar: bool) -> PeticionAjuste {
+            PeticionAjuste {
+                ajuste: ajuste.into(),
+                instancia: Some("7".into()),
+                borrar,
+                valores: valores
+                    .iter()
+                    .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+                    .collect(),
+            }
+        }
+
+        fn mapa(pares: &[(&str, &str)]) -> BTreeMap<String, String> {
+            pares
+                .iter()
+                .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+                .collect()
+        }
+
+        #[test]
+        fn grupo_de_un_ajuste_de_varios_campos() {
+            let cat = CatalogoAjustes::load().unwrap();
+            let a = cat.ajuste("wifi.red_5").unwrap();
+            let p = peticion(
+                "wifi.red_5",
+                &[("nombre", "casa-5"), ("seguridad", "abierta")],
+                false,
+            );
+            let g = grupo_de(a, &p).unwrap();
+            assert_eq!(g.titulo.as_deref(), Some("ajuste-wifi-red_5-titulo"));
+            assert_eq!(g.pasos.len(), 1, "{g:?}");
+            let paso = &g.pasos[0];
+            assert_eq!(paso.etiqueta.as_deref(), Some("ajuste-wifi-red_5-titulo"));
+            assert_eq!(paso.req.funcion, "cbSetWifiAccPt");
+            assert_eq!(paso.req.instancia, None, "no es una lista");
+            assert!(!paso.req.borrar);
+            assert_eq!(
+                paso.req.valores,
+                mapa(&[
+                    ("dpm_cfg_wifi_acc_pt_id", "1"),
+                    ("ssid", "casa-5"),
+                    ("authentication", "0"),
+                    ("encryption", "0"),
+                ])
+            );
+        }
+
+        #[test]
+        fn grupo_de_sin_secreto_sin_tocar_ni_campos_sin_tocar() {
+            let cat = CatalogoAjustes::load().unwrap();
+            let a = cat.ajuste("wifi.red_24").unwrap();
+            let p = peticion(
+                "wifi.red_24",
+                &[("nombre", "casa"), ("contrasena", MASCARA)],
+                false,
+            );
+            let g = grupo_de(a, &p).unwrap();
+            assert_eq!(
+                g.pasos[0].req.valores,
+                mapa(&[("dpm_cfg_wifi_acc_pt_id", "0"), ("ssid", "casa")])
+            );
+            // Nada tocado: ningún paso.
+            let g = grupo_de(a, &peticion("wifi.red_24", &[], false)).unwrap();
+            assert!(g.pasos.is_empty());
+        }
+
+        #[test]
+        fn grupo_de_valida_cada_valor() {
+            let cat = CatalogoAjustes::load().unwrap();
+            let a = cat.ajuste("wifi.red_24").unwrap();
+            let largo = "x".repeat(33);
+            let e = grupo_de(a, &peticion("wifi.red_24", &[("nombre", &largo)], false));
+            assert_eq!(e.unwrap_err(), ErrorValor::Largo { max: 32 });
+            let e = grupo_de(a, &peticion("wifi.red_24", &[("seguridad", "wep")], false));
+            assert_eq!(e.unwrap_err(), ErrorValor::Opcion);
+            // Un campo de solo lectura no se escribe.
+            let u = cat.ajuste("seguridad.usuarios_router").unwrap();
+            let e = grupo_de(u, &peticion("x", &[("papel", "x")], false));
+            assert_eq!(e.unwrap_err(), ErrorValor::SoloLectura);
+        }
+
+        #[test]
+        fn grupo_de_una_lista_con_su_instancia_y_borrar() {
+            let cat = CatalogoAjustes::load().unwrap();
+            let a = cat.ajuste("red_local.reservas").unwrap();
+            let g = grupo_de(a, &peticion("x", &[("ip", "192.0.2.9")], false)).unwrap();
+            assert_eq!(g.pasos.len(), 1);
+            assert_eq!(g.pasos[0].req.instancia.as_deref(), Some("7"));
+            assert_eq!(
+                g.pasos[0].req.valores,
+                mapa(&[
+                    ("ipv4_addr", "192.0.2.9"),
+                    ("rtm_cfg_dhcpv4_svr_pool_id", "0")
+                ])
+            );
+            // Borrar: cada función de escritura, solo con los fijos.
+            let g = grupo_de(a, &peticion("x", &[("ip", "192.0.2.9")], true)).unwrap();
+            assert_eq!(g.pasos.len(), 1);
+            assert!(g.pasos[0].req.borrar);
+            assert_eq!(
+                g.pasos[0].req.valores,
+                mapa(&[("rtm_cfg_dhcpv4_svr_pool_id", "0")])
+            );
+        }
+
+        #[test]
+        fn instancia_fija_de_un_ajuste_sobre_una_funcion_de_lista() {
+            let f = Catalogo::load().unwrap();
+            let cat = CatalogoAjustes::load().unwrap();
+            let a = cat.ajuste("red_local.dhcp").unwrap();
+            let mut g = grupo_de(a, &peticion("x", &[("activo", "false")], false)).unwrap();
+            assert_eq!(g.pasos[0].req.instancia, None);
+            instancias_fijas(&f, a, &mut g).unwrap();
+            assert_eq!(g.pasos[0].req.instancia.as_deref(), Some("0"));
+            // Sin el id en los fijos, no se adivina (crearía otra instancia).
+            let mut sin_id = a.clone();
+            sin_id.fijos.clear();
+            let mut g = grupo_de(&sin_id, &peticion("x", &[("activo", "false")], false)).unwrap();
+            assert_eq!(
+                instancias_fijas(&f, &sin_id, &mut g).unwrap_err(),
+                "cbSetDhcpv4ServerPool"
+            );
+        }
+
+        #[test]
+        fn resumen_legible_de_una_opcion_con_ademas() {
+            let cat = CatalogoAjustes::load().unwrap();
+            let a = cat.ajuste("wifi.red_24").unwrap();
+            let c = a.campo("seguridad").unwrap();
+            // Solo cambia `authentication`; `encryption` (igual) lo completa
+            // lo pedido.
+            let diff = Diff {
+                campos: vec![crate::changes::CampoDiff {
+                    nombre: "authentication".into(),
+                    antes: "99".into(),
+                    despues: "3".into(),
+                    secreto: false,
+                }],
+            };
+            let pedido = mapa(&[("authentication", "3"), ("encryption", "4")]);
+            let completar = |p: &str| buscar(&pedido, p).map(str::to_owned);
+            let l = cambio_legible("ajuste-wifi-red_24", c, &diff, &completar).unwrap();
+            assert_eq!(l.campo, "ajuste-wifi-red_24-seguridad");
+            assert_eq!(l.antes, "99", "desconocido: tal cual");
+            assert_eq!(l.despues, "wpa2");
+            assert_eq!(l.tipo, TipoCampo::Opcion);
+            // Un campo cuyo parámetro no cambia no sale.
+            let nombre = a.campo("nombre").unwrap();
+            assert_eq!(
+                cambio_legible("ajuste-wifi-red_24", nombre, &diff, &completar),
+                None
+            );
         }
     }
 }
