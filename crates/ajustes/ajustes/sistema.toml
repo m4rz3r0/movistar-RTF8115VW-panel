@@ -31,7 +31,8 @@ validar = { max = 253, ascii = true }
 
 # El espejo copia todo lo que entra y sale de internet a un puerto de la
 # red de casa. Con el espejo apagado el router da puerto 0, que no es una
-# opción: se ve como valor desconocido.
+# opción: se ve como valor desconocido. Encenderlo exige elegir la toma
+# (`requiere`): si no, se escribiría la toma 0.
 [[ajuste]]
 id = "sistema.diagnostico"
 tema = "sistema"
@@ -44,6 +45,7 @@ escribe = { funcion = "cbSetDiagConfig", parametro = "wan_mirror" }
 lee = "wan_mirror"
 tipo = "booleano"
 recomendado = "false"
+requiere = { campo = "puerto", cuando = "true" }
 
 [[ajuste.campo]]
 id = "puerto"

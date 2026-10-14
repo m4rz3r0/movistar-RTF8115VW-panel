@@ -13,8 +13,10 @@
 //! contra `funciones.toml`/`secretos.toml` y la traducción de valores entre el
 //! formato del router y el legible.
 
+mod legible;
 mod modelo;
-pub use modelo::{Nivel, Tema, TipoCampo, ValorLegible};
+pub use legible::{ErrorValor, Limites, validar_legible};
+pub use modelo::{Nivel, Requiere, Tema, TipoCampo, ValorLegible};
 
 #[cfg(feature = "catalogo")]
 mod carga;
@@ -32,4 +34,4 @@ pub use modelo::{
 #[cfg(feature = "catalogo")]
 pub use validar::{claves_requeridas, comprobar, prefijo_i18n, riesgo};
 #[cfg(feature = "catalogo")]
-pub use valores::{ErrorValor, a_legible, a_router};
+pub use valores::{a_legible, a_router, falta_requerido};

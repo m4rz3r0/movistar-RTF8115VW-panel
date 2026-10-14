@@ -972,3 +972,45 @@ fn excluida_solo_de_escrituras_no_bloqueadas() {
     .unwrap();
     falla_con(&solo(set_x, &bloqueada), "cbSetX", "bloqueada");
 }
+
+/// `requiere`: al poner un campo en un valor, otro del mismo ajuste tiene que
+/// venir también (la toma del espejo al encenderlo). `comprobar` exige que el
+/// otro campo exista, no sea el mismo y que el valor sea válido.
+#[test]
+fn requiere_otro_campo_del_mismo_ajuste() {
+    let con = |requiere: &str| {
+        WIFI.replace(
+            "invertido = true\nrecomendado = \"true\"",
+            &format!("invertido = true\nrecomendado = \"true\"\nrequiere = {requiere}"),
+        )
+    };
+    let bien = con(r#"{ campo = "seguridad", cuando = "true" }"#);
+    let f = fallos(&bien, "");
+    assert!(f.is_empty(), "{f:#?}");
+    let c = cargar(&[("wifi", &bien)], "");
+    let r = c.ajuste("wifi.red").unwrap().campo("visible").unwrap();
+    let r = r.requiere.as_ref().expect("requiere cargado");
+    assert_eq!((r.campo.as_str(), r.cuando.as_str()), ("seguridad", "true"));
+
+    falla_con(
+        &fallos(&con(r#"{ campo = "no_existe", cuando = "true" }"#), ""),
+        "wifi.red.visible",
+        "requiere",
+    );
+    falla_con(
+        &fallos(&con(r#"{ campo = "visible", cuando = "true" }"#), ""),
+        "wifi.red.visible",
+        "requiere",
+    );
+    falla_con(
+        &fallos(&con(r#"{ campo = "seguridad", cuando = "quizá" }"#), ""),
+        "wifi.red.visible",
+        "requiere",
+    );
+    // El campo exigido tiene que poder escribirse.
+    falla_con(
+        &fallos(&con(r#"{ campo = "clave_basica", cuando = "true" }"#), ""),
+        "wifi.red.visible",
+        "requiere",
+    );
+}

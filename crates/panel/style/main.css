@@ -226,7 +226,8 @@ button {
   filter: brightness(1.08);
 }
 
-.boton:disabled {
+.boton:disabled,
+.boton[aria-disabled="true"] {
   opacity: 0.6;
   cursor: progress;
 }
@@ -2531,4 +2532,401 @@ summary.hist-cabeza:hover {
   content: "·";
   margin-left: var(--esp-3);
   color: var(--texto-2);
+}
+
+/* ------------------------------------------------ Ajustes del router */
+
+/* Una sola columna, como una hoja de ajustes: cada tarjeta se lee de arriba
+   abajo sin saltar de columna al editar. */
+.ajustes-lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-4);
+  max-width: 880px;
+}
+
+/* Vista resumida o formulario: solo uno a la vista. */
+.ajuste-resumen.oculto,
+.ajuste-edicion.oculto {
+  display: none;
+}
+
+/* Pestañas de los temas: subrayado ámbar en la actual. */
+.temas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--esp-1);
+  max-width: 880px;
+  border-bottom: 1px solid var(--borde);
+}
+
+.temas a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 var(--esp-3);
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  color: var(--texto-2);
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.temas a:hover {
+  color: var(--texto-1);
+}
+
+.temas a[aria-current="page"] {
+  border-bottom-color: var(--acento);
+  color: var(--texto-1);
+}
+
+.temas-selector {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  .temas {
+    display: none;
+  }
+
+  .temas-selector {
+    display: flex;
+  }
+}
+
+.tema-desc {
+  max-width: 880px;
+  color: var(--texto-2);
+}
+
+.ajustes-lista + .mas-opciones,
+.tema-desc + .aviso {
+  max-width: 880px;
+}
+
+/* Tarjeta de un ajuste. */
+.ajuste {
+  gap: var(--esp-3);
+  min-width: 0;
+}
+
+.ajuste-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esp-2) var(--esp-4);
+}
+
+.ajuste-cabecera h2:focus {
+  outline: none;
+}
+
+.ajuste-cabecera h2:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
+}
+
+.ajuste-etiquetas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-2);
+}
+
+.chip-nivel {
+  color: var(--texto-1);
+}
+
+.nivel-nota {
+  color: var(--texto-2);
+  font-size: 12px;
+}
+
+.ajuste-desc {
+  color: var(--texto-2);
+  max-width: 72ch;
+}
+
+.ajuste-ayuda summary,
+.detalles-tecnicos summary,
+.recomendacion-pros summary {
+  width: fit-content;
+  color: var(--texto-2);
+  cursor: pointer;
+}
+
+.ajuste-ayuda summary:hover,
+.detalles-tecnicos summary:hover,
+.recomendacion-pros summary:hover {
+  color: var(--texto-1);
+}
+
+.ajuste-ayuda p {
+  max-width: 72ch;
+  margin-top: var(--esp-2);
+  padding-left: var(--esp-3);
+  border-left: 2px solid var(--borde);
+}
+
+/* Valor actual: etiqueta a la izquierda, valor a la derecha; en móvil, uno
+   bajo otro. */
+.ajuste-valores {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  border-top: 1px solid var(--borde);
+}
+
+.ajuste-fila {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: var(--esp-1) var(--esp-4);
+  padding: var(--esp-2) 0;
+  border-bottom: 1px solid var(--borde);
+}
+
+.ajuste-fila dt {
+  color: var(--texto-2);
+}
+
+.ajuste-fila dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-2);
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ajuste-vacio {
+  color: var(--texto-2);
+}
+
+@media (max-width: 480px) {
+  .ajuste-fila {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.chip-recomendado {
+  border-color: color-mix(in srgb, var(--acento) 55%, var(--borde));
+  background: var(--acento-suave);
+  color: var(--texto-1);
+  white-space: normal;
+}
+
+.chip-sugerencia {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--acento) 55%, var(--borde));
+  color: var(--texto-1);
+  white-space: normal;
+}
+
+.nota-solo-lectura,
+.nota-hueco,
+.ajuste-efecto {
+  max-width: 72ch;
+  color: var(--texto-2);
+  font-size: 13px;
+}
+
+.ajuste-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--esp-2);
+}
+
+.ajuste-resumen,
+.ajuste-formulario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-3);
+}
+
+/* Edición: un campo bajo otro, con su ayuda debajo. */
+.ajuste-campos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-4);
+}
+
+.campo-ajuste {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 560px;
+}
+
+.campo-ajuste label {
+  color: var(--texto-1);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.campo-ajuste input:not([type="checkbox"]),
+.campo-ajuste select {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 var(--esp-3);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--fondo);
+  color: var(--texto-1);
+  font: inherit;
+}
+
+.campo-ajuste input:focus-visible,
+.campo-ajuste select:focus-visible {
+  border-color: var(--acento);
+  outline-offset: 0;
+}
+
+.campo-ajuste input[aria-invalid="true"],
+.campo-ajuste select[aria-invalid="true"] {
+  border-color: var(--error);
+}
+
+.campo-ajuste .campo-interruptor {
+  display: flex;
+  min-height: 32px;
+}
+
+/* El interruptor dentro de `.campo`: sin la altura ni el relleno de los
+   campos de texto. */
+.campo-ajuste input.interruptor {
+  width: 36px;
+  height: 20px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 999px;
+  background: var(--superficie-2);
+}
+
+.campo-ajuste input.interruptor:checked {
+  background: var(--acento-suave);
+}
+
+.campo-ajuste .campo-interruptor label {
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.opcion-elegida {
+  color: var(--texto-1);
+}
+
+/* Recomendación: el valor que aconsejamos y para quién; a favor y en
+   contra, plegado. */
+.recomendacion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-1);
+  padding: var(--esp-2) var(--esp-3);
+  border-left: 2px solid color-mix(in srgb, var(--acento) 55%, var(--borde));
+  color: var(--texto-2);
+  font-size: 13px;
+}
+
+.recomendacion .chip {
+  margin-right: var(--esp-1);
+}
+
+.recomendacion-pros p {
+  margin-top: var(--esp-1);
+}
+
+/* Detalles técnicos: lo único con nombres de la API, apagado. */
+.detalles-tecnicos {
+  padding-top: var(--esp-2);
+  border-top: 1px dashed var(--borde);
+  font-size: 13px;
+}
+
+.detalles-tecnicos[open] > * + * {
+  margin-top: var(--esp-2);
+}
+
+.detalles-lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-1);
+  margin: 0;
+}
+
+.detalles-lista div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-2);
+}
+
+.detalles-lista dt {
+  color: var(--texto-2);
+}
+
+.detalles-lista dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* «Más opciones»: una barra que se despliega. */
+.mas-opciones {
+  max-width: 880px;
+}
+
+.mas-opciones > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--esp-1) var(--esp-3);
+  padding: var(--esp-3) var(--esp-4);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie-1);
+  cursor: pointer;
+}
+
+.mas-opciones > summary::before {
+  content: "";
+  align-self: center;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid var(--texto-2);
+  border-bottom: 2px solid var(--texto-2);
+  transform: rotate(-45deg);
+  transition: transform 120ms ease;
+}
+
+.mas-opciones[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+.mas-opciones > summary::-webkit-details-marker {
+  display: none;
+}
+
+.mas-opciones > summary {
+  list-style: none;
+}
+
+.mas-opciones > summary:hover {
+  border-color: color-mix(in srgb, var(--acento) 45%, var(--borde));
+}
+
+.mas-opciones-titulo {
+  font-family: var(--fuente-titulos);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.mas-opciones-desc {
+  color: var(--texto-2);
+}
+
+.mas-opciones[open] > summary {
+  margin-bottom: var(--esp-4);
 }

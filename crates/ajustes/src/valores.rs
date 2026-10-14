@@ -6,70 +6,9 @@
 
 use std::collections::BTreeMap;
 use std::net::Ipv4Addr;
-use thiserror::Error;
 
-use crate::modelo::{Campo, Opcion, TipoCampo, ValorLegible};
-
-/// Valor legible que no se puede escribir. Los mensajes no llevan el valor
-/// (puede ser un secreto); el texto para la interfaz es [`ErrorValor::clave_i18n`].
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
-pub enum ErrorValor {
-    #[error("el valor no puede estar vacío")]
-    Vacio,
-    #[error("demasiado corto: al menos {min} bytes")]
-    Corto { min: i64 },
-    #[error("demasiado largo: como mucho {max} bytes")]
-    Largo { max: i64 },
-    #[error("{}", rango(*.min, *.max))]
-    FueraDeRango { min: Option<i64>, max: Option<i64> },
-    #[error("no es una dirección IPv4")]
-    Ip,
-    #[error("no es una dirección MAC")]
-    Mac,
-    #[error("no es una de las opciones")]
-    Opcion,
-    #[error("lleva caracteres de control")]
-    Control,
-    #[error("solo admite letras sin tilde, cifras y signos ASCII")]
-    Ascii,
-    #[error("el campo es de solo lectura")]
-    SoloLectura,
-}
-
-/// Mensaje de [`ErrorValor::FueraDeRango`] según los límites que haya.
-fn rango(min: Option<i64>, max: Option<i64>) -> String {
-    match (min, max) {
-        (Some(min), Some(max)) => format!("número fuera de rango: de {min} a {max}"),
-        (Some(min), None) => format!("número fuera de rango: al menos {min}"),
-        (None, Some(max)) => format!("número fuera de rango: como mucho {max}"),
-        (None, None) => "no es un número".to_owned(),
-    }
-}
-
-impl ErrorValor {
-    /// Clave de traducción del mensaje (`ajustes-error-…`). Sus argumentos
-    /// son los campos del error (`min`, `max`); fuera de rango tiene una
-    /// clave por cada combinación de límites, con solo los que hay.
-    pub fn clave_i18n(&self) -> &'static str {
-        match self {
-            ErrorValor::Vacio => "ajustes-error-vacio",
-            ErrorValor::Corto { .. } => "ajustes-error-corto",
-            ErrorValor::Largo { .. } => "ajustes-error-largo",
-            ErrorValor::FueraDeRango { min, max } => match (min, max) {
-                (Some(_), Some(_)) => "ajustes-error-fuera-de-rango",
-                (Some(_), None) => "ajustes-error-fuera-de-rango-desde",
-                (None, Some(_)) => "ajustes-error-fuera-de-rango-hasta",
-                (None, None) => "ajustes-error-numero",
-            },
-            ErrorValor::Ip => "ajustes-error-ip",
-            ErrorValor::Mac => "ajustes-error-mac",
-            ErrorValor::Opcion => "ajustes-error-opcion",
-            ErrorValor::Control => "ajustes-error-control",
-            ErrorValor::Ascii => "ajustes-error-ascii",
-            ErrorValor::SoloLectura => "ajustes-error-solo-lectura",
-        }
-    }
-}
+use crate::legible::{ErrorValor, Limites, admite_opcional, mac, validar_legible};
+use crate::modelo::{Ajuste, Campo, Opcion, TipoCampo, ValorLegible};
 
 /// Elemento `nombre` de una lectura: primero exacto, luego sin distinguir
 /// mayúsculas.
@@ -83,11 +22,6 @@ fn leido<'a>(leidos: &'a BTreeMap<String, String>, nombre: &str) -> Option<&'a s
                 .map(|(_, v)| v)
         })
         .map(String::as_str)
-}
-
-/// Admite `opcional`: un campo que se puede dejar vacío.
-pub(crate) fn admite_opcional(t: TipoCampo) -> bool {
-    !matches!(t, TipoCampo::Opcion | TipoCampo::Booleano)
 }
 
 /// Valor legible de un campo a partir de los elementos de su lectura
@@ -167,36 +101,28 @@ pub(crate) fn traducir<'c>(
     c: &'c Campo,
     legible: &str,
 ) -> Result<(String, Option<&'c Opcion>), ErrorValor> {
-    if legible.chars().any(char::is_control) {
-        return Err(ErrorValor::Control);
-    }
+    let limites = Limites {
+        min: c.validar.and_then(|v| v.min),
+        max: c.validar.and_then(|v| v.max),
+        ascii: c.validar.is_some_and(|v| v.ascii),
+        opcional: c.opcional,
+    };
+    validar_legible(
+        c.tipo,
+        limites,
+        |k| c.opciones.iter().any(|o| o.clave == k),
+        legible,
+    )?;
     let vacio = match c.tipo {
         TipoCampo::Texto | TipoCampo::Secreto => legible.is_empty(),
         _ => legible.trim().is_empty(),
     };
     if vacio {
-        return if c.opcional && admite_opcional(c.tipo) {
-            Ok((String::new(), None))
-        } else {
-            Err(ErrorValor::Vacio)
-        };
+        return Ok((String::new(), None));
     }
-    let (min, max) = c.validar.map_or((None, None), |v| (v.min, v.max));
-    let ascii = c.validar.is_some_and(|v| v.ascii);
+    // Ya validado: las conversiones no fallan.
     let valor = match c.tipo {
-        TipoCampo::Texto | TipoCampo::Secreto => {
-            if ascii && !legible.bytes().all(|b| (b' '..=b'~').contains(&b)) {
-                return Err(ErrorValor::Ascii);
-            }
-            let bytes = legible.len() as i64;
-            if let Some(min) = min.filter(|m| bytes < *m) {
-                return Err(ErrorValor::Corto { min });
-            }
-            if let Some(max) = max.filter(|m| bytes > *m) {
-                return Err(ErrorValor::Largo { max });
-            }
-            legible.to_owned()
-        }
+        TipoCampo::Texto | TipoCampo::Secreto => legible.to_owned(),
         TipoCampo::Opcion => {
             let o = c
                 .opciones
@@ -206,20 +132,21 @@ pub(crate) fn traducir<'c>(
             return Ok((o.valor.clone(), Some(o)));
         }
         TipoCampo::Booleano => {
-            let si = match legible {
-                "true" => true,
-                "false" => false,
-                _ => return Err(ErrorValor::Opcion),
-            };
             let (v_si, v_no) = c.si_no();
-            if si != c.invertido { v_si } else { v_no }.to_owned()
+            if (legible == "true") != c.invertido {
+                v_si
+            } else {
+                v_no
+            }
+            .to_owned()
         }
         TipoCampo::Numero => legible
             .trim()
             .parse::<i64>()
-            .ok()
-            .filter(|n| min.is_none_or(|m| *n >= m) && max.is_none_or(|m| *n <= m))
-            .ok_or(ErrorValor::FueraDeRango { min, max })?
+            .map_err(|_| ErrorValor::FueraDeRango {
+                min: limites.min,
+                max: limites.max,
+            })?
             .to_string(),
         TipoCampo::Ip => legible
             .trim()
@@ -231,13 +158,22 @@ pub(crate) fn traducir<'c>(
     Ok((valor, None))
 }
 
-/// MAC con `:` o con `-` (el mismo en toda ella), en minúsculas con `:`.
-fn mac(v: &str) -> Option<String> {
-    let sep = if v.contains('-') { '-' } else { ':' };
-    let partes: Vec<&str> = v.split(sep).collect();
-    let valida = partes.len() == 6
-        && partes
-            .iter()
-            .all(|p| p.len() == 2 && p.bytes().all(|b| b.is_ascii_hexdigit()));
-    valida.then(|| partes.join(":").to_ascii_lowercase())
+/// Primer campo de `a` que, con los `valores` pedidos (id → legible), exige
+/// otro que no viene o viene vacío (su `requiere`): `(el que lo pide, el que
+/// falta)`. Un campo que no se toca no exige nada.
+pub fn falta_requerido<'a>(
+    a: &'a Ajuste,
+    valores: &BTreeMap<String, String>,
+) -> Option<(&'a Campo, &'a Campo)> {
+    a.campos.iter().find_map(|c| {
+        let r = c.requiere.as_ref()?;
+        if valores.get(&c.id) != Some(&r.cuando) {
+            return None;
+        }
+        let exigido = a.campo(&r.campo)?;
+        valores
+            .get(&exigido.id)
+            .is_none_or(|v| v.trim().is_empty())
+            .then_some((c, exigido))
+    })
 }

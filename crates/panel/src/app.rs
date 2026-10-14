@@ -2,6 +2,7 @@
 
 use crate::t;
 use crate::ui::{
+    ajustes_router::{InicioAjustes, PaginaTema, SeccionAjustes},
     charts::{provide_zona, zona_inicial},
     estado::PaginaEstado,
     explorador::{Explorador, InicioExplorador, PaginaArea, PaginaFuncion},
@@ -76,7 +77,7 @@ pub fn App() -> impl IntoView {
     provide_zona(zona_inicial());
     provide_vista(vista_inicial());
     // `<Redirect>` en el servidor: 302 con `Location` (`/router`,
-    // `/recomendaciones/*`).
+    // `/ajustes`, `/recomendaciones/*`).
     #[cfg(feature = "ssr")]
     leptos_router::components::provide_server_redirect(leptos_axum::redirect);
     view! {
@@ -91,6 +92,10 @@ pub fn App() -> impl IntoView {
                 <Route path=StaticSegment("instalar") view=PaginaInstalar />
                 <ParentRoute path=StaticSegment("") view=Layout>
                     <Route path=StaticSegment("") view=PaginaEstado />
+                    <ParentRoute path=StaticSegment("ajustes") view=SeccionAjustes>
+                        <Route path=StaticSegment("") view=InicioAjustes />
+                        <Route path=ParamSegment("tema") view=PaginaTema />
+                    </ParentRoute>
                     <Route path=StaticSegment("historial") view=PaginaHistorial />
                     <Route path=StaticSegment("panel") view=PaginaPanel />
                     // Vuelve en la fase 4 con sus tarjetas.

@@ -2,7 +2,9 @@
 
 use std::collections::BTreeMap;
 
-use ajustes::{Campo, CatalogoAjustes, ErrorValor, ValorLegible, a_legible, a_router};
+use ajustes::{
+    Campo, CatalogoAjustes, ErrorValor, ValorLegible, a_legible, a_router, falta_requerido,
+};
 
 const CAMPOS: &str = r#"
 [[ajuste]]
@@ -526,4 +528,52 @@ fn textos_de_error_con_sus_limites() {
             }
         }
     }
+}
+
+/// `falta_requerido`: al poner el campo que lo pide en su valor, el campo
+/// exigido tiene que venir y no vacío; con otro valor, o sin tocar el que lo
+/// pide, no se exige nada.
+#[test]
+fn falta_requerido_segun_el_valor_pedido() {
+    let toml = r#"
+[[ajuste]]
+id = "sistema.prueba"
+tema = "sistema"
+nivel = "oculto"
+leer = { funcion = "cbGetX" }
+
+[[ajuste.campo]]
+id = "espejo"
+escribe = { funcion = "cbSetX", parametro = "espejo" }
+lee = "espejo"
+tipo = "booleano"
+requiere = { campo = "puerto", cuando = "true" }
+
+[[ajuste.campo]]
+id = "puerto"
+escribe = { funcion = "cbSetX", parametro = "puerto" }
+lee = "puerto"
+tipo = "opcion"
+opciones = [{ valor = "1", clave = "puerto_1" }, { valor = "2", clave = "puerto_2" }]
+"#;
+    let c = CatalogoAjustes::from_toml(&[("sistema", toml)], "").unwrap();
+    let a = c.ajuste("sistema.prueba").unwrap();
+    let pedir = |pares: &[(&str, &str)]| {
+        let v: BTreeMap<String, String> = pares
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        falta_requerido(a, &v).map(|(pide, falta)| (pide.id.clone(), falta.id.clone()))
+    };
+    assert_eq!(
+        pedir(&[("espejo", "true")]),
+        Some(("espejo".into(), "puerto".into()))
+    );
+    assert_eq!(
+        pedir(&[("espejo", "true"), ("puerto", " ")]),
+        Some(("espejo".into(), "puerto".into()))
+    );
+    assert_eq!(pedir(&[("espejo", "true"), ("puerto", "puerto_2")]), None);
+    assert_eq!(pedir(&[("espejo", "false")]), None);
+    assert_eq!(pedir(&[("puerto", "puerto_1")]), None);
 }

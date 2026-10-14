@@ -5,8 +5,9 @@ use catalogo::{Catalogo, Funcion, Origen, Parametro, Riesgo, Tipo, TipoParam, ma
 use std::collections::HashSet;
 
 use crate::carga::CatalogoAjustes;
+use crate::legible::admite_opcional;
 use crate::modelo::{Ajuste, Campo, TipoCampo};
-use crate::valores::{admite_opcional, traducir};
+use crate::valores::traducir;
 
 /// Prefijo de las claves de traducción de un ajuste: `ajuste-` más el id con
 /// `.` → `-` (`wifi.red_5` → `ajuste-wifi-red_5`).
@@ -143,10 +144,40 @@ fn comprobar_ajuste(a: &Ajuste, f: &Catalogo, m: &Mascara, fallos: &mut Vec<Stri
             fallos.push(format!("{id}: campo {} repetido", campo.id));
         }
         comprobar_campo(a, campo, f, m, fallos);
+        comprobar_requiere(a, campo, fallos);
         let escritura = campo.escribe.as_ref().and_then(|e| f.funcion(&e.funcion));
         if let Some(func) = escritura.filter(|_| a.lista) {
             comprobar_id_de_lista(a, func, m, fallos);
         }
+    }
+}
+
+/// `requiere`: el campo exigido es otro del mismo ajuste y se puede
+/// escribir, y `cuando` es un valor válido del campo que lo pide.
+fn comprobar_requiere(a: &Ajuste, c: &Campo, fallos: &mut Vec<String>) {
+    let Some(r) = &c.requiere else {
+        return;
+    };
+    let donde = format!("{}.{}", a.id, c.id);
+    match a.campo(&r.campo) {
+        None => fallos.push(format!(
+            "{donde}: requiere {}, que no es un campo del ajuste",
+            r.campo
+        )),
+        Some(e) if e.id == c.id => {
+            fallos.push(format!("{donde}: requiere el propio campo"));
+        }
+        Some(e) if e.escribible().is_none() => fallos.push(format!(
+            "{donde}: requiere {}, que no se puede escribir",
+            e.id
+        )),
+        Some(_) => {}
+    }
+    if traducir(c, &r.cuando).is_err() {
+        fallos.push(format!(
+            "{donde}: requiere con «{}», que no es un valor válido del campo",
+            r.cuando
+        ));
     }
 }
 

@@ -916,3 +916,206 @@ async fn deshacer_dos_veces_da_400() {
     assert_eq!(status, 200, "{body}");
     assert!(body.contains("ajuste-wifi-red_24-titulo"), "{body}");
 }
+
+/// Espejo de puerto: encenderlo sin elegir la toma escribiría la toma 0. El
+/// servidor lo rechaza (400, en el idioma de la petición, junto a la toma) y
+/// lo acepta con la toma; la vista lleva la regla para la página.
+#[tokio::test]
+async fn espejo_sin_toma_da_400() {
+    let (p, cookie) = panel_con_gestor().await;
+    let tema = leer(&p, &cookie, "sistema").await;
+    let espejo = campo(ajuste(&tema, "sistema.diagnostico"), "espejo");
+    assert_eq!(
+        espejo["requiere"],
+        json!({ "campo": "puerto", "cuando": "true" }),
+        "{espejo}"
+    );
+    let (status, body) = preparar_ajuste(
+        &p,
+        &cookie,
+        "sistema.diagnostico",
+        json!({ "espejo": "true" }),
+    )
+    .await;
+    assert_eq!(status, 400, "{body}");
+    assert!(body.contains("Toma que recibe la copia"), "{body}");
+    assert!(body.contains("Copia encendida"), "{body}");
+    let en = format!("{cookie}; rp_lang=en");
+    let (status, body) =
+        preparar_ajuste(&p, &en, "sistema.diagnostico", json!({ "espejo": "true" })).await;
+    assert_eq!(status, 400, "{body}");
+    assert!(body.contains("Socket that receives the copy"), "{body}");
+    assert!(p.sim.control.writes().is_empty());
+    // Apagarlo no exige toma; encenderlo con ella, sí vale.
+    let (status, body) = preparar_ajuste(
+        &p,
+        &cookie,
+        "sistema.diagnostico",
+        json!({ "espejo": "true", "puerto": "puerto_2" }),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+}
+
+// ------------------------------------------------- páginas /ajustes/<tema>
+
+/// La página `ruta` como la pide el navegador: estado y HTML.
+async fn pagina(p: &Panel, cookie: &str, ruta: &str) -> (u16, String, String) {
+    let resp = send(
+        &p.app,
+        axum::http::Request::get(ruta)
+            .header("cookie", cookie)
+            .header("accept", "text/html")
+            .body(axum::body::Body::empty())
+            .unwrap(),
+    )
+    .await;
+    let status = resp.status().as_u16();
+    let location = resp
+        .headers()
+        .get(header::LOCATION)
+        .map(|v| v.to_str().unwrap().to_owned())
+        .unwrap_or_default();
+    (status, location, body_text(resp).await)
+}
+
+/// `html` sin los bloques `<abre …>…</cierra>` cuya apertura empieza por
+/// `abre` (sin anidar), y esos bloques aparte.
+fn partir<'a>(html: &'a str, abre: &str, cierra: &str) -> (String, Vec<&'a str>) {
+    let mut fuera = String::new();
+    let mut dentro = Vec::new();
+    let mut resto = html;
+    while let Some(i) = resto.find(abre) {
+        fuera.push_str(&resto[..i]);
+        let fin = i + resto[i..].find(cierra).expect("bloque sin cerrar") + cierra.len();
+        dentro.push(&resto[i..fin]);
+        resto = &resto[fin..];
+    }
+    fuera.push_str(resto);
+    (fuera, dentro)
+}
+
+/// Texto que se lee en pantalla (o en voz alta) de un trozo de HTML: el de
+/// fuera de las etiquetas y los atributos que se leen.
+fn texto_legible(html: &str) -> String {
+    let atributos =
+        regex::Regex::new(r#"\b(?:aria-label|title|placeholder|alt)="([^"]*)""#).unwrap();
+    let mut out: String = atributos
+        .captures_iter(html)
+        .map(|c| format!("{} ", &c[1]))
+        .collect();
+    let etiquetas = regex::Regex::new(r"<[^>]*>").unwrap();
+    out.push_str(&etiquetas.replace_all(html, " "));
+    out
+}
+
+/// Nombres de parámetro del catálogo de ajustes (lecturas, fijos, campos y
+/// sus `ademas`).
+fn parametros_del_catalogo() -> Vec<String> {
+    let c = ajustes::CatalogoAjustes::load().unwrap();
+    let mut nombres = std::collections::BTreeSet::new();
+    for a in c.todos() {
+        nombres.extend(a.leer.params.iter().map(|(k, _)| k.clone()));
+        nombres.extend(a.fijos.keys().cloned());
+        for x in &a.campos {
+            nombres.insert(x.lee.clone());
+            nombres.extend(x.escribe.iter().map(|e| e.parametro.clone()));
+            for ad in &x.ademas {
+                nombres.insert(ad.parametro.clone());
+                nombres.insert(ad.lee.clone());
+            }
+        }
+    }
+    nombres.into_iter().collect()
+}
+
+/// Palabras corrientes que también son parámetros (las mismas que deja
+/// pasar `ajustes::catalogo_real`).
+const FORMAS_CORRIENTES: [&str; 9] = [
+    "account",
+    "Account",
+    "all",
+    "All",
+    "beamforming",
+    "isolation",
+    "password",
+    "Password",
+    "WMM",
+];
+
+#[tokio::test]
+async fn pagina_tema_sin_nombres_de_api_fuera_de_detalles() {
+    let (p, cookie) = panel_con_gestor().await;
+    let funcion = regex::Regex::new(r"\bcb[A-Z]\w+").unwrap();
+    let pagina_api = regex::Regex::new(r"\bte_\w+\.(asp|cmd|cgi|wl)\b").unwrap();
+    let parametros: Vec<regex::Regex> = parametros_del_catalogo()
+        .iter()
+        .map(|n| regex::Regex::new(&format!(r"(?i)\b{}\b", regex::escape(n))).unwrap())
+        .collect();
+    for tema in ["wifi", "puertos", "seguridad"] {
+        let ruta = format!("/ajustes/{tema}");
+        let (status, _, html) = pagina(&p, &cookie, &ruta).await;
+        assert_eq!(status, 200, "{ruta}: {html}");
+        let (sin_detalles, detalles) =
+            partir(&html, r#"<details class="detalles-tecnicos""#, "</details>");
+        assert!(!detalles.is_empty(), "{ruta}: sin detalles técnicos");
+        // Los datos de la hidratación (`<script>`) no se pintan: llevan los
+        // detalles técnicos para hidratar sus bloques plegados.
+        let (visible, _) = partir(&sin_detalles, "<script", "</script>");
+        let api: Vec<&str> = funcion
+            .find_iter(&visible)
+            .chain(pagina_api.find_iter(&visible))
+            .map(|m| m.as_str())
+            .collect();
+        assert!(
+            api.is_empty(),
+            "{ruta}: {api:?} fuera de los detalles técnicos"
+        );
+        let texto = texto_legible(&visible);
+        for p in &parametros {
+            for m in p.find_iter(&texto) {
+                assert!(
+                    FORMAS_CORRIENTES.contains(&m.as_str()),
+                    "{ruta}: parámetro «{}» en el texto",
+                    m.as_str()
+                );
+            }
+        }
+        if tema == "wifi" {
+            assert!(
+                detalles.iter().any(|d| d.contains("cbSetWifiAccPt")),
+                "{ruta}: {detalles:#?}"
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn pagina_tema_sin_secretos() {
+    let (p, cookie) = panel_con_gestor().await;
+    let clave = "clave-conocida-del-sim-7";
+    escribir_red_24(&p, &[("key_phrase", clave)]).await;
+    let (status, _, html) = pagina(&p, &cookie, "/ajustes/wifi").await;
+    assert_eq!(status, 200, "{html}");
+    assert!(html.contains("Red WiFi 2,4 GHz"), "{html}");
+    assert!(!html.contains(clave), "la clave sale en el HTML");
+}
+
+#[tokio::test]
+async fn ajustes_lleva_a_internet() {
+    let (p, cookie) = panel_con_gestor().await;
+    for ruta in ["/ajustes", "/ajustes/"] {
+        let (status, location, body) = pagina(&p, &cookie, ruta).await;
+        assert_eq!(status, 302, "{ruta}: {body}");
+        assert_eq!(location, "/ajustes/internet", "{ruta}");
+    }
+}
+
+#[tokio::test]
+async fn tema_desconocido_no_encontrada() {
+    let (p, cookie) = panel_con_gestor().await;
+    let (status, _, html) = pagina(&p, &cookie, "/ajustes/no-existe").await;
+    assert_eq!(status, 404, "{html}");
+    assert!(html.contains("Página no encontrada"), "{html}");
+    assert!(p.sim.control.writes().is_empty());
+}

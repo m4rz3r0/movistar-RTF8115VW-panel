@@ -36,7 +36,7 @@ ajuste-puertos-upnp-activo-recomendado = Recomendado si prefieres decidir tú qu
 ## Ayudantes de protocolos (ALG)
 ajuste-puertos-alg-titulo = Ayudantes de protocolos (ALG)
 ajuste-puertos-alg-desc = Ayudas del router para que algunos programas antiguos funcionen a través de él: transferencia de archivos, llamadas por internet, redes privadas y videoconferencia.
-ajuste-puertos-alg-ayuda = Cada ayudante retoca el tráfico de un tipo de programa para que pase bien por el router. Si funciona todo, no los toques. Apagar uno puede impedir que ese tipo de programa funcione desde tu red; encender el de llamadas a veces da problemas con los teléfonos o aplicaciones de llamadas de tu red.
+ajuste-puertos-alg-ayuda = Cada ayudante retoca el tráfico de un tipo de programa para que pase bien por el router. Aquí ves cuáles tiene encendidos tu router; de momento no se pueden cambiar desde el panel. Con uno apagado, ese tipo de programa puede no funcionar desde tu red; con el de llamadas encendido, a veces fallan los teléfonos o las aplicaciones de llamadas de tu red.
 ajuste-puertos-alg-motivo = Por ahora solo se puede consultar: para cambiarlo, el router necesita un dato que no enseña al leerlo, y el panel no podría deshacer el cambio si algo fallase. Se revisará cuando se pruebe con el router real.
 ajuste-puertos-alg-ftp = Transferencia de archivos (FTP)
 ajuste-puertos-alg-ftp-desc = Hace que funcionen los programas de transferencia de archivos que usan el modo activo de FTP.

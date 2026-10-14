@@ -148,15 +148,15 @@ async fn foto(p: &Panel, cookie: &str, a: &Ajuste) -> BTreeMap<String, (Value, O
     out
 }
 
-/// Tras escribir `campo`, el resto de campos de `a` siguen como en `antes`.
+/// Tras escribir `tocados`, el resto de campos de `a` siguen como en `antes`.
 fn hermanos_iguales(
     que: &str,
-    campo: &str,
+    tocados: &[&str],
     antes: &BTreeMap<String, (Value, Option<String>)>,
     ahora: &BTreeMap<String, (Value, Option<String>)>,
 ) {
     for (id, valor) in antes {
-        if id != campo {
+        if !tocados.contains(&id.as_str()) {
             assert_eq!(&ahora[id], valor, "{que}: ha cambiado también {id}");
         }
     }
@@ -178,10 +178,19 @@ async fn cada_ajuste_antes_aplicar_verificar_deshacer() {
             let antes = todo_antes[&c.id].0.clone();
             let antes_crudo = crudo(&p, a, &c.lee).await;
             let (nuevo, esperado) = otro_valor(c, &antes, n);
+            let mut valores = json!({ c.id.as_str(): nuevo });
+            let mut tocados = vec![c.id.as_str()];
+            // Con el valor que exige otro campo (encender el espejo), ese
+            // campo va también: su primera opción.
+            if let Some(r) = c.requiere.as_ref().filter(|r| r.cuando == nuevo) {
+                let exigido = a.campo(&r.campo).unwrap();
+                valores[&r.campo] = json!(exigido.opciones[0].clave);
+                tocados.push(&exigido.id);
+            }
             let (status, body) = llamar(
                 &p,
                 "preparar_ajuste",
-                json!({ "p": { "ajuste": a.id, "instancia": null, "borrar": false, "valores": { c.id.as_str(): nuevo } } }),
+                json!({ "p": { "ajuste": a.id, "instancia": null, "borrar": false, "valores": valores } }),
                 Some(&cookie),
             )
             .await;
@@ -192,7 +201,7 @@ async fn cada_ajuste_antes_aplicar_verificar_deshacer() {
                 Some(v) => assert_eq!(legible(&p, &cookie, a, &c.id).await, v, "{que}"),
                 None => assert_eq!(crudo(&p, a, &c.lee).await, nuevo, "{que}"),
             }
-            hermanos_iguales(&que, &c.id, &todo_antes, &foto(&p, &cookie, a).await);
+            hermanos_iguales(&que, &tocados, &todo_antes, &foto(&p, &cookie, a).await);
             let (status, body) = llamar(
                 &p,
                 "deshacer_ajuste",

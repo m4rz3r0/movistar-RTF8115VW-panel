@@ -5,6 +5,7 @@
 //! [`Insignia`]. Los colores de estado se reservan para estados y van siempre
 //! con icono y texto, nunca solos.
 
+pub mod ajustes_router;
 pub mod charts;
 pub mod estado;
 pub mod explorador;

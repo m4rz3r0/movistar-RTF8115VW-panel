@@ -3,7 +3,7 @@
 # `ajustes-<section>.ftl`.
 
 ## Page
-ajustes-titulo = Router settings
+ajustes-titulo = Settings
 ajustes-desc = Change what you need on the router in plain language. Every change is watched and, if the router stops responding, it is undone on its own.
 ajustes-mas-opciones = More options
 ajustes-mas-opciones-desc = Settings you will hardly ever need to touch.
@@ -20,6 +20,23 @@ ajustes-valor-desconocido-desc = The router has a value the panel does not know.
 ajustes-secreto = Hidden
 ajustes-secreto-desc = For security, the panel does not show it. Only type a new one if you want to change it.
 ajustes-efecto = When applied
+ajustes-temas = Settings topics
+ajustes-tema-elegir = Topic
+ajustes-volver = Go to the Internet settings
+ajustes-solo-lectura-aviso = Settings can only be viewed for now: the router firmware has not been tested with the panel yet.
+ajustes-solo-lectura-enlace = Confirm it in Router settings
+ajustes-que-hace = What does this do?
+ajustes-editar = Edit
+ajustes-guardar = Save
+ajustes-cancelar = Cancel
+ajustes-recomendado-valor = Recommended: { $valor }
+ajustes-recomendado-pros = Pros and cons
+ajustes-recomendado-marca = Pros:
+ajustes-opcion-recomendada = { $opcion } (recommended)
+ajustes-secreto-placeholder = Leave it empty to keep it
+ajustes-hueco = This setting will have its own screen here; it is not ready yet.
+ajustes-lista-vacia = None set up.
+ajustes-lista-sin-editar = For now this list can only be viewed.
 
 ## Sections
 ajustes-tema-internet = Internet
@@ -42,8 +59,8 @@ ajustes-nivel-basico = Essentials
 ajustes-nivel-basico-desc = Always in view.
 ajustes-nivel-avanzado = Advanced
 ajustes-nivel-avanzado-desc = Under "More options": for those who know what they are looking for.
-ajustes-nivel-oculto = Hidden by the operator
-ajustes-nivel-oculto-desc = Under "More options". The router's web page does not show it, but the router accepts it.
+ajustes-nivel-oculto = Hidden
+ajustes-nivel-oculto-desc = Not shown in the operator's web interface.
 
 ## Risks
 ajustes-riesgo-bajo = Low risk
@@ -77,6 +94,7 @@ ajustes-error-ajuste = That setting does not exist.
 ajustes-error-campo = That setting has no such value. Reload the page and try again.
 ajustes-error-cambio = That change was not made from Settings. You can undo it from the History.
 ajustes-error-no-deshacer = That change can no longer be undone: only a change that is already applied (once the watch is over) and has not been undone before can be undone.
+ajustes-error-requiere = You need to choose this for “{ $campo }”.
 
 ## Saving a setting: summary and confirmation
 ajustes-grupo-revisar = Review the change

@@ -10,7 +10,7 @@
 //! [`ValorLegible::Secreto`]: su valor nunca sale del servidor.
 
 use crate::ui::explorador::RiesgoCambio;
-use ajustes::{Nivel, TipoCampo, ValorLegible};
+use ajustes::{Nivel, Requiere, TipoCampo, ValorLegible};
 use leptos::prelude::*;
 use leptos::server_fn::codec::Json;
 use serde::{Deserialize, Serialize};
@@ -92,6 +92,9 @@ pub struct CampoVista {
     /// Clave de traducción del porqué de la recomendación (para quién es, a
     /// favor y en contra): `<clave>-recomendado`. Solo si hay recomendación.
     pub motivo_recomendado: Option<String>,
+    /// Otro campo del ajuste que hace falta cuando este toma un valor (la
+    /// toma del espejo al encenderlo): la página lo pide junto a ese campo.
+    pub requiere: Option<Requiere>,
 }
 
 /// Una opción de un campo `opcion`.
@@ -198,6 +201,20 @@ pub struct CambioLegible {
     pub tipo: TipoCampo,
 }
 
+/// Texto traducido de un valor que no vale, con sus límites: el mismo en el
+/// servidor y en la página.
+pub fn texto_error_valor(e: &ajustes::ErrorValor) -> String {
+    let mut args = i18n::FluentArgs::new();
+    let (min, max) = e.limites();
+    if let Some(min) = min {
+        args.set("min", min);
+    }
+    if let Some(max) = max {
+        args.set("max", max);
+    }
+    crate::ui::i18n::traducir(e.clave_i18n(), Some(&args))
+}
+
 /// Prepara el guardado de un ajuste: lee el router, calcula lo que cambia
 /// en cada paso y devuelve el resumen con su token. Errores con el mensaje
 /// traducido: 409 si ya está así o hay otro cambio en curso, 403 en solo
@@ -270,7 +287,9 @@ pub(crate) mod servidor {
             servidor::{error_cambio, gestor, riesgo},
         },
     };
-    use ajustes::{Ajuste, Campo, ErrorValor, Tema, a_legible, a_router, prefijo_i18n};
+    use ajustes::{
+        Ajuste, Campo, ErrorValor, Tema, a_legible, a_router, falta_requerido, prefijo_i18n,
+    };
     use axum::http::StatusCode;
     use catalogo::{Catalogo, Riesgo};
     use hgu::xml::XmlNode;
@@ -469,6 +488,7 @@ pub(crate) mod servidor {
             solo_lectura: c.solo_lectura.clone(),
             motivo_recomendado: recomendado.as_ref().map(|_| format!("{clave}-recomendado")),
             recomendado,
+            requiere: c.requiere.clone(),
             clave,
         }
     }
@@ -800,17 +820,25 @@ pub(crate) mod servidor {
 
     /// Mensaje traducido de un valor que no vale, con la etiqueta del campo.
     fn error_valor(prefijo: &str, c: &Campo, e: &ErrorValor) -> ServerFnError {
-        let mut args = i18n::FluentArgs::new();
-        if let ErrorValor::Corto { min } | ErrorValor::FueraDeRango { min: Some(min), .. } = e {
-            args.set("min", *min);
-        }
-        if let ErrorValor::Largo { max } | ErrorValor::FueraDeRango { max: Some(max), .. } = e {
-            args.set("max", *max);
-        }
+        let etiqueta = crate::ui::i18n::traducir(&format!("{prefijo}-{}", c.id), None);
+        fallo(
+            StatusCode::BAD_REQUEST,
+            format!("{etiqueta}: {}", texto_error_valor(e)),
+        )
+    }
+
+    /// Mensaje traducido de un campo que hace falta y no viene (400), junto
+    /// a la etiqueta del campo que falta: «<falta>: hace falta para <pide>».
+    fn error_requiere(prefijo: &str, pide: &Campo, falta: &Campo) -> ServerFnError {
         let traducir = crate::ui::i18n::traducir;
-        let etiqueta = traducir(&format!("{prefijo}-{}", c.id), None);
-        let msg = traducir(e.clave_i18n(), Some(&args));
-        fallo(StatusCode::BAD_REQUEST, format!("{etiqueta}: {msg}"))
+        let etiqueta = |c: &Campo| traducir(&format!("{prefijo}-{}", c.id), None);
+        let mut args = i18n::FluentArgs::new();
+        args.set("campo", etiqueta(pide));
+        let msg = traducir("ajustes-error-requiere", Some(&args));
+        fallo(
+            StatusCode::BAD_REQUEST,
+            format!("{}: {msg}", etiqueta(falta)),
+        )
     }
 
     /// Ajuste `id` del catálogo (404 si no existe).
@@ -842,6 +870,11 @@ pub(crate) mod servidor {
                 .campo(id)
                 .ok_or_else(|| fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-campo")))?;
             pares(c, v).map_err(|e| error_valor(&prefijo, c, &e))?;
+        }
+        if !p.borrar
+            && let Some((pide, falta)) = falta_requerido(a, &p.valores)
+        {
+            return Err(error_requiere(&prefijo, pide, falta));
         }
         let g = gestor(&state)?;
         libre(&g)?;

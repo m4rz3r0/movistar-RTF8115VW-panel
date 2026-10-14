@@ -20,6 +20,23 @@ ajustes-valor-desconocido-desc = El router tiene puesto un valor que el panel no
 ajustes-secreto = Oculta
 ajustes-secreto-desc = Por seguridad, el panel no la muestra. Escribe una nueva solo si quieres cambiarla.
 ajustes-efecto = Al aplicarlo
+ajustes-temas = Temas de ajustes
+ajustes-tema-elegir = Tema
+ajustes-volver = Ir a los ajustes de Internet
+ajustes-solo-lectura-aviso = Ahora solo se pueden consultar los ajustes: el firmware del router aún no está probado con el panel.
+ajustes-solo-lectura-enlace = Confírmalo en Configuración del router
+ajustes-que-hace = ¿Qué hace esto?
+ajustes-editar = Editar
+ajustes-guardar = Guardar
+ajustes-cancelar = Cancelar
+ajustes-recomendado-valor = Recomendado: { $valor }
+ajustes-recomendado-pros = A favor y en contra
+ajustes-recomendado-marca = A favor:
+ajustes-opcion-recomendada = { $opcion } (recomendada)
+ajustes-secreto-placeholder = Déjala vacía para no cambiarla
+ajustes-hueco = Este ajuste tendrá aquí su propia pantalla; todavía no está lista.
+ajustes-lista-vacia = No hay ninguno configurado.
+ajustes-lista-sin-editar = Por ahora esta lista solo se puede consultar.
 
 ## Temas
 ajustes-tema-internet = Internet
@@ -42,8 +59,8 @@ ajustes-nivel-basico = Lo esencial
 ajustes-nivel-basico-desc = Siempre a la vista.
 ajustes-nivel-avanzado = Avanzado
 ajustes-nivel-avanzado-desc = Bajo «Más opciones»: para quien sabe lo que busca.
-ajustes-nivel-oculto = Oculto por el operador
-ajustes-nivel-oculto-desc = Bajo «Más opciones». La web del router no lo muestra, pero el router lo admite.
+ajustes-nivel-oculto = Oculto
+ajustes-nivel-oculto-desc = No aparece en la web del operador.
 
 ## Riesgos
 ajustes-riesgo-bajo = Riesgo bajo
@@ -77,6 +94,7 @@ ajustes-error-ajuste = Ese ajuste no existe.
 ajustes-error-campo = Ese ajuste no tiene ese dato. Recarga la página y prueba de nuevo.
 ajustes-error-cambio = Ese cambio no se hizo desde Ajustes. Puedes deshacerlo desde el Historial.
 ajustes-error-no-deshacer = Ese cambio ya no se puede deshacer: solo se deshace un cambio ya aplicado (cuando termina la vigilancia) que no se haya deshecho antes.
+ajustes-error-requiere = Hace falta elegirlo para «{ $campo }».
 
 ## Guardar un ajuste: resumen y confirmación
 ajustes-grupo-revisar = Revisa el cambio

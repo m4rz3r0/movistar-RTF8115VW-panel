@@ -90,6 +90,19 @@ pub enum ValorLegible {
     Secreto,
 }
 
+/// Otro campo del mismo ajuste que hace falta cuando este toma un valor: al
+/// encender el espejo de puerto hay que elegir la toma. Lo comprueban el
+/// servidor al guardar y la página junto al campo exigido.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Requiere {
+    /// Id del campo exigido.
+    pub campo: String,
+    /// Valor legible de este campo con el que se exige (`true`, una clave
+    /// de opción…).
+    pub cuando: String,
+}
+
 #[cfg(feature = "catalogo")]
 pub use catalogo_toml::*;
 
@@ -116,7 +129,7 @@ pub use catalogo_toml::*;
 /// web básica.
 #[cfg(feature = "catalogo")]
 mod catalogo_toml {
-    use super::{Nivel, Tema, TipoCampo};
+    use super::{Nivel, Requiere, Tema, TipoCampo};
     use serde::{Deserialize, Deserializer};
     use std::collections::BTreeMap;
 
@@ -235,6 +248,10 @@ mod catalogo_toml {
         /// recomendada en la propia opción).
         #[serde(default)]
         pub recomendado: Option<String>,
+        /// Otro campo que hace falta cuando este toma un valor
+        /// (`requiere = { campo = "puerto", cuando = "true" }`).
+        #[serde(default)]
+        pub requiere: Option<Requiere>,
     }
 
     impl Campo {

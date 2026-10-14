@@ -1961,6 +1961,7 @@ dependencies = [
  "leptos_axum",
  "leptos_meta",
  "leptos_router",
+ "regex",
  "router-sim",
  "rpassword",
  "serde",

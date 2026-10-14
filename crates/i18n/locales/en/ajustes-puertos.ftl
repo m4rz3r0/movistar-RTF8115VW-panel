@@ -36,7 +36,7 @@ ajuste-puertos-upnp-activo-recomendado = Recommended if you prefer to decide whi
 ## Protocol helpers (ALG)
 ajuste-puertos-alg-titulo = Protocol helpers (ALG)
 ajuste-puertos-alg-desc = Router helpers that let some older programs work through it: file transfer, internet calls, private networks and video conferencing.
-ajuste-puertos-alg-ayuda = Each helper adjusts the traffic of one kind of program so it gets through the router properly. If everything works, leave them alone. Turning one off may stop that kind of program from working from your network; turning on the calls helper sometimes causes trouble with the phones or calling apps on your network.
+ajuste-puertos-alg-ayuda = Each helper adjusts the traffic of one kind of program so it gets through the router properly. Here you can see which ones your router has turned on; for now they cannot be changed from the panel. With one turned off, that kind of program may not work from your network; with the calls helper turned on, the phones or calling apps on your network sometimes fail.
 ajuste-puertos-alg-motivo = For now it can only be viewed: to change it, the router needs a value it does not show when read, so the panel could not undo the change if something went wrong. This will be reviewed when tested with the real router.
 ajuste-puertos-alg-ftp = File transfer (FTP)
 ajuste-puertos-alg-ftp-desc = Makes file transfer programs that use FTP active mode work.
