@@ -6,8 +6,9 @@ mod common;
 
 use axum::http::header;
 use common::{
-    Panel, body_text, esperar_final, llamar, ok, panel, panel_con_ajustes, panel_con_capa,
-    panel_con_gestor, panel_con_tiempos, post_json, send, sesion, tiempos_rapidos, variante,
+    Panel, aplicar, body_text, esperar_final, esperar_libre, llamar, ok, panel, panel_con_ajustes,
+    panel_con_capa, panel_con_gestor, panel_con_tiempos, post_json, send, sesion, tiempos_rapidos,
+    variante,
 };
 use panel::instancia::{self, claves};
 use serde_json::{Value, json};
@@ -833,4 +834,85 @@ async fn guardar_exige_sesion() {
     )
     .await;
     assert_eq!(status, 401, "{body}");
+}
+
+#[tokio::test]
+async fn borrar_en_un_ajuste_que_no_es_lista_da_400() {
+    let (p, cookie) = panel_con_gestor().await;
+    let (status, body) = llamar(
+        &p,
+        "preparar_ajuste",
+        json!({ "p": { "ajuste": "wifi.red_24", "instancia": null, "borrar": true, "valores": {} } }),
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(status, 400, "{body}");
+    assert!(body.contains("no ha podido preparar"), "{body}");
+    assert!(p.sim.control.writes().is_empty());
+}
+
+/// `deshacer_ajuste` del cambio `id`: estado y cuerpo.
+async fn deshacer(p: &Panel, cookie: &str, id: i64) -> (u16, String) {
+    llamar(p, "deshacer_ajuste", json!({ "cambio": id }), Some(cookie)).await
+}
+
+#[tokio::test]
+async fn deshacer_un_cambio_que_no_es_de_ajustes_da_404() {
+    let (p, cookie) = panel_con_gestor().await;
+    // Un cambio del explorador: sin título de ajuste.
+    let id = aplicar(
+        &p,
+        &cookie,
+        json!({ "funcion": "cbSetUpnpCfg", "instancia": null, "valores": [["adm_state", "1"]], "borrar": false }),
+    )
+    .await;
+    assert_eq!(esperar_final(&p, &cookie, id).await["estado"], "Aplicado");
+    esperar_libre(&p).await;
+    let (status, body) = deshacer(&p, &cookie, id).await;
+    assert_eq!(status, 404, "{body}");
+    assert!(body.contains("no se hizo desde Ajustes"), "{body}");
+}
+
+#[tokio::test]
+async fn deshacer_en_vigilancia_da_400() {
+    let (p, cookie) = panel_vigilando().await;
+    let g = resumen(
+        &p,
+        &cookie,
+        "wifi.red_24",
+        json!({ "nombre": "casa-nueva" }),
+    )
+    .await;
+    let id = confirmar(&p, &cookie, &g, &[]).await;
+    let (status, body) = deshacer(&p, &cookie, id).await;
+    assert_eq!(status, 400, "{body}");
+    assert!(body.contains("ya no se puede deshacer"), "{body}");
+}
+
+#[tokio::test]
+async fn deshacer_dos_veces_da_400() {
+    let (p, cookie) = panel_con_gestor().await;
+    let g = resumen(
+        &p,
+        &cookie,
+        "wifi.red_24",
+        json!({ "nombre": "casa-nueva" }),
+    )
+    .await;
+    let id = confirmar(&p, &cookie, &g, &[]).await;
+    assert_eq!(esperar_final(&p, &cookie, id).await["estado"], "Aplicado");
+    esperar_libre(&p).await;
+    let (status, body) = deshacer(&p, &cookie, id).await;
+    assert_eq!(status, 200, "{body}");
+    let inverso: Value = serde_json::from_str(&body).unwrap();
+    let otro = confirmar(&p, &cookie, &inverso, &[]).await;
+    assert_eq!(esperar_final(&p, &cookie, otro).await["estado"], "Aplicado");
+    esperar_libre(&p).await;
+    let (status, body) = deshacer(&p, &cookie, id).await;
+    assert_eq!(status, 400, "{body}");
+    assert!(body.contains("ya no se puede deshacer"), "{body}");
+    // El deshacer sí se puede deshacer, y sigue siendo del mismo ajuste.
+    let (status, body) = deshacer(&p, &cookie, otro).await;
+    assert_eq!(status, 200, "{body}");
+    assert!(body.contains("ajuste-wifi-red_24-titulo"), "{body}");
 }

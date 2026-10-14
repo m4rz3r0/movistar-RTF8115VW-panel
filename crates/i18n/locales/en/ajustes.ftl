@@ -76,6 +76,7 @@ ajustes-error-invalida = The panel could not prepare this change. Reload the pag
 ajustes-error-ajuste = That setting does not exist.
 ajustes-error-campo = That setting has no such value. Reload the page and try again.
 ajustes-error-cambio = That change was not made from Settings. You can undo it from the History.
+ajustes-error-no-deshacer = That change can no longer be undone: only a change that is already applied (once the watch is over) and has not been undone before can be undone.
 
 ## Saving a setting: summary and confirmation
 ajustes-grupo-revisar = Review the change

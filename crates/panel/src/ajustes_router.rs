@@ -126,8 +126,9 @@ pub struct DetallesTecnicos {
     pub parametros: Vec<(String, String)>,
 }
 
-/// Lo que la página pide guardar de un ajuste.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// Lo que la página pide guardar de un ajuste. Su `Debug` no enseña los
+/// valores (pueden ser contraseñas), solo los ids de los campos.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PeticionAjuste {
     /// Id del ajuste (`wifi.red_24`).
     pub ajuste: String,
@@ -139,6 +140,17 @@ pub struct PeticionAjuste {
     /// Campos que se cambian: id del campo → valor legible (la clave de una
     /// opción, `true`/`false`, el texto). Un secreto sin tocar no va.
     pub valores: BTreeMap<String, String>,
+}
+
+impl std::fmt::Debug for PeticionAjuste {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PeticionAjuste")
+            .field("ajuste", &self.ajuste)
+            .field("instancia", &self.instancia)
+            .field("borrar", &self.borrar)
+            .field("valores", &self.valores.keys().collect::<Vec<_>>())
+            .finish()
+    }
 }
 
 /// Resumen de un ajuste preparado para guardarlo: lo que cambia en cada paso
@@ -220,6 +232,24 @@ pub async fn deshacer_ajuste(cambio: i64) -> Result<GrupoVista, ServerFnError> {
 #[server(endpoint = "leer_tema", input = Json)]
 pub async fn leer_tema(tema: String) -> Result<TemaVista, ServerFnError> {
     servidor::leer_tema(tema).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn debug_de_la_peticion_no_ensena_los_valores() {
+        let p = PeticionAjuste {
+            ajuste: "wifi.red_24".into(),
+            instancia: None,
+            borrar: false,
+            valores: [("contrasena".to_owned(), "clave-de-prueba-9".to_owned())].into(),
+        };
+        let d = format!("{p:?}");
+        assert!(!d.contains("clave-de-prueba-9"), "{d}");
+        assert!(d.contains("wifi.red_24") && d.contains("contrasena"), "{d}");
+    }
 }
 
 #[cfg(feature = "ssr")]
@@ -803,6 +833,9 @@ pub(crate) mod servidor {
     pub(super) async fn preparar_ajuste(p: PeticionAjuste) -> Result<GrupoVista, ServerFnError> {
         let (state, _) = preparar().await?;
         let a = ajuste_por_id(&state, &p.ajuste)?;
+        if p.borrar && !a.lista {
+            return Err(fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-invalida")));
+        }
         let prefijo = prefijo_i18n(a);
         for (id, v) in &p.valores {
             let c = a
@@ -883,6 +916,14 @@ pub(crate) mod servidor {
         let (a, instancia) = ajuste_del_cambio(&state, &g, cambio)
             .await
             .ok_or_else(|| fallo(StatusCode::NOT_FOUND, t!("ajustes-error-cambio")))?;
+        // Antes que «otro cambio en curso»: un cambio que aún se vigila (el
+        // activo) o que ya se deshizo no se puede deshacer.
+        if !g.se_puede_deshacer(cambio).await {
+            return Err(fallo(
+                StatusCode::BAD_REQUEST,
+                t!("ajustes-error-no-deshacer"),
+            ));
+        }
         libre(&g)?;
         let prep = g.deshacer(cambio).await.map_err(error_ajuste)?;
         // Lo que no cambia en cada paso, como lo muestra ahora el router

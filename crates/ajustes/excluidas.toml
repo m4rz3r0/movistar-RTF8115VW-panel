@@ -198,3 +198,7 @@ motivo = "prefijo IPv6 de la red de casa desde la web básica: ningún ajuste lo
 [[excluida]]
 funcion = "te_ipv6.cmd?action=dhcpapply"
 motivo = "modo y rango de DHCPv6 desde la web básica: ningún ajuste lo ofrece en esta fase (red_local.ipv6 solo activa IPv6 y los anuncios); formato por validar con el router real; fase 3"
+
+[[excluida]]
+funcion = "cbSetNatConfig"
+motivo = "ayudantes de protocolos (puertos.alg, de solo lectura): la escritura exige set_nf_conntrack = 1, que la lectura no devuelve, así que el gestor no podría deshacer el cambio; se revisará con el router real (fase 3)"

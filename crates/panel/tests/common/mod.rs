@@ -394,3 +394,17 @@ pub async fn esperar_final(p: &Panel, cookie: &str, id: i64) -> Value {
         tokio::time::sleep(Duration::from_millis(20)).await;
     }
 }
+
+/// Espera a que el gestor suelte el cambio activo: lo hace justo después de
+/// guardarlo en su estado final.
+pub async fn esperar_libre(p: &Panel) {
+    let g = p.state.cambios().unwrap();
+    let inicio = Instant::now();
+    while g.activo().is_some() {
+        assert!(
+            inicio.elapsed() < Duration::from_secs(5),
+            "el gestor sigue ocupado"
+        );
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+}

@@ -128,10 +128,21 @@ fn desmarcados(pasos: &[PasoVista], marcados: &[bool]) -> Vec<usize> {
         .collect()
 }
 
+/// Cambio que se deshace tras pulsar «Deshacer» sobre el cambio `id`
+/// cuando ya se estaba deshaciendo `actual`: deshacer un deshacer vuelve a
+/// ser un cambio normal (título y botón de siempre).
+fn siguiente_deshace(actual: Option<i64>, id: i64) -> Option<i64> {
+    match actual {
+        Some(_) => None,
+        None => Some(id),
+    }
+}
+
 /// Diálogo de un grupo preparado con [`preparar_ajuste`]
 /// (`crate::ajustes_router::preparar_ajuste`). Al cerrarse llama a
-/// `on_cerrar` con el id del último cambio aplicado desde él (`None` si no
-/// se aplicó nada), para que la página vuelva a leer los ajustes.
+/// `on_cerrar` con el id del último cambio confirmado desde él, haya
+/// acabado aplicado, revertido o fallido (`None` si no se confirmó
+/// ninguno), para que la página vuelva a leer los ajustes.
 #[component]
 pub fn DialogoGrupo(
     grupo: GrupoVista,
@@ -148,7 +159,7 @@ pub fn DialogoGrupo(
     let cambio = RwSignal::new(None::<CambioVista>);
     let terminado =
         Memo::new(move |_| cambio.with(|c| c.as_ref().is_some_and(|c| c.estado.final_())));
-    let ultimo = StoredValue::new(None::<i64>);
+    let ultimo_confirmado = StoredValue::new(None::<i64>);
     let quien_abrio = StoredValue::new_local(None::<leptos::web_sys::HtmlElement>);
 
     let enfocar_titulo = move || {
@@ -189,7 +200,7 @@ pub fn DialogoGrupo(
         spawn_local(async move {
             match confirmar_ajuste(token, quitar).await {
                 Ok(id) => {
-                    ultimo.set_value(Some(id));
+                    ultimo_confirmado.set_value(Some(id));
                     cambio.set(None);
                     fase.set(Fase::Seguimiento(id));
                 }
@@ -237,7 +248,7 @@ pub fn DialogoGrupo(
                 Ok(g) => {
                     marcados.set(marcados_de(&g));
                     grupo.set(g);
-                    deshace.set(Some(id));
+                    deshace.update(|d| *d = siguiente_deshace(*d, id));
                     cambio.set(None);
                     fase.set(Fase::Revisar);
                     enfocar_titulo();
@@ -434,7 +445,7 @@ pub fn DialogoGrupo(
                         let _ = e.focus();
                     }
                 });
-                on_cerrar.run(ultimo.get_value());
+                on_cerrar.run(ultimo_confirmado.get_value());
             }
         >
             <form class="dialogo-cuerpo" on:submit=aplicar>
@@ -583,6 +594,13 @@ mod tests {
             "solo el paso sin cambios: {h}"
         );
         assert!(h.contains(&t!("ajustes-grupo-paso", n = 2)), "{h}");
+    }
+
+    #[test]
+    fn deshacer_un_deshacer_vuelve_a_ser_un_cambio_normal() {
+        assert_eq!(siguiente_deshace(None, 5), Some(5));
+        assert_eq!(siguiente_deshace(Some(5), 6), None);
+        assert_eq!(siguiente_deshace(None, 7), Some(7));
     }
 
     #[test]

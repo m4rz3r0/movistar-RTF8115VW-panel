@@ -76,6 +76,7 @@ ajustes-error-invalida = El panel no ha podido preparar este cambio. Recarga la 
 ajustes-error-ajuste = Ese ajuste no existe.
 ajustes-error-campo = Ese ajuste no tiene ese dato. Recarga la página y prueba de nuevo.
 ajustes-error-cambio = Ese cambio no se hizo desde Ajustes. Puedes deshacerlo desde el Historial.
+ajustes-error-no-deshacer = Ese cambio ya no se puede deshacer: solo se deshace un cambio ya aplicado (cuando termina la vigilancia) que no se haya deshecho antes.
 
 ## Guardar un ajuste: resumen y confirmación
 ajustes-grupo-revisar = Revisa el cambio

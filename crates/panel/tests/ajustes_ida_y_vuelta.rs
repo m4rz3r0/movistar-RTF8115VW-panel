@@ -6,9 +6,9 @@
 mod common;
 
 use ajustes::{Ajuste, Campo, CatalogoAjustes, TipoCampo};
-use common::{Panel, esperar_final, llamar, ok, panel_con_gestor};
+use common::{Panel, esperar_final, esperar_libre, llamar, ok, panel_con_gestor};
 use serde_json::{Value, json};
-use std::time::{Duration, Instant};
+use std::collections::BTreeMap;
 
 /// Valor legible actual del campo `campo` del ajuste `ajuste` según
 /// `leer_tema` (`{"Texto": …}`, `{"Opcion": …}`…).
@@ -33,6 +33,13 @@ async fn legible(p: &Panel, cookie: &str, a: &Ajuste, campo: &str) -> Value {
 /// Valor tal cual lo da el simulador del elemento `lee` de la lectura del
 /// ajuste (para los secretos, que `leer_tema` no enseña).
 async fn crudo(p: &Panel, a: &Ajuste, lee: &str) -> String {
+    crudo_opcional(p, a, lee)
+        .await
+        .unwrap_or_else(|| panic!("{}: el simulador no da {lee}", a.id))
+}
+
+/// Como [`crudo`], `None` si el simulador no da el elemento.
+async fn crudo_opcional(p: &Panel, a: &Ajuste, lee: &str) -> Option<String> {
     let params: Vec<(&str, &str)> = a
         .leer
         .params
@@ -40,7 +47,7 @@ async fn crudo(p: &Panel, a: &Ajuste, lee: &str) -> String {
         .map(|(k, v)| (k.as_str(), v.as_str()))
         .collect();
     let n = p.state.hgu.call(&a.leer.funcion, &params).await.unwrap();
-    elemento(&n, lee).unwrap_or_else(|| panic!("{}: el simulador no da {lee}", a.id))
+    elemento(&n, lee)
 }
 
 fn elemento(n: &hgu::xml::XmlNode, nombre: &str) -> Option<String> {
@@ -125,48 +132,34 @@ async fn aplicar(p: &Panel, cookie: &str, grupo: &Value, que: &str) -> i64 {
     let id = id.as_i64().unwrap();
     let c = esperar_final(p, cookie, id).await;
     assert_eq!(c["estado"], "Aplicado", "{que}: {c}");
-    // El gestor suelta el cambio justo después de guardarlo como aplicado.
-    let g = p.state.cambios().unwrap();
-    let inicio = Instant::now();
-    while g.activo().is_some() {
-        assert!(
-            inicio.elapsed() < Duration::from_secs(5),
-            "{que}: sigue activo"
-        );
-        tokio::time::sleep(Duration::from_millis(5)).await;
-    }
+    esperar_libre(p).await;
     id
 }
 
-/// Ajustes del catálogo que hoy no se pueden guardar, con el motivo. La
-/// prueba exige que sigan sin poder guardarse: cuando se arregle uno, hay
-/// que quitarlo de aquí para que haga la ida y vuelta.
-const SIN_GUARDAR: &[(&str, &str)] = &[(
-    "puertos.alg",
-    "su fijo set_nf_conntrack no sale en la lectura del router, y el gestor no \
-     escribe un parámetro cuyo valor anterior no conoce (no podría deshacerlo)",
-)];
+/// Valor de cada campo del ajuste `a`: el legible de `leer_tema` y el
+/// crudo del simulador (los secretos solo se distinguen en crudo).
+async fn foto(p: &Panel, cookie: &str, a: &Ajuste) -> BTreeMap<String, (Value, Option<String>)> {
+    let mut out = BTreeMap::new();
+    for c in &a.campos {
+        let legible = legible(p, cookie, a, &c.id).await;
+        let crudo = crudo_opcional(p, a, &c.lee).await;
+        out.insert(c.id.clone(), (legible, crudo));
+    }
+    out
+}
 
-/// El ajuste `a` sigue sin poder guardarse: preparar su primer campo
-/// editable da 400 y no escribe nada.
-async fn sigue_sin_guardarse(p: &Panel, cookie: &str, a: &Ajuste, motivo: &str) {
-    let c = a.campos.iter().find(|c| c.escribible().is_some()).unwrap();
-    let antes = legible(p, cookie, a, &c.id).await;
-    let (nuevo, _) = otro_valor(c, &antes, 1);
-    let escritas = p.sim.control.writes().len();
-    let (status, body) = llamar(
-        p,
-        "preparar_ajuste",
-        json!({ "p": { "ajuste": a.id, "instancia": null, "borrar": false, "valores": { c.id.as_str(): nuevo } } }),
-        Some(cookie),
-    )
-    .await;
-    assert_eq!(
-        status, 400,
-        "{}: ¿ya se puede guardar? Quítalo de SIN_GUARDAR ({motivo}): {body}",
-        a.id
-    );
-    assert_eq!(p.sim.control.writes().len(), escritas, "{}", a.id);
+/// Tras escribir `campo`, el resto de campos de `a` siguen como en `antes`.
+fn hermanos_iguales(
+    que: &str,
+    campo: &str,
+    antes: &BTreeMap<String, (Value, Option<String>)>,
+    ahora: &BTreeMap<String, (Value, Option<String>)>,
+) {
+    for (id, valor) in antes {
+        if id != campo {
+            assert_eq!(&ahora[id], valor, "{que}: ha cambiado también {id}");
+        }
+    }
 }
 
 #[tokio::test]
@@ -178,14 +171,11 @@ async fn cada_ajuste_antes_aplicar_verificar_deshacer() {
         if a.lista || a.componente.is_some() {
             continue;
         }
-        if let Some((_, motivo)) = SIN_GUARDAR.iter().find(|(id, _)| *id == a.id) {
-            sigue_sin_guardarse(&p, &cookie, a, motivo).await;
-            continue;
-        }
         for c in a.campos.iter().filter(|c| c.escribible().is_some()) {
             n += 1;
             let que = format!("{} / {}", a.id, c.id);
-            let antes = legible(&p, &cookie, a, &c.id).await;
+            let todo_antes = foto(&p, &cookie, a).await;
+            let antes = todo_antes[&c.id].0.clone();
             let antes_crudo = crudo(&p, a, &c.lee).await;
             let (nuevo, esperado) = otro_valor(c, &antes, n);
             let (status, body) = llamar(
@@ -202,6 +192,7 @@ async fn cada_ajuste_antes_aplicar_verificar_deshacer() {
                 Some(v) => assert_eq!(legible(&p, &cookie, a, &c.id).await, v, "{que}"),
                 None => assert_eq!(crudo(&p, a, &c.lee).await, nuevo, "{que}"),
             }
+            hermanos_iguales(&que, &c.id, &todo_antes, &foto(&p, &cookie, a).await);
             let (status, body) = llamar(
                 &p,
                 "deshacer_ajuste",
@@ -221,6 +212,11 @@ async fn cada_ajuste_antes_aplicar_verificar_deshacer() {
                 crudo(&p, a, &c.lee).await,
                 antes_crudo,
                 "{que}: tras deshacer (en crudo)"
+            );
+            assert_eq!(
+                foto(&p, &cookie, a).await,
+                todo_antes,
+                "{que}: tras deshacer, todo el ajuste"
             );
         }
     }

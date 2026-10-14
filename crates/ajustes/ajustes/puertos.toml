@@ -78,36 +78,35 @@ lee = "adm_state"
 tipo = "booleano"
 recomendado = "false"
 
-# El formulario de los ALG manda siempre `set_nf_conntrack = 1`.
+# Solo lectura: al escribir, el router necesita un dato que no devuelve al
+# leer, así que el panel no podría deshacer el cambio (`cbSetNatConfig` está
+# en `excluidas.toml`). Se revisará al probar con el router real (fase 3).
 [[ajuste]]
 id = "puertos.alg"
 tema = "puertos"
 nivel = "oculto"
 leer = { funcion = "cbGetNatConfig" }
-fijos = { set_nf_conntrack = "1" }
 
 [[ajuste.campo]]
 id = "ftp"
-escribe = { funcion = "cbSetNatConfig", parametro = "ftp_enable" }
 lee = "ftp_enable"
 tipo = "booleano"
-recomendado = "true"
+solo_lectura = "ajuste-puertos-alg-motivo"
 
 [[ajuste.campo]]
 id = "sip"
-escribe = { funcion = "cbSetNatConfig", parametro = "sip_enable" }
 lee = "sip_enable"
 tipo = "booleano"
-recomendado = "false"
+solo_lectura = "ajuste-puertos-alg-motivo"
 
 [[ajuste.campo]]
 id = "pptp"
-escribe = { funcion = "cbSetNatConfig", parametro = "pptp_enable" }
 lee = "pptp_enable"
 tipo = "booleano"
+solo_lectura = "ajuste-puertos-alg-motivo"
 
 [[ajuste.campo]]
 id = "h323"
-escribe = { funcion = "cbSetNatConfig", parametro = "h323_enable" }
 lee = "h323_enable"
 tipo = "booleano"
+solo_lectura = "ajuste-puertos-alg-motivo"
