@@ -14,10 +14,11 @@
 # privilegios rpbuild) con traer_ultima_etiqueta (deploy/lib/git.sh: nunca
 # hace merge, así que tolera un historial reescrito en el remoto); si la
 # última v* (sort -V) no es la desplegada, cargo leptos build
-# --release y las pruebas; copia binario y web a releases/<versión>; cambia el
-# enlace «current» de la jail del panel; reinicia el servicio y espera a que
-# /salud responda 200 (60 s como mucho). Si no responde, vuelve a la versión
-# anterior. Se conservan las 3 últimas versiones.
+# --release (solo compila: las pruebas se pasan en el equipo de desarrollo
+# antes de crear la etiqueta); copia binario y web a releases/<versión>;
+# cambia el enlace «current» de la jail del panel; reinicia el servicio y
+# espera a que /salud responda 200 (60 s como mucho). Si no responde, vuelve
+# a la versión anterior. Se conservan las 3 últimas versiones.
 #
 # Configuración: /usr/local/etc/routerpanel-actualizar.conf (JAILS_RAIZ,
 # JAIL_PANEL, JAIL_COMPILAR, REPO_URL; la escribe install.sh) y
@@ -28,7 +29,7 @@
 # compilación en /var/log/routerpanel-build.log).
 #
 # Todo lo que hay bajo la jail de compilación lo controla el código del
-# repositorio (build.rs, macros, pruebas), así que este guion, que corre como
+# repositorio (build.rs, macros), así que este guion, que corre como
 # root, nunca abre rutas de esa jail desde el host: los artefactos salen como
 # un tar que se genera DENTRO de la jail, y del lado del host sólo se aceptan
 # ficheros y directorios normales. Lo mismo con la base de datos del panel:
@@ -104,7 +105,7 @@ in_jail_sh()
 		$_script" sh "$@"
 }
 
-# Para compilar y probar: con ~/.cargo/bin delante.
+# Para compilar: con ~/.cargo/bin delante.
 in_build()
 {
 	in_jail_sh "\$HOME/.cargo/bin:/usr/local/bin:/usr/bin:/bin" "$@"
@@ -267,14 +268,12 @@ build_release()
 			;;
 		esac
 		renice -n 15 $$ >/dev/null 2>&1
-		cargo leptos build --release &&
-		# Red de seguridad: una prueba colgada no deja el actualizador
-		# esperando para siempre (con lockf, tampoco correría el siguiente).
-		# Falla como cualquier prueba; cargo deja en el registro cuál llevaba
-		# más de 60 s («has been running for over 60 seconds»).
-		timeout -k 60 3600 cargo test --workspace &&
-		timeout -k 60 3600 cargo test --workspace --features panel/ssr' "$TRABAJOS_COMPILACION" >>"$BUILD_LOG" 2>&1; then
-		log "ERROR: falló la compilación o las pruebas de $_name (ver $BUILD_LOG)"
+		# Solo se compila; las pruebas no corren aquí (se pasan antes de crear
+		# la etiqueta). Red de seguridad: un compilador colgado no deja el
+		# actualizador esperando para siempre (con lockf, tampoco correría el
+		# siguiente); falla como cualquier error de compilación.
+		timeout -k 60 3600 cargo leptos build --release' "$TRABAJOS_COMPILACION" >>"$BUILD_LOG" 2>&1; then
+		log "ERROR: falló la compilación de $_name (ver $BUILD_LOG)"
 		return 1
 	fi
 	_tmp=$RELEASES/.$_name.tmp
@@ -406,7 +405,7 @@ deploy()
 }
 
 # Un fallo de la etiqueta $1 (nada si está vacía: --ref). Un fallo suelto
-# puede ser transitorio (red, una prueba sensible a tiempos): la etiqueta sólo
+# puede ser transitorio (red, falta de memoria): la etiqueta sólo
 # queda en «fallida» (y el cron deja de intentarlo) tras $MAX_TRIES fallos
 # seguidos; hasta entonces se reintenta en la ejecución siguiente.
 tag_failed()

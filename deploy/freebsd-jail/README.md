@@ -191,14 +191,19 @@ Si no hay acceso al repositorio, compila lo que ya tenga el clon.
    mucho 100 caracteres) y el commit, 7–40 cifras hexadecimales; si no, el
    actualizador registra el error y no hace nada (el nombre acaba en rutas
    que root borra).
-3. `cargo leptos build --release`, `cargo test --workspace` y
-   `cargo test --workspace --features panel/ssr` (como `rpbuild`; si el
+3. `cargo leptos build --release` (como `rpbuild`; si el
    `Cargo.lock` pide otra versión de `wasm-bindgen`, instala antes
    `wasm-bindgen-cli` de esa versión), con prioridad baja y, si se fijó
    `TRABAJOS_COMPILACION` en la configuración, ese número de trabajos de
-   cargo a la vez (menos memoria). Cada `cargo test` tiene una hora como
-   mucho (`timeout`): una prueba colgada cuenta como fallo y no bloquea las
-   ejecuciones siguientes.
+   cargo a la vez (menos memoria). **El servidor solo compila**: no ejecuta
+   las pruebas (el servidor es lento y las pruebas, además, necesitan
+   memoria). Las pruebas completas (`cargo test --workspace` y
+   `cargo test --workspace --features panel/ssr`) y los e2e se pasan en el
+   equipo de desarrollo **antes de crear la etiqueta**, y es obligatorio: el
+   actualizador despliega cualquier `v*` que compile, y solo `/salud` y la
+   vuelta atrás protegen de una versión rota. La compilación tiene una hora
+   como mucho (`timeout`): un compilador colgado cuenta como fallo y no
+   bloquea las ejecuciones siguientes.
 4. Saca `target/release/panel` y `target/site/` como un `tar` generado
    **dentro** de la jail (`jexec -U rpbuild … tar -cf -`) y lo extrae en el
    host con `--no-same-owner --no-same-permissions` en
@@ -222,7 +227,7 @@ Si no hay acceso al repositorio, compila lo que ya tenga el clon.
    arrancaría), vuelve a la versión anterior, arranca y borra la versión
    fallida. La etiqueta se reintenta en la ejecución siguiente y sólo queda
    marcada como fallida si falla dos veces seguidas (un tropiezo de red o de
-   una prueba no la descarta). Sin versión anterior a la
+   memoria no la descarta). Sin versión anterior a la
    que volver (primer despliegue, o `current` apunta a una que ya no existe)
    el servicio queda **parado**, se quita `current` (rc.d no arranca nada sin
    él, tampoco al reiniciar el host) y se borra igualmente la fallida: nunca
@@ -262,8 +267,8 @@ reglas de doas nuevas (`doas.conf.snippet`).
 - La jail de compilación, que ejecuta código del repositorio, sale libremente
   a Internet (crates.io, rustup, pkg), pero de `RED_LAN` y `RED_VPN` sólo
   alcanza el repositorio git (si `REPO_URL` lleva una IP), el DNS
-  (`DNS_IP`:53), el panel y a sí misma (las pruebas escuchan en 127.0.0.1, que
-  en la jail es su propia IP). Mismo truco: etiqueta `ROUTERPANEL_BUILD` en su
+  (`DNS_IP`:53), el panel y a sí misma (127.0.0.1 en la jail es su propia IP:
+  lo que la compilación escuche en local). Mismo truco: etiqueta `ROUTERPANEL_BUILD` en su
   nat para lo que va por la interfaz externa.
 - El interruptor de hombre muerto es
   `sh -c "sleep 180 && : >/var/run/routerpanel-pf-deadman.saltado && cp … && pfctl -f …"`

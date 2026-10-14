@@ -50,6 +50,11 @@ debug = "line-tables-only"
 debug = false
 
 [profile.release]
+# LTO completo y una unidad de codegen. Medido con LTO "thin" y 16 unidades
+# en un portátil multinúcleo: el reloj baja de 8m34s a 3m54s, pero la CPU
+# total sube de 19m06s a 23m37s y el binario pasa de 37 a 65 MB. Inferencia
+# (no medida): en un equipo con pocos núcleos cuenta la CPU total, así que
+# no compensa.
 codegen-units = 1
 lto = true
 

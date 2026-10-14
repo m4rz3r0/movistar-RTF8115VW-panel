@@ -20,7 +20,7 @@ ZFS_DATASET=zroot/jails/containers
 JAIL_PANEL=routerpanel
 JAIL_PANEL_IP=192.0.2.20
 
-# Jail de compilación: Rust, el clon del repositorio y las pruebas. Sale a
+# Jail de compilación: Rust y el clon del repositorio. Sale a
 # Internet, pero de tu red solo alcanza el DNS, el repositorio y el panel.
 JAIL_COMPILAR=routerpanel-build
 JAIL_COMPILAR_IP=192.0.2.21
