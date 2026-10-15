@@ -52,8 +52,10 @@ DEPLOY_DIR=$(dirname "$DIR")
 . "$DEPLOY_DIR/lib/plantillas.sh"
 
 STAGE=routerpanel-deploy
-# En el servidor, los ficheros generados con la configuración.
-PLANTILLAS=$DEPLOY_DIR/plantillas
+# En el servidor, los ficheros generados con la configuración (pueden llevar
+# datos del dueño). Los fija plantillas_de_root(): un temporal de root, nunca la
+# carpeta de subida del usuario.
+PLANTILLAS=
 RELEASES=/usr/local/routerpanel/releases
 BUILD_USER=rpbuild
 # uid/gid del usuario del servicio en la jail del panel.
@@ -473,11 +475,23 @@ aviso_asistente()
 	fi
 }
 
+# Genera las plantillas en un temporal propio de root (mktemp -d: 0700) y lo
+# borra al salir, también si algo falla. No se generan dentro de
+# ~/routerpanel-deploy: lo que crea root ahí no lo puede borrar el usuario en
+# la subida siguiente. Solo la usan las ramas que corren como root y generan
+# plantillas (servidor y pf_cargar); pf_confirmar y comprobar_red no las usan.
+plantillas_de_root()
+{
+	PLANTILLAS=$(mktemp -d "${TMPDIR:-/tmp}/routerpanel-plantillas.XXXXXX") ||
+		die "no puedo crear el directorio temporal de las plantillas"
+	trap 'rm -rf "$PLANTILLAS"' EXIT
+	generar_plantillas "$PLANTILLAS"
+}
+
 servidor()
 {
 	check_syntax
-	rm -rf "$PLANTILLAS"
-	generar_plantillas "$PLANTILLAS"
+	plantillas_de_root
 	setup_jail_conf
 	if tiene_modulo rc; then
 		setup_runtime_jail
@@ -536,8 +550,7 @@ pf_render()
 
 pf_cargar()
 {
-	rm -rf "$PLANTILLAS"
-	generar_plantillas "$PLANTILLAS"
+	plantillas_de_root
 	pf_render >/etc/pf.conf.routerpanel-new ||
 		die "no encuentro dónde insertar las reglas en /etc/pf.conf (hace falta una regla nat y un «block all»)"
 	if cmp -s /etc/pf.conf.routerpanel-new /etc/pf.conf; then

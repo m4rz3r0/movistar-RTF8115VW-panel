@@ -100,6 +100,38 @@ for malo in x 0 -2; do
 	fi
 done
 
+# --- plantillas en el servidor: temporal de root -----------------------------
+# servidor() y pf_cargar() corren como root y no pueden probarse enteras sin
+# root; se prueba plantillas_de_root() extraída del guion (con generar_plantillas
+# y die de mentira) y que las dos ramas la usan y no escriben en DEPLOY_DIR.
+INSTALL=$DEPLOY/freebsd-jail/install.sh
+awk '/^plantillas_de_root\(\)/ {d=1} d {print} d && /^}/ {exit}' "$INSTALL" >"$TMP/pdr.sh"
+[ -s "$TMP/pdr.sh" ] || fallo "install.sh no define plantillas_de_root"
+for modo in ok falla; do
+	rm -f "$TMP/ruta" "$TMP/modo"
+	(
+		. "$TMP/pdr.sh"
+		die() { echo "$*" >&2; exit 1; }
+		generar_plantillas() { echo secreto >"$1/jail.conf"; }
+		TMPDIR=$TMP
+		plantillas_de_root
+		printf '%s\n' "$PLANTILLAS" >"$TMP/ruta"
+		ls -ld "$PLANTILLAS" | cut -c1-10 >"$TMP/modo"
+		[ "$modo" = ok ] || exit 3
+	) || [ "$modo" = falla ] || fallo "plantillas_de_root ($modo) falla"
+	ruta=$(cat "$TMP/ruta" 2>/dev/null || true)
+	[ -n "$ruta" ] || { fallo "plantillas_de_root ($modo) no fija PLANTILLAS"; continue; }
+	[ ! -e "$ruta" ] || fallo "plantillas_de_root ($modo): el temporal no se borra al salir"
+	[ "$(cat "$TMP/modo")" = drwx------ ] || fallo "plantillas_de_root ($modo): el temporal no es 0700"
+	case $ruta in "$DEPLOY"/*) fallo "plantillas_de_root: el temporal está dentro de deploy/" ;; esac
+done
+for f in servidor pf_cargar; do
+	cuerpo=$(awk -v f="$f" '$0 == f "()" {d=1; next} d && /^}/ {exit} d {print}' "$INSTALL")
+	case $cuerpo in *plantillas_de_root*) ;; *) fallo "$f no usa plantillas_de_root" ;; esac
+	case $cuerpo in *'rm -rf "$PLANTILLAS"'* | *DEPLOY_DIR*) fallo "$f toca la carpeta de subida" ;; esac
+done
+grep -q '^PLANTILLAS=\$DEPLOY_DIR' "$INSTALL" && fallo "PLANTILLAS apunta dentro de DEPLOY_DIR"
+
 if [ "$fallos" -ne 0 ]; then
 	echo "$fallos fallos" >&2
 	exit 1
