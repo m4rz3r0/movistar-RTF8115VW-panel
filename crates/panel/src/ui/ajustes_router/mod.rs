@@ -14,7 +14,7 @@ mod dispositivos;
 mod reservas;
 mod tarjeta;
 
-use crate::ajustes_router::{TemaVista, leer_tema};
+use crate::ajustes_router::{CADUCIDAD_LECTURAS, TemaVista, leer_tema};
 use crate::t;
 use crate::ui::explorador::texto_error;
 use crate::ui::i18n::traducir;
@@ -26,7 +26,16 @@ use leptos_router::{
     components::{Outlet, Redirect},
     hooks::{use_navigate, use_params_map},
 };
+use std::{collections::HashSet, time::Duration};
 use tarjeta::Tarjeta;
+
+/// Espera antes de enseñar «Actualizando…»: una lectura más rápida (de la
+/// caché del servidor) no hace parpadear la página.
+const UMBRAL_ACTUALIZANDO: Duration = Duration::from_millis(150);
+
+/// Tiempo con el ratón o el foco en una pestaña antes de precargar su tema:
+/// pasar por encima de camino a otra no lee nada.
+const RETARDO_PRECARGA: Duration = Duration::from_millis(150);
 
 /// Id de la nota que dice qué significa «Oculto» (una por página; la
 /// describen todos sus chips).
@@ -70,13 +79,84 @@ fn nombre(t: Tema) -> String {
     traducir(&format!("ajustes-tema-{}", t.slug()), None)
 }
 
+/// Precarga de los temas: al dejar el ratón o el foco en una pestaña, lee
+/// su tema en segundo plano para que el servidor lo tenga en su caché
+/// corta cuando se pulse. Una sola a la vez (el servidor las lee en serie)
+/// y cada tema una vez por caducidad de la caché.
+#[derive(Clone, Copy)]
+struct Precarga {
+    programada: StoredValue<Option<TimeoutHandle>>,
+    en_curso: StoredValue<bool>,
+    hechas: StoredValue<HashSet<String>>,
+}
+
+impl Precarga {
+    fn nueva() -> Precarga {
+        Precarga {
+            programada: StoredValue::new(None),
+            en_curso: StoredValue::new(false),
+            hechas: StoredValue::new(HashSet::new()),
+        }
+    }
+
+    /// Precarga `t` si el ratón o el foco siguen en su pestaña dentro de
+    /// [`RETARDO_PRECARGA`].
+    fn programar(self, t: Tema, actual: Memo<String>) {
+        self.cancelar();
+        let slug = t.slug().to_owned();
+        let precargar = move || {
+            self.programada.set_value(None);
+            let ya = self.hechas.with_value(|h| h.contains(&slug));
+            if ya || self.en_curso.get_value() || actual.get_untracked() == slug {
+                return;
+            }
+            self.en_curso.set_value(true);
+            leptos::task::spawn_local(async move {
+                if leer_tema(slug.clone()).await.is_ok() {
+                    self.hechas.update_value(|h| {
+                        h.insert(slug.clone());
+                    });
+                    // Pasada la caducidad, el servidor ya no lo tiene.
+                    set_timeout(
+                        move || self.hechas.update_value(|h| _ = h.remove(&slug)),
+                        CADUCIDAD_LECTURAS,
+                    );
+                }
+                self.en_curso.set_value(false);
+            });
+        };
+        if let Ok(h) = set_timeout_with_handle(precargar, RETARDO_PRECARGA) {
+            self.programada.set_value(Some(h));
+        }
+    }
+
+    fn cancelar(self) {
+        if let Some(h) = self.programada.get_value() {
+            h.clear();
+            self.programada.set_value(None);
+        }
+    }
+}
+
 /// Pestañas de los temas y, en pantallas estrechas, el selector que navega.
 fn pestanas(slug: Memo<String>) -> impl IntoView {
+    let precarga = Precarga::nueva();
     let enlaces = Tema::TODOS
         .into_iter()
         .map(|t| {
             let actual = move || (slug.get() == t.slug()).then_some("page");
-            view! { <a href=ruta(t) aria-current=actual>{nombre(t)}</a> }
+            view! {
+                <a
+                    href=ruta(t)
+                    aria-current=actual
+                    on:mouseenter=move |_| precarga.programar(t, slug)
+                    on:focus=move |_| precarga.programar(t, slug)
+                    on:mouseleave=move |_| precarga.cancelar()
+                    on:blur=move |_| precarga.cancelar()
+                >
+                    {nombre(t)}
+                </a>
+            }
         })
         .collect_view();
     // `selected` da el valor del HTML del servidor; después manda
@@ -140,6 +220,24 @@ pub fn PaginaTema() -> impl IntoView {
     let foco = Foco(RwSignal::new(None));
     provide_context(foco);
     let recargar = Callback::new(move |()| datos.refetch());
+    // Mientras se lee otro tema (o el mismo tras un cambio), lo anterior se
+    // ve atenuado y con «Actualizando…», si tarda más que el umbral.
+    let pendiente = RwSignal::new(false);
+    let actualizando = RwSignal::new(false);
+    Effect::new(move |_| {
+        if pendiente.get() {
+            set_timeout(
+                move || {
+                    if pendiente.get_untracked() {
+                        actualizando.set(true);
+                    }
+                },
+                UMBRAL_ACTUALIZANDO,
+            );
+        } else {
+            actualizando.set(false);
+        }
+    });
     // Con la lectura nueva ya pintada, el foco al título pendiente.
     Effect::new(move |_| {
         if datos.with(|d| d.is_some())
@@ -163,7 +261,16 @@ pub fn PaginaTema() -> impl IntoView {
                 </div>
             </header>
             {pestanas(slug)}
-            <Transition fallback=|| view! { <p class="estado-espera">{t!("comun-cargando")}</p> }>
+            <div class="tema-contenido" aria-busy=move || actualizando.get().then_some("true")>
+                // Siempre en la página (vacío si no carga): el lector de
+                // pantalla anuncia el texto una vez cada vez que aparece.
+                <p class="tema-actualizando" role="status">
+                    {move || actualizando.get().then(|| t!("ajustes-actualizando"))}
+                </p>
+                <Transition
+                    fallback=|| view! { <p class="estado-espera">{t!("comun-cargando")}</p> }
+                    set_pending=pendiente
+                >
                 {move || Suspend::new(async move {
                     match datos.await {
                         Ok(Some(t)) => view! { <ContenidoTema t recargar /> }.into_any(),
@@ -179,7 +286,8 @@ pub fn PaginaTema() -> impl IntoView {
                         }
                     }
                 })}
-            </Transition>
+                </Transition>
+            </div>
         }
         .into_any()
     }

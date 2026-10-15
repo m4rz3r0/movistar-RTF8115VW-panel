@@ -1,15 +1,16 @@
 //! Router simulado para desarrollo.
 //!
 //! Uso: `router-sim [--listen 127.0.0.1:8081] [--fixtures crates/hgu/fixtures]
-//! [--capa DIR] [--user U] [--password P]` (por defecto usuario y contraseña
-//! `sim`). `--capa` añade fixtures que sustituyen a las de `--fixtures` (p.
-//! ej. `crates/hgu/fixtures-variantes/dhcp-sin-voip`).
+//! [--capa DIR] [--user U] [--password P] [--retardo-ms N]` (por defecto
+//! usuario y contraseña `sim`). `--capa` añade fixtures que sustituyen a las
+//! de `--fixtures` (p. ej. `crates/hgu/fixtures-variantes/dhcp-sin-voip`).
+//! `--retardo-ms` retarda cada respuesta, como la latencia del router real
+//! (se cambia en marcha con `POST /__sim/retardo`).
 
 use router_sim::{Sim, SimConfig};
 use std::process::ExitCode;
 
-const USAGE: &str =
-    "uso: router-sim [--listen DIR:PUERTO] [--fixtures DIR] [--capa DIR] [--user U] [--password P]";
+const USAGE: &str = "uso: router-sim [--listen DIR:PUERTO] [--fixtures DIR] [--capa DIR] [--user U] [--password P] [--retardo-ms N]";
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -27,6 +28,13 @@ async fn main() -> ExitCode {
             "--capa" => cfg.capa = Some(value.into()),
             "--user" => cfg.user = value,
             "--password" => cfg.password = value,
+            "--retardo-ms" => match value.parse() {
+                Ok(ms) => cfg.retardo = std::time::Duration::from_millis(ms),
+                Err(e) => {
+                    eprintln!("--retardo-ms {value}: {e}");
+                    return ExitCode::from(2);
+                }
+            },
             _ => {
                 eprintln!("{USAGE}");
                 return ExitCode::from(2);

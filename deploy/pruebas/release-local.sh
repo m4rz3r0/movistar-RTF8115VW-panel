@@ -232,7 +232,7 @@ fi
 
 # --- 4. lo desplegado --------------------------------------------------------
 [ "$(readlink "$PREFIJO/current" 2>/dev/null)" = "releases/$VER" ] || fallo "current no apunta a releases/$VER"
-for f in panel site/pkg/panel.css LICENSE AVISO-LEGAL.md deploy/linux/README.md \
+for f in panel LICENSE AVISO-LEGAL.md deploy/linux/README.md \
 	deploy/linux/routerpanel.service deploy/linux/actualizar-release.sh; do
 	[ -f "$PREFIJO/current/$f" ] || fallo "falta $f en la versión desplegada"
 done
@@ -241,8 +241,13 @@ cmp -s "$PANEL" "$PREFIJO/current/panel" || fallo "el panel desplegado no es el 
 if ! curl -fsS -m 5 "http://127.0.0.1:$PUERTO_PANEL/salud" | grep -q '"ok":true'; then
 	fallo "el panel desplegado no responde en /salud"
 fi
-if ! curl -fsS -m 5 -o /dev/null "http://127.0.0.1:$PUERTO_PANEL/pkg/panel.css"; then
-	fallo "el panel desplegado no sirve su web desde site/ (/pkg/panel.css)"
+# La hoja de estilos, con el hash en el nombre si la web lo lleva (hash.txt).
+CSS=pkg/panel.css
+H=$(sed -n 's/^css: *//p' "$PREFIJO/current/site/hash.txt" 2>/dev/null || true)
+[ -z "$H" ] || CSS=pkg/panel.$H.css
+[ -f "$PREFIJO/current/site/$CSS" ] || fallo "falta site/$CSS en la versión desplegada"
+if ! curl -fsS -m 5 -o /dev/null "http://127.0.0.1:$PUERTO_PANEL/$CSS"; then
+	fallo "el panel desplegado no sirve su web desde site/ (/$CSS)"
 fi
 if ! actualizar --comprobar || ! grep -q "al día: $VER" "$TMP/salida"; then
 	cat "$TMP/salida" >&2

@@ -8,11 +8,20 @@ use std::{
     collections::BTreeMap,
     sync::{
         Arc,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     time::Duration,
 };
-use tokio::{sync::Mutex, time::Instant};
+use tokio::{
+    sync::{Mutex, MutexGuard},
+    time::Instant,
+};
+
+/// Lecturas seguidas como mucho en un [`Turno`] antes de ceder el cerrojo
+/// una vez a quien espera (el sondeo, el gestor de cambios): una tanda
+/// larga no los deja sin turno. Un tema de Ajustes hace hasta 7 (Red
+/// local, con sus dispositivos).
+pub const LECTURAS_POR_TURNO: usize = 8;
 
 /// Configuración del cliente.
 #[derive(Clone)]
@@ -68,6 +77,8 @@ struct Shared {
     http: reqwest::Client,
     /// Espejo de `state.cfg.is_some()` para consultarlo sin esperar el cerrojo.
     configurado: AtomicBool,
+    /// Ver [`Client::escrituras`].
+    escrituras: AtomicU64,
     state: Mutex<State>,
 }
 
@@ -145,6 +156,7 @@ impl Client {
             shared: Arc::new(Shared {
                 http,
                 configurado: AtomicBool::new(cfg.is_some()),
+                escrituras: AtomicU64::new(0),
                 state: Mutex::new(State {
                     cfg,
                     ..State::default()
@@ -159,10 +171,36 @@ impl Client {
     /// por petición sigue siendo el del cliente original.
     pub async fn reconfigurar(&self, cfg: ClientConfig) {
         let mut st = self.shared.state.lock().await;
+        self.contar_escritura();
         Self::invalidate(&mut st);
         st.last_request = None;
         st.cfg = Some(cfg);
         self.shared.configurado.store(true, Ordering::SeqCst);
+    }
+
+    /// Contador que cambia con cada escritura (al empezar y al terminar) y
+    /// con cada [`Client::reconfigurar`]: lo leído antes de un cambio del
+    /// contador puede no ser ya lo que muestra el router. Lo usa la caché de
+    /// lecturas del panel.
+    pub fn escrituras(&self) -> u64 {
+        self.shared.escrituras.load(Ordering::SeqCst)
+    }
+
+    fn contar_escritura(&self) {
+        self.shared.escrituras.fetch_add(1, Ordering::SeqCst);
+    }
+
+    /// Toma el cerrojo para una tanda de lecturas seguidas ([`Turno::call`]):
+    /// nadie más (el sondeo, el gestor) llama al router entre ellas. Las
+    /// peticiones siguen en serie y con `min_gap`. Tras
+    /// [`LECTURAS_POR_TURNO`] lecturas, el turno cede el cerrojo una vez
+    /// antes de seguir.
+    pub async fn turno(&self) -> Turno<'_> {
+        Turno {
+            client: self,
+            st: Some(self.shared.state.lock().await),
+            hechas: 0,
+        }
     }
 
     /// Si hay un router configurado.
@@ -193,15 +231,28 @@ impl Client {
         params: &[(&str, &str)],
     ) -> Result<XmlNode, Error> {
         let mut st = self.shared.state.lock().await;
+        self.contar_escritura();
+        let r = self.write_locked(&mut st, page, name, params).await;
+        self.contar_escritura();
+        r
+    }
+
+    async fn write_locked(
+        &self,
+        st: &mut State,
+        page: &str,
+        name: &str,
+        params: &[(&str, &str)],
+    ) -> Result<XmlNode, Error> {
         for attempt in 0..2 {
-            if !self.ensure_advanced(&mut st).await? {
+            if !self.ensure_advanced(st).await? {
                 tracing::debug!("{name}: sesión básica caducada (intento {attempt})");
                 continue;
             }
-            let key = self.session_key_locked(&mut st, page).await?;
+            let key = self.session_key_locked(st, page).await?;
             let mut all: Vec<(&str, &str)> = params.to_vec();
             all.push(("sessionKey", &key));
-            if let Some(node) = self.call_once(&mut st, name, &all).await? {
+            if let Some(node) = self.call_once(st, name, &all).await? {
                 return Ok(node);
             }
             tracing::debug!("{name}: sesión caducada (intento {attempt})");
@@ -225,14 +276,27 @@ impl Client {
         params: &[(&str, &str)],
     ) -> Result<String, Error> {
         let mut st = self.shared.state.lock().await;
+        self.contar_escritura();
+        let r = self.basic_write_locked(&mut st, page, path, params).await;
+        self.contar_escritura();
+        r
+    }
+
+    async fn basic_write_locked(
+        &self,
+        st: &mut State,
+        page: &str,
+        path: &str,
+        params: &[(&str, &str)],
+    ) -> Result<String, Error> {
         let path = path.trim_start_matches('/');
         let sep = if path.contains('?') { '&' } else { '?' };
         for _ in 0..2 {
-            let key = self.session_key_locked(&mut st, page).await?;
+            let key = self.session_key_locked(st, page).await?;
             let mut all: Vec<(&str, &str)> = params.to_vec();
             all.push(("sessionKey", &key));
             let url = format!("/cgi-bin/{path}{sep}{}", form_body(&all));
-            let body = self.send(&mut st, Method::GET, &url, None).await?;
+            let body = self.send(st, Method::GET, &url, None).await?;
             if let Some(error) = basic_error(&body) {
                 return Err(Error::CallFailed {
                     name: sin_consulta(path).to_owned(),
@@ -243,7 +307,7 @@ impl Client {
             if !looks_logged_out(&body) {
                 return Ok(body);
             }
-            Self::invalidate(&mut st);
+            Self::invalidate(st);
         }
         Err(Error::SessionExpired(format!(
             "{}: el router sigue pidiendo iniciar sesión",
@@ -497,5 +561,31 @@ impl Client {
             )));
         }
         Ok(text)
+    }
+}
+
+/// Turno del cerrojo del cliente para una tanda de lecturas seguidas (ver
+/// [`Client::turno`]). Lo suelta al soltarse.
+pub struct Turno<'a> {
+    client: &'a Client,
+    /// Siempre `Some` fuera de [`Turno::call`].
+    st: Option<MutexGuard<'a, State>>,
+    /// Lecturas desde que se tomó el cerrojo por última vez.
+    hechas: usize,
+}
+
+impl Turno<'_> {
+    /// Como [`Client::call`], dentro del turno. Cada
+    /// [`LECTURAS_POR_TURNO`] lecturas cede el cerrojo y espera a volver a
+    /// tenerlo (el `Mutex` de tokio es justo: pasa antes quien esperaba).
+    pub async fn call(&mut self, name: &str, params: &[(&str, &str)]) -> Result<XmlNode, Error> {
+        if self.hechas >= LECTURAS_POR_TURNO {
+            self.st = None;
+            self.st = Some(self.client.shared.state.lock().await);
+            self.hechas = 0;
+        }
+        self.hechas += 1;
+        let st = self.st.as_mut().expect("el turno tiene el cerrojo");
+        self.client.call_locked(st, name, params).await
     }
 }

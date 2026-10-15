@@ -10,7 +10,8 @@
 # <objetivo> x86_64-unknown-linux-gnu o aarch64-unknown-linux-gnu
 # <panel>    el binario (target/release/panel de `cargo leptos build --release`)
 # <site>     su web, la salida de cargo-leptos (target/site, con pkg/panel.js,
-#            pkg/panel.wasm y pkg/panel.css)
+#            pkg/panel.wasm y pkg/panel.css; con hash-files, pkg/panel.<hash>.js…
+#            y los hashes en hash.txt)
 # <salida>   carpeta donde deja routerpanel-<versión>-<objetivo>.tar.gz
 #
 # El archivo tiene una única carpeta, routerpanel-<versión>-<objetivo>/, con
@@ -69,7 +70,13 @@ esac
 	echo "falta $PANEL" >&2
 	exit 1
 }
-for f in pkg/panel.js pkg/panel.wasm pkg/panel.css; do
+for ext in js wasm css; do
+	f=pkg/panel.$ext
+	if [ -f "$SITE/hash.txt" ]; then
+		# «js: <hash>» y así: el nombre que pide la página.
+		h=$(sed -n "s/^$ext: *//p" "$SITE/hash.txt")
+		f=pkg/panel.$h.$ext
+	fi
 	[ -f "$SITE/$f" ] || {
 		echo "falta $SITE/$f: <site> tiene que ser la salida de cargo leptos build --release" >&2
 		exit 1

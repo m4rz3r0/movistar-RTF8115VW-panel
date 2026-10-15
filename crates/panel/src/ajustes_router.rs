@@ -358,6 +358,10 @@ pub fn texto_error_valor(e: &ajustes::ErrorValor) -> String {
     crate::ui::i18n::traducir(e.clave_i18n(), Some(&args))
 }
 
+/// Cuánto vale una lectura del router para mostrar: la caché del servidor
+/// (`crate::lecturas`) y la precarga de temas de la página.
+pub const CADUCIDAD_LECTURAS: std::time::Duration = std::time::Duration::from_secs(30);
+
 /// Prepara el guardado de un ajuste: lee el router, calcula lo que cambia
 /// en cada paso y devuelve el resumen con su token. Errores con el mensaje
 /// traducido: 409 si ya está así o hay otro cambio en curso, 403 en solo
@@ -386,24 +390,27 @@ pub async fn deshacer_ajuste(cambio: i64) -> Result<GrupoVista, ServerFnError> {
 }
 
 /// Los ajustes del tema `tema` (`wifi`, `puertos`…) con su valor actual
-/// del router. Cada lectura distinta se hace una sola vez; si una falla,
-/// solo sus ajustes quedan [`EstadoLectura::SinLeer`]. 404 si el tema no
-/// existe. Exige sesión; la respuesta va con `no-store`.
+/// del router. Cada lectura distinta se hace una sola vez, de la caché
+/// corta si está ([`crate::lecturas`]) y, las que faltan, seguidas en una
+/// tanda; si una falla, solo sus ajustes quedan [`EstadoLectura::SinLeer`].
+/// 404 si el tema no existe. Exige sesión; la respuesta va con `no-store`.
 #[server(endpoint = "leer_tema", input = Json)]
 pub async fn leer_tema(tema: String) -> Result<TemaVista, ServerFnError> {
     servidor::leer_tema(tema).await
 }
 
 /// Los dispositivos que el router conoce en la red de casa, los conectados
-/// primero y por IP, con su conexión y su reserva. Exige sesión; la
-/// respuesta va con `no-store`.
+/// primero y por IP, con su conexión y su reserva (lecturas para mostrar,
+/// como [`leer_tema`]). Exige sesión; la respuesta va con `no-store`.
 #[server(endpoint = "leer_dispositivos", input = Json)]
 pub async fn leer_dispositivos() -> Result<Vec<DispositivoVista>, ServerFnError> {
     servidor::leer_dispositivos().await
 }
 
 /// IP y máscara del router en la red de casa (`None` si no da ninguna
-/// legible): la página valida con ellas una reserva antes de enviarla.
+/// legible): la página valida con ellas una reserva antes de enviarla (el
+/// servidor la vuelve a validar leyendo el router). Lectura para mostrar,
+/// como [`leer_tema`].
 #[server(endpoint = "leer_red_casa", input = Json)]
 pub async fn leer_red_casa() -> Result<Option<(Ipv4Addr, Ipv4Addr)>, ServerFnError> {
     servidor::leer_red_casa().await
@@ -438,6 +445,7 @@ pub(crate) mod servidor {
         },
         instalar::servidor::fallo,
         instancia,
+        lecturas::Clave,
         panel_ajustes::servidor::preparar,
         state::AppState,
         t,
@@ -457,50 +465,49 @@ pub(crate) mod servidor {
 
     /// Elementos de una lectura: nombre → valor.
     type Leidos = BTreeMap<String, String>;
-    /// Una lectura del router: función y parámetros.
-    type Lectura = (String, Vec<(String, String)>);
+
+    /// Lectura de un ajuste.
+    fn clave(a: &Ajuste) -> Clave {
+        Clave::new(&a.leer.funcion, &a.leer.params)
+    }
 
     pub(super) async fn leer_tema(tema: String) -> Result<TemaVista, ServerFnError> {
         let (state, _) = preparar().await?;
         let tema = Tema::from_slug(&tema)
             .ok_or_else(|| fallo(StatusCode::NOT_FOUND, t!("ajustes-error-tema")))?;
-        let mut lecturas: HashMap<Lectura, Option<XmlNode>> = HashMap::new();
-        let mut ajustes = Vec::new();
-        for a in state.ajustes.por_tema(tema) {
-            let clave = (a.leer.funcion.clone(), a.leer.params.clone());
-            if !lecturas.contains_key(&clave) {
-                let nodo = leer(&state, a).await;
-                lecturas.insert(clave.clone(), nodo);
-            }
-            ajustes.push(vista(&state.catalogo, a, lecturas[&clave].as_ref()));
+        let del_tema: Vec<&Ajuste> = state.ajustes.por_tema(tema).collect();
+        let claves: Vec<Clave> = del_tema.iter().map(|a| clave(a)).collect();
+        // Las tarjetas de dispositivos y reservas piden después
+        // `leer_dispositivos` y `leer_red_casa`: lo que leen va en la misma
+        // tanda y lo encuentran en la caché.
+        let de_red = del_tema.iter().any(|a| {
+            matches!(
+                a.componente,
+                Some(Componente::Dispositivos | Componente::Reservas)
+            )
+        });
+        let mut a_leer = claves.clone();
+        if de_red {
+            a_leer.extend(claves_dispositivos());
+            a_leer.push(clave_red_casa());
         }
+        let leidas = state
+            .lecturas
+            .leer(&state.hgu, &state.mascara, &a_leer)
+            .await;
+        let ajustes = del_tema
+            .iter()
+            .zip(&claves)
+            .map(|(a, c)| {
+                let nodo = leidas.get(c).and_then(|r| r.as_ref().ok());
+                vista(&state.catalogo, a, nodo)
+            })
+            .collect();
         Ok(TemaVista {
             tema: tema.slug().to_owned(),
             solo_lectura: instancia::solo_lectura(&state.db).await,
             ajustes,
         })
-    }
-
-    /// Respuesta de la lectura del ajuste; `None` (y se registra) si falla.
-    async fn leer(state: &AppState, a: &Ajuste) -> Option<XmlNode> {
-        let params: Vec<(&str, &str)> = a
-            .leer
-            .params
-            .iter()
-            .map(|(k, v)| (k.as_str(), v.as_str()))
-            .collect();
-        state
-            .hgu
-            .call(&a.leer.funcion, &params)
-            .await
-            .inspect_err(|e| {
-                tracing::warn!(
-                    "ajustes: no se puede leer {} ({}): {e}",
-                    a.leer.funcion,
-                    a.id
-                );
-            })
-            .ok()
     }
 
     /// Vista de un ajuste con la respuesta de su lectura (`None` si falló).
@@ -1029,19 +1036,46 @@ pub(crate) mod servidor {
         fallo(StatusCode::BAD_GATEWAY, t!("ajustes-error-lectura"))
     }
 
+    /// Lectura de las estaciones asociadas a la radio `radio`.
+    fn clave_estaciones(radio: &str) -> Clave {
+        Clave::new("cbListWifiAccPtAssociation", &[("dpm_cfg_wifi_id", radio)])
+    }
+
+    /// Lista de dispositivos del router.
+    fn clave_hosts() -> Clave {
+        Clave::new::<&str, &str>("cbGetLanHostList", &[])
+    }
+
+    /// Reservas del servidor DHCP.
+    fn clave_reservas() -> Clave {
+        Clave::new("cbDhcpV4SvrPoolGetStatic", &hgu::read::POOL)
+    }
+
+    /// IP y máscara del router en la red de casa.
+    fn clave_red_casa() -> Clave {
+        Clave::new::<&str, &str>("cbGetLanIPv4Addr", &[])
+    }
+
+    /// Lecturas de [`leer_dispositivos`]: la lista, las reservas y las
+    /// estaciones de cada radio.
+    fn claves_dispositivos() -> Vec<Clave> {
+        let mut claves = vec![clave_hosts(), clave_reservas()];
+        claves.extend(hgu::read::RADIOS_POR_DEFECTO.map(clave_estaciones));
+        claves
+    }
+
     /// Conexión de cada MAC asociada a la WiFi (en minúsculas), por los
     /// puntos de acceso de cada radio: la radio 0 es la de 2,4 GHz y la 1
     /// la de 5 GHz; en cada una, el punto de acceso con su mismo id es la
     /// red principal y los demás son de invitados. `None` si no se pudo
     /// leer alguna radio.
-    async fn asociados(c: &hgu::Client) -> Option<HashMap<String, Conexion>> {
+    fn asociados(
+        leidas: &HashMap<Clave, Result<XmlNode, hgu::Error>>,
+    ) -> Option<HashMap<String, Conexion>> {
         let mut out = HashMap::new();
         for radio in hgu::read::RADIOS_POR_DEFECTO {
-            let estaciones = hgu::read::wifi_stations(c, radio)
-                .await
-                .inspect_err(|e| tracing::warn!("ajustes: no se puede leer la WiFi {radio}: {e}"))
-                .ok()?;
-            for st in estaciones {
+            let n = leidas.get(&clave_estaciones(radio))?.as_ref().ok()?;
+            for st in hgu::models::WifiAssoc::parse_all(n) {
                 let conexion = match (st.ap_id == radio, radio) {
                     (false, _) => Conexion::Invitados,
                     (true, "0") => Conexion::Wifi24,
@@ -1060,16 +1094,36 @@ pub(crate) mod servidor {
         (!d.activo, ip, d.ip.clone())
     }
 
+    /// Respuesta de la lectura `clave` de `leidas`; si falló, 502 (ver
+    /// [`sin_leer`]).
+    fn leida(
+        leidas: &mut HashMap<Clave, Result<XmlNode, hgu::Error>>,
+        clave: &Clave,
+        que: &str,
+    ) -> Result<XmlNode, ServerFnError> {
+        match leidas.remove(clave) {
+            Some(r) => r.map_err(|e| sin_leer(que, e)),
+            None => Err(fallo(StatusCode::BAD_GATEWAY, t!("ajustes-error-lectura"))),
+        }
+    }
+
     pub(super) async fn leer_dispositivos() -> Result<Vec<DispositivoVista>, ServerFnError> {
         let (state, _) = preparar().await?;
-        let c = &state.hgu;
-        let hosts = hgu::read::lan_hosts(c)
-            .await
-            .map_err(|e| sin_leer("los dispositivos", e))?;
-        let reservas = hgu::read::static_leases(c)
-            .await
-            .map_err(|e| sin_leer("las reservas", e))?;
-        let wifi = asociados(c).await;
+        let mut leidas = state
+            .lecturas
+            .leer(&state.hgu, &state.mascara, &claves_dispositivos())
+            .await;
+        let wifi = asociados(&leidas);
+        let hosts = hgu::models::LanHost::parse_all(&leida(
+            &mut leidas,
+            &clave_hosts(),
+            "los dispositivos",
+        )?);
+        let reservas = hgu::models::StaticLease::parse_all(&leida(
+            &mut leidas,
+            &clave_reservas(),
+            "las reservas",
+        )?);
         let mut lista: Vec<DispositivoVista> = hosts
             .into_iter()
             .map(|h| {
@@ -1102,9 +1156,13 @@ pub(crate) mod servidor {
 
     pub(super) async fn leer_red_casa() -> Result<Option<(Ipv4Addr, Ipv4Addr)>, ServerFnError> {
         let (state, _) = preparar().await?;
-        hgu::read::lan_ipv4(&state.hgu)
-            .await
-            .map_err(|e| sin_leer("la red de casa", e))
+        let clave = clave_red_casa();
+        let mut leidas = state
+            .lecturas
+            .leer(&state.hgu, &state.mascara, std::slice::from_ref(&clave))
+            .await;
+        let n = leida(&mut leidas, &clave, "la red de casa")?;
+        Ok(hgu::read::lan_ipv4_de(&n))
     }
 
     /// Nombre del dispositivo con la MAC `mac` en la lista del router, si lo
@@ -1500,6 +1558,66 @@ pub(crate) mod servidor {
             assert_eq!(
                 cambio_legible("ajuste-wifi-red_24", nombre, &diff, &completar),
                 None
+            );
+        }
+
+        /// La caché guarda las lecturas enmascaradas: lo que se pinta con
+        /// ellas (cada ajuste del catálogo, los dispositivos, las reservas,
+        /// las estaciones WiFi y la red de casa) es igual que con la
+        /// respuesta en claro del router.
+        #[tokio::test]
+        async fn lo_enmascarado_se_pinta_igual_que_lo_leido() {
+            let fixtures = concat!(env!("CARGO_MANIFEST_DIR"), "/../hgu/fixtures");
+            let sim =
+                router_sim::Sim::start(router_sim::SimConfig::new("u", "clave", fixtures)).await;
+            let mut cfg = hgu::ClientConfig::new(&sim.base_url, "u", "clave");
+            cfg.min_gap = std::time::Duration::from_millis(1);
+            let c = hgu::Client::new(cfg);
+            let f = Catalogo::load().unwrap();
+            let m = catalogo::mask::Mascara::load().unwrap();
+            let ajustes = CatalogoAjustes::load().unwrap();
+            let leer = async |clave: &Clave| {
+                let p: Vec<(&str, &str)> = clave
+                    .params
+                    .iter()
+                    .map(|(k, v)| (k.as_str(), v.as_str()))
+                    .collect();
+                c.call(&clave.funcion, &p).await.unwrap()
+            };
+            for a in ajustes.todos() {
+                let n = leer(&clave(a)).await;
+                assert_eq!(
+                    vista(&f, a, Some(&n)),
+                    vista(&f, a, Some(&m.enmascarar(&n))),
+                    "{}",
+                    a.id
+                );
+            }
+            use hgu::models::{LanHost, StaticLease, WifiAssoc};
+            let n = leer(&clave_hosts()).await;
+            assert!(!LanHost::parse_all(&n).is_empty());
+            assert_eq!(
+                LanHost::parse_all(&n),
+                LanHost::parse_all(&m.enmascarar(&n))
+            );
+            let n = leer(&clave_reservas()).await;
+            assert!(!StaticLease::parse_all(&n).is_empty());
+            assert_eq!(
+                StaticLease::parse_all(&n),
+                StaticLease::parse_all(&m.enmascarar(&n))
+            );
+            for radio in hgu::read::RADIOS_POR_DEFECTO {
+                let n = leer(&clave_estaciones(radio)).await;
+                assert_eq!(
+                    WifiAssoc::parse_all(&n),
+                    WifiAssoc::parse_all(&m.enmascarar(&n))
+                );
+            }
+            let n = leer(&clave_red_casa()).await;
+            assert!(hgu::read::lan_ipv4_de(&n).is_some());
+            assert_eq!(
+                hgu::read::lan_ipv4_de(&n),
+                hgu::read::lan_ipv4_de(&m.enmascarar(&n))
             );
         }
     }

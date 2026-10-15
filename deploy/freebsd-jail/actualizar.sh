@@ -13,9 +13,10 @@
 # Pasos: trae el repositorio (REPO_URL) en la jail de compilación (usuario sin
 # privilegios rpbuild) con traer_ultima_etiqueta (deploy/lib/git.sh: nunca
 # hace merge, así que tolera un historial reescrito en el remoto); si la
-# última v* (sort -V) no es la desplegada, cargo leptos build
-# --release y las pruebas; copia binario y web a releases/<versión>; cambia el
-# enlace «current» de la jail del panel; reinicia el servicio y espera a que
+# última v* (sort -V) no es la desplegada, cargo leptos build --release
+# --precompress (la web, también en .br y .gz) y las pruebas; copia binario
+# y web a releases/<versión>; cambia el enlace «current» de la jail del
+# panel; reinicia el servicio y espera a que
 # /salud responda 200 (60 s como mucho). Si no responde, vuelve a la versión
 # anterior. Se conservan las 3 últimas versiones.
 #
@@ -267,7 +268,9 @@ build_release()
 			;;
 		esac
 		renice -n 15 $$ >/dev/null 2>&1
-		cargo leptos build --release &&
+		# --precompress: el panel sirve el wasm, el JS y el CSS ya comprimidos
+		# (con hash en el nombre y target/site/hash.txt, que va con la web).
+		cargo leptos build --release --precompress &&
 		# Red de seguridad: una prueba colgada no deja el actualizador
 		# esperando para siempre (con lockf, tampoco correría el siguiente).
 		# Falla como cualquier prueba; cargo deja en el registro cuál llevaba

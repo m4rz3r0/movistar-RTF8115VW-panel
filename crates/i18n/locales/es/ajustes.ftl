@@ -22,6 +22,7 @@ ajustes-secreto-desc = Por seguridad, el panel no la muestra. Escribe una nueva 
 ajustes-efecto = Al aplicarlo
 ajustes-temas = Temas de ajustes
 ajustes-tema-elegir = Tema
+ajustes-actualizando = Actualizando…
 ajustes-volver = Ir a los ajustes de Internet
 ajustes-solo-lectura-aviso = Ahora solo se pueden consultar los ajustes: el firmware del router aún no está probado con el panel.
 ajustes-solo-lectura-enlace = Confírmalo en Configuración del router

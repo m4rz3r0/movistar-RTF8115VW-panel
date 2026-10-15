@@ -54,6 +54,7 @@ async fn serve() -> std::process::ExitCode {
     };
     // `RP_LISTEN` manda sobre `site-addr` de cargo-leptos.
     leptos.site_addr = cfg.listen;
+    panel::estaticos::configurar_hash(&mut leptos);
     let listen = cfg.listen;
     let state = match AppState::new(cfg, leptos).await {
         Ok(state) => state,

@@ -28,9 +28,13 @@ pub mod crypto;
 #[cfg(feature = "ssr")]
 pub mod db;
 #[cfg(feature = "ssr")]
+pub mod estaticos;
+#[cfg(feature = "ssr")]
 pub mod fotos;
 #[cfg(feature = "ssr")]
 pub mod instancia;
+#[cfg(feature = "ssr")]
+pub mod lecturas;
 #[cfg(feature = "ssr")]
 pub mod poller;
 #[cfg(feature = "ssr")]
@@ -71,8 +75,9 @@ mod server {
 
     /// Construye el router Axum completo: rutas Leptos (páginas con sesión
     /// obligatoria salvo `/login`; server functions en `/api/*`, que la
-    /// comprueban ellas mismas), `/salud`, ficheros estáticos, freno de CSRF
-    /// en `/api/*` y cabeceras de seguridad en todas las respuestas.
+    /// comprueban ellas mismas), `/salud`, ficheros estáticos (con su caché
+    /// del navegador: [`crate::estaticos`]), freno de CSRF en `/api/*` y
+    /// cabeceras de seguridad en todas las respuestas.
     pub fn build_router(state: AppState) -> Router {
         let routes = rutas();
         Router::new()
@@ -92,6 +97,7 @@ mod server {
                 state.clone(),
                 security::csrf,
             ))
+            .layer(middleware::from_fn(crate::estaticos::cabeceras))
             .layer(security::layer())
             .with_state(state)
     }

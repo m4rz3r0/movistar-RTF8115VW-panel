@@ -22,6 +22,7 @@ ajustes-secreto-desc = For security, the panel does not show it. Only type a new
 ajustes-efecto = When applied
 ajustes-temas = Settings topics
 ajustes-tema-elegir = Topic
+ajustes-actualizando = Updating…
 ajustes-volver = Go to the Internet settings
 ajustes-solo-lectura-aviso = Settings can only be viewed for now: the router firmware has not been tested with the panel yet.
 ajustes-solo-lectura-enlace = Confirm it in Router settings

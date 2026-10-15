@@ -39,6 +39,8 @@ struct Fake {
     cookies_seen: Mutex<Vec<String>>,
     /// Retraso extra (ms) de cada llamada `.xml`.
     delay_ms: std::sync::atomic::AtomicU64,
+    /// Nombres de las llamadas `.xml` con sesión válida, en orden de llegada.
+    llamadas: Mutex<Vec<String>>,
 }
 
 type S = Arc<Fake>;
@@ -143,9 +145,12 @@ async fn api(
         return LOGGED_OUT.into();
     }
     let name = name.trim_end_matches(".xml");
+    s.llamadas.lock().unwrap().push(name.to_owned());
     let f = form(&body);
     match name {
         "cbGet" => "<Response><cbGet><Result>0</Result><v>7</v></cbGet></Response>".into(),
+        // Lecturas con nombre propio, para ver el orden de llegada.
+        n if n.starts_with("cbGet") => format!("<Response><{n}><Result>0</Result></{n}></Response>"),
         "cbFail" => {
             "<Response><cbFail><Result>1</Result><ErrorString>no se pudo</ErrorString></cbFail></Response>"
                 .into()
@@ -456,4 +461,79 @@ async fn reconfigurar_espera_peticion_en_curso() {
     assert_eq!(b.basic_logins.load(Ordering::SeqCst), 1);
     assert_eq!(b.adv_logins.load(Ordering::SeqCst), 1);
     assert_eq!(a.adv_logins.load(Ordering::SeqCst), 1);
+}
+
+/// Lanza `c.call(nombre)` y espera a que esté esperando el cerrojo.
+async fn llamada_en_espera(c: &Client, nombre: &'static str) -> tokio::task::JoinHandle<()> {
+    let c = c.clone();
+    let t = tokio::spawn(async move {
+        c.call(nombre, &[]).await.unwrap();
+    });
+    tokio::time::sleep(Duration::from_millis(30)).await;
+    t
+}
+
+#[tokio::test]
+async fn turno_sin_llamadas_intercaladas() {
+    let (url, s) = start().await;
+    s.delay_ms.store(20, Ordering::SeqCst);
+    let c = client(&url, PASS);
+    c.call("cbGet", &[]).await.unwrap();
+    let mut turno = c.turno().await;
+    let otra = llamada_en_espera(&c, "cbGetOtra").await;
+    for n in ["cbGetA", "cbGetB", "cbGetC"] {
+        turno.call(n, &[]).await.unwrap();
+    }
+    drop(turno);
+    otra.await.unwrap();
+    let llamadas = s.llamadas.lock().unwrap().clone();
+    assert_eq!(
+        llamadas[1..],
+        ["cbGetA", "cbGetB", "cbGetC", "cbGetOtra"],
+        "{llamadas:?}"
+    );
+    assert_eq!(s.overlaps.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn turno_cede_el_cerrojo_tras_el_maximo() {
+    let (url, s) = start().await;
+    let c = client(&url, PASS);
+    c.call("cbGet", &[]).await.unwrap();
+    let mut turno = c.turno().await;
+    let otra = llamada_en_espera(&c, "cbGetOtra").await;
+    for _ in 0..=hgu::client::LECTURAS_POR_TURNO {
+        turno.call("cbGetT", &[]).await.unwrap();
+    }
+    drop(turno);
+    otra.await.unwrap();
+    let llamadas = s.llamadas.lock().unwrap().clone();
+    let posicion = llamadas[1..].iter().position(|n| n == "cbGetOtra");
+    assert_eq!(
+        posicion,
+        Some(hgu::client::LECTURAS_POR_TURNO),
+        "{llamadas:?}"
+    );
+}
+
+#[tokio::test]
+async fn escrituras_cuenta_escrituras_y_reconfiguraciones_no_lecturas() {
+    let (url, _s) = start().await;
+    let c = client(&url, PASS);
+    let inicio = c.escrituras();
+    c.call("cbGet", &[]).await.unwrap();
+    c.turno().await.call("cbGetA", &[]).await.unwrap();
+    assert_eq!(c.escrituras(), inicio);
+    c.write("dhcp.asp", "cbSet", &[("x", "1")]).await.unwrap();
+    let tras_escribir = c.escrituras();
+    assert!(tras_escribir > inicio);
+    c.basic_write("dhcp.asp", "ok.wl", &[]).await.unwrap();
+    let tras_basica = c.escrituras();
+    assert!(tras_basica > tras_escribir);
+    // También una escritura que falla: pudo llegar al router.
+    let _ = c.basic_write("dhcp.asp", "boom.wl", &[]).await;
+    assert!(c.escrituras() > tras_basica);
+    let antes = c.escrituras();
+    c.reconfigurar(ClientConfig::new(&url, USER, PASS)).await;
+    assert!(c.escrituras() > antes);
 }

@@ -76,3 +76,9 @@ lib-features = ["hydrate"]
 lib-default-features = false
 lib-profile-release = "wasm-release"
 env = "DEV"
+# Hash del contenido en los nombres del wasm, el JS y el CSS (el navegador
+# los guarda para siempre: ver crates/panel/src/estaticos.rs). Los hashes van
+# a target/site/hash.txt (la ruta es relativa a target/<perfil>), dentro de
+# la web que copia el despliegue; el panel los busca allí.
+hash-files = true
+hash-file-name = "../site/hash.txt"
