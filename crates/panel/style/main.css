@@ -3203,20 +3203,25 @@ summary.hist-cabeza:hover {
   }
 }
 
-/* Contenido de un tema: mientras se lee otro, lo anterior atenuado y el
-   aviso «Actualizando…» encima, sin mover nada. El aviso vacío sigue en la
-   página (sin tamaño) para que el lector de pantalla lo anuncie al llenarse. */
-.tema-contenido {
+/* Contenido de un tema: mientras se lee otro, lo anterior atenuado (e
+   inerte) y el aviso «Actualizando…» encima, sin mover nada. El aviso va
+   fuera de la zona con aria-busy (que aplaza los avisos de lo que contiene)
+   y, vacío, sigue en la página sin tamaño para que el lector de pantalla
+   lo anuncie al llenarse. */
+.tema-zona {
   position: relative;
+  min-width: 0;
+}
+
+.tema-contenido {
   display: flex;
   flex-direction: column;
   gap: var(--esp-5);
   min-width: 0;
 }
 
-.tema-contenido[aria-busy="true"] > :not(.tema-actualizando) {
+.tema-contenido[aria-busy="true"] {
   opacity: 0.45;
-  pointer-events: none;
   transition: opacity 150ms ease;
 }
 

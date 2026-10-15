@@ -19,9 +19,8 @@ use tokio::{
 
 /// Lecturas seguidas como mucho en un [`Turno`] antes de ceder el cerrojo
 /// una vez a quien espera (el sondeo, el gestor de cambios): una tanda
-/// larga no los deja sin turno. Un tema de Ajustes hace hasta 7 (Red
-/// local, con sus dispositivos).
-pub const LECTURAS_POR_TURNO: usize = 8;
+/// larga no los deja sin turno. Un tema de Ajustes hace hasta 5.
+pub const LECTURAS_POR_TURNO: usize = 6;
 
 /// Configuración del cliente.
 #[derive(Clone)]

@@ -67,10 +67,15 @@ test.describe("ajustes: carga al cambiar de tema", () => {
     await expect(contenido).toHaveAttribute("aria-busy", "true");
     await expect(page.locator(".tema-actualizando")).toHaveText("Actualizando…");
     await expect(page.locator(".tema-actualizando")).toHaveAttribute("role", "status");
+    // El aviso, fuera de la zona ocupada (aria-busy aplaza sus avisos), y lo
+    // anterior, inerte (ni ratón ni teclado).
+    await expect(page.locator("[aria-busy=true] [role=status]")).toHaveCount(0);
+    await expect(contenido).toHaveAttribute("inert", "");
     // Mientras, aún se ve el tema anterior.
     await expect(page.locator(".tema-desc")).toHaveText(antes ?? "");
     await expect(page.locator(".tema-desc")).not.toHaveText(antes ?? "", { timeout: 10_000 });
     await expect(contenido).not.toHaveAttribute("aria-busy", /.*/);
+    await expect(contenido).not.toHaveAttribute("inert", /.*/);
     await expect(page.locator(".tema-actualizando")).toHaveText("");
 
     // Volver a Internet (leído al abrir la página) y otra vez a Sistema: de
@@ -79,6 +84,77 @@ test.describe("ajustes: carga al cambiar de tema", () => {
     await cambiar(page, "internet");
     await cambiar(page, "sistema");
     expect(await ocupado(page)).toBe(false);
+    expect(errores).toEqual([]);
+  });
+
+  test("una vez a la vista, «Actualizando…» no parpadea", async ({ page }) => {
+    const errores = recogerErrores(page);
+    await entrar(page);
+    await page.goto("/ajustes/internet");
+    await page.waitForLoadState("networkidle");
+    // Seguridad (dos lecturas, sin leer aún) tarda unos 350 ms: un poco más
+    // que el umbral.
+    await retardo(100);
+    await page.evaluate(() => {
+      const w = window as unknown as { __visto?: number; __oculto?: number };
+      const aviso = document.querySelector(".tema-actualizando")!;
+      new MutationObserver(() => {
+        const t = performance.now();
+        if (aviso.textContent && w.__visto === undefined) w.__visto = t;
+        if (!aviso.textContent && w.__visto !== undefined && w.__oculto === undefined) {
+          w.__oculto = t;
+        }
+      }).observe(aviso, { childList: true, subtree: true, characterData: true });
+    });
+    await cambiar(page, "seguridad");
+    const { visto, oculto } = await page.evaluate(() => {
+      const w = window as unknown as { __visto?: number; __oculto?: number };
+      return { visto: w.__visto, oculto: w.__oculto };
+    });
+    expect(visto, "no llegó a verse: la prueba no prueba nada").toBeDefined();
+    expect(oculto! - visto!).toBeGreaterThanOrEqual(280);
+    expect(errores).toEqual([]);
+  });
+
+  test("salir de la página antes del umbral no rompe nada", async ({ page }) => {
+    const errores = recogerErrores(page);
+    await entrar(page);
+    await page.goto("/ajustes/internet");
+    await page.waitForLoadState("networkidle");
+    await retardo(300);
+    // Pulsar un tema lento y, enseguida, otra sección del menú…
+    await page.locator('nav.temas a[href="/ajustes/sistema"]').click();
+    await page.locator('nav.nav a[href="/"]').click();
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.waitForTimeout(600);
+    // …y con el foco en una pestaña (la precarga programada), volver atrás.
+    await page.goto("/ajustes/internet");
+    await page.waitForLoadState("networkidle");
+    await page.locator('nav.temas a[href="/ajustes/puertos"]').focus();
+    await page.locator('nav.nav a[href="/"]').click();
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.waitForTimeout(600);
+    // La aplicación sigue viva: el menú navega en el navegador.
+    await page.locator('nav.nav a[href^="/ajustes"]').click();
+    await expect(page.locator("nav.temas")).toBeVisible();
+    expect(errores).toEqual([]);
+  });
+
+  test("la precarga de Red local trae también sus dispositivos", async ({ page }) => {
+    const errores = recogerErrores(page);
+    await entrar(page);
+    await page.goto("/ajustes/internet");
+    await page.waitForLoadState("networkidle");
+    await retardo(300);
+    const pestana = page.locator('nav.temas a[href="/ajustes/red_local"]');
+    const red = page.waitForResponse((r) => r.url().endsWith("/api/leer_red_casa"), {
+      timeout: 15_000,
+    });
+    await pestana.hover();
+    await red;
+    await pestana.click();
+    // De la caché: sin esperar al router (cada lectura tarda 300 ms).
+    await expect(page.locator("li.dispositivo").first()).toBeVisible({ timeout: 500 });
     expect(errores).toEqual([]);
   });
 });

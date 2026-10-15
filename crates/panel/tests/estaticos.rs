@@ -126,3 +126,28 @@ async fn la_pagina_pide_los_ficheros_con_hash() {
         assert!(html.contains(&format!("panel.{HASH}.{f}")), "{f}: {html}");
     }
 }
+
+/// Un 304 (el navegador ya lo tiene) repite la caché y el `Vary` del 200.
+/// El manejador de ficheros de Leptos no contesta 304 (no le pasa las
+/// cabeceras condicionales a `ServeDir`), así que se prueba la capa sola,
+/// delante de una ruta que contesta 304.
+#[tokio::test]
+async fn el_304_repite_la_cache() {
+    use axum::{Router, http::StatusCode, middleware, routing::get as ruta};
+    let app = Router::new()
+        .route("/pkg/{f}", ruta(|| async { StatusCode::NOT_MODIFIED }))
+        .layer(middleware::from_fn(panel::estaticos::cabeceras));
+    let resp = get(&app, &format!("/pkg/panel.{HASH}.css")).await;
+    assert_eq!(resp.status(), 304);
+    assert_eq!(
+        cabecera(&resp, header::CACHE_CONTROL),
+        "public, max-age=31536000, immutable"
+    );
+    assert!(
+        cabecera(&resp, header::VARY)
+            .to_lowercase()
+            .contains("accept-encoding")
+    );
+    let resp = get(&app, "/pkg/panel.css").await;
+    assert_eq!(cabecera(&resp, header::CACHE_CONTROL), "no-cache");
+}

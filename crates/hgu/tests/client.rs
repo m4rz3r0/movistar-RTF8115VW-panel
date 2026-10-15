@@ -463,13 +463,19 @@ async fn reconfigurar_espera_peticion_en_curso() {
     assert_eq!(a.adv_logins.load(Ordering::SeqCst), 1);
 }
 
-/// Lanza `c.call(nombre)` y espera a que esté esperando el cerrojo.
+/// Lanza `c.call(nombre)` y espera a que esté esperando el cerrojo, sin
+/// depender del reloj: las pruebas corren en un solo hilo (`current_thread`)
+/// y `call` pide el cerrojo antes de cualquier otra espera, así que al ceder
+/// el paso la tarea nueva corre hasta quedarse en la cola del cerrojo.
 async fn llamada_en_espera(c: &Client, nombre: &'static str) -> tokio::task::JoinHandle<()> {
     let c = c.clone();
     let t = tokio::spawn(async move {
         c.call(nombre, &[]).await.unwrap();
     });
-    tokio::time::sleep(Duration::from_millis(30)).await;
+    for _ in 0..10 {
+        tokio::task::yield_now().await;
+    }
+    assert!(!t.is_finished(), "{nombre} no esperó el cerrojo");
     t
 }
 

@@ -10,6 +10,12 @@ use panel::poller::{Poller, PollerConfig};
 use serde_json::{Value, json};
 use std::time::Duration;
 
+use common::USER;
+use panel::{
+    changes::{ChangeManager, ChangeRequest, Estado, Tiempos},
+    lecturas::{CADUCIDAD_LECTURAS, CacheLecturas, Clave},
+};
+
 async fn leer(p: &Panel, cookie: &str, tema: &str) -> Value {
     ok(p, "leer_tema", json!({ "tema": tema }), cookie).await
 }
@@ -17,6 +23,17 @@ async fn leer(p: &Panel, cookie: &str, tema: &str) -> Value {
 /// Lecturas que ha recibido el simulador desde `desde`.
 fn lecturas_desde(p: &Panel, desde: usize) -> Vec<(String, Vec<(String, String)>)> {
     p.sim.control.reads().into_iter().skip(desde).collect()
+}
+
+/// Comprueba que `tema` sale de la caché: leerlo no llega al simulador.
+async fn sin_leer_el_router(p: &Panel, cookie: &str, tema: &str) {
+    let antes = p.sim.control.reads().len();
+    leer(p, cookie, tema).await;
+    assert_eq!(
+        lecturas_desde(p, antes),
+        vec![],
+        "{tema}: no salió de la caché"
+    );
 }
 
 /// Valor legible del campo `campo` del ajuste `ajuste` en un tema leído.
@@ -51,22 +68,52 @@ async fn volver_a_un_tema_no_lee_el_router() {
     }
 }
 
-/// Red local lee en su tanda también lo que piden después sus tarjetas de
-/// dispositivos y reservas: la lista y la red de casa salen de la caché.
+/// Red local pinta primero sus tarjetas (su tanda, solo con sus lecturas);
+/// después, `leer_dispositivos` reusa de la caché la lista y las reservas y
+/// solo lee lo suyo, y `leer_red_casa` lo suyo. La segunda vez, nada.
 #[tokio::test]
 async fn dispositivos_y_red_de_casa_tambien_de_la_cache() {
     let p = panel().await;
     let cookie = sesion(&p).await;
+    let antes = p.sim.control.reads().len();
     leer(&p, &cookie, "red_local").await;
+    let del_tema: Vec<String> = lecturas_desde(&p, antes)
+        .into_iter()
+        .map(|(n, _)| n)
+        .collect();
+    assert!(
+        !del_tema
+            .iter()
+            .any(|n| n == "cbListWifiAccPtAssociation" || n == "cbGetLanIPv4Addr"),
+        "la tanda de Red local lee lo de los dispositivos: {del_tema:?}"
+    );
     let antes = p.sim.control.reads().len();
     let dispositivos = ok(&p, "leer_dispositivos", json!({}), &cookie).await;
     let red = ok(&p, "leer_red_casa", json!({}), &cookie).await;
-    assert_eq!(lecturas_desde(&p, antes), vec![]);
+    let nombres: Vec<String> = lecturas_desde(&p, antes)
+        .into_iter()
+        .map(|(n, _)| n)
+        .collect();
+    assert_eq!(
+        nombres,
+        [
+            "cbListWifiAccPtAssociation",
+            "cbListWifiAccPtAssociation",
+            "cbGetLanIPv4Addr"
+        ]
+    );
     assert!(
         !dispositivos.as_array().unwrap().is_empty(),
         "{dispositivos}"
     );
     assert!(red.is_array(), "{red}");
+    let antes = p.sim.control.reads().len();
+    assert_eq!(
+        ok(&p, "leer_dispositivos", json!({}), &cookie).await,
+        dispositivos
+    );
+    assert_eq!(ok(&p, "leer_red_casa", json!({}), &cookie).await, red);
+    assert_eq!(lecturas_desde(&p, antes), vec![]);
 }
 
 /// Sin pasar por Red local, `leer_dispositivos` y `leer_red_casa` también
@@ -92,6 +139,7 @@ async fn dispositivos_y_red_de_casa_se_guardan() {
 async fn tras_escribir_vuelve_a_leer_el_valor_nuevo() {
     let (p, cookie) = panel_con_gestor().await;
     let antes = leer(&p, &cookie, "puertos").await;
+    sin_leer_el_router(&p, &cookie, "puertos").await;
     assert_eq!(
         valor(&antes, "puertos.upnp", "activo"),
         json!({ "Booleano": false })
@@ -136,6 +184,7 @@ async fn cualquier_escritura_del_cliente_invalida() {
     let p = panel().await;
     let cookie = sesion(&p).await;
     leer(&p, &cookie, "puertos").await;
+    sin_leer_el_router(&p, &cookie, "puertos").await;
     p.state
         .hgu
         .write("upnp.asp", "cbSetUpnpCfg", &[("adm_state", "1")])
@@ -250,4 +299,264 @@ async fn las_lecturas_de_un_tema_van_seguidas() {
         seguidas.iter().all(|n| del_tema.contains(n)),
         "lecturas del sondeo entre las del tema: {leidas:?}"
     );
+}
+
+/// Cliente del router como el del panel, con un plazo por petición `plazo`
+/// y sin pausa entre peticiones.
+fn cliente(p: &Panel, plazo: Duration) -> hgu::Client {
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, USER, common::PASS);
+    cfg.timeout = plazo;
+    cfg.min_gap = Duration::from_millis(1);
+    hgu::Client::new(cfg)
+}
+
+fn claves(nombres: &[&str]) -> Vec<Clave> {
+    nombres
+        .iter()
+        .map(|n| Clave::new::<&str, &str>(n, &[]))
+        .collect()
+}
+
+/// Si el router deja de responder, la tanda no espera el plazo de cada
+/// lectura: tras la primera que no responde, las demás fallan al momento y
+/// el turno queda libre para el gestor y el sondeo.
+#[tokio::test]
+async fn sin_respuesta_del_router_la_tanda_se_corta() {
+    let p = panel().await;
+    let plazo = Duration::from_millis(300);
+    let c = cliente(&p, plazo);
+    c.call("cbGetSummary", &[]).await.unwrap();
+    let cache = CacheLecturas::new(CADUCIDAD_LECTURAS);
+    let k = claves(&["cbGetUpnpCfg", "cbGetNatConfig", "cbGetNatPortMapping"]);
+    p.sim.control.set_unresponsive(true);
+    let inicio = std::time::Instant::now();
+    let r = cache.leer(&c, &p.state.mascara, &k).await;
+    let tardo = inicio.elapsed();
+    p.sim.control.set_unresponsive(false);
+    assert!(
+        matches!(&r[&k[0]], Err(hgu::Error::Network(_))),
+        "{:?}",
+        r[&k[0]]
+    );
+    for clave in &k[1..] {
+        assert!(
+            matches!(&r[clave], Err(hgu::Error::Network(e)) if e.contains("no se intentó")),
+            "{}: {:?}",
+            clave.funcion,
+            r[clave]
+        );
+    }
+    // Una sola espera del plazo (sin cortar serían tres).
+    assert!(tardo < plazo * 2, "{tardo:?}");
+    // El router vuelve: la siguiente lectura entra sin esperar a nadie.
+    assert!(c.call("cbGetSummary", &[]).await.is_ok());
+}
+
+/// Un error de la propia función (el router responde con `Result` distinto
+/// de 0) no corta la tanda.
+#[tokio::test]
+async fn un_error_de_la_funcion_no_corta_la_tanda() {
+    let p = panel().await;
+    let c = cliente(&p, Duration::from_secs(5));
+    let cache = CacheLecturas::new(CADUCIDAD_LECTURAS);
+    let k = claves(&["cbGetNoExiste", "cbGetUpnpCfg"]);
+    let r = cache.leer(&c, &p.state.mascara, &k).await;
+    assert!(
+        matches!(&r[&k[0]], Err(hgu::Error::CallFailed { .. })),
+        "{:?}",
+        r[&k[0]]
+    );
+    assert!(r[&k[1]].is_ok(), "{:?}", r[&k[1]]);
+}
+
+/// Destino del registro en memoria.
+#[derive(Clone, Default)]
+struct Registro(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
+
+impl std::io::Write for Registro {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0.lock().unwrap().extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Registro {
+    type Writer = Registro;
+
+    fn make_writer(&'a self) -> Registro {
+        self.clone()
+    }
+}
+
+/// Una lectura que falla deja una sola línea en el registro, también en
+/// `leer_dispositivos` y `leer_red_casa` (que responden 502).
+#[tokio::test]
+async fn una_linea_por_lectura_fallida() {
+    let mut p = panel().await;
+    let cookie = sesion(&p).await;
+    p.state.hgu = cliente(&p, Duration::from_millis(200));
+    p.state.hgu.call("cbGetSummary", &[]).await.unwrap();
+    p.app = panel::build_router(p.state.clone());
+    let registro = Registro::default();
+    let _registro = tracing::subscriber::set_default(
+        tracing_subscriber::fmt()
+            .with_writer(registro.clone())
+            .with_ansi(false)
+            .finish(),
+    );
+    p.sim.control.set_unresponsive(true);
+    let (estado, _) = common::llamar(&p, "leer_red_casa", json!({}), Some(&cookie)).await;
+    p.sim.control.set_unresponsive(false);
+    assert_eq!(estado, 502);
+    let texto = String::from_utf8_lossy(&registro.0.lock().unwrap()).into_owned();
+    let lineas: Vec<&str> = texto.lines().filter(|l| l.contains("WARN")).collect();
+    assert_eq!(lineas.len(), 1, "{texto}");
+    assert!(lineas[0].contains("cbGetLanIPv4Addr"), "{texto}");
+}
+
+/// Una escritura que llega mientras la tanda espera su turno: lo que lee la
+/// tanda después no se guarda (empezó antes de la escritura) y la siguiente
+/// lectura vuelve al router.
+#[tokio::test]
+async fn escritura_mientras_la_tanda_espera_el_turno() {
+    let p = panel().await;
+    let c = cliente(&p, Duration::from_secs(5));
+    let cache = std::sync::Arc::new(CacheLecturas::new(CADUCIDAD_LECTURAS));
+    let k = claves(&["cbGetUpnpCfg"]);
+    // Alguien tiene el turno; detrás esperan una escritura y luego la tanda.
+    let turno = c.turno().await;
+    let escritura = {
+        let c = c.clone();
+        tokio::spawn(async move {
+            c.write("upnp.asp", "cbSetUpnpCfg", &[("adm_state", "1")])
+                .await
+                .unwrap();
+        })
+    };
+    for _ in 0..10 {
+        tokio::task::yield_now().await;
+    }
+    let tanda = {
+        let (c, cache, mascara, k) = (c.clone(), cache.clone(), p.state.mascara.clone(), k.clone());
+        tokio::spawn(async move { cache.leer(&c, &mascara, &k).await })
+    };
+    for _ in 0..10 {
+        tokio::task::yield_now().await;
+    }
+    drop(turno);
+    escritura.await.unwrap();
+    let r = tanda.await.unwrap();
+    assert!(r[&k[0]].is_ok());
+    let antes = p.sim.control.reads().len();
+    cache.leer(&c, &p.state.mascara, &k).await;
+    assert_eq!(
+        lecturas_desde(&p, antes).len(),
+        1,
+        "guardó una lectura que empezó antes de la escritura"
+    );
+}
+
+/// Ajuste de la reserva `id` (pool 0): su IP.
+fn reserva(id: &str, ip: &str) -> ChangeRequest {
+    ChangeRequest {
+        funcion: "cbDhcpV4SvrPoolSetStatic".into(),
+        instancia: Some(id.to_owned()),
+        valores: [("rtm_cfg_dhcpv4_svr_pool_id", "0"), ("ipv4_addr", ip)]
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .collect(),
+        borrar: false,
+    }
+}
+
+/// IP de la reserva `id` en lo que la caché da para mostrar.
+async fn ip_mostrada(p: &Panel, id: &str) -> String {
+    let clave = Clave::new("cbDhcpV4SvrPoolGetStatic", &hgu::read::POOL);
+    let r = p
+        .state
+        .lecturas
+        .leer(&p.state.hgu, &p.state.mascara, std::slice::from_ref(&clave))
+        .await;
+    let n = r[&clave].as_ref().unwrap();
+    hgu::models::StaticLease::parse_all(n)
+        .into_iter()
+        .find(|l| l.id == id)
+        .unwrap()
+        .ip
+}
+
+/// Cambia la reserva 1 con otro cliente (como la app del operador, o el
+/// router aplicando algo tarde): el contador de escrituras del panel no se
+/// entera.
+async fn cambiar_fuera(p: &Panel, ip: &str) {
+    cliente(p, Duration::from_secs(5))
+        .write(
+            "dhcp.asp",
+            "cbDhcpV4SvrPoolSetStatic",
+            &[
+                ("rtm_cfg_dhcpv4_svr_pool_id", "0"),
+                ("rtm_dhcpv4_svr_pool_static_id", "1"),
+                ("ipv4_addr", ip),
+            ],
+        )
+        .await
+        .unwrap();
+}
+
+fn tiempos(vigilancia: Duration) -> Tiempos {
+    Tiempos {
+        bajo: vigilancia,
+        medio: vigilancia,
+        alto: vigilancia,
+        intervalo: Duration::from_millis(30),
+        fallos_para_revertir: 3,
+        pausa_max: Duration::from_secs(2),
+    }
+}
+
+/// Al comprobar en el router un cambio (aquí, al retomarlo tras un reinicio
+/// del panel, sin escribir nada) la caché se invalida: mientras sigue la
+/// vigilancia, la página ya ve lo que el router tiene.
+#[tokio::test]
+async fn comprobar_un_cambio_invalida_lo_guardado() {
+    let mut p = panel().await;
+    p.state.hgu = cliente(&p, Duration::from_millis(500));
+    let lento = tiempos(Duration::from_secs(60));
+    let a = ChangeManager::new(p.state.clone(), lento.clone());
+    a.reanudar_pendientes().await;
+    let prep = a.preparar(reserva("0", "192.168.1.80")).await.unwrap();
+    let id = a.confirmar(&prep.token, None, "admin").await.unwrap();
+    assert_eq!(a.cambio(id).await.unwrap().estado, Estado::Vigilando);
+    // El proceso muere a mitad de la vigilancia.
+    a.detener();
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    let antes = ip_mostrada(&p, "1").await;
+    cambiar_fuera(&p, "192.168.1.99").await;
+    assert_eq!(ip_mostrada(&p, "1").await, antes, "aún de la caché");
+    let b = ChangeManager::new(p.state.clone(), lento);
+    b.reanudar_pendientes().await;
+    // Retomado y vigilando (el gestor sigue ocupado): ya comprobó.
+    assert_eq!(b.activo(), Some(id));
+    assert_eq!(ip_mostrada(&p, "1").await, "192.168.1.99");
+    b.detener();
+}
+
+/// Al soltar el gestor (fin de un cambio, de un grupo o de lo que lo
+/// apartó), la caché se invalida.
+#[tokio::test]
+async fn soltar_el_gestor_invalida_lo_guardado() {
+    let mut p = panel().await;
+    p.state.hgu = cliente(&p, Duration::from_secs(5));
+    let m = ChangeManager::new(p.state.clone(), tiempos(Duration::from_millis(300)));
+    m.reanudar_pendientes().await;
+    let antes = ip_mostrada(&p, "1").await;
+    let apartado = m.excluir_cambios().unwrap();
+    cambiar_fuera(&p, "192.168.1.99").await;
+    assert_eq!(ip_mostrada(&p, "1").await, antes, "aún de la caché");
+    drop(apartado);
+    assert_eq!(ip_mostrada(&p, "1").await, "192.168.1.99");
 }

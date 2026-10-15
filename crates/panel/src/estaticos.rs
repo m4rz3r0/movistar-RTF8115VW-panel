@@ -14,7 +14,7 @@
 
 use axum::{
     extract::Request,
-    http::{HeaderValue, header},
+    http::{HeaderValue, StatusCode, header},
     middleware::Next,
     response::Response,
 };
@@ -67,8 +67,10 @@ pub async fn cabeceras(req: Request, next: Next) -> Response {
         .get(header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
         .is_some_and(|t| t.starts_with("text/html"));
+    // Un 304 repite las cabeceras de caché del 200 (RFC 9110 §15.4.5).
+    let servido = resp.status().is_success() || resp.status() == StatusCode::NOT_MODIFIED;
     let valor = match pkg {
-        Some(_) if !resp.status().is_success() => None,
+        Some(_) if !servido => None,
         Some(true) => Some(INMUTABLE),
         Some(false) => Some(REVALIDAR),
         None if html => Some(SIN_GUARDAR),
@@ -81,7 +83,7 @@ pub async fn cabeceras(req: Request, next: Next) -> Response {
     }
     // El mismo fichero va comprimido o no según `Accept-Encoding`: que una
     // caché intermedia no sirva una versión a quien no la entiende.
-    if pkg.is_some() && resp.status().is_success() && !resp.headers().contains_key(header::VARY) {
+    if pkg.is_some() && servido && !resp.headers().contains_key(header::VARY) {
         resp.headers_mut()
             .insert(header::VARY, HeaderValue::from_static("accept-encoding"));
     }

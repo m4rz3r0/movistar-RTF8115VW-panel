@@ -14,7 +14,9 @@ mod dispositivos;
 mod reservas;
 mod tarjeta;
 
-use crate::ajustes_router::{CADUCIDAD_LECTURAS, TemaVista, leer_tema};
+use crate::ajustes_router::{
+    CADUCIDAD_LECTURAS, TemaVista, leer_dispositivos, leer_red_casa, leer_tema,
+};
 use crate::t;
 use crate::ui::explorador::texto_error;
 use crate::ui::i18n::traducir;
@@ -32,6 +34,10 @@ use tarjeta::Tarjeta;
 /// Espera antes de enseñar «Actualizando…»: una lectura más rápida (de la
 /// caché del servidor) no hace parpadear la página.
 const UMBRAL_ACTUALIZANDO: Duration = Duration::from_millis(150);
+
+/// Tiempo mínimo a la vista de «Actualizando…» una vez que aparece: una
+/// lectura que acaba justo después del umbral no lo hace parpadear.
+const MINIMO_ACTUALIZANDO: Duration = Duration::from_millis(300);
 
 /// Tiempo con el ratón o el foco en una pestaña antes de precargar su tema:
 /// pasar por encima de camino a otra no lee nada.
@@ -79,24 +85,64 @@ fn nombre(t: Tema) -> String {
     traducir(&format!("ajustes-tema-{}", t.slug()), None)
 }
 
+/// Temas ya precargados (el servidor los tiene en su caché corta). Lo
+/// olvida todo al terminar un cambio (el servidor ha invalidado su caché),
+/// y una precarga que empezó antes de olvidar no cuenta.
+#[derive(Default)]
+struct Precargados {
+    hechas: HashSet<String>,
+    generacion: u64,
+}
+
+impl Precargados {
+    /// ¿Hay que precargar `slug`?
+    fn falta(&self, slug: &str) -> bool {
+        !self.hechas.contains(slug)
+    }
+
+    /// `slug` quedó precargado por una precarga que empezó en `generacion`.
+    fn hecha(&mut self, slug: &str, generacion: u64) {
+        if generacion == self.generacion {
+            self.hechas.insert(slug.to_owned());
+        }
+    }
+
+    /// Pasada la caducidad, el servidor ya no tiene `slug`.
+    fn caducada(&mut self, slug: &str, generacion: u64) {
+        if generacion == self.generacion {
+            self.hechas.remove(slug);
+        }
+    }
+
+    fn olvidar(&mut self) {
+        self.hechas.clear();
+        self.generacion += 1;
+    }
+}
+
 /// Precarga de los temas: al dejar el ratón o el foco en una pestaña, lee
 /// su tema en segundo plano para que el servidor lo tenga en su caché
-/// corta cuando se pulse. Una sola a la vez (el servidor las lee en serie)
-/// y cada tema una vez por caducidad de la caché.
+/// corta cuando se pulse (en Red local, también sus dispositivos y la red
+/// de casa, que piden después sus tarjetas). Una sola a la vez (el
+/// servidor las lee en serie) y cada tema una vez por caducidad de la
+/// caché. Al desmontarse la página, lo programado se cancela; lo que ya
+/// corre no lee señales (solo `try_*` y valores guardados).
 #[derive(Clone, Copy)]
 struct Precarga {
     programada: StoredValue<Option<TimeoutHandle>>,
     en_curso: StoredValue<bool>,
-    hechas: StoredValue<HashSet<String>>,
+    hechas: StoredValue<Precargados>,
 }
 
 impl Precarga {
     fn nueva() -> Precarga {
-        Precarga {
+        let p = Precarga {
             programada: StoredValue::new(None),
             en_curso: StoredValue::new(false),
-            hechas: StoredValue::new(HashSet::new()),
-        }
+            hechas: StoredValue::new(Precargados::default()),
+        };
+        on_cleanup(move || p.cancelar());
+        p
     }
 
     /// Precarga `t` si el ratón o el foco siguen en su pestaña dentro de
@@ -105,20 +151,27 @@ impl Precarga {
         self.cancelar();
         let slug = t.slug().to_owned();
         let precargar = move || {
-            self.programada.set_value(None);
-            let ya = self.hechas.with_value(|h| h.contains(&slug));
-            if ya || self.en_curso.get_value() || actual.get_untracked() == slug {
+            self.programada.try_update_value(|h| *h = None);
+            let falta = self.hechas.try_with_value(|h| h.falta(&slug));
+            let libre = self.en_curso.try_get_value() == Some(false);
+            let otro = actual.try_get_untracked().is_some_and(|a| a != slug);
+            if falta != Some(true) || !libre || !otro {
                 return;
             }
+            let Some(generacion) = self.hechas.try_with_value(|h| h.generacion) else {
+                return;
+            };
             self.en_curso.set_value(true);
             leptos::task::spawn_local(async move {
-                if leer_tema(slug.clone()).await.is_ok() {
-                    self.hechas.update_value(|h| {
-                        h.insert(slug.clone());
-                    });
-                    // Pasada la caducidad, el servidor ya no lo tiene.
+                let mut bien = leer_tema(slug.clone()).await.is_ok();
+                // Las tarjetas de Red local piden esto en cuanto se pintan.
+                if bien && t == Tema::RedLocal {
+                    bien = leer_dispositivos().await.is_ok() && leer_red_casa().await.is_ok();
+                }
+                if bien {
+                    self.hechas.update_value(|h| h.hecha(&slug, generacion));
                     set_timeout(
-                        move || self.hechas.update_value(|h| _ = h.remove(&slug)),
+                        move || self.hechas.update_value(|h| h.caducada(&slug, generacion)),
                         CADUCIDAD_LECTURAS,
                     );
                 }
@@ -131,16 +184,19 @@ impl Precarga {
     }
 
     fn cancelar(self) {
-        if let Some(h) = self.programada.get_value() {
+        if let Some(Some(h)) = self.programada.try_update_value(Option::take) {
             h.clear();
-            self.programada.set_value(None);
         }
+    }
+
+    /// Tras un cambio: el servidor ya no tiene nada precargado.
+    fn olvidar(self) {
+        self.hechas.update_value(Precargados::olvidar);
     }
 }
 
 /// Pestañas de los temas y, en pantallas estrechas, el selector que navega.
-fn pestanas(slug: Memo<String>) -> impl IntoView {
-    let precarga = Precarga::nueva();
+fn pestanas(slug: Memo<String>, precarga: Precarga) -> impl IntoView {
     let enlaces = Tema::TODOS
         .into_iter()
         .map(|t| {
@@ -219,25 +275,15 @@ pub fn PaginaTema() -> impl IntoView {
     );
     let foco = Foco(RwSignal::new(None));
     provide_context(foco);
-    let recargar = Callback::new(move |()| datos.refetch());
+    let precarga = Precarga::nueva();
+    let recargar = Callback::new(move |()| {
+        precarga.olvidar();
+        datos.refetch();
+    });
     // Mientras se lee otro tema (o el mismo tras un cambio), lo anterior se
     // ve atenuado y con «Actualizando…», si tarda más que el umbral.
     let pendiente = RwSignal::new(false);
-    let actualizando = RwSignal::new(false);
-    Effect::new(move |_| {
-        if pendiente.get() {
-            set_timeout(
-                move || {
-                    if pendiente.get_untracked() {
-                        actualizando.set(true);
-                    }
-                },
-                UMBRAL_ACTUALIZANDO,
-            );
-        } else {
-            actualizando.set(false);
-        }
-    });
+    let actualizando = aviso_actualizando(pendiente);
     // Con la lectura nueva ya pintada, el foco al título pendiente.
     Effect::new(move |_| {
         if datos.with(|d| d.is_some())
@@ -260,13 +306,19 @@ pub fn PaginaTema() -> impl IntoView {
                     <p class="pagina-sub">{t!("ajustes-desc")}</p>
                 </div>
             </header>
-            {pestanas(slug)}
-            <div class="tema-contenido" aria-busy=move || actualizando.get().then_some("true")>
-                // Siempre en la página (vacío si no carga): el lector de
+            {pestanas(slug, precarga)}
+            <div class="tema-zona">
+                // Siempre en la página (vacío si no carga) y fuera de la zona
+                // ocupada (`aria-busy` aplaza sus avisos): el lector de
                 // pantalla anuncia el texto una vez cada vez que aparece.
                 <p class="tema-actualizando" role="status">
                     {move || actualizando.get().then(|| t!("ajustes-actualizando"))}
                 </p>
+                <div
+                    class="tema-contenido"
+                    aria-busy=move || actualizando.get().then_some("true")
+                    inert=move || actualizando.get()
+                >
                 <Transition
                     fallback=|| view! { <p class="estado-espera">{t!("comun-cargando")}</p> }
                     set_pending=pendiente
@@ -287,10 +339,63 @@ pub fn PaginaTema() -> impl IntoView {
                     }
                 })}
                 </Transition>
+                </div>
             </div>
         }
         .into_any()
     }
+}
+
+/// Si se ve «Actualizando…»: cuando `pendiente` dura más que
+/// [`UMBRAL_ACTUALIZANDO`], y entonces al menos [`MINIMO_ACTUALIZANDO`].
+/// Los temporizadores se cancelan al desmontarse la página y no leen
+/// señales ya liberadas.
+fn aviso_actualizando(pendiente: RwSignal<bool>) -> RwSignal<bool> {
+    let actualizando = RwSignal::new(false);
+    let umbral: StoredValue<Option<TimeoutHandle>> = StoredValue::new(None);
+    let minimo: StoredValue<Option<TimeoutHandle>> = StoredValue::new(None);
+    let cancelar = move |t: StoredValue<Option<TimeoutHandle>>| {
+        if let Some(Some(h)) = t.try_update_value(Option::take) {
+            h.clear();
+        }
+    };
+    let ocultar_tras_el_minimo = move || {
+        minimo.try_update_value(|h| *h = None);
+        if pendiente.try_get_untracked() == Some(false) {
+            actualizando.try_set(false);
+        }
+    };
+    let mostrar = move || {
+        umbral.try_update_value(|h| *h = None);
+        if pendiente.try_get_untracked() != Some(true) {
+            return;
+        }
+        actualizando.try_set(true);
+        if let Ok(h) = set_timeout_with_handle(ocultar_tras_el_minimo, MINIMO_ACTUALIZANDO) {
+            minimo.try_update_value(|m| *m = Some(h));
+        }
+    };
+    Effect::new(move |_| {
+        if pendiente.get() {
+            if !actualizando.get_untracked() {
+                cancelar(umbral);
+                if let Ok(h) = set_timeout_with_handle(mostrar, UMBRAL_ACTUALIZANDO) {
+                    umbral.set_value(Some(h));
+                }
+            }
+        } else {
+            cancelar(umbral);
+            // Visible y aún dentro del mínimo: lo quita el temporizador.
+            if minimo.with_value(Option::is_none) {
+                actualizando.set(false);
+            }
+        }
+    });
+    on_cleanup(move || {
+        cancelar(umbral);
+        cancelar(minimo);
+    });
+    actualizando
 }
 
 /// Las tarjetas de un tema: lo esencial arriba; lo avanzado y lo oculto,
@@ -375,5 +480,29 @@ fn ContenidoTema(t: TemaVista, recargar: Callback<()>) -> impl IntoView {
         <p class="tema-desc">{traducir(&tema, None)}</p>
         {aviso}
         {cuerpo}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Precargados;
+
+    /// Tras un cambio, todo vuelve a precargarse, y una precarga que empezó
+    /// antes no cuenta (leyó antes de que el servidor invalidara).
+    #[test]
+    fn olvidar_vuelve_a_precargar() {
+        let mut p = Precargados::default();
+        let g = p.generacion;
+        p.hecha("wifi", g);
+        assert!(!p.falta("wifi"));
+        let en_vuelo = p.generacion;
+        p.olvidar();
+        assert!(p.falta("wifi"));
+        p.hecha("puertos", en_vuelo);
+        assert!(p.falta("puertos"));
+        // La caducidad de una precarga anterior no borra una nueva.
+        p.hecha("wifi", p.generacion);
+        p.caducada("wifi", g);
+        assert!(!p.falta("wifi"));
     }
 }

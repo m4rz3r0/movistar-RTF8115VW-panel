@@ -29,6 +29,10 @@ use std::{
 
 pub use crate::ajustes_router::CADUCIDAD_LECTURAS;
 
+/// Error de las lecturas de una tanda que no se intentan porque el router
+/// no respondió a una anterior (ver [`CacheLecturas::leer`]).
+pub const NO_INTENTADA: &str = "no se intentó: el router no respondió a la lectura anterior";
+
 /// Una lectura: función y parámetros, ordenados por nombre (el orden no
 /// cambia lo que se lee).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -135,8 +139,15 @@ impl CacheLecturas {
 
     /// Las lecturas `claves` para mostrar, ya enmascaradas: las guardadas
     /// que aún valen y, en una sola tanda (un turno de `hgu`: nadie llama al
-    /// router entre ellas), las que faltan. Las que fallan se registran y no
-    /// se guardan.
+    /// router entre ellas), las que faltan. Las que fallan se registran (una
+    /// vez cada una, aquí) y no se guardan.
+    ///
+    /// Si una lectura falla porque el router no responde (error de red o
+    /// tiempo agotado), las que quedan no se intentan: fallan al momento
+    /// ([`NO_INTENTADA`]) y la tanda suelta el turno, para que el gestor de
+    /// cambios (su vigilancia, una reversión) y el sondeo no esperen un
+    /// plazo por cada una. Un error de la propia función (el router responde
+    /// con `Result` distinto de 0) no corta la tanda.
     pub async fn leer(
         &self,
         hgu: &hgu::Client,
@@ -161,10 +172,16 @@ impl CacheLecturas {
         }
         let generacion = self.generacion(hgu);
         let mut turno = hgu.turno().await;
+        let mut sin_router = false;
         for c in faltan {
             // Otra tanda que tenía el turno antes pudo leerla ya.
             if let Some(n) = self.buscar(hgu, &c) {
                 out.insert(c, Ok(n));
+                continue;
+            }
+            if sin_router {
+                tracing::warn!("no se lee {}: {NO_INTENTADA}", c.funcion);
+                out.insert(c, Err(hgu::Error::Network(NO_INTENTADA.to_owned())));
                 continue;
             }
             let params: Vec<(&str, &str)> = c
@@ -179,6 +196,7 @@ impl CacheLecturas {
             });
             if let Err(e) = &r {
                 tracing::warn!("no se puede leer {}: {e}", c.funcion);
+                sin_router = matches!(e, hgu::Error::Network(_));
             }
             out.insert(c, r);
         }

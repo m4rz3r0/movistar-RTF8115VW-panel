@@ -477,23 +477,9 @@ pub(crate) mod servidor {
             .ok_or_else(|| fallo(StatusCode::NOT_FOUND, t!("ajustes-error-tema")))?;
         let del_tema: Vec<&Ajuste> = state.ajustes.por_tema(tema).collect();
         let claves: Vec<Clave> = del_tema.iter().map(|a| clave(a)).collect();
-        // Las tarjetas de dispositivos y reservas piden después
-        // `leer_dispositivos` y `leer_red_casa`: lo que leen va en la misma
-        // tanda y lo encuentran en la caché.
-        let de_red = del_tema.iter().any(|a| {
-            matches!(
-                a.componente,
-                Some(Componente::Dispositivos | Componente::Reservas)
-            )
-        });
-        let mut a_leer = claves.clone();
-        if de_red {
-            a_leer.extend(claves_dispositivos());
-            a_leer.push(clave_red_casa());
-        }
         let leidas = state
             .lecturas
-            .leer(&state.hgu, &state.mascara, &a_leer)
+            .leer(&state.hgu, &state.mascara, &claves)
             .await;
         let ajustes = del_tema
             .iter()
@@ -1094,16 +1080,15 @@ pub(crate) mod servidor {
         (!d.activo, ip, d.ip.clone())
     }
 
-    /// Respuesta de la lectura `clave` de `leidas`; si falló, 502 (ver
-    /// [`sin_leer`]).
+    /// Respuesta de la lectura `clave` de `leidas`; si falló, 502 con el
+    /// mensaje de siempre (el fallo ya lo registró la caché de lecturas).
     fn leida(
         leidas: &mut HashMap<Clave, Result<XmlNode, hgu::Error>>,
         clave: &Clave,
-        que: &str,
     ) -> Result<XmlNode, ServerFnError> {
         match leidas.remove(clave) {
-            Some(r) => r.map_err(|e| sin_leer(que, e)),
-            None => Err(fallo(StatusCode::BAD_GATEWAY, t!("ajustes-error-lectura"))),
+            Some(Ok(n)) => Ok(n),
+            _ => Err(fallo(StatusCode::BAD_GATEWAY, t!("ajustes-error-lectura"))),
         }
     }
 
@@ -1114,16 +1099,8 @@ pub(crate) mod servidor {
             .leer(&state.hgu, &state.mascara, &claves_dispositivos())
             .await;
         let wifi = asociados(&leidas);
-        let hosts = hgu::models::LanHost::parse_all(&leida(
-            &mut leidas,
-            &clave_hosts(),
-            "los dispositivos",
-        )?);
-        let reservas = hgu::models::StaticLease::parse_all(&leida(
-            &mut leidas,
-            &clave_reservas(),
-            "las reservas",
-        )?);
+        let hosts = hgu::models::LanHost::parse_all(&leida(&mut leidas, &clave_hosts())?);
+        let reservas = hgu::models::StaticLease::parse_all(&leida(&mut leidas, &clave_reservas())?);
         let mut lista: Vec<DispositivoVista> = hosts
             .into_iter()
             .map(|h| {
@@ -1161,7 +1138,7 @@ pub(crate) mod servidor {
             .lecturas
             .leer(&state.hgu, &state.mascara, std::slice::from_ref(&clave))
             .await;
-        let n = leida(&mut leidas, &clave, "la red de casa")?;
+        let n = leida(&mut leidas, &clave)?;
         Ok(hgu::read::lan_ipv4_de(&n))
     }
 
