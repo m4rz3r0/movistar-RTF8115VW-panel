@@ -157,4 +157,62 @@ test.describe("ajustes: carga al cambiar de tema", () => {
     await expect(page.locator("li.dispositivo").first()).toBeVisible({ timeout: 500 });
     expect(errores).toEqual([]);
   });
+
+  test("tras aplicar, una relectura de 300 ms deja el foco en la tarjeta", async ({ page }) => {
+    test.setTimeout(150_000);
+    const errores = recogerErrores(page);
+    await entrar(page);
+    await page.goto("/ajustes/puertos");
+    await page.waitForLoadState("networkidle");
+    const titulo = "Apertura automática de puertos (UPnP)";
+    const upnp = page.locator("article.ajuste").filter({
+      has: page.getByRole("heading", { level: 2, name: titulo, exact: true }),
+    });
+    await upnp.getByRole("button", { name: "Editar" }).click();
+    await upnp.getByRole("switch").click();
+    await upnp.getByRole("button", { name: "Guardar" }).click();
+    const dialogo = page.locator("dialog[open]");
+    await dialogo.getByRole("button", { name: "Aplicar" }).click();
+    await expect(dialogo.getByText("Hecho: el router tiene ya el cambio.")).toBeVisible({
+      timeout: 120_000,
+    });
+    // El servidor ya tiene el tema en su caché (leído tras el cambio): la
+    // relectura la marca la espera de abajo, no el router.
+    const leer = () =>
+      page.evaluate(async () => {
+        const r = await fetch("/api/leer_tema", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ tema: "puertos" }),
+        });
+        return r.status;
+      });
+    expect(await leer()).toBe(200);
+    expect(await leer()).toBe(200);
+    // La relectura del tema tarda unos 300 ms (lo que tarde el servidor, si
+    // es más): más que el umbral de «Actualizando…» (150 ms) y menos que el
+    // umbral más su mínimo a la vista (450 ms).
+    let tardo = 0;
+    await page.route(
+      "**/api/leer_tema",
+      async (r) => {
+        const t0 = Date.now();
+        const respuesta = await r.fetch();
+        await new Promise((ok) => setTimeout(ok, Math.max(0, 300 - (Date.now() - t0))));
+        tardo = Date.now() - t0;
+        await r.fulfill({ response: respuesta });
+      },
+      { times: 1 },
+    );
+    const relectura = page.waitForResponse((r) => r.url().endsWith("/api/leer_tema"));
+    await dialogo.getByRole("button", { name: "Cerrar" }).click();
+    await relectura;
+    expect(tardo).toBeGreaterThan(150);
+    expect(tardo).toBeLessThan(450);
+    await expect(upnp.getByRole("heading", { level: 2 })).toBeFocused();
+    // El tema nuevo, ni inerte ni ocupado ni atenuado en cuanto llega.
+    await expect(page.locator(".tema-contenido")).not.toHaveAttribute("inert", /.*/);
+    await expect(page.locator(".tema-contenido")).not.toHaveAttribute("aria-busy", /.*/);
+    expect(errores).toEqual([]);
+  });
 });

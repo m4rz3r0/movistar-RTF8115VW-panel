@@ -281,7 +281,8 @@ pub fn PaginaTema() -> impl IntoView {
         datos.refetch();
     });
     // Mientras se lee otro tema (o el mismo tras un cambio), lo anterior se
-    // ve atenuado y con «Actualizando…», si tarda más que el umbral.
+    // ve atenuado (e inerte) y con «Actualizando…», si tarda más que el
+    // umbral; el contenido nuevo, nunca.
     let pendiente = RwSignal::new(false);
     let actualizando = aviso_actualizando(pendiente);
     // Con la lectura nueva ya pintada, el foco al título pendiente.
@@ -312,12 +313,12 @@ pub fn PaginaTema() -> impl IntoView {
                 // ocupada (`aria-busy` aplaza sus avisos): el lector de
                 // pantalla anuncia el texto una vez cada vez que aparece.
                 <p class="tema-actualizando" role="status">
-                    {move || actualizando.get().then(|| t!("ajustes-actualizando"))}
+                    {move || actualizando.aviso.get().then(|| t!("ajustes-actualizando"))}
                 </p>
                 <div
                     class="tema-contenido"
-                    aria-busy=move || actualizando.get().then_some("true")
-                    inert=move || actualizando.get()
+                    aria-busy=move || actualizando.ocupado.get().then_some("true")
+                    inert=move || actualizando.ocupado.get()
                 >
                 <Transition
                     fallback=|| view! { <p class="estado-espera">{t!("comun-cargando")}</p> }
@@ -346,12 +347,25 @@ pub fn PaginaTema() -> impl IntoView {
     }
 }
 
-/// Si se ve «Actualizando…»: cuando `pendiente` dura más que
-/// [`UMBRAL_ACTUALIZANDO`], y entonces al menos [`MINIMO_ACTUALIZANDO`].
-/// Los temporizadores se cancelan al desmontarse la página y no leen
-/// señales ya liberadas.
-fn aviso_actualizando(pendiente: RwSignal<bool>) -> RwSignal<bool> {
-    let actualizando = RwSignal::new(false);
+/// Estado de la lectura de un tema para la página.
+#[derive(Clone, Copy)]
+struct Actualizando {
+    /// La lectura sigue pendiente pasado [`UMBRAL_ACTUALIZANDO`]: lo
+    /// anterior va atenuado, `inert` y con `aria-busy`. Se quita en cuanto
+    /// llega la lectura (el contenido nuevo nunca queda bloqueado, y el foco
+    /// puede ir a él).
+    ocupado: RwSignal<bool>,
+    /// El texto «Actualizando…»: aparece con `ocupado` y, una vez a la
+    /// vista, dura al menos [`MINIMO_ACTUALIZANDO`] para no parpadear.
+    aviso: RwSignal<bool>,
+}
+
+/// Sigue `pendiente` (la lectura del tema) con el umbral y el mínimo de
+/// [`Actualizando`]. Los temporizadores se cancelan al desmontarse la
+/// página y no leen señales ya liberadas.
+fn aviso_actualizando(pendiente: RwSignal<bool>) -> Actualizando {
+    let ocupado = RwSignal::new(false);
+    let aviso = RwSignal::new(false);
     let umbral: StoredValue<Option<TimeoutHandle>> = StoredValue::new(None);
     let minimo: StoredValue<Option<TimeoutHandle>> = StoredValue::new(None);
     let cancelar = move |t: StoredValue<Option<TimeoutHandle>>| {
@@ -362,7 +376,7 @@ fn aviso_actualizando(pendiente: RwSignal<bool>) -> RwSignal<bool> {
     let ocultar_tras_el_minimo = move || {
         minimo.try_update_value(|h| *h = None);
         if pendiente.try_get_untracked() == Some(false) {
-            actualizando.try_set(false);
+            aviso.try_set(false);
         }
     };
     let mostrar = move || {
@@ -370,14 +384,19 @@ fn aviso_actualizando(pendiente: RwSignal<bool>) -> RwSignal<bool> {
         if pendiente.try_get_untracked() != Some(true) {
             return;
         }
-        actualizando.try_set(true);
+        ocupado.try_set(true);
+        if aviso.try_get_untracked() == Some(true) {
+            // Sigue a la vista desde la lectura anterior (dentro del mínimo).
+            return;
+        }
+        aviso.try_set(true);
         if let Ok(h) = set_timeout_with_handle(ocultar_tras_el_minimo, MINIMO_ACTUALIZANDO) {
             minimo.try_update_value(|m| *m = Some(h));
         }
     };
     Effect::new(move |_| {
         if pendiente.get() {
-            if !actualizando.get_untracked() {
+            if !ocupado.get_untracked() {
                 cancelar(umbral);
                 if let Ok(h) = set_timeout_with_handle(mostrar, UMBRAL_ACTUALIZANDO) {
                     umbral.set_value(Some(h));
@@ -385,9 +404,10 @@ fn aviso_actualizando(pendiente: RwSignal<bool>) -> RwSignal<bool> {
             }
         } else {
             cancelar(umbral);
-            // Visible y aún dentro del mínimo: lo quita el temporizador.
+            ocupado.set(false);
+            // El texto, dentro del mínimo, lo quita su temporizador.
             if minimo.with_value(Option::is_none) {
-                actualizando.set(false);
+                aviso.set(false);
             }
         }
     });
@@ -395,7 +415,7 @@ fn aviso_actualizando(pendiente: RwSignal<bool>) -> RwSignal<bool> {
         cancelar(umbral);
         cancelar(minimo);
     });
-    actualizando
+    Actualizando { ocupado, aviso }
 }
 
 /// Las tarjetas de un tema: lo esencial arriba; lo avanzado y lo oculto,
