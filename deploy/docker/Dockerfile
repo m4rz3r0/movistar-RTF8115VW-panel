@@ -6,7 +6,7 @@
 # o con deploy/docker/compose.yaml. Etapas:
 #   herramientas  Rust, cargo-leptos, wasm-bindgen-cli (la versión de
 #                 Cargo.lock) y binaryen (wasm-opt);
-#   compilacion   cargo leptos build --release;
+#   compilacion   cargo leptos build --release --precompress;
 #   router-sim    el router simulado (solo para el perfil «prueba» de Compose);
 #   panel         la imagen final (la de por defecto): debian:bookworm-slim,
 #                 usuario sin privilegios y los datos en el volumen /data.
@@ -58,7 +58,7 @@ COPY . .
 # copia fuera de la caché para la etapa siguiente.
 RUN --mount=type=cache,id=routerpanel-cargo,target=/usr/local/cargo/registry \
 	--mount=type=cache,id=routerpanel-target,target=/src/target \
-	cargo leptos build --release \
+	cargo leptos build --release --precompress \
 	&& mkdir -p /out \
 	&& cp target/release/panel /out/panel \
 	&& cp -r target/site /out/site

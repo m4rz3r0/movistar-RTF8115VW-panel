@@ -24,7 +24,7 @@ use std::{
     path::{Path as FsPath, PathBuf},
     sync::{
         Arc, Mutex, MutexGuard,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
@@ -49,6 +49,9 @@ pub struct SimConfig {
     pub capa: Option<PathBuf>,
     /// Dirección de escucha; `None` = `127.0.0.1` en un puerto libre.
     pub listen: Option<SocketAddr>,
+    /// Retardo de cada respuesta, como la latencia del router real (ver
+    /// [`SimControl::set_retardo`]); cero por defecto.
+    pub retardo: Duration,
 }
 
 impl SimConfig {
@@ -60,6 +63,7 @@ impl SimConfig {
             fixtures_dir: fixtures_dir.into(),
             capa: None,
             listen: None,
+            retardo: Duration::ZERO,
         }
     }
 
@@ -104,6 +108,7 @@ impl Sim {
             catalogo: Catalogo::load().expect("el catálogo de funciones carga"),
             wan,
             unresponsive: AtomicBool::new(false),
+            retardo_ms: AtomicU64::new(u64::try_from(cfg.retardo.as_millis()).unwrap_or(u64::MAX)),
             state: Mutex::new(SimState {
                 seed: SystemTime::now()
                     .duration_since(UNIX_EPOCH)
@@ -125,6 +130,7 @@ impl Sim {
             .route("/cgi-bin/te_logout.cgi", get(logout))
             .route("/cgi-bin/{file}", post(cgi).get(basic_cgi))
             .route("/{page}", get(page))
+            .route(RUTA_RETARDO, post(fijar_retardo))
             .layer(middleware::from_fn_with_state(
                 inner.clone(),
                 hang_if_unresponsive,
@@ -153,6 +159,14 @@ impl SimControl {
     /// Si `true`, el router deja de responder (las peticiones quedan colgadas).
     pub fn set_unresponsive(&self, on: bool) {
         self.inner.unresponsive.store(on, Ordering::SeqCst);
+    }
+
+    /// Retarda cada respuesta `retardo` (cero, sin retardo), como la latencia
+    /// del router real. También se cambia por HTTP: `POST /__sim/retardo`
+    /// con los milisegundos en el cuerpo (lo usa el e2e).
+    pub fn set_retardo(&self, retardo: Duration) {
+        let ms = u64::try_from(retardo.as_millis()).unwrap_or(u64::MAX);
+        self.inner.retardo_ms.store(ms, Ordering::SeqCst);
     }
 
     /// Caduca todas las sesiones (básicas y avanzadas).
@@ -331,6 +345,8 @@ struct Inner {
     /// Conexión a internet de las fixtures (ver [`wan_de_las_fixtures`]).
     wan: Option<String>,
     unresponsive: AtomicBool,
+    /// Retardo de cada respuesta en milisegundos (`set_retardo`).
+    retardo_ms: AtomicU64,
     state: Mutex<SimState>,
 }
 
@@ -600,11 +616,36 @@ fn has_basic(st: &SimState, c: &HashMap<String, String>) -> bool {
         .is_some_and(|id| st.basic.contains(id))
 }
 
+/// Cuelga las peticiones mientras el router «no responde» y retarda cada
+/// respuesta lo fijado con [`SimControl::set_retardo`] (salvo la del propio
+/// ajuste del retardo).
 async fn hang_if_unresponsive(State(s): State<Arc<Inner>>, req: Request, next: Next) -> Response {
     while s.unresponsive.load(Ordering::SeqCst) {
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
+    let ms = s.retardo_ms.load(Ordering::SeqCst);
+    if ms > 0 && req.uri().path() != RUTA_RETARDO {
+        tokio::time::sleep(Duration::from_millis(ms)).await;
+    }
     next.run(req).await
+}
+
+/// Ruta de control del retardo (no existe en el router real).
+const RUTA_RETARDO: &str = "/__sim/retardo";
+
+/// `POST /__sim/retardo` con los milisegundos en el cuerpo: fija el retardo
+/// de cada respuesta ([`SimControl::set_retardo`]).
+async fn fijar_retardo(State(s): State<Arc<Inner>>, body: Bytes) -> Response {
+    match std::str::from_utf8(&body)
+        .ok()
+        .and_then(|t| t.trim().parse::<u64>().ok())
+    {
+        Some(ms) => {
+            s.retardo_ms.store(ms, Ordering::SeqCst);
+            StatusCode::NO_CONTENT.into_response()
+        }
+        None => (StatusCode::BAD_REQUEST, "milisegundos").into_response(),
+    }
 }
 
 /// Como el micro_httpd del router real: un POST sin `Content-Length` (lo que
@@ -1395,6 +1436,7 @@ mod tests {
             catalogo: Catalogo::load().unwrap(),
             wan: None,
             unresponsive: AtomicBool::new(false),
+            retardo_ms: AtomicU64::new(0),
             state: Mutex::new(SimState::default()),
         }
     }

@@ -10,7 +10,8 @@ use std::net::Ipv4Addr;
 
 /// Radios WiFi que se leen si no se han detectado (2,4 y 5 GHz).
 pub const RADIOS_POR_DEFECTO: [&str; 2] = ["0", "1"];
-const POOL: [(&str, &str); 2] = [("rtm_cfg_dhcpv4_svr_pool_id", "0"), ("all", "ALL")];
+/// Parámetros de las lecturas del servidor DHCP (pool 0, todas las instancias).
+pub const POOL: [(&str, &str); 2] = [("rtm_cfg_dhcpv4_svr_pool_id", "0"), ("all", "ALL")];
 
 /// `cbGetSummary`.
 pub async fn summary(c: &Client) -> Result<Summary, Error> {
@@ -67,12 +68,17 @@ pub fn regla_por_defecto(n: &XmlNode) -> Option<String> {
 /// Dirección y máscara IPv4 del router en la LAN (`cbGetLanIPv4Addr`); `None`
 /// si no trae ninguna legible.
 pub async fn lan_ipv4(c: &Client) -> Result<Option<(Ipv4Addr, Ipv4Addr)>, Error> {
-    let n = c.call("cbGetLanIPv4Addr", &[]).await?;
-    Ok(n.all("rtm_cfg_ipv4_addr").into_iter().find_map(|a| {
+    Ok(lan_ipv4_de(&c.call("cbGetLanIPv4Addr", &[]).await?))
+}
+
+/// Dirección y máscara de una respuesta de `cbGetLanIPv4Addr` (ver
+/// [`lan_ipv4`]).
+pub fn lan_ipv4_de(n: &XmlNode) -> Option<(Ipv4Addr, Ipv4Addr)> {
+    n.all("rtm_cfg_ipv4_addr").into_iter().find_map(|a| {
         let ip = a.text_of("ipv4_addr")?.parse::<Ipv4Addr>().ok()?;
         let mask = a.text_of("ipv4_mask")?.parse::<Ipv4Addr>().ok()?;
         (!ip.is_unspecified()).then_some((ip, mask))
-    }))
+    })
 }
 
 /// `cbGetLanHostList`.

@@ -15,7 +15,7 @@ ajuste-sistema-hora-servidor_2-desc = Se usa si el primero no contesta. Puedes d
 ## Diagnóstico
 ajuste-sistema-diagnostico-titulo = Copia del tráfico para diagnóstico
 ajuste-sistema-diagnostico-desc = Copia todo lo que entra y sale de internet a una de las tomas de cable del router, para analizarlo con un ordenador.
-ajuste-sistema-diagnostico-ayuda = Sirve a técnicos para ver qué pasa por la conexión. Mientras está encendida, quien enchufe un aparato en esa toma puede ver todo el tráfico de tu casa hacia internet. Apágala en cuanto termines.
+ajuste-sistema-diagnostico-ayuda = Sirve a técnicos para ver qué pasa por la conexión. Mientras está encendida, quien enchufe un dispositivo en esa toma puede ver todo el tráfico de tu casa hacia internet. Apágala en cuanto termines.
 ajuste-sistema-diagnostico-espejo = Copia encendida
 ajuste-sistema-diagnostico-espejo-desc = Si la enciendes, la toma elegida recibe una copia de todo el tráfico de internet.
 ajuste-sistema-diagnostico-espejo-recomendado = Recomendado si no estás analizando la conexión con un técnico. A favor: nadie que se enchufe a esa toma puede ver lo que hace tu casa en internet. En contra: ninguno importante; enciéndela solo mientras haces un diagnóstico.

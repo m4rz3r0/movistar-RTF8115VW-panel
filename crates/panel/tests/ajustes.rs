@@ -1052,7 +1052,7 @@ async fn pagina_tema_sin_nombres_de_api_fuera_de_detalles() {
         .iter()
         .map(|n| regex::Regex::new(&format!(r"(?i)\b{}\b", regex::escape(n))).unwrap())
         .collect();
-    for tema in ["wifi", "puertos", "seguridad"] {
+    for tema in ["wifi", "puertos", "seguridad", "red_local"] {
         let ruta = format!("/ajustes/{tema}");
         let (status, _, html) = pagina(&p, &cookie, &ruta).await;
         assert_eq!(status, 200, "{ruta}: {html}");
@@ -1184,7 +1184,8 @@ async fn recomendacion_visible_en_el_resumen() {
     assert!(
         resumenes
             .iter()
-            .any(|r| r.contains("Recomendado si conectas tus aparatos escribiendo la contraseña")),
+            .any(|r| r
+                .contains("Recomendado si conectas tus dispositivos escribiendo la contraseña")),
         "{resumenes:#?}"
     );
     assert!(

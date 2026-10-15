@@ -54,6 +54,7 @@ pub(crate) use plan::{buscar, identidad};
 
 use crate::{
     crypto::HistoryKey,
+    lecturas::CacheLecturas,
     poller::PollerHandle,
     series,
     state::{AppState, RedActual},
@@ -329,6 +330,9 @@ struct Recursos {
     history_key: Arc<HistoryKey>,
     /// Conexión a internet que vigila la red de seguridad WAN.
     red: RedActual,
+    /// Caché de lecturas para mostrar: se invalida al verificar y al
+    /// terminar cada cambio (las escrituras ya la invalidan solas).
+    lecturas: Arc<CacheLecturas>,
 }
 
 impl Recursos {
@@ -382,6 +386,9 @@ impl Reserva {
 impl Drop for Reserva {
     fn drop(&mut self) {
         *lock(&self.m.activo) = None;
+        // Lo leído para mostrar durante el cambio pudo ser de antes de que
+        // el router lo aplicase.
+        self.m.state.lecturas.invalidar();
     }
 }
 
@@ -422,6 +429,7 @@ impl ChangeManager {
                 mascara: state.mascara,
                 poller: state.poller,
                 history_key: state.history_key,
+                lecturas: state.lecturas,
             },
             tiempos,
             pendientes: Mutex::new(HashMap::new()),
@@ -1233,6 +1241,14 @@ impl ChangeManager {
 
     /// ¿Muestra el router el lado `lado` del plan?
     async fn comprobar(&self, plan: &Plan, lado: Lado) -> Comprobacion {
+        let c = self.comprobar_en_el_router(plan, lado).await;
+        // El router puede aplicar una escritura un poco después de
+        // responder: lo leído para mostrar hasta ahora quizá sea de antes.
+        self.state.lecturas.invalidar();
+        c
+    }
+
+    async fn comprobar_en_el_router(&self, plan: &Plan, lado: Lado) -> Comprobacion {
         let f = &plan.funcion;
         let no_leido =
             |e: hgu::Error| Comprobacion::SinLectura(format!("no se puede releer el estado: {e}"));

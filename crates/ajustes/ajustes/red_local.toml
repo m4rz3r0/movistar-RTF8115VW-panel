@@ -1,4 +1,4 @@
-# Red local: aparatos conectados, IP fijas (reservas), reparto de
+# Red local: dispositivos conectados, IP fijas (reservas), reparto de
 # direcciones (DHCP) e IPv6 en casa. Pool DHCP 0: el de la red de casa.
 
 [[ajuste]]
@@ -34,6 +34,8 @@ id = "activa"
 escribe = { funcion = "cbDhcpV4SvrPoolSetStatic", parametro = "adm_state" }
 lee = "adm_state"
 tipo = "booleano"
+# Una reserva nueva nace activa (la plantilla parte del recomendado).
+recomendado = "true"
 
 [[ajuste]]
 id = "red_local.dhcp"

@@ -2,8 +2,23 @@
 
 ## Connected devices
 ajuste-red_local-dispositivos-titulo = Connected devices
-ajuste-red_local-dispositivos-desc = The devices the router knows on your home network, with their address and whether they are connected now.
-ajuste-red_local-dispositivos-ayuda = This list is only for reading: it changes nothing on the router. It tells you what is connected and lets you give a device a fixed IP.
+ajuste-red_local-dispositivos-desc = The devices the router knows on your home network: their name, their address and how they connect. With "Fix this IP", a device always gets the same address.
+ajuste-red_local-dispositivos-ayuda = Looking at this list changes nothing on the router. "Fix this IP" saves the address the device has now as its fixed IP (you'll see it under "Fixed IPs"); before applying it, it shows you the change. You can't block a device or set parental controls from here: the router doesn't give the panel a safe way to do it, and it's being looked into.
+ajuste-red_local-dispositivos-col-ip = IP address
+ajuste-red_local-dispositivos-col-mac = Physical address (MAC)
+ajuste-red_local-dispositivos-sin-nombre = No name
+ajuste-red_local-dispositivos-cable = Cable
+ajuste-red_local-dispositivos-wifi24 = 2.4 GHz WiFi
+ajuste-red_local-dispositivos-wifi5 = 5 GHz WiFi
+ajuste-red_local-dispositivos-invitados = Guest WiFi
+ajuste-red_local-dispositivos-desconocida = Unknown
+ajuste-red_local-dispositivos-desconectado = Not connected now
+ajuste-red_local-dispositivos-fijar = Fix this IP
+ajuste-red_local-dispositivos-fijar-de = Fix this IP: { $ip } ({ $equipo })
+ajuste-red_local-dispositivos-ya-fija = Already has a fixed IP: { $ip }
+ajuste-red_local-dispositivos-no-fijable = This IP can't be fixed
+ajuste-red_local-dispositivos-fijar-desconectado = Connect it to fix its IP
+ajuste-red_local-dispositivos-vacia = The router doesn't know any device on your network yet.
 
 ## Fixed IPs
 ajuste-red_local-reservas-titulo = Fixed IPs
@@ -15,6 +30,22 @@ ajuste-red_local-reservas-ip = IP address
 ajuste-red_local-reservas-ip-desc = The address the device will always have, inside your network (for example 192.168.1.60) and not already used by another device.
 ajuste-red_local-reservas-activa = Active
 ajuste-red_local-reservas-activa-desc = If you turn it off, the reservation is kept but the device goes back to getting any address.
+ajuste-red_local-reservas-activa-recomendado = Recommended if you want the device to have its fixed IP now. Pros: it gets it the next time it connects. Cons: nothing important; turn it off only to keep it for later without using it.
+ajuste-red_local-reservas-col-equipo = Device
+ajuste-red_local-reservas-col-acciones = Actions
+ajuste-red_local-reservas-anadir = Add fixed IP
+ajuste-red_local-reservas-nueva = New fixed IP
+ajuste-red_local-reservas-cambiar = Change the fixed IP
+ajuste-red_local-reservas-editar-de = Edit the fixed IP of { $equipo }
+ajuste-red_local-reservas-borrar = Delete
+ajuste-red_local-reservas-borrar-de = Delete the fixed IP of { $equipo }
+ajuste-red_local-reservas-vacia = There are no fixed IPs yet. Add one here or with "Fix this IP" in the device list.
+ajuste-red_local-reservas-error-fuera = That IP isn't on your network. It has to be on the same network as the router ({ $router }).
+ajuste-red_local-reservas-error-router = That's the router's IP: choose another one.
+ajuste-red_local-reservas-error-ip-repetida = That IP is already another device's fixed IP: choose another one.
+ajuste-red_local-reservas-error-mac-repetida = That device already has a fixed IP: change it in its row instead of adding another.
+ajuste-red_local-reservas-error-difusion = That IP belongs to the whole network (the first and last ones can't be given to a device): choose another one.
+ajuste-red_local-reservas-error-cambiada = That fixed IP has changed since you opened the page (maybe from another window). Reload the page and try again.
 
 ## Address handout (DHCP)
 ajuste-red_local-dhcp-titulo = Address handout (DHCP)

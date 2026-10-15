@@ -157,3 +157,15 @@ required-features = ["ssr"]
 [[test]]
 name = "ajustes_ida_y_vuelta"
 required-features = ["ssr"]
+
+[[test]]
+name = "ajustes_listas"
+required-features = ["ssr"]
+
+[[test]]
+name = "lecturas"
+required-features = ["ssr"]
+
+[[test]]
+name = "estaticos"
+required-features = ["ssr"]

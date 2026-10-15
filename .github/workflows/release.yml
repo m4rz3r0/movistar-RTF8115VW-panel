@@ -100,8 +100,9 @@ jobs:
           fi
       - name: Instalar cargo-leptos
         run: cargo install --locked cargo-leptos@0.3.11
+      # --precompress: el panel sirve el wasm, el JS y el CSS ya comprimidos.
       - name: Compilar
-        run: cargo leptos build --release
+        run: cargo leptos build --release --precompress
       - name: Empaquetar
         run: tools/empaquetar-release.sh "$VERSION" "$OBJETIVO" target/release/panel target/site dist
       # El mismo empaquetado, desplegado con actualizar-release.sh desde un

@@ -4,15 +4,18 @@
 //! lo deja como estaba) y, al final, los detalles técnicos plegados: lo
 //! único que nombra la API.
 //!
-//! Un ajuste que no se pudo leer muestra el motivo y no se edita. Uno con
-//! componente propio (reservas, puertos…) es por ahora un hueco con su
-//! título y descripción; una lista sin componente se ve como tabla.
+//! Un ajuste que no se pudo leer muestra el motivo y no se edita. Los
+//! dispositivos y las IP fijas tienen su componente ([`Dispositivos`],
+//! [`Reservas`]); otro componente propio (puertos…) es por ahora un hueco
+//! con su título y descripción; una lista sin componente se ve como tabla.
 
 use super::Foco;
 use super::campo::{
     Campo, cambiado, elegido, es_recomendado, etiqueta, inicial, texto_legible, validar,
     valor_resumido,
 };
+use super::dispositivos::Dispositivos;
+use super::reservas::Reservas;
 use crate::ajustes_router::{
     AjusteVista, CampoVista, DetallesTecnicos, EstadoLectura, GrupoVista, PeticionAjuste,
     preparar_ajuste,
@@ -27,7 +30,7 @@ use leptos::{ev::SubmitEvent, html, prelude::*, task::spawn_local};
 use std::collections::BTreeMap;
 
 /// Prefijo de los ids de la tarjeta en la página (`ajuste-wifi-red_24`).
-fn dom(a: &AjusteVista) -> String {
+pub(super) fn dom(a: &AjusteVista) -> String {
     format!("ajuste-{}", a.id.replace('.', "-"))
 }
 
@@ -78,7 +81,7 @@ fn riesgo(r: RiesgoCambio) -> AnyView {
 
 /// Cabecera común: título (enfocable, para volver a él tras guardar), nivel,
 /// riesgo si se puede cambiar, y la descripción corta.
-fn cabecera(a: &AjusteVista, editable: bool) -> impl IntoView + use<> {
+pub(super) fn cabecera(a: &AjusteVista, editable: bool) -> impl IntoView + use<> {
     let titulo_id = format!("{}-titulo", dom(a));
     view! {
         <header class="ajuste-cabecera">
@@ -93,7 +96,7 @@ fn cabecera(a: &AjusteVista, editable: bool) -> impl IntoView + use<> {
 }
 
 /// «¿Qué hace esto?»: la ayuda larga, plegada.
-fn ayuda(a: &AjusteVista) -> impl IntoView + use<> {
+pub(super) fn ayuda(a: &AjusteVista) -> impl IntoView + use<> {
     view! {
         <details class="ajuste-ayuda">
             <summary>{t!("ajustes-que-hace")}</summary>
@@ -104,7 +107,7 @@ fn ayuda(a: &AjusteVista) -> impl IntoView + use<> {
 
 /// Funciones y parámetros del router detrás del ajuste, plegados. Lo único
 /// de la página con nombres de la API.
-fn detalles_tecnicos(clave: &str, d: &DetallesTecnicos) -> impl IntoView + use<> {
+pub(super) fn detalles_tecnicos(clave: &str, d: &DetallesTecnicos) -> impl IntoView + use<> {
     let parametros = d
         .parametros
         .iter()
@@ -186,7 +189,12 @@ pub(crate) fn Tarjeta(
     #[prop(into)] recargar: Callback<()>,
 ) -> impl IntoView {
     let id_dom = dom(&a);
-    let cuerpo = if a.componente.is_some() {
+    // Los nombres de los componentes son los del catálogo (`Componente::slug`).
+    let cuerpo = if a.componente.as_deref() == Some(super::DISPOSITIVOS) {
+        view! { <Dispositivos a solo_lectura recargar /> }.into_any()
+    } else if a.componente.as_deref() == Some(super::RESERVAS) {
+        view! { <Reservas a solo_lectura recargar /> }.into_any()
+    } else if a.componente.is_some() {
         hueco(&a).into_any()
     } else if a.lista {
         lista(&a).into_any()
@@ -407,6 +415,7 @@ fn TarjetaAjuste(a: AjusteVista, solo_lectura: bool, recargar: Callback<()>) -> 
                 instancia: None,
                 borrar: false,
                 valores: pedir,
+                esperados: BTreeMap::new(),
             };
             spawn_local(async move {
                 match preparar_ajuste(p).await {

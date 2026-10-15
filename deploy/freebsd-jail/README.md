@@ -191,7 +191,8 @@ Si no hay acceso al repositorio, compila lo que ya tenga el clon.
    mucho 100 caracteres) y el commit, 7–40 cifras hexadecimales; si no, el
    actualizador registra el error y no hace nada (el nombre acaba en rutas
    que root borra).
-3. `cargo leptos build --release` (como `rpbuild`; si el
+3. `cargo leptos build --release --precompress` (como `rpbuild`; la web
+   sale también en `.br` y `.gz`, que el panel sirve ya comprimida; si el
    `Cargo.lock` pide otra versión de `wasm-bindgen`, instala antes
    `wasm-bindgen-cli` de esa versión), con prioridad baja y, si se fijó
    `TRABAJOS_COMPILACION` en la configuración, ese número de trabajos de

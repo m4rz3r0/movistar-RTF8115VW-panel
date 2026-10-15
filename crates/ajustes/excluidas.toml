@@ -181,7 +181,7 @@ motivo = "usuarios de la web del router: puede borrar el usuario con el que entr
 
 [[excluida]]
 funcion = "cbSetWifiWds"
-motivo = "enlace WiFi con otro punto de acceso (WDS): hay que configurar los dos aparatos a la vez"
+motivo = "enlace WiFi con otro punto de acceso (WDS): hay que configurar los dos dispositivos a la vez"
 
 [[excluida]]
 funcion = "cbSetNTPInfo"

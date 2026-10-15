@@ -1,7 +1,13 @@
 //! Estado compartido del servidor.
 
 use crate::{
-    changes, config::Config, crypto::HistoryKey, db, poller::PollerHandle, ui::charts::Zona,
+    changes,
+    config::Config,
+    crypto::HistoryKey,
+    db,
+    lecturas::{CADUCIDAD_LECTURAS, CacheLecturas},
+    poller::PollerHandle,
+    ui::charts::Zona,
 };
 use ajustes::CatalogoAjustes;
 use axum::extract::FromRef;
@@ -73,6 +79,9 @@ pub struct AppState {
     pub cfg: Arc<Config>,
     pub db: SqlitePool,
     pub hgu: hgu::Client,
+    /// Caché corta de las lecturas del router para pintar páginas (ver
+    /// [`crate::lecturas`]).
+    pub lecturas: Arc<CacheLecturas>,
     pub catalogo: Arc<Catalogo>,
     pub mascara: Arc<Mascara>,
     /// Catálogo de ajustes, ya comprobado contra `catalogo` y `mascara`
@@ -219,6 +228,7 @@ impl AppState {
         Ok(AppState {
             cfg: Arc::new(cfg),
             db,
+            lecturas: Arc::new(CacheLecturas::new(CADUCIDAD_LECTURAS)),
             hgu,
             catalogo: Arc::new(catalogo),
             mascara: Arc::new(mascara),

@@ -13,12 +13,13 @@
 # Pasos: trae el repositorio (REPO_URL) en la jail de compilación (usuario sin
 # privilegios rpbuild) con traer_ultima_etiqueta (deploy/lib/git.sh: nunca
 # hace merge, así que tolera un historial reescrito en el remoto); si la
-# última v* (sort -V) no es la desplegada, cargo leptos build
-# --release (solo compila: las pruebas se pasan en el equipo de desarrollo
-# antes de crear la etiqueta); copia binario y web a releases/<versión>;
-# cambia el enlace «current» de la jail del panel; reinicia el servicio y
-# espera a que /salud responda 200 (60 s como mucho). Si no responde, vuelve
-# a la versión anterior. Se conservan las 3 últimas versiones.
+# última v* (sort -V) no es la desplegada, cargo leptos build --release
+# --precompress (la web, también en .br y .gz; solo compila: las pruebas se
+# pasan en el equipo de desarrollo antes de crear la etiqueta); copia binario
+# y web a releases/<versión>; cambia el enlace «current» de la jail del panel;
+# reinicia el servicio y espera a que /salud responda 200 (60 s como mucho).
+# Si no responde, vuelve a la versión anterior. Se conservan las 3 últimas
+# versiones.
 #
 # Configuración: /usr/local/etc/routerpanel-actualizar.conf (JAILS_RAIZ,
 # JAIL_PANEL, JAIL_COMPILAR, REPO_URL; la escribe install.sh) y
@@ -269,10 +270,12 @@ build_release()
 		esac
 		renice -n 15 $$ >/dev/null 2>&1
 		# Solo se compila; las pruebas no corren aquí (se pasan antes de crear
-		# la etiqueta). Red de seguridad: un compilador colgado no deja el
+		# la etiqueta). --precompress: el panel sirve el wasm, el JS y el CSS
+		# ya comprimidos (con hash en el nombre y target/site/hash.txt, que va
+		# con la web). Red de seguridad: un compilador colgado no deja el
 		# actualizador esperando para siempre (con lockf, tampoco correría el
 		# siguiente); falla como cualquier error de compilación.
-		timeout -k 60 3600 cargo leptos build --release' "$TRABAJOS_COMPILACION" >>"$BUILD_LOG" 2>&1; then
+		timeout -k 60 3600 cargo leptos build --release --precompress' "$TRABAJOS_COMPILACION" >>"$BUILD_LOG" 2>&1; then
 		log "ERROR: falló la compilación de $_name (ver $BUILD_LOG)"
 		return 1
 	fi

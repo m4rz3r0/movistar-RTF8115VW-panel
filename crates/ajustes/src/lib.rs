@@ -15,7 +15,7 @@
 
 mod legible;
 mod modelo;
-pub use legible::{ErrorValor, Limites, validar_legible};
+pub use legible::{ErrorValor, Limites, mac as normalizar_mac, validar_legible};
 pub use modelo::{Nivel, Requiere, SIN_ELECCION, Tema, TipoCampo, ValorLegible};
 
 #[cfg(feature = "catalogo")]

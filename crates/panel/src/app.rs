@@ -17,7 +17,7 @@ use crate::ui::{
     vista::{provide_vista, vista_inicial},
 };
 use leptos::prelude::*;
-use leptos_meta::{Link, MetaTags, Stylesheet, Title, provide_meta_context};
+use leptos_meta::{HashedStylesheet, Link, MetaTags, Title, provide_meta_context};
 use leptos_router::{
     ParamSegment, StaticSegment,
     components::{Outlet, ParentRoute, Route, Router, Routes},
@@ -45,6 +45,7 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
                 <meta charset="utf-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
                 <AutoReload options=options.clone() />
+                <HashedStylesheet options=options.clone() id="leptos" />
                 <HydrationScripts options />
                 <MetaTags />
             </head>
@@ -81,7 +82,6 @@ pub fn App() -> impl IntoView {
     #[cfg(feature = "ssr")]
     leptos_router::components::provide_server_redirect(leptos_axum::redirect);
     view! {
-        <Stylesheet id="leptos" href="/pkg/panel.css" />
         // Las fuentes de títulos y texto, antes de que las pida la hoja.
         <Link rel="preload" href="/fonts/inter-var.woff2" as_="font" type_="font/woff2" crossorigin="anonymous" />
         <Link rel="preload" href="/fonts/chakra-petch-600.woff2" as_="font" type_="font/woff2" crossorigin="anonymous" />

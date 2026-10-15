@@ -1571,3 +1571,51 @@ async fn escritura_del_pool_dhcp_se_lee() {
         Some("0")
     );
 }
+
+#[tokio::test]
+async fn retardo_de_cada_respuesta() {
+    let mut cfg = SimConfig::new(USER, PASS, fixtures_dir());
+    cfg.retardo = Duration::from_millis(150);
+    let sim = Sim::start(cfg).await;
+    let c = client(&sim, Duration::from_secs(5));
+    c.call("cbGetSummary", &[]).await.unwrap();
+    let t = std::time::Instant::now();
+    c.call("cbGetSummary", &[]).await.unwrap();
+    assert!(
+        t.elapsed() >= Duration::from_millis(150),
+        "{:?}",
+        t.elapsed()
+    );
+    // Sin retardo, con el control del simulador…
+    sim.control.set_retardo(Duration::ZERO);
+    let t = std::time::Instant::now();
+    c.call("cbGetSummary", &[]).await.unwrap();
+    assert!(
+        t.elapsed() < Duration::from_millis(150),
+        "{:?}",
+        t.elapsed()
+    );
+    // …y con el de HTTP (el del e2e).
+    let addr = sim.base_url.trim_start_matches("http://").to_owned();
+    let resp = tokio::task::spawn_blocking(move || {
+        use std::io::{Read, Write};
+        let mut s = std::net::TcpStream::connect(addr).unwrap();
+        s.write_all(
+            b"POST /__sim/retardo HTTP/1.1\r\nHost: x\r\nContent-Length: 3\r\nConnection: close\r\n\r\n200",
+        )
+        .unwrap();
+        let mut resp = String::new();
+        s.read_to_string(&mut resp).unwrap();
+        resp
+    })
+    .await
+    .unwrap();
+    assert!(resp.starts_with("HTTP/1.1 204"), "{resp}");
+    let t = std::time::Instant::now();
+    c.call("cbGetSummary", &[]).await.unwrap();
+    assert!(
+        t.elapsed() >= Duration::from_millis(200),
+        "{:?}",
+        t.elapsed()
+    );
+}
