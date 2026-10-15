@@ -1,6 +1,6 @@
 [package]
 name = "catalogo"
-version = "0.2.5"
+version = "0.2.6"
 description = "Catálogo revisado de funciones del router Askey RTF8115VW y enmascarado de secretos"
 edition.workspace = true
 rust-version.workspace = true

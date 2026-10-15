@@ -1,6 +1,6 @@
 [package]
 name = "i18n"
-version = "0.2.5"
+version = "0.2.6"
 description = "Textos de la interfaz del panel en español e inglés (Fluent)"
 edition.workspace = true
 rust-version.workspace = true
