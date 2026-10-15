@@ -151,8 +151,8 @@ pub struct PeticionAjuste {
     pub valores: BTreeMap<String, String>,
     /// Lo que la página espera que tenga la instancia que edita o borra
     /// (id del campo → valor legible): si el router ya tiene otra cosa
-    /// (otra sesión la cambió), 409. Por ahora lo comprueban las reservas
-    /// (su MAC).
+    /// (otra sesión la cambió), 409. Por ahora lo comprueban las reservas,
+    /// que al editar o borrar exigen su MAC (sin ella, 400).
     #[serde(default)]
     pub esperados: BTreeMap<String, String>,
 }
@@ -1124,9 +1124,9 @@ pub(crate) mod servidor {
 
     /// Comprueba una reserva de `p` con lo que tiene ahora el router y
     /// devuelve el nombre de su dispositivo, si se conoce (para el resumen).
-    /// - Al editar o borrar, la reserva tiene que existir (400) y ser la que
-    ///   la página espera (`esperados`, su MAC; si no, 409: otra sesión la
-    ///   cambió).
+    /// - Al editar o borrar, la reserva tiene que existir (400), la página
+    ///   tiene que decir qué MAC espera (`esperados`; si no, 400) y tiene que
+    ///   ser esa (si no, 409: otra sesión la cambió).
     /// - Si hay que validarla ([`valida_la_reserva`]), como la página
     ///   ([`validar_reserva`]), con la red y las reservas del router; lo que
     ///   no se cambia es lo de la reserva. Una nueva necesita MAC e IP.
@@ -1149,13 +1149,19 @@ pub(crate) mod servidor {
                     .ok_or_else(|| fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-invalida")))?,
             ),
         };
-        if let (Some(r), Some(esperada)) = (actual, p.esperados.get("mac"))
-            && mac_comparable(&r.mac) != mac_comparable(esperada)
-        {
-            return Err(fallo(
-                StatusCode::CONFLICT,
-                t!("ajuste-red_local-reservas-error-cambiada"),
-            ));
+        // Al editar o borrar, la MAC que espera la página es obligatoria:
+        // sin ella no se sabe si la reserva sigue siendo la misma.
+        if let Some(r) = actual {
+            let esperada = p.esperados.get("mac").ok_or_else(|| {
+                tracing::warn!("ajustes: {}: editar o borrar sin la MAC esperada", a.id);
+                fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-invalida"))
+            })?;
+            if mac_comparable(&r.mac) != mac_comparable(esperada) {
+                return Err(fallo(
+                    StatusCode::CONFLICT,
+                    t!("ajuste-red_local-reservas-error-cambiada"),
+                ));
+            }
         }
         let valor = |campo: &str, de_la_reserva: Option<&str>| {
             p.valores

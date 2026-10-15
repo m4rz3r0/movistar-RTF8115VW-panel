@@ -99,6 +99,7 @@ ajustes-error-requiere = Hace falta elegirlo para «{ $campo }».
 ajustes-grupo-revisar = Revisa el cambio
 ajustes-grupo-deshacer-titulo = Volver a como estaba
 ajustes-grupo-intro = Esto es lo que va a cambiar en el router.
+ajustes-grupo-ajuste-detalle = { $ajuste }: { $detalle }
 ajustes-grupo-paso = Paso { $n }
 ajustes-grupo-pasos-desc = Desmarca un paso si no quieres aplicarlo ahora.
 ajustes-grupo-ya-esta = Ya está así

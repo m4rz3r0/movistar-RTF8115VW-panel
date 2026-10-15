@@ -86,7 +86,7 @@ fn mac_repetida() {
     for mac in [
         "02:00:00:00:00:04",
         "02-00-00-00-00-04",
-        "02:00:00:00:00:04",
+        " 02-00-00-00-00-04 ",
     ] {
         let r = validar_reserva(mac, ip("192.168.1.90"), LAN, &existentes(), None);
         assert_eq!(r, Err(ErrorReserva::MacRepetida), "{mac}");
@@ -182,7 +182,9 @@ async fn reservas(p: &Panel, cookie: &str) -> Vec<(String, String, String)> {
         .collect()
 }
 
-/// `preparar_ajuste` de las reservas: estado y cuerpo.
+/// `preparar_ajuste` de las reservas: estado y cuerpo. Al editar o borrar,
+/// envía como la página la MAC que tiene ahora la reserva en el router (si
+/// existe).
 async fn preparar(
     p: &Panel,
     cookie: &str,
@@ -190,6 +192,13 @@ async fn preparar(
     borrar: bool,
     valores: Value,
 ) -> (u16, String) {
+    let mut esperados = json!({});
+    if let Some(id) = instancia {
+        let actuales = hgu::read::static_leases(&p.state.hgu).await.unwrap();
+        if let Some(r) = actuales.iter().find(|r| r.id == id) {
+            esperados = json!({ "mac": r.mac });
+        }
+    }
     llamar(
         p,
         "preparar_ajuste",
@@ -198,6 +207,7 @@ async fn preparar(
             "instancia": instancia,
             "borrar": borrar,
             "valores": valores,
+            "esperados": esperados,
         } }),
         Some(cookie),
     )
@@ -747,5 +757,30 @@ async fn reserva_inexistente_o_de_difusion_da_400() {
     .await;
     assert_eq!(status, 400, "{body}");
     assert!(body.contains("es de toda la red"), "{body}");
+    assert!(p.sim.control.writes().is_empty());
+}
+
+/// Editar o borrar una reserva exige la MAC que la página espera: sin
+/// ella, el servidor no puede saber si la reserva sigue siendo la misma
+/// (400, nada escrito).
+#[tokio::test]
+async fn editar_o_borrar_sin_mac_esperada_da_400() {
+    let (p, cookie) = panel_con_gestor().await;
+    for (borrar, valores) in [(true, json!({})), (false, json!({ "activa": "false" }))] {
+        let (status, body) = llamar(
+            &p,
+            "preparar_ajuste",
+            json!({ "p": {
+                "ajuste": "red_local.reservas",
+                "instancia": "1",
+                "borrar": borrar,
+                "valores": valores,
+            } }),
+            Some(&cookie),
+        )
+        .await;
+        assert_eq!(status, 400, "borrar={borrar}: {body}");
+        assert!(body.contains("no ha podido preparar"), "{body}");
+    }
     assert!(p.sim.control.writes().is_empty());
 }

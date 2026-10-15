@@ -99,6 +99,7 @@ ajustes-error-requiere = You need to choose this for “{ $campo }”.
 ajustes-grupo-revisar = Review the change
 ajustes-grupo-deshacer-titulo = Put it back as it was
 ajustes-grupo-intro = This is what will change on the router.
+ajustes-grupo-ajuste-detalle = { $ajuste }: { $detalle }
 ajustes-grupo-paso = Step { $n }
 ajustes-grupo-pasos-desc = Untick a step if you don't want to apply it now.
 ajustes-grupo-ya-esta = Already like that

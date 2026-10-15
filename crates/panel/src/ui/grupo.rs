@@ -286,7 +286,11 @@ pub fn DialogoGrupo(
         grupo.with(|g| {
             let titulo = traducir(&g.titulo, None);
             match &g.detalle {
-                Some(d) => format!("{titulo}: {d}"),
+                Some(d) => t!(
+                    "ajustes-grupo-ajuste-detalle",
+                    ajuste = titulo,
+                    detalle = d.clone()
+                ),
                 None => titulo,
             }
         })
