@@ -107,23 +107,47 @@ done
 INSTALL=$DEPLOY/freebsd-jail/install.sh
 awk '/^plantillas_de_root\(\)/ {d=1} d {print} d && /^}/ {exit}' "$INSTALL" >"$TMP/pdr.sh"
 [ -s "$TMP/pdr.sh" ] || fallo "install.sh no define plantillas_de_root"
-for modo in ok falla; do
-	rm -f "$TMP/ruta" "$TMP/modo"
-	(
-		. "$TMP/pdr.sh"
-		die() { echo "$*" >&2; exit 1; }
-		generar_plantillas() { echo secreto >"$1/jail.conf"; }
-		TMPDIR=$TMP
-		plantillas_de_root
-		printf '%s\n' "$PLANTILLAS" >"$TMP/ruta"
-		ls -ld "$PLANTILLAS" | cut -c1-10 >"$TMP/modo"
-		[ "$modo" = ok ] || exit 3
-	) || [ "$modo" = falla ] || fallo "plantillas_de_root ($modo) falla"
+# El temporal es siempre /tmp/routerpanel-plantillas.*, aunque TMPDIR apunte
+# a otro sitio (aquí, dentro de deploy/): en producción no hay variable que
+# desvíe la ruta. Cada modo termina de una forma y el temporal debe borrarse.
+cat >"$TMP/drv.sh" <<'DRV'
+. "$1"
+die() { echo "$2" >&2; exit 1; }
+set -eu
+PLANTILLAS=
+generar_plantillas() { echo secreto >"$1/jail.conf"; }
+modo=$2
+[ "$modo" != mktemp ] || mktemp() { return 1; }
+plantillas_de_root
+printf '%s\n' "$PLANTILLAS" >"$3"
+ls -ld "$PLANTILLAS" | cut -c1-10 >"$3.modo"
+case $modo in
+ok) ;;
+falla) exit 3 ;;
+diez) exit 10 ;;
+doble) plantillas_de_root ;;
+hup) kill -HUP $$ ;;
+int) kill -INT $$ ;;
+term) kill -TERM $$ ;;
+esac
+DRV
+sed -i 's/^die() .*/die() { echo "ERROR: $*" >\&2; exit 1; }/' "$TMP/drv.sh"
+for par in ok:0 falla:3 diez:10 doble:1 hup:1 int:1 term:1 mktemp:1; do
+	modo=${par%:*}
+	esperado=${par#*:}
+	rm -f "$TMP/ruta" "$TMP/ruta.modo"
+	rc=0
+	TMPDIR=$DEPLOY sh "$TMP/drv.sh" "$TMP/pdr.sh" "$modo" "$TMP/ruta" >/dev/null 2>&1 || rc=$?
+	[ "$rc" = "$esperado" ] || fallo "plantillas_de_root ($modo): sale con $rc, no con $esperado"
+	if [ "$modo" = mktemp ]; then
+		[ ! -e "$TMP/ruta" ] || fallo "plantillas_de_root (mktemp falla): sigue adelante"
+		continue
+	fi
 	ruta=$(cat "$TMP/ruta" 2>/dev/null || true)
 	[ -n "$ruta" ] || { fallo "plantillas_de_root ($modo) no fija PLANTILLAS"; continue; }
-	[ ! -e "$ruta" ] || fallo "plantillas_de_root ($modo): el temporal no se borra al salir"
-	[ "$(cat "$TMP/modo")" = drwx------ ] || fallo "plantillas_de_root ($modo): el temporal no es 0700"
-	case $ruta in "$DEPLOY"/*) fallo "plantillas_de_root: el temporal está dentro de deploy/" ;; esac
+	[ ! -e "$ruta" ] || { fallo "plantillas_de_root ($modo): el temporal no se borra al salir"; rm -rf "$ruta"; }
+	[ "$(cat "$TMP/ruta.modo")" = drwx------ ] || fallo "plantillas_de_root ($modo): el temporal no es 0700"
+	case $ruta in /tmp/routerpanel-plantillas.*) ;; *) fallo "plantillas_de_root ($modo): ruta fuera de /tmp ($ruta)" ;; esac
 done
 for f in servidor pf_cargar; do
 	cuerpo=$(awk -v f="$f" '$0 == f "()" {d=1; next} d && /^}/ {exit} d {print}' "$INSTALL")

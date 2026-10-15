@@ -476,15 +476,19 @@ aviso_asistente()
 }
 
 # Genera las plantillas en un temporal propio de root (mktemp -d: 0700) y lo
-# borra al salir, también si algo falla. No se generan dentro de
-# ~/routerpanel-deploy: lo que crea root ahí no lo puede borrar el usuario en
-# la subida siguiente. Solo la usan las ramas que corren como root y generan
-# plantillas (servidor y pf_cargar); pf_confirmar y comprobar_red no las usan.
+# borra al salir, también si algo falla o llega HUP, INT o TERM (salida 1).
+# La ruta es fija en /tmp: no se hereda TMPDIR, que podría apuntar a una
+# carpeta del usuario. No se generan dentro de ~/routerpanel-deploy: lo que
+# crea root ahí no lo puede borrar el usuario en la subida siguiente. Solo la
+# usan las ramas que corren como root y generan plantillas (servidor y
+# pf_cargar); pf_confirmar y comprobar_red no las usan. Se llama una sola vez.
 plantillas_de_root()
 {
-	PLANTILLAS=$(mktemp -d "${TMPDIR:-/tmp}/routerpanel-plantillas.XXXXXX") ||
+	[ -z "$PLANTILLAS" ] || die "plantillas_de_root: ya se llamó antes"
+	PLANTILLAS=$(mktemp -d /tmp/routerpanel-plantillas.XXXXXX) ||
 		die "no puedo crear el directorio temporal de las plantillas"
 	trap 'rm -rf "$PLANTILLAS"' EXIT
+	trap 'exit 1' HUP INT TERM
 	generar_plantillas "$PLANTILLAS"
 }
 
