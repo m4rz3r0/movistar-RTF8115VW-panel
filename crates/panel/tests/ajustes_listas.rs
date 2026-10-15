@@ -784,3 +784,435 @@ async fn editar_o_borrar_sin_mac_esperada_da_400() {
     }
     assert!(p.sim.control.writes().is_empty());
 }
+
+// =========================================== Tarea 10: apertura de puertos
+
+use panel::ajustes_router::{
+    DispositivoVista, ErrorRegla, Protocolo, ReglaPuertos, destino_inexistente, validar_regla,
+};
+
+fn dispositivo(ip: &str, activo: bool) -> DispositivoVista {
+    DispositivoVista {
+        nombre: "host-2".into(),
+        ip: ip.into(),
+        mac: "02:00:00:00:00:03".into(),
+        conexion: panel::ajustes_router::Conexion::Desconocida,
+        activo,
+        reserva: None,
+        ip_fija: None,
+    }
+}
+
+#[test]
+fn destino_de_un_dispositivo_o_de_una_ip_fija_existe() {
+    let d = [
+        dispositivo("192.168.1.62", true),
+        dispositivo("192.168.1.61", false),
+    ];
+    let r = existentes();
+    assert!(!destino_inexistente("192.168.1.62", &d, &r), "conectado");
+    assert!(!destino_inexistente("192.168.1.61", &d, &r), "desconectado");
+    assert!(!destino_inexistente("192.168.1.69", &d, &r), "IP fija");
+    assert!(
+        !destino_inexistente(" 192.168.1.68 ", &[], &r),
+        "con espacios"
+    );
+    assert!(destino_inexistente("192.168.1.75", &d, &r), "de nadie");
+    assert!(destino_inexistente("192.168.1.75", &[], &[]), "sin nada");
+}
+
+fn regla(id: Option<&str>, protocolo: Protocolo, externo: (u16, u16)) -> ReglaPuertos {
+    ReglaPuertos {
+        id: id.map(str::to_owned),
+        nombre: "Consola".into(),
+        protocolo,
+        externo,
+        interno: externo,
+        ip: ip("192.168.1.62"),
+        activa: true,
+    }
+}
+
+/// Las reglas del router de las pruebas: 8080 TCP y 3074–3075 UDP.
+fn reglas_existentes() -> Vec<ReglaPuertos> {
+    vec![
+        regla(Some("0"), Protocolo::Tcp, (8080, 8080)),
+        regla(Some("1"), Protocolo::Udp, (3074, 3075)),
+    ]
+}
+
+#[test]
+fn regla_valida() {
+    let e = reglas_existentes();
+    for r in [
+        regla(None, Protocolo::Tcp, (9000, 9000)),
+        regla(None, Protocolo::Udp, (8080, 8080)),
+        regla(None, Protocolo::Tcp, (3074, 3075)),
+        regla(None, Protocolo::Ambos, (9000, 9010)),
+    ] {
+        assert_eq!(validar_regla(&r, &e, LAN), Ok(()), "{r:?}");
+    }
+    // Otro puerto interno del mismo tamaño.
+    let mut r = regla(None, Protocolo::Tcp, (9000, 9001));
+    r.interno = (80, 81);
+    assert_eq!(validar_regla(&r, &e, LAN), Ok(()));
+}
+
+#[test]
+fn puerto_cero() {
+    let r = regla(None, Protocolo::Tcp, (0, 10));
+    assert_eq!(validar_regla(&r, &[], LAN), Err(ErrorRegla::PuertoCero));
+    let mut r = regla(None, Protocolo::Tcp, (10, 10));
+    r.interno = (0, 0);
+    assert_eq!(validar_regla(&r, &[], LAN), Err(ErrorRegla::PuertoCero));
+}
+
+#[test]
+fn rango_invertido() {
+    let r = regla(None, Protocolo::Tcp, (9010, 9000));
+    assert_eq!(validar_regla(&r, &[], LAN), Err(ErrorRegla::RangoInvertido));
+    let mut r = regla(None, Protocolo::Tcp, (9000, 9000));
+    r.interno = (90, 80);
+    assert_eq!(validar_regla(&r, &[], LAN), Err(ErrorRegla::RangoInvertido));
+}
+
+#[test]
+fn rangos_distintos() {
+    let mut r = regla(None, Protocolo::Tcp, (9000, 9010));
+    r.interno = (9000, 9005);
+    assert_eq!(
+        validar_regla(&r, &[], LAN),
+        Err(ErrorRegla::RangosDistintos)
+    );
+}
+
+#[test]
+fn solapa() {
+    let e = reglas_existentes();
+    for r in [
+        regla(None, Protocolo::Tcp, (8080, 8080)),
+        regla(None, Protocolo::Tcp, (8000, 8080)),
+        regla(None, Protocolo::Udp, (3075, 3080)),
+        regla(None, Protocolo::Ambos, (8080, 8080)),
+        regla(None, Protocolo::Ambos, (3070, 3074)),
+        // Editar la 1 con los puertos de la 0.
+        regla(Some("1"), Protocolo::Tcp, (8080, 8080)),
+    ] {
+        assert_eq!(validar_regla(&r, &e, LAN), Err(ErrorRegla::Solapa), "{r:?}");
+    }
+    // Editar la 0 sin cambiar sus puertos no se solapa consigo misma.
+    let r = regla(Some("0"), Protocolo::Tcp, (8080, 8080));
+    assert_eq!(validar_regla(&r, &e, LAN), Ok(()));
+}
+
+#[test]
+fn fuera_de_la_red_regla() {
+    for otra in ["192.0.2.10", "192.168.1.1", "192.168.1.0"] {
+        let mut r = regla(None, Protocolo::Tcp, (9000, 9000));
+        r.ip = ip(otra);
+        assert_eq!(
+            validar_regla(&r, &[], LAN),
+            Err(ErrorRegla::FueraDeLaRed),
+            "{otra}"
+        );
+    }
+    // La última dirección es de toda la red (en una red de documentación).
+    let doc = (Ipv4Addr::new(192, 0, 2, 1), Ipv4Addr::new(255, 255, 255, 0));
+    let mut r = regla(None, Protocolo::Tcp, (9000, 9000));
+    r.ip = ip("192.0.2.255");
+    assert_eq!(validar_regla(&r, &[], doc), Err(ErrorRegla::FueraDeLaRed));
+    r.ip = ip("192.0.2.254");
+    assert_eq!(validar_regla(&r, &[], doc), Ok(()));
+}
+
+// ------------------------------------------------- puertos en el simulador
+
+/// Reglas de `leer_tema` como `(id, nombre, protocolo, externo_desde,
+/// destino)`.
+async fn reglas_del_tema(p: &Panel, cookie: &str) -> Vec<[String; 5]> {
+    let tema = ok(p, "leer_tema", json!({ "tema": "puertos" }), cookie).await;
+    let a = tema["ajustes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| a["id"] == "puertos.reglas")
+        .unwrap()
+        .clone();
+    assert_eq!(a["estado"], "Leido", "{a}");
+    let valor = |i: &Value, campo: &str| {
+        let c = i["campos"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["id"] == campo)
+            .unwrap();
+        let v = &c["valor"];
+        v["Texto"]
+            .as_str()
+            .or(v["Opcion"].as_str())
+            .unwrap_or_default()
+            .to_owned()
+    };
+    a["instancias"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| {
+            [
+                i["id"].as_str().unwrap().to_owned(),
+                valor(i, "nombre"),
+                valor(i, "protocolo"),
+                valor(i, "externo_desde"),
+                valor(i, "destino"),
+            ]
+        })
+        .collect()
+}
+
+async fn preparar_regla(
+    p: &Panel,
+    cookie: &str,
+    instancia: Option<&str>,
+    borrar: bool,
+    valores: Value,
+    esperados: Value,
+) -> (u16, String) {
+    llamar(
+        p,
+        "preparar_ajuste",
+        json!({ "p": {
+            "ajuste": "puertos.reglas",
+            "instancia": instancia,
+            "borrar": borrar,
+            "valores": valores,
+            "esperados": esperados,
+        } }),
+        Some(cookie),
+    )
+    .await
+}
+
+/// Una regla nueva completa hacia host-2 (192.168.1.62).
+fn nueva(protocolo: &str, puerto: &str) -> Value {
+    json!({
+        "nombre": "Consola",
+        "protocolo": protocolo,
+        "externo_desde": puerto,
+        "externo_hasta": puerto,
+        "destino": "192.168.1.62",
+        "interno_desde": puerto,
+        "interno_hasta": puerto,
+        "activa": "true",
+    })
+}
+
+/// Lo que identifica la regla 0 de las fixtures (8080 TCP a .75).
+fn esperados_0() -> Value {
+    json!({ "protocolo": "tcp", "externo_desde": "8080", "destino": "192.168.1.75" })
+}
+
+#[tokio::test]
+async fn abrir_puerto_y_deshacer() {
+    let (p, cookie) = panel_con_gestor().await;
+    let antes = reglas_del_tema(&p, &cookie).await;
+    let (status, body) =
+        preparar_regla(&p, &cookie, None, false, nueva("tcp", "9000"), json!({})).await;
+    assert_eq!(status, 200, "{body}");
+    let g: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(g["titulo"], "ajuste-puertos-reglas-titulo");
+    assert_eq!(g["detalle"], "Consola", "{g}");
+    assert_eq!(g["pasos"].as_array().unwrap().len(), 1, "{g}");
+    let id = aplicar(&p, &cookie, &g).await;
+    let ahora = reglas_del_tema(&p, &cookie).await;
+    assert_eq!(ahora.len(), antes.len() + 1, "{ahora:?}");
+    let n = ahora
+        .iter()
+        .find(|r| r[3] == "9000")
+        .expect("la regla nueva");
+    assert_eq!(n[1..], ["Consola", "tcp", "9000", "192.168.1.62"]);
+    deshacer(&p, &cookie, id).await;
+    assert_eq!(reglas_del_tema(&p, &cookie).await, antes);
+}
+
+/// «Ambos»: dos reglas (TCP y UDP) en un único grupo, con un solo diálogo y
+/// un solo deshacer que borra las dos.
+#[tokio::test]
+async fn abrir_puerto_en_ambos_es_un_grupo_y_un_deshacer() {
+    let (p, cookie) = panel_con_gestor().await;
+    let antes = reglas_del_tema(&p, &cookie).await;
+    let (status, body) =
+        preparar_regla(&p, &cookie, None, false, nueva("ambos", "9000"), json!({})).await;
+    assert_eq!(status, 200, "{body}");
+    let g: Value = serde_json::from_str(&body).unwrap();
+    let pasos = g["pasos"].as_array().unwrap();
+    assert_eq!(pasos.len(), 2, "{g}");
+    let protocolo = |paso: &Value| {
+        paso["campos"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["campo"] == "ajuste-puertos-reglas-protocolo")
+            .map(|c| c["despues"].clone())
+    };
+    assert_eq!(protocolo(&pasos[0]), Some(json!("tcp")), "{g}");
+    assert_eq!(protocolo(&pasos[1]), Some(json!("udp")), "{g}");
+    let id = aplicar(&p, &cookie, &g).await;
+    let ahora = reglas_del_tema(&p, &cookie).await;
+    let nuevas: Vec<&[String; 5]> = ahora.iter().filter(|r| r[3] == "9000").collect();
+    assert_eq!(nuevas.len(), 2, "{ahora:?}");
+    assert!(nuevas.iter().any(|r| r[2] == "tcp") && nuevas.iter().any(|r| r[2] == "udp"));
+    assert_ne!(nuevas[0][0], nuevas[1][0], "dos instancias distintas");
+    deshacer(&p, &cookie, id).await;
+    assert_eq!(reglas_del_tema(&p, &cookie).await, antes);
+}
+
+/// Una regla que abre un puerto que ya abre otra con el mismo protocolo no
+/// se prepara (400, junto al campo y en el idioma) y no escribe nada. Con
+/// el otro protocolo, sí.
+#[tokio::test]
+async fn regla_solapada_da_400() {
+    let (p, cookie) = panel_con_gestor().await;
+    for protocolo in ["tcp", "ambos"] {
+        let (status, body) = preparar_regla(
+            &p,
+            &cookie,
+            None,
+            false,
+            nueva(protocolo, "8080"),
+            json!({}),
+        )
+        .await;
+        assert_eq!(status, 400, "{protocolo}: {body}");
+        assert!(body.contains("ya está abierto"), "{body}");
+    }
+    let en = format!("{cookie}; rp_lang=en");
+    let (status, body) =
+        preparar_regla(&p, &en, None, false, nueva("tcp", "8080"), json!({})).await;
+    assert_eq!(status, 400, "{body}");
+    assert!(body.contains("already open"), "{body}");
+    // Fuera de la red y rango al revés.
+    let mut fuera = nueva("tcp", "9000");
+    fuera["destino"] = json!("192.0.2.10");
+    let (status, body) = preparar_regla(&p, &cookie, None, false, fuera, json!({})).await;
+    assert_eq!(status, 400, "{body}");
+    assert!(
+        body.contains("no es la de un dispositivo de tu red"),
+        "{body}"
+    );
+    let mut al_reves = nueva("tcp", "9000");
+    al_reves["externo_hasta"] = json!("8990");
+    al_reves["interno_hasta"] = json!("8990");
+    let (status, body) = preparar_regla(&p, &cookie, None, false, al_reves, json!({})).await;
+    assert_eq!(status, 400, "{body}");
+    assert!(body.contains("menor"), "{body}");
+    // A una nueva no le puede faltar el destino.
+    let mut sin_destino = nueva("tcp", "9000");
+    sin_destino.as_object_mut().unwrap().remove("destino");
+    let (status, body) = preparar_regla(&p, &cookie, None, false, sin_destino, json!({})).await;
+    assert_eq!(status, 400, "{body}");
+    assert!(p.sim.control.writes().is_empty());
+    // Con UDP no choca.
+    let (status, body) =
+        preparar_regla(&p, &cookie, None, false, nueva("udp", "8080"), json!({})).await;
+    assert_eq!(status, 200, "{body}");
+}
+
+/// Editar o borrar una regla exige lo que la identifica (protocolo, puerto
+/// de internet y destino): sin ello, 400; si el router ya tiene otra cosa,
+/// 409; nada escrito. «Ambos» solo vale al crear.
+#[tokio::test]
+async fn editar_o_borrar_regla_con_esperados() {
+    let (p, cookie) = panel_con_gestor().await;
+    for borrar in [true, false] {
+        let valores = if borrar {
+            json!({})
+        } else {
+            json!({ "activa": "false" })
+        };
+        let (status, body) =
+            preparar_regla(&p, &cookie, Some("0"), borrar, valores.clone(), json!({})).await;
+        assert_eq!(status, 400, "sin esperados, borrar={borrar}: {body}");
+        let (status, body) = preparar_regla(
+            &p,
+            &cookie,
+            Some("0"),
+            borrar,
+            valores.clone(),
+            json!({ "protocolo": "tcp", "externo_desde": "8080" }),
+        )
+        .await;
+        assert_eq!(status, 400, "a medias, borrar={borrar}: {body}");
+        let (status, body) = preparar_regla(
+            &p,
+            &cookie,
+            Some("0"),
+            borrar,
+            valores.clone(),
+            json!({ "protocolo": "tcp", "externo_desde": "8081", "destino": "192.168.1.75" }),
+        )
+        .await;
+        assert_eq!(status, 409, "otra, borrar={borrar}: {body}");
+        assert!(body.contains("ha cambiado"), "{body}");
+    }
+    let (status, body) = preparar_regla(
+        &p,
+        &cookie,
+        Some("0"),
+        false,
+        json!({ "protocolo": "ambos" }),
+        esperados_0(),
+    )
+    .await;
+    assert_eq!(status, 400, "ambos al editar: {body}");
+    let (status, body) =
+        preparar_regla(&p, &cookie, Some("77"), true, json!({}), esperados_0()).await;
+    assert_eq!(status, 400, "no existe: {body}");
+    assert!(p.sim.control.writes().is_empty());
+    // Con lo que tiene, sí; y desactivarla no la valida (su destino ya no
+    // está, pero eso no impide apagarla).
+    let (status, body) =
+        preparar_regla(&p, &cookie, Some("0"), true, json!({}), esperados_0()).await;
+    assert_eq!(status, 200, "{body}");
+    let (status, body) = preparar_regla(
+        &p,
+        &cookie,
+        Some("0"),
+        false,
+        json!({ "activa": "false" }),
+        esperados_0(),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+}
+
+/// La regla de las fixtures va a 192.168.1.75, que no es de ningún
+/// dispositivo ni de ninguna IP fija: la página lo avisa.
+#[tokio::test]
+async fn aviso_destino_inexistente_en_la_pagina() {
+    let p = common::panel().await;
+    let cookie = sesion(&p).await;
+    let resp = common::get_con_cookie(&p.app, "/ajustes/puertos", &cookie).await;
+    assert_eq!(resp.status(), 200);
+    let html = common::body_text(resp).await;
+    assert!(
+        html.contains("el dispositivo de destino ya no está en la red"),
+        "{html}"
+    );
+    assert!(!html.contains("todavía no está lista"), "{html}");
+    assert!(html.contains("Abrir un puerto"), "{html}");
+}
+
+#[tokio::test]
+async fn leer_reservas_de_la_cache() {
+    let (p, cookie) = panel_con_gestor().await;
+    let r = ok(&p, "leer_reservas", json!({}), &cookie).await;
+    assert_eq!(
+        r,
+        json!([
+            ["0", "02:00:00:00:00:04", "192.168.1.68"],
+            ["1", "02:00:00:00:00:01", "192.168.1.69"]
+        ])
+    );
+    let (status, _) = llamar(&p, "leer_reservas", json!({}), None).await;
+    assert_eq!(status, 401);
+}

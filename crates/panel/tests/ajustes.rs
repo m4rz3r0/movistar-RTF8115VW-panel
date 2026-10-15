@@ -466,9 +466,10 @@ async fn plantilla_de_lista_sin_desconocidos() {
         campo(reglas, "protocolo")["valor"],
         json!({ "Opcion": "tcp" })
     );
+    // Una regla nueva nace activa (su recomendado).
     assert_eq!(
         campo(reglas, "activa")["valor"],
-        json!({ "Booleano": false })
+        json!({ "Booleano": true })
     );
     assert_eq!(campo(reglas, "nombre")["valor"], json!({ "Texto": "" }));
     assert_eq!(campo(reglas, "destino")["valor"], json!({ "Texto": "" }));
@@ -1045,7 +1046,10 @@ const FORMAS_CORRIENTES: [&str; 9] = [
 
 #[tokio::test]
 async fn pagina_tema_sin_nombres_de_api_fuera_de_detalles() {
-    let (p, cookie) = panel_con_gestor().await;
+    // La regla de puertos de las fixtures se llama «desc-1» (el seudónimo
+    // del simulador), que se lee como el parámetro `desc`: aquí lleva otro
+    // nombre que el simulador admite («Default»), que no es de la API.
+    let (p, cookie) = common::panel_con_gestor_y_capa(&variante("puertos-nombre")).await;
     let funcion = regex::Regex::new(r"\bcb[A-Z]\w+").unwrap();
     let pagina_api = regex::Regex::new(r"\bte_\w+\.(asp|cmd|cgi|wl)\b").unwrap();
     let parametros: Vec<regex::Regex> = parametros_del_catalogo()

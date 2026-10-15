@@ -5,9 +5,10 @@
 //! único que nombra la API.
 //!
 //! Un ajuste que no se pudo leer muestra el motivo y no se edita. Los
-//! dispositivos y las IP fijas tienen su componente ([`Dispositivos`],
-//! [`Reservas`]); otro componente propio (puertos…) es por ahora un hueco
-//! con su título y descripción; una lista sin componente se ve como tabla.
+//! dispositivos, las IP fijas y los puertos abiertos tienen su componente
+//! ([`Dispositivos`], [`Reservas`], [`Puertos`]); otro componente propio (la
+//! contraseña del router) es por ahora un hueco con su título y
+//! descripción; una lista sin componente se ve como tabla.
 
 use super::Foco;
 use super::campo::{
@@ -15,6 +16,7 @@ use super::campo::{
     valor_resumido,
 };
 use super::dispositivos::Dispositivos;
+use super::puertos::Puertos;
 use super::reservas::Reservas;
 use crate::ajustes_router::{
     AjusteVista, CampoVista, DetallesTecnicos, EstadoLectura, GrupoVista, PeticionAjuste,
@@ -194,6 +196,8 @@ pub(crate) fn Tarjeta(
         view! { <Dispositivos a solo_lectura recargar /> }.into_any()
     } else if a.componente.as_deref() == Some(super::RESERVAS) {
         view! { <Reservas a solo_lectura recargar /> }.into_any()
+    } else if a.componente.as_deref() == Some(super::PUERTOS) {
+        view! { <Puertos a solo_lectura recargar /> }.into_any()
     } else if a.componente.is_some() {
         hueco(&a).into_any()
     } else if a.lista {

@@ -64,6 +64,8 @@ id = "activa"
 escribe = { funcion = "cbSetNatPortMapping", parametro = "adm_state" }
 lee = "adm_state"
 tipo = "booleano"
+# Una regla nueva nace activa (decisión del controlador, Tarea 10).
+recomendado = "true"
 
 [[ajuste]]
 id = "puertos.upnp"
