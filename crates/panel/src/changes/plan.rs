@@ -240,6 +240,17 @@ pub(super) struct Compuesto {
     pub(super) payload: Vec<(String, String)>,
     /// Campos que cambian.
     pub(super) campos: Vec<Campo>,
+    /// Secretos que la carga reenviaría tal como los da la lectura, que los
+    /// tapa ([`tapado`]): reenviarlos podría borrar la clave del router.
+    pub(super) secretos_tapados: Vec<String>,
+}
+
+/// ¿El router da este secreto tapado en vez de su valor? Vacío, la máscara o
+/// solo asteriscos o puntos. Un valor así no se reenvía nunca como si fuera
+/// la clave.
+pub(super) fn tapado(v: &str) -> bool {
+    let v = v.trim();
+    v.is_empty() || v == MASCARA || v.chars().all(|c| matches!(c, '*' | '•' | '●'))
 }
 
 /// Une valores de la petición y valores actuales. No hace peticiones.
@@ -259,12 +270,15 @@ pub(super) fn componer(
     // Sin tocar (un secreto vacío o cualquier campo que llega enmascarado):
     // valor actual, o fuera si no se conoce. `MASCARA` nunca se escribe.
     let mut efectivos = BTreeMap::new();
+    // Lo que se reenvía tal como lo da la lectura.
+    let mut de_la_lectura = BTreeSet::new();
     for (k, v) in valores {
         let p = f.parametro(k);
         let vacio = !explicito && es_secreto_param(f, m, k) && v.trim().is_empty();
         if v == MASCARA || vacio {
             if let Some(cur) = buscar(actual, k) {
                 efectivos.insert(k.clone(), cur.to_owned());
+                de_la_lectura.insert(k.clone());
             }
             continue;
         }
@@ -275,14 +289,21 @@ pub(super) fn componer(
         efectivos.insert(k.clone(), v);
     }
     let mut payload = Vec::new();
+    let mut secretos_tapados = Vec::new();
     for p in &f.parametros {
-        if let Some(v) = efectivos.get(&p.nombre) {
-            payload.push((p.nombre.clone(), v.clone()));
+        let (v, leido) = if let Some(v) = efectivos.get(&p.nombre) {
+            (v.as_str(), de_la_lectura.contains(&p.nombre))
         } else if op == Operacion::Editar
             && let Some(cur) = buscar(actual, &p.nombre)
         {
-            payload.push((p.nombre.clone(), cur.to_owned()));
+            (cur, true)
+        } else {
+            continue;
+        };
+        if leido && es_secreto_param(f, m, &p.nombre) && tapado(v) {
+            secretos_tapados.push(p.nombre.clone());
         }
+        payload.push((p.nombre.clone(), v.to_owned()));
     }
     let secreto =
         |k: &str, a: &str, b: &str| es_secreto_param(f, m, k) || m.oculta(k, a) || m.oculta(k, b);
@@ -329,6 +350,7 @@ pub(super) fn componer(
         efectivos,
         payload,
         campos,
+        secretos_tapados,
     }
 }
 
@@ -529,7 +551,9 @@ mod tests {
             efectivos,
             payload,
             campos,
+            secretos_tapados,
         } = componer(f, &m, Operacion::Editar, &actual, &valores, false);
+        assert!(secretos_tapados.is_empty());
         let p: BTreeMap<_, _> = payload.into_iter().collect();
         assert_eq!(p["ssid"], "Otra");
         assert_eq!(p["key_phrase"], "clave-actual", "secreto sin tocar");
@@ -563,6 +587,56 @@ mod tests {
         assert_eq!(r.campos.len(), 1);
         let r = componer(f, &m, Operacion::Editar, &actual, &valores, false);
         assert!(r.campos.is_empty(), "sin explícito, vacío = sin tocar");
+    }
+
+    /// Un secreto que el router da vacío o tapado no se reenvía como si
+    /// fuera la clave: `componer` lo señala (y el gestor no escribe). Uno
+    /// que llega en la petición, sí vale.
+    #[test]
+    fn secreto_leido_vacio_o_tapado_se_senala() {
+        let c = cat();
+        let m = Mascara::load().unwrap();
+        let f = c.funcion("cbSetVoiceLine").unwrap();
+        for tapada in ["", "  ", "********", MASCARA, "●●●●"] {
+            let actual = mapa(&[
+                ("interwork_id", "0"),
+                ("adm_state", "1"),
+                ("auth_username", "usuario-de-prueba"),
+                ("auth_password", tapada),
+            ]);
+            let otro = mapa(&[("interwork_id", "0"), ("adm_state", "0")]);
+            let r = componer(f, &m, Operacion::Editar, &actual, &otro, false);
+            assert_eq!(r.secretos_tapados, ["auth_password"], "«{tapada}»");
+            // Con la máscara o vacío en la petición («sin tocar»), igual.
+            for sin_tocar in [MASCARA, ""] {
+                let v = mapa(&[("interwork_id", "0"), ("auth_password", sin_tocar)]);
+                let r = componer(f, &m, Operacion::Editar, &actual, &v, false);
+                assert_eq!(r.secretos_tapados, ["auth_password"], "«{tapada}»");
+            }
+            // Una clave nueva en la petición no es la leída.
+            let nueva = mapa(&[
+                ("interwork_id", "0"),
+                ("auth_password", "clave-de-prueba-1"),
+            ]);
+            let r = componer(f, &m, Operacion::Editar, &actual, &nueva, false);
+            assert!(r.secretos_tapados.is_empty(), "«{tapada}»");
+        }
+        // Una clave leída de verdad, o un campo que no es secreto vacío, no.
+        let actual = mapa(&[
+            ("interwork_id", "0"),
+            ("auth_password", "clave-de-prueba-2"),
+            ("web", ""),
+        ]);
+        let r = componer(
+            f,
+            &m,
+            Operacion::Editar,
+            &actual,
+            &mapa(&[("adm_state", "0")]),
+            false,
+        );
+        assert!(r.secretos_tapados.is_empty());
+        assert!(tapado("****") && tapado("") && !tapado("a***"));
     }
 
     #[test]

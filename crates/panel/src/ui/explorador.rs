@@ -23,8 +23,8 @@ pub use datos::*;
 pub use dialogo::{DialogoCambio, TablaDiff};
 
 use crate::t;
+use crate::ui::secreto::{ObjetivoSecreto, Secreto};
 use crate::ui::{Estado, IconoEstado, Insignia};
-use dialogo::DialogoRevelar;
 use formulario::Escritura;
 use leptos::prelude::*;
 use leptos_router::{
@@ -477,48 +477,6 @@ struct Objetivo {
     params: Vec<(String, String)>,
 }
 
-/// Valores revelados (30 s) y el que se está pidiendo.
-#[derive(Clone, Copy)]
-struct Revelados {
-    pidiendo: RwSignal<Option<Objetivo>>,
-    valores: RwSignal<Vec<(Objetivo, String)>>,
-}
-
-/// Tiempo que se muestra un secreto revelado.
-const REVELADO: std::time::Duration = std::time::Duration::from_secs(30);
-
-impl Revelados {
-    /// Muestra `valor` en la celda de `o` durante [`REVELADO`].
-    fn mostrar(self, o: Objetivo, valor: String) {
-        self.valores.update(|v| v.push((o.clone(), valor)));
-        self.pidiendo.set(None);
-        set_timeout(
-            move || self.valores.update(|v| v.retain(|(k, _)| *k != o)),
-            REVELADO,
-        );
-    }
-
-    /// «Revelar»: sin pedir la contraseña si la sesión tiene abierta la
-    /// ventana de reautenticación; si no (o si falla), con el diálogo, que
-    /// la pide y muestra el error.
-    fn pedir(self, o: Objetivo) {
-        leptos::task::spawn_local(async move {
-            let r = revelar(
-                o.funcion.clone(),
-                o.campo.clone(),
-                o.instancia.clone(),
-                o.params.clone(),
-                String::new(),
-            )
-            .await;
-            match r {
-                Ok(valor) => self.mostrar(o, valor),
-                Err(_) => self.pidiendo.set(Some(o)),
-            }
-        });
-    }
-}
-
 /// Celda de un valor de lectura; los secretos, con «Revelar».
 fn celda_valor(v: Valor, objetivo: Objetivo) -> AnyView {
     match v {
@@ -540,39 +498,17 @@ fn celda_valor(v: Valor, objetivo: Objetivo) -> AnyView {
     }
 }
 
+/// Un secreto de la lectura, con «Revelar» ([`Secreto`]).
 #[component]
 fn CeldaSecreta(objetivo: Objetivo) -> impl IntoView {
-    let r = expect_context::<Revelados>();
-    let o = StoredValue::new(objetivo);
-    let revelado = move || {
-        r.valores.with(|v| {
-            v.iter()
-                .find(|(k, _)| o.with_value(|o| k == o))
-                .map(|(_, v)| v.clone())
-        })
+    let nombre = objetivo.campo.clone();
+    let objetivo = ObjetivoSecreto::Funcion {
+        funcion: objetivo.funcion,
+        campo: objetivo.campo,
+        instancia: objetivo.instancia,
+        params: objetivo.params,
     };
-    move || match revelado() {
-        Some(v) => view! {
-            <span class="mono revelado">{v}</span>
-            <span class="solo-lector">{t!("biblioteca-visible-30")}</span>
-        }
-        .into_any(),
-        None => view! {
-            <span class="celda-secreta">
-                <span class="secreto">{MASCARA}</span>
-                <span class="solo-lector">{t!("comun-valor-oculto")}</span>
-                <button
-                    class="boton-mini"
-                    type="button"
-                    on:click=move |_| r.pedir(o.get_value())
-                >
-                    {t!("biblioteca-revelar")}
-                    <span class="solo-lector">{o.with_value(|o| format!(" {}", o.campo))}</span>
-                </button>
-            </span>
-        }
-        .into_any(),
-    }
+    view! { <Secreto objetivo nombre /> }
 }
 
 /// Valores de una lectura: tabla clave/valor, tablas de instancias y XML.
@@ -710,11 +646,6 @@ fn VistaLectura(detalle: FuncionDetalle) -> impl IntoView {
         |(f, p)| leer(f, p),
     );
     let leyendo = RwSignal::new(false);
-    let revelados = Revelados {
-        pidiendo: RwSignal::new(None),
-        valores: RwSignal::new(Vec::new()),
-    };
-    provide_context(revelados);
 
     let entradas = campos
         .iter()
@@ -773,22 +704,6 @@ fn VistaLectura(detalle: FuncionDetalle) -> impl IntoView {
         }
     };
 
-    let dialogo = move || {
-        revelados.pidiendo.get().map(|o| {
-            let o2 = o.clone();
-            view! {
-                <DialogoRevelar
-                    funcion=o.funcion.clone()
-                    campo=o.campo.clone()
-                    instancia=o.instancia.clone()
-                    params=o.params.clone()
-                    on_cerrar=move |_| revelados.pidiendo.set(None)
-                    on_revelado=move |valor: String| revelados.mostrar(o2.clone(), valor)
-                />
-            }
-        })
-    };
-
     view! {
         <section class="seccion" aria-labelledby="titulo-lectura">
             <div class="seccion-cabecera">
@@ -806,7 +721,6 @@ fn VistaLectura(detalle: FuncionDetalle) -> impl IntoView {
                 <Transition set_pending=leyendo fallback=|| view! { <p class="estado-espera">{t!("biblioteca-leyendo")}</p> }>{datos}</Transition>
             </div>
         </section>
-        {dialogo}
     }
     .into_any()
 }

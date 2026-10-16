@@ -504,6 +504,11 @@ fn comprobar_forma(c: &Campo, mal: &mut impl FnMut(String)) {
     if c.opcional && !admite_opcional(c.tipo) {
         mal("`opcional` no vale en un campo `opcion` ni `booleano`".into());
     }
+    // Un secreto vacío se enviaría como clave nueva y la vaciaría: en un
+    // secreto, vacío es «sin tocar» y nunca se escribe.
+    if c.opcional && c.tipo == TipoCampo::Secreto {
+        mal("`opcional` no vale en un secreto: vaciaría la clave del router".into());
+    }
     if let Some(v) = c.validar {
         if !matches!(
             c.tipo,

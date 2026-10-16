@@ -9,7 +9,7 @@ use crate::{
         PreparadoVista, ruta_funcion,
         servidor::{
             Ocultar, campo_cambio, con_estado, error_cambio, estado, gestor, interno, riesgo,
-            vista_preparado,
+            usuario_para_revelar, vista_preparado,
         },
     },
 };
@@ -114,6 +114,12 @@ async fn fila_cambio(
         puede_deshacer: g.se_puede_deshacer(c.id).await,
         titulo: c.titulo.as_deref().map(traducir),
         pasos,
+        anteriores: g
+            .anteriores_secretos(c.id)
+            .await
+            .into_iter()
+            .flat_map(|(orden, _, m)| m.into_keys().map(move |k| (orden, k)))
+            .collect(),
     })
 }
 
@@ -130,22 +136,98 @@ fn estado_paso(e: EstadoPaso) -> EstadoPasoVista {
 
 async fn fila_revelado(state: &AppState, id: i64) -> Result<Option<ReveladoFila>, ServerFnError> {
     let fila = sqlx::query(
-        "SELECT r.ts, r.funcion, r.campo, r.instancia, u.username \
+        "SELECT r.ts, r.funcion, r.campo, r.instancia, r.ajuste, r.cambio_id, u.username \
          FROM reveals r LEFT JOIN users u ON u.id = r.user_id WHERE r.id = ?",
     )
     .bind(id)
     .fetch_optional(&state.db)
     .await
     .map_err(interno)?;
-    Ok(fila.map(|f| ReveladoFila {
-        id,
-        ts: f.get("ts"),
-        usuario: f.get("username"),
-        ruta: ruta(state, &f.get::<String, _>("funcion")),
-        funcion: f.get("funcion"),
-        campo: f.get("campo"),
-        instancia: f.get("instancia"),
+    let traducir = |clave: &str| crate::ui::i18n::traducir(clave, None);
+    Ok(fila.map(|f| {
+        let funcion: String = f.get("funcion");
+        let campo: String = f.get("campo");
+        let ajuste: Option<String> = f.get("ajuste");
+        // Desde Ajustes: el título del ajuste y la etiqueta del campo, sin
+        // la función (si el ajuste ya no está en el catálogo, sus ids).
+        let (ajuste, campo, ruta) = match ajuste {
+            Some(id) => match state.ajustes.ajuste(&id) {
+                Some(a) => {
+                    let p = ajustes::prefijo_i18n(a);
+                    (
+                        Some(traducir(&format!("{p}-titulo"))),
+                        traducir(&format!("{p}-{campo}")),
+                        None,
+                    )
+                }
+                None => (Some(id), campo, None),
+            },
+            None => (None, campo, ruta(state, &funcion)),
+        };
+        ReveladoFila {
+            id,
+            ts: f.get("ts"),
+            usuario: f.get("username"),
+            ruta,
+            funcion,
+            campo,
+            instancia: f.get("instancia"),
+            ajuste,
+            cambio: f.get("cambio_id"),
+        }
     }))
+}
+
+/// Marca la respuesta `no-store`: lleva un secreto.
+pub(super) fn sin_guardar() {
+    use axum::http::{HeaderValue, header};
+    if let Some(resp) = leptos::prelude::use_context::<leptos_axum::ResponseOptions>() {
+        resp.insert_header(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    }
+}
+
+pub async fn revelar_anterior(
+    state: &AppState,
+    user: crate::auth::User,
+    cambio: i64,
+    orden: i64,
+    campo: &str,
+    contrasena: &str,
+) -> Result<String, ServerFnError> {
+    let g = gestor(state)?;
+    let Some((funcion, valor)) = g
+        .anteriores_secretos(cambio)
+        .await
+        .into_iter()
+        .filter(|(o, _, _)| *o == orden)
+        .find_map(|(_, funcion, mut m)| m.remove(campo).map(|v| (funcion, v)))
+    else {
+        return Err(con_estado(
+            StatusCode::NOT_FOUND,
+            crate::t!("historial-error-sin-anterior"),
+        ));
+    };
+    let user = usuario_para_revelar(state, user, contrasena).await?;
+    sqlx::query(
+        "INSERT INTO reveals (ts, user_id, funcion, campo, instancia, cambio_id) \
+         VALUES (?, ?, ?, ?, NULL, ?)",
+    )
+    .bind(crate::series::now())
+    .bind(user.id)
+    .bind(&funcion)
+    .bind(campo)
+    .bind(cambio)
+    .execute(&state.db)
+    .await
+    .map_err(interno)?;
+    tracing::info!(
+        usuario = %user.username,
+        cambio,
+        orden,
+        campo,
+        "valor anterior de un secreto mostrado"
+    );
+    Ok(valor)
 }
 
 pub async fn pagina(state: &AppState, pagina: u32) -> Result<PaginaHistorial, ServerFnError> {

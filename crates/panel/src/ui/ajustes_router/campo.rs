@@ -11,6 +11,7 @@ use crate::ajustes_router::{CampoVista, OpcionVista, texto_error_valor};
 use crate::t;
 use crate::ui::explorador::MASCARA;
 use crate::ui::i18n::traducir;
+use crate::ui::secreto::{ObjetivoSecreto, Secreto};
 use crate::ui::{Estado, IconoEstado};
 use ajustes::{Limites, SIN_ELECCION, TipoCampo, ValorLegible, validar_legible};
 use leptos::prelude::*;
@@ -77,21 +78,25 @@ pub(crate) fn texto_legible(c: &CampoVista, v: &str) -> String {
     }
 }
 
-/// Valor actual del campo en la vista resumida.
-pub(crate) fn valor_resumido(c: &CampoVista) -> AnyView {
-    match &c.valor {
-        ValorLegible::Secreto => view! {
+/// Valor actual del campo en la vista resumida. Un secreto, con «Mostrar»
+/// si se sabe de dónde leerlo (`secreto`).
+pub(crate) fn valor_resumido(c: &CampoVista, secreto: Option<ObjetivoSecreto>) -> AnyView {
+    match (&c.valor, secreto) {
+        (ValorLegible::Secreto, Some(objetivo)) => {
+            view! { <Secreto objetivo nombre=etiqueta(c) /> }.into_any()
+        }
+        (ValorLegible::Secreto, None) => view! {
             <span class="secreto" aria-hidden="true">{MASCARA}</span>
             <span class="solo-lector">{t!("comun-valor-oculto")}</span>
         }
         .into_any(),
-        ValorLegible::Desconocido(x) => {
+        (ValorLegible::Desconocido(x), _) => {
             view! { <span>{t!("ajustes-valor-desconocido", valor = x.clone())}</span> }.into_any()
         }
-        ValorLegible::Texto(t) if t.is_empty() => {
+        (ValorLegible::Texto(t), _) if t.is_empty() => {
             view! { <span class="ajuste-vacio">{t!("ajustes-grupo-vacio")}</span> }.into_any()
         }
-        v => view! { <span>{texto_legible(c, &inicial(v))}</span> }.into_any(),
+        (v, _) => view! { <span>{texto_legible(c, &inicial(v))}</span> }.into_any(),
     }
 }
 
@@ -162,7 +167,9 @@ fn aviso_de(opciones: &[OpcionVista], v: &str) -> Option<String> {
 
 /// Un campo editable: control según su tipo, con etiqueta, descripción,
 /// recomendación, aviso de la opción elegida y error. `dom` es el prefijo
-/// único de sus ids en la página.
+/// único de sus ids en la página. Un secreto va con [`CampoSecreto`]
+/// (`secreto` dice de dónde leerlo para «Mostrar»; `editando`, cuándo se
+/// cierra la edición).
 #[component]
 pub(crate) fn Campo(
     c: CampoVista,
@@ -170,7 +177,12 @@ pub(crate) fn Campo(
     valor: RwSignal<String>,
     error: RwSignal<Option<String>>,
     #[prop(into)] bloqueado: Signal<bool>,
+    #[prop(optional)] secreto: Option<ObjetivoSecreto>,
+    #[prop(optional)] editando: Option<RwSignal<bool>>,
 ) -> impl IntoView {
+    if c.tipo == TipoCampo::Secreto {
+        return view! { <CampoSecreto c dom valor error bloqueado secreto editando /> }.into_any();
+    }
     let control_id = format!("{dom}-control");
     let desc_id = format!("{dom}-desc");
     let error_id = format!("{dom}-error");
@@ -193,10 +205,7 @@ pub(crate) fn Campo(
         valor.set(event_target_value(&ev));
         error.set(None);
     };
-    let mut desc = traducir(&format!("{}-desc", c.clave), None);
-    if c.tipo == TipoCampo::Secreto {
-        desc = format!("{desc} {}", t!("ajustes-secreto-desc"));
-    }
+    let desc = traducir(&format!("{}-desc", c.clave), None);
     let etiqueta = etiqueta(&c);
     let control = match c.tipo {
         TipoCampo::Booleano => view! {
@@ -343,6 +352,122 @@ pub(crate) fn Campo(
             <p class="ayuda" id=desc_id>{desc}</p>
             {opcion_elegida}
             {recomendacion(&c, &reco_id)}
+            <p class="campo-error" id=error_id aria-live="polite">{move || error.get()}</p>
+        </div>
+    }
+    .into_any()
+}
+
+/// Un secreto al editar: «•••••• · Mostrar · Cambiar». «Cambiar» abre el
+/// campo de contraseña (con «Ver lo escrito»); vacío, no se cambia. Al
+/// cerrarse la edición (`editando` a falso), vuelve a la máscara.
+#[component]
+fn CampoSecreto(
+    c: CampoVista,
+    dom: String,
+    valor: RwSignal<String>,
+    error: RwSignal<Option<String>>,
+    bloqueado: Signal<bool>,
+    secreto: Option<ObjetivoSecreto>,
+    editando: Option<RwSignal<bool>>,
+) -> impl IntoView {
+    let control_id = format!("{dom}-control");
+    let desc_id = format!("{dom}-desc");
+    let error_id = format!("{dom}-error");
+    let descrito = format!("{desc_id} {error_id}");
+    let abierto = RwSignal::new(false);
+    let ver = RwSignal::new(false);
+    if let Some(editando) = editando {
+        Effect::new(move |_| {
+            if !editando.get() {
+                abierto.set(false);
+                ver.set(false);
+            }
+        });
+    }
+    let etiqueta = etiqueta(&c);
+    let desc = format!(
+        "{} {}",
+        traducir(&format!("{}-desc", c.clave), None),
+        t!("ajustes-secreto-desc")
+    );
+    let invalido = move || error.with(|e| e.is_some()).then_some("true");
+    let cambiar = {
+        let control_id = control_id.clone();
+        move |_| {
+            abierto.set(true);
+            let id = control_id.clone();
+            request_animation_frame(move || super::tarjeta::enfocar(&id));
+        }
+    };
+    let secreto = StoredValue::new(secreto);
+    let cerrado = {
+        let (etiqueta, control_id, descrito) =
+            (etiqueta.clone(), control_id.clone(), descrito.clone());
+        move || {
+            let mascara = match secreto.get_value() {
+                Some(objetivo) => view! { <Secreto objetivo nombre=etiqueta.clone() /> }.into_any(),
+                None => view! {
+                    <span class="secreto" aria-hidden="true">{MASCARA}</span>
+                    <span class="solo-lector">{t!("comun-valor-oculto")}</span>
+                }
+                .into_any(),
+            };
+            view! {
+                <p class="campo-etiqueta">{etiqueta.clone()}</p>
+                <div class="secreto-fila">
+                    {mascara}
+                    <button
+                        id=control_id.clone()
+                        class="boton-mini"
+                        type="button"
+                        aria-describedby=descrito.clone()
+                        disabled=move || bloqueado.get()
+                        on:click=cambiar.clone()
+                    >
+                        {t!("ajustes-secreto-cambiar")}
+                        <span class="solo-lector">{format!(" {etiqueta}")}</span>
+                    </button>
+                </div>
+            }
+        }
+    };
+    let abierto_vista = move || {
+        view! {
+            <label for=control_id.clone()>{etiqueta.clone()}</label>
+            <div class="secreto-fila">
+                <input
+                    id=control_id.clone()
+                    type=move || if ver.get() { "text" } else { "password" }
+                    autocomplete="new-password"
+                    autocapitalize="none"
+                    spellcheck="false"
+                    placeholder=t!("ajustes-secreto-placeholder")
+                    aria-describedby=descrito.clone()
+                    aria-invalid=invalido
+                    disabled=move || bloqueado.get()
+                    prop:value=move || valor.get()
+                    on:input=move |ev| {
+                        valor.set(event_target_value(&ev));
+                        error.set(None);
+                    }
+                />
+                <button
+                    class="boton-mini"
+                    type="button"
+                    aria-controls=control_id.clone()
+                    aria-pressed=move || ver.get().to_string()
+                    on:click=move |_| ver.update(|v| *v = !*v)
+                >
+                    {t!("ajustes-secreto-ver")}
+                </button>
+            </div>
+        }
+    };
+    view! {
+        <div class="campo campo-ajuste campo-secreto">
+            {move || if abierto.get() { abierto_vista().into_any() } else { cerrado().into_any() }}
+            <p class="ayuda" id=desc_id>{desc}</p>
             <p class="campo-error" id=error_id aria-live="polite">{move || error.get()}</p>
         </div>
     }

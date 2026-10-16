@@ -7,7 +7,8 @@
 //! llevan ids, claves de traducción y valores legibles: ningún nombre de la
 //! API salvo en [`DetallesTecnicos`], que la interfaz pinta únicamente dentro
 //! de `<details class="detalles-tecnicos">`. Un secreto llega como
-//! [`ValorLegible::Secreto`]: su valor nunca sale del servidor.
+//! [`ValorLegible::Secreto`]: su valor solo sale del servidor al pedirlo con
+//! [`revelar_ajuste`] (con reautenticación, anotado y con `no-store`).
 
 use crate::t;
 use crate::ui::explorador::RiesgoCambio;
@@ -603,6 +604,25 @@ pub async fn leer_tema(tema: String) -> Result<TemaVista, ServerFnError> {
     servidor::leer_tema(tema).await
 }
 
+/// Valor en claro del secreto `campo` del ajuste `ajuste` (en una lista, de
+/// su instancia `instancia`), leído del router en ese momento: nunca de la
+/// caché de lecturas. Con `contrasena` vacía, solo si la sesión tiene abierta
+/// la ventana de reautenticación (si no, 401 con
+/// [`crate::auth::ERROR_REAUTENTICACION`]); con la contraseña del panel, la
+/// comprueba con el freno del login y abre la ventana. Queda anotado, sin el
+/// valor, en `reveals` (con el ajuste y el campo). La respuesta va con
+/// `no-store`. 400 si el campo no es un secreto del ajuste; 404 si el ajuste
+/// no existe.
+#[server(endpoint = "revelar_ajuste", input = Json)]
+pub async fn revelar_ajuste(
+    ajuste: String,
+    campo: String,
+    instancia: Option<String>,
+    #[server(default)] contrasena: String,
+) -> Result<String, ServerFnError> {
+    servidor::revelar_ajuste(ajuste, campo, instancia, contrasena).await
+}
+
 /// Los dispositivos que el router conoce en la red de casa, los conectados
 /// primero y por IP, con su conexión y su reserva (lecturas para mostrar,
 /// como [`leer_tema`]). Exige sesión; la respuesta va con `no-store`.
@@ -653,8 +673,8 @@ pub(crate) mod servidor {
     use super::*;
     use crate::{
         changes::{
-            BLOQUEO_SOLO_LECTURA, CambioError, ChangeManager, ChangeRequest, Diff, GrupoRequest,
-            Paso, PasoPreparado, buscar,
+            BLOQUEO_SECRETO_TAPADO, BLOQUEO_SOLO_LECTURA, CambioError, ChangeManager,
+            ChangeRequest, Diff, GrupoRequest, Paso, PasoPreparado, buscar,
         },
         instalar::servidor::fallo,
         instancia,
@@ -664,7 +684,7 @@ pub(crate) mod servidor {
         t,
         ui::explorador::{
             MASCARA,
-            servidor::{error_cambio, gestor, riesgo},
+            servidor::{error_cambio, gestor, riesgo, usuario_para_revelar},
         },
     };
     use ajustes::{
@@ -772,6 +792,24 @@ pub(crate) mod servidor {
     /// escribe por ese id, y una posición tomada por id editaría o borraría
     /// otra instancia.
     fn lista(f: &Catalogo, a: &Ajuste, prefijo: &str, n: &XmlNode) -> Option<Vec<InstanciaVista>> {
+        Some(
+            instancias_con_id(f, a, n)?
+                .into_iter()
+                .map(|(id, leidos)| InstanciaVista {
+                    id,
+                    campos: a
+                        .campos
+                        .iter()
+                        .map(|c| campo(prefijo, c, a_legible(c, &leidos)))
+                        .collect(),
+                })
+                .collect(),
+        )
+    }
+
+    /// Instancias de una lista con su id (ver [`lista`]) y sus elementos tal
+    /// cual los da el router.
+    fn instancias_con_id(f: &Catalogo, a: &Ajuste, n: &XmlNode) -> Option<Vec<(String, Leidos)>> {
         let se_escribe = a.campos.iter().any(|c| c.escribible().is_some());
         let id_param = id_instancia(f, a);
         let mut elementos: Vec<&str> = a
@@ -793,12 +831,7 @@ pub(crate) mod servidor {
                     None if !se_escribe => i.to_string(),
                     None => return None,
                 };
-                let campos = a
-                    .campos
-                    .iter()
-                    .map(|c| campo(prefijo, c, a_legible(c, &leidos)))
-                    .collect();
-                Some(InstanciaVista { id, campos })
+                Some((id, leidos))
             })
             .collect()
     }
@@ -971,8 +1004,13 @@ pub(crate) mod servidor {
     // ------------------------------------------------------------ guardar
 
     /// Pares `(parámetro, valor)` que escribe el campo `c` con el legible
-    /// `v`, validado; `None` si es un secreto sin tocar ([`MASCARA`]).
+    /// `v`, validado; `None` si es un secreto sin tocar ([`MASCARA`]). Un
+    /// campo de solo lectura no vale ni con la máscara: la página no lo
+    /// envía.
     fn pares(c: &Campo, v: &str) -> Result<Option<Vec<(String, String)>>, ErrorValor> {
+        if c.escribible().is_none() {
+            return Err(ErrorValor::SoloLectura);
+        }
         if c.tipo == TipoCampo::Secreto && v == MASCARA {
             return Ok(None);
         }
@@ -1171,6 +1209,9 @@ pub(crate) mod servidor {
             E::EnCurso => fallo(StatusCode::CONFLICT, t!("biblioteca-error-en-curso")),
             E::Bloqueada(m) if m == BLOQUEO_SOLO_LECTURA => {
                 fallo(StatusCode::FORBIDDEN, t!("ajustes-solo-lectura"))
+            }
+            E::Bloqueada(m) if m == BLOQUEO_SECRETO_TAPADO => {
+                fallo(StatusCode::FORBIDDEN, t!("cambio-error-secreto-tapado"))
             }
             E::Bloqueada(m) => {
                 tracing::warn!("ajustes: escritura bloqueada: {m}");
@@ -1697,6 +1738,90 @@ pub(crate) mod servidor {
                 paso.nota = Some(format!("{prefijo}-paso-igual"));
             }
         }
+    }
+
+    // --------------------------------------------------- secretos
+
+    /// Elemento `nombre` de una lectura: primero exacto, luego sin distinguir
+    /// mayúsculas.
+    fn leido<'a>(leidos: &'a Leidos, nombre: &str) -> Option<&'a str> {
+        leidos
+            .get(nombre)
+            .or_else(|| {
+                leidos
+                    .iter()
+                    .find(|(k, _)| k.eq_ignore_ascii_case(nombre))
+                    .map(|(_, v)| v)
+            })
+            .map(String::as_str)
+    }
+
+    pub(super) async fn revelar_ajuste(
+        ajuste: String,
+        campo: String,
+        instancia: Option<String>,
+        contrasena: String,
+    ) -> Result<String, ServerFnError> {
+        let (state, user) = preparar().await?;
+        let a = ajuste_por_id(&state, &ajuste)?;
+        let c = a
+            .campo(&campo)
+            .filter(|c| c.tipo == TipoCampo::Secreto)
+            .ok_or_else(|| fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-campo")))?;
+        if a.lista != instancia.is_some() {
+            return Err(fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-invalida")));
+        }
+        let user = usuario_para_revelar(&state, user, &contrasena).await?;
+        // Del router, no de la caché: lo que se ve es lo que tiene ahora.
+        let params: Vec<(&str, &str)> = a
+            .leer
+            .params
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_str()))
+            .collect();
+        let n = state
+            .hgu
+            .call(&a.leer.funcion, &params)
+            .await
+            .map_err(|e| sin_leer("un secreto", e))?;
+        let leidos = match &instancia {
+            None => {
+                let mut leidos = Leidos::new();
+                hojas(&n, &mut leidos);
+                Some(leidos)
+            }
+            Some(id) => instancias_con_id(&state.catalogo, a, &n)
+                .into_iter()
+                .flatten()
+                .find(|(i, _)| i == id)
+                .map(|(_, leidos)| leidos),
+        };
+        let valor = leidos
+            .as_ref()
+            .and_then(|l| leido(l, &c.lee))
+            .map(str::to_owned)
+            .ok_or_else(|| fallo(StatusCode::NOT_FOUND, t!("ajustes-error-secreto-sin-valor")))?;
+        sqlx::query(
+            "INSERT INTO reveals (ts, user_id, funcion, campo, instancia, ajuste) \
+             VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .bind(crate::series::now())
+        .bind(user.id)
+        .bind(&a.leer.funcion)
+        .bind(&c.id)
+        .bind(&instancia)
+        .bind(&a.id)
+        .execute(&state.db)
+        .await
+        .map_err(crate::instalar::servidor::interno)?;
+        tracing::info!(
+            usuario = %user.username,
+            ajuste = %a.id,
+            campo = %c.id,
+            instancia = instancia.as_deref().unwrap_or("-"),
+            "secreto mostrado desde Ajustes"
+        );
+        Ok(valor)
     }
 
     pub(super) async fn confirmar_ajuste(

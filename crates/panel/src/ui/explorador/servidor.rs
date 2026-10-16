@@ -65,6 +65,10 @@ pub(crate) fn error_cambio(e: CambioError) -> ServerFnError {
         E::Bloqueada(m) if m == crate::changes::BLOQUEO_SOLO_LECTURA => {
             (StatusCode::FORBIDDEN, crate::t!("panel-solo-lectura"))
         }
+        E::Bloqueada(m) if m == crate::changes::BLOQUEO_SECRETO_TAPADO => (
+            StatusCode::FORBIDDEN,
+            crate::t!("cambio-error-secreto-tapado"),
+        ),
         E::Bloqueada(m) => (
             StatusCode::FORBIDDEN,
             crate::t!("biblioteca-error-bloqueada", motivo = m),
@@ -931,6 +935,23 @@ async fn comprobar_contrasena(
         )),
         Err(LoginError::Internal(e)) => Err(interno(e)),
     }
+}
+
+/// Usuario que puede ver un secreto: con `contrasena` vacía, el de la sesión
+/// si tiene abierta la ventana de reautenticación (si no, 401 con
+/// [`crate::auth::ERROR_REAUTENTICACION`]); si no, `user` (el de la sesión)
+/// tras comprobar la contraseña con el freno del login, y se abre la ventana.
+pub(crate) async fn usuario_para_revelar(
+    state: &AppState,
+    user: User,
+    contrasena: &str,
+) -> Result<User, ServerFnError> {
+    if contrasena.is_empty() {
+        return crate::auth::require_reauth().await;
+    }
+    comprobar_contrasena(state, &user, contrasena).await?;
+    crate::auth::abrir_ventana_de_reautenticacion().await?;
+    Ok(user)
 }
 
 pub async fn revelar(

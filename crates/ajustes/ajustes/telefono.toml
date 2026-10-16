@@ -25,10 +25,11 @@ tipo = "booleano"
 recomendado = "false"
 
 # La contraseña de la línea (`auth_password`) no está: el router la devuelve
-# vacía, así que el panel no tendría valor anterior al que volver. La fase 3
-# debe comprobar, antes de la primera escritura de voz, que reenviar ese
-# secreto vacío (el gestor completa cada escritura con la lectura) no borra
-# la contraseña de la línea, o hacer que el gestor no lo envíe.
+# vacía, así que el panel no tendría valor anterior al que volver. Como el
+# gestor completa cada escritura con la lectura y no reenvía un secreto que
+# el router da vacío (podría borrarlo), por ahora no escribe la línea de voz
+# (ni estos ajustes ni los de `telefono.linea`): la fase 3 debe comprobar
+# qué hace el router real con ese reenvío.
 [[ajuste]]
 id = "telefono.linea_oculto"
 tema = "telefono"

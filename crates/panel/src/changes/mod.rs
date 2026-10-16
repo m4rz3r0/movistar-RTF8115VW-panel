@@ -38,8 +38,11 @@
 //! valor anterior no se podría revertir ni deshacer.
 //!
 //! Un valor secreto que llega como [`MASCARA`] o vacío significa "sin tocar":
-//! se reenvía el valor actual leído del router y no cuenta como cambio. Los
-//! registros (`tracing`) y el historial solo muestran secretos enmascarados.
+//! se reenvía el valor actual leído del router y no cuenta como cambio. Si
+//! la lectura lo da vacío o tapado (asteriscos, la máscara), no se reenvía:
+//! la escritura se bloquea ([`BLOQUEO_SECRETO_TAPADO`]), porque reenviarlo
+//! podría borrar la clave. Los registros (`tracing`) y el historial solo
+//! muestran secretos enmascarados; sus valores anteriores van cifrados.
 
 mod grupo;
 pub mod plan;
@@ -368,6 +371,11 @@ const CAMBIAN_IP_LAN: &[&str] = &[
 pub const BLOQUEO_SOLO_LECTURA: &str = "panel-solo-lectura";
 const BLOQUEO_IP_LAN: &str = "bloqueada en v1: cambiar la IP del router corta la conexión del \
                               propio panel; hazlo desde la web del router";
+/// Motivo de [`CambioError::Bloqueada`] cuando la escritura reenviaría un
+/// secreto que el router da vacío o tapado (al completar la carga con lo
+/// leído): podría borrar esa clave. Es la clave i18n del texto. Se quitará
+/// cuando la fase 3 compruebe qué hace el router real con ese reenvío.
+pub const BLOQUEO_SECRETO_TAPADO: &str = "cambio-error-secreto-tapado";
 const BLOQUEO_SECRETOS_BASICA: &str = "bloqueada en v1: falta validar con el router real el \
                                        formato de los secretos de la web básica";
 
@@ -1008,6 +1016,38 @@ impl ChangeManager {
         a_cambio(&f, &self.filas_pasos(id).await)
     }
 
+    /// Valores anteriores secretos de cada paso del cambio `id`, en claro:
+    /// `(orden, función, parámetro → valor)`. Son los que se guardaron
+    /// cifrados: los secretos que cambiaron y se leyeron antes de escribir.
+    /// Solo para «Mostrar el valor anterior» del Historial; un paso que no
+    /// se puede descifrar (otra clave) queda fuera y se anota, sin valores.
+    pub async fn anteriores_secretos(
+        &self,
+        id: i64,
+    ) -> Vec<(i64, String, BTreeMap<String, String>)> {
+        self.filas_pasos(id)
+            .await
+            .iter()
+            .filter_map(|f| {
+                let blob = f.get::<Option<Vec<u8>>, _>("valores_anteriores_cifrados")?;
+                let orden: i64 = f.get("orden");
+                let abierto = self
+                    .state
+                    .history_key
+                    .open(&blob)
+                    .and_then(|plano| serde_json::from_slice(&plano).ok());
+                if abierto.is_none() {
+                    tracing::warn!(
+                        cambio = id,
+                        orden,
+                        "no se pueden descifrar los valores anteriores (¿otra clave?)"
+                    );
+                }
+                Some((orden, f.get("funcion"), abierto?))
+            })
+            .collect()
+    }
+
     /// Los `limite` cambios más recientes, del último al primero.
     pub async fn historial(&self, limite: u32) -> Vec<Cambio> {
         match sqlx::query("SELECT * FROM changes ORDER BY id DESC LIMIT ?")
@@ -1109,7 +1149,17 @@ impl ChangeManager {
             efectivos,
             payload,
             campos,
+            secretos_tapados,
         } = componer(f, &self.state.mascara, op, &actual, &valores, explicito);
+        if !secretos_tapados.is_empty() {
+            tracing::warn!(
+                funcion = %f.name,
+                parametros = ?secretos_tapados,
+                "el router da vacíos o tapados unos secretos que la escritura reenviaría: \
+                 no se escribe"
+            );
+            return Err(CambioError::Bloqueada(BLOQUEO_SECRETO_TAPADO.into()));
+        }
         if op == Operacion::Editar
             && let Some(c) = campos.iter().find(|c| !c.leido)
         {

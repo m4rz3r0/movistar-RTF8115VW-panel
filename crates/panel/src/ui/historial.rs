@@ -11,7 +11,10 @@
 //! Un cambio de varios pasos (un grupo) es una sola fila; su detalle lista
 //! los pasos con su resumen humano, su estado y su diff.
 //!
-//! Los revelados no llevan el valor: solo quién, cuándo y qué campo.
+//! Los revelados no llevan el valor: solo quién, cuándo y qué campo (de qué
+//! ajuste, si se mostró desde Ajustes; de qué cambio, si era un valor
+//! anterior). Un paso que cambió un secreto ofrece «Mostrar el valor
+//! anterior» ([`revelar_anterior`]), con la contraseña del panel.
 
 #[cfg(feature = "ssr")]
 pub(crate) mod servidor;
@@ -24,6 +27,8 @@ use crate::ui::{
         CampoCambio, DialogoCambio, EstadoDeCambio, PreparadoVista, RiesgoCambio, TablaDiff,
         texto_error,
     },
+    panel_ajustes::{DialogoReautenticar, Reautenticacion},
+    secreto::{ObjetivoSecreto, Secreto},
 };
 use leptos::prelude::*;
 use leptos::server_fn::codec::Json;
@@ -75,6 +80,10 @@ pub struct CambioFila {
     pub titulo: Option<String>,
     /// Pasos del grupo (vacío si es de un solo paso).
     pub pasos: Vec<PasoFila>,
+    /// Secretos con valor anterior guardado (cifrado): `(orden del paso,
+    /// parámetro)`. Cada uno ofrece «Mostrar el valor anterior».
+    #[serde(default)]
+    pub anteriores: Vec<(i64, String)>,
 }
 
 /// Estado de un paso de un grupo.
@@ -132,9 +141,18 @@ pub struct ReveladoFila {
     /// `None` si el usuario ya no existe.
     pub usuario: Option<String>,
     pub funcion: String,
+    /// Página de la función en el explorador; `None` si se mostró desde
+    /// Ajustes (allí no se nombra la función).
     pub ruta: Option<String>,
+    /// El parámetro; si se mostró desde Ajustes, la etiqueta del campo.
     pub campo: String,
     pub instancia: Option<String>,
+    /// Título del ajuste, si se mostró desde Ajustes.
+    #[serde(default)]
+    pub ajuste: Option<String>,
+    /// Cambio cuyo valor anterior se mostró, si fue eso.
+    #[serde(default)]
+    pub cambio: Option<i64>,
 }
 
 /// Entrada del historial.
@@ -227,6 +245,26 @@ pub async fn deshacer(change_id: i64) -> Result<PreparadoVista, ServerFnError> {
     servidor::deshacer(&state, change_id).await
 }
 
+/// Valor anterior del secreto `campo` (el parámetro) del paso `orden` del
+/// cambio `cambio`, descifrado del historial. Mismas reglas que
+/// [`revelar_ajuste`](crate::ajustes_router::revelar_ajuste): con
+/// `contrasena` vacía, solo con la ventana de reautenticación abierta (si
+/// no, 401); con la del panel, con el freno del login. Queda anotado, sin el
+/// valor, en `reveals` (con el cambio). La respuesta va con `no-store`. 404
+/// si ese paso no guardó un valor anterior secreto con ese nombre.
+#[server(endpoint = "revelar_anterior", input = Json)]
+pub async fn revelar_anterior(
+    cambio: i64,
+    orden: i64,
+    campo: String,
+    #[server(default)] contrasena: String,
+) -> Result<String, ServerFnError> {
+    servidor::sin_guardar();
+    let user = crate::auth::require_user().await?;
+    let state = crate::ui::explorador::servidor::app_state()?;
+    servidor::revelar_anterior(&state, user, cambio, orden, &campo, &contrasena).await
+}
+
 // ------------------------------------------------------------ interfaz
 
 /// Icono de ojo de los revelados (decorativo).
@@ -276,6 +314,40 @@ fn funcion_enlazada(funcion: String, ruta: Option<String>, instancia: Option<Str
 #[component]
 fn FilaRevelado(r: ReveladoFila) -> impl IntoView {
     let instancia = r.instancia.map(|i| t!("historial-instancia-par", i = i));
+    // Desde Ajustes: el ajuste y el campo en lenguaje claro; un valor
+    // anterior: el parámetro y su cambio; si no, el parámetro y la función.
+    let que = match (r.ajuste, r.cambio) {
+        (Some(ajuste), _) => view! {
+            {t!("historial-revelado")}
+            " "
+            <span class="hist-campo">{r.campo}</span>
+            " "
+            {t!("historial-revelado-de")}
+            " "
+            <span>{ajuste}</span>
+            {instancia}
+        }
+        .into_any(),
+        (None, Some(cambio)) => view! {
+            {t!("historial-revelado-anterior")}
+            " "
+            <span class="mono">{r.campo}</span>
+            " "
+            {t!("historial-revelado-cambio", id = cambio)}
+        }
+        .into_any(),
+        (None, None) => view! {
+            {t!("historial-revelado")}
+            " "
+            <span class="mono">{r.campo}</span>
+            " "
+            {t!("historial-revelado-de")}
+            " "
+            {funcion_enlazada(r.funcion, r.ruta, None)}
+            {instancia}
+        }
+        .into_any(),
+    };
     view! {
         <li class="hist-entrada hist-revelado" id=format!("revelado-{}", r.id)>
             <div class="hist-cabeza">
@@ -283,16 +355,7 @@ fn FilaRevelado(r: ReveladoFila) -> impl IntoView {
                 <span class="hist-quien">{r.usuario.unwrap_or_else(|| "—".to_owned())}</span>
                 <span class="hist-que">
                     <IconoOjo />
-                    <span>
-                        {t!("historial-revelado")}
-                        " "
-                        <span class="mono">{r.campo}</span>
-                        " "
-                        {t!("historial-revelado-de")}
-                        " "
-                        {funcion_enlazada(r.funcion, r.ruta, None)}
-                        {instancia}
-                    </span>
+                    <span>{que}</span>
                 </span>
                 <span class="chip">{t!("historial-secreto")}</span>
             </div>
@@ -300,11 +363,51 @@ fn FilaRevelado(r: ReveladoFila) -> impl IntoView {
     }
 }
 
+/// Los secretos del paso `orden` del cambio `cambio` con valor anterior
+/// guardado, cada uno con «Mostrar el valor anterior». La etiqueta es la del
+/// campo en `campos` (o el parámetro).
+fn valores_anteriores(
+    cambio: i64,
+    orden: i64,
+    campos: &[CampoCambio],
+    anteriores: &[(i64, String)],
+) -> Option<impl IntoView + use<>> {
+    let filas: Vec<_> = anteriores
+        .iter()
+        .filter(|(o, _)| *o == orden)
+        .map(|(_, campo)| {
+            let etiqueta = campos
+                .iter()
+                .find(|c| c.nombre == *campo)
+                .map_or_else(|| campo.clone(), |c| c.etiqueta.clone());
+            let objetivo = ObjetivoSecreto::Anterior {
+                cambio,
+                orden,
+                campo: campo.clone(),
+            };
+            view! {
+                <li>
+                    <span class="hist-anterior-campo">{etiqueta.clone()}</span>
+                    <Secreto objetivo nombre=etiqueta />
+                </li>
+            }
+        })
+        .collect();
+    (!filas.is_empty()).then(|| {
+        view! {
+            <ul class="hist-anteriores" aria-label=t!("historial-anteriores")>
+                {filas}
+            </ul>
+        }
+    })
+}
+
 /// Lista desplegable de los pasos de un grupo.
-fn lista_pasos(pasos: Vec<PasoFila>) -> impl IntoView {
+fn lista_pasos(cambio: i64, pasos: Vec<PasoFila>, anteriores: &[(i64, String)]) -> impl IntoView {
     let filas = pasos
         .into_iter()
         .map(|p| {
+            let anteriores = valores_anteriores(cambio, p.numero - 1, &p.campos, anteriores);
             let instancia = p
                 .instancia
                 .map(|i| view! { <span class="hist-instancia">{t!("historial-instancia-sep", i = i)}</span> });
@@ -325,6 +428,7 @@ fn lista_pasos(pasos: Vec<PasoFila>) -> impl IntoView {
                         </summary>
                         <div class="hist-paso-cuerpo">
                             <TablaDiff campos=p.campos />
+                            {anteriores}
                             {error}
                         </div>
                     </details>
@@ -399,9 +503,14 @@ fn FilaCambio(
             .into_any()
     };
     let detalle = if n_pasos > 0 {
-        lista_pasos(c.pasos).into_any()
+        lista_pasos(id, c.pasos, &c.anteriores).into_any()
     } else {
-        view! { <TablaDiff campos=c.campos /> }.into_any()
+        let anteriores = valores_anteriores(id, 0, &c.campos, &c.anteriores);
+        view! {
+            <TablaDiff campos=c.campos />
+            {anteriores}
+        }
+        .into_any()
     };
     let boton = c.puede_deshacer.then(|| {
         view! {
@@ -490,6 +599,9 @@ pub fn PaginaHistorial() -> impl IntoView {
     let tick = RwSignal::new(0u32);
     let datos = Resource::new(move || (pagina.get(), tick.get()), |(p, _)| historial(p));
     let abiertos = RwSignal::new(BTreeSet::<i64>::new());
+    // «Mostrar el valor anterior» pide la contraseña del panel con este
+    // diálogo.
+    let reauth = Reautenticacion::proveer();
     let preparado = RwSignal::new(None::<(i64, PreparadoVista)>);
     let preparando = RwSignal::new(false);
     let error = RwSignal::new(None::<String>);
@@ -619,6 +731,7 @@ pub fn PaginaHistorial() -> impl IntoView {
             {contenido}
         </Transition>
         {dialogo}
+        {move || reauth.abierto().then(|| view! { <DialogoReautenticar /> })}
     }
 }
 

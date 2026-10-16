@@ -163,6 +163,10 @@ name = "ajustes_listas"
 required-features = ["ssr"]
 
 [[test]]
+name = "ajustes_secretos"
+required-features = ["ssr"]
+
+[[test]]
 name = "lecturas"
 required-features = ["ssr"]
 

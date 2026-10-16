@@ -7,7 +7,7 @@
 
 use super::{
     CambioVista, CampoCambio, EstadoDeCambio, MASCARA, PreparadoVista, Valor, confirmar_cambio,
-    duracion, estado_cambio, revelar, texto_error,
+    duracion, estado_cambio, texto_error,
 };
 use crate::t;
 use crate::ui::{Estado, Insignia};
@@ -344,101 +344,6 @@ pub fn DialogoCambio(
                     {estado}
                 </div>
                 <div class="dialogo-pie">{pie}</div>
-            </form>
-        </dialog>
-    }
-}
-
-/// Diálogo para revelar un secreto: pide la contraseña del panel.
-#[component]
-pub(super) fn DialogoRevelar(
-    funcion: String,
-    campo: String,
-    instancia: Option<String>,
-    params: Vec<(String, String)>,
-    #[prop(into)] on_cerrar: Callback<()>,
-    #[prop(into)] on_revelado: Callback<String>,
-) -> impl IntoView {
-    let dlg = NodeRef::<html::Dialog>::new();
-    abrir_modal(dlg);
-    let contrasena = RwSignal::new(String::new());
-    let error = RwSignal::new(None::<String>);
-    let pidiendo = RwSignal::new(false);
-    let datos = StoredValue::new((funcion, campo.clone(), instancia, params));
-
-    let enviar = move |ev: SubmitEvent| {
-        ev.prevent_default();
-        if pidiendo.get_untracked() {
-            return;
-        }
-        error.set(None);
-        pidiendo.set(true);
-        let (f, c, i, p) = datos.get_value();
-        let clave = contrasena.get_untracked();
-        spawn_local(async move {
-            match revelar(f, c, i, p, clave).await {
-                Ok(v) => {
-                    contrasena.set(String::new());
-                    on_revelado.run(v);
-                    if let Some(d) = dlg.get_untracked() {
-                        d.close();
-                    }
-                }
-                Err(e) => {
-                    contrasena.set(String::new());
-                    error.set(Some(texto_error(&e)));
-                }
-            }
-            pidiendo.set(false);
-        });
-    };
-    let cerrar = move |_| {
-        if let Some(d) = dlg.get_untracked() {
-            d.close();
-        }
-    };
-
-    view! {
-        <dialog
-            class="dialogo dialogo-estrecho"
-            node_ref=dlg
-            aria-labelledby="revelar-titulo"
-            aria-modal="true"
-            on:close=move |_| on_cerrar.run(())
-        >
-            <form class="dialogo-cuerpo" on:submit=enviar>
-                <header class="dialogo-cabecera">
-                    <h2 id="revelar-titulo">{t!("biblioteca-revelar-titulo")}</h2>
-                </header>
-                <p>
-                    {t!("biblioteca-revelar-para-ver")}
-                    " "
-                    <span class="mono">{campo}</span>
-                    {t!("biblioteca-revelar-texto")}
-                </p>
-                <p class="campo">
-                    <label for="revelar-contrasena">{t!("biblioteca-contrasena-panel")}</label>
-                    <input
-                        id="revelar-contrasena"
-                        type="password"
-                        autocomplete="current-password"
-                        required
-                        autofocus
-                        prop:value=contrasena
-                        on:input=move |ev| contrasena.set(event_target_value(&ev))
-                    />
-                </p>
-                <p class="error-formulario" role="alert">
-                    {move || error.get()}
-                </p>
-                <div class="dialogo-pie">
-                    <button class="boton-sutil" type="button" on:click=cerrar>
-                        {t!("biblioteca-cancelar")}
-                    </button>
-                    <button class="boton" type="submit" disabled=move || pidiendo.get()>
-                        {move || if pidiendo.get() { t!("biblioteca-comprobando") } else { t!("biblioteca-revelar") }}
-                    </button>
-                </div>
             </form>
         </dialog>
     }

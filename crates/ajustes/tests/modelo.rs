@@ -1063,3 +1063,46 @@ fn sin_eleccion_solo_en_opciones_y_distinto() {
         "sin_eleccion",
     );
 }
+
+/// Un secreto no puede ser `opcional`: al enviarlo vacío se vaciaría la
+/// clave del router.
+#[test]
+fn secreto_no_puede_ser_opcional() {
+    let malo = WIFI.replace(
+        "lee = \"key_phrase\"\ntipo = \"secreto\"\nvalidar = { min = 8, max = 63 }",
+        "lee = \"key_phrase\"\ntipo = \"secreto\"\nopcional = true\nvalidar = { min = 8, max = 63 }",
+    );
+    assert_ne!(malo, WIFI, "el reemplazo tiene que casar");
+    falla_con(&fallos(&malo, ""), "wifi.red.clave", "`opcional`");
+}
+
+/// Límites de la excepción de la regla 8: solo un secreto de la web básica
+/// con `solo_lectura` conserva su `escribe`. Un texto de la web básica o un
+/// secreto de la web avanzada con `solo_lectura` y `escribe` siguen siendo
+/// un error del catálogo.
+#[test]
+fn excepcion_de_solo_lectura_con_escribe_solo_para_secretos_basicos() {
+    let f = fallos(WIFI, "");
+    assert!(f.is_empty(), "el secreto básico de WIFI vale: {f:#?}");
+    let texto_basico = format!(
+        "{WIFI}\n[[ajuste.campo]]\nid = \"nombre_basico\"\n\
+         escribe = {{ funcion = \"te_x.wl\", parametro = \"wlSsid\" }}\nlee = \"nombre\"\n\
+         tipo = \"texto\"\nsolo_lectura = \"ajustes-solo-lectura-basica\"\n"
+    );
+    falla_con(
+        &fallos(&texto_basico, ""),
+        "wifi.avanzado.nombre_basico",
+        "`solo_lectura` con `escribe`",
+    );
+    let secreto_avanzado = WIFI.replace(
+        "lee = \"key_phrase\"\ntipo = \"secreto\"\nvalidar = { min = 8, max = 63 }",
+        "lee = \"key_phrase\"\ntipo = \"secreto\"\nvalidar = { min = 8, max = 63 }\n\
+         solo_lectura = \"ajustes-solo-lectura-basica\"",
+    );
+    assert_ne!(secreto_avanzado, WIFI, "el reemplazo tiene que casar");
+    falla_con(
+        &fallos(&secreto_avanzado, ""),
+        "wifi.red.clave",
+        "`solo_lectura` con `escribe`",
+    );
+}

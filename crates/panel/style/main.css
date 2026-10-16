@@ -1801,6 +1801,72 @@ input {
   background: var(--aviso-suave);
 }
 
+/* Un secreto mostrado: el valor (se selecciona entero de un toque, para
+   copiarlo a mano si no hay portapapeles) con «Copiar» al lado. */
+.secreto-mostrado {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-2);
+  max-width: 100%;
+}
+
+.secreto-mostrado .revelado {
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+
+.celda-secreta {
+  flex-wrap: wrap;
+}
+
+.secreto-error {
+  display: block;
+}
+
+/* Al editar: «•••••• Mostrar · Cambiar» o el campo con «Ver lo escrito». */
+.campo-etiqueta {
+  margin: 0;
+  color: var(--texto-1);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.secreto-fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-2);
+}
+
+.campo-ajuste .secreto-fila input:not([type="checkbox"]) {
+  flex: 1 1 12rem;
+  width: auto;
+  min-width: 0;
+}
+
+/* Historial: los valores anteriores de las contraseñas de un paso. */
+.hist-anteriores {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hist-anteriores li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-2);
+}
+
+.hist-anterior-campo {
+  color: var(--texto-2);
+  font-size: 13px;
+}
+
 .boton-mini {
   display: inline-flex;
   align-items: center;

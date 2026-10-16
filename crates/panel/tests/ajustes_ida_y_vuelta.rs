@@ -162,11 +162,36 @@ fn hermanos_iguales(
     }
 }
 
+/// ¿Escribir el campo `c` reenviaría un secreto que el simulador da vacío o
+/// tapado (como la contraseña de la línea de voz)? Entonces el gestor no
+/// escribe (podría borrarla) hasta que la fase 3 lo compruebe con el router
+/// real.
+async fn reenviaria_un_secreto_tapado(p: &Panel, a: &Ajuste, c: &Campo) -> bool {
+    let f = catalogo::Catalogo::load().unwrap();
+    let m = catalogo::mask::Mascara::load().unwrap();
+    let Some(func) = c.escribible().and_then(|e| f.funcion(&e.funcion)) else {
+        return false;
+    };
+    for param in &func.parametros {
+        if param.tipo != catalogo::TipoParam::Secret && !m.es_secreto(&param.nombre) {
+            continue;
+        }
+        if let Some(v) = crudo_opcional(p, a, &param.nombre).await {
+            let v = v.trim();
+            if v.is_empty() || v.chars().all(|c| matches!(c, '*' | '•' | '●')) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 #[tokio::test]
 async fn cada_ajuste_antes_aplicar_verificar_deshacer() {
     let (p, cookie) = panel_con_gestor().await;
     let catalogo = CatalogoAjustes::load().unwrap();
     let mut n = 0u32;
+    let mut bloqueados = Vec::new();
     for a in catalogo.todos() {
         if a.lista || a.componente.is_some() {
             continue;
@@ -174,6 +199,24 @@ async fn cada_ajuste_antes_aplicar_verificar_deshacer() {
         for c in a.campos.iter().filter(|c| c.escribible().is_some()) {
             n += 1;
             let que = format!("{} / {}", a.id, c.id);
+            if reenviaria_un_secreto_tapado(&p, a, c).await {
+                let actual = legible(&p, &cookie, a, &c.id).await;
+                let (nuevo, _) = otro_valor(c, &actual, n);
+                let escritas = p.sim.control.writes().len();
+                let (status, body) = llamar(
+                    &p,
+                    "preparar_ajuste",
+                    json!({ "p": { "ajuste": a.id, "instancia": null, "borrar": false,
+                                   "valores": { c.id.as_str(): nuevo } } }),
+                    Some(&cookie),
+                )
+                .await;
+                assert_eq!(status, 403, "{que}: se esperaba el bloqueo: {body}");
+                assert!(body.contains("contraseña"), "{que}: {body}");
+                assert_eq!(p.sim.control.writes().len(), escritas, "{que}");
+                bloqueados.push(que);
+                continue;
+            }
             let todo_antes = foto(&p, &cookie, a).await;
             let antes = todo_antes[&c.id].0.clone();
             let antes_crudo = crudo(&p, a, &c.lee).await;
@@ -230,4 +273,10 @@ async fn cada_ajuste_antes_aplicar_verificar_deshacer() {
         }
     }
     assert!(n > 20, "solo {n} campos: ¿se ha saltado alguno?");
+    // Solo la línea de voz: el simulador da vacía su contraseña.
+    assert!(!bloqueados.is_empty(), "ninguno bloqueado");
+    assert!(
+        bloqueados.iter().all(|q| q.starts_with("telefono.")),
+        "{bloqueados:?}"
+    );
 }

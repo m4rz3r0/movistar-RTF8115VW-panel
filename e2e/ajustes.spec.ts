@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
+import { CONTRASENA } from "./instancias";
 import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 
 // Páginas de Ajustes (/ajustes/<tema>) a 360 y 1440 px, en español y en
@@ -218,4 +219,110 @@ for (const idioma of ["es", "en"] as const) {
       });
     });
   }
+}
+
+// Secretos (en español, a 360, 1024 y 1440 px): «Mostrar» la contraseña de
+// la red de 5 GHz pide la del panel con el diálogo de reautenticación,
+// enseña el valor con «Copiar» y, a los 30 s (con el reloj de Playwright),
+// vuelve a la máscara y el valor sale del DOM. Al editar, «Cambiar» abre el
+// campo con «Ver lo escrito». En el Historial, el paso que cambió esa
+// contraseña (lo aplica e2e_grupo al arrancar) ofrece «Mostrar el valor
+// anterior».
+const CLAVE_5 = "clave-de-prueba-1";
+
+for (const ancho of [360, 1024, 1440]) {
+  test.describe(`secretos a ${ancho} px`, () => {
+    test.use({ locale: "es-ES", viewport: { width: ancho, height: 900 } });
+
+    test("Mostrar, cuenta atrás, Cambiar y el valor anterior", async ({ page }) => {
+      // El 401 que pide la contraseña es lo esperado; cualquier otro error
+      // o aviso de la consola, no.
+      const errores: string[] = [];
+      page.on("console", (m) => {
+        const url = m.location().url;
+        if (url.endsWith("/favicon.ico") || /\/api\/revelar_(ajuste|anterior)$/.test(url)) return;
+        if (m.type() === "error" || m.type() === "warning") errores.push(m.text());
+      });
+      page.on("pageerror", (e) => errores.push(String(e)));
+      await page.clock.install();
+      await entrar(page);
+      await page.goto("/ajustes/wifi");
+      await asentar(page);
+      const red5 = tarjeta(page, "Red WiFi 5 GHz");
+      const fila = red5.locator(".ajuste-resumen .ajuste-fila").filter({ hasText: "Contraseña" });
+      await expect(fila.locator(".secreto")).toHaveText("••••••");
+      await expect(red5).not.toContainText(CLAVE_5);
+      expect(await page.content()).not.toContain(CLAVE_5);
+      await page.screenshot({ path: `capturas/secreto-mascara-es-${ancho}.png` });
+
+      // «Mostrar»: sin la ventana abierta, el diálogo de reautenticación.
+      await fila.getByRole("button", { name: /^Mostrar/ }).click();
+      const dialogo = page.locator("dialog[open]");
+      await expect(dialogo.locator("h2")).toHaveText("Confirma que eres tú");
+      await dialogo.locator("#reautenticar-contrasena").fill(CONTRASENA);
+      await dialogo.getByRole("button", { name: "Seguir" }).click();
+      await expect(page.locator("dialog[open]")).toHaveCount(0);
+      const valor = fila.locator(".revelado");
+      await expect(valor).toHaveText(CLAVE_5);
+      await expect(fila.getByRole("button", { name: /^Copiar/ })).toBeVisible();
+      await expect(fila.locator(".solo-lector").filter({ hasText: "Se volverá a ocultar" })).toHaveText(
+        /en 30 s/,
+      );
+      await sinDesbordamiento(page, `secreto mostrado ${ancho}`);
+      await page.screenshot({ path: `capturas/secreto-mostrado-es-${ancho}.png` });
+
+      // A los 30 s, la máscara otra vez; el valor ya no está en la página.
+      await page.clock.runFor(29_000);
+      await expect(valor).toHaveText(CLAVE_5);
+      await page.clock.runFor(1_500);
+      await expect(fila.locator(".revelado")).toHaveCount(0);
+      await expect(fila.locator(".secreto")).toHaveText("••••••");
+      expect(await page.content()).not.toContain(CLAVE_5);
+
+      // Editar: «•••••• · Mostrar · Cambiar»; «Cambiar» abre el campo.
+      await red5.getByRole("button", { name: "Editar" }).click();
+      const edicion = red5.locator(".ajuste-edicion");
+      const cambiar = edicion.getByRole("button", { name: /^Cambiar/ });
+      await expect(cambiar).toBeVisible();
+      await expect(edicion.getByRole("button", { name: /^Mostrar/ })).toBeVisible();
+      await cambiar.click();
+      const campo = edicion.getByLabel("Contraseña", { exact: true });
+      await expect(campo).toBeFocused();
+      await expect(campo).toHaveAttribute("type", "password");
+      await expect(campo).toHaveAttribute("autocomplete", "new-password");
+      await campo.fill("clave-de-prueba-2");
+      await edicion.getByRole("button", { name: "Ver lo escrito" }).click();
+      await expect(campo).toHaveAttribute("type", "text");
+      await sinDesbordamiento(page, `secreto en edición ${ancho}`);
+      await page.screenshot({ path: `capturas/secreto-edicion-es-${ancho}.png` });
+      // «Cancelar» lo deja como estaba: otra vez la máscara y «Cambiar».
+      await red5.getByRole("button", { name: "Cancelar" }).click();
+      await red5.getByRole("button", { name: "Editar" }).click();
+      await expect(edicion.getByRole("button", { name: /^Cambiar/ })).toBeVisible();
+      await expect(edicion.getByLabel("Contraseña", { exact: true })).toHaveCount(0);
+      await red5.getByRole("button", { name: "Cancelar" }).click();
+
+      // Historial: «Mostrar el valor anterior» del paso que cambió la clave.
+      await page.goto("/historial");
+      await asentar(page);
+      // (El botón está dentro del detalle plegado: se busca la lista.)
+      const cambio = page.locator("li.hist-cambio", { has: page.locator("ul.hist-anteriores") });
+      await expect(cambio).toHaveCount(1);
+      // En la hora: el centro del resumen puede caer en el enlace a la función.
+      await cambio.locator("summary.hist-cabeza .hist-hora").click();
+      const anterior = cambio.locator(".hist-anteriores li");
+      await expect(anterior.locator(".secreto")).toHaveText("••••••");
+      await sinDesbordamiento(page, `historial con el valor anterior ${ancho}`);
+      await page.screenshot({ path: `capturas/secreto-historial-es-${ancho}.png`, fullPage: true });
+      // La ventana de reautenticación sigue abierta: no vuelve a pedirla.
+      await anterior.getByRole("button", { name: /^Mostrar el valor anterior/ }).click();
+      await expect(anterior.locator(".revelado")).toBeVisible();
+      await expect(anterior.locator(".revelado")).not.toHaveText(CLAVE_5);
+      await expect(page.locator("dialog[open]")).toHaveCount(0);
+      await page.screenshot({ path: `capturas/secreto-historial-mostrado-es-${ancho}.png`, fullPage: true });
+      // Y el revelado de Ajustes figura con el ajuste y el campo.
+      await expect(page.locator("li.hist-revelado").first()).toContainText("Red WiFi 5 GHz");
+      expect(errores, "errores o avisos en la consola").toEqual([]);
+    });
+  });
 }

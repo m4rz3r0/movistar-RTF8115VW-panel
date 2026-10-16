@@ -22,6 +22,7 @@ use crate::ajustes_router::{
 use crate::t;
 use crate::ui::explorador::texto_error;
 use crate::ui::i18n::traducir;
+use crate::ui::panel_ajustes::{DialogoReautenticar, Reautenticacion};
 use crate::ui::{Estado, IconoEstado};
 use ajustes::{Nivel, Tema};
 use leptos::prelude::*;
@@ -286,6 +287,8 @@ pub fn PaginaTema() -> impl IntoView {
     );
     let foco = Foco(RwSignal::new(None));
     provide_context(foco);
+    // «Mostrar» un secreto pide la contraseña del panel con este diálogo.
+    let reauth = Reautenticacion::proveer();
     let precarga = Precarga::nueva();
     let recargar = Callback::new(move |()| {
         precarga.olvidar();
@@ -353,6 +356,8 @@ pub fn PaginaTema() -> impl IntoView {
                 </Transition>
                 </div>
             </div>
+            // Fuera de la zona que se bloquea mientras lee.
+            {move || reauth.abierto().then(|| view! { <DialogoReautenticar /> })}
         }
         .into_any()
     }
