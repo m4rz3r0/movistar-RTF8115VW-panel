@@ -129,8 +129,9 @@ impl Precargados {
 /// corta cuando se pulse (en Red local y en Puertos, también los
 /// dispositivos y la red de casa, y en Puertos las IP fijas, que piden
 /// después sus tarjetas). Una sola a la vez (el servidor las lee en serie)
-/// y cada tema una vez por caducidad de la caché. Al desmontarse la página, lo programado se cancela; lo que ya
-/// corre no lee señales (solo `try_*` y valores guardados).
+/// y cada tema una vez por caducidad de la caché. Al desmontarse la
+/// página, lo programado se cancela; lo que ya corre no lee señales (solo
+/// `try_*` y valores guardados).
 #[derive(Clone, Copy)]
 struct Precarga {
     programada: StoredValue<Option<TimeoutHandle>>,

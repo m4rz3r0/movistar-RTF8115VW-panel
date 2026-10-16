@@ -1195,7 +1195,7 @@ async fn aviso_destino_inexistente_en_la_pagina() {
     assert_eq!(resp.status(), 200);
     let html = common::body_text(resp).await;
     assert!(
-        html.contains("el dispositivo de destino ya no está en la red"),
+        html.contains("El dispositivo de destino ya no está en la red"),
         "{html}"
     );
     assert!(!html.contains("todavía no está lista"), "{html}");
@@ -1206,13 +1206,165 @@ async fn aviso_destino_inexistente_en_la_pagina() {
 async fn leer_reservas_de_la_cache() {
     let (p, cookie) = panel_con_gestor().await;
     let r = ok(&p, "leer_reservas", json!({}), &cookie).await;
-    assert_eq!(
-        r,
-        json!([
-            ["0", "02:00:00:00:00:04", "192.168.1.68"],
-            ["1", "02:00:00:00:00:01", "192.168.1.69"]
-        ])
-    );
+    // Solo las IP: es lo único que usa la página.
+    assert_eq!(r, json!(["192.168.1.68", "192.168.1.69"]));
     let (status, _) = llamar(&p, "leer_reservas", json!({}), None).await;
     assert_eq!(status, 401);
+}
+
+// ------------------------------------------- ronda de corrección 1 (T10)
+
+/// «TCP y UDP» con la segunda escritura fallida: el gestor revierte la
+/// primera (borra la regla TCP recién creada) y el grupo queda fallido; la
+/// lista vuelve a ser la de antes.
+#[tokio::test]
+async fn ambos_con_la_segunda_escritura_fallida_no_deja_nada() {
+    let (p, cookie) = panel_con_gestor().await;
+    let antes = reglas_del_tema(&p, &cookie).await;
+    let (status, body) =
+        preparar_regla(&p, &cookie, None, false, nueva("ambos", "9000"), json!({})).await;
+    assert_eq!(status, 200, "{body}");
+    let g: Value = serde_json::from_str(&body).unwrap();
+    p.sim.control.fail_write_n(2);
+    let (status, body) = llamar(
+        &p,
+        "confirmar_ajuste",
+        json!({ "token": g["token"], "desmarcados": [] }),
+        Some(&cookie),
+    )
+    .await;
+    assert_ne!(status, 200, "{body}");
+    esperar_libre(&p).await;
+    let historial = p.state.cambios().unwrap();
+    let ultimo = historial
+        .historial(5)
+        .await
+        .into_iter()
+        .next()
+        .expect("el cambio");
+    assert_eq!(ultimo.estado, panel::changes::Estado::Fallido, "{ultimo:?}");
+    assert_eq!(reglas_del_tema(&p, &cookie).await, antes);
+}
+
+/// Editar una regla valida lo que resulta de mezclar lo pedido con lo que
+/// tiene el router: chocar con otra regla o salir de la red da 400; un
+/// cambio que vale se aplica.
+#[tokio::test]
+async fn editar_regla_valida_con_lo_del_router() {
+    let (p, cookie) = panel_con_gestor().await;
+    let (status, body) =
+        preparar_regla(&p, &cookie, None, false, nueva("tcp", "9000"), json!({})).await;
+    assert_eq!(status, 200, "{body}");
+    aplicar(&p, &cookie, &serde_json::from_str(&body).unwrap()).await;
+    let escritas = p.sim.control.writes().len();
+    // La 0 al puerto 9000 de internet (el de dentro sigue en 8080).
+    let (status, body) = preparar_regla(
+        &p,
+        &cookie,
+        Some("0"),
+        false,
+        json!({ "externo_desde": "9000", "externo_hasta": "9000" }),
+        esperados_0(),
+    )
+    .await;
+    assert_eq!(status, 400, "{body}");
+    assert!(body.contains("ya está abierto"), "{body}");
+    let (status, body) = preparar_regla(
+        &p,
+        &cookie,
+        Some("0"),
+        false,
+        json!({ "destino": "192.0.2.10" }),
+        esperados_0(),
+    )
+    .await;
+    assert_eq!(status, 400, "{body}");
+    assert!(
+        body.contains("no es la de un dispositivo de tu red"),
+        "{body}"
+    );
+    assert_eq!(p.sim.control.writes().len(), escritas);
+    let (status, body) = preparar_regla(
+        &p,
+        &cookie,
+        Some("0"),
+        false,
+        json!({ "destino": "192.168.1.62" }),
+        esperados_0(),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    aplicar(&p, &cookie, &serde_json::from_str(&body).unwrap()).await;
+    let ahora = reglas_del_tema(&p, &cookie).await;
+    let r0 = ahora.iter().find(|r| r[0] == "0").unwrap();
+    assert_eq!(r0[2..], ["tcp", "8080", "192.168.1.62"]);
+}
+
+/// Un protocolo que el panel no conoce se ve como en el resto de ajustes
+/// («Valor no reconocido (47)»), nunca con su clave de traducción.
+#[tokio::test]
+async fn protocolo_desconocido_en_la_pagina() {
+    let (p, cookie) = panel_con_gestor_y_capa(&variante("puertos-protocolo-desconocido")).await;
+    let resp = common::get_con_cookie(&p.app, "/ajustes/puertos", &cookie).await;
+    let html = common::body_text(resp).await;
+    assert!(html.contains("Valor no reconocido (47)"), "{html}");
+    assert!(!html.contains("ajuste-puertos-reglas-protocolo-"), "{html}");
+}
+
+/// Con un protocolo desconocido no se sabe si choca: cuenta como TCP y UDP
+/// a la vez (8080 UDP choca con ella).
+#[tokio::test]
+async fn protocolo_desconocido_solapa_con_los_dos() {
+    let (p, cookie) = panel_con_gestor_y_capa(&variante("puertos-protocolo-desconocido")).await;
+    for protocolo in ["tcp", "udp"] {
+        let (status, body) = preparar_regla(
+            &p,
+            &cookie,
+            None,
+            false,
+            nueva(protocolo, "8080"),
+            json!({}),
+        )
+        .await;
+        assert_eq!(status, 400, "{protocolo}: {body}");
+        assert!(body.contains("ya está abierto"), "{body}");
+    }
+    let (status, body) =
+        preparar_regla(&p, &cookie, None, false, nueva("udp", "8081"), json!({})).await;
+    assert_eq!(status, 200, "{body}");
+}
+
+/// «TCP y UDP»: cada paso lleva su título («TCP», «UDP») y el segundo solo
+/// lo que cambia respecto al primero (el resto, en su nota).
+#[tokio::test]
+async fn ambos_con_un_titulo_por_paso() {
+    let (p, cookie) = panel_con_gestor().await;
+    let (status, body) =
+        preparar_regla(&p, &cookie, None, false, nueva("ambos", "9000"), json!({})).await;
+    assert_eq!(status, 200, "{body}");
+    let g: Value = serde_json::from_str(&body).unwrap();
+    let pasos = g["pasos"].as_array().unwrap();
+    assert_eq!(
+        pasos[0]["titulo"], "ajuste-puertos-reglas-protocolo-tcp",
+        "{g}"
+    );
+    assert_eq!(
+        pasos[1]["titulo"], "ajuste-puertos-reglas-protocolo-udp",
+        "{g}"
+    );
+    let campos = |i: usize| -> Vec<String> {
+        pasos[i]["campos"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| c["campo"].as_str().unwrap().to_owned())
+            .collect()
+    };
+    assert!(campos(0).len() >= 7, "{g}");
+    assert_eq!(campos(1), ["ajuste-puertos-reglas-protocolo"], "{g}");
+    assert_eq!(pasos[1]["nota"], "ajuste-puertos-reglas-paso-igual", "{g}");
+    // Una regla de un solo protocolo no lleva títulos.
+    let (_, body) = preparar_regla(&p, &cookie, None, false, nueva("tcp", "9000"), json!({})).await;
+    let g: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(g["pasos"][0]["titulo"], Value::Null, "{g}");
 }

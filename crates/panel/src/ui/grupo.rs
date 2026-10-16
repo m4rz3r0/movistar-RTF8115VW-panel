@@ -329,6 +329,15 @@ pub fn DialogoGrupo(
             .map(|(i, p)| {
                 let sin_cambios = p.sin_cambios;
                 let id = format!("grupo-paso-{i}");
+                // Su título («TCP») o, sin él, «Paso N».
+                let nombre = p
+                    .titulo
+                    .as_ref()
+                    .map_or_else(|| t!("ajustes-grupo-paso", n = i + 1), |c| traducir(c, None));
+                let nota_paso = p
+                    .nota
+                    .as_ref()
+                    .map(|c| view! { <p class="pagina-sub">{traducir(c, None)}</p> });
                 let cabeza = varios.then(|| {
                     view! {
                         <legend class="grupo-paso-titulo">
@@ -346,7 +355,7 @@ pub fn DialogoGrupo(
                                     });
                                 }
                             />
-                            <label for=id>{t!("ajustes-grupo-paso", n = i + 1)}</label>
+                            <label for=id>{nombre}</label>
                             {sin_cambios.then(|| view! {
                                 <span class="chip">{t!("ajustes-grupo-ya-esta")}</span>
                             })}
@@ -360,6 +369,7 @@ pub fn DialogoGrupo(
                     <fieldset class="grupo-paso">
                         {cabeza}
                         {nota}
+                        {nota_paso}
                         {tabla(&p.campos)}
                     </fieldset>
                 }
@@ -574,6 +584,8 @@ mod tests {
                     TipoCampo::Secreto,
                 ),
             ],
+            titulo: None,
+            nota: None,
         }]);
         let h = html(g);
         assert!(h.contains("Revisa el cambio"), "{h}");
@@ -619,11 +631,15 @@ mod tests {
                     "b",
                     TipoCampo::Texto,
                 )],
+                titulo: None,
+                nota: None,
             },
             PasoVista {
                 indice: 1,
                 sin_cambios: true,
                 campos: vec![],
+                titulo: None,
+                nota: None,
             },
         ]);
         let h = html(g);
@@ -634,6 +650,41 @@ mod tests {
             1,
             "solo el paso sin cambios: {h}"
         );
+        assert!(h.contains(&t!("ajustes-grupo-paso", n = 2)), "{h}");
+    }
+
+    /// Un paso con título («TCP», «UDP») lo enseña en vez de «Paso N», con
+    /// su nota debajo; sin título, sigue siendo «Paso N».
+    #[test]
+    fn pasos_con_titulo_y_nota() {
+        let paso = |indice, titulo: Option<&str>, nota: Option<&str>| PasoVista {
+            indice,
+            sin_cambios: false,
+            campos: vec![cambio(
+                "ajuste-puertos-reglas-protocolo",
+                "",
+                "udp",
+                TipoCampo::Opcion,
+            )],
+            titulo: titulo.map(str::to_owned),
+            nota: nota.map(str::to_owned),
+        };
+        let h = html(grupo(vec![
+            paso(0, Some("ajuste-puertos-reglas-protocolo-tcp"), None),
+            paso(
+                1,
+                Some("ajuste-puertos-reglas-protocolo-udp"),
+                Some("ajuste-puertos-reglas-paso-igual"),
+            ),
+        ]));
+        assert!(h.contains(">TCP</label>"), "{h}");
+        assert!(h.contains(">UDP</label>"), "{h}");
+        assert!(!h.contains(&t!("ajustes-grupo-paso", n = 1)), "{h}");
+        assert!(
+            h.contains(&traducir("ajuste-puertos-reglas-paso-igual", None)),
+            "{h}"
+        );
+        let h = html(grupo(vec![paso(0, None, None), paso(1, None, None)]));
         assert!(h.contains(&t!("ajustes-grupo-paso", n = 2)), "{h}");
     }
 
@@ -650,6 +701,8 @@ mod tests {
             indice,
             sin_cambios,
             campos: vec![],
+            titulo: None,
+            nota: None,
         };
         let pasos = vec![paso(0, false), paso(1, true), paso(2, false)];
         assert_eq!(desmarcados(&pasos, &[true, false, false]), vec![2]);

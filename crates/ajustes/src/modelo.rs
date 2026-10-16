@@ -251,6 +251,7 @@ mod catalogo_toml {
                 Componente::Puertos => &[
                     "protocolo-ambos",
                     "protocolo-ambos-desc",
+                    "paso-igual",
                     "abrir",
                     "nueva",
                     "cambiar",

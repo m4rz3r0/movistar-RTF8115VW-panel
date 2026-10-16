@@ -3245,9 +3245,13 @@ summary.hist-cabeza:hover {
 /* Puertos: puertos abiertos. Cada regla es una fila: su nombre (y el aviso
    si su destino ya no está en la red), el puerto de internet (lo que se
    abre, en grande) con su protocolo, el dispositivo al que va, si está
-   activa y sus acciones, en columnas bajo una cabecera. En pantallas
-   estrechas, uno bajo otro y cada dato con su etiqueta. */
+   activa y sus acciones, en columnas bajo una cabecera. Las columnas van en
+   rem (no en em): la cabecera, con letra más pequeña, cae sobre ellas. Si
+   la lista no tiene sitio para todas con un mínimo legible para el nombre y
+   el aviso, cada regla se apila (según el ancho de la lista, no el de la
+   ventana: el menú lateral también ocupa). */
 .reglas {
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   margin: 0;
@@ -3261,7 +3265,7 @@ summary.hist-cabeza:hover {
 .regla,
 .reglas-cabecera {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 11em minmax(0, 13em) 4.5em 10.5em;
+  grid-template-columns: minmax(12rem, 1fr) 9rem minmax(8rem, 12rem) 4.5rem 10rem;
   align-items: center;
   gap: var(--esp-2) var(--esp-4);
   padding: var(--esp-3) var(--esp-4);
@@ -3393,7 +3397,7 @@ summary.hist-cabeza:hover {
   margin-bottom: var(--esp-2);
 }
 
-@media (max-width: 720px) {
+@container (max-width: 50rem) {
   .reglas-cabecera {
     display: none;
   }

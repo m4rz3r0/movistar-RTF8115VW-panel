@@ -12,7 +12,7 @@
 //! junto al campo. Todo se guarda con el diálogo de grupo.
 
 use super::Foco;
-use super::campo::{Campo, validar};
+use super::campo::{Campo, DESCONOCIDO, validar};
 use super::dispositivos::{aviso_error, nombre};
 use super::tarjeta::{ayuda, cabecera, detalles_tecnicos, dom, enfocar};
 use crate::ajustes_router::{
@@ -37,8 +37,8 @@ const CLAVE: &str = "ajuste-puertos-reglas";
 /// Valor del `<select>` de dispositivos que pide escribir la IP.
 const OTRA_IP: &str = "otra";
 
-/// IP fijas como `(id, mac, ip)`.
-type IpFijas = Vec<(String, String, String)>;
+/// Las IP de las IP fijas.
+type IpFijas = Vec<String>;
 
 /// Lo que lee de la red de casa la tarjeta de Puertos: los dispositivos
 /// (para elegir el destino y ponerle nombre), las IP fijas (para saber si
@@ -65,7 +65,13 @@ impl RedPuertos {
     /// se pudieron leer los dispositivos y las IP fijas: sin ellos no se sabe.
     fn destino_perdido(&self, ip: &str) -> bool {
         match (&self.dispositivos, &self.reservas) {
-            (Some(d), Some(r)) => destino_inexistente(ip, d, r),
+            (Some(d), Some(r)) => {
+                let fijas: Vec<(String, String, String)> = r
+                    .iter()
+                    .map(|ip| (String::new(), String::new(), ip.clone()))
+                    .collect();
+                destino_inexistente(ip, d, &fijas)
+            }
             _ => false,
         }
     }
@@ -181,16 +187,28 @@ struct Inicial {
 }
 
 impl Inicial {
-    fn de(r: Option<&ReglaPuertos>) -> Inicial {
+    /// De la regla que se edita (`r`, leída de `i`); sin ella, una nueva.
+    /// Un protocolo que el panel no conoce empieza «sin elegir»
+    /// ([`DESCONOCIDO`]): hay que elegir TCP o UDP para guardarla.
+    fn de(r: Option<&ReglaPuertos>, i: Option<&InstanciaVista>) -> Inicial {
         let Some(r) = r else {
             return Inicial {
                 protocolo: "tcp".into(),
                 ..Inicial::default()
             };
         };
+        let protocolo = i
+            .map(|i| valor_de(&i.campos, "protocolo"))
+            .filter(|p| {
+                matches!(
+                    Protocolo::de_clave(p),
+                    Some(Protocolo::Tcp | Protocolo::Udp)
+                )
+            })
+            .unwrap_or_else(|| DESCONOCIDO.to_owned());
         Inicial {
             nombre: r.nombre.clone(),
-            protocolo: r.protocolo.claves()[0].to_owned(),
+            protocolo,
             puerto: rango_editable(r.externo),
             destino: r.ip.to_string(),
             interno: if r.interno == r.externo {
@@ -220,7 +238,7 @@ fn FormRegla(
     let regla = editando.as_ref().and_then(regla_de);
     let instancia = editando.as_ref().map(|i| i.id.clone());
     let nueva = instancia.is_none();
-    let ini = Inicial::de(regla.as_ref());
+    let ini = Inicial::de(regla.as_ref(), editando.as_ref());
     let plantilla_de = |id: &str| plantilla.iter().find(|c| c.id == id).cloned();
     let Some((c_nombre, mut c_protocolo, c_destino)) = plantilla_de("nombre")
         .zip(plantilla_de("protocolo"))
@@ -229,6 +247,15 @@ fn FormRegla(
     else {
         return ().into_any();
     };
+    // Al editar, el protocolo con el valor del router: si no lo conoce, el
+    // control lo enseña como «valor no reconocido».
+    if let Some(v) = editando
+        .as_ref()
+        .and_then(|i| i.campos.iter().find(|c| c.id == "protocolo"))
+        .map(|c| c.valor.clone())
+    {
+        c_protocolo.valor = v;
+    }
     // «TCP y UDP» solo al crear: el router guarda un protocolo por regla.
     if nueva {
         c_protocolo.opciones.push(OpcionVista {
@@ -301,6 +328,17 @@ fn FormRegla(
     let editando = StoredValue::new(editando);
     let lan = red.lan;
 
+    // El plegable del puerto del dispositivo se abre si su campo tiene un
+    // error: el error y el foco no pueden quedar ocultos.
+    let id_interno = id("plegable-interno");
+    let abrir_interno = {
+        let id_interno = id_interno.clone();
+        move || {
+            if let Some(e) = document().get_element_by_id(&id_interno) {
+                let _ = e.set_attribute("open", "");
+            }
+        }
+    };
     let guardar = {
         let control = control.clone();
         move |ev: SubmitEvent| {
@@ -366,6 +404,7 @@ fn FormRegla(
                     Ok(()) => interno_texto.parse::<u16>().ok(),
                     Err(m) => {
                         marcar(e_interno, "interno", m);
+                        abrir_interno();
                         None
                     }
                 }
@@ -378,6 +417,7 @@ fn FormRegla(
                         "interno",
                         t!("ajuste-puertos-reglas-error-distintos"),
                     );
+                    abrir_interno();
                 }
                 int
             });
@@ -523,7 +563,7 @@ fn FormRegla(
                 <Campo c=c_puerto dom=id("puerto") valor=puerto_v error=e_puerto bloqueado=preparando />
                 {selector}
                 {otra_ip}
-                <details class="regla-interno" open=interno_abierto>
+                <details class="regla-interno" id=id_interno.clone() open=interno_abierto>
                     <summary>{t!("ajuste-puertos-reglas-puerto-distinto")}</summary>
                     <Campo c=c_interno dom=id("interno") valor=interno_v error=e_interno bloqueado=preparando />
                 </details>
@@ -781,7 +821,16 @@ fn fila(
     let nombre_regla = Some(v("nombre"))
         .filter(|n| !n.is_empty())
         .unwrap_or_else(|| puerto.clone());
-    let protocolo = traducir(&format!("{CLAVE}-protocolo-{}", v("protocolo")), None);
+    // Un protocolo que el panel no conoce, como en el resto de ajustes.
+    let protocolo = match i
+        .campos
+        .iter()
+        .find(|c| c.id == "protocolo")
+        .map(|c| &c.valor)
+    {
+        Some(ValorLegible::Opcion(k)) => traducir(&format!("{CLAVE}-protocolo-{k}"), None),
+        _ => t!("ajustes-valor-desconocido", valor = v("protocolo")),
+    };
     let interno = r
         .filter(|r| r.interno != r.externo)
         .map(|r| t!("ajuste-puertos-reglas-a-ip", puerto = rango(r.interno)));
@@ -815,14 +864,15 @@ fn fila(
             "ajuste-puertos-reglas-activa-de",
             nombre = nombre_regla.clone()
         );
-        let ocupado = ocupado.clone();
         view! {
             <input
                 class="interruptor"
                 type="checkbox"
                 role="switch"
                 aria-label=etiqueta
-                disabled=move || !editable || ocupado()
+                // Mientras se prepara cualquier regla, ninguno: el cambio
+                // se perdería y el interruptor quedaría como no está.
+                disabled=move || !editable || ocupada.with(Option::is_some)
                 prop:checked=marcada
                 on:change=move |ev| preparar.run((i.clone(), false, Some(event_target_checked(&ev))))
             />

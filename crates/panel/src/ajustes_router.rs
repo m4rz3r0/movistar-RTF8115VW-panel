@@ -198,6 +198,12 @@ pub struct PasoVista {
     /// El router ya está así: no se escribirá.
     pub sin_cambios: bool,
     pub campos: Vec<CambioLegible>,
+    /// Clave de traducción de su título («TCP»); sin ella, «Paso N».
+    #[serde(default)]
+    pub titulo: Option<String>,
+    /// Clave de traducción de una nota bajo el título (lo que no se repite).
+    #[serde(default)]
+    pub nota: Option<String>,
 }
 
 /// Un campo que cambia, con sus valores legibles. Si es `secreto`, `antes`
@@ -500,16 +506,20 @@ pub fn valor_de(campos: &[CampoVista], id: &str) -> String {
     }
 }
 
-/// La regla de una instancia leída de `puertos.reglas`; `None` si algún
-/// valor no se entiende (un protocolo que no es TCP ni UDP, un puerto o
-/// una IP que no lo son).
+/// La regla de una instancia leída de `puertos.reglas`; `None` si un puerto
+/// o la IP no lo son. Un protocolo que no es TCP ni UDP queda como
+/// [`Protocolo::Ambos`]: no se sabe con cuál choca.
 pub fn regla_de(i: &InstanciaVista) -> Option<ReglaPuertos> {
     let v = |id: &str| valor_de(&i.campos, id);
     let puerto = |id: &str| v(id).parse::<u16>().ok();
     Some(ReglaPuertos {
         id: Some(i.id.clone()),
         nombre: v("nombre"),
-        protocolo: Protocolo::de_clave(&v("protocolo")).filter(|p| *p != Protocolo::Ambos)?,
+        // Un protocolo que el panel no conoce puede ser cualquiera: cuenta
+        // como los dos (al comprobar si otra regla choca con ella).
+        protocolo: Protocolo::de_clave(&v("protocolo"))
+            .filter(|p| *p != Protocolo::Ambos)
+            .unwrap_or(Protocolo::Ambos),
         externo: (puerto("externo_desde")?, puerto("externo_hasta")?),
         interno: (puerto("interno_desde")?, puerto("interno_hasta")?),
         ip: v("destino").parse().ok()?,
@@ -610,11 +620,12 @@ pub async fn leer_red_casa() -> Result<Option<(Ipv4Addr, Ipv4Addr)>, ServerFnErr
     servidor::leer_red_casa().await
 }
 
-/// Las IP fijas del router como `(id, mac, ip)`: Puertos las usa para saber
-/// si el dispositivo de destino de una regla sigue en la red
-/// ([`destino_inexistente`]). Lectura para mostrar, como [`leer_tema`].
+/// Las IP de las IP fijas del router (solo eso: es lo que usa la página):
+/// Puertos las usa para saber si el dispositivo de destino de una regla
+/// sigue en la red ([`destino_inexistente`]). Lectura para mostrar, como
+/// [`leer_tema`].
 #[server(endpoint = "leer_reservas", input = Json)]
-pub async fn leer_reservas() -> Result<Vec<(String, String, String)>, ServerFnError> {
+pub async fn leer_reservas() -> Result<Vec<String>, ServerFnError> {
     servidor::leer_reservas().await
 }
 
@@ -1140,6 +1151,8 @@ pub(crate) mod servidor {
                             })
                         })
                         .collect(),
+                    titulo: None,
+                    nota: None,
                 })
                 .collect(),
             riesgo: riesgo(r),
@@ -1344,7 +1357,7 @@ pub(crate) mod servidor {
         Ok(hgu::read::lan_ipv4_de(&n))
     }
 
-    pub(super) async fn leer_reservas() -> Result<Vec<(String, String, String)>, ServerFnError> {
+    pub(super) async fn leer_reservas() -> Result<Vec<String>, ServerFnError> {
         let (state, _) = preparar().await?;
         let clave = clave_reservas();
         let mut leidas = state
@@ -1354,7 +1367,7 @@ pub(crate) mod servidor {
         let n = leida(&mut leidas, &clave)?;
         Ok(hgu::models::StaticLease::parse_all(&n)
             .into_iter()
-            .map(|r| (r.id, r.mac, r.ip))
+            .map(|r| r.ip)
             .collect())
     }
 
@@ -1634,11 +1647,19 @@ pub(crate) mod servidor {
             pasos: Vec::new(),
             titulo: None,
         };
+        // Con varias partes («TCP y UDP»), cada paso se titula con su
+        // protocolo.
+        let mut titulos: Vec<Option<String>> = Vec::new();
         for q in &partes {
             let g = grupo_de(a, q).map_err(|e| {
                 tracing::warn!("ajustes: {}: valor no válido tras validarlo: {e}", a.id);
                 fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-invalida"))
             })?;
+            let titulo = (partes.len() > 1)
+                .then(|| q.valores.get("protocolo"))
+                .flatten()
+                .map(|v| format!("{prefijo}-protocolo-{v}"));
+            titulos.extend(std::iter::repeat_n(titulo, g.pasos.len()));
             grupo.pasos.extend(g.pasos);
             grupo.titulo = g.titulo;
         }
@@ -1655,12 +1676,27 @@ pub(crate) mod servidor {
         let pedidos: Vec<BTreeMap<String, String>> =
             grupo.pasos.iter().map(|p| p.req.valores.clone()).collect();
         let prep = g.preparar_grupo(grupo).await.map_err(error_ajuste)?;
-        Ok(GrupoVista {
-            detalle,
-            ..vista_grupo(&g, a, prep.token, &prep.pasos, prep.riesgo, &|i, param| {
-                buscar(&pedidos[i], param).map(str::to_owned)
-            })
-        })
+        let mut vista = vista_grupo(&g, a, prep.token, &prep.pasos, prep.riesgo, &|i, param| {
+            buscar(&pedidos[i], param).map(str::to_owned)
+        });
+        titular_partes(&mut vista.pasos, &titulos, &prefijo);
+        Ok(GrupoVista { detalle, ..vista })
+    }
+
+    /// Pone a cada paso su título (`titulos`, por índice). Los pasos
+    /// titulados después del primero solo enseñan lo que cambia respecto a
+    /// él (en «TCP y UDP», el protocolo), con una nota que lo dice.
+    fn titular_partes(pasos: &mut [PasoVista], titulos: &[Option<String>], prefijo: &str) {
+        let Some(primero) = pasos.first().map(|p| p.campos.clone()) else {
+            return;
+        };
+        for (i, paso) in pasos.iter_mut().enumerate() {
+            paso.titulo = titulos.get(paso.indice).cloned().flatten();
+            if i > 0 && paso.titulo.is_some() {
+                paso.campos.retain(|c| !primero.contains(c));
+                paso.nota = Some(format!("{prefijo}-paso-igual"));
+            }
+        }
     }
 
     pub(super) async fn confirmar_ajuste(
