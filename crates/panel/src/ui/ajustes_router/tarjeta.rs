@@ -278,9 +278,11 @@ fn lista(a: &AjusteVista) -> impl IntoView + use<> {
 }
 
 /// De dónde se lee el campo `c` del ajuste `ajuste` (de la instancia
-/// `instancia` en una lista) para «Mostrar», si es un secreto.
+/// `instancia` en una lista) para «Mostrar», si es un secreto que se puede
+/// leer.
 fn objetivo(ajuste: &str, c: &CampoVista, instancia: Option<&str>) -> Option<ObjetivoSecreto> {
-    (c.tipo == TipoCampo::Secreto).then(|| ObjetivoSecreto::Ajuste {
+    // Uno tapado al leer no tiene nada que mostrar.
+    (c.tipo == TipoCampo::Secreto && !c.tapado).then(|| ObjetivoSecreto::Ajuste {
         ajuste: ajuste.to_owned(),
         campo: c.id.clone(),
         instancia: instancia.map(str::to_owned),
@@ -420,6 +422,19 @@ fn TarjetaAjuste(a: AjusteVista, solo_lectura: bool, recargar: Callback<()>) -> 
                     }
                 }
             });
+            // Guardar reenvía la clave que el router no deja leer: hay que
+            // escribirla (el servidor tampoco guarda sin ella).
+            if !pedir.is_empty() {
+                campos.with_value(|cs| {
+                    for (i, c) in cs.iter().enumerate() {
+                        if c.tapado && c.solo_lectura.is_none() && !pedir.contains_key(&c.id) {
+                            errores
+                                .with_value(|e| e[i].set(Some(t!("ajustes-secreto-tapado-pedir"))));
+                            primero_mal.get_or_insert(i);
+                        }
+                    }
+                });
+            }
             if let Some(i) = primero_mal {
                 enfocar(&control(i));
                 return;
@@ -497,6 +512,17 @@ fn TarjetaAjuste(a: AjusteVista, solo_lectura: bool, recargar: Callback<()>) -> 
                                 error
                                 bloqueado=preparando
                                 secreto
+                                editando
+                            />
+                        }
+                        .into_any(),
+                        None if c.tipo == TipoCampo::Secreto => view! {
+                            <Campo
+                                c=c.clone()
+                                dom=format!("{id_dom}-c{i}")
+                                valor
+                                error
+                                bloqueado=preparando
                                 editando
                             />
                         }

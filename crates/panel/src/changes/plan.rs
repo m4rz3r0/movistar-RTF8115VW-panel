@@ -240,17 +240,26 @@ pub(super) struct Compuesto {
     pub(super) payload: Vec<(String, String)>,
     /// Campos que cambian.
     pub(super) campos: Vec<Campo>,
-    /// Secretos que la carga reenviaría tal como los da la lectura, que los
-    /// tapa ([`tapado`]): reenviarlos podría borrar la clave del router.
+    /// Secretos que la carga reenviaría desde la lectura sin que valga como
+    /// clave: uno que el catálogo marca como tapado al leer
+    /// ([`catalogo::Parametro::tapado`]) o uno que llega enmascarado
+    /// ([`enmascarado`]). Reenviarlos podría borrar la clave del router: el
+    /// gestor no escribe. Siempre vacío con `explicito` (ahí se omiten).
     pub(super) secretos_tapados: Vec<String>,
 }
 
-/// ¿El router da este secreto tapado en vez de su valor? Vacío, la máscara o
-/// solo asteriscos o puntos. Un valor así no se reenvía nunca como si fuera
-/// la clave.
-pub(super) fn tapado(v: &str) -> bool {
+/// ¿Es una máscara y no una clave? La del panel, o solo asteriscos o puntos.
+pub(super) fn enmascarado(v: &str) -> bool {
     let v = v.trim();
-    v.is_empty() || v == MASCARA || v.chars().all(|c| matches!(c, '*' | '•' | '●'))
+    !v.is_empty() && (v == MASCARA || v.chars().all(|c| matches!(c, '*' | '•' | '●')))
+}
+
+/// ¿El valor leído (o guardado de una lectura) del secreto `p` no sirve para
+/// reenviarlo? Si el catálogo lo marca como tapado al leer, vacío o
+/// enmascarado; si no, solo enmascarado (uno vacío, como una clave WEP sin
+/// usar, se reenvía tal cual).
+fn no_reenviable(p: &Parametro, v: &str) -> bool {
+    enmascarado(v) || (p.tapado && v.trim().is_empty())
 }
 
 /// Une valores de la petición y valores actuales. No hace peticiones.
@@ -290,6 +299,9 @@ pub(super) fn componer(
     }
     let mut payload = Vec::new();
     let mut secretos_tapados = Vec::new();
+    // Con `explicito` (reversión o deshacer), un secreto que no sirve para
+    // reenviarlo se omite: la vuelta atrás no se bloquea nunca por esto.
+    let mut omitidos = BTreeSet::new();
     for p in &f.parametros {
         let (v, leido) = if let Some(v) = efectivos.get(&p.nombre) {
             (v.as_str(), de_la_lectura.contains(&p.nombre))
@@ -300,10 +312,20 @@ pub(super) fn componer(
         } else {
             continue;
         };
-        if leido && es_secreto_param(f, m, &p.nombre) && tapado(v) {
+        let secreto = es_secreto_param(f, m, &p.nombre);
+        // Lo que viene de una lectura: la de ahora o, con `explicito`, el
+        // valor anterior que se guardó de la de entonces.
+        if secreto && (leido || explicito) && no_reenviable(p, v) {
+            if explicito {
+                omitidos.insert(p.nombre.clone());
+                continue;
+            }
             secretos_tapados.push(p.nombre.clone());
         }
         payload.push((p.nombre.clone(), v.to_owned()));
+    }
+    for k in &omitidos {
+        efectivos.remove(k);
     }
     let secreto =
         |k: &str, a: &str, b: &str| es_secreto_param(f, m, k) || m.oculta(k, a) || m.oculta(k, b);
@@ -311,7 +333,10 @@ pub(super) fn componer(
     if op == Operacion::Borrar {
         payload.push(("del".into(), "DEL".into()));
         for p in &f.parametros {
-            if ident.contains(&p.nombre) || efectivos.contains_key(&p.nombre) {
+            if ident.contains(&p.nombre)
+                || efectivos.contains_key(&p.nombre)
+                || omitidos.contains(&p.nombre)
+            {
                 continue;
             }
             if let Some(cur) = buscar(actual, &p.nombre) {
@@ -589,14 +614,16 @@ mod tests {
         assert!(r.campos.is_empty(), "sin explícito, vacío = sin tocar");
     }
 
-    /// Un secreto que el router da vacío o tapado no se reenvía como si
-    /// fuera la clave: `componer` lo señala (y el gestor no escribe). Uno
-    /// que llega en la petición, sí vale.
+    /// Un secreto que el catálogo marca como tapado al leer (la contraseña
+    /// de la línea de voz) no se reenvía desde la lectura ni vacío ni
+    /// enmascarado: `componer` lo señala y el gestor no escribe. Una clave
+    /// nueva en la petición sí vale.
     #[test]
-    fn secreto_leido_vacio_o_tapado_se_senala() {
+    fn secreto_marcado_leido_vacio_o_tapado_se_senala() {
         let c = cat();
         let m = Mascara::load().unwrap();
         let f = c.funcion("cbSetVoiceLine").unwrap();
+        assert!(f.parametro("auth_password").unwrap().tapado);
         for tapada in ["", "  ", "********", MASCARA, "●●●●"] {
             let actual = mapa(&[
                 ("interwork_id", "0"),
@@ -607,36 +634,83 @@ mod tests {
             let otro = mapa(&[("interwork_id", "0"), ("adm_state", "0")]);
             let r = componer(f, &m, Operacion::Editar, &actual, &otro, false);
             assert_eq!(r.secretos_tapados, ["auth_password"], "«{tapada}»");
-            // Con la máscara o vacío en la petición («sin tocar»), igual.
             for sin_tocar in [MASCARA, ""] {
                 let v = mapa(&[("interwork_id", "0"), ("auth_password", sin_tocar)]);
                 let r = componer(f, &m, Operacion::Editar, &actual, &v, false);
                 assert_eq!(r.secretos_tapados, ["auth_password"], "«{tapada}»");
             }
-            // Una clave nueva en la petición no es la leída.
             let nueva = mapa(&[
                 ("interwork_id", "0"),
                 ("auth_password", "clave-de-prueba-1"),
             ]);
             let r = componer(f, &m, Operacion::Editar, &actual, &nueva, false);
             assert!(r.secretos_tapados.is_empty(), "«{tapada}»");
+            assert!(
+                r.payload
+                    .contains(&("auth_password".into(), "clave-de-prueba-1".into()))
+            );
         }
-        // Una clave leída de verdad, o un campo que no es secreto vacío, no.
+    }
+
+    /// Un secreto sin marca (una clave WEP sin usar) se reenvía tal como se
+    /// leyó, también vacío; solo una máscara no se reenvía nunca.
+    #[test]
+    fn secreto_sin_marca_se_reenvia_salvo_una_mascara() {
+        let c = cat();
+        let m = Mascara::load().unwrap();
+        let f = c.funcion("cbSetWifiAccPt").unwrap();
+        let con = |wep: &str| {
+            mapa(&[
+                ("dpm_cfg_wifi_acc_pt_id", "1"),
+                ("ssid", "Casa"),
+                ("key_phrase", "clave-de-prueba-1"),
+                ("wep_key1_data", wep),
+            ])
+        };
+        let valores = mapa(&[("dpm_cfg_wifi_acc_pt_id", "1"), ("ssid", "Otra")]);
+        let r = componer(f, &m, Operacion::Editar, &con(""), &valores, false);
+        assert!(r.secretos_tapados.is_empty());
+        assert!(r.payload.contains(&("wep_key1_data".into(), String::new())));
+        for mascara in ["*****", MASCARA] {
+            let r = componer(f, &m, Operacion::Editar, &con(mascara), &valores, false);
+            assert_eq!(r.secretos_tapados, ["wep_key1_data"], "«{mascara}»");
+        }
+        assert!(enmascarado("****") && !enmascarado("") && !enmascarado("a***"));
+    }
+
+    /// La reversión y el deshacer (`explicito`) no se bloquean nunca por un
+    /// secreto que no sirve para reenviarlo: lo omiten de la carga y del
+    /// diff, venga de la lectura de ahora o del valor anterior guardado.
+    #[test]
+    fn explicito_omite_lo_que_no_se_puede_reenviar() {
+        let c = cat();
+        let m = Mascara::load().unwrap();
+        let f = c.funcion("cbSetVoiceLine").unwrap();
         let actual = mapa(&[
             ("interwork_id", "0"),
-            ("auth_password", "clave-de-prueba-2"),
-            ("web", ""),
+            ("adm_state", "0"),
+            ("auth_password", ""),
         ]);
-        let r = componer(
-            f,
-            &m,
-            Operacion::Editar,
-            &actual,
-            &mapa(&[("adm_state", "0")]),
-            false,
-        );
+        // La inversa: el valor anterior (vacío, el de la lectura de entonces).
+        let inversa = mapa(&[
+            ("interwork_id", "0"),
+            ("adm_state", "1"),
+            ("auth_password", ""),
+        ]);
+        let r = componer(f, &m, Operacion::Editar, &actual, &inversa, true);
         assert!(r.secretos_tapados.is_empty());
-        assert!(tapado("****") && tapado("") && !tapado("a***"));
+        assert!(
+            r.payload.iter().all(|(k, _)| k != "auth_password"),
+            "{:?}",
+            r.payload
+        );
+        assert!(r.campos.iter().all(|c| c.nombre != "auth_password"));
+        assert!(r.payload.contains(&("adm_state".into(), "1".into())));
+        // Sin tocarla y leída vacía, igual.
+        let otro = mapa(&[("interwork_id", "0"), ("adm_state", "1")]);
+        let r = componer(f, &m, Operacion::Editar, &actual, &otro, true);
+        assert!(r.secretos_tapados.is_empty());
+        assert!(r.payload.iter().all(|(k, _)| k != "auth_password"));
     }
 
     #[test]

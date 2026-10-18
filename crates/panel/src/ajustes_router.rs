@@ -89,6 +89,10 @@ pub struct CampoVista {
     pub opcional: bool,
     /// Clave de traducción del motivo por el que no se puede editar.
     pub solo_lectura: Option<String>,
+    /// Secreto que el router da tapado al leer: no se puede «Mostrar», y
+    /// guardar cualquier campo que escriba con él exige escribirlo.
+    #[serde(default)]
+    pub tapado: bool,
     /// Valor legible recomendado: la clave de la opción recomendada en un
     /// campo `opcion` (`wpa2`), `true`/`false` en un booleano o el texto.
     pub recomendado: Option<String>,
@@ -746,7 +750,7 @@ pub(crate) mod servidor {
                     let plantilla = a
                         .campos
                         .iter()
-                        .map(|c| campo(&prefijo, c, valor_inicial(c)))
+                        .map(|c| campo(f, &prefijo, c, valor_inicial(c)))
                         .collect();
                     (EstadoLectura::Leido, plantilla, instancias)
                 }
@@ -765,7 +769,7 @@ pub(crate) mod servidor {
                 let campos = a
                     .campos
                     .iter()
-                    .map(|c| campo(&prefijo, c, a_legible(c, &leidos)))
+                    .map(|c| campo(f, &prefijo, c, a_legible(c, &leidos)))
                     .collect();
                 (EstadoLectura::Leido, campos, Vec::new())
             }
@@ -800,7 +804,7 @@ pub(crate) mod servidor {
                     campos: a
                         .campos
                         .iter()
-                        .map(|c| campo(prefijo, c, a_legible(c, &leidos)))
+                        .map(|c| campo(f, prefijo, c, a_legible(c, &leidos)))
                         .collect(),
                 })
                 .collect(),
@@ -859,7 +863,17 @@ pub(crate) mod servidor {
 
     /// Vista de un campo con su valor. Las claves de traducción siguen las
     /// de `ajustes::claves_requeridas`.
-    fn campo(prefijo: &str, c: &Campo, valor: ValorLegible) -> CampoVista {
+    /// ¿El campo `c` escribe un secreto que el router da tapado al leer?
+    pub(crate) fn tapado(f: &Catalogo, c: &Campo) -> bool {
+        c.tipo == TipoCampo::Secreto
+            && c.escribible().is_some_and(|e| {
+                f.funcion(&e.funcion)
+                    .and_then(|func| func.parametro(&e.parametro))
+                    .is_some_and(|p| p.tapado)
+            })
+    }
+
+    fn campo(f: &Catalogo, prefijo: &str, c: &Campo, valor: ValorLegible) -> CampoVista {
         let clave = format!("{prefijo}-{}", c.id);
         let recomendado = c
             .opciones
@@ -885,6 +899,7 @@ pub(crate) mod servidor {
             ascii: c.validar.is_some_and(|v| v.ascii),
             opcional: c.opcional,
             solo_lectura: c.solo_lectura.clone(),
+            tapado: tapado(f, c),
             motivo_recomendado: recomendado.as_ref().map(|_| format!("{clave}-recomendado")),
             recomendado,
             requiere: c.requiere.clone(),
@@ -1714,6 +1729,7 @@ pub(crate) mod servidor {
         if grupo.pasos.is_empty() {
             return Err(error_ajuste(CambioError::SinCambios));
         }
+        exigir_tapados(&state.catalogo, a, &partes, &grupo)?;
         let pedidos: Vec<BTreeMap<String, String>> =
             grupo.pasos.iter().map(|p| p.req.valores.clone()).collect();
         let prep = g.preparar_grupo(grupo).await.map_err(error_ajuste)?;
@@ -1722,6 +1738,40 @@ pub(crate) mod servidor {
         });
         titular_partes(&mut vista.pasos, &titulos, &prefijo);
         Ok(GrupoVista { detalle, ..vista })
+    }
+
+    /// Cada paso que escribe una función con un secreto tapado al leer lo
+    /// reenvía: tiene que venir escrito en la petición (si no, 400 junto al
+    /// campo, con el motivo). Al borrar no se reenvía.
+    fn exigir_tapados(
+        f: &Catalogo,
+        a: &Ajuste,
+        partes: &[PeticionAjuste],
+        g: &GrupoRequest,
+    ) -> Result<(), ServerFnError> {
+        let prefijo = prefijo_i18n(a);
+        for c in a.campos.iter().filter(|c| tapado(f, c)) {
+            let Some(e) = c.escribible() else {
+                continue;
+            };
+            let reenvia = g
+                .pasos
+                .iter()
+                .any(|p| p.req.funcion == e.funcion && !p.req.borrar);
+            let escrito = partes.iter().all(|q| {
+                q.valores
+                    .get(&c.id)
+                    .is_some_and(|v| !v.is_empty() && v != MASCARA)
+            });
+            if reenvia && !escrito {
+                let etiqueta = crate::ui::i18n::traducir(&format!("{prefijo}-{}", c.id), None);
+                return Err(fallo(
+                    StatusCode::BAD_REQUEST,
+                    format!("{etiqueta}: {}", t!("ajustes-secreto-tapado-pedir")),
+                ));
+            }
+        }
+        Ok(())
     }
 
     /// Pone a cada paso su título (`titulos`, por índice). Los pasos
@@ -1764,9 +1814,10 @@ pub(crate) mod servidor {
     ) -> Result<String, ServerFnError> {
         let (state, user) = preparar().await?;
         let a = ajuste_por_id(&state, &ajuste)?;
+        // Uno tapado al leer no tiene nada que mostrar.
         let c = a
             .campo(&campo)
-            .filter(|c| c.tipo == TipoCampo::Secreto)
+            .filter(|c| c.tipo == TipoCampo::Secreto && !tapado(&state.catalogo, c))
             .ok_or_else(|| fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-campo")))?;
         if a.lista != instancia.is_some() {
             return Err(fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-invalida")));
@@ -1838,7 +1889,7 @@ pub(crate) mod servidor {
     /// Ajuste e instancia del cambio `id`, hecho desde Ajustes: por su
     /// título o, si es un deshacer (que no lo lleva), por el del cambio que
     /// deshace.
-    async fn ajuste_del_cambio<'a>(
+    pub(crate) async fn ajuste_del_cambio<'a>(
         state: &'a AppState,
         g: &ChangeManager,
         id: i64,

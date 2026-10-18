@@ -13,7 +13,7 @@
 //! [`DialogoRevelar`].
 
 use crate::t;
-use crate::ui::explorador::{MASCARA, texto_error};
+use crate::ui::explorador::{MASCARA, abrir_modal, texto_error};
 use crate::ui::panel_ajustes::Reautenticacion;
 use leptos::{ev::SubmitEvent, html, prelude::*, task::spawn_local};
 use std::time::Duration;
@@ -157,13 +157,23 @@ pub fn Secreto(objetivo: ObjetivoSecreto, #[prop(into)] nombre: String) -> impl 
         restante.try_set(0);
         copiado.try_set(false);
     };
-    // Al desmontarse, solo se cancela el temporizador: escribir en las
-    // señales aquí volvería a pintar una vista que ya se está liberando.
-    on_cleanup(move || {
-        if let Some(Some(h)) = intervalo.try_update_value(Option::take) {
-            h.clear();
-        }
-    });
+    // La operación que espera a la reautenticación de la página (0: ninguna).
+    let pendiente = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+    // Al desmontarse se cancela lo que quedó pendiente (el temporizador y la
+    // operación tras reautenticarse); escribir en las señales aquí volvería a
+    // pintar una vista que ya se está liberando.
+    {
+        let pendiente = pendiente.clone();
+        on_cleanup(move || {
+            if let Some(Some(h)) = intervalo.try_update_value(Option::take) {
+                h.clear();
+            }
+            let n = pendiente.swap(0, std::sync::atomic::Ordering::Relaxed);
+            if let (Some(r), true) = (reauth, n != 0) {
+                r.olvidar(n);
+            }
+        });
+    }
     let mostrar = move |v: String| {
         ocultar();
         if valor.try_set(Some(v)).is_some() {
@@ -187,7 +197,7 @@ pub fn Secreto(objetivo: ObjetivoSecreto, #[prop(into)] nombre: String) -> impl 
         let Some(obj) = o.try_get_value() else {
             return;
         };
-        pidiendo.set(true);
+        pidiendo.try_set(true);
         spawn_local(async move {
             let r = obj.revelar(String::new()).await;
             pidiendo.try_set(false);
@@ -206,12 +216,20 @@ pub fn Secreto(objetivo: ObjetivoSecreto, #[prop(into)] nombre: String) -> impl 
         error.set(None);
         pidiendo.set(true);
         let obj = o.get_value();
+        let pendiente = pendiente.clone();
         spawn_local(async move {
             let r = obj.revelar(String::new()).await;
             pidiendo.try_set(false);
             match (r, reauth) {
                 (Ok(v), _) => mostrar(v),
-                (Err(e), Some(r)) => r.tratar(&e, error, tras_reautenticar),
+                (Err(e), Some(r)) => {
+                    // Si ya no está (se desmontó mientras esperaba), nada.
+                    if valor.try_get_untracked().is_some()
+                        && let Some(n) = r.tratar(&e, error, tras_reautenticar)
+                    {
+                        pendiente.store(n, std::sync::atomic::Ordering::Relaxed);
+                    }
+                }
                 // Sin diálogo de la página (la Biblioteca): el suyo, que pide
                 // la contraseña y enseña el error.
                 (Err(_), None) => {
@@ -281,7 +299,7 @@ pub fn Secreto(objetivo: ObjetivoSecreto, #[prop(into)] nombre: String) -> impl 
                         class="boton-mini"
                         type="button"
                         aria-disabled=move || pidiendo.get().then_some("true")
-                        on:click=pedir
+                        on:click=pedir.clone()
                     >
                         {boton}
                         <span class="solo-lector">{lector}</span>
@@ -308,13 +326,7 @@ fn DialogoRevelar(
     #[prop(into)] on_revelado: Callback<String>,
 ) -> impl IntoView {
     let dlg = NodeRef::<html::Dialog>::new();
-    Effect::new(move |_| {
-        if let Some(d) = dlg.get()
-            && !d.open()
-        {
-            let _ = d.show_modal();
-        }
-    });
+    abrir_modal(dlg);
     let contrasena = RwSignal::new(String::new());
     let error = RwSignal::new(None::<String>);
     let pidiendo = RwSignal::new(false);

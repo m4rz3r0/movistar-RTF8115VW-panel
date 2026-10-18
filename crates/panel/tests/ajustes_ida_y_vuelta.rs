@@ -162,28 +162,18 @@ fn hermanos_iguales(
     }
 }
 
-/// ¿Escribir el campo `c` reenviaría un secreto que el simulador da vacío o
-/// tapado (como la contraseña de la línea de voz)? Entonces el gestor no
-/// escribe (podría borrarla) hasta que la fase 3 lo compruebe con el router
-/// real.
-async fn reenviaria_un_secreto_tapado(p: &Panel, a: &Ajuste, c: &Campo) -> bool {
+/// ¿Escribe `c` un secreto que el router da tapado al leer (la contraseña de
+/// la línea de voz)? Guardar cualquier campo de su función exige escribirlo,
+/// y el deshacer lo omite (no hay valor anterior de verdad): se queda el
+/// escrito.
+fn tapado(c: &Campo) -> bool {
     let f = catalogo::Catalogo::load().unwrap();
-    let m = catalogo::mask::Mascara::load().unwrap();
-    let Some(func) = c.escribible().and_then(|e| f.funcion(&e.funcion)) else {
-        return false;
-    };
-    for param in &func.parametros {
-        if param.tipo != catalogo::TipoParam::Secret && !m.es_secreto(&param.nombre) {
-            continue;
-        }
-        if let Some(v) = crudo_opcional(p, a, &param.nombre).await {
-            let v = v.trim();
-            if v.is_empty() || v.chars().all(|c| matches!(c, '*' | '•' | '●')) {
-                return true;
-            }
-        }
-    }
-    false
+    c.escribible()
+        .and_then(|e| {
+            f.funcion(&e.funcion)
+                .and_then(|func| func.parametro(&e.parametro))
+        })
+        .is_some_and(|p| p.tapado)
 }
 
 #[tokio::test]
@@ -191,7 +181,7 @@ async fn cada_ajuste_antes_aplicar_verificar_deshacer() {
     let (p, cookie) = panel_con_gestor().await;
     let catalogo = CatalogoAjustes::load().unwrap();
     let mut n = 0u32;
-    let mut bloqueados = Vec::new();
+    let mut con_tapado = Vec::new();
     for a in catalogo.todos() {
         if a.lista || a.componente.is_some() {
             continue;
@@ -199,30 +189,23 @@ async fn cada_ajuste_antes_aplicar_verificar_deshacer() {
         for c in a.campos.iter().filter(|c| c.escribible().is_some()) {
             n += 1;
             let que = format!("{} / {}", a.id, c.id);
-            if reenviaria_un_secreto_tapado(&p, a, c).await {
-                let actual = legible(&p, &cookie, a, &c.id).await;
-                let (nuevo, _) = otro_valor(c, &actual, n);
-                let escritas = p.sim.control.writes().len();
-                let (status, body) = llamar(
-                    &p,
-                    "preparar_ajuste",
-                    json!({ "p": { "ajuste": a.id, "instancia": null, "borrar": false,
-                                   "valores": { c.id.as_str(): nuevo } } }),
-                    Some(&cookie),
-                )
-                .await;
-                assert_eq!(status, 403, "{que}: se esperaba el bloqueo: {body}");
-                assert!(body.contains("contraseña"), "{que}: {body}");
-                assert_eq!(p.sim.control.writes().len(), escritas, "{que}");
-                bloqueados.push(que);
-                continue;
-            }
+
             let todo_antes = foto(&p, &cookie, a).await;
             let antes = todo_antes[&c.id].0.clone();
             let antes_crudo = crudo(&p, a, &c.lee).await;
             let (nuevo, esperado) = otro_valor(c, &antes, n);
             let mut valores = json!({ c.id.as_str(): nuevo });
             let mut tocados = vec![c.id.as_str()];
+            // La clave que el router no deja leer va con cualquier guardado
+            // de su función; el deshacer no la vuelve atrás.
+            let tapados: Vec<&Campo> = a.campos.iter().filter(|x| tapado(x)).collect();
+            for t in &tapados {
+                if t.id != c.id {
+                    valores[t.id.as_str()] = json!(format!("clave-de-prueba-voz-{n}"));
+                }
+                tocados.push(&t.id);
+                con_tapado.push(que.clone());
+            }
             // Con el valor que exige otro campo (encender el espejo), ese
             // campo va también: su primera opción.
             if let Some(r) = c.requiere.as_ref().filter(|r| r.cuando == nuevo) {
@@ -260,23 +243,41 @@ async fn cada_ajuste_antes_aplicar_verificar_deshacer() {
                 antes,
                 "{que}: tras deshacer"
             );
-            assert_eq!(
-                crudo(&p, a, &c.lee).await,
-                antes_crudo,
-                "{que}: tras deshacer (en crudo)"
-            );
-            assert_eq!(
-                foto(&p, &cookie, a).await,
-                todo_antes,
-                "{que}: tras deshacer, todo el ajuste"
-            );
+            if tapado(c) {
+                // Su valor anterior es lo que dio la lectura: vacío (lo del
+                // router de verdad) se omite y se queda la escrita; el
+                // simulador da la última que se le escribió, y esa vuelve.
+                let esperado = if antes_crudo.is_empty() {
+                    &nuevo
+                } else {
+                    &antes_crudo
+                };
+                assert_eq!(
+                    &crudo(&p, a, &c.lee).await,
+                    esperado,
+                    "{que}: tras deshacer"
+                );
+            } else {
+                assert_eq!(
+                    crudo(&p, a, &c.lee).await,
+                    antes_crudo,
+                    "{que}: tras deshacer (en crudo)"
+                );
+            }
+            let mut despues = foto(&p, &cookie, a).await;
+            let mut esperado = todo_antes.clone();
+            for t in &tapados {
+                despues.remove(&t.id);
+                esperado.remove(&t.id);
+            }
+            assert_eq!(despues, esperado, "{que}: tras deshacer, todo el ajuste");
         }
     }
     assert!(n > 20, "solo {n} campos: ¿se ha saltado alguno?");
-    // Solo la línea de voz: el simulador da vacía su contraseña.
-    assert!(!bloqueados.is_empty(), "ninguno bloqueado");
+    // Solo la línea de voz lleva una clave tapada al leer.
+    assert!(!con_tapado.is_empty(), "ninguno con la clave de la voz");
     assert!(
-        bloqueados.iter().all(|q| q.starts_with("telefono.")),
-        "{bloqueados:?}"
+        con_tapado.iter().all(|q| q.starts_with("telefono.")),
+        "{con_tapado:?}"
     );
 }

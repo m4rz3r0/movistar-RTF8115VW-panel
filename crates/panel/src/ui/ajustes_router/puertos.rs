@@ -162,6 +162,7 @@ fn campo_propio(id: &str, tipo: TipoCampo, opcional: bool) -> CampoVista {
         ascii: false,
         opcional,
         solo_lectura: None,
+        tapado: false,
         recomendado: None,
         motivo_recomendado: None,
         requiere: None,

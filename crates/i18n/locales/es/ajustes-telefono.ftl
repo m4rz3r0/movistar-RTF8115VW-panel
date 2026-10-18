@@ -11,17 +11,21 @@ ajuste-telefono-linea-activa-recomendado = Recomendado si usas el teléfono fijo
 ajuste-telefono-linea-silencio = Ahorro en los silencios
 ajuste-telefono-linea-silencio-desc = Mientras nadie habla, el router deja de enviar sonido para gastar menos conexión.
 ajuste-telefono-linea-silencio-recomendado = Recomendado si tienes fibra o una buena conexión, lo normal hoy. A favor: no se cortan los comienzos de las palabras ni parece que la llamada se ha caído. En contra: cada llamada gasta un poco más de conexión, algo que con fibra no se nota.
+ajuste-telefono-linea-contrasena = Contraseña de la línea
+ajuste-telefono-linea-contrasena-desc = La clave con la que la línea entra en el operador. El router no deja leerla, así que para guardar cualquier cambio de esta tarjeta hay que escribirla; si no la sabes, pídesela al operador.
 
 ## Línea de teléfono: cuenta y línea directa
 ajuste-telefono-linea_oculto-titulo = Cuenta de la línea y línea directa
 ajuste-telefono-linea_oculto-desc = Los datos con los que la línea se identifica ante el operador y la llamada automática al descolgar.
-ajuste-telefono-linea_oculto-ayuda = Estos datos los pone el operador y no se muestran nunca. Si escribes uno mal, el teléfono fijo deja de funcionar hasta que deshagas el cambio. La contraseña de la línea no se cambia desde aquí. Cámbialos solo si el operador te lo pide.
+ajuste-telefono-linea_oculto-ayuda = Estos datos los pone el operador y están ocultos. Si escribes uno mal, el teléfono fijo deja de funcionar hasta que deshagas el cambio. Para guardar cualquiera de ellos hace falta escribir la contraseña de la línea, que el router no deja leer. Cámbialos solo si el operador te lo pide.
 ajuste-telefono-linea_oculto-usuario = Usuario de la línea
 ajuste-telefono-linea_oculto-usuario-desc = El nombre con el que la línea se identifica ante el operador.
 ajuste-telefono-linea_oculto-linea_directa = Línea directa
 ajuste-telefono-linea_oculto-linea_directa-desc = Al descolgar, el teléfono llama solo a un número fijado: nada más descolgar o, si no marcas nada, al cabo de unos segundos, según lo que haya dejado puesto el operador. Si no sabes para qué está, no la toques.
 ajuste-telefono-linea_oculto-numero_directo = Número de la línea directa
 ajuste-telefono-linea_oculto-numero_directo-desc = El número al que se llama solo con la línea directa encendida.
+ajuste-telefono-linea_oculto-contrasena = Contraseña de la línea
+ajuste-telefono-linea_oculto-contrasena-desc = La clave con la que la línea entra en el operador. El router no deja leerla, así que para guardar cualquier cambio de esta tarjeta hay que escribirla; si no la sabes, pídesela al operador.
 
 ## Llamadas
 ajuste-telefono-sip-titulo = Teclas y fax en las llamadas

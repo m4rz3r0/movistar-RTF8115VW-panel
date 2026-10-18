@@ -838,6 +838,7 @@ fn parametro(c: &Campo) -> Parametro {
         tipo: c.tipo,
         opciones: c.opciones.clone(),
         partido: c.partido,
+        tapado: false,
     }
 }
 
@@ -909,6 +910,7 @@ pub fn extraer(dir: &Path) -> Result<Vec<Funcion>, String> {
                         tipo,
                         opciones: Vec::new(),
                         partido: None,
+                        tapado: false,
                     },
                     &mut params,
                 );
@@ -989,6 +991,7 @@ pub fn extraer(dir: &Path) -> Result<Vec<Funcion>, String> {
                 tipo: tipo_por_nombre(&m, k),
                 opciones: Vec::new(),
                 partido: None,
+                tapado: false,
             })
             .collect();
         if let Some(&i) = vistas.get(&u.nombre) {

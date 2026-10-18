@@ -84,7 +84,6 @@ biblioteca-xml = Response XML (masked)
 biblioteca-vacio-par = (empty)
 biblioteca-vacio = empty
 biblioteca-valor-desconocido = (unknown value: { $valor })
-biblioteca-visible-30 = (visible for 30 s)
 biblioteca-revelar = Reveal
 biblioteca-instancias = { $n ->
     [one] { $n } instance

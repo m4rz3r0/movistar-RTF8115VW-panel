@@ -3610,6 +3610,9 @@ tipo = "secret"
 nombre = "auth_password"
 etiqueta = "Contraseña SIP"
 tipo = "secret"
+# El router la da vacía al leerla (cbGetVoiceLine): sin valor de verdad que
+# reenviar. Fase 3: comprobar en el router real qué devuelve cada secreto.
+tapado = true
 
 [[funcion.parametro]]
 nombre = "vad_state"

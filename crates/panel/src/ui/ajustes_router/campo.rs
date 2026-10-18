@@ -88,6 +88,7 @@ pub(crate) fn valor_resumido(c: &CampoVista, secreto: Option<ObjetivoSecreto>) -
         (ValorLegible::Secreto, None) => view! {
             <span class="secreto" aria-hidden="true">{MASCARA}</span>
             <span class="solo-lector">{t!("comun-valor-oculto")}</span>
+            {c.tapado.then(|| view! { <span class="ayuda secreto-tapado">{t!("ajustes-secreto-tapado")}</span> })}
         }
         .into_any(),
         (ValorLegible::Desconocido(x), _) => {
@@ -375,22 +376,30 @@ fn CampoSecreto(
     let desc_id = format!("{dom}-desc");
     let error_id = format!("{dom}-error");
     let descrito = format!("{desc_id} {error_id}");
-    let abierto = RwSignal::new(false);
+    // Uno que el router da tapado al leer no tiene nada que mostrar ni que
+    // conservar: el campo está siempre abierto y se pide al guardar.
+    let tapado = c.tapado;
+    let abierto = RwSignal::new(tapado);
     let ver = RwSignal::new(false);
     if let Some(editando) = editando {
         Effect::new(move |_| {
             if !editando.get() {
-                abierto.set(false);
+                abierto.set(tapado);
                 ver.set(false);
             }
         });
     }
     let etiqueta = etiqueta(&c);
-    let desc = format!(
-        "{} {}",
-        traducir(&format!("{}-desc", c.clave), None),
-        t!("ajustes-secreto-desc")
-    );
+    // La descripción de uno tapado ya dice que hay que escribirlo.
+    let desc = if tapado {
+        traducir(&format!("{}-desc", c.clave), None)
+    } else {
+        format!(
+            "{} {}",
+            traducir(&format!("{}-desc", c.clave), None),
+            t!("ajustes-secreto-desc")
+        )
+    };
     let invalido = move || error.with(|e| e.is_some()).then_some("true");
     let cambiar = {
         let control_id = control_id.clone();
@@ -442,7 +451,7 @@ fn CampoSecreto(
                     autocomplete="new-password"
                     autocapitalize="none"
                     spellcheck="false"
-                    placeholder=t!("ajustes-secreto-placeholder")
+                    placeholder=(!tapado).then(|| t!("ajustes-secreto-placeholder"))
                     aria-describedby=descrito.clone()
                     aria-invalid=invalido
                     disabled=move || bloqueado.get()
@@ -501,6 +510,7 @@ mod tests {
             ascii: true,
             opcional: false,
             solo_lectura: None,
+            tapado: false,
             recomendado: Some("wpa2".into()),
             motivo_recomendado: None,
             requiere: None,

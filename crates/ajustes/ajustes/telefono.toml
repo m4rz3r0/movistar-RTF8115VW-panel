@@ -24,12 +24,18 @@ lee = "vad_state"
 tipo = "booleano"
 recomendado = "false"
 
-# La contraseña de la línea (`auth_password`) no está: el router la devuelve
-# vacía, así que el panel no tendría valor anterior al que volver. Como el
-# gestor completa cada escritura con la lectura y no reenvía un secreto que
-# el router da vacío (podría borrarlo), por ahora no escribe la línea de voz
-# (ni estos ajustes ni los de `telefono.linea`): la fase 3 debe comprobar
-# qué hace el router real con ese reenvío.
+# El router la da vacía al leerla (`tapado` en el catálogo de funciones):
+# cualquier guardado de la línea la reenvía, así que la página la pide al
+# guardar y el servidor no escribe sin ella.
+[[ajuste.campo]]
+id = "contrasena"
+escribe = { funcion = "cbSetVoiceLine", parametro = "auth_password" }
+lee = "auth_password"
+tipo = "secreto"
+validar = { min = 1 }
+
+# Como en `telefono.linea`, la contraseña de la línea (tapada al leerla) va
+# también aquí: cualquier guardado de estos datos la reenvía.
 [[ajuste]]
 id = "telefono.linea_oculto"
 tema = "telefono"
@@ -54,6 +60,13 @@ tipo = "booleano"
 id = "numero_directo"
 escribe = { funcion = "cbSetVoiceLine", parametro = "warmline_hotline_number" }
 lee = "warmline_hotline_number"
+tipo = "secreto"
+validar = { min = 1 }
+
+[[ajuste.campo]]
+id = "contrasena"
+escribe = { funcion = "cbSetVoiceLine", parametro = "auth_password" }
+lee = "auth_password"
 tipo = "secreto"
 validar = { min = 1 }
 

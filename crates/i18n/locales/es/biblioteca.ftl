@@ -84,7 +84,6 @@ biblioteca-xml = XML de la respuesta (enmascarado)
 biblioteca-vacio-par = (vacío)
 biblioteca-vacio = vacío
 biblioteca-valor-desconocido = (valor desconocido: { $valor })
-biblioteca-visible-30 = (visible durante 30 s)
 biblioteca-revelar = Revelar
 biblioteca-instancias = { $n ->
     [one] { $n } instancia

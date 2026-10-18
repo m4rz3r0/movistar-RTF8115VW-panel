@@ -41,7 +41,9 @@ pub(crate) fn texto_error(e: &ServerFnError) -> String {
 #[derive(Clone, Copy)]
 pub(crate) struct Reautenticacion {
     abierto: RwSignal<bool>,
-    pendiente: StoredValue<Option<Callback<()>>>,
+    /// La operación que se repetirá, con un número para poder olvidarla.
+    pendiente: StoredValue<Option<(u64, Callback<()>)>>,
+    siguiente: StoredValue<u64>,
 }
 
 impl Reautenticacion {
@@ -51,6 +53,7 @@ impl Reautenticacion {
         let r = Reautenticacion {
             abierto: RwSignal::new(false),
             pendiente: StoredValue::new(None),
+            siguiente: StoredValue::new(0),
         };
         provide_context(r);
         r
@@ -62,20 +65,38 @@ impl Reautenticacion {
     }
 
     /// Trata el error de una operación delicada: si falta reautenticarse,
-    /// abre el diálogo y repetirá `reintentar`; si no, deja el mensaje en
-    /// `error`.
+    /// abre el diálogo y repetirá `reintentar` (devuelve su número, para
+    /// [`Reautenticacion::olvidar`]); si no, deja el mensaje en `error`.
+    /// Se puede llamar después de un `await`: no falla si la página ya no
+    /// está.
     pub(crate) fn tratar(
         self,
         e: &ServerFnError,
         error: RwSignal<Option<String>>,
         reintentar: Callback<()>,
-    ) {
+    ) -> Option<u64> {
         if es_error_de_reautenticacion(e) {
-            self.pendiente.set_value(Some(reintentar));
-            self.abierto.set(true);
+            let n = self.siguiente.try_update_value(|n| {
+                *n += 1;
+                *n
+            })?;
+            self.pendiente.try_set_value(Some((n, reintentar)));
+            self.abierto.try_set(true);
+            Some(n)
         } else {
-            error.set(Some(texto_error(e)));
+            error.try_set(Some(texto_error(e)));
+            None
         }
+    }
+
+    /// Quien pidió la operación `n` ya no está (se desmontó): tras
+    /// reautenticarse no se repetirá.
+    pub(crate) fn olvidar(self, n: u64) {
+        self.pendiente.try_update_value(|p| {
+            if p.as_ref().is_some_and(|(m, _)| *m == n) {
+                *p = None;
+            }
+        });
     }
 }
 
@@ -465,7 +486,9 @@ fn SeccionUsuarios(usuarios: Vec<String>, yo: String) -> impl IntoView {
                     borrando.set(None);
                     aviso.set(Some(t!("panel-guardado")));
                 }
-                Err(e) => reauth.tratar(&e, error, yo_cb),
+                Err(e) => {
+                    reauth.tratar(&e, error, yo_cb);
+                }
             }
             pendiente.set(false);
         });
@@ -485,7 +508,9 @@ fn SeccionUsuarios(usuarios: Vec<String>, yo: String) -> impl IntoView {
                     clave_nueva.set(String::new());
                     aviso.set(Some(t!("panel-guardado")));
                 }
-                Err(e) => reauth.tratar(&e, error, yo_cb),
+                Err(e) => {
+                    reauth.tratar(&e, error, yo_cb);
+                }
             }
             pendiente.set(false);
         });
@@ -503,7 +528,9 @@ fn SeccionUsuarios(usuarios: Vec<String>, yo: String) -> impl IntoView {
                     clave.set(String::new());
                     aviso.set(Some(t!("panel-guardado")));
                 }
-                Err(e) => reauth.tratar(&e, error, yo_cb),
+                Err(e) => {
+                    reauth.tratar(&e, error, yo_cb);
+                }
             }
             pendiente.set(false);
         });
@@ -653,13 +680,7 @@ fn SeccionUsuarios(usuarios: Vec<String>, yo: String) -> impl IntoView {
 pub(crate) fn DialogoReautenticar() -> impl IntoView {
     let reauth = expect_context::<Reautenticacion>();
     let dlg = NodeRef::<html::Dialog>::new();
-    Effect::new(move |_| {
-        if let Some(d) = dlg.get()
-            && !d.open()
-        {
-            let _ = d.show_modal();
-        }
-    });
+    crate::ui::explorador::abrir_modal(dlg);
     let contrasena = RwSignal::new(String::new());
     let error = RwSignal::new(None::<String>);
     let pidiendo = RwSignal::new(false);
@@ -677,13 +698,14 @@ pub(crate) fn DialogoReautenticar() -> impl IntoView {
             pidiendo.set(false);
             match r {
                 Ok(()) => {
-                    let pendiente = reauth.pendiente.get_value();
-                    reauth.pendiente.set_value(None);
+                    let pendiente = reauth.pendiente.try_get_value().flatten();
+                    reauth.pendiente.try_set_value(None);
                     if let Some(d) = dlg.get_untracked() {
                         d.close();
                     }
-                    if let Some(p) = pendiente {
-                        p.run(());
+                    // `try_run`: quien la pidió puede haberse desmontado.
+                    if let Some((_, p)) = pendiente {
+                        p.try_run(());
                     }
                 }
                 Err(e) => error.set(Some(texto_error(&e))),
@@ -703,7 +725,7 @@ pub(crate) fn DialogoReautenticar() -> impl IntoView {
             aria-modal="true"
             on:close=move |_| {
                 reauth.abierto.set(false);
-                reauth.pendiente.set_value(None);
+                reauth.pendiente.try_set_value(None);
             }
         >
             <form class="dialogo-cuerpo" on:submit=enviar>

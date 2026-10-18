@@ -399,7 +399,7 @@ id = "contrasena"
 escribe = { funcion = "te_wifi.wl", parametro = "wlWpaPsk" }
 lee = "key_phrase"
 tipo = "secreto"
-solo_lectura = "ajustes-secreto-basica-motivo"
+solo_lectura = "ajuste-puertos-alg-motivo"
 "#;
     let (p, cookie) = panel_con_ajustes(toml).await;
     escribir_punto(&p, "1", &[("key_phrase", CLAVE_1)]).await;
@@ -437,7 +437,7 @@ solo_lectura = "ajustes-secreto-basica-motivo"
         .find(|c| c["id"] == "contrasena")
         .unwrap()
         .clone();
-    assert_eq!(campo["solo_lectura"], "ajustes-secreto-basica-motivo");
+    assert_eq!(campo["solo_lectura"], "ajuste-puertos-alg-motivo");
     let v = ok(
         &p,
         "revelar_ajuste",
@@ -484,7 +484,11 @@ async fn revelar_anterior_de_un_paso() {
         .iter()
         .find_map(|e| e.get("Cambio").filter(|c| c["id"] == id))
         .unwrap_or_else(|| panic!("falta el cambio {id}: {h}"));
-    assert_eq!(fila["anteriores"], json!([[0, "key_phrase"]]), "{fila}");
+    assert_eq!(
+        fila["anteriores"],
+        json!([[0, "key_phrase", "Contraseña"]]),
+        "{fila}"
+    );
     // El revelado, con el cambio al que pertenece.
     let revelado = h["entradas"]
         .as_array()
@@ -581,17 +585,96 @@ async fn html_nunca_contiene_secretos() {
     );
 }
 
-/// Cambiar otro campo de la línea de voz no reenvía su contraseña: el
-/// router la da vacía, y reenviarla podría borrarla. Mientras no se valide
-/// con un router real, la escritura se bloquea con su motivo, también desde
-/// la Biblioteca.
+const CLAVE_3: &str = "clave-de-prueba-3";
+const PIDE_LA_CLAVE: &str = "El router no deja leer esta clave: escríbela para guardar los cambios";
+
+/// Lo que el simulador tiene en la línea de voz 0.
+async fn de_la_voz(p: &Panel, nombre: &str) -> String {
+    let n = p
+        .state
+        .hgu
+        .call("cbGetVoiceLine", &[("interwork_id", "0")])
+        .await
+        .unwrap();
+    elemento(&n, nombre).unwrap_or_default()
+}
+
+/// Última escritura de `funcion` en el simulador.
+fn ultima_escritura(p: &Panel, funcion: &str) -> Vec<(String, String)> {
+    p.sim
+        .control
+        .writes()
+        .into_iter()
+        .rev()
+        .find(|(f, _)| f == funcion)
+        .unwrap_or_else(|| panic!("ninguna escritura de {funcion}"))
+        .1
+}
+
+/// La línea de voz con su contraseña (que el router da vacía) escrita: se
+/// guarda, y va la escrita.
 #[tokio::test]
-async fn voz_no_reenvia_su_contrasena_vacia() {
+async fn voz_con_la_clave_escrita_se_guarda() {
     let (p, cookie) = panel_con_gestor().await;
-    let (status, body) =
-        preparar(&p, &cookie, "telefono.linea", json!({ "activa": "false" })).await;
-    assert_eq!(status, 403, "{body}");
-    assert!(body.contains("contraseña"), "{body}");
+    assert_eq!(de_la_voz(&p, "auth_password").await, "");
+    let tema = ok(&p, "leer_tema", json!({ "tema": "telefono" }), &cookie).await;
+    let linea = tema["ajustes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| a["id"] == "telefono.linea")
+        .unwrap();
+    let campo = linea["campos"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["id"] == "contrasena")
+        .unwrap();
+    assert_eq!(campo["tapado"], true, "{campo}");
+    let (status, body) = preparar(
+        &p,
+        &cookie,
+        "telefono.linea",
+        json!({ "activa": "false", "contrasena": CLAVE_3 }),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    assert!(!body.contains(CLAVE_3));
+    let g: Value = serde_json::from_str(&body).unwrap();
+    aplicar(&p, &cookie, &g).await;
+    let enviado = ultima_escritura(&p, "cbSetVoiceLine");
+    assert!(
+        enviado.contains(&("auth_password".into(), CLAVE_3.into())),
+        "va la escrita"
+    );
+    assert_eq!(de_la_voz(&p, "adm_state").await, "0");
+    // No hay nada que «Mostrar»: el router no la deja leer.
+    let (status, _) = llamar(
+        &p,
+        "revelar_ajuste",
+        mostrar("telefono.linea", "contrasena", PANEL_PASS),
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(status, 400);
+}
+
+/// Sin escribirla, no se guarda: 400 junto al campo, con el motivo, y nada
+/// se escribe. Desde la Biblioteca, el gestor tampoco la reenvía vacía.
+#[tokio::test]
+async fn voz_con_la_clave_vacia_se_bloquea_con_el_motivo() {
+    let (p, cookie) = panel_con_gestor().await;
+    for valores in [
+        json!({ "activa": "false" }),
+        json!({ "activa": "false", "contrasena": panel::ui::explorador::MASCARA }),
+    ] {
+        let (status, body) = preparar(&p, &cookie, "telefono.linea", valores.clone()).await;
+        assert_eq!(status, 400, "{valores}: {body}");
+        assert!(body.contains("Contraseña de la línea"), "{body}");
+        assert!(body.contains(PIDE_LA_CLAVE), "{body}");
+    }
+    let (status, body) = preparar(&p, &cookie, "telefono.linea", json!({ "contrasena": "" })).await;
+    assert_eq!(status, 400, "{body}");
     let (status, body) = llamar(
         &p,
         "preparar_cambio",
@@ -601,11 +684,116 @@ async fn voz_no_reenvia_su_contrasena_vacia() {
     )
     .await;
     assert_eq!(status, 403, "{body}");
+    assert!(body.contains("clave"), "{body}");
     assert!(
         p.sim.control.writes().is_empty(),
         "{:?}",
         p.sim.control.writes()
     );
+}
+
+/// Las claves WEP no van marcadas: vacías (sin usar), se reenvían tal cual
+/// y la WiFi se guarda.
+#[tokio::test]
+async fn wifi_con_wep_vacias_se_guarda() {
+    let (p, cookie) = panel_con_gestor().await;
+    let vacias: Vec<(&str, &str)> = (1..=4)
+        .map(|i| match i {
+            1 => ("wep_key1_data", ""),
+            2 => ("wep_key2_data", ""),
+            3 => ("wep_key3_data", ""),
+            _ => ("wep_key4_data", ""),
+        })
+        .collect();
+    escribir_punto(&p, "1", &vacias).await;
+    let (status, body) = preparar(&p, &cookie, "wifi.red_5", json!({ "nombre": "otra-red" })).await;
+    assert_eq!(status, 200, "{body}");
+    let g: Value = serde_json::from_str(&body).unwrap();
+    aplicar(&p, &cookie, &g).await;
+    let enviado = ultima_escritura(&p, "cbSetWifiAccPt");
+    for (k, _) in &vacias {
+        assert!(
+            enviado.contains(&((*k).into(), String::new())),
+            "{k}: {enviado:?}"
+        );
+    }
+}
+
+/// El deshacer de un cambio de la línea no se bloquea: omite la contraseña
+/// (su valor anterior es el vacío que dio el router) y vuelve lo demás.
+#[tokio::test]
+async fn deshacer_la_voz_omite_la_clave_tapada() {
+    let (p, cookie) = panel_con_gestor().await;
+    let (status, body) = preparar(
+        &p,
+        &cookie,
+        "telefono.linea",
+        json!({ "activa": "false", "contrasena": CLAVE_3 }),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    let id = aplicar(&p, &cookie, &serde_json::from_str(&body).unwrap()).await;
+    let (status, body) = llamar(
+        &p,
+        "deshacer_ajuste",
+        json!({ "cambio": id }),
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    aplicar(&p, &cookie, &serde_json::from_str(&body).unwrap()).await;
+    let enviado = ultima_escritura(&p, "cbSetVoiceLine");
+    assert!(
+        enviado.iter().all(|(k, _)| k != "auth_password"),
+        "{enviado:?}"
+    );
+    assert_eq!(de_la_voz(&p, "adm_state").await, "1");
+    assert_eq!(de_la_voz(&p, "auth_password").await, CLAVE_3, "no se vacía");
+}
+
+/// La reversión automática (la WAN cae mientras se vigila) tampoco se
+/// bloquea: omite la contraseña y deja la línea como estaba.
+#[tokio::test]
+async fn revertir_la_voz_omite_la_clave_tapada() {
+    let mut t = common::tiempos_rapidos();
+    t.bajo = Duration::from_secs(5);
+    t.medio = Duration::from_secs(5);
+    let (p, cookie) = common::panel_con_tiempos(t).await;
+    let (status, body) = preparar(
+        &p,
+        &cookie,
+        "telefono.linea",
+        json!({ "activa": "false", "contrasena": CLAVE_3 }),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    let g: Value = serde_json::from_str(&body).unwrap();
+    let id = ok(
+        &p,
+        "confirmar_ajuste",
+        json!({ "token": g["token"], "desmarcados": [] }),
+        &cookie,
+    )
+    .await
+    .as_i64()
+    .unwrap();
+    let inicio = std::time::Instant::now();
+    while ok(&p, "estado_cambio", json!({ "id": id }), &cookie).await["estado"] != "Vigilando" {
+        assert!(
+            inicio.elapsed() < Duration::from_secs(5),
+            "no llega a vigilarse"
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    p.sim.control.set_wan_up(false);
+    let c = esperar_final(&p, &cookie, id).await;
+    assert_eq!(c["estado"], "Revertido", "{c}");
+    let enviado = ultima_escritura(&p, "cbSetVoiceLine");
+    assert!(
+        enviado.iter().all(|(k, _)| k != "auth_password"),
+        "{enviado:?}"
+    );
+    assert_eq!(de_la_voz(&p, "adm_state").await, "1");
 }
 
 /// Una clave que el router da tapada (asteriscos o la máscara) tampoco se
@@ -630,4 +818,136 @@ async fn clave_tapada_no_se_reenvia() {
     )
     .await;
     assert_eq!(status, 200, "{body}");
+}
+
+/// El Historial de un valor anterior mostrado no enseña el parámetro: el
+/// título del ajuste y la etiqueta del campo, la misma que en Ajustes, en
+/// los dos idiomas. La lista de valores anteriores, igual.
+#[tokio::test]
+async fn historial_del_valor_anterior_sin_nombres_de_la_api() {
+    let (p, cookie) = panel_con_gestor().await;
+    let id = cambiar_clave_5(&p, &cookie, CLAVE_2).await;
+    ok(
+        &p,
+        "revelar_anterior",
+        json!({ "cambio": id, "orden": 0, "campo": "key_phrase", "contrasena": PANEL_PASS }),
+        &cookie,
+    )
+    .await;
+    for (idioma, ajuste, campo) in [
+        ("es", "Red WiFi 5 GHz", "Contraseña"),
+        ("en", "5 GHz WiFi network", "Password"),
+    ] {
+        let con_idioma = format!("{cookie}; rp_lang={idioma}");
+        let h = ok(&p, "historial", json!({ "pagina": 1 }), &con_idioma).await;
+        let r = h["entradas"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find_map(|e| e.get("Revelado").filter(|r| r["cambio"] == id))
+            .unwrap_or_else(|| panic!("falta el revelado: {h}"));
+        assert_eq!(r["campo"], campo, "{idioma}: {r}");
+        assert_eq!(r["ajuste"], ajuste, "{idioma}: {r}");
+        let c = h["entradas"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find_map(|e| e.get("Cambio").filter(|c| c["id"] == id))
+            .unwrap();
+        assert_eq!(
+            c["anteriores"],
+            json!([[0, "key_phrase", campo]]),
+            "{idioma}: {c}"
+        );
+        let pagina = html(&p, &con_idioma, "/historial").await;
+        let fila = &pagina[pagina.find("hist-revelado").expect("la fila")..];
+        let fila = &fila[..fila.find("</li>").unwrap()];
+        assert!(
+            fila.contains(ajuste) && fila.contains(campo),
+            "{idioma}: {fila}"
+        );
+        assert!(
+            !fila.contains("key_phrase") && !fila.contains("cbSet"),
+            "{idioma}: {fila}"
+        );
+        let lista = &pagina[pagina.find("hist-anteriores").expect("la lista")..];
+        let lista = &lista[..lista.find("</ul>").unwrap()];
+        assert!(
+            lista.contains(campo) && !lista.contains("key_phrase"),
+            "{idioma}: {lista}"
+        );
+    }
+}
+
+/// Sin la ventana de reautenticación, `revelar_anterior` pide la contraseña
+/// antes de mirar (ni descifra ni dice si el cambio existe).
+#[tokio::test]
+async fn revelar_anterior_pide_la_contrasena_antes_de_descifrar() {
+    let (p, cookie) = panel_con_gestor().await;
+    let id = cambiar_clave_5(&p, &cookie, CLAVE_2).await;
+    for cambio in [id, id + 50] {
+        let (status, _, body) = llamada(
+            &p,
+            "revelar_anterior",
+            json!({ "cambio": cambio, "orden": 0, "campo": "key_phrase", "contrasena": "" }),
+            &cookie,
+        )
+        .await;
+        assert_eq!(status, 401, "{cambio}: {body}");
+    }
+}
+
+/// Una contraseña mala en el diálogo de reautenticación de Ajustes, en
+/// «Mostrar» o en «Revelar» de la Biblioteca cuenta para el mismo freno que
+/// el login.
+#[tokio::test]
+async fn el_freno_es_el_mismo_que_el_del_login() {
+    let (p, cookie) = panel_con_gestor().await;
+    let revelar = |contrasena: &str| {
+        json!({ "funcion": "cbGetWifiAccPt", "campo": "key_phrase", "instancia": null,
+                "params": [["dpm_cfg_wifi_acc_pt_id", "1"]], "contrasena": contrasena })
+    };
+    // Diálogo de Ajustes → «Revelar» de la Biblioteca.
+    let (status, _) = llamar(
+        &p,
+        "reautenticar",
+        json!({ "contrasena": "mala" }),
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(status, 403);
+    let (status, _) = llamar(&p, "revelar", revelar(PANEL_PASS), Some(&cookie)).await;
+    assert_eq!(status, 429);
+    tokio::time::sleep(Duration::from_millis(1100)).await;
+    // «Mostrar» de Ajustes → el login.
+    let (status, _) = llamar(
+        &p,
+        "revelar_ajuste",
+        mostrar("wifi.red_5", "contrasena", "mala"),
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(status, 403);
+    let resp = send(
+        &p.app,
+        common::post_form(
+            "/api/login",
+            &common::login_body(common::PANEL_USER, PANEL_PASS),
+            "127.0.0.1",
+        ),
+    )
+    .await;
+    assert_eq!(resp.status(), 429);
+    tokio::time::sleep(Duration::from_millis(2100)).await;
+    // «Revelar» de la Biblioteca → el diálogo de Ajustes.
+    let (status, _) = llamar(&p, "revelar", revelar("mala"), Some(&cookie)).await;
+    assert_eq!(status, 403);
+    let (status, _) = llamar(
+        &p,
+        "reautenticar",
+        json!({ "contrasena": PANEL_PASS }),
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(status, 429);
 }

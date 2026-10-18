@@ -1016,6 +1016,43 @@ impl ChangeManager {
         a_cambio(&f, &self.filas_pasos(id).await)
     }
 
+    /// Secretos con valor anterior guardado (cifrado) en cada paso del cambio
+    /// `id`: `(orden, función, parámetro)`, sacados del diff sin descifrar
+    /// nada (son los secretos que cambiaron en un paso que no creaba nada).
+    /// Fuera, los que el router da tapados al leer: su «valor anterior» es
+    /// el vacío que dio la lectura, no la clave.
+    pub async fn secretos_con_anterior(&self, id: i64) -> Vec<(i64, String, String)> {
+        let filas = sqlx::query(
+            "SELECT orden, funcion, operacion, diff FROM cambio_pasos \
+             WHERE cambio_id = ? AND valores_anteriores_cifrados IS NOT NULL \
+             AND operacion <> 'crear' ORDER BY orden",
+        )
+        .bind(id)
+        .fetch_all(&self.state.db)
+        .await
+        .unwrap_or_else(|e| {
+            tracing::error!(cambio = id, "no se pueden leer los pasos: {e}");
+            Vec::new()
+        });
+        let mut out = Vec::new();
+        for f in &filas {
+            let orden: i64 = f.get("orden");
+            let funcion: String = f.get("funcion");
+            let diff: Vec<CampoDiff> =
+                serde_json::from_str(&f.get::<String, _>("diff")).unwrap_or_default();
+            let func = self.state.catalogo.funcion(&funcion);
+            for d in diff.into_iter().filter(|d| d.secreto) {
+                let tapado = func
+                    .and_then(|f| f.parametro(&d.nombre))
+                    .is_some_and(|p| p.tapado);
+                if !tapado {
+                    out.push((orden, funcion.clone(), d.nombre));
+                }
+            }
+        }
+        out
+    }
+
     /// Valores anteriores secretos de cada paso del cambio `id`, en claro:
     /// `(orden, función, parámetro → valor)`. Son los que se guardaron
     /// cifrados: los secretos que cambiaron y se leyeron antes de escribir.

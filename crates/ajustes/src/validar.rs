@@ -157,6 +157,38 @@ fn comprobar_ajuste(a: &Ajuste, f: &Catalogo, m: &Mascara, fallos: &mut Vec<Stri
             comprobar_id_de_lista(a, func, m, fallos);
         }
     }
+    comprobar_tapados(a, f, fallos);
+}
+
+/// Un secreto que el router da tapado al leer ([`Parametro::tapado`]) no se
+/// puede reenviar desde la lectura: si el ajuste escribe su función, tiene
+/// que tener un campo `secreto` editable para él (la página lo pide al
+/// guardar).
+fn comprobar_tapados(a: &Ajuste, f: &Catalogo, fallos: &mut Vec<String>) {
+    let mut funciones: Vec<&str> = a
+        .campos
+        .iter()
+        .filter_map(Campo::escribible)
+        .map(|e| e.funcion.as_str())
+        .collect();
+    funciones.sort_unstable();
+    funciones.dedup();
+    for func in funciones.iter().filter_map(|n| f.funcion(n)) {
+        for p in func.parametros.iter().filter(|p| p.tapado) {
+            let pedido = a.campos.iter().any(|c| {
+                c.tipo == TipoCampo::Secreto
+                    && c.escribible()
+                        .is_some_and(|e| e.funcion == func.name && e.parametro == p.nombre)
+            });
+            if !pedido {
+                fallos.push(format!(
+                    "{}: {} reenvía {}, que el router da tapado al leer, y el ajuste no \
+                     tiene un campo `secreto` editable para pedirlo",
+                    a.id, func.name, p.nombre
+                ));
+            }
+        }
+    }
 }
 
 /// `requiere`: el campo que lo pide se puede escribir (si no, nunca se

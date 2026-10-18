@@ -81,9 +81,11 @@ pub struct CambioFila {
     /// Pasos del grupo (vacío si es de un solo paso).
     pub pasos: Vec<PasoFila>,
     /// Secretos con valor anterior guardado (cifrado): `(orden del paso,
-    /// parámetro)`. Cada uno ofrece «Mostrar el valor anterior».
+    /// parámetro, etiqueta)`, con la etiqueta del campo en Ajustes si el
+    /// cambio se hizo desde allí. Cada uno ofrece «Mostrar el valor
+    /// anterior».
     #[serde(default)]
-    pub anteriores: Vec<(i64, String)>,
+    pub anteriores: Vec<(i64, String, String)>,
 }
 
 /// Estado de un paso de un grupo.
@@ -144,10 +146,12 @@ pub struct ReveladoFila {
     /// Página de la función en el explorador; `None` si se mostró desde
     /// Ajustes (allí no se nombra la función).
     pub ruta: Option<String>,
-    /// El parámetro; si se mostró desde Ajustes, la etiqueta del campo.
+    /// El parámetro; si se mostró desde Ajustes o era un valor anterior, la
+    /// etiqueta del campo.
     pub campo: String,
     pub instancia: Option<String>,
-    /// Título del ajuste, si se mostró desde Ajustes.
+    /// Título del ajuste, si se mostró desde Ajustes (o el valor anterior es
+    /// de un cambio hecho desde allí).
     #[serde(default)]
     pub ajuste: Option<String>,
     /// Cambio cuyo valor anterior se mostró, si fue eso.
@@ -317,23 +321,17 @@ fn FilaRevelado(r: ReveladoFila) -> impl IntoView {
     // Desde Ajustes: el ajuste y el campo en lenguaje claro; un valor
     // anterior: el parámetro y su cambio; si no, el parámetro y la función.
     let que = match (r.ajuste, r.cambio) {
-        (Some(ajuste), _) => view! {
-            {t!("historial-revelado")}
-            " "
-            <span class="hist-campo">{r.campo}</span>
-            " "
-            {t!("historial-revelado-de")}
-            " "
-            <span>{ajuste}</span>
-            {instancia}
-        }
+        (Some(ajuste), Some(id)) => t!(
+            "historial-revelado-anterior-ajuste",
+            campo = r.campo,
+            ajuste = ajuste,
+            id = id
+        )
         .into_any(),
-        (None, Some(cambio)) => view! {
-            {t!("historial-revelado-anterior")}
-            " "
-            <span class="mono">{r.campo}</span>
-            " "
-            {t!("historial-revelado-cambio", id = cambio)}
+        (None, Some(id)) => t!("historial-revelado-anterior", campo = r.campo, id = id).into_any(),
+        (Some(ajuste), None) => view! {
+            {t!("historial-revelado-ajuste", campo = r.campo, ajuste = ajuste)}
+            {instancia}
         }
         .into_any(),
         (None, None) => view! {
@@ -364,22 +362,17 @@ fn FilaRevelado(r: ReveladoFila) -> impl IntoView {
 }
 
 /// Los secretos del paso `orden` del cambio `cambio` con valor anterior
-/// guardado, cada uno con «Mostrar el valor anterior». La etiqueta es la del
-/// campo en `campos` (o el parámetro).
+/// guardado, cada uno con su etiqueta y «Mostrar el valor anterior».
 fn valores_anteriores(
     cambio: i64,
     orden: i64,
-    campos: &[CampoCambio],
-    anteriores: &[(i64, String)],
+    anteriores: &[(i64, String, String)],
 ) -> Option<impl IntoView + use<>> {
     let filas: Vec<_> = anteriores
         .iter()
-        .filter(|(o, _)| *o == orden)
-        .map(|(_, campo)| {
-            let etiqueta = campos
-                .iter()
-                .find(|c| c.nombre == *campo)
-                .map_or_else(|| campo.clone(), |c| c.etiqueta.clone());
+        .filter(|(o, _, _)| *o == orden)
+        .map(|(_, campo, etiqueta)| {
+            let etiqueta = etiqueta.clone();
             let objetivo = ObjetivoSecreto::Anterior {
                 cambio,
                 orden,
@@ -403,11 +396,15 @@ fn valores_anteriores(
 }
 
 /// Lista desplegable de los pasos de un grupo.
-fn lista_pasos(cambio: i64, pasos: Vec<PasoFila>, anteriores: &[(i64, String)]) -> impl IntoView {
+fn lista_pasos(
+    cambio: i64,
+    pasos: Vec<PasoFila>,
+    anteriores: &[(i64, String, String)],
+) -> impl IntoView {
     let filas = pasos
         .into_iter()
         .map(|p| {
-            let anteriores = valores_anteriores(cambio, p.numero - 1, &p.campos, anteriores);
+            let anteriores = valores_anteriores(cambio, p.numero - 1, anteriores);
             let instancia = p
                 .instancia
                 .map(|i| view! { <span class="hist-instancia">{t!("historial-instancia-sep", i = i)}</span> });
@@ -505,7 +502,7 @@ fn FilaCambio(
     let detalle = if n_pasos > 0 {
         lista_pasos(id, c.pasos, &c.anteriores).into_any()
     } else {
-        let anteriores = valores_anteriores(id, 0, &c.campos, &c.anteriores);
+        let anteriores = valores_anteriores(id, 0, &c.anteriores);
         view! {
             <TablaDiff campos=c.campos />
             {anteriores}
@@ -586,6 +583,111 @@ fn Paginacion(pagina: u32, paginas: u32, hay_mas: bool, total: u32) -> impl Into
     }
 }
 
+/// Lo que la página enseña alrededor de las entradas: solo si cambia esto se
+/// vuelve a pintar todo; las filas que no cambian se quedan (ver
+/// [`ListaHistorial`]).
+#[derive(Clone, Debug, PartialEq)]
+enum Forma {
+    Error(String),
+    Vacio,
+    /// Con entradas o sin ellas en esta página. La paginación (que cambia
+    /// con cada entrada nueva) va aparte.
+    Lista {
+        sin_entradas: bool,
+    },
+}
+
+/// Clave de una fila para `<For>`: todo lo que la fila enseña. Con el
+/// refresco de 2 s (un cambio en curso), las filas iguales no se recrean, y
+/// así no se pierde un secreto mostrado ni la operación que espera a la
+/// reautenticación.
+fn clave_fila(e: &EntradaVista) -> String {
+    format!("{e:?}")
+}
+
+/// Las entradas de la página del historial, en filas que sobreviven al
+/// refresco mientras no cambien.
+#[component]
+fn ListaHistorial(
+    datos: Resource<Result<PaginaHistorial, ServerFnError>>,
+    abiertos: RwSignal<BTreeSet<i64>>,
+    ocupado: Signal<bool>,
+    #[prop(into)] on_deshacer: Callback<i64>,
+) -> impl IntoView {
+    let forma = Memo::new(move |_| {
+        datos.get().map(|r| match r {
+            Err(e) => Forma::Error(texto_error(&e)),
+            Ok(p) if p.total == 0 => Forma::Vacio,
+            Ok(p) => Forma::Lista {
+                sin_entradas: p.entradas.is_empty(),
+            },
+        })
+    });
+    let paginacion = Memo::new(move |_| {
+        datos
+            .get()
+            .and_then(Result::ok)
+            .map(|p| (p.pagina, p.paginas(), p.hay_mas, p.total))
+    });
+    let entradas = move || {
+        datos
+            .get()
+            .and_then(Result::ok)
+            .map(|p| p.entradas)
+            .unwrap_or_default()
+    };
+    move || {
+        forma.get().map(|f| match f {
+            Forma::Error(e) => {
+                view! { <p class="error-formulario" role="alert">{e}</p> }.into_any()
+            }
+            Forma::Vacio => view! {
+                <section class="tarjeta hist-vacio">
+                    <p>{t!("historial-vacio")}</p>
+                    <p class="pagina-sub">{t!("historial-vacio-sub")}</p>
+                </section>
+            }
+            .into_any(),
+            Forma::Lista { sin_entradas } => {
+                let lista = if sin_entradas {
+                    view! {
+                        <p class="pagina-sub">
+                            {t!("historial-pagina-vacia")}
+                            " "
+                            <A href="/historial">{t!("historial-volver-recientes")}</A>
+                        </p>
+                    }
+                    .into_any()
+                } else {
+                    view! {
+                        <ol class="hist-lista">
+                            <For each=entradas key=clave_fila let:e>
+                                {match e {
+                                    EntradaVista::Cambio(c) => view! {
+                                        <FilaCambio c abiertos ocupado on_deshacer />
+                                    }
+                                    .into_any(),
+                                    EntradaVista::Revelado(r) => view! { <FilaRevelado r /> }.into_any(),
+                                }}
+                            </For>
+                        </ol>
+                    }
+                    .into_any()
+                };
+                view! {
+                    {lista}
+                    {move || {
+                        paginacion.get().map(|(pagina, paginas, hay_mas, total)| {
+                            view! { <Paginacion pagina paginas hay_mas total /> }
+                        })
+                    }}
+                }
+                .into_any()
+            }
+        })
+    }
+}
+
 /// Página `/historial`.
 #[component]
 pub fn PaginaHistorial() -> impl IntoView {
@@ -663,60 +765,6 @@ pub fn PaginaHistorial() -> impl IntoView {
         })
     };
 
-    let contenido = move || {
-        datos.get().map(|r| match r {
-            Err(e) => {
-                view! { <p class="error-formulario" role="alert">{texto_error(&e)}</p> }.into_any()
-            }
-            Ok(p) if p.total == 0 => view! {
-                <section class="tarjeta hist-vacio">
-                    <p>{t!("historial-vacio")}</p>
-                    <p class="pagina-sub">{t!("historial-vacio-sub")}</p>
-                </section>
-            }
-            .into_any(),
-            Ok(p) => {
-                let paginacion = view! {
-                    <Paginacion
-                        pagina=p.pagina
-                        paginas=p.paginas()
-                        hay_mas=p.hay_mas
-                        total=p.total
-                    />
-                };
-                let lista = if p.entradas.is_empty() {
-                    view! {
-                        <p class="pagina-sub">
-                            {t!("historial-pagina-vacia")}
-                            " "
-                            <A href="/historial">{t!("historial-volver-recientes")}</A>
-                        </p>
-                    }
-                    .into_any()
-                } else {
-                    let filas = p
-                        .entradas
-                        .into_iter()
-                        .map(|e| match e {
-                            EntradaVista::Cambio(c) => view! {
-                                <FilaCambio
-                                    c
-                                    abiertos
-                                    ocupado=preparando.into()
-                                    on_deshacer=deshacer_cambio
-                                />
-                            }
-                            .into_any(),
-                            EntradaVista::Revelado(r) => view! { <FilaRevelado r /> }.into_any(),
-                        })
-                        .collect_view();
-                    view! { <ol class="hist-lista">{filas}</ol> }.into_any()
-                };
-                view! { {lista} {paginacion} }.into_any()
-            }
-        })
-    };
-
     view! {
         <header class="pagina-cabecera">
             <div>
@@ -728,7 +776,12 @@ pub fn PaginaHistorial() -> impl IntoView {
             {move || error.get()}
         </p>
         <Transition fallback=|| view! { <p class="pagina-sub">{t!("comun-cargando")}</p> }>
-            {contenido}
+            <ListaHistorial
+                datos
+                abiertos
+                ocupado=preparando.into()
+                on_deshacer=deshacer_cambio
+            />
         </Transition>
         {dialogo}
         {move || reauth.abierto().then(|| view! { <DialogoReautenticar /> })}

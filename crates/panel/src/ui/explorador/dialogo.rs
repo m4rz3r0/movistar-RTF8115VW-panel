@@ -17,8 +17,9 @@ use std::time::Duration;
 /// Cada cuánto se pregunta por el estado de un cambio.
 const SONDEO: Duration = Duration::from_secs(2);
 
-/// Abre el `<dialog>` como modal en cuanto existe en el DOM.
-fn abrir_modal(dlg: NodeRef<html::Dialog>) {
+/// Abre el `<dialog>` como modal en cuanto existe en el DOM (lo usan todos
+/// los diálogos del panel).
+pub(crate) fn abrir_modal(dlg: NodeRef<html::Dialog>) {
     Effect::new(move |_| {
         if let Some(d) = dlg.get()
             && !d.open()

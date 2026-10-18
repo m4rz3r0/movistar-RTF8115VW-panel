@@ -11,17 +11,21 @@ ajuste-telefono-linea-activa-recomendado = Recommended if you use the landline. 
 ajuste-telefono-linea-silencio = Save during silences
 ajuste-telefono-linea-silencio-desc = While nobody is speaking, the router stops sending sound to use less of the connection.
 ajuste-telefono-linea-silencio-recomendado = Recommended if you have fibre or a good connection, as is usual today. Pros: the start of words is not cut off and the call does not seem to have dropped. Cons: each call uses a little more of the connection, which you will not notice with fibre.
+ajuste-telefono-linea-contrasena = Line password
+ajuste-telefono-linea-contrasena-desc = The password the line uses to sign in to the operator. The router won't let it be read, so to save any change on this card you have to type it; if you don't know it, ask the operator.
 
 ## Phone line: account and direct line
 ajuste-telefono-linea_oculto-titulo = Line account and direct line
 ajuste-telefono-linea_oculto-desc = The details the line uses to identify itself to the operator, and the automatic call when you pick up.
-ajuste-telefono-linea_oculto-ayuda = The operator sets these and they are never shown. If you type one wrong, the landline stops working until you undo the change. The line password is not changed from here. Only change them if the operator asks you to.
+ajuste-telefono-linea_oculto-ayuda = The operator sets these and they are hidden. If you type one wrong, the landline stops working until you undo the change. To save any of them you have to type the line password, which the router won't let be read. Only change them if the operator asks you to.
 ajuste-telefono-linea_oculto-usuario = Line user name
 ajuste-telefono-linea_oculto-usuario-desc = The name the line uses to identify itself to the operator.
 ajuste-telefono-linea_oculto-linea_directa = Direct line
 ajuste-telefono-linea_oculto-linea_directa-desc = When you pick up, the phone calls a set number on its own: straight away or, if you do not dial anything, after a few seconds, depending on what the operator has set. If you do not know what it is for, leave it alone.
 ajuste-telefono-linea_oculto-numero_directo = Direct line number
 ajuste-telefono-linea_oculto-numero_directo-desc = The number that is called on its own while the direct line is on.
+ajuste-telefono-linea_oculto-contrasena = Line password
+ajuste-telefono-linea_oculto-contrasena-desc = The password the line uses to sign in to the operator. The router won't let it be read, so to save any change on this card you have to type it; if you don't know it, ask the operator.
 
 ## Calls
 ajuste-telefono-sip-titulo = Keys and fax during calls

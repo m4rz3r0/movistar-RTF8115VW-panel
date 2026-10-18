@@ -114,13 +114,50 @@ async fn fila_cambio(
         puede_deshacer: g.se_puede_deshacer(c.id).await,
         titulo: c.titulo.as_deref().map(traducir),
         pasos,
-        anteriores: g
-            .anteriores_secretos(c.id)
-            .await
-            .into_iter()
-            .flat_map(|(orden, _, m)| m.into_keys().map(move |k| (orden, k)))
-            .collect(),
+        anteriores: {
+            let mut v = Vec::new();
+            for (orden, funcion, param) in g.secretos_con_anterior(c.id).await {
+                let (_, etiqueta) = etiqueta_del_secreto(state, c.id, &funcion, &param).await;
+                v.push((orden, param, etiqueta));
+            }
+            v
+        },
     })
+}
+
+/// Título del ajuste (si el cambio `cambio` se hizo desde Ajustes) y
+/// etiqueta del secreto `param` de la escritura `funcion`, la misma que en
+/// Ajustes. Si no es de Ajustes, la etiqueta del parámetro en el catálogo
+/// de funciones (nunca su nombre, salvo que ya no esté en él).
+async fn etiqueta_del_secreto(
+    state: &AppState,
+    cambio: i64,
+    funcion: &str,
+    param: &str,
+) -> (Option<String>, String) {
+    let traducir = |clave: &str| crate::ui::i18n::traducir(clave, None);
+    let de_ajustes = match gestor(state) {
+        Ok(g) => crate::ajustes_router::servidor::ajuste_del_cambio(state, &g, cambio).await,
+        Err(_) => None,
+    };
+    if let Some((a, _)) = de_ajustes {
+        let p = ajustes::prefijo_i18n(a);
+        if let Some(c) = a.campos.iter().find(|c| {
+            c.escribible()
+                .is_some_and(|e| e.funcion == funcion && e.parametro == param)
+        }) {
+            return (
+                Some(traducir(&format!("{p}-titulo"))),
+                traducir(&format!("{p}-{}", c.id)),
+            );
+        }
+    }
+    let etiqueta = state
+        .catalogo
+        .funcion(funcion)
+        .and_then(|f| f.parametro(param))
+        .map_or_else(|| param.to_owned(), |p| p.etiqueta.clone());
+    (None, etiqueta)
 }
 
 fn estado_paso(e: EstadoPaso) -> EstadoPasoVista {
@@ -144,37 +181,46 @@ async fn fila_revelado(state: &AppState, id: i64) -> Result<Option<ReveladoFila>
     .await
     .map_err(interno)?;
     let traducir = |clave: &str| crate::ui::i18n::traducir(clave, None);
-    Ok(fila.map(|f| {
-        let funcion: String = f.get("funcion");
-        let campo: String = f.get("campo");
-        let ajuste: Option<String> = f.get("ajuste");
-        // Desde Ajustes: el título del ajuste y la etiqueta del campo, sin
-        // la función (si el ajuste ya no está en el catálogo, sus ids).
-        let (ajuste, campo, ruta) = match ajuste {
-            Some(id) => match state.ajustes.ajuste(&id) {
-                Some(a) => {
-                    let p = ajustes::prefijo_i18n(a);
-                    (
-                        Some(traducir(&format!("{p}-titulo"))),
-                        traducir(&format!("{p}-{campo}")),
-                        None,
-                    )
-                }
-                None => (Some(id), campo, None),
-            },
-            None => (None, campo, ruta(state, &funcion)),
-        };
-        ReveladoFila {
-            id,
-            ts: f.get("ts"),
-            usuario: f.get("username"),
-            ruta,
-            funcion,
-            campo,
-            instancia: f.get("instancia"),
-            ajuste,
-            cambio: f.get("cambio_id"),
+    let Some(f) = fila else {
+        return Ok(None);
+    };
+    let funcion: String = f.get("funcion");
+    let campo: String = f.get("campo");
+    let ajuste: Option<String> = f.get("ajuste");
+    let cambio: Option<i64> = f.get("cambio_id");
+    // Desde Ajustes: el título del ajuste y la etiqueta del campo, sin la
+    // función (si el ajuste ya no está en el catálogo, sus ids). Un valor
+    // anterior: la etiqueta del secreto (y su ajuste, si el cambio se hizo
+    // desde Ajustes). Si no, el parámetro y la función, como en la
+    // Biblioteca.
+    let (ajuste, campo, ruta) = match (ajuste, cambio) {
+        (Some(id), _) => match state.ajustes.ajuste(&id) {
+            Some(a) => {
+                let p = ajustes::prefijo_i18n(a);
+                (
+                    Some(traducir(&format!("{p}-titulo"))),
+                    traducir(&format!("{p}-{campo}")),
+                    None,
+                )
+            }
+            None => (Some(id), campo, None),
+        },
+        (None, Some(cambio)) => {
+            let (ajuste, etiqueta) = etiqueta_del_secreto(state, cambio, &funcion, &campo).await;
+            (ajuste, etiqueta, None)
         }
+        (None, None) => (None, campo, ruta(state, &funcion)),
+    };
+    Ok(Some(ReveladoFila {
+        id,
+        ts: f.get("ts"),
+        usuario: f.get("username"),
+        ruta,
+        funcion,
+        campo,
+        instancia: f.get("instancia"),
+        ajuste,
+        cambio,
     }))
 }
 
@@ -194,12 +240,20 @@ pub async fn revelar_anterior(
     campo: &str,
     contrasena: &str,
 ) -> Result<String, ServerFnError> {
+    // Primero la contraseña: sin ella no se descifra ni se dice si existe.
+    let user = usuario_para_revelar(state, user, contrasena).await?;
     let g = gestor(state)?;
+    // Solo los secretos con valor anterior de verdad (no los tapados al leer).
+    let guardado = g
+        .secretos_con_anterior(cambio)
+        .await
+        .iter()
+        .any(|(o, _, p)| *o == orden && p == campo);
     let Some((funcion, valor)) = g
         .anteriores_secretos(cambio)
         .await
         .into_iter()
-        .filter(|(o, _, _)| *o == orden)
+        .filter(|(o, _, _)| guardado && *o == orden)
         .find_map(|(_, funcion, mut m)| m.remove(campo).map(|v| (funcion, v)))
     else {
         return Err(con_estado(
@@ -207,7 +261,6 @@ pub async fn revelar_anterior(
             crate::t!("historial-error-sin-anterior"),
         ));
     };
-    let user = usuario_para_revelar(state, user, contrasena).await?;
     sqlx::query(
         "INSERT INTO reveals (ts, user_id, funcion, campo, instancia, cambio_id) \
          VALUES (?, ?, ?, ?, NULL, ?)",

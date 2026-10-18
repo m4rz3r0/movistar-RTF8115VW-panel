@@ -195,11 +195,20 @@ fn ajustes_minimos_presentes() {
     assert_eq!(dns.campo("rele").unwrap().recomendado, None);
 }
 
-/// La contraseña de la línea de voz no se edita: el router la devuelve
-/// vacía, así que no hay valor anterior al que volver (fase 3).
+/// La contraseña de la línea de voz: el router la da vacía al leerla, así
+/// que el catálogo de funciones la marca como tapada y solo se escribe
+/// pidiéndola (un campo `secreto` en cada ajuste que reenvía la línea). Sin
+/// valor anterior de verdad, la reversión y el deshacer la omiten (lo
+/// comprueba el gestor). Antes de la Tarea 11 no se editaba en ningún sitio.
 #[test]
-fn contrasena_de_la_voz_no_se_edita() {
+fn contrasena_de_la_voz_solo_pedida() {
     let c = cargar();
+    let f = catalogo::Catalogo::load().unwrap();
+    let p = f
+        .funcion("cbSetVoiceLine")
+        .and_then(|f| f.parametro("auth_password"))
+        .unwrap();
+    assert!(p.tapado, "auth_password tiene que ir marcado como tapado");
     let editables: Vec<String> = c
         .todos()
         .iter()
@@ -208,9 +217,16 @@ fn contrasena_de_la_voz_no_se_edita() {
             x.escribible()
                 .is_some_and(|e| e.funcion == "cbSetVoiceLine" && e.parametro == "auth_password")
         })
+        .inspect(|(a, x)| assert_eq!(x.tipo, ajustes::TipoCampo::Secreto, "{}.{}", a.id, x.id))
         .map(|(a, x)| format!("{}.{}", a.id, x.id))
         .collect();
-    assert!(editables.is_empty(), "{editables:?}");
+    assert_eq!(
+        editables,
+        [
+            "telefono.linea.contrasena",
+            "telefono.linea_oculto.contrasena"
+        ]
+    );
 }
 
 /// Cada función de escritura que no está bloqueada en el catálogo de

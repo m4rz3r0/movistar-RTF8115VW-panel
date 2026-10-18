@@ -1106,3 +1106,29 @@ fn excepcion_de_solo_lectura_con_escribe_solo_para_secretos_basicos() {
         "`solo_lectura` con `escribe`",
     );
 }
+
+/// Un secreto que el router da tapado al leer tiene que poder pedirse: un
+/// ajuste que escribe su función necesita un campo `secreto` editable para
+/// él.
+#[test]
+fn secreto_tapado_necesita_su_campo() {
+    let marcadas = FUNCIONES.replace(
+        "nombre = \"key_phrase\"\netiqueta = \"Clave\"\ntipo = \"secret\"",
+        "nombre = \"key_phrase\"\netiqueta = \"Clave\"\ntipo = \"secret\"\ntapado = true",
+    );
+    assert_ne!(marcadas, FUNCIONES, "el reemplazo tiene que casar");
+    let f = Catalogo::from_toml(&marcadas).unwrap();
+    let con = comprobar(&cargar(&[("wifi", WIFI)], ""), &f, &mascara());
+    // wifi.red tiene su campo; wifi.avanzado escribe cbSetX sin él.
+    assert!(!con.iter().any(|x| x.starts_with("wifi.red:")), "{con:#?}");
+    falla_con(&con, "wifi.avanzado", "tapado");
+    // Sin el campo, también wifi.red.
+    let sin = WIFI.replace(
+        "[[ajuste.campo]]\nid = \"clave\"\nescribe = { funcion = \"cbSetX\", parametro = \"key_phrase\" }\n\
+         lee = \"key_phrase\"\ntipo = \"secreto\"\nvalidar = { min = 8, max = 63 }\n",
+        "",
+    );
+    assert_ne!(sin, WIFI, "el reemplazo tiene que casar");
+    let fallos = comprobar(&cargar(&[("wifi", &sin)], ""), &f, &mascara());
+    falla_con(&fallos, "wifi.red:", "tapado");
+}

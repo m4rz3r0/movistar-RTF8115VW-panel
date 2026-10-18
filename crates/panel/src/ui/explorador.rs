@@ -20,6 +20,7 @@ mod formulario;
 pub(crate) mod servidor;
 
 pub use datos::*;
+pub(crate) use dialogo::abrir_modal;
 pub use dialogo::{DialogoCambio, TablaDiff};
 
 use crate::t;
