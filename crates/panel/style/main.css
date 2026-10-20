@@ -1857,6 +1857,24 @@ input {
   border: 0;
 }
 
+/* En un formulario (Configuración del router), el campo con el ojo ocupa
+   lo que un campo normal, con su borde por fuera. */
+.campo-secreto .secreto-campo {
+  display: flex;
+  width: 100%;
+}
+
+.campo .secreto-campo .secreto-valor {
+  min-height: 38px;
+  padding: 0 var(--esp-3);
+  border: 0;
+  background: transparent;
+}
+
+.campo .secreto-campo:has(.secreto-valor[aria-invalid="true"]) {
+  border-color: var(--error);
+}
+
 /* Historial: los nombres técnicos de un paso, plegados. */
 .hist-tecnico {
   margin: 0;

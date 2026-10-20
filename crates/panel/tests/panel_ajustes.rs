@@ -672,7 +672,23 @@ async fn conexion_con_el_router_en_su_seccion() {
         html.contains(r#"href="/router/conexion""#),
         "enlace de la navegación: {html}"
     );
-    assert!(!html.contains(PASS));
+    // La contraseña del router guardada llega con la página (decisión del
+    // usuario del 2026-10-18): fuera de los datos de la página, solo en el
+    // `value` de su campo, censurado con el ojo.
+    let fuera: String = html
+        .split("<script")
+        .enumerate()
+        .map(|(i, t)| {
+            if i == 0 {
+                t
+            } else {
+                t.split_once("</script>").map_or("", |(_, r)| r)
+            }
+        })
+        .collect();
+    assert_eq!(fuera.matches(PASS).count(), 1, "{fuera}");
+    assert!(fuera.contains(r#"id="panel-router-contrasena""#));
+    assert!(fuera.contains(&format!(r#"value="{PASS}""#)));
 
     let html = body_text(get_con_cookie(&p.app, "/panel", &cookie).await).await;
     assert!(html.contains("Ajustes del panel"), "{html}");

@@ -55,6 +55,9 @@ pub(crate) const DISPOSITIVOS: &str = "dispositivos";
 pub(crate) const RESERVAS: &str = "reservas";
 /// Componente de Puertos (como [`DISPOSITIVOS`]).
 pub(crate) const PUERTOS: &str = "puertos";
+/// Componente de Seguridad (como [`DISPOSITIVOS`]): un enlace a
+/// «Configuración del router», donde se cambia.
+pub(crate) const CONTRASENA_ROUTER: &str = "contrasena_router";
 
 /// Primera página de la sección (la del menú).
 pub const RUTA_AJUSTES: &str = "/ajustes/internet";

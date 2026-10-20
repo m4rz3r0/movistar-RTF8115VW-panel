@@ -77,10 +77,10 @@ pub fn Secreto(
                 placeholder=vacio
                 // Que los gestores de contraseñas no la rellenen ni la
                 // guarden: es una clave del router, no de este sitio.
-                attr:data-1p-ignore=""
-                attr:data-lpignore="true"
-                attr:data-bwignore=""
-                attr:data-form-type="other"
+                data-1p-ignore=""
+                data-lpignore="true"
+                data-bwignore=""
+                data-form-type="other"
                 disabled=move || editable && bloqueado.get()
                 // El atributo, para el HTML del servidor; luego manda la
                 // propiedad (lo que se escribe).

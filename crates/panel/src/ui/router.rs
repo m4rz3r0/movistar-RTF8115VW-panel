@@ -9,19 +9,29 @@
 //! LAN, telefonía y televisión) y deja elegir a mano la conexión a internet
 //! o volver a detectarla.
 //!
-//! Cambiar las credenciales, confirmar el firmware, elegir la conexión a
-//! internet y volver a detectar piden la contraseña del panel si no se ha
-//! escrito en los últimos 5 minutos (el mismo diálogo que «Ajustes del
-//! panel», [`DialogoReautenticar`]).
+//! Junto a las credenciales, «Cambiar la contraseña del router»
+//! ([`contrasena::CambiarContrasena`]) cambia la del propio router. La
+//! contraseña guardada llega con la página (con `no-store`) y se ve con el
+//! ojo; sin tocarla, no se envía y el servidor se queda con la guardada.
+//!
+//! Cambiar las credenciales o la contraseña del router, confirmar el
+//! firmware, elegir la conexión a internet y volver a detectar piden la
+//! contraseña del panel si no se ha escrito en los últimos 5 minutos (el
+//! mismo diálogo que «Ajustes del panel», [`DialogoReautenticar`]).
+
+mod contrasena;
+
+pub use contrasena::ID_TARJETA as ID_CAMBIAR_CONTRASENA;
 
 use super::panel_ajustes::{
     DialogoReautenticar, Reautenticacion, campo, mensajes, repetible, texto_error,
 };
+use super::secreto::Secreto;
 use super::{Estado, Insignia};
 use crate::instalar::{ResumenRed, TipoRed};
 use crate::panel_ajustes::{
-    InfoRouter, confirmar_firmware, guardar_router, guardar_wan, leer_panel, probar_router,
-    redetectar,
+    InfoRouter, confirmar_firmware, guardar_router, guardar_wan, leer_conexion_router,
+    probar_router, redetectar,
 };
 use crate::t;
 use leptos::{ev::SubmitEvent, prelude::*, task::spawn_local};
@@ -54,7 +64,7 @@ pub fn InicioRouter() -> impl IntoView {
 /// Página «Conexión con el router».
 #[component]
 pub fn PaginaConexion() -> impl IntoView {
-    let datos = Resource::new(|| (), |_| leer_panel());
+    let datos = Resource::new(|| (), |_| leer_conexion_router());
     let reauth = Reautenticacion::proveer();
     view! {
         <header class="pagina-cabecera">
@@ -66,15 +76,34 @@ pub fn PaginaConexion() -> impl IntoView {
         <Suspense fallback=|| view! { <p>{t!("comun-cargando")}</p> }>
             {move || Suspend::new(async move {
                 match datos.await {
-                    Ok(a) => {
+                    Ok(c) => {
+                        let a = c.ajustes;
+                        let configurado = !a.router.url.is_empty();
+                        // La contraseña guardada y la del campo de las
+                        // credenciales: las comparte la tarjeta que cambia la
+                        // del router.
+                        let guardada = RwSignal::new(c.contrasena.clone());
+                        let contrasena = RwSignal::new(c.contrasena);
                         view! {
                             <div class="ajustes-panel">
                                 <Conexion
                                     url=a.router.url
                                     usuario=a.router.usuario
+                                    contrasena
+                                    guardada
                                     solo_lectura=a.solo_lectura
                                     firmware=a.firmware
-                                />
+                                >
+                                    {configurado
+                                        .then(|| {
+                                            view! {
+                                                <contrasena::CambiarContrasena
+                                                    contrasena_panel=contrasena
+                                                    guardada
+                                                />
+                                            }
+                                        })}
+                                </Conexion>
                                 <RedDelRouter
                                     red=a.red
                                     wan_manual=a.wan_manual
@@ -95,31 +124,37 @@ pub fn PaginaConexion() -> impl IntoView {
     }
 }
 
-/// Credenciales del router y firmware.
+/// Credenciales del router y firmware, con `children` entre las dos (la
+/// tarjeta que cambia la contraseña del router, al lado de las
+/// credenciales). `contrasena` es el campo de la contraseña (empieza con la
+/// guardada) y `guardada`, la que tiene guardada el panel: si el campo no ha
+/// cambiado, no se envía.
 #[component]
 fn Conexion(
     url: String,
     usuario: String,
+    contrasena: RwSignal<String>,
+    guardada: RwSignal<String>,
     solo_lectura: bool,
     firmware: Option<String>,
+    children: Children,
 ) -> impl IntoView {
     let reauth = expect_context::<Reautenticacion>();
     let configurado = !url.is_empty();
     let url = RwSignal::new(url);
     let usuario = RwSignal::new(usuario);
-    let contrasena = RwSignal::new(String::new());
     let info = RwSignal::new(None::<InfoRouter>);
     let error = RwSignal::new(None::<String>);
     let aviso = RwSignal::new(None::<String>);
     let pendiente = RwSignal::new(false);
     let solo_lectura = RwSignal::new(solo_lectura);
     let error_firmware = RwSignal::new(None::<String>);
+    // La contraseña, solo si se ha tocado (si no, el servidor usa la
+    // guardada).
     let datos = move || {
-        (
-            url.get_untracked(),
-            usuario.get_untracked(),
-            contrasena.get_untracked(),
-        )
+        let c = contrasena.get_untracked();
+        let tocada = (c != guardada.get_untracked()).then_some(c);
+        (url.get_untracked(), usuario.get_untracked(), tocada)
     };
 
     let probar = move |_| {
@@ -141,7 +176,7 @@ fn Conexion(
         pendiente.set(true);
         let (u, us, c) = datos();
         spawn_local(async move {
-            match guardar_router(u, us, c).await {
+            match guardar_router(u, us, c.clone()).await {
                 Ok(i) => {
                     // Con un firmware probado se quita el solo lectura; con
                     // uno sin probar, queda como estaba (o confirmado).
@@ -149,7 +184,9 @@ fn Conexion(
                         solo_lectura.set(false);
                     }
                     info.set(Some(i));
-                    contrasena.set(String::new());
+                    if let Some(c) = c {
+                        guardada.set(c);
+                    }
                     aviso.set(Some(t!("router-guardadas")));
                 }
                 Err(e) => reauth.tratar(&e, error, yo),
@@ -218,14 +255,19 @@ fn Conexion(
                     usuario,
                     None,
                 )}
-                {campo(
-                    "panel-router-contrasena",
-                    t!("router-contrasena"),
-                    "password",
-                    "new-password",
-                    contrasena,
-                    None,
-                )}
+                <div class="campo campo-secreto">
+                    <label for="panel-router-contrasena">{t!("router-contrasena")}</label>
+                    <Secreto
+                        valor=contrasena
+                        nombre=t!("router-contrasena")
+                        editable=true
+                        id="panel-router-contrasena"
+                        descrito="panel-router-contrasena-ayuda"
+                    />
+                    <span class="nota" id="panel-router-contrasena-ayuda">
+                        {t!("router-contrasena-ayuda")}
+                    </span>
+                </div>
                 {detectado}
                 {mensajes(error, aviso)}
                 <div class="botones">
@@ -243,6 +285,7 @@ fn Conexion(
                 </div>
             </form>
         </section>
+        {children()}
         <section class="tarjeta" aria-labelledby="router-firmware">
             <h2 id="router-firmware">{t!("router-firmware-titulo")}</h2>
             <div class="ajustes-estado">

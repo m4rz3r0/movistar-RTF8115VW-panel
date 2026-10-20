@@ -620,6 +620,10 @@ async fn secretos_solo_en_el_campo_de_las_paginas_que_los_muestran() {
         assert!(wifi.contains(marca), "{marca}");
     }
     assert!(
+        !wifi.contains("attr:data-"),
+        "con su nombre, sin el prefijo"
+    );
+    assert!(
         wifi.contains(CLAVE_2),
         "la página de la WiFi lleva la clave"
     );

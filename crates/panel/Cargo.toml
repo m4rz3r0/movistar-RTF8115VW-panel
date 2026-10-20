@@ -167,6 +167,10 @@ name = "ajustes_secretos"
 required-features = ["ssr"]
 
 [[test]]
+name = "contrasena_router"
+required-features = ["ssr"]
+
+[[test]]
 name = "lecturas"
 required-features = ["ssr"]
 

@@ -17,7 +17,10 @@ use axum::{
     routing::{get, post},
 };
 use catalogo::{Catalogo, Lista};
-use hgu::{fmt::mess_userpass, xml::XmlNode};
+use hgu::{
+    fmt::{codificar_cambio_contrasena, mess_userpass},
+    xml::XmlNode,
+};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     net::SocketAddr,
@@ -1221,16 +1224,21 @@ fn write(s: &Inner, st: &mut SimState, name: &str, params: &[(String, String)]) 
     }
 }
 
-/// Cambia la contraseña del usuario del sim (`rqUser`, `rqOPwd`, `rqNPwd`).
-/// Las sesiones abiertas siguen valiendo, como en el router.
+/// Cambia la contraseña del usuario del sim (`rqUser`, `rqOPwd`, `rqNPwd`,
+/// leídos con la misma codificación con la que los manda el panel:
+/// [`codificar_cambio_contrasena`]). Las sesiones abiertas siguen valiendo,
+/// como en el router.
 fn modify_pwd(s: &Inner, st: &mut SimState, p: &[(String, String)]) -> Result<(), String> {
-    let nueva = param(p, "rqNPwd").ok_or("falta rqNPwd")?;
+    let leer = |k: &str| param(p, k).map(codificar_cambio_contrasena);
+    let nueva = leer("rqNPwd").ok_or("falta rqNPwd")?;
     let actual = s.password();
-    if param(p, "rqUser") != Some(s.user.as_str()) || param(p, "rqOPwd") != Some(actual.as_str()) {
+    if leer("rqUser").as_deref() != Some(s.user.as_str())
+        || leer("rqOPwd").as_deref() != Some(actual.as_str())
+    {
         return Err("usuario o contraseña actual incorrectos".to_owned());
     }
     if !std::mem::take(&mut st.modify_pwd_sin_efecto) {
-        *s.password.lock().unwrap_or_else(|e| e.into_inner()) = nueva.to_owned();
+        *s.password.lock().unwrap_or_else(|e| e.into_inner()) = nueva;
     }
     Ok(())
 }

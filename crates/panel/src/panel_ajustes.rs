@@ -10,8 +10,9 @@
 //! red y todo lo de usuarios) exigen además haber vuelto a
 //! escribir la contraseña del panel en los últimos 5 minutos
 //! ([`reautenticar`]); sin eso responden 401 con
-//! [`crate::auth::ERROR_REAUTENTICACION`]. La contraseña del router nunca
-//! sale del servidor.
+//! [`crate::auth::ERROR_REAUTENTICACION`]. La contraseña del router solo
+//! sale del servidor hacia «Conexión con el router» ([`leer_conexion_router`]),
+//! que la muestra censurada con el ojo.
 
 use crate::ui::charts::Zona;
 use ::i18n::Idioma;
@@ -259,28 +260,48 @@ pub async fn leer_panel() -> Result<AjustesPanel, ServerFnError> {
     servidor::leer().await
 }
 
-/// Prueba unas credenciales del router sin guardarlas.
+/// «Conexión con el router»: lo de [`leer_panel`] y la contraseña del
+/// router guardada, que la página muestra censurada con el ojo (decisión
+/// del usuario del 2026-10-18). Solo para esa página; con `no-store`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConexionRouter {
+    pub ajustes: AjustesPanel,
+    /// Vacía si el router no está configurado.
+    pub contrasena: String,
+}
+
+/// Lo de «Conexión con el router», con la contraseña del router guardada.
+#[server(endpoint = "leer_conexion_router", input = Json)]
+pub async fn leer_conexion_router() -> Result<ConexionRouter, ServerFnError> {
+    servidor::leer_conexion().await
+}
+
+/// Prueba unas credenciales del router sin guardarlas. Sin `contrasena`
+/// (el campo sin tocar), la guardada.
 #[server(endpoint = "panel_probar_router", input = Json)]
 pub async fn probar_router(
     url: String,
     usuario: String,
-    contrasena: String,
+    #[server(default)] contrasena: Option<String>,
 ) -> Result<InfoRouter, ServerFnError> {
     let (state, _) = servidor::preparar().await?;
+    let contrasena = servidor::contrasena_o_guardada(&state, contrasena).await?;
     crate::instalar::servidor::probar(&state, &url, &usuario, &contrasena)
         .await
         .map(|(info, _)| info)
 }
 
 /// Prueba las credenciales del router y, si entran, las guarda y el panel
-/// pasa a usarlas. No con un cambio en curso. Exige reautenticación.
+/// pasa a usarlas. Sin `contrasena` (el campo sin tocar), se queda la
+/// guardada. No con un cambio en curso. Exige reautenticación.
 #[server(endpoint = "panel_guardar_router", input = Json)]
 pub async fn guardar_router(
     url: String,
     usuario: String,
-    contrasena: String,
+    #[server(default)] contrasena: Option<String>,
 ) -> Result<InfoRouter, ServerFnError> {
     let (state, _) = servidor::preparar_delicada().await?;
+    let contrasena = servidor::contrasena_o_guardada(&state, contrasena).await?;
     crate::instalar::servidor::guardar(&state, &url, &usuario, &contrasena).await
 }
 
@@ -372,7 +393,7 @@ pub(crate) mod servidor {
     }
 
     /// Como [`preparar`], con la ventana de reautenticación abierta.
-    pub(super) async fn preparar_delicada() -> Result<(AppState, auth::User), ServerFnError> {
+    pub(crate) async fn preparar_delicada() -> Result<(AppState, auth::User), ServerFnError> {
         let state = estado()?;
         Ok((state, auth::require_reauth().await?))
     }
@@ -448,6 +469,36 @@ pub(crate) mod servidor {
             wan_manual: state.wan_manual(),
             conexiones,
         })
+    }
+
+    pub(super) async fn leer_conexion() -> Result<ConexionRouter, ServerFnError> {
+        let ajustes = leer().await?;
+        let state = estado()?;
+        let contrasena = instancia::leer_credenciales(&state.db, &state.history_key)
+            .await
+            .map_err(interno)?
+            .map(|c| c.contrasena)
+            .unwrap_or_default();
+        Ok(ConexionRouter {
+            ajustes,
+            contrasena,
+        })
+    }
+
+    /// `contrasena` si llegó; si no (el campo sin tocar), la guardada (vacía
+    /// si no hay: la prueba lo dirá).
+    pub(super) async fn contrasena_o_guardada(
+        state: &AppState,
+        contrasena: Option<String>,
+    ) -> Result<String, ServerFnError> {
+        match contrasena {
+            Some(c) => Ok(c),
+            None => Ok(instancia::leer_credenciales(&state.db, &state.history_key)
+                .await
+                .map_err(interno)?
+                .map(|c| c.contrasena)
+                .unwrap_or_default()),
+        }
     }
 
     /// Estado del panel (con reautenticación) y el gestor de cambios

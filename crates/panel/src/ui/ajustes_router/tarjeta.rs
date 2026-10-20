@@ -6,9 +6,10 @@
 //!
 //! Un ajuste que no se pudo leer muestra el motivo y no se edita. Los
 //! dispositivos, las IP fijas y los puertos abiertos tienen su componente
-//! ([`Dispositivos`], [`Reservas`], [`Puertos`]); otro componente propio (la
-//! contraseña del router) es por ahora un hueco con su título y
-//! descripción; una lista sin componente se ve como tabla.
+//! ([`Dispositivos`], [`Reservas`], [`Puertos`]); la contraseña del router
+//! se cambia en «Configuración del router» y aquí lleva un enlace; otro
+//! componente propio sería un hueco con su título y descripción; una lista
+//! sin componente se ve como tabla.
 
 use super::Foco;
 use super::campo::{
@@ -29,6 +30,7 @@ use crate::ui::i18n::traducir;
 use crate::ui::{Estado, IconoEstado, Insignia};
 use ajustes::Nivel;
 use leptos::{ev::SubmitEvent, html, prelude::*, task::spawn_local};
+use leptos_router::components::A;
 use std::collections::BTreeMap;
 
 /// Prefijo de los ids de la tarjeta en la página (`ajuste-wifi-red_24`).
@@ -198,6 +200,8 @@ pub(crate) fn Tarjeta(
         view! { <Reservas a solo_lectura recargar /> }.into_any()
     } else if a.componente.as_deref() == Some(super::PUERTOS) {
         view! { <Puertos a solo_lectura recargar /> }.into_any()
+    } else if a.componente.as_deref() == Some(super::CONTRASENA_ROUTER) {
+        enlace_contrasena(&a).into_any()
     } else if a.componente.is_some() {
         hueco(&a).into_any()
     } else if a.lista {
@@ -212,7 +216,27 @@ pub(crate) fn Tarjeta(
     }
 }
 
-/// Ajuste con componente propio: por ahora, su título y su descripción.
+/// La contraseña del router: se cambia en «Configuración del router»
+/// (junto a la que usa el panel para entrar); aquí, el enlace.
+fn enlace_contrasena(a: &AjusteVista) -> impl IntoView + use<> {
+    let href = format!(
+        "{}#{}",
+        crate::ui::router::RUTA_CONEXION,
+        crate::ui::router::ID_CAMBIAR_CONTRASENA
+    );
+    view! {
+        {cabecera(a, false)}
+        {ayuda(a)}
+        <p class="ayuda">{t!("contrasena-router-enlace-texto")}</p>
+        <p>
+            <A href=href attr:class="boton-sutil">
+                {t!("contrasena-router-enlace")}
+            </A>
+        </p>
+    }
+}
+
+/// Ajuste con componente propio sin hacer: su título y su descripción.
 fn hueco(a: &AjusteVista) -> impl IntoView + use<> {
     view! {
         {cabecera(a, false)}
