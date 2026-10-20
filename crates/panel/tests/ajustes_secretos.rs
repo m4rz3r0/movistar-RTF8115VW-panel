@@ -928,3 +928,160 @@ async fn deshacer_mixto_avisa_de_la_clave_tapada() {
         "{prep}"
     );
 }
+
+/// Lo que se ve de una fila del Historial: fuera de los datos de la página
+/// y de los detalles técnicos plegados.
+fn a_la_vista(fila: &str) -> String {
+    let (sin_scripts, _) = partir(fila, "<script", "</script>");
+    let (fuera, _) = partir(
+        &sin_scripts,
+        "<details class=\"detalles-tecnicos\"",
+        "</details>",
+    );
+    texto_visible(&fuera)
+}
+
+/// La fila `id="cambio-{id}"` del HTML del Historial.
+fn fila_del_cambio(pagina: &str, id: i64) -> String {
+    let fila = &pagina[pagina
+        .find(&format!("id=\"cambio-{id}\""))
+        .expect("la fila")..];
+    fila[..fila
+        .find("<li class=\"hist-entrada")
+        .unwrap_or(fila.find("</ol>").unwrap())]
+        .to_owned()
+}
+
+/// El deshacer de un cambio hecho desde Ajustes lleva su título, y sus
+/// campos las etiquetas de Ajustes, en los dos idiomas; ninguna fila enseña
+/// el nombre de una función. Una fila de deshacer guardada sin título (de
+/// antes) lo toma del cambio que deshace, y uno de la Biblioteca, sin
+/// título, sale como «Cambio en el router».
+#[tokio::test]
+async fn historial_sin_nombres_de_la_api_al_deshacer() {
+    let (p, cookie) = panel_con_gestor().await;
+    let (status, body) = preparar(&p, &cookie, "wifi.red_5", json!({ "nombre": "otra-red" })).await;
+    assert_eq!(status, 200, "{body}");
+    let id = aplicar(&p, &cookie, &serde_json::from_str(&body).unwrap()).await;
+    let g = ok(&p, "deshacer_ajuste", json!({ "cambio": id }), &cookie).await;
+    let deshecho = aplicar(&p, &cookie, &g).await;
+    let titulo: Option<String> = sqlx::query_scalar("SELECT titulo FROM changes WHERE id = ?")
+        .bind(deshecho)
+        .fetch_one(&p.state.db)
+        .await
+        .unwrap();
+    assert_eq!(
+        titulo.as_deref(),
+        Some("ajuste-wifi-red_5-titulo"),
+        "el deshacer lleva título"
+    );
+    // Uno de la Biblioteca, sin título.
+    let (status, body) = llamar(
+        &p,
+        "preparar_cambio",
+        json!({ "peticion": { "funcion": "cbSetUpnpCfg", "instancia": null,
+                "valores": [["adm_state", "1"]], "borrar": false } }),
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    let prep: Value = serde_json::from_str(&body).unwrap();
+    let biblioteca = ok(
+        &p,
+        "confirmar_cambio",
+        json!({ "token": prep["token"], "palabra": null }),
+        &cookie,
+    )
+    .await
+    .as_i64()
+    .unwrap();
+    esperar_final(&p, &cookie, biblioteca).await;
+    let comprobar = |fase: &'static str| {
+        let (p, cookie) = (&p, &cookie);
+        async move {
+            for (idioma, ajuste, campo, generico) in [
+                (
+                    "es",
+                    "Red WiFi 5 GHz",
+                    "Nombre de la red",
+                    "Cambio en el router",
+                ),
+                ("en", "5 GHz WiFi network", "Network name", "Router change"),
+            ] {
+                let con_idioma = format!("{cookie}; rp_lang={idioma}");
+                let h = ok(p, "historial", json!({ "pagina": 1 }), &con_idioma).await;
+                let c = h["entradas"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find_map(|e| e.get("Cambio").filter(|c| c["id"] == deshecho))
+                    .unwrap();
+                assert_eq!(c["titulo"], ajuste, "{fase} {idioma}: {c}");
+                assert_eq!(c["campos"][0]["etiqueta"], campo, "{fase} {idioma}: {c}");
+                let pagina = html(p, &con_idioma, "/historial").await;
+                for (n, esperado) in [(deshecho, ajuste), (biblioteca, generico)] {
+                    let vista = a_la_vista(&fila_del_cambio(&pagina, n));
+                    assert!(vista.contains(esperado), "{fase} {idioma} {n}: {vista}");
+                    assert!(!vista.contains("cbSet"), "{fase} {idioma} {n}: {vista}");
+                }
+                let vista = a_la_vista(&fila_del_cambio(&pagina, deshecho));
+                assert!(vista.contains(campo), "{fase} {idioma}: {vista}");
+            }
+        }
+    };
+    comprobar("con título").await;
+    // Una fila de deshacer guardada antes, sin título: lo toma del cambio
+    // que deshace.
+    sqlx::query("UPDATE changes SET titulo = NULL WHERE id = ?")
+        .bind(deshecho)
+        .execute(&p.state.db)
+        .await
+        .unwrap();
+    comprobar("sin título guardado").await;
+}
+
+/// Si el cambio aún se vigila, deshacerlo da el motivo de siempre, aunque
+/// solo cambiara una clave que el router no deja leer: el estado va
+/// primero.
+#[tokio::test]
+async fn deshacer_en_vigilancia_da_su_motivo_aunque_sea_una_clave_tapada() {
+    let mut t = common::tiempos_rapidos();
+    t.bajo = Duration::from_secs(10);
+    t.medio = Duration::from_secs(10);
+    let (p, cookie) = common::panel_con_tiempos(t).await;
+    let (status, body) = preparar(
+        &p,
+        &cookie,
+        "telefono.linea",
+        json!({ "contrasena": CLAVE_3 }),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    let g: Value = serde_json::from_str(&body).unwrap();
+    let id = ok(
+        &p,
+        "confirmar_ajuste",
+        json!({ "token": g["token"], "desmarcados": [] }),
+        &cookie,
+    )
+    .await
+    .as_i64()
+    .unwrap();
+    let inicio = std::time::Instant::now();
+    while ok(&p, "estado_cambio", json!({ "id": id }), &cookie).await["estado"] != "Vigilando" {
+        assert!(
+            inicio.elapsed() < Duration::from_secs(5),
+            "no llega a vigilarse"
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    let (status, body) = llamar(
+        &p,
+        "deshacer_ajuste",
+        json!({ "cambio": id }),
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(status, 400, "{body}");
+    assert!(!body.contains("no se puede volver atrás"), "{body}");
+}

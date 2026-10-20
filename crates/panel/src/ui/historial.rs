@@ -505,22 +505,22 @@ fn FilaCambio(
     // número de pasos); uno de la Biblioteca, su función. El detalle, los
     // pasos o el diff, con los nombres técnicos plegados aparte.
     let n_pasos = c.pasos.len();
-    let que = match (&c.titulo, n_pasos) {
-        (titulo, n) if n > 0 => {
-            let titulo = titulo.clone().unwrap_or_else(|| c.funcion.clone());
-            view! {
-                <span>
-                    {titulo}
-                    <span class="hist-instancia">{t!("historial-pasos", n = n)}</span>
-                </span>
-            }
-            .into_any()
+    // Sin título (un cambio de la Biblioteca), un texto genérico: el nombre
+    // de la función solo va en los detalles técnicos.
+    let titulo = c
+        .titulo
+        .clone()
+        .unwrap_or_else(|| t!("historial-cambio-router"));
+    let que = if n_pasos > 0 {
+        view! {
+            <span>
+                {titulo}
+                <span class="hist-instancia">{t!("historial-pasos", n = n_pasos)}</span>
+            </span>
         }
-        (Some(titulo), _) => view! { <span>{titulo.clone()}</span> }.into_any(),
-        (None, _) => view! {
-            <span>{funcion_enlazada(c.funcion.clone(), c.ruta.clone(), c.instancia.clone())}</span>
-        }
-        .into_any(),
+        .into_any()
+    } else {
+        view! { <span>{titulo}</span> }.into_any()
     };
     // Los valores de sus secretos, al desplegarlo (solo si cambió alguno).
     let con_secreto = c

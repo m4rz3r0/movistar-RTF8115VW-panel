@@ -58,7 +58,15 @@ async fn fila_cambio(
     c: Cambio,
 ) -> Result<CambioFila, ServerFnError> {
     let g = gestor(state)?;
-    let de_ajuste = c.titulo.is_some();
+    let (por, deshace) = g.enlaces_deshacer(c.id).await;
+    // Un deshacer guardado sin título (antes de que lo llevaran) toma el del
+    // cambio que deshace: así no se queda con el nombre de la función.
+    let titulo = match (&c.titulo, deshace) {
+        (Some(t), _) => Some(t.clone()),
+        (None, Some(d)) => g.cambio(d).await.and_then(|d| d.titulo),
+        (None, None) => None,
+    };
+    let de_ajuste = titulo.is_some();
     // Cada campo con la etiqueta de su campo en Ajustes o, si no, la de la
     // función de su paso.
     let campos_de = |funcion: &str, diff: crate::changes::Diff| -> Vec<CampoCambio> {
@@ -85,10 +93,12 @@ async fn fila_cambio(
             .into_iter()
             .map(|p| PasoFila {
                 numero: p.orden + 1,
+                // Sin etiqueta, un texto genérico: nunca el nombre de la
+                // función (va en los detalles técnicos).
                 etiqueta: p
                     .etiqueta
                     .as_deref()
-                    .map_or_else(|| p.funcion.clone(), traducir),
+                    .map_or_else(|| crate::t!("historial-cambio-router"), traducir),
                 campos: campos_de(&p.funcion, p.diff),
                 funcion: p.funcion,
                 instancia: p.instancia,
@@ -101,7 +111,6 @@ async fn fila_cambio(
     } else {
         (campos_de(&c.funcion, c.diff), Vec::new())
     };
-    let (por, deshace) = g.enlaces_deshacer(c.id).await;
     let puede_deshacer = g.se_puede_deshacer(c.id).await;
     // Aplicado y sin deshacer, pero sin nada que volver atrás: solo cambió
     // lo que el router no deja leer. La fila dice por qué.
@@ -141,7 +150,7 @@ async fn fila_cambio(
         deshace: enlace(deshace).await?,
         puede_deshacer,
         sin_deshacer,
-        titulo: c.titulo.as_deref().map(traducir),
+        titulo: titulo.as_deref().map(traducir),
         pasos,
     })
 }

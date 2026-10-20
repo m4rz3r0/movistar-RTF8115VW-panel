@@ -1891,8 +1891,15 @@ pub(crate) mod servidor {
             crate::ui::historial::servidor::nombres(&e, &state, &tapados)
         };
         if !g.se_puede_deshacer(cambio).await {
-            // Solo cambió lo que el router no deja leer: se dice por qué.
-            let msg = if solo_tapados {
+            // Primero el estado (aún se vigila, ya se deshizo…); solo un
+            // cambio aplicado y sin deshacer en el que solo cambió lo que el
+            // router no deja leer da ese motivo.
+            let aplicado = g
+                .cambio(cambio)
+                .await
+                .is_some_and(|c| c.estado == crate::changes::Estado::Aplicado);
+            let deshecho = g.enlaces_deshacer(cambio).await.0.is_some();
+            let msg = if solo_tapados && aplicado && !deshecho {
                 t!("cambio-sin-deshacer-tapado", campos = nombres_tapados())
             } else {
                 t!("ajustes-error-no-deshacer")

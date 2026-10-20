@@ -467,6 +467,9 @@ for (const idioma of ["es", "en"] as const) {
         if (conCambioEnCurso) enCurso = await cambiarUpnp(page);
         await page.goto("/historial");
         await asentar(page);
+        // Con las filas plegadas, ningún nombre de la API a la vista (los de
+        // las funciones van en los detalles técnicos de cada paso).
+        expect(await page.locator("ol.hist-lista").innerText()).not.toMatch(/\bcb[A-Z]\w+/);
         // El de la clave (en la pasada completa hay otros de esta red: el nombre).
         const cambio = page
           .locator("li.hist-cambio")

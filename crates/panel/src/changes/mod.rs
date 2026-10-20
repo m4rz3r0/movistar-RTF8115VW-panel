@@ -524,25 +524,26 @@ impl ChangeManager {
     /// ([`crate::instancia::solo_lectura`]) no prepara nada:
     /// `Bloqueada(`[`BLOQUEO_SOLO_LECTURA`]`)`.
     pub async fn preparar(&self, req: ChangeRequest) -> Result<Preparado, CambioError> {
-        self.preparar_con(vec![req], false, None).await
+        self.preparar_con(vec![(req, None)], false, None, None)
+            .await
     }
 
-    /// Prepara el grupo de `reqs` y lo presenta como un [`Preparado`].
+    /// Prepara el grupo de `reqs` (cada paso con su etiqueta) con el título
+    /// `titulo` y lo presenta como un [`Preparado`].
     async fn preparar_con(
         &self,
-        reqs: Vec<ChangeRequest>,
+        pasos: Vec<(ChangeRequest, Option<String>)>,
         explicito: bool,
         deshace: Option<i64>,
+        titulo: Option<String>,
     ) -> Result<Preparado, CambioError> {
+        let reqs: Vec<ChangeRequest> = pasos.iter().map(|(r, _)| r.clone()).collect();
         let g = GrupoRequest {
-            pasos: reqs
-                .iter()
-                .map(|req| Paso {
-                    req: req.clone(),
-                    etiqueta: None,
-                })
+            pasos: pasos
+                .into_iter()
+                .map(|(req, etiqueta)| Paso { req, etiqueta })
                 .collect(),
-            titulo: None,
+            titulo,
         };
         let g = self.preparar_grupo_con(g, explicito, deshace).await?;
         let primero = g.pasos.iter().position(|p| !p.sin_cambios).unwrap_or(0);
@@ -691,7 +692,12 @@ impl ChangeManager {
     /// los valores anteriores (secretos incluidos), en orden inverso al de
     /// sus pasos. Es la única comprobación de qué se puede deshacer: la usan
     /// [`ChangeManager::deshacer`] y [`ChangeManager::se_puede_deshacer`].
-    async fn inversa_de(&self, change_id: i64) -> Result<Vec<ChangeRequest>, CambioError> {
+    /// Pasos inversos de un cambio aplicado, cada uno con la etiqueta del
+    /// paso que deshace.
+    async fn inversa_de(
+        &self,
+        change_id: i64,
+    ) -> Result<Vec<(ChangeRequest, Option<String>)>, CambioError> {
         let fila = self
             .fila(change_id)
             .await
@@ -722,7 +728,8 @@ impl ChangeManager {
                 continue;
             }
             let plan = self.reconstruir(paso).map_err(CambioError::Invalida)?;
-            reqs.push(inversa(&plan).ok_or_else(no_se_puede)?);
+            let etiqueta: Option<String> = paso.get("etiqueta");
+            reqs.push((inversa(&plan).ok_or_else(no_se_puede)?, etiqueta));
         }
         if reqs.is_empty() {
             return Err(no_se_puede());
@@ -735,7 +742,10 @@ impl ChangeManager {
     /// orden inverso, que se confirman juntos con [`ChangeManager::confirmar`].
     pub async fn deshacer(&self, change_id: i64) -> Result<Preparado, CambioError> {
         let reqs = self.inversa_de(change_id).await?;
-        self.preparar_con(reqs, true, Some(change_id)).await
+        // El deshacer lleva el título del cambio que deshace (el de su
+        // ajuste, si se hizo desde Ajustes): así el Historial lo nombra igual.
+        let titulo = self.cambio(change_id).await.and_then(|c| c.titulo);
+        self.preparar_con(reqs, true, Some(change_id), titulo).await
     }
 
     /// Los parámetros que el router da tapados al leer y que cambiaron en los

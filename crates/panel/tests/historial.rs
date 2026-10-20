@@ -374,7 +374,10 @@ async fn grupo_es_una_fila_con_sus_pasos() {
     assert_eq!(pasos[0]["etiqueta"], "Deshacer");
     assert_eq!(pasos[0]["funcion"], "cbSetUpnpCfg");
     assert_eq!(pasos[0]["estado"], "Aplicado");
-    assert_eq!(pasos[1]["etiqueta"], LEASES);
+    // Sin etiqueta, un texto genérico (Tarea 11): nunca el nombre de la
+    // función, que sigue en los datos para los detalles técnicos.
+    assert_eq!(pasos[1]["etiqueta"], "Cambio en el router");
+    assert_eq!(pasos[1]["funcion"], LEASES);
     assert_eq!(pasos[1]["instancia"], "0");
     assert_eq!(pasos[1]["campos"][0]["nombre"], "ipv4_addr");
     assert_eq!(g["campos"].as_array().unwrap().len(), 2);
