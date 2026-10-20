@@ -16,7 +16,7 @@ use crate::ui::explorador::{
     CambioVista, EstadoDeCambio, MASCARA, RiesgoCambio, duracion, estado_cambio, texto_error,
 };
 use crate::ui::i18n::{idioma_actual, traducir};
-use crate::ui::{Estado, Insignia};
+use crate::ui::{Estado, IconoEstado, Insignia};
 use ajustes::TipoCampo;
 use leptos::{ev::SubmitEvent, html, prelude::*, task::spawn_local};
 use std::time::Duration;
@@ -313,6 +313,16 @@ pub fn DialogoGrupo(
             }
         })
     };
+    let aviso = move || {
+        grupo.with(|g| g.aviso.clone()).map(|a| {
+            view! {
+                <p class="aviso estado-aviso" role="status">
+                    <IconoEstado estado=Estado::Aviso />
+                    <span>{a}</span>
+                </p>
+            }
+        })
+    };
     let vigilancia = move || {
         let plazo = duracion(grupo.with(|g| g.vigilancia_s));
         t!("ajustes-grupo-vigilancia", plazo = plazo.as_str())
@@ -487,6 +497,7 @@ pub fn DialogoGrupo(
                     {t!("ajustes-grupo-intro")}
                 </p>
                 {pasos}
+                {aviso}
                 {efecto}
                 <p class="pagina-sub">{vigilancia}</p>
                 <p class="error-formulario" role="alert">
@@ -524,6 +535,7 @@ mod tests {
             efecto: Some("efecto-wifi_red".into()),
             vigilancia_s: 120,
             detalle: None,
+            aviso: None,
         }
     }
 

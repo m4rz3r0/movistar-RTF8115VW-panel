@@ -376,6 +376,10 @@ const BLOQUEO_IP_LAN: &str = "bloqueada en v1: cambiar la IP del router corta la
 /// leído): podría borrar esa clave. Es la clave i18n del texto. Se quitará
 /// cuando la fase 3 compruebe qué hace el router real con ese reenvío.
 pub const BLOQUEO_SECRETO_TAPADO: &str = "cambio-error-secreto-tapado";
+/// Motivo de [`CambioError::Invalida`] al deshacer un cambio en el que solo
+/// cambió lo que el router no deja leer: no hay valor anterior al que volver.
+pub const DESHACER_SOLO_TAPADOS: &str =
+    "solo cambió una clave que el router no deja leer: no hay valor anterior al que volver";
 const BLOQUEO_SECRETOS_BASICA: &str = "bloqueada en v1: falta validar con el router real el \
                                        formato de los secretos de la web básica";
 
@@ -707,6 +711,11 @@ impl ChangeManager {
                     .into(),
             )
         };
+        // Solo cambió lo que el router no deja leer (su valor anterior es el
+        // vacío de la lectura, que el deshacer omite): no hay nada que volver.
+        if let (true, _) = self.tapados_del_cambio(change_id).await {
+            return Err(CambioError::Invalida(DESHACER_SOLO_TAPADOS.into()));
+        }
         let mut reqs = Vec::new();
         for paso in self.filas_pasos(change_id).await.iter().rev() {
             if paso.get::<String, _>("estado") != EstadoPaso::Aplicado.as_str() {
@@ -727,6 +736,34 @@ impl ChangeManager {
     pub async fn deshacer(&self, change_id: i64) -> Result<Preparado, CambioError> {
         let reqs = self.inversa_de(change_id).await?;
         self.preparar_con(reqs, true, Some(change_id)).await
+    }
+
+    /// Los parámetros que el router da tapados al leer y que cambiaron en los
+    /// pasos aplicados del cambio `id` (`(función, parámetro)`), y si solo
+    /// cambiaron ellos. El deshacer los omite: su valor anterior es el vacío
+    /// que dio la lectura.
+    pub async fn tapados_del_cambio(&self, id: i64) -> (bool, Vec<(String, String)>) {
+        let (mut tapados, mut otros) = (Vec::new(), 0usize);
+        for f in self.filas_pasos(id).await {
+            if f.get::<String, _>("estado") != EstadoPaso::Aplicado.as_str() {
+                continue;
+            }
+            let funcion: String = f.get("funcion");
+            let diff: Vec<CampoDiff> =
+                serde_json::from_str(&f.get::<String, _>("diff")).unwrap_or_default();
+            let func = self.state.catalogo.funcion(&funcion);
+            for d in diff {
+                if func
+                    .and_then(|f| f.parametro(&d.nombre))
+                    .is_some_and(|p| p.tapado)
+                {
+                    tapados.push((funcion.clone(), d.nombre));
+                } else {
+                    otros += 1;
+                }
+            }
+        }
+        (!tapados.is_empty() && otros == 0, tapados)
     }
 
     /// ¿Aceptaría [`ChangeManager::deshacer`] este cambio? Solo mira el
@@ -1017,18 +1054,21 @@ impl ChangeManager {
     }
 
     /// Los secretos que cambiaron en cada paso del cambio `id`, con su valor
-    /// anterior y el nuevo en claro: `(orden, parámetro, antes, después)`
-    /// (`None` si ese lado no se guardó: al crear no hay anterior; al borrar,
-    /// nuevo). Descifra solo este cambio. Para el detalle de un cambio en el
+    /// anterior y el nuevo en claro: `(orden, parámetro, antes, después,
+    /// tapado)` (`None` si ese lado no se guardó: al crear no hay anterior;
+    /// al borrar, nuevo; ni el anterior de uno que el router da tapado al
+    /// leer, que es el vacío de la lectura). Descifra solo este cambio. Para el detalle de un cambio en el
     /// Historial, que los enseña censurados con el ojo; un paso que no se
     /// puede descifrar (otra clave) queda fuera y se anota, sin valores.
     pub async fn secretos_en_claro(
         &self,
         id: i64,
-    ) -> Vec<(i64, String, Option<String>, Option<String>)> {
+    ) -> Vec<(i64, String, Option<String>, Option<String>, bool)> {
         let mut out = Vec::new();
         for f in self.filas_pasos(id).await {
             let orden: i64 = f.get("orden");
+            let funcion: String = f.get("funcion");
+            let func = self.state.catalogo.funcion(&funcion);
             let diff: Vec<CampoDiff> =
                 serde_json::from_str(&f.get::<String, _>("diff")).unwrap_or_default();
             let abrir = |col: &str| -> Option<BTreeMap<String, String>> {
@@ -1052,10 +1092,13 @@ impl ChangeManager {
                 abrir("valores_nuevos_cifrados").unwrap_or_default(),
             );
             for d in diff.into_iter().filter(|d| d.secreto) {
-                let a = antes.get(&d.nombre).cloned();
+                let tapado = func
+                    .and_then(|f| f.parametro(&d.nombre))
+                    .is_some_and(|p| p.tapado);
+                let a = antes.get(&d.nombre).cloned().filter(|_| !tapado);
                 let n = despues.get(&d.nombre).cloned();
                 if a.is_some() || n.is_some() {
-                    out.push((orden, d.nombre, a, n));
+                    out.push((orden, d.nombre, a, n, tapado));
                 }
             }
         }

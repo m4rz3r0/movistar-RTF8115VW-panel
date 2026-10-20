@@ -75,6 +75,12 @@ pub fn Secreto(
                 aria-describedby=descrito
                 aria-invalid=move || invalido.get().then_some("true")
                 placeholder=vacio
+                // Que los gestores de contraseñas no la rellenen ni la
+                // guarden: es una clave del router, no de este sitio.
+                attr:data-1p-ignore=""
+                attr:data-lpignore="true"
+                attr:data-bwignore=""
+                attr:data-form-type="other"
                 disabled=move || editable && bloqueado.get()
                 // El atributo, para el HTML del servidor; luego manda la
                 // propiedad (lo que se escribe).
@@ -94,8 +100,16 @@ pub fn Secreto(
                 type="button"
                 aria-controls=control
                 aria-pressed=move || visible.get().to_string()
-                aria-label=move || {
-                    if visible.get() { t!("secreto-ocultar") } else { t!("secreto-ver") }
+                aria-label={
+                    // Con el nombre del campo: en una tabla hay varios ojos.
+                    let nombre = nombre.clone();
+                    move || {
+                        if visible.get() {
+                            t!("secreto-ocultar", campo = nombre.clone())
+                        } else {
+                            t!("secreto-ver", campo = nombre.clone())
+                        }
+                    }
                 }
                 on:click=move |_| visible.update(|v| *v = !*v)
             >

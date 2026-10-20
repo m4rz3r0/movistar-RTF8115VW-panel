@@ -378,7 +378,8 @@ fn CampoSecreto(
     if sin_leer && !c.tapado {
         desc = format!("{desc} {}", t!("ajustes-secreto-sin-leer-desc"));
     }
-    let vacio = sin_leer.then(|| t!("ajustes-secreto-sin-leer"));
+    // Corto, para que quepa a 360 px; la explicación va en la ayuda.
+    let vacio = sin_leer.then(|| t!("secreto-sin-leer"));
     let invalido = Signal::derive(move || error.with(|e| e.is_some()));
     let campo = match vacio {
         Some(vacio) => view! {

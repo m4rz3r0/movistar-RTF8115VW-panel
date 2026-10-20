@@ -199,6 +199,10 @@ pub struct GrupoVista {
     pub vigilancia_s: u64,
     /// A qué se refiere, si el título no basta (el dispositivo de una IP fija).
     pub detalle: Option<String>,
+    /// Un aviso para quien confirma, ya traducido (al deshacer: la clave que
+    /// el router no deja leer se queda como se escribió).
+    #[serde(default)]
+    pub aviso: Option<String>,
 }
 
 /// Un paso del grupo: los campos de una misma escritura del router.
@@ -1237,6 +1241,7 @@ pub(crate) mod servidor {
             efecto: a.efecto.as_ref().map(|e| format!("efecto-{e}")),
             vigilancia_s: g.tiempos().vigilancia(r).as_secs(),
             detalle: None,
+            aviso: None,
         }
     }
 
@@ -1829,6 +1834,25 @@ pub(crate) mod servidor {
     /// Ajuste e instancia del cambio `id`, hecho desde Ajustes: por su
     /// título o, si es un deshacer (que no lo lleva), por el del cambio que
     /// deshace.
+    /// Etiqueta (traducida) de cada campo que se escribe del catálogo de
+    /// ajustes, por (función, parámetro): la que se ve en Ajustes. El primer
+    /// ajuste que lo escribe da la suya.
+    pub(crate) fn etiquetas_de_campos(state: &AppState) -> HashMap<(String, String), String> {
+        let mut out = HashMap::new();
+        for a in state.ajustes.todos() {
+            let p = prefijo_i18n(a);
+            for c in &a.campos {
+                if let Some(e) = &c.escribe {
+                    out.entry((e.funcion.clone(), e.parametro.clone()))
+                        .or_insert_with(|| {
+                            crate::ui::i18n::traducir(&format!("{p}-{}", c.id), None)
+                        });
+                }
+            }
+        }
+        out
+    }
+
     pub(crate) async fn ajuste_del_cambio<'a>(
         state: &'a AppState,
         g: &ChangeManager,
@@ -1861,11 +1885,19 @@ pub(crate) mod servidor {
             .ok_or_else(|| fallo(StatusCode::NOT_FOUND, t!("ajustes-error-cambio")))?;
         // Antes que «otro cambio en curso»: un cambio que aún se vigila (el
         // activo) o que ya se deshizo no se puede deshacer.
+        let (solo_tapados, tapados) = g.tapados_del_cambio(cambio).await;
+        let nombres_tapados = || {
+            let e = etiquetas_de_campos(&state);
+            crate::ui::historial::servidor::nombres(&e, &state, &tapados)
+        };
         if !g.se_puede_deshacer(cambio).await {
-            return Err(fallo(
-                StatusCode::BAD_REQUEST,
-                t!("ajustes-error-no-deshacer"),
-            ));
+            // Solo cambió lo que el router no deja leer: se dice por qué.
+            let msg = if solo_tapados {
+                t!("cambio-sin-deshacer-tapado", campos = nombres_tapados())
+            } else {
+                t!("ajustes-error-no-deshacer")
+            };
+            return Err(fallo(StatusCode::BAD_REQUEST, msg));
         }
         libre(&g)?;
         let prep = g.deshacer(cambio).await.map_err(error_ajuste)?;
@@ -1886,14 +1918,13 @@ pub(crate) mod servidor {
             };
             actuales.push(leidos.unwrap_or_default());
         }
-        Ok(vista_grupo(
-            &g,
-            a,
-            prep.token,
-            &prep.pasos,
-            prep.riesgo,
-            &|i, param| buscar(&actuales[i], param).map(str::to_owned),
-        ))
+        let vista = vista_grupo(&g, a, prep.token, &prep.pasos, prep.riesgo, &|i, param| {
+            buscar(&actuales[i], param).map(str::to_owned)
+        });
+        // Lo que el router no deja leer se queda como se escribió.
+        let aviso =
+            (!tapados.is_empty()).then(|| t!("cambio-aviso-tapado", campos = nombres_tapados()));
+        Ok(GrupoVista { aviso, ..vista })
     }
 
     #[cfg(test)]

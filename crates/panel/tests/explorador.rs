@@ -480,3 +480,36 @@ async fn paginas_del_explorador_con_nombres_codificados() {
     let resp = common::get(&p.app, "/explorador/wan").await;
     assert_eq!(resp.status(), 303);
 }
+
+/// Las respuestas de la Biblioteca que pueden llevar secretos (una lectura,
+/// las instancias de una lista, el formulario) van con `no-store`.
+#[tokio::test]
+async fn respuestas_con_secretos_no_store() {
+    let (p, cookie) = explorador().await;
+    for (nombre, cuerpo) in [
+        (
+            "leer",
+            json!({ "funcion": "cbGetWifiAccPt", "params": [["dpm_cfg_wifi_acc_pt_id", "1"]] }),
+        ),
+        (
+            "instancias",
+            json!({ "funcion": LEASES, "claves": [[POOL, "0"]] }),
+        ),
+        (
+            "formulario",
+            json!({ "funcion": "cbSetWifiAccPt", "instancia": null,
+                    "claves": [["dpm_cfg_wifi_acc_pt_id", "1"]] }),
+        ),
+    ] {
+        let mut req =
+            common::post_json(&format!("/api/{nombre}"), &cuerpo.to_string(), "127.0.0.1");
+        req.headers_mut().insert("cookie", cookie.parse().unwrap());
+        let resp = common::send(&p.app, req).await;
+        assert_eq!(resp.status(), 200, "{nombre}");
+        let cache = resp
+            .headers()
+            .get(axum::http::header::CACHE_CONTROL)
+            .map(|v| v.to_str().unwrap().to_owned());
+        assert_eq!(cache.as_deref(), Some("no-store"), "{nombre}");
+    }
+}

@@ -328,6 +328,10 @@ pub struct PreparadoVista {
     pub vigilancia_s: u64,
     /// Palabra que hay que escribir para confirmar (acciones).
     pub palabra: Option<String>,
+    /// Un aviso para quien confirma, ya traducido (al deshacer: la clave que
+    /// el router no deja leer se queda como se escribió).
+    #[serde(default)]
+    pub aviso: Option<String>,
 }
 
 /// Estado de un cambio.
@@ -463,6 +467,8 @@ pub async fn detalle_funcion(nombre: String) -> Result<FuncionDetalle, ServerFnE
 /// Ejecuta la lectura `funcion` con `params` y la devuelve enmascarada.
 #[server(endpoint = "leer", input = Json)]
 pub async fn leer(funcion: String, params: Vec<(String, String)>) -> Result<Vista, ServerFnError> {
+    // Lleva los valores de los secretos (para el ojo).
+    super::servidor::sin_guardar();
     crate::auth::require_user().await?;
     let state = super::servidor::app_state()?;
     super::servidor::leer(&state, &funcion, &params).await
@@ -476,6 +482,7 @@ pub async fn formulario(
     instancia: Option<String>,
     claves: Vec<(String, String)>,
 ) -> Result<FormVista, ServerFnError> {
+    super::servidor::sin_guardar();
     crate::auth::require_user().await?;
     let state = super::servidor::app_state()?;
     super::servidor::formulario(&state, &funcion, instancia, claves).await
@@ -487,6 +494,7 @@ pub async fn instancias(
     funcion: String,
     claves: Vec<(String, String)>,
 ) -> Result<ListaInstancias, ServerFnError> {
+    super::servidor::sin_guardar();
     crate::auth::require_user().await?;
     let state = super::servidor::app_state()?;
     super::servidor::instancias(&state, &funcion, claves).await

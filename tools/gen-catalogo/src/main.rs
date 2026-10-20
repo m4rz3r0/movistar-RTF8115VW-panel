@@ -7,7 +7,8 @@
 //!   (`*.cmd|.cgi|.wl`), páginas ocultas y peligrosas, emparejado
 //!   lectura/escritura y listas. Nunca escribe en `crates/catalogo/funciones.toml`
 //!   (la fuente de verdad, revisada a mano) y no pisa un fichero existente sin
-//!   `--forzar`. Las descripciones quedan como `PENDIENTE` para revisarlas.
+//!   `--forzar`. Las descripciones quedan como `PENDIENTE` para revisarlas; las
+//!   marcas que solo se ponen a mano (`tapado`) se copian del catálogo revisado.
 //! - `gen-catalogo comprobar <dir_bruto>`: lista lo que hay en los datos brutos y
 //!   falta en el catálogo revisado.
 //! - `gen-catalogo --api-md [salida.md]`: genera `docs/api.md` del catálogo
@@ -66,11 +67,30 @@ fn borrador(dir: &Path, salida: &Path, forzar: bool) -> Result<(), String> {
     if salida.exists() && !forzar {
         return Err(format!("{} ya existe (usa --forzar)", salida.display()));
     }
-    let funciones = extraer::extraer(dir)?;
+    let mut funciones = extraer::extraer(dir)?;
+    if let Ok(revisado) = catalogo::Catalogo::load() {
+        conservar_marcas(&mut funciones, &revisado);
+    }
     let texto = extraer::a_toml(&funciones)?;
     std::fs::write(salida, texto).map_err(|e| format!("{}: {e}", salida.display()))?;
     eprintln!("{} funciones → {}", funciones.len(), salida.display());
     Ok(())
+}
+
+/// Lleva al borrador las marcas que solo se ponen a mano en el catálogo
+/// revisado y que los datos brutos no pueden dar: `tapado` (el router no deja
+/// leer ese secreto), por función y parámetro.
+fn conservar_marcas(borrador: &mut [catalogo::Funcion], revisado: &catalogo::Catalogo) {
+    for f in borrador {
+        let Some(r) = revisado.funcion(&f.name) else {
+            continue;
+        };
+        for p in &mut f.parametros {
+            if r.parametro(&p.nombre).is_some_and(|rp| rp.tapado) {
+                p.tapado = true;
+            }
+        }
+    }
 }
 
 /// Nombres presentes en los datos brutos que faltan en el catálogo revisado.
@@ -101,6 +121,23 @@ fn comprobar(dir: &Path) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// El borrador conserva las marcas que solo se ponen a mano en el
+    /// catálogo revisado (`tapado`: el router no deja leer ese secreto), para
+    /// que copiarlo o compararlo con `funciones.toml` no las pierda.
+    #[test]
+    fn el_borrador_conserva_la_marca_tapado() {
+        let revisado = catalogo::Catalogo::load().unwrap();
+        let mut borrador = vec![revisado.funcion("cbSetVoiceLine").unwrap().clone()];
+        for p in &mut borrador[0].parametros {
+            p.tapado = false;
+        }
+        conservar_marcas(&mut borrador, &revisado);
+        assert!(borrador[0].parametro("auth_password").unwrap().tapado);
+        assert!(!borrador[0].parametro("auth_username").unwrap().tapado);
+        let toml = extraer::a_toml(&borrador).unwrap();
+        assert_eq!(toml.matches("tapado = true").count(), 1, "{toml}");
+    }
 
     /// Directorio de los datos brutos del análisis, obligatorio en
     /// `RTF_RAW_DIR` (no hay ruta por defecto); sin él, o si no existe, la

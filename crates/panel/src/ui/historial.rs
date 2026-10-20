@@ -71,6 +71,10 @@ pub struct CambioFila {
     pub deshace: Option<Vinculo>,
     /// El gestor aceptaría deshacerlo ahora.
     pub puede_deshacer: bool,
+    /// Por qué no se puede deshacer un cambio aplicado (solo cambió una
+    /// clave que el router no deja leer), ya traducido.
+    #[serde(default)]
+    pub sin_deshacer: Option<String>,
     /// Resumen humano del grupo, si lo tiene.
     pub titulo: Option<String>,
     /// Pasos del grupo (vacío si es de un solo paso).
@@ -148,6 +152,9 @@ pub struct SecretoDelCambio {
     pub nombre: String,
     pub antes: Option<String>,
     pub despues: Option<String>,
+    /// El router no deja leerlo: no hay «antes» que enseñar.
+    #[serde(default)]
+    pub tapado: bool,
 }
 
 impl std::fmt::Debug for SecretoDelCambio {
@@ -162,7 +169,8 @@ impl std::fmt::Debug for SecretoDelCambio {
 /// Entrada del historial.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EntradaVista {
-    Cambio(CambioFila),
+    /// En una caja: es mucho más grande que un revelado.
+    Cambio(Box<CambioFila>),
     Revelado(ReveladoFila),
 }
 
@@ -255,7 +263,7 @@ pub async fn deshacer(change_id: i64) -> Result<PreparadoVista, ServerFnError> {
 /// cambio no existe o no cambió ningún secreto.
 #[server(endpoint = "secretos_del_cambio", input = Json)]
 pub async fn secretos_del_cambio(cambio: i64) -> Result<Vec<SecretoDelCambio>, ServerFnError> {
-    servidor::sin_guardar();
+    crate::ui::explorador::servidor::sin_guardar();
     crate::auth::require_user().await?;
     let state = crate::ui::explorador::servidor::app_state()?;
     servidor::secretos_del_cambio(&state, cambio).await
@@ -352,8 +360,13 @@ fn con_secretos(
         .map(|c| {
             let mut c = c.clone();
             if let Some(s) = buscar(&c.nombre) {
-                if let (Valor::Secreto, Some(v)) = (&c.antes, &s.antes) {
-                    c.antes = Valor::Clave(v.clone());
+                match (&c.antes, &s.antes) {
+                    (Valor::Secreto, Some(v)) => c.antes = Valor::Clave(v.clone()),
+                    // Lo que había no se sabe: el router no deja leerlo.
+                    (Valor::Secreto, None) if s.tapado => {
+                        c.antes = Valor::Texto(t!("historial-clave-sin-leer"));
+                    }
+                    _ => {}
                 }
                 if let (Valor::Secreto, Some(v)) = (&c.despues, &s.despues) {
                     c.despues = Valor::Clave(v.clone());
@@ -514,8 +527,10 @@ fn FilaCambio(
         .campos
         .iter()
         .any(|x| x.antes == Valor::Secreto || x.despues == Valor::Secreto);
+    // Solo esta fila: abrir o cerrar otra no vuelve a pedir nada ni repinta.
+    let abierta = Memo::new(move |_| abiertos.with(|a| a.contains(&id)));
     let pedidos = LocalResource::new(move || {
-        let abierto = con_secreto && abiertos.with(|a| a.contains(&id));
+        let abierto = con_secreto && abierta.get();
         async move {
             if abierto {
                 secretos_del_cambio(id).await.ok()
@@ -527,13 +542,14 @@ fn FilaCambio(
     // Solo se lee al desplegarlo (nunca al pintar en el servidor, donde
     // está plegado: si no, la página esperaría a un recurso que allí no
     // se carga).
-    let secretos = Signal::derive(move || {
-        if abiertos.with(|a| a.contains(&id)) {
+    let secretos = Memo::new(move |_| {
+        if abierta.get() {
             pedidos.get().flatten()
         } else {
             None
         }
     });
+    let secretos = Signal::from(secretos);
     let detalle = if n_pasos > 0 {
         lista_pasos(c.pasos, secretos).into_any()
     } else {
@@ -557,6 +573,12 @@ fn FilaCambio(
         }
         .into_any()
     };
+    // Por qué no se puede deshacer (solo cambió una clave que el router no
+    // deja leer).
+    let sin_deshacer = c
+        .sin_deshacer
+        .clone()
+        .map(|m| view! { <p class="hist-nota hist-sin-deshacer">{m}</p> });
     let boton = c.puede_deshacer.then(|| {
         view! {
             <button
@@ -606,6 +628,7 @@ fn FilaCambio(
                 </div>
             </details>
             {nota.map(|n| view! { <p class=nota_clase>{n}</p> })}
+            {sin_deshacer}
             {boton.map(|b| view! { <div class="hist-acciones">{b}</div> })}
         </li>
     }
@@ -712,7 +735,7 @@ fn ListaHistorial(
                             <For each=entradas key=clave_fila let:e>
                                 {match e {
                                     EntradaVista::Cambio(c) => view! {
-                                        <FilaCambio c abiertos ocupado on_deshacer />
+                                        <FilaCambio c=*c abiertos ocupado on_deshacer />
                                     }
                                     .into_any(),
                                     EntradaVista::Revelado(r) => view! { <FilaRevelado r /> }.into_any(),

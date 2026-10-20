@@ -254,9 +254,9 @@ async fn cada_ajuste_antes_aplicar_verificar_deshacer() {
             .await;
             if tapado(c) {
                 // Solo cambió ella, y su valor anterior es el vacío que dio
-                // el router: no hay nada que volver atrás (el deshacer no la
-                // vacía).
-                assert_eq!(status, 409, "{que}: deshacer: {body}");
+                // el router: no hay nada que volver atrás, y se dice por qué.
+                assert_eq!(status, 400, "{que}: deshacer: {body}");
+                assert!(body.contains("no se puede volver atrás"), "{que}: {body}");
                 continue;
             }
             assert_eq!(status, 200, "{que}: deshacer: {body}");

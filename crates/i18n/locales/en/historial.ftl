@@ -22,6 +22,7 @@ historial-instancia-par = { " " }(instance { $i })
 historial-revelado = Revealed
 historial-revelado-de = in
 historial-tecnico = Technical details
+historial-clave-sin-leer = (the router won't let it be read)
 historial-valor-anterior = { $campo }, previous value
 historial-valor-nuevo = { $campo }, new value
 historial-secreto = Secret

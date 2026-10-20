@@ -596,10 +596,29 @@ async fn secreto_sin_cambiar_no_se_envia() {
 /// lleva, y nunca se guardan en claro.
 #[tokio::test]
 async fn secretos_solo_en_el_campo_de_las_paginas_que_los_muestran() {
+    // El registro, antes de hacer nada: así recoge todo lo de este test.
+    let registro = registro_global();
     let (p, cookie) = panel_con_gestor().await;
     escribir_punto(&p, "1", &[("key_phrase", CLAVE_1)]).await;
     cambiar_clave_5(&p, &cookie, CLAVE_2).await;
+    // Dos veces: la segunda sale de la caché de lecturas (sin enmascarar).
+    ok(&p, "leer_tema", json!({ "tema": "wifi" }), &cookie).await;
+    ok(&p, "leer_tema", json!({ "tema": "wifi" }), &cookie).await;
     let wifi = html(&p, &cookie, "/ajustes/wifi").await;
+    // El ojo dice de qué campo es, y los gestores de contraseñas lo
+    // ignoran.
+    assert!(
+        wifi.contains("aria-label=\"Mostrar Contraseña\""),
+        "el nombre del ojo"
+    );
+    for marca in [
+        "data-1p-ignore",
+        "data-lpignore=\"true\"",
+        "data-bwignore",
+        "data-form-type=\"other\"",
+    ] {
+        assert!(wifi.contains(marca), "{marca}");
+    }
     assert!(
         wifi.contains(CLAVE_2),
         "la página de la WiFi lleva la clave"
@@ -631,8 +650,12 @@ async fn secretos_solo_en_el_campo_de_las_paginas_que_los_muestran() {
             .all(|c| !c.contains(CLAVE_1) && !c.contains(CLAVE_2)),
         "{claro:?}"
     );
-    // Ni en el registro.
-    let texto = registro_global().texto();
+    // Ni en el registro, que sí ha recogido lo que se ha hecho.
+    let texto = registro.texto();
+    assert!(
+        texto.contains("cbSetWifiAccPt"),
+        "el registro no recoge nada: {texto}"
+    );
     assert!(
         !texto.contains(CLAVE_1) && !texto.contains(CLAVE_2),
         "{texto}"
@@ -658,7 +681,8 @@ async fn detalle_de_un_cambio_con_sus_secretos() {
     let v: Value = serde_json::from_str(&body).unwrap();
     assert_eq!(
         v,
-        json!([{ "orden": 0, "nombre": "key_phrase", "antes": CLAVE_1, "despues": CLAVE_2 }]),
+        json!([{ "orden": 0, "nombre": "key_phrase", "antes": CLAVE_1, "despues": CLAVE_2,
+                 "tapado": false }]),
         "{v}"
     );
     // Sin sesión, nada; un cambio que no existe, vacío.
@@ -815,4 +839,92 @@ fn texto_visible(html: &str) -> String {
         }
     }
     out
+}
+
+/// Un cambio que solo tocó la clave de la voz no se puede deshacer: su valor
+/// anterior es el vacío que dio el router. No se ofrece «Deshacer», y la
+/// fila dice por qué (en los dos idiomas); el deshacer, pedido igualmente,
+/// da 400 con ese motivo. Su detalle no enseña un «antes».
+#[tokio::test]
+async fn deshacer_solo_la_clave_tapada_no_se_ofrece() {
+    let (p, cookie) = panel_con_gestor().await;
+    let (status, body) = preparar(
+        &p,
+        &cookie,
+        "telefono.linea",
+        json!({ "contrasena": CLAVE_3 }),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    let id = aplicar(&p, &cookie, &serde_json::from_str(&body).unwrap()).await;
+    for (idioma, motivo) in [
+        ("es", "no se puede volver atrás"),
+        ("en", "can't be put back"),
+    ] {
+        let con_idioma = format!("{cookie}; rp_lang={idioma}");
+        let h = ok(&p, "historial", json!({ "pagina": 1 }), &con_idioma).await;
+        let c = h["entradas"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find_map(|e| e.get("Cambio").filter(|c| c["id"] == id))
+            .unwrap();
+        assert_eq!(c["puede_deshacer"], false, "{c}");
+        assert!(
+            c["sin_deshacer"]
+                .as_str()
+                .unwrap_or_default()
+                .contains(motivo),
+            "{idioma}: {c}"
+        );
+    }
+    let (status, body) = llamar(
+        &p,
+        "deshacer_ajuste",
+        json!({ "cambio": id }),
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(status, 400, "{body}");
+    assert!(body.contains("no se puede volver atrás"), "{body}");
+    let (status, _) = llamar(&p, "deshacer", json!({ "change_id": id }), Some(&cookie)).await;
+    assert_eq!(status, 400);
+    let v = ok(&p, "secretos_del_cambio", json!({ "cambio": id }), &cookie).await;
+    assert_eq!(
+        v,
+        json!([{ "orden": 0, "nombre": "auth_password", "antes": null, "despues": CLAVE_3,
+                 "tapado": true }])
+    );
+}
+
+/// En un cambio mixto (la línea y su clave), deshacer vuelve la línea y
+/// avisa de que la clave se queda como se escribió.
+#[tokio::test]
+async fn deshacer_mixto_avisa_de_la_clave_tapada() {
+    let (p, cookie) = panel_con_gestor().await;
+    let (status, body) = preparar(
+        &p,
+        &cookie,
+        "telefono.linea",
+        json!({ "activa": "false", "contrasena": CLAVE_3 }),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    let id = aplicar(&p, &cookie, &serde_json::from_str(&body).unwrap()).await;
+    let h = ok(&p, "historial", json!({ "pagina": 1 }), &cookie).await;
+    let c = h["entradas"][0]["Cambio"].clone();
+    assert_eq!(c["puede_deshacer"], true, "{c}");
+    assert_eq!(c["sin_deshacer"], Value::Null, "{c}");
+    let g = ok(&p, "deshacer_ajuste", json!({ "cambio": id }), &cookie).await;
+    let aviso = g["aviso"].as_str().unwrap_or_default();
+    assert!(
+        aviso.contains("Contraseña de la línea") && aviso.contains("se queda"),
+        "{g}"
+    );
+    let prep = ok(&p, "deshacer", json!({ "change_id": id }), &cookie).await;
+    let aviso = prep["aviso"].as_str().unwrap_or_default();
+    assert!(
+        aviso.contains("Contraseña de la línea") && aviso.contains("se queda"),
+        "{prep}"
+    );
 }

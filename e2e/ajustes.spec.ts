@@ -236,8 +236,8 @@ const textosSecreto = {
   es: {
     red5: "Red WiFi 5 GHz",
     contrasena: "Contraseña",
-    ver: "Mostrar la clave",
-    ocultar: "Ocultar la clave",
+    ver: /^Mostrar /,
+    ocultar: /^Ocultar /,
     editar: "Editar",
     cancelar: "Cancelar",
     guardar: "Guardar",
@@ -251,12 +251,16 @@ const textosSecreto = {
     pideLaClave: "El router no deja leer esta clave: escríbela para guardar los cambios.",
     leer: "Leer de nuevo",
     tecnico: "Detalles técnicos",
+    ojoContrasena: "Mostrar Contraseña",
+    sinDeshacer: "no se puede volver atrás",
+    claveSinLeer: "(el router no deja leerla)",
+    deshacer: "Deshacer",
   },
   en: {
     red5: "5 GHz WiFi network",
     contrasena: "Password",
-    ver: "Show the password",
-    ocultar: "Hide the password",
+    ver: /^Show /,
+    ocultar: /^Hide /,
     editar: "Edit",
     cancelar: "Cancel",
     guardar: "Save",
@@ -270,6 +274,10 @@ const textosSecreto = {
     pideLaClave: "The router won't let this password be read: type it to save the changes.",
     leer: "Read again",
     tecnico: "Technical details",
+    ojoContrasena: "Show Password",
+    sinDeshacer: "can't be put back",
+    claveSinLeer: "(the router won't let it be read)",
+    deshacer: "Undo",
   },
 } as const;
 
@@ -312,7 +320,7 @@ for (const idioma of ["es", "en"] as const) {
     // Con un cambio en curso en el Historial y guardando de verdad la clave
     // de la voz, una sola combinación cada uno (se vigilan 30 s).
     const conCambioEnCurso = idioma === "en" && ancho === 1024;
-    const guardaLaVoz = idioma === "es" && ancho === 1024;
+    const guardaLaVoz = (idioma === "es" && ancho === 1024) || (idioma === "en" && ancho === 1440);
     test.describe(`secretos ${idioma} a ${ancho} px`, () => {
       test.use({
         locale: idioma === "es" ? "es-ES" : "en-GB",
@@ -341,7 +349,8 @@ for (const idioma of ["es", "en"] as const) {
         await page.screenshot({ path: `capturas/secreto-censurado-${idioma}-${ancho}.png` });
 
         // El ojo lo muestra al instante, sin pedir la contraseña del panel.
-        const ojo = fila.getByRole("button", { name: t.ver });
+        // Su nombre dice de qué campo es.
+        const ojo = fila.getByRole("button", { name: t.ojoContrasena, exact: true });
         await expect(ojo).toHaveAttribute("aria-pressed", "false");
         await ojo.click();
         await expect(campo).toHaveAttribute("type", "text");
@@ -421,6 +430,19 @@ for (const idioma of ["es", "en"] as const) {
           await expect(
             linea.locator(".ajuste-resumen .ajuste-fila").filter({ hasText: t.lineaClave }).locator("input"),
           ).toHaveValue("");
+          // En el Historial no se ofrece deshacerlo, y se dice por qué; lo
+          // de antes de la clave no se sabe.
+          await page.goto("/historial");
+          await asentar(page);
+          const voz = page.locator("li.hist-cambio").filter({ hasText: t.linea }).first();
+          await expect(voz.locator(".hist-sin-deshacer")).toContainText(t.sinDeshacer);
+          await expect(voz.getByRole("button", { name: new RegExp(`^${t.deshacer}`) })).toHaveCount(0);
+          await voz.locator("summary.hist-cabeza .hist-hora").click();
+          await expect(voz.locator(".hist-detalle .tabla-scroll")).toContainText(t.claveSinLeer);
+          await sinDesbordamiento(page, `historial sin deshacer ${idioma} ${ancho}`);
+          await page.screenshot({ path: `capturas/secreto-sin-deshacer-${idioma}-${ancho}.png`, fullPage: true });
+          await page.goto("/ajustes/telefono");
+          await asentar(page);
         } else {
           await linea.getByRole("button", { name: t.cancelar }).click();
         }

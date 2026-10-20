@@ -10,7 +10,7 @@ use super::{
     duracion, estado_cambio, texto_error,
 };
 use crate::t;
-use crate::ui::{Estado, Insignia};
+use crate::ui::{Estado, IconoEstado, Insignia};
 use leptos::{ev::SubmitEvent, html, prelude::*, task::spawn_local};
 use std::time::Duration;
 
@@ -352,6 +352,12 @@ pub fn DialogoCambio(
                     {instancia}
                 </p>
                 <TablaDiff campos=preparado.campos.clone() />
+                {preparado.aviso.clone().map(|a| view! {
+                    <p class="aviso estado-aviso" role="status">
+                        <IconoEstado estado=Estado::Aviso />
+                        <span>{a}</span>
+                    </p>
+                })}
                 <p class="pagina-sub">{nota}</p>
                 {campo_palabra}
                 <p class="error-formulario" role="alert">

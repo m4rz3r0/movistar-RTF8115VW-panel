@@ -25,6 +25,15 @@ pub fn app_state() -> Result<AppState, ServerFnError> {
     use_context::<AppState>().ok_or_else(|| ServerFnError::new("falta el estado del panel"))
 }
 
+/// Marca la respuesta `no-store`: puede llevar secretos (una lectura con sus
+/// valores, el detalle de un cambio).
+pub(crate) fn sin_guardar() {
+    use axum::http::{HeaderValue, header};
+    if let Some(resp) = use_context::<leptos_axum::ResponseOptions>() {
+        resp.insert_header(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    }
+}
+
 pub(crate) fn con_estado(status: StatusCode, msg: impl Into<String>) -> ServerFnError {
     if let Some(resp) = use_context::<leptos_axum::ResponseOptions>() {
         resp.set_status(status);
@@ -822,6 +831,7 @@ pub(crate) fn vista_preparado(
         riesgo: riesgo(prep.riesgo),
         vigilancia_s: g.tiempos().vigilancia(prep.riesgo).as_secs(),
         palabra: prep.palabra,
+        aviso: None,
     }
 }
 
