@@ -152,9 +152,7 @@ fn Conexion(
                     contrasena.set(String::new());
                     aviso.set(Some(t!("router-guardadas")));
                 }
-                Err(e) => {
-                    reauth.tratar(&e, error, yo);
-                }
+                Err(e) => reauth.tratar(&e, error, yo),
             }
             pendiente.set(false);
         });
@@ -168,9 +166,7 @@ fn Conexion(
         spawn_local(async move {
             match confirmar_firmware().await {
                 Ok(()) => solo_lectura.set(false),
-                Err(e) => {
-                    reauth.tratar(&e, error_firmware, yo);
-                }
+                Err(e) => reauth.tratar(&e, error_firmware, yo),
             }
         });
     });
@@ -331,9 +327,7 @@ fn RedDelRouter(
                     guardada.set(manual);
                     aviso.set(Some(t!("router-red-guardada")));
                 }
-                Err(e) => {
-                    reauth.tratar(&e, error, yo);
-                }
+                Err(e) => reauth.tratar(&e, error, yo),
             }
             pendiente.set(false);
         });
@@ -352,9 +346,7 @@ fn RedDelRouter(
                     red.set(Some(r));
                     aviso.set(Some(t!("router-red-redetectada")));
                 }
-                Err(e) => {
-                    reauth.tratar(&e, error, yo);
-                }
+                Err(e) => reauth.tratar(&e, error, yo),
             }
             pendiente.set(false);
         });

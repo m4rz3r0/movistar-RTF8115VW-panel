@@ -84,7 +84,6 @@ biblioteca-xml = Response XML (masked)
 biblioteca-vacio-par = (empty)
 biblioteca-vacio = empty
 biblioteca-valor-desconocido = (unknown value: { $valor })
-biblioteca-revelar = Reveal
 biblioteca-instancias = { $n ->
     [one] { $n } instance
    *[other] { $n } instances
@@ -151,11 +150,6 @@ biblioteca-aplicando = Applying…
 biblioteca-deshacer = Undo
 biblioteca-borrar = Delete
 biblioteca-aplicar = Apply
-biblioteca-revelar-titulo = Reveal a secret
-biblioteca-revelar-para-ver = To see
-biblioteca-revelar-texto = {", "}type the panel password (it won't be asked again for 5 minutes). It will be shown for 30 s and logged in the history (without the value).
-biblioteca-contrasena-panel = Panel password
-biblioteca-comprobando = Checking…
 
 ## Server errors
 biblioteca-error-bloqueada = Function blocked: { $motivo }.
@@ -174,6 +168,4 @@ biblioteca-error-param-desconocido = { $funcion }: unknown parameter { $param }
 biblioteca-error-lectura-router = The router did not answer the read: { $error }
 biblioteca-error-no-identifica = { $param } does not identify instances of { $funcion }
 biblioteca-error-lectura-sin-formulario = { $nombre } is a read: it has no form
-biblioteca-error-intentos = Too many attempts: wait { $s } s and try again.
-biblioteca-error-contrasena = Wrong panel password.
 biblioteca-error-campo-desaparecido = The read no longer shows field { $campo }; read again.

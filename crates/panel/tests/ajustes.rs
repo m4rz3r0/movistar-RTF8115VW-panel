@@ -146,17 +146,20 @@ async fn leer_tema_wifi_con_valores_legibles() {
 }
 
 #[tokio::test]
-async fn secretos_no_salen_del_servidor() {
+async fn secretos_solo_en_su_campo() {
     let p = panel().await;
     let cookie = sesion(&p).await;
     let clave = "clave-conocida-del-sim-7319";
     escribir_red_24(&p, &[("key_phrase", clave)]).await;
     let (status, body) = llamar(&p, "leer_tema", json!({ "tema": "wifi" }), Some(&cookie)).await;
     assert_eq!(status, 200, "{body}");
-    assert!(!body.contains(clave), "la clave sale del servidor");
+    // Desde la Tarea 11, el valor de un secreto viaja con la página, pero
+    // solo en su campo aparte (para el campo censurado con el ojo).
+    assert_eq!(body.matches(clave).count(), 1, "{body}");
     let tema: Value = serde_json::from_str(&body).unwrap();
     let red = ajuste(&tema, "wifi.red_24");
     assert_eq!(campo(red, "contrasena")["valor"], "Secreto");
+    assert_eq!(campo(red, "contrasena")["valor_secreto"], clave);
 }
 
 #[tokio::test]
@@ -185,9 +188,9 @@ async fn usuarios_del_router_por_pares_y_secretos() {
             campo(i, "nombre")["solo_lectura"],
             "ajuste-seguridad-usuarios_router-motivo"
         );
+        // El nombre (secreto) va solo en su campo aparte, para el ojo.
+        assert_eq!(campo(i, "nombre")["valor_secreto"], "X-REDACTED-X", "{i}");
     }
-    // Los nombres de las fixtures no aparecen.
-    assert!(!tema.to_string().contains("X-REDACTED-X"), "{tema}");
     // TR-069 es una opción, con la apagada recomendada.
     let remota = ajuste(&tema, "seguridad.gestion_remota");
     assert_eq!(campo(remota, "activa")["recomendado"], "apagada");
@@ -1094,15 +1097,25 @@ async fn pagina_tema_sin_nombres_de_api_fuera_de_detalles() {
     }
 }
 
+/// Desde la Tarea 11 (decisión del usuario), la página lleva el valor de sus
+/// secretos para el campo censurado con el ojo: solo en el `value` de ese
+/// campo (y en los datos de la página), nunca como texto a la vista.
 #[tokio::test]
-async fn pagina_tema_sin_secretos() {
+async fn pagina_tema_con_el_secreto_solo_en_su_campo() {
     let (p, cookie) = panel_con_gestor().await;
     let clave = "clave-conocida-del-sim-7";
     escribir_red_24(&p, &[("key_phrase", clave)]).await;
     let (status, _, html) = pagina(&p, &cookie, "/ajustes/wifi").await;
     assert_eq!(status, 200, "{html}");
     assert!(html.contains("Red WiFi 2,4 GHz"), "{html}");
-    assert!(!html.contains(clave), "la clave sale en el HTML");
+    let (fuera, _) = partir(&html, "<script", "</script>");
+    let en_value = format!("value=\"{clave}\"");
+    assert!(fuera.contains(&en_value), "en su campo");
+    assert_eq!(
+        fuera.matches(clave).count(),
+        fuera.matches(&en_value).count(),
+        "solo en el value de su campo"
+    );
 }
 
 #[tokio::test]

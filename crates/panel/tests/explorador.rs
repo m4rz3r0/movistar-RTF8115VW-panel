@@ -8,7 +8,6 @@ use common::{
     panel_con_gestor as explorador, valores_de,
 };
 use serde_json::{Value, json};
-use std::time::Duration;
 
 const LEASES: &str = "cbDhcpV4SvrPoolSetStatic";
 const POOL: &str = "rtm_cfg_dhcpv4_svr_pool_id";
@@ -30,8 +29,11 @@ async fn ids_de_reservas(p: &Panel, cookie: &str) -> Vec<String> {
         .collect()
 }
 
+/// Una lectura trae el valor de sus secretos para el campo censurado con el
+/// ojo (`Clave`), sin pedir la contraseña ni anotar nada; el XML crudo, que
+/// se lee como texto, sigue enmascarado.
 #[tokio::test]
-async fn leer_enmascara_psk() {
+async fn leer_trae_los_secretos_para_el_ojo() {
     let (p, cookie) = explorador().await;
     // Página básica: variables con nombres de secretos del catálogo.
     let v = ok(
@@ -42,8 +44,6 @@ async fn leer_enmascara_psk() {
     )
     .await;
     let body = v.to_string();
-    assert!(!body.contains("psk-sim-secreta"), "{body}");
-    assert!(!body.contains("wep-sim-secreta"), "{body}");
     assert!(!body.contains("sessionKey"), "{body}");
     let par = |n: &str| {
         v["pares"]
@@ -54,11 +54,11 @@ async fn leer_enmascara_psk() {
             .unwrap_or_else(|| panic!("falta {n}: {body}"))["valor"]
             .clone()
     };
-    assert_eq!(par("wlWpaPsk"), json!("Secreto"));
-    assert_eq!(par("wlKey1"), json!("Secreto"));
+    assert_eq!(par("wlWpaPsk"), json!({ "Clave": "psk-sim-secreta" }));
     assert_eq!(par("wlSsid"), json!({ "Texto": "RED-SIM" }));
 
-    // Lectura XML: tabla de instancias y XML crudo, ambos enmascarados.
+    // Lectura XML: la tabla de instancias con el valor; el XML crudo,
+    // enmascarado.
     let v = ok(
         &p,
         "leer",
@@ -66,8 +66,6 @@ async fn leer_enmascara_psk() {
         &cookie,
     )
     .await;
-    let body = v.to_string();
-    assert!(!body.contains("X-REDACTED-X"), "{body}");
     let g = &v["grupos"][0];
     let col = g["columnas"]
         .as_array()
@@ -75,9 +73,21 @@ async fn leer_enmascara_psk() {
         .iter()
         .position(|c| c == "key_phrase")
         .expect("columna key_phrase");
-    assert_eq!(g["filas"][0]["valores"][col], json!("Secreto"));
+    assert_eq!(
+        g["filas"][0]["valores"][col],
+        json!({ "Clave": "X-REDACTED-X" })
+    );
     assert_eq!(g["filas"][0]["id"], "1");
-    assert!(v["crudo"].as_str().unwrap().contains(MASCARA));
+    let crudo = v["crudo"].as_str().unwrap();
+    assert!(
+        crudo.contains(MASCARA) && !crudo.contains("X-REDACTED-X"),
+        "{crudo}"
+    );
+    let filas: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM reveals")
+        .fetch_one(&p.state.db)
+        .await
+        .unwrap();
+    assert_eq!(filas, 0, "ver un secreto ya no se anota");
 
     // Lista completa con `all=ALL`.
     let v = ok(
@@ -270,134 +280,6 @@ async fn preparar_con_secreto_sin_tocar_no_cambia_secreto() {
     assert_eq!(enviado("key_phrase"), Some(clave_actual.as_str()));
     assert_eq!(enviado("ssid"), Some("Otra red"));
     assert_eq!(enviado("validation_only"), None);
-}
-
-#[tokio::test]
-async fn revelar_exige_contrasena_y_registra() {
-    let (p, cookie) = explorador().await;
-    let revelar = |contrasena: &str| {
-        json!({ "funcion": "te_wifi.asp", "campo": "wlWpaPsk", "instancia": null,
-                "params": [], "contrasena": contrasena })
-    };
-    let (status, body) = llamar(&p, "revelar", revelar("mala"), Some(&cookie)).await;
-    assert_eq!(status, 403, "{body}");
-    assert!(body.contains("incorrecta"), "{body}");
-    assert!(!body.contains("psk-sim-secreta"));
-    // El freno del login: justo después, ni con la buena.
-    let (status, body) = llamar(&p, "revelar", revelar(common::PANEL_PASS), Some(&cookie)).await;
-    assert_eq!(status, 429, "{body}");
-    assert!(!body.contains("psk-sim-secreta"));
-    let filas: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM reveals")
-        .fetch_one(&p.state.db)
-        .await
-        .unwrap();
-    assert_eq!(filas, 0);
-
-    tokio::time::sleep(Duration::from_millis(1100)).await;
-    let v = ok(&p, "revelar", revelar(common::PANEL_PASS), &cookie).await;
-    assert_eq!(v, "psk-sim-secreta");
-
-    // De una fila de una lectura XML.
-    let v = ok(
-        &p,
-        "revelar",
-        json!({ "funcion": "cbGetWifiAccPt", "campo": "key_phrase", "instancia": "1",
-                "params": [["dpm_cfg_wifi_acc_pt_id", "1"]], "contrasena": common::PANEL_PASS }),
-        &cookie,
-    )
-    .await;
-    assert_eq!(v, "X-REDACTED-X");
-
-    let filas: Vec<(String, String, Option<String>, Option<i64>)> =
-        sqlx::query_as("SELECT funcion, campo, instancia, user_id FROM reveals ORDER BY id")
-            .fetch_all(&p.state.db)
-            .await
-            .unwrap();
-    assert_eq!(filas.len(), 2);
-    assert_eq!(
-        (
-            filas[0].0.as_str(),
-            filas[0].1.as_str(),
-            filas[0].2.as_deref()
-        ),
-        ("te_wifi.asp", "wlWpaPsk", None)
-    );
-    assert_eq!(
-        (
-            filas[1].0.as_str(),
-            filas[1].1.as_str(),
-            filas[1].2.as_deref()
-        ),
-        ("cbGetWifiAccPt", "key_phrase", Some("1"))
-    );
-    assert!(filas[0].3.is_some());
-    // Ninguna columna guarda el valor.
-    let todo: Vec<String> = sqlx::query_scalar(
-        "SELECT COALESCE(funcion,'') || COALESCE(campo,'') || COALESCE(instancia,'') FROM reveals",
-    )
-    .fetch_all(&p.state.db)
-    .await
-    .unwrap();
-    assert!(
-        todo.iter()
-            .all(|t| !t.contains("psk-sim") && !t.contains("REDACTED"))
-    );
-
-    // Sin sesión no hay nada que revelar.
-    let (status, _) = llamar(&p, "revelar", revelar(common::PANEL_PASS), None).await;
-    assert_eq!(status, 401);
-}
-
-/// «Revelar» comparte la ventana de reautenticación de cinco minutos de
-/// «Ajustes del panel»: con ella abierta no vuelve a pedir la contraseña.
-#[tokio::test]
-async fn revelar_usa_la_ventana_de_reautenticacion() {
-    let (p, cookie) = explorador().await;
-    let revelar = |contrasena: &str| {
-        json!({ "funcion": "te_wifi.asp", "campo": "wlWpaPsk", "instancia": null,
-                "params": [], "contrasena": contrasena })
-    };
-    let revelados = || async {
-        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM reveals")
-            .fetch_one(&p.state.db)
-            .await
-            .unwrap()
-    };
-    // Sin ventana ni contraseña: hay que reautenticarse.
-    let (status, body) = llamar(&p, "revelar", revelar(""), Some(&cookie)).await;
-    assert_eq!(status, 401, "{body}");
-    assert!(body.contains(panel::auth::ERROR_REAUTENTICACION), "{body}");
-    assert!(!body.contains("psk-sim-secreta"));
-    assert_eq!(revelados().await, 0);
-
-    // Con la contraseña se abre la ventana: el siguiente ya no la pide.
-    let v = ok(&p, "revelar", revelar(common::PANEL_PASS), &cookie).await;
-    assert_eq!(v, "psk-sim-secreta");
-    let v = ok(&p, "revelar", revelar(""), &cookie).await;
-    assert_eq!(v, "psk-sim-secreta");
-    assert_eq!(revelados().await, 2, "cada revelado queda registrado");
-
-    // Cerrada la ventana, vuelve a pedirla.
-    sqlx::query("UPDATE sessions SET reautenticado_hasta = reautenticado_hasta - 301")
-        .execute(&p.state.db)
-        .await
-        .unwrap();
-    let (status, body) = llamar(&p, "revelar", revelar(""), Some(&cookie)).await;
-    assert_eq!(status, 401, "{body}");
-    // La ventana abierta en «Ajustes del panel» también vale.
-    ok(
-        &p,
-        "reautenticar",
-        json!({ "contrasena": common::PANEL_PASS }),
-        &cookie,
-    )
-    .await;
-    let v = ok(&p, "revelar", revelar(""), &cookie).await;
-    assert_eq!(v, "psk-sim-secreta");
-    // Otra sesión del mismo usuario no la hereda.
-    let otra = common::sesion_de(&p).await;
-    let (status, _) = llamar(&p, "revelar", revelar(""), Some(&otra)).await;
-    assert_eq!(status, 401);
 }
 
 #[tokio::test]

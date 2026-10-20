@@ -614,8 +614,9 @@ mod server {
     }
 
     /// Vuelve a pedir la contraseña del usuario de la sesión (p. ej. antes de
-    /// revelar un secreto). Mismo freno que el login: los fallos cuentan para
-    /// la IP y para el usuario, y durante la espera se rechaza sin comprobar.
+    /// cambiar la contraseña del router o exportar). Mismo freno que el
+    /// login: los fallos cuentan para la IP y para el usuario, y durante la
+    /// espera se rechaza sin comprobar.
     pub async fn reauthenticate(
         state: &AppState,
         ip: IpAddr,
@@ -861,8 +862,8 @@ mod server {
     }
 
     /// Como [`require_user`], y además la sesión tiene abierta la ventana de
-    /// reautenticación ([`reautenticar_sesion`], o «Revelar» con la
-    /// contraseña); si no, 401 con [`super::ERROR_REAUTENTICACION`].
+    /// reautenticación ([`reautenticar_sesion`]); si no, 401 con
+    /// [`super::ERROR_REAUTENTICACION`].
     pub async fn require_reauth() -> Result<User, ServerFnError> {
         let state = app_state()?;
         let user = require_user().await?;

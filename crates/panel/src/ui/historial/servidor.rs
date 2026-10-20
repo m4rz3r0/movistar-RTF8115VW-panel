@@ -9,7 +9,7 @@ use crate::{
         PreparadoVista, ruta_funcion,
         servidor::{
             Ocultar, campo_cambio, con_estado, error_cambio, estado, gestor, interno, riesgo,
-            usuario_para_revelar, vista_preparado,
+            vista_preparado,
         },
     },
 };
@@ -57,12 +57,22 @@ async fn fila_cambio(
     c: Cambio,
 ) -> Result<CambioFila, ServerFnError> {
     let g = gestor(state)?;
-    // Cada campo con las etiquetas de la función de su paso.
+    // De un cambio hecho desde Ajustes, las etiquetas de sus campos (las
+    // mismas que en Ajustes) por (función, parámetro).
+    let de_ajustes = etiquetas_de_ajustes(state, &g, c.id).await;
+    // Cada campo con la etiqueta de su campo en Ajustes o, si no, la de la
+    // función de su paso.
     let campos_de = |funcion: &str, diff: crate::changes::Diff| -> Vec<CampoCambio> {
         let f = state.catalogo.funcion(funcion);
         diff.campos
             .into_iter()
-            .map(|d| campo_cambio(f, o, d))
+            .map(|d| {
+                let mut c = campo_cambio(f, o, d);
+                if let Some(e) = de_ajustes.get(&(funcion.to_owned(), c.nombre.clone())) {
+                    c.etiqueta = e.clone();
+                }
+                c
+            })
             .collect()
     };
     let traducir = |clave: &str| crate::ui::i18n::traducir(clave, None);
@@ -114,50 +124,56 @@ async fn fila_cambio(
         puede_deshacer: g.se_puede_deshacer(c.id).await,
         titulo: c.titulo.as_deref().map(traducir),
         pasos,
-        anteriores: {
-            let mut v = Vec::new();
-            for (orden, funcion, param) in g.secretos_con_anterior(c.id).await {
-                let (_, etiqueta) = etiqueta_del_secreto(state, c.id, &funcion, &param).await;
-                v.push((orden, param, etiqueta));
-            }
-            v
-        },
     })
 }
 
-/// Título del ajuste (si el cambio `cambio` se hizo desde Ajustes) y
-/// etiqueta del secreto `param` de la escritura `funcion`, la misma que en
-/// Ajustes. Si no es de Ajustes, la etiqueta del parámetro en el catálogo
-/// de funciones (nunca su nombre, salvo que ya no esté en él).
-async fn etiqueta_del_secreto(
+/// Etiquetas de los campos del ajuste con que se hizo el cambio `id` (si se
+/// hizo desde Ajustes), por (función, parámetro): las mismas que en Ajustes.
+async fn etiquetas_de_ajustes(
     state: &AppState,
-    cambio: i64,
-    funcion: &str,
-    param: &str,
-) -> (Option<String>, String) {
-    let traducir = |clave: &str| crate::ui::i18n::traducir(clave, None);
-    let de_ajustes = match gestor(state) {
-        Ok(g) => crate::ajustes_router::servidor::ajuste_del_cambio(state, &g, cambio).await,
-        Err(_) => None,
-    };
-    if let Some((a, _)) = de_ajustes {
+    g: &crate::changes::ChangeManager,
+    id: i64,
+) -> std::collections::HashMap<(String, String), String> {
+    let mut out = std::collections::HashMap::new();
+    if let Some((a, _)) = crate::ajustes_router::servidor::ajuste_del_cambio(state, g, id).await {
         let p = ajustes::prefijo_i18n(a);
-        if let Some(c) = a.campos.iter().find(|c| {
-            c.escribible()
-                .is_some_and(|e| e.funcion == funcion && e.parametro == param)
-        }) {
-            return (
-                Some(traducir(&format!("{p}-titulo"))),
-                traducir(&format!("{p}-{}", c.id)),
-            );
+        for c in &a.campos {
+            if let Some(e) = &c.escribe {
+                out.insert(
+                    (e.funcion.clone(), e.parametro.clone()),
+                    crate::ui::i18n::traducir(&format!("{p}-{}", c.id), None),
+                );
+            }
         }
     }
-    let etiqueta = state
-        .catalogo
-        .funcion(funcion)
-        .and_then(|f| f.parametro(param))
-        .map_or_else(|| param.to_owned(), |p| p.etiqueta.clone());
-    (None, etiqueta)
+    out
+}
+
+/// Marca la respuesta `no-store`: lleva secretos.
+pub(super) fn sin_guardar() {
+    use axum::http::{HeaderValue, header};
+    if let Some(resp) = leptos::prelude::use_context::<leptos_axum::ResponseOptions>() {
+        resp.insert_header(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    }
+}
+
+/// Los secretos del cambio `cambio` con su valor anterior y el nuevo, para
+/// su detalle desplegado (descifra solo este cambio).
+pub async fn secretos_del_cambio(
+    state: &AppState,
+    cambio: i64,
+) -> Result<Vec<SecretoDelCambio>, ServerFnError> {
+    let g = gestor(state)?;
+    Ok(g.secretos_en_claro(cambio)
+        .await
+        .into_iter()
+        .map(|(orden, nombre, antes, despues)| SecretoDelCambio {
+            orden,
+            nombre,
+            antes,
+            despues,
+        })
+        .collect())
 }
 
 fn estado_paso(e: EstadoPaso) -> EstadoPasoVista {
@@ -173,114 +189,22 @@ fn estado_paso(e: EstadoPaso) -> EstadoPasoVista {
 
 async fn fila_revelado(state: &AppState, id: i64) -> Result<Option<ReveladoFila>, ServerFnError> {
     let fila = sqlx::query(
-        "SELECT r.ts, r.funcion, r.campo, r.instancia, r.ajuste, r.cambio_id, u.username \
+        "SELECT r.ts, r.funcion, r.campo, r.instancia, u.username \
          FROM reveals r LEFT JOIN users u ON u.id = r.user_id WHERE r.id = ?",
     )
     .bind(id)
     .fetch_optional(&state.db)
     .await
     .map_err(interno)?;
-    let traducir = |clave: &str| crate::ui::i18n::traducir(clave, None);
-    let Some(f) = fila else {
-        return Ok(None);
-    };
-    let funcion: String = f.get("funcion");
-    let campo: String = f.get("campo");
-    let ajuste: Option<String> = f.get("ajuste");
-    let cambio: Option<i64> = f.get("cambio_id");
-    // Desde Ajustes: el título del ajuste y la etiqueta del campo, sin la
-    // función (si el ajuste ya no está en el catálogo, sus ids). Un valor
-    // anterior: la etiqueta del secreto (y su ajuste, si el cambio se hizo
-    // desde Ajustes). Si no, el parámetro y la función, como en la
-    // Biblioteca.
-    let (ajuste, campo, ruta) = match (ajuste, cambio) {
-        (Some(id), _) => match state.ajustes.ajuste(&id) {
-            Some(a) => {
-                let p = ajustes::prefijo_i18n(a);
-                (
-                    Some(traducir(&format!("{p}-titulo"))),
-                    traducir(&format!("{p}-{campo}")),
-                    None,
-                )
-            }
-            None => (Some(id), campo, None),
-        },
-        (None, Some(cambio)) => {
-            let (ajuste, etiqueta) = etiqueta_del_secreto(state, cambio, &funcion, &campo).await;
-            (ajuste, etiqueta, None)
-        }
-        (None, None) => (None, campo, ruta(state, &funcion)),
-    };
-    Ok(Some(ReveladoFila {
+    Ok(fila.map(|f| ReveladoFila {
         id,
         ts: f.get("ts"),
         usuario: f.get("username"),
-        ruta,
-        funcion,
-        campo,
+        ruta: ruta(state, &f.get::<String, _>("funcion")),
+        funcion: f.get("funcion"),
+        campo: f.get("campo"),
         instancia: f.get("instancia"),
-        ajuste,
-        cambio,
     }))
-}
-
-/// Marca la respuesta `no-store`: lleva un secreto.
-pub(super) fn sin_guardar() {
-    use axum::http::{HeaderValue, header};
-    if let Some(resp) = leptos::prelude::use_context::<leptos_axum::ResponseOptions>() {
-        resp.insert_header(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
-    }
-}
-
-pub async fn revelar_anterior(
-    state: &AppState,
-    user: crate::auth::User,
-    cambio: i64,
-    orden: i64,
-    campo: &str,
-    contrasena: &str,
-) -> Result<String, ServerFnError> {
-    // Primero la contraseña: sin ella no se descifra ni se dice si existe.
-    let user = usuario_para_revelar(state, user, contrasena).await?;
-    let g = gestor(state)?;
-    // Solo los secretos con valor anterior de verdad (no los tapados al leer).
-    let guardado = g
-        .secretos_con_anterior(cambio)
-        .await
-        .iter()
-        .any(|(o, _, p)| *o == orden && p == campo);
-    let Some((funcion, valor)) = g
-        .anteriores_secretos(cambio)
-        .await
-        .into_iter()
-        .filter(|(o, _, _)| guardado && *o == orden)
-        .find_map(|(_, funcion, mut m)| m.remove(campo).map(|v| (funcion, v)))
-    else {
-        return Err(con_estado(
-            StatusCode::NOT_FOUND,
-            crate::t!("historial-error-sin-anterior"),
-        ));
-    };
-    sqlx::query(
-        "INSERT INTO reveals (ts, user_id, funcion, campo, instancia, cambio_id) \
-         VALUES (?, ?, ?, ?, NULL, ?)",
-    )
-    .bind(crate::series::now())
-    .bind(user.id)
-    .bind(&funcion)
-    .bind(campo)
-    .bind(cambio)
-    .execute(&state.db)
-    .await
-    .map_err(interno)?;
-    tracing::info!(
-        usuario = %user.username,
-        cambio,
-        orden,
-        campo,
-        "valor anterior de un secreto mostrado"
-    );
-    Ok(valor)
 }
 
 pub async fn pagina(state: &AppState, pagina: u32) -> Result<PaginaHistorial, ServerFnError> {

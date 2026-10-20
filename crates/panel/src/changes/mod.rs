@@ -1016,73 +1016,50 @@ impl ChangeManager {
         a_cambio(&f, &self.filas_pasos(id).await)
     }
 
-    /// Secretos con valor anterior guardado (cifrado) en cada paso del cambio
-    /// `id`: `(orden, función, parámetro)`, sacados del diff sin descifrar
-    /// nada (son los secretos que cambiaron en un paso que no creaba nada).
-    /// Fuera, los que el router da tapados al leer: su «valor anterior» es
-    /// el vacío que dio la lectura, no la clave.
-    pub async fn secretos_con_anterior(&self, id: i64) -> Vec<(i64, String, String)> {
-        let filas = sqlx::query(
-            "SELECT orden, funcion, operacion, diff FROM cambio_pasos \
-             WHERE cambio_id = ? AND valores_anteriores_cifrados IS NOT NULL \
-             AND operacion <> 'crear' ORDER BY orden",
-        )
-        .bind(id)
-        .fetch_all(&self.state.db)
-        .await
-        .unwrap_or_else(|e| {
-            tracing::error!(cambio = id, "no se pueden leer los pasos: {e}");
-            Vec::new()
-        });
-        let mut out = Vec::new();
-        for f in &filas {
-            let orden: i64 = f.get("orden");
-            let funcion: String = f.get("funcion");
-            let diff: Vec<CampoDiff> =
-                serde_json::from_str(&f.get::<String, _>("diff")).unwrap_or_default();
-            let func = self.state.catalogo.funcion(&funcion);
-            for d in diff.into_iter().filter(|d| d.secreto) {
-                let tapado = func
-                    .and_then(|f| f.parametro(&d.nombre))
-                    .is_some_and(|p| p.tapado);
-                if !tapado {
-                    out.push((orden, funcion.clone(), d.nombre));
-                }
-            }
-        }
-        out
-    }
-
-    /// Valores anteriores secretos de cada paso del cambio `id`, en claro:
-    /// `(orden, función, parámetro → valor)`. Son los que se guardaron
-    /// cifrados: los secretos que cambiaron y se leyeron antes de escribir.
-    /// Solo para «Mostrar el valor anterior» del Historial; un paso que no
-    /// se puede descifrar (otra clave) queda fuera y se anota, sin valores.
-    pub async fn anteriores_secretos(
+    /// Los secretos que cambiaron en cada paso del cambio `id`, con su valor
+    /// anterior y el nuevo en claro: `(orden, parámetro, antes, después)`
+    /// (`None` si ese lado no se guardó: al crear no hay anterior; al borrar,
+    /// nuevo). Descifra solo este cambio. Para el detalle de un cambio en el
+    /// Historial, que los enseña censurados con el ojo; un paso que no se
+    /// puede descifrar (otra clave) queda fuera y se anota, sin valores.
+    pub async fn secretos_en_claro(
         &self,
         id: i64,
-    ) -> Vec<(i64, String, BTreeMap<String, String>)> {
-        self.filas_pasos(id)
-            .await
-            .iter()
-            .filter_map(|f| {
-                let blob = f.get::<Option<Vec<u8>>, _>("valores_anteriores_cifrados")?;
-                let orden: i64 = f.get("orden");
-                let abierto = self
+    ) -> Vec<(i64, String, Option<String>, Option<String>)> {
+        let mut out = Vec::new();
+        for f in self.filas_pasos(id).await {
+            let orden: i64 = f.get("orden");
+            let diff: Vec<CampoDiff> =
+                serde_json::from_str(&f.get::<String, _>("diff")).unwrap_or_default();
+            let abrir = |col: &str| -> Option<BTreeMap<String, String>> {
+                let blob = f.get::<Option<Vec<u8>>, _>(col)?;
+                let m = self
                     .state
                     .history_key
                     .open(&blob)
                     .and_then(|plano| serde_json::from_slice(&plano).ok());
-                if abierto.is_none() {
+                if m.is_none() {
                     tracing::warn!(
                         cambio = id,
                         orden,
-                        "no se pueden descifrar los valores anteriores (¿otra clave?)"
+                        "no se puede descifrar {col} (¿otra clave?)"
                     );
                 }
-                Some((orden, f.get("funcion"), abierto?))
-            })
-            .collect()
+                m
+            };
+            let (antes, despues) = (
+                abrir("valores_anteriores_cifrados").unwrap_or_default(),
+                abrir("valores_nuevos_cifrados").unwrap_or_default(),
+            );
+            for d in diff.into_iter().filter(|d| d.secreto) {
+                let a = antes.get(&d.nombre).cloned();
+                let n = despues.get(&d.nombre).cloned();
+                if a.is_some() || n.is_some() {
+                    out.push((orden, d.nombre, a, n));
+                }
+            }
+        }
+        out
     }
 
     /// Los `limite` cambios más recientes, del último al primero.

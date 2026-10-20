@@ -11,10 +11,7 @@
 //! Un cambio de varios pasos (un grupo) es una sola fila; su detalle lista
 //! los pasos con su resumen humano, su estado y su diff.
 //!
-//! Los revelados no llevan el valor: solo quién, cuándo y qué campo (de qué
-//! ajuste, si se mostró desde Ajustes; de qué cambio, si era un valor
-//! anterior). Un paso que cambió un secreto ofrece «Mostrar el valor
-//! anterior» ([`revelar_anterior`]), con la contraseña del panel.
+//! Los revelados no llevan el valor: solo quién, cuándo y qué campo.
 
 #[cfg(feature = "ssr")]
 pub(crate) mod servidor;
@@ -24,11 +21,9 @@ use crate::ui::{
     Estado, Insignia,
     charts::{formato_fecha, hora_local},
     explorador::{
-        CampoCambio, DialogoCambio, EstadoDeCambio, PreparadoVista, RiesgoCambio, TablaDiff,
+        CampoCambio, DialogoCambio, EstadoDeCambio, PreparadoVista, RiesgoCambio, TablaDiff, Valor,
         texto_error,
     },
-    panel_ajustes::{DialogoReautenticar, Reautenticacion},
-    secreto::{ObjetivoSecreto, Secreto},
 };
 use leptos::prelude::*;
 use leptos::server_fn::codec::Json;
@@ -80,12 +75,6 @@ pub struct CambioFila {
     pub titulo: Option<String>,
     /// Pasos del grupo (vacío si es de un solo paso).
     pub pasos: Vec<PasoFila>,
-    /// Secretos con valor anterior guardado (cifrado): `(orden del paso,
-    /// parámetro, etiqueta)`, con la etiqueta del campo en Ajustes si el
-    /// cambio se hizo desde allí. Cada uno ofrece «Mostrar el valor
-    /// anterior».
-    #[serde(default)]
-    pub anteriores: Vec<(i64, String, String)>,
 }
 
 /// Estado de un paso de un grupo.
@@ -143,20 +132,31 @@ pub struct ReveladoFila {
     /// `None` si el usuario ya no existe.
     pub usuario: Option<String>,
     pub funcion: String,
-    /// Página de la función en el explorador; `None` si se mostró desde
-    /// Ajustes (allí no se nombra la función).
     pub ruta: Option<String>,
-    /// El parámetro; si se mostró desde Ajustes o era un valor anterior, la
-    /// etiqueta del campo.
     pub campo: String,
     pub instancia: Option<String>,
-    /// Título del ajuste, si se mostró desde Ajustes (o el valor anterior es
-    /// de un cambio hecho desde allí).
-    #[serde(default)]
-    pub ajuste: Option<String>,
-    /// Cambio cuyo valor anterior se mostró, si fue eso.
-    #[serde(default)]
-    pub cambio: Option<i64>,
+}
+
+/// Un secreto de un cambio con su valor anterior y el nuevo, para el detalle
+/// desplegado del cambio (se pide al desplegarlo). Su `Debug` no enseña los
+/// valores.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SecretoDelCambio {
+    /// Orden del paso (desde 0).
+    pub orden: i64,
+    /// Parámetro del paso.
+    pub nombre: String,
+    pub antes: Option<String>,
+    pub despues: Option<String>,
+}
+
+impl std::fmt::Debug for SecretoDelCambio {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SecretoDelCambio")
+            .field("orden", &self.orden)
+            .field("nombre", &self.nombre)
+            .finish_non_exhaustive()
+    }
 }
 
 /// Entrada del historial.
@@ -249,24 +249,16 @@ pub async fn deshacer(change_id: i64) -> Result<PreparadoVista, ServerFnError> {
     servidor::deshacer(&state, change_id).await
 }
 
-/// Valor anterior del secreto `campo` (el parámetro) del paso `orden` del
-/// cambio `cambio`, descifrado del historial. Mismas reglas que
-/// [`revelar_ajuste`](crate::ajustes_router::revelar_ajuste): con
-/// `contrasena` vacía, solo con la ventana de reautenticación abierta (si
-/// no, 401); con la del panel, con el freno del login. Queda anotado, sin el
-/// valor, en `reveals` (con el cambio). La respuesta va con `no-store`. 404
-/// si ese paso no guardó un valor anterior secreto con ese nombre.
-#[server(endpoint = "revelar_anterior", input = Json)]
-pub async fn revelar_anterior(
-    cambio: i64,
-    orden: i64,
-    campo: String,
-    #[server(default)] contrasena: String,
-) -> Result<String, ServerFnError> {
+/// Los secretos del cambio `cambio` con su valor anterior y el nuevo, para
+/// enseñarlos censurados con el ojo en su detalle desplegado. Solo descifra
+/// ese cambio. Exige sesión; la respuesta va con `no-store`. Vacío si el
+/// cambio no existe o no cambió ningún secreto.
+#[server(endpoint = "secretos_del_cambio", input = Json)]
+pub async fn secretos_del_cambio(cambio: i64) -> Result<Vec<SecretoDelCambio>, ServerFnError> {
     servidor::sin_guardar();
-    let user = crate::auth::require_user().await?;
+    crate::auth::require_user().await?;
     let state = crate::ui::explorador::servidor::app_state()?;
-    servidor::revelar_anterior(&state, user, cambio, orden, &campo, &contrasena).await
+    servidor::secretos_del_cambio(&state, cambio).await
 }
 
 // ------------------------------------------------------------ interfaz
@@ -318,34 +310,6 @@ fn funcion_enlazada(funcion: String, ruta: Option<String>, instancia: Option<Str
 #[component]
 fn FilaRevelado(r: ReveladoFila) -> impl IntoView {
     let instancia = r.instancia.map(|i| t!("historial-instancia-par", i = i));
-    // Desde Ajustes: el ajuste y el campo en lenguaje claro; un valor
-    // anterior: el parámetro y su cambio; si no, el parámetro y la función.
-    let que = match (r.ajuste, r.cambio) {
-        (Some(ajuste), Some(id)) => t!(
-            "historial-revelado-anterior-ajuste",
-            campo = r.campo,
-            ajuste = ajuste,
-            id = id
-        )
-        .into_any(),
-        (None, Some(id)) => t!("historial-revelado-anterior", campo = r.campo, id = id).into_any(),
-        (Some(ajuste), None) => view! {
-            {t!("historial-revelado-ajuste", campo = r.campo, ajuste = ajuste)}
-            {instancia}
-        }
-        .into_any(),
-        (None, None) => view! {
-            {t!("historial-revelado")}
-            " "
-            <span class="mono">{r.campo}</span>
-            " "
-            {t!("historial-revelado-de")}
-            " "
-            {funcion_enlazada(r.funcion, r.ruta, None)}
-            {instancia}
-        }
-        .into_any(),
-    };
     view! {
         <li class="hist-entrada hist-revelado" id=format!("revelado-{}", r.id)>
             <div class="hist-cabeza">
@@ -353,7 +317,16 @@ fn FilaRevelado(r: ReveladoFila) -> impl IntoView {
                 <span class="hist-quien">{r.usuario.unwrap_or_else(|| "—".to_owned())}</span>
                 <span class="hist-que">
                     <IconoOjo />
-                    <span>{que}</span>
+                    <span>
+                        {t!("historial-revelado")}
+                        " "
+                        <span class="mono">{r.campo}</span>
+                        " "
+                        {t!("historial-revelado-de")}
+                        " "
+                        {funcion_enlazada(r.funcion, r.ruta, None)}
+                        {instancia}
+                    </span>
                 </span>
                 <span class="chip">{t!("historial-secreto")}</span>
             </div>
@@ -361,54 +334,83 @@ fn FilaRevelado(r: ReveladoFila) -> impl IntoView {
     }
 }
 
-/// Los secretos del paso `orden` del cambio `cambio` con valor anterior
-/// guardado, cada uno con su etiqueta y «Mostrar el valor anterior».
-fn valores_anteriores(
-    cambio: i64,
+/// Los campos `campos` del paso `orden` con el valor de sus secretos, si ya
+/// llegaron (`secretos`), para enseñarlos censurados con el ojo.
+fn con_secretos(
+    campos: &[CampoCambio],
     orden: i64,
-    anteriores: &[(i64, String, String)],
-) -> Option<impl IntoView + use<>> {
-    let filas: Vec<_> = anteriores
+    secretos: Option<&[SecretoDelCambio]>,
+) -> Vec<CampoCambio> {
+    let buscar = |nombre: &str| {
+        secretos
+            .into_iter()
+            .flatten()
+            .find(|s| s.orden == orden && s.nombre == nombre)
+    };
+    campos
         .iter()
-        .filter(|(o, _, _)| *o == orden)
-        .map(|(_, campo, etiqueta)| {
-            let etiqueta = etiqueta.clone();
-            let objetivo = ObjetivoSecreto::Anterior {
-                cambio,
-                orden,
-                campo: campo.clone(),
-            };
+        .map(|c| {
+            let mut c = c.clone();
+            if let Some(s) = buscar(&c.nombre) {
+                if let (Valor::Secreto, Some(v)) = (&c.antes, &s.antes) {
+                    c.antes = Valor::Clave(v.clone());
+                }
+                if let (Valor::Secreto, Some(v)) = (&c.despues, &s.despues) {
+                    c.despues = Valor::Clave(v.clone());
+                }
+            }
+            c
+        })
+        .collect()
+}
+
+/// Los nombres técnicos de un paso (la función, su instancia y cada
+/// parámetro con su etiqueta), solo dentro de los detalles técnicos.
+fn tecnico_de(
+    funcion: String,
+    ruta: Option<String>,
+    instancia: Option<String>,
+    campos: &[CampoCambio],
+) -> impl IntoView + use<> {
+    let parametros = campos
+        .iter()
+        .map(|c| {
             view! {
                 <li>
-                    <span class="hist-anterior-campo">{etiqueta.clone()}</span>
-                    <Secreto objetivo nombre=etiqueta />
+                    {c.etiqueta.clone()}
+                    ": "
+                    <code class="mono">{c.nombre.clone()}</code>
                 </li>
             }
         })
-        .collect();
-    (!filas.is_empty()).then(|| {
-        view! {
-            <ul class="hist-anteriores" aria-label=t!("historial-anteriores")>
-                {filas}
-            </ul>
-        }
-    })
+        .collect_view();
+    view! {
+        <p>{funcion_enlazada(funcion, ruta, instancia)}</p>
+        <ul class="hist-tecnico">{parametros}</ul>
+    }
 }
 
-/// Lista desplegable de los pasos de un grupo.
+/// Lista desplegable de los pasos de un grupo, con el valor de sus secretos
+/// cuando llegan (`secretos`).
 fn lista_pasos(
-    cambio: i64,
     pasos: Vec<PasoFila>,
-    anteriores: &[(i64, String, String)],
+    secretos: Signal<Option<Vec<SecretoDelCambio>>>,
 ) -> impl IntoView {
     let filas = pasos
         .into_iter()
         .map(|p| {
-            let anteriores = valores_anteriores(cambio, p.numero - 1, anteriores);
             let instancia = p
                 .instancia
+                .clone()
                 .map(|i| view! { <span class="hist-instancia">{t!("historial-instancia-sep", i = i)}</span> });
             let error = p.error.map(|e| view! { <p class="hist-error">{e}</p> });
+            let orden = p.numero - 1;
+            let campos = p.campos.clone();
+            let tabla = move || {
+                let campos = secretos.with(|s| con_secretos(&campos, orden, s.as_deref()));
+                view! { <TablaDiff campos sin_nombres=true /> }
+            };
+            let tecnico = tecnico_de(p.funcion.clone(), None, p.instancia.clone(), &p.campos);
             view! {
                 <li class="hist-paso">
                     <details>
@@ -417,15 +419,17 @@ fn lista_pasos(
                                 {t!("historial-paso-num", n = p.numero)}
                             </span>
                             <span>{p.etiqueta}</span>
-                            <span class="mono hist-instancia">{p.funcion}</span>
                             {instancia}
                             <span class="hist-paso-estado">
                                 <Insignia estado=p.estado.estado() texto=p.estado.etiqueta() />
                             </span>
                         </summary>
                         <div class="hist-paso-cuerpo">
-                            <TablaDiff campos=p.campos />
-                            {anteriores}
+                            {tabla}
+                            <details class="detalles-tecnicos">
+                                <summary>{t!("historial-tecnico")}</summary>
+                                {tecnico}
+                            </details>
                             {error}
                         </div>
                     </details>
@@ -484,28 +488,72 @@ fn FilaCambio(
             </p>
         }
     });
-    // Un grupo: su resumen y el número de pasos; el detalle, los pasos.
+    // Un grupo o un cambio hecho desde Ajustes: su título (y en un grupo, el
+    // número de pasos); uno de la Biblioteca, su función. El detalle, los
+    // pasos o el diff, con los nombres técnicos plegados aparte.
     let n_pasos = c.pasos.len();
-    let que = if n_pasos > 0 {
-        let titulo = c.titulo.clone().unwrap_or_else(|| c.funcion.clone());
-        view! {
-            <span>
-                {titulo}
-                <span class="hist-instancia">{t!("historial-pasos", n = n_pasos)}</span>
-            </span>
-        }
-        .into_any()
-    } else {
-        view! { <span>{funcion_enlazada(c.funcion.clone(), c.ruta, c.instancia.clone())}</span> }
+    let que = match (&c.titulo, n_pasos) {
+        (titulo, n) if n > 0 => {
+            let titulo = titulo.clone().unwrap_or_else(|| c.funcion.clone());
+            view! {
+                <span>
+                    {titulo}
+                    <span class="hist-instancia">{t!("historial-pasos", n = n)}</span>
+                </span>
+            }
             .into_any()
+        }
+        (Some(titulo), _) => view! { <span>{titulo.clone()}</span> }.into_any(),
+        (None, _) => view! {
+            <span>{funcion_enlazada(c.funcion.clone(), c.ruta.clone(), c.instancia.clone())}</span>
+        }
+        .into_any(),
     };
+    // Los valores de sus secretos, al desplegarlo (solo si cambió alguno).
+    let con_secreto = c
+        .campos
+        .iter()
+        .any(|x| x.antes == Valor::Secreto || x.despues == Valor::Secreto);
+    let pedidos = LocalResource::new(move || {
+        let abierto = con_secreto && abiertos.with(|a| a.contains(&id));
+        async move {
+            if abierto {
+                secretos_del_cambio(id).await.ok()
+            } else {
+                None
+            }
+        }
+    });
+    // Solo se lee al desplegarlo (nunca al pintar en el servidor, donde
+    // está plegado: si no, la página esperaría a un recurso que allí no
+    // se carga).
+    let secretos = Signal::derive(move || {
+        if abiertos.with(|a| a.contains(&id)) {
+            pedidos.get().flatten()
+        } else {
+            None
+        }
+    });
     let detalle = if n_pasos > 0 {
-        lista_pasos(id, c.pasos, &c.anteriores).into_any()
+        lista_pasos(c.pasos, secretos).into_any()
     } else {
-        let anteriores = valores_anteriores(id, 0, &c.anteriores);
+        let campos = c.campos.clone();
+        let tabla = move || {
+            let campos = secretos.with(|s| con_secretos(&campos, 0, s.as_deref()));
+            view! { <TablaDiff campos sin_nombres=true /> }
+        };
+        let tecnico = tecnico_de(
+            c.funcion.clone(),
+            c.ruta.clone(),
+            c.instancia.clone(),
+            &c.campos,
+        );
         view! {
-            <TablaDiff campos=c.campos />
-            {anteriores}
+            {tabla}
+            <details class="detalles-tecnicos">
+                <summary>{t!("historial-tecnico")}</summary>
+                {tecnico}
+            </details>
         }
         .into_any()
     };
@@ -701,9 +749,6 @@ pub fn PaginaHistorial() -> impl IntoView {
     let tick = RwSignal::new(0u32);
     let datos = Resource::new(move || (pagina.get(), tick.get()), |(p, _)| historial(p));
     let abiertos = RwSignal::new(BTreeSet::<i64>::new());
-    // «Mostrar el valor anterior» pide la contraseña del panel con este
-    // diálogo.
-    let reauth = Reautenticacion::proveer();
     let preparado = RwSignal::new(None::<(i64, PreparadoVista)>);
     let preparando = RwSignal::new(false);
     let error = RwSignal::new(None::<String>);
@@ -784,14 +829,12 @@ pub fn PaginaHistorial() -> impl IntoView {
             />
         </Transition>
         {dialogo}
-        {move || reauth.abierto().then(|| view! { <DialogoReautenticar /> })}
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ui::explorador::Valor;
 
     fn campo(etiqueta: &str) -> CampoCambio {
         CampoCambio {

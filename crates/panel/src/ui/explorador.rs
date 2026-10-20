@@ -6,7 +6,7 @@
 //!   panel no las usa, el motivo.
 //! - `/explorador/:area/:funcion` (nombre codificado con [`codificar`]):
 //!   ficha con parámetros; las lecturas se ejecutan y se muestran como tabla
-//!   clave/valor o de instancias (secretos enmascarados, con «Revelar»); las
+//!   clave/valor o de instancias (secretos censurados, con el ojo); las
 //!   escrituras y acciones tienen un formulario generado del catálogo que
 //!   pasa por el gestor de cambios ([`DialogoCambio`]).
 //!
@@ -24,7 +24,7 @@ pub(crate) use dialogo::abrir_modal;
 pub use dialogo::{DialogoCambio, TablaDiff};
 
 use crate::t;
-use crate::ui::secreto::{ObjetivoSecreto, Secreto};
+use crate::ui::secreto::SecretoLeido;
 use crate::ui::{Estado, IconoEstado, Insignia};
 use formulario::Escritura;
 use leptos::prelude::*;
@@ -469,17 +469,9 @@ fn ficha(d: FuncionDetalle) -> impl IntoView {
 
 // ------------------------------------------------------------ lectura
 
-/// Secreto que se quiere revelar.
-#[derive(Clone, Debug, PartialEq)]
-struct Objetivo {
-    funcion: String,
-    campo: String,
-    instancia: Option<String>,
-    params: Vec<(String, String)>,
-}
-
-/// Celda de un valor de lectura; los secretos, con «Revelar».
-fn celda_valor(v: Valor, objetivo: Objetivo) -> AnyView {
+/// Celda de un valor de lectura (del campo `campo`); los secretos,
+/// censurados con el ojo.
+fn celda_valor(v: Valor, campo: &str) -> AnyView {
     match v {
         Valor::Texto(t) if t.is_empty() => view! {
             <span class="vacia" aria-hidden="true">{t!("biblioteca-vacio-par")}</span>
@@ -495,38 +487,27 @@ fn celda_valor(v: Valor, objetivo: Objetivo) -> AnyView {
             <span class="solo-lector">{t!("comun-sin-valor")}</span>
         }
         .into_any(),
-        Valor::Secreto => view! { <CeldaSecreta objetivo /> }.into_any(),
+        Valor::Clave(v) => {
+            view! { <SecretoLeido valor=Some(v) nombre=campo.to_owned() /> }.into_any()
+        }
+        // Una lectura siempre trae el valor; por si acaso, la máscara.
+        Valor::Secreto => view! {
+            <span class="secreto" aria-hidden="true">{MASCARA}</span>
+            <span class="solo-lector">{t!("comun-valor-oculto")}</span>
+        }
+        .into_any(),
     }
 }
 
-/// Un secreto de la lectura, con «Revelar» ([`Secreto`]).
-#[component]
-fn CeldaSecreta(objetivo: Objetivo) -> impl IntoView {
-    let nombre = objetivo.campo.clone();
-    let objetivo = ObjetivoSecreto::Funcion {
-        funcion: objetivo.funcion,
-        campo: objetivo.campo,
-        instancia: objetivo.instancia,
-        params: objetivo.params,
-    };
-    view! { <Secreto objetivo nombre /> }
-}
-
 /// Valores de una lectura: tabla clave/valor, tablas de instancias y XML.
-fn vista_valores(v: Vista, funcion: &str, params: &[(String, String)]) -> impl IntoView + use<> {
-    let objetivo = |campo: &str, instancia: Option<&str>| Objetivo {
-        funcion: funcion.to_owned(),
-        campo: campo.to_owned(),
-        instancia: instancia.map(str::to_owned),
-        params: params.to_vec(),
-    };
+fn vista_valores(v: Vista) -> impl IntoView + use<> {
     let vacia = v.pares.is_empty() && v.grupos.is_empty();
     let pares = (!v.pares.is_empty()).then(|| {
         let filas = v
             .pares
             .into_iter()
             .map(|p| {
-                let celda = celda_valor(p.valor, objetivo(&p.nombre, None));
+                let celda = celda_valor(p.valor, &p.nombre);
                 view! {
                     <tr>
                         <th scope="row"><span class="mono">{p.nombre}</span></th>
@@ -567,7 +548,7 @@ fn vista_valores(v: Vista, funcion: &str, params: &[(String, String)]) -> impl I
                         .valores
                         .into_iter()
                         .zip(&g.columnas)
-                        .map(|(v, c)| view! { <td>{celda_valor(v, objetivo(c, Some(&f.id)))}</td> })
+                        .map(|(v, c)| view! { <td>{celda_valor(v, c)}</td> })
                         .collect_view();
                     view! { <tr>{celdas}</tr> }
                 })
@@ -686,13 +667,10 @@ fn VistaLectura(detalle: FuncionDetalle) -> impl IntoView {
     };
 
     let datos = {
-        let funcion = funcion.clone();
         move || {
-            let funcion = funcion.clone();
             Suspend::new(async move {
-                let params = consulta.get_untracked();
                 match resultado.await {
-                    Ok(v) => vista_valores(v, &funcion, &params).into_any(),
+                    Ok(v) => vista_valores(v).into_any(),
                     Err(e) => view! {
                         <p class="aviso estado-error" role="alert">
                             <IconoEstado estado=Estado::Error />

@@ -61,7 +61,7 @@ async fn historial_lista_cambios_en_orden() {
 
     let a = alta_reserva(&p, &cookie, "192.168.1.91", "02:00:00:00:00:91").await;
     let b = alta_reserva(&p, &cookie, "192.168.1.92", "02:00:00:00:00:92").await;
-    // Un revelado entre los dos (a mano: lo que escribe `revelar`).
+    // Un revelado entre los dos (a mano: así se anotaban antes de la Tarea 11).
     sqlx::query("UPDATE changes SET ts = 1000 WHERE id = ?")
         .bind(a)
         .execute(&p.state.db)
@@ -241,16 +241,14 @@ async fn secretos_enmascarados_y_deshacer_los_restaura() {
 #[tokio::test]
 async fn revelados_listados_sin_valor() {
     let (p, cookie) = historial_panel().await;
-    tokio::time::sleep(Duration::from_millis(1100)).await;
-    let v = ok(
-        &p,
-        "revelar",
-        json!({ "funcion": "te_wifi.asp", "campo": "wlWpaPsk", "instancia": null,
-                "params": [], "contrasena": common::PANEL_PASS }),
-        &cookie,
+    // Un revelado antiguo (antes de la Tarea 11 se anotaba cada uno).
+    sqlx::query(
+        "INSERT INTO reveals (ts, user_id, funcion, campo, instancia) \
+         VALUES (2000, (SELECT id FROM users LIMIT 1), 'te_wifi.asp', 'wlWpaPsk', NULL)",
     )
-    .await;
-    assert_eq!(v, "psk-sim-secreta");
+    .execute(&p.state.db)
+    .await
+    .unwrap();
 
     let pag = pagina(&p, &cookie, 1).await;
     let e = pag["entradas"].as_array().unwrap();

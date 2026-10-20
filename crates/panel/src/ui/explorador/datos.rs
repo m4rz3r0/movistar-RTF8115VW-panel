@@ -2,10 +2,10 @@
 //! (la misma en el navegador y en el servidor), enlaces y server functions.
 //!
 //! Los tipos de aquí no dependen de `catalogo` ni de `hgu` (que solo existen
-//! en el servidor). Un valor secreto nunca viaja: va como [`Valor::Secreto`]
-//! (lecturas y diff) o como [`MASCARA`] (formularios, que el gestor entiende
-//! como "sin tocar"). Solo [`revelar`] devuelve un secreto, tras pedir otra
-//! vez la contraseña del panel, y queda registrado en `reveals`.
+//! en el servidor). En una lectura, un secreto viaja con su valor
+//! ([`Valor::Clave`], decisión del usuario del 2026-10-18), para el campo
+//! censurado con el ojo; en el diff va como [`Valor::Secreto`] y en los
+//! formularios como [`MASCARA`] (que el gestor entiende como "sin tocar").
 //!
 //! Toda escritura pasa por el gestor de cambios del servidor
 //! (`AppState::cambios`): `preparar_cambio` y `confirmar_cambio` son sus
@@ -198,8 +198,11 @@ pub struct FuncionDetalle {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Valor {
     Texto(String),
-    /// Secreto: no viaja.
+    /// Secreto sin su valor (un diff, que se enseña enmascarado).
     Secreto,
+    /// Secreto con su valor (una lectura, o los valores de un cambio del
+    /// Historial): se pinta censurado, con el ojo.
+    Clave(String),
     /// La instancia no tiene ese campo.
     Ausente,
     /// Valor de una opción (o sí/no) con su etiqueta; `None` si no es una
@@ -514,38 +517,6 @@ pub async fn estado_cambio(id: i64) -> Result<CambioVista, ServerFnError> {
     crate::auth::require_user().await?;
     let state = super::servidor::app_state()?;
     super::servidor::estado_cambio(&state, id).await
-}
-
-/// Valor de un secreto de la lectura `funcion` (con `params`): campo `campo`
-/// de la instancia `instancia` (id de la fila) o suelto. Con `contrasena`
-/// vacía, solo si la sesión tiene abierta la ventana de reautenticación (si
-/// no, 401 con [`crate::auth::ERROR_REAUTENTICACION`]); con la contraseña del
-/// panel, la comprueba con el mismo freno que el login y abre la ventana.
-/// Queda registrado (sin el valor) en `reveals`.
-#[server(endpoint = "revelar", input = Json)]
-pub async fn revelar(
-    funcion: String,
-    campo: String,
-    instancia: Option<String>,
-    params: Vec<(String, String)>,
-    #[server(default)] contrasena: String,
-) -> Result<String, ServerFnError> {
-    let (user, contrasena) = if contrasena.is_empty() {
-        (crate::auth::require_reauth().await?, None)
-    } else {
-        (crate::auth::require_user().await?, Some(contrasena))
-    };
-    let state = super::servidor::app_state()?;
-    super::servidor::revelar(
-        &state,
-        &user,
-        &funcion,
-        &campo,
-        instancia.as_deref(),
-        &params,
-        contrasena.as_deref(),
-    )
-    .await
 }
 
 #[cfg(test)]

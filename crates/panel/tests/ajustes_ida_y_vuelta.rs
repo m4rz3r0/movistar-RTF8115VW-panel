@@ -162,6 +162,16 @@ fn hermanos_iguales(
     }
 }
 
+/// Último valor escrito del parámetro `param` en el simulador.
+fn escrito(p: &Panel, param: &str) -> Option<String> {
+    p.sim
+        .control
+        .writes()
+        .into_iter()
+        .rev()
+        .find_map(|(_, ps)| ps.into_iter().find(|(k, _)| k == param).map(|(_, v)| v))
+}
+
 /// ¿Escribe `c` un secreto que el router da tapado al leer (la contraseña de
 /// la línea de voz)? Guardar cualquier campo de su función exige escribirlo,
 /// y el deshacer lo omite (no hay valor anterior de verdad): se queda el
@@ -225,6 +235,13 @@ async fn cada_ajuste_antes_aplicar_verificar_deshacer() {
             let id = aplicar(&p, &cookie, &grupo, &que).await;
             match esperado {
                 Some(v) => assert_eq!(legible(&p, &cookie, a, &c.id).await, v, "{que}"),
+                // El router (y el simulador) no deja leer uno tapado: lo que
+                // cuenta es lo que se escribió.
+                None if tapado(c) => assert_eq!(
+                    escrito(&p, &c.escribible().unwrap().parametro).as_deref(),
+                    Some(nuevo.as_str()),
+                    "{que}"
+                ),
                 None => assert_eq!(crudo(&p, a, &c.lee).await, nuevo, "{que}"),
             }
             hermanos_iguales(&que, &tocados, &todo_antes, &foto(&p, &cookie, a).await);
@@ -235,6 +252,13 @@ async fn cada_ajuste_antes_aplicar_verificar_deshacer() {
                 Some(&cookie),
             )
             .await;
+            if tapado(c) {
+                // Solo cambió ella, y su valor anterior es el vacío que dio
+                // el router: no hay nada que volver atrás (el deshacer no la
+                // vacía).
+                assert_eq!(status, 409, "{que}: deshacer: {body}");
+                continue;
+            }
             assert_eq!(status, 200, "{que}: deshacer: {body}");
             let inverso: Value = serde_json::from_str(&body).unwrap();
             aplicar(&p, &cookie, &inverso, &format!("{que} (deshacer)")).await;
@@ -243,27 +267,11 @@ async fn cada_ajuste_antes_aplicar_verificar_deshacer() {
                 antes,
                 "{que}: tras deshacer"
             );
-            if tapado(c) {
-                // Su valor anterior es lo que dio la lectura: vacío (lo del
-                // router de verdad) se omite y se queda la escrita; el
-                // simulador da la última que se le escribió, y esa vuelve.
-                let esperado = if antes_crudo.is_empty() {
-                    &nuevo
-                } else {
-                    &antes_crudo
-                };
-                assert_eq!(
-                    &crudo(&p, a, &c.lee).await,
-                    esperado,
-                    "{que}: tras deshacer"
-                );
-            } else {
-                assert_eq!(
-                    crudo(&p, a, &c.lee).await,
-                    antes_crudo,
-                    "{que}: tras deshacer (en crudo)"
-                );
-            }
+            assert_eq!(
+                crudo(&p, a, &c.lee).await,
+                antes_crudo,
+                "{que}: tras deshacer (en crudo)"
+            );
             let mut despues = foto(&p, &cookie, a).await;
             let mut esperado = todo_antes.clone();
             for t in &tapados {

@@ -1789,82 +1789,78 @@ input {
   position: static;
 }
 
-.celda-secreta {
+/* Un secreto: su campo de contraseña (relleno, censurado) con el ojo al
+   lado, que lo muestra u oculta. */
+.secreto-campo {
   display: inline-flex;
-  align-items: center;
-  gap: var(--esp-2);
-}
-
-.revelado {
-  padding: 0 var(--esp-1);
-  border-radius: 4px;
-  background: var(--aviso-suave);
-}
-
-/* Un secreto mostrado: el valor (se selecciona entero de un toque, para
-   copiarlo a mano si no hay portapapeles) con «Copiar» al lado. */
-.secreto-mostrado {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--esp-2);
+  align-items: stretch;
   max-width: 100%;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--fondo);
 }
 
-.secreto-mostrado .revelado {
-  user-select: all;
-  overflow-wrap: anywhere;
+.secreto-campo:focus-within {
+  border-color: var(--viz-cruceta);
 }
 
-.celda-secreta {
-  flex-wrap: wrap;
-}
-
-.secreto-error {
-  display: block;
-}
-
-/* Al editar: «•••••• Mostrar · Cambiar» o el campo con «Ver lo escrito». */
-.campo-etiqueta {
-  margin: 0;
-  color: var(--texto-1);
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.secreto-fila {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--esp-2);
-}
-
-.campo-ajuste .secreto-fila input:not([type="checkbox"]) {
-  flex: 1 1 12rem;
-  width: auto;
+.secreto-valor {
+  flex: 1 1 10rem;
   min-width: 0;
-}
-
-/* Historial: los valores anteriores de las contraseñas de un paso. */
-.hist-anteriores {
-  display: flex;
-  flex-direction: column;
-  gap: var(--esp-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.hist-anteriores li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--esp-2);
-}
-
-.hist-anterior-campo {
-  color: var(--texto-2);
+  min-height: 36px;
+  padding: 0 var(--esp-2);
+  border: 0;
+  border-radius: var(--radio) 0 0 var(--radio);
+  background: transparent;
+  color: var(--texto-1);
+  font-family: var(--fuente-mono);
   font-size: 13px;
+}
+
+.secreto-valor:focus-visible,
+.boton-ojo:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
+}
+
+.secreto-valor[readonly] {
+  color: var(--texto-2);
+}
+
+.boton-ojo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  border: 0;
+  border-left: 1px solid var(--borde);
+  border-radius: 0 var(--radio) var(--radio) 0;
+  background: transparent;
+  color: var(--texto-2);
+  cursor: pointer;
+}
+
+.boton-ojo:hover,
+.boton-ojo[aria-pressed="true"] {
+  color: var(--texto-1);
+}
+
+/* En la edición de un ajuste, el campo ocupa lo que un campo normal. */
+.campo-ajuste .secreto-campo {
+  display: flex;
+  width: 100%;
+}
+
+.campo-ajuste .secreto-campo .secreto-valor:not([type="checkbox"]) {
+  width: auto;
+  min-height: 38px;
+  border: 0;
+}
+
+/* Historial: los nombres técnicos de un paso, plegados. */
+.hist-tecnico {
+  margin: 0;
+  padding-left: var(--esp-4);
 }
 
 .boton-mini {

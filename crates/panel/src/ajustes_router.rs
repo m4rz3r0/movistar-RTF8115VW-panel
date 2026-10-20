@@ -7,8 +7,8 @@
 //! llevan ids, claves de traducción y valores legibles: ningún nombre de la
 //! API salvo en [`DetallesTecnicos`], que la interfaz pinta únicamente dentro
 //! de `<details class="detalles-tecnicos">`. Un secreto llega como
-//! [`ValorLegible::Secreto`]: su valor solo sale del servidor al pedirlo con
-//! [`revelar_ajuste`] (con reautenticación, anotado y con `no-store`).
+//! [`ValorLegible::Secreto`], y su valor aparte, en
+//! [`CampoVista::valor_secreto`] (la página lo enseña censurado, con un ojo).
 
 use crate::t;
 use crate::ui::explorador::RiesgoCambio;
@@ -89,10 +89,16 @@ pub struct CampoVista {
     pub opcional: bool,
     /// Clave de traducción del motivo por el que no se puede editar.
     pub solo_lectura: Option<String>,
-    /// Secreto que el router da tapado al leer: no se puede «Mostrar», y
-    /// guardar cualquier campo que escriba con él exige escribirlo.
+    /// Secreto que el router da tapado al leer: sale vacío, y guardar
+    /// cualquier campo que escriba con él exige escribirlo.
     #[serde(default)]
     pub tapado: bool,
+    /// El valor leído de un secreto, para su campo censurado con el ojo
+    /// (decisión del usuario del 2026-10-18: viaja con la página, que va con
+    /// `no-store`). `None` si no es un secreto o el router no deja leerlo
+    /// (lo da enmascarado, o vacío uno marcado como tapado al leer).
+    #[serde(default)]
+    pub valor_secreto: Option<String>,
     /// Valor legible recomendado: la clave de la opción recomendada en un
     /// campo `opcion` (`wpa2`), `true`/`false` en un booleano o el texto.
     pub recomendado: Option<String>,
@@ -608,25 +614,6 @@ pub async fn leer_tema(tema: String) -> Result<TemaVista, ServerFnError> {
     servidor::leer_tema(tema).await
 }
 
-/// Valor en claro del secreto `campo` del ajuste `ajuste` (en una lista, de
-/// su instancia `instancia`), leído del router en ese momento: nunca de la
-/// caché de lecturas. Con `contrasena` vacía, solo si la sesión tiene abierta
-/// la ventana de reautenticación (si no, 401 con
-/// [`crate::auth::ERROR_REAUTENTICACION`]); con la contraseña del panel, la
-/// comprueba con el freno del login y abre la ventana. Queda anotado, sin el
-/// valor, en `reveals` (con el ajuste y el campo). La respuesta va con
-/// `no-store`. 400 si el campo no es un secreto del ajuste; 404 si el ajuste
-/// no existe.
-#[server(endpoint = "revelar_ajuste", input = Json)]
-pub async fn revelar_ajuste(
-    ajuste: String,
-    campo: String,
-    instancia: Option<String>,
-    #[server(default)] contrasena: String,
-) -> Result<String, ServerFnError> {
-    servidor::revelar_ajuste(ajuste, campo, instancia, contrasena).await
-}
-
 /// Los dispositivos que el router conoce en la red de casa, los conectados
 /// primero y por IP, con su conexión y su reserva (lecturas para mostrar,
 /// como [`leer_tema`]). Exige sesión; la respuesta va con `no-store`.
@@ -688,7 +675,7 @@ pub(crate) mod servidor {
         t,
         ui::explorador::{
             MASCARA,
-            servidor::{error_cambio, gestor, riesgo, usuario_para_revelar},
+            servidor::{error_cambio, gestor, riesgo},
         },
     };
     use ajustes::{
@@ -714,10 +701,7 @@ pub(crate) mod servidor {
             .ok_or_else(|| fallo(StatusCode::NOT_FOUND, t!("ajustes-error-tema")))?;
         let del_tema: Vec<&Ajuste> = state.ajustes.por_tema(tema).collect();
         let claves: Vec<Clave> = del_tema.iter().map(|a| clave(a)).collect();
-        let leidas = state
-            .lecturas
-            .leer(&state.hgu, &state.mascara, &claves)
-            .await;
+        let leidas = state.lecturas.leer(&state.hgu, &claves).await;
         let ajustes = del_tema
             .iter()
             .zip(&claves)
@@ -750,7 +734,7 @@ pub(crate) mod servidor {
                     let plantilla = a
                         .campos
                         .iter()
-                        .map(|c| campo(f, &prefijo, c, valor_inicial(c)))
+                        .map(|c| campo(f, &prefijo, c, valor_inicial(c), None))
                         .collect();
                     (EstadoLectura::Leido, plantilla, instancias)
                 }
@@ -769,7 +753,15 @@ pub(crate) mod servidor {
                 let campos = a
                     .campos
                     .iter()
-                    .map(|c| campo(f, &prefijo, c, a_legible(c, &leidos)))
+                    .map(|c| {
+                        campo(
+                            f,
+                            &prefijo,
+                            c,
+                            a_legible(c, &leidos),
+                            valor_secreto(f, c, &leidos),
+                        )
+                    })
                     .collect();
                 (EstadoLectura::Leido, campos, Vec::new())
             }
@@ -804,7 +796,15 @@ pub(crate) mod servidor {
                     campos: a
                         .campos
                         .iter()
-                        .map(|c| campo(f, prefijo, c, a_legible(c, &leidos)))
+                        .map(|c| {
+                            campo(
+                                f,
+                                prefijo,
+                                c,
+                                a_legible(c, &leidos),
+                                valor_secreto(f, c, &leidos),
+                            )
+                        })
                         .collect(),
                 })
                 .collect(),
@@ -873,7 +873,31 @@ pub(crate) mod servidor {
             })
     }
 
-    fn campo(f: &Catalogo, prefijo: &str, c: &Campo, valor: ValorLegible) -> CampoVista {
+    /// Valor leído del secreto `c` para su campo con el ojo; `None` si no es
+    /// un secreto o el router no deja leerlo (lo da enmascarado, o vacío
+    /// uno tapado al leer).
+    fn valor_secreto(f: &Catalogo, c: &Campo, leidos: &Leidos) -> Option<String> {
+        if c.tipo != TipoCampo::Secreto {
+            return None;
+        }
+        let v = leidos.get(&c.lee).cloned().or_else(|| {
+            leidos
+                .iter()
+                .find(|(k, _)| k.eq_ignore_ascii_case(&c.lee))
+                .map(|(_, v)| v.clone())
+        })?;
+        let no_vale =
+            crate::changes::plan::enmascarado(&v) || (tapado(f, c) && v.trim().is_empty());
+        (!no_vale).then_some(v)
+    }
+
+    fn campo(
+        f: &Catalogo,
+        prefijo: &str,
+        c: &Campo,
+        valor: ValorLegible,
+        valor_secreto: Option<String>,
+    ) -> CampoVista {
         let clave = format!("{prefijo}-{}", c.id);
         let recomendado = c
             .opciones
@@ -900,6 +924,7 @@ pub(crate) mod servidor {
             opcional: c.opcional,
             solo_lectura: c.solo_lectura.clone(),
             tapado: tapado(f, c),
+            valor_secreto,
             motivo_recomendado: recomendado.as_ref().map(|_| format!("{clave}-recomendado")),
             recomendado,
             requiere: c.requiere.clone(),
@@ -1367,7 +1392,7 @@ pub(crate) mod servidor {
         let (state, _) = preparar().await?;
         let mut leidas = state
             .lecturas
-            .leer(&state.hgu, &state.mascara, &claves_dispositivos())
+            .leer(&state.hgu, &claves_dispositivos())
             .await;
         let wifi = asociados(&leidas);
         let hosts = hgu::models::LanHost::parse_all(&leida(&mut leidas, &clave_hosts())?);
@@ -1407,7 +1432,7 @@ pub(crate) mod servidor {
         let clave = clave_red_casa();
         let mut leidas = state
             .lecturas
-            .leer(&state.hgu, &state.mascara, std::slice::from_ref(&clave))
+            .leer(&state.hgu, std::slice::from_ref(&clave))
             .await;
         let n = leida(&mut leidas, &clave)?;
         Ok(hgu::read::lan_ipv4_de(&n))
@@ -1418,7 +1443,7 @@ pub(crate) mod servidor {
         let clave = clave_reservas();
         let mut leidas = state
             .lecturas
-            .leer(&state.hgu, &state.mascara, std::slice::from_ref(&clave))
+            .leer(&state.hgu, std::slice::from_ref(&clave))
             .await;
         let n = leida(&mut leidas, &clave)?;
         Ok(hgu::models::StaticLease::parse_all(&n)
@@ -1790,91 +1815,6 @@ pub(crate) mod servidor {
         }
     }
 
-    // --------------------------------------------------- secretos
-
-    /// Elemento `nombre` de una lectura: primero exacto, luego sin distinguir
-    /// mayúsculas.
-    fn leido<'a>(leidos: &'a Leidos, nombre: &str) -> Option<&'a str> {
-        leidos
-            .get(nombre)
-            .or_else(|| {
-                leidos
-                    .iter()
-                    .find(|(k, _)| k.eq_ignore_ascii_case(nombre))
-                    .map(|(_, v)| v)
-            })
-            .map(String::as_str)
-    }
-
-    pub(super) async fn revelar_ajuste(
-        ajuste: String,
-        campo: String,
-        instancia: Option<String>,
-        contrasena: String,
-    ) -> Result<String, ServerFnError> {
-        let (state, user) = preparar().await?;
-        let a = ajuste_por_id(&state, &ajuste)?;
-        // Uno tapado al leer no tiene nada que mostrar.
-        let c = a
-            .campo(&campo)
-            .filter(|c| c.tipo == TipoCampo::Secreto && !tapado(&state.catalogo, c))
-            .ok_or_else(|| fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-campo")))?;
-        if a.lista != instancia.is_some() {
-            return Err(fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-invalida")));
-        }
-        let user = usuario_para_revelar(&state, user, &contrasena).await?;
-        // Del router, no de la caché: lo que se ve es lo que tiene ahora.
-        let params: Vec<(&str, &str)> = a
-            .leer
-            .params
-            .iter()
-            .map(|(k, v)| (k.as_str(), v.as_str()))
-            .collect();
-        let n = state
-            .hgu
-            .call(&a.leer.funcion, &params)
-            .await
-            .map_err(|e| sin_leer("un secreto", e))?;
-        let leidos = match &instancia {
-            None => {
-                let mut leidos = Leidos::new();
-                hojas(&n, &mut leidos);
-                Some(leidos)
-            }
-            Some(id) => instancias_con_id(&state.catalogo, a, &n)
-                .into_iter()
-                .flatten()
-                .find(|(i, _)| i == id)
-                .map(|(_, leidos)| leidos),
-        };
-        let valor = leidos
-            .as_ref()
-            .and_then(|l| leido(l, &c.lee))
-            .map(str::to_owned)
-            .ok_or_else(|| fallo(StatusCode::NOT_FOUND, t!("ajustes-error-secreto-sin-valor")))?;
-        sqlx::query(
-            "INSERT INTO reveals (ts, user_id, funcion, campo, instancia, ajuste) \
-             VALUES (?, ?, ?, ?, ?, ?)",
-        )
-        .bind(crate::series::now())
-        .bind(user.id)
-        .bind(&a.leer.funcion)
-        .bind(&c.id)
-        .bind(&instancia)
-        .bind(&a.id)
-        .execute(&state.db)
-        .await
-        .map_err(crate::instalar::servidor::interno)?;
-        tracing::info!(
-            usuario = %user.username,
-            ajuste = %a.id,
-            campo = %c.id,
-            instancia = instancia.as_deref().unwrap_or("-"),
-            "secreto mostrado desde Ajustes"
-        );
-        Ok(valor)
-    }
-
     pub(super) async fn confirmar_ajuste(
         token: String,
         desmarcados: Vec<usize>,
@@ -2113,66 +2053,6 @@ pub(crate) mod servidor {
             assert_eq!(
                 cambio_legible("ajuste-wifi-red_24", nombre, &diff, &completar),
                 None
-            );
-        }
-
-        /// La caché guarda las lecturas enmascaradas: lo que se pinta con
-        /// ellas (cada ajuste del catálogo, los dispositivos, las reservas,
-        /// las estaciones WiFi y la red de casa) es igual que con la
-        /// respuesta en claro del router.
-        #[tokio::test]
-        async fn lo_enmascarado_se_pinta_igual_que_lo_leido() {
-            let fixtures = concat!(env!("CARGO_MANIFEST_DIR"), "/../hgu/fixtures");
-            let sim =
-                router_sim::Sim::start(router_sim::SimConfig::new("u", "clave", fixtures)).await;
-            let mut cfg = hgu::ClientConfig::new(&sim.base_url, "u", "clave");
-            cfg.min_gap = std::time::Duration::from_millis(1);
-            let c = hgu::Client::new(cfg);
-            let f = Catalogo::load().unwrap();
-            let m = catalogo::mask::Mascara::load().unwrap();
-            let ajustes = CatalogoAjustes::load().unwrap();
-            let leer = async |clave: &Clave| {
-                let p: Vec<(&str, &str)> = clave
-                    .params
-                    .iter()
-                    .map(|(k, v)| (k.as_str(), v.as_str()))
-                    .collect();
-                c.call(&clave.funcion, &p).await.unwrap()
-            };
-            for a in ajustes.todos() {
-                let n = leer(&clave(a)).await;
-                assert_eq!(
-                    vista(&f, a, Some(&n)),
-                    vista(&f, a, Some(&m.enmascarar(&n))),
-                    "{}",
-                    a.id
-                );
-            }
-            use hgu::models::{LanHost, StaticLease, WifiAssoc};
-            let n = leer(&clave_hosts()).await;
-            assert!(!LanHost::parse_all(&n).is_empty());
-            assert_eq!(
-                LanHost::parse_all(&n),
-                LanHost::parse_all(&m.enmascarar(&n))
-            );
-            let n = leer(&clave_reservas()).await;
-            assert!(!StaticLease::parse_all(&n).is_empty());
-            assert_eq!(
-                StaticLease::parse_all(&n),
-                StaticLease::parse_all(&m.enmascarar(&n))
-            );
-            for radio in hgu::read::RADIOS_POR_DEFECTO {
-                let n = leer(&clave_estaciones(radio)).await;
-                assert_eq!(
-                    WifiAssoc::parse_all(&n),
-                    WifiAssoc::parse_all(&m.enmascarar(&n))
-                );
-            }
-            let n = leer(&clave_red_casa()).await;
-            assert!(hgu::read::lan_ipv4_de(&n).is_some());
-            assert_eq!(
-                hgu::read::lan_ipv4_de(&n),
-                hgu::read::lan_ipv4_de(&m.enmascarar(&n))
             );
         }
     }

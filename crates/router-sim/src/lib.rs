@@ -912,7 +912,30 @@ fn read_node(
     };
     aplicar_ediciones(st, name, &mut node);
     patch(s, st, name, &mut node);
+    tapar_al_leer(name, &mut node);
     Ok(node)
+}
+
+/// Secretos que el router no deja leer (los marca `tapado` el catálogo de
+/// funciones): se escriben, pero al leerlos salen vacíos, como en las
+/// fixtures del router real.
+const TAPADOS_AL_LEER: &[(&str, &str)] = &[("cbGetVoiceLine", "auth_password")];
+
+fn tapar_al_leer(name: &str, n: &mut XmlNode) {
+    for (lectura, campo) in TAPADOS_AL_LEER {
+        if *lectura == name {
+            vaciar(n, campo);
+        }
+    }
+}
+
+fn vaciar(n: &mut XmlNode, campo: &str) {
+    if n.children.is_empty() && n.tag == campo {
+        n.text.clear();
+    }
+    for c in &mut n.children {
+        vaciar(c, campo);
+    }
 }
 
 /// Valor de `campo` en el primer nodo (en preorden) que lo tiene.

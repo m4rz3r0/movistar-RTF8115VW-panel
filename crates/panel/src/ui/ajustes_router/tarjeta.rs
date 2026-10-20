@@ -12,7 +12,7 @@
 
 use super::Foco;
 use super::campo::{
-    Campo, cambiado, elegido, es_recomendado, etiqueta, inicial, texto_legible, validar,
+    Campo, cambiado, elegido, es_recomendado, etiqueta, inicial_campo, texto_legible, validar,
     valor_resumido,
 };
 use super::dispositivos::Dispositivos;
@@ -26,9 +26,8 @@ use crate::t;
 use crate::ui::explorador::{RiesgoCambio, texto_error};
 use crate::ui::grupo::DialogoGrupo;
 use crate::ui::i18n::traducir;
-use crate::ui::secreto::ObjetivoSecreto;
 use crate::ui::{Estado, IconoEstado, Insignia};
-use ajustes::{Nivel, TipoCampo};
+use ajustes::Nivel;
 use leptos::{ev::SubmitEvent, html, prelude::*, task::spawn_local};
 use std::collections::BTreeMap;
 
@@ -245,10 +244,7 @@ fn lista(a: &AjusteVista) -> impl IntoView + use<> {
                 let celdas = i
                     .campos
                     .iter()
-                    .map(|c| {
-                        let secreto = objetivo(&a.id, c, Some(&i.id));
-                        view! { <td>{valor_resumido(c, secreto)}</td> }
-                    })
+                    .map(|c| view! { <td>{valor_resumido(c)}</td> })
                     .collect_view();
                 view! { <tr>{celdas}</tr> }
             })
@@ -277,23 +273,11 @@ fn lista(a: &AjusteVista) -> impl IntoView + use<> {
     }
 }
 
-/// De dónde se lee el campo `c` del ajuste `ajuste` (de la instancia
-/// `instancia` en una lista) para «Mostrar», si es un secreto que se puede
-/// leer.
-fn objetivo(ajuste: &str, c: &CampoVista, instancia: Option<&str>) -> Option<ObjetivoSecreto> {
-    // Uno tapado al leer no tiene nada que mostrar.
-    (c.tipo == TipoCampo::Secreto && !c.tapado).then(|| ObjetivoSecreto::Ajuste {
-        ajuste: ajuste.to_owned(),
-        campo: c.id.clone(),
-        instancia: instancia.map(str::to_owned),
-    })
-}
-
-/// Una fila de la vista resumida del ajuste `ajuste`: etiqueta, valor (un
-/// secreto, con «Mostrar») y, si no es el recomendado, cuál lo es (cuando
-/// coincide no se marca: menos ruido). La marca se despliega con para quién
-/// es y sus pros y contras.
-fn fila(ajuste: &str, c: &CampoVista) -> impl IntoView + use<> {
+/// Una fila de la vista resumida: etiqueta, valor (un secreto, censurado con
+/// el ojo) y, si no es el recomendado, cuál lo es (cuando coincide no se
+/// marca: menos ruido). La marca se despliega con para quién es y sus pros
+/// y contras.
+fn fila(c: &CampoVista) -> impl IntoView + use<> {
     let marca = (es_recomendado(c) == Some(false)).then(|| {
         let r = c.recomendado.clone().unwrap_or_default();
         let chip = t!("ajustes-recomendado-valor", valor = texto_legible(c, &r));
@@ -311,7 +295,7 @@ fn fila(ajuste: &str, c: &CampoVista) -> impl IntoView + use<> {
     view! {
         <div class="ajuste-fila">
             <dt>{etiqueta(c)}</dt>
-            <dd>{valor_resumido(c, objetivo(ajuste, c, None))} {marca}</dd>
+            <dd>{valor_resumido(c)} {marca}</dd>
         </div>
     }
 }
@@ -326,7 +310,7 @@ fn TarjetaAjuste(a: AjusteVista, solo_lectura: bool, recargar: Callback<()>) -> 
     let valores: Vec<RwSignal<String>> = a
         .campos
         .iter()
-        .map(|c| RwSignal::new(inicial(&c.valor)))
+        .map(|c| RwSignal::new(inicial_campo(c)))
         .collect();
     let errores: Vec<RwSignal<Option<String>>> =
         a.campos.iter().map(|_| RwSignal::new(None)).collect();
@@ -360,7 +344,7 @@ fn TarjetaAjuste(a: AjusteVista, solo_lectura: bool, recargar: Callback<()>) -> 
     let cancelar = move |_| {
         campos.with_value(|cs| {
             for (i, c) in cs.iter().enumerate() {
-                valores.with_value(|v| v[i].set(inicial(&c.valor)));
+                valores.with_value(|v| v[i].set(inicial_campo(c)));
                 errores.with_value(|e| e[i].set(None));
             }
         });
@@ -481,7 +465,7 @@ fn TarjetaAjuste(a: AjusteVista, solo_lectura: bool, recargar: Callback<()>) -> 
         EstadoLectura::Leido => None,
     };
     let resumen = {
-        let filas = a.campos.iter().map(|c| fila(&a.id, c)).collect_view();
+        let filas = a.campos.iter().map(fila).collect_view();
         let motivos = motivos(&a.campos);
         view! {
             <dl class="ajuste-valores">{filas}</dl>
@@ -496,48 +480,22 @@ fn TarjetaAjuste(a: AjusteVista, solo_lectura: bool, recargar: Callback<()>) -> 
             .map(|(i, c)| {
                 if c.solo_lectura.is_some() {
                     view! {
-                        <dl class="ajuste-valores">{fila(&a.id, c)}</dl>
+                        <dl class="ajuste-valores">{fila(c)}</dl>
                     }
                     .into_any()
                 } else {
                     let valor = valores.with_value(|v| v[i]);
                     let error = errores.with_value(|e| e[i]);
-                    let secreto = objetivo(&a.id, c, None);
-                    match secreto {
-                        Some(secreto) => view! {
-                            <Campo
-                                c=c.clone()
-                                dom=format!("{id_dom}-c{i}")
-                                valor
-                                error
-                                bloqueado=preparando
-                                secreto
-                                editando
-                            />
-                        }
-                        .into_any(),
-                        None if c.tipo == TipoCampo::Secreto => view! {
-                            <Campo
-                                c=c.clone()
-                                dom=format!("{id_dom}-c{i}")
-                                valor
-                                error
-                                bloqueado=preparando
-                                editando
-                            />
-                        }
-                        .into_any(),
-                        None => view! {
-                            <Campo
-                                c=c.clone()
-                                dom=format!("{id_dom}-c{i}")
-                                valor
-                                error
-                                bloqueado=preparando
-                            />
-                        }
-                        .into_any(),
+                    view! {
+                        <Campo
+                            c=c.clone()
+                            dom=format!("{id_dom}-c{i}")
+                            valor
+                            error
+                            bloqueado=preparando
+                        />
                     }
+                    .into_any()
                 }
             })
             .collect_view();

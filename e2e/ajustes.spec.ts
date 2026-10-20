@@ -1,5 +1,4 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
-import { CONTRASENA } from "./instancias";
 import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 
 // Páginas de Ajustes (/ajustes/<tema>) a 360 y 1440 px, en español y en
@@ -221,58 +220,56 @@ for (const idioma of ["es", "en"] as const) {
   }
 }
 
-// Secretos (en español y en inglés, a 360, 1024 y 1440 px): «Mostrar» la
-// contraseña de la red de 5 GHz pide la del panel con el diálogo de
-// reautenticación, enseña el valor con «Copiar» y, a los 30 s (con el reloj
-// de Playwright), vuelve a la máscara y el valor sale del DOM. Al editar,
-// «Cambiar» abre el campo con «Ver lo escrito». En Teléfono, la contraseña
-// de la línea (el router no deja leerla) se pide al guardar. En el
-// Historial, el paso que cambió la clave de 5 GHz (lo aplica e2e_grupo al
-// arrancar) ofrece «Mostrar el valor anterior»; en una combinación, con un
-// cambio en curso (el Historial se refresca cada 2 s): el diálogo abierto
-// más de 2 s no rompe la página y el valor aguanta.
+// Secretos (en español y en inglés, a 360, 1024 y 1440 px). Cada secreto es
+// un campo de contraseña ya relleno, censurado, con un ojo que lo muestra u
+// oculta al instante, sin pedir la contraseña del panel y sin ocultarse
+// solo; los que se pueden escribir se editan en el mismo campo. Se prueba en
+// la WiFi (censurado, visible, con el teclado y editando), en Teléfono (la
+// clave que el router no deja leer: vacía, con su motivo, y pedida al
+// guardar; en una combinación se guarda de verdad), en la Biblioteca y en el
+// Historial (el valor anterior y el nuevo de la clave de 5 GHz, que cambia
+// e2e_grupo al arrancar; en una combinación, con un cambio en curso: el
+// Historial se refresca cada 2 s y lo desplegado aguanta).
 const CLAVE_5 = "clave-de-prueba-1";
 
 const textosSecreto = {
   es: {
     red5: "Red WiFi 5 GHz",
     contrasena: "Contraseña",
-    mostrar: /^Mostrar/,
-    copiar: /^Copiar/,
-    cuenta: "Se volverá a ocultar",
-    reautenticar: "Confirma que eres tú",
-    seguir: "Seguir",
+    ver: "Mostrar la clave",
+    ocultar: "Ocultar la clave",
     editar: "Editar",
-    cambiar: /^Cambiar/,
-    ver: "Ver lo escrito",
     cancelar: "Cancelar",
     guardar: "Guardar",
+    aplicar: "Aplicar",
+    hecho: "Hecho: el router tiene ya el cambio.",
+    cerrar: "Cerrar",
     linea: "Línea de teléfono",
     lineaActiva: "Línea encendida",
     lineaClave: "Contraseña de la línea",
+    sinLeer: "El router no deja leerla",
     pideLaClave: "El router no deja leer esta clave: escríbela para guardar los cambios.",
-    anterior: /^Mostrar el valor anterior/,
-    revelado: "Se mostró «Contraseña» de Red WiFi 5 GHz",
+    leer: "Leer de nuevo",
+    tecnico: "Detalles técnicos",
   },
   en: {
     red5: "5 GHz WiFi network",
     contrasena: "Password",
-    mostrar: /^Show(?! what I typed)/,
-    copiar: /^Copy/,
-    cuenta: "It will be hidden again",
-    reautenticar: "Confirm it's you",
-    seguir: "Continue",
+    ver: "Show the password",
+    ocultar: "Hide the password",
     editar: "Edit",
-    cambiar: /^Change/,
-    ver: "Show what I typed",
     cancelar: "Cancel",
     guardar: "Save",
+    aplicar: "Apply",
+    hecho: "Done: the router now has the change.",
+    cerrar: "Close",
     linea: "Phone line",
     lineaActiva: "Line on",
     lineaClave: "Line password",
+    sinLeer: "The router won't let it be read",
     pideLaClave: "The router won't let this password be read: type it to save the changes.",
-    anterior: /^Show the previous value/,
-    revelado: "Showed “Password” for 5 GHz WiFi network",
+    leer: "Read again",
+    tecnico: "Technical details",
   },
 } as const;
 
@@ -292,7 +289,7 @@ async function cambiarUpnp(page: Page): Promise<number> {
   return api("confirmar_ajuste", { token: grupo.token, desmarcados: [] });
 }
 
-/** Espera a que el cambio `id` termine (y el gestor quede libre). */
+/** Espera a que el cambio `id` termine. */
 async function esperarFinal(page: Page, id: number) {
   await expect
     .poll(
@@ -305,95 +302,101 @@ async function esperarFinal(page: Page, id: number) {
     .toBe("Aplicado");
 }
 
+/** El texto que se ve de un trozo de la página (sin los valores de los campos). */
+async function aLaVista(l: Locator): Promise<string> {
+  return l.innerText();
+}
+
 for (const idioma of ["es", "en"] as const) {
   for (const ancho of [360, 1024, 1440]) {
-    // Con un cambio en curso solo en una (cada cambio se vigila 30 s, y hay
-    // que deshacerlo para dejar el simulador como estaba).
+    // Con un cambio en curso en el Historial y guardando de verdad la clave
+    // de la voz, una sola combinación cada uno (se vigilan 30 s).
     const conCambioEnCurso = idioma === "en" && ancho === 1024;
+    const guardaLaVoz = idioma === "es" && ancho === 1024;
     test.describe(`secretos ${idioma} a ${ancho} px`, () => {
       test.use({
         locale: idioma === "es" ? "es-ES" : "en-GB",
         viewport: { width: ancho, height: 900 },
       });
 
-      test("Mostrar, cuenta atrás, Cambiar, la clave de la voz y el valor anterior", async ({ page }) => {
-        if (conCambioEnCurso) test.setTimeout(240_000);
+      test("el ojo en Ajustes, Teléfono, la Biblioteca y el Historial", async ({ page }) => {
+        if (conCambioEnCurso || guardaLaVoz) test.setTimeout(240_000);
         const t = textosSecreto[idioma];
-        // El 401 que pide la contraseña es lo esperado; cualquier otro error
-        // o aviso de la consola, no.
-        const errores: string[] = [];
-        page.on("console", (m) => {
-          const url = m.location().url;
-          if (url.endsWith("/favicon.ico") || /\/api\/revelar_(ajuste|anterior)$/.test(url)) return;
-          if (m.type() === "error" || m.type() === "warning") errores.push(m.text());
-        });
-        page.on("pageerror", (e) => errores.push(String(e)));
+        const errores = recogerErrores(page);
         await page.clock.install();
         await entrar(page);
+
+        // WiFi: censurado, con el valor ya en el campo.
         await page.goto("/ajustes/wifi");
         await asentar(page);
         const red5 = tarjeta(page, t.red5);
         const fila = red5.locator(".ajuste-resumen .ajuste-fila").filter({ hasText: t.contrasena });
-        await expect(fila.locator(".secreto")).toHaveText("••••••");
-        await expect(red5).not.toContainText(CLAVE_5);
-        expect(await page.content()).not.toContain(CLAVE_5);
-        await page.screenshot({ path: `capturas/secreto-mascara-${idioma}-${ancho}.png` });
+        const campo = fila.locator("input.secreto-valor");
+        await expect(campo).toHaveAttribute("type", "password");
+        await expect(campo).toHaveValue(CLAVE_5);
+        await expect(campo).toHaveAttribute("readonly", "");
+        await expect(campo).toHaveAttribute("autocomplete", "off");
+        expect(await aLaVista(page.locator("main"))).not.toContain(CLAVE_5);
+        await sinDesbordamiento(page, `secreto censurado ${idioma} ${ancho}`);
+        await page.screenshot({ path: `capturas/secreto-censurado-${idioma}-${ancho}.png` });
 
-        // «Mostrar»: sin la ventana abierta, el diálogo de reautenticación.
-        await fila.getByRole("button", { name: t.mostrar }).click();
-        const dialogo = page.locator("dialog[open]");
-        await expect(dialogo.locator("h2")).toHaveText(t.reautenticar);
-        await dialogo.locator("#reautenticar-contrasena").fill(CONTRASENA);
-        await dialogo.getByRole("button", { name: t.seguir }).click();
+        // El ojo lo muestra al instante, sin pedir la contraseña del panel.
+        const ojo = fila.getByRole("button", { name: t.ver });
+        await expect(ojo).toHaveAttribute("aria-pressed", "false");
+        await ojo.click();
+        await expect(campo).toHaveAttribute("type", "text");
+        await expect(fila.getByRole("button", { name: t.ocultar })).toHaveAttribute("aria-pressed", "true");
         await expect(page.locator("dialog[open]")).toHaveCount(0);
-        const valor = fila.locator(".revelado");
-        await expect(valor).toHaveText(CLAVE_5);
-        await expect(fila.getByRole("button", { name: t.copiar })).toBeVisible();
-        await expect(fila.locator(".solo-lector").filter({ hasText: t.cuenta })).toContainText("30");
-        await sinDesbordamiento(page, `secreto mostrado ${idioma} ${ancho}`);
-        await page.screenshot({ path: `capturas/secreto-mostrado-${idioma}-${ancho}.png` });
+        await sinDesbordamiento(page, `secreto visible ${idioma} ${ancho}`);
+        await page.screenshot({ path: `capturas/secreto-visible-${idioma}-${ancho}.png` });
+        // No se oculta solo.
+        await page.clock.runFor(60_000);
+        await expect(campo).toHaveAttribute("type", "text");
+        // Teclado: Tab desde el campo llega al ojo; Espacio e Intro lo cambian.
+        await campo.focus();
+        await page.keyboard.press("Tab");
+        await expect(fila.getByRole("button", { name: t.ocultar })).toBeFocused();
+        await page.keyboard.press("Space");
+        await expect(campo).toHaveAttribute("type", "password");
+        await page.keyboard.press("Enter");
+        await expect(campo).toHaveAttribute("type", "text");
 
-        // A los 30 s, la máscara otra vez; el valor ya no está en la página.
-        await page.clock.runFor(29_000);
-        await expect(valor).toHaveText(CLAVE_5);
-        await page.clock.runFor(1_500);
-        await expect(fila.locator(".revelado")).toHaveCount(0);
-        await expect(fila.locator(".secreto")).toHaveText("••••••");
-        expect(await page.content()).not.toContain(CLAVE_5);
-
-        // Editar: «•••••• · Mostrar · Cambiar»; «Cambiar» abre el campo.
+        // Editar: el mismo campo, relleno y editable, con su ojo.
         await red5.getByRole("button", { name: t.editar }).click();
         const edicion = red5.locator(".ajuste-edicion");
-        const cambiar = edicion.getByRole("button", { name: t.cambiar });
-        await expect(cambiar).toBeVisible();
-        await expect(edicion.getByRole("button", { name: t.mostrar })).toBeVisible();
-        await cambiar.click();
-        const campo = edicion.getByLabel(t.contrasena, { exact: true });
-        await expect(campo).toBeFocused();
-        await expect(campo).toHaveAttribute("type", "password");
-        await expect(campo).toHaveAttribute("autocomplete", "new-password");
-        await campo.fill("clave-de-prueba-2");
+        const editable = edicion.getByLabel(t.contrasena, { exact: true });
+        await expect(editable).toHaveValue(CLAVE_5);
+        await expect(editable).toHaveAttribute("type", "password");
+        await expect(editable).toHaveAttribute("autocomplete", "new-password");
+        await expect(editable).not.toHaveAttribute("readonly", "");
+        await editable.fill("clave-de-prueba-2");
         await edicion.getByRole("button", { name: t.ver }).click();
-        await expect(campo).toHaveAttribute("type", "text");
-        await sinDesbordamiento(page, `secreto en edición ${idioma} ${ancho}`);
-        await page.screenshot({ path: `capturas/secreto-edicion-${idioma}-${ancho}.png` });
-        // «Cancelar» lo deja como estaba: otra vez la máscara y «Cambiar».
+        await expect(editable).toHaveAttribute("type", "text");
+        await sinDesbordamiento(page, `secreto editando ${idioma} ${ancho}`);
+        await page.screenshot({ path: `capturas/secreto-editando-${idioma}-${ancho}.png` });
+        // «Cancelar» lo deja como estaba.
         await red5.getByRole("button", { name: t.cancelar }).click();
         await red5.getByRole("button", { name: t.editar }).click();
-        await expect(edicion.getByRole("button", { name: t.cambiar })).toBeVisible();
-        await expect(edicion.getByLabel(t.contrasena, { exact: true })).toHaveCount(0);
+        await expect(edicion.getByLabel(t.contrasena, { exact: true })).toHaveValue(CLAVE_5);
         await red5.getByRole("button", { name: t.cancelar }).click();
 
-        // Teléfono: la contraseña de la línea (el router no deja leerla) está
-        // abierta al editar y se pide al guardar; sin ella, nada se envía.
+        // Al salir de la página, el valor ya no está en ella.
+        await page.goto("/ajustes/puertos");
+        await asentar(page);
+        expect(await page.content()).not.toContain(CLAVE_5);
+
+        // Teléfono: la clave que el router no deja leer sale vacía, con su
+        // motivo, y se pide al guardar.
         await page.goto("/ajustes/telefono");
         await asentar(page);
         const linea = tarjeta(page, t.linea);
+        const resumen = linea.locator(".ajuste-resumen .ajuste-fila").filter({ hasText: t.lineaClave });
+        await expect(resumen.locator("input.secreto-valor")).toHaveValue("");
+        await expect(resumen.locator("input.secreto-valor")).toHaveAttribute("placeholder", t.sinLeer);
         await linea.getByRole("button", { name: t.editar }).click();
         const lineaEdicion = linea.locator(".ajuste-edicion");
         const lineaClave = lineaEdicion.getByLabel(t.lineaClave, { exact: true });
-        await expect(lineaClave).toBeVisible();
-        await expect(lineaEdicion.getByRole("button", { name: t.mostrar })).toHaveCount(0);
+        await expect(lineaClave).toHaveValue("");
         await lineaEdicion.getByRole("switch", { name: t.lineaActiva }).click();
         let preparados = 0;
         page.on("request", (r) => {
@@ -405,46 +408,68 @@ for (const idioma of ["es", "en"] as const) {
         expect(preparados, "sin la clave no se pide nada al servidor").toBe(0);
         await sinDesbordamiento(page, `clave de la voz ${idioma} ${ancho}`);
         await page.screenshot({ path: `capturas/secreto-voz-${idioma}-${ancho}.png` });
-        await linea.getByRole("button", { name: t.cancelar }).click();
+        if (guardaLaVoz) {
+          // Con la clave escrita (y la línea como estaba), se guarda.
+          await lineaEdicion.getByRole("switch", { name: t.lineaActiva }).click();
+          await lineaClave.fill("clave-de-prueba-voz");
+          await lineaEdicion.getByRole("button", { name: t.guardar }).click();
+          const dialogo = page.locator("dialog[open]");
+          await dialogo.getByRole("button", { name: t.aplicar }).click();
+          await expect(dialogo.getByText(t.hecho)).toBeVisible({ timeout: 90_000 });
+          await dialogo.getByRole("button", { name: t.cerrar }).click();
+          // Sigue sin poder leerse: vacía otra vez.
+          await expect(
+            linea.locator(".ajuste-resumen .ajuste-fila").filter({ hasText: t.lineaClave }).locator("input"),
+          ).toHaveValue("");
+        } else {
+          await linea.getByRole("button", { name: t.cancelar }).click();
+        }
 
-        // Historial, en otra sesión (sin la ventana de reautenticación):
-        // «Mostrar el valor anterior» del paso que cambió la clave.
+        // Biblioteca: la celda secreta de una lectura, con el mismo ojo.
+        await page.goto("/explorador/wifi/cbGetWifiAccPt");
+        await asentar(page);
+        await page.locator("#lectura-1").fill("1");
+        await page.getByRole("button", { name: t.leer }).click();
+        const celda = page.locator(".resultado-lectura input.secreto-valor").first();
+        await expect(celda).toHaveAttribute("type", "password");
+        await expect(celda).not.toHaveValue("");
+        await page.locator(".resultado-lectura").getByRole("button", { name: t.ver }).first().click();
+        await expect(celda).toHaveAttribute("type", "text");
+        await sinDesbordamiento(page, `biblioteca ${idioma} ${ancho}`);
+        await page.screenshot({ path: `capturas/secreto-biblioteca-${idioma}-${ancho}.png` });
+
+        // Historial: el cambio de la clave de 5 GHz, por su título; al
+        // desplegarlo, el valor anterior y el nuevo con el ojo, sin
+        // nombres de la API a la vista.
         let enCurso: number | null = null;
-        await entrar(page);
         if (conCambioEnCurso) enCurso = await cambiarUpnp(page);
         await page.goto("/historial");
         await asentar(page);
-        // (El botón está dentro del detalle plegado: se busca la lista.)
-        const cambio = page.locator("li.hist-cambio", { has: page.locator("ul.hist-anteriores") });
+        // El de la clave (en la pasada completa hay otros de esta red: el nombre).
+        const cambio = page
+          .locator("li.hist-cambio")
+          .filter({ hasText: t.red5 })
+          .filter({ hasText: t.contrasena });
         await expect(cambio).toHaveCount(1);
-        // En la hora: el centro del resumen puede caer en el enlace a la función.
         await cambio.locator("summary.hist-cabeza .hist-hora").click();
-        const anterior = cambio.locator(".hist-anteriores li");
-        await expect(anterior).toContainText(t.contrasena);
-        await expect(anterior.locator(".secreto")).toHaveText("••••••");
-        await sinDesbordamiento(page, `historial con el valor anterior ${idioma} ${ancho}`);
-        await page.screenshot({ path: `capturas/secreto-historial-${idioma}-${ancho}.png`, fullPage: true });
-        await anterior.getByRole("button", { name: t.anterior }).click();
-        await expect(dialogo.locator("h2")).toHaveText(t.reautenticar);
-        await dialogo.locator("#reautenticar-contrasena").fill(CONTRASENA);
-        // Con un cambio en curso, el Historial se refresca mientras el
-        // diálogo sigue abierto.
-        if (conCambioEnCurso) await page.waitForTimeout(4_500);
-        await dialogo.getByRole("button", { name: t.seguir }).click();
-        await expect(page.locator("dialog[open]")).toHaveCount(0);
-        const mostrado = anterior.locator(".revelado");
-        await expect(mostrado).toBeVisible();
-        await expect(mostrado).not.toHaveText(CLAVE_5);
+        const valores = cambio.locator(".hist-detalle input.secreto-valor");
+        await expect(valores).toHaveCount(2);
+        await expect(valores.nth(1)).toHaveValue(CLAVE_5);
+        await expect(valores.nth(0)).not.toHaveValue("");
+        await cambio.locator(".hist-detalle").getByRole("button", { name: t.ver }).nth(1).click();
+        await expect(valores.nth(1)).toHaveAttribute("type", "text");
+        const fuera = await cambio.locator(".hist-detalle > .tabla-scroll").innerText();
+        expect(fuera).toContain(t.contrasena);
+        expect(fuera).not.toMatch(/key_phrase|cbSet/);
+        await expect(cambio.locator("details.detalles-tecnicos > summary")).toHaveText(t.tecnico);
         if (conCambioEnCurso) {
-          // Aguanta los refrescos de 2 s.
+          // Aguanta los refrescos de 2 s del cambio en curso.
           await page.waitForTimeout(5_000);
-          await expect(mostrado).toBeVisible();
+          await expect(valores.nth(1)).toHaveAttribute("type", "text");
+          await expect(valores.nth(1)).toHaveValue(CLAVE_5);
         }
-        await page.screenshot({ path: `capturas/secreto-historial-mostrado-${idioma}-${ancho}.png`, fullPage: true });
-        // El revelado de Ajustes, con el ajuste y el campo (en lenguaje claro).
-        const revelados = page.locator("li.hist-revelado");
-        await expect(revelados.filter({ hasText: t.revelado }).first()).toBeVisible();
-        expect(await revelados.allInnerTexts()).not.toContainEqual(expect.stringMatching(/key_phrase|cbGet|cbSet/));
+        await sinDesbordamiento(page, `historial ${idioma} ${ancho}`);
+        await page.screenshot({ path: `capturas/secreto-historial-${idioma}-${ancho}.png`, fullPage: true });
         if (enCurso !== null) {
           // Lo deja como estaba: espera al primero y deshace con otro.
           await esperarFinal(page, enCurso);

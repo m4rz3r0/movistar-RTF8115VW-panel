@@ -1,5 +1,5 @@
 //! Diálogos modales: revisar y aplicar un cambio (también lo usa el
-//! historial para deshacer) y revelar un secreto.
+//! historial para deshacer).
 //!
 //! Son `<dialog>` nativos abiertos con `showModal()`: el resto de la página
 //! queda inerte (el foco no sale del diálogo), Esc lo cierra salvo mientras
@@ -29,8 +29,12 @@ pub(crate) fn abrir_modal(dlg: NodeRef<html::Dialog>) {
     });
 }
 
-fn valor(v: &Valor) -> AnyView {
+fn valor(v: &Valor, nombre: &str) -> AnyView {
     match v {
+        Valor::Clave(v) => view! {
+            <crate::ui::secreto::SecretoLeido valor=Some(v.clone()) nombre=nombre.to_owned() />
+        }
+        .into_any(),
         Valor::Texto(t) => view! { <span class="mono">{t.clone()}</span> }.into_any(),
         Valor::Secreto => view! {
             <span class="secreto">{MASCARA}</span>
@@ -49,24 +53,36 @@ fn valor(v: &Valor) -> AnyView {
     }
 }
 
-/// Tabla de un diff: campo (con su nombre técnico), antes y después. Los
-/// secretos van enmascarados y las opciones con su etiqueta.
+/// Tabla de un diff: campo (con su nombre técnico, salvo con
+/// `sin_nombres`: el Historial lo deja en sus detalles técnicos), antes y
+/// después. Los secretos van enmascarados o, con su valor
+/// ([`Valor::Clave`]), censurados con el ojo; las opciones, con su etiqueta.
 #[component]
-pub fn TablaDiff(campos: Vec<CampoCambio>) -> impl IntoView {
+pub fn TablaDiff(campos: Vec<CampoCambio>, #[prop(optional)] sin_nombres: bool) -> impl IntoView {
     if campos.is_empty() {
         return view! { <p class="pagina-sub">{t!("biblioteca-diff-vacio")}</p> }.into_any();
     }
     let filas = campos
         .iter()
         .map(|c| {
+            let campo = if sin_nombres {
+                view! { <span>{c.etiqueta.clone()}</span> }.into_any()
+            } else {
+                view! {
+                    <span lang="es">{c.etiqueta.clone()}</span>
+                    <span class="mono campo-nombre">{c.nombre.clone()}</span>
+                }
+                .into_any()
+            };
+            let (antes, despues) = (
+                t!("historial-valor-anterior", campo = c.etiqueta.clone()),
+                t!("historial-valor-nuevo", campo = c.etiqueta.clone()),
+            );
             view! {
                 <tr>
-                    <th scope="row">
-                        <span lang="es">{c.etiqueta.clone()}</span>
-                        <span class="mono campo-nombre">{c.nombre.clone()}</span>
-                    </th>
-                    <td>{valor(&c.antes)}</td>
-                    <td>{valor(&c.despues)}</td>
+                    <th scope="row">{campo}</th>
+                    <td>{valor(&c.antes, &antes)}</td>
+                    <td>{valor(&c.despues, &despues)}</td>
                 </tr>
             }
         })

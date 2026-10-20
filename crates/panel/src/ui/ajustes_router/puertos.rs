@@ -163,6 +163,7 @@ fn campo_propio(id: &str, tipo: TipoCampo, opcional: bool) -> CampoVista {
         opcional,
         solo_lectura: None,
         tapado: false,
+        valor_secreto: None,
         recomendado: None,
         motivo_recomendado: None,
         requiere: None,

@@ -12,11 +12,13 @@
 //!   de escrituras del cliente con que se lee ([`hgu::Client::escrituras`],
 //!   que cambia con cualquier escritura o reconfiguración). Si cualquiera de las dos cambió,
 //!   la entrada no vale (ni se guarda una lectura que empezó antes).
-//! - **Sin secretos en claro.** Se guarda (y se devuelve) la respuesta ya
-//!   enmascarada con la [`Mascara`]: las vistas nunca muestran un secreto
-//!   (son siempre «oculto»), así que lo enmascarado basta para pintarlas.
+//! - **Con los secretos, solo en memoria.** Desde la Tarea 11 las páginas
+//!   de Ajustes muestran el valor de sus secretos (censurado, con un ojo):
+//!   la respuesta se guarda tal cual la da el router, en memoria del
+//!   proceso y como mucho [`CADUCIDAD_LECTURAS`]. Nunca va a disco ni al
+//!   registro; quien la usa decide qué enseña (los secretos, solo en su
+//!   campo).
 
-use catalogo::mask::Mascara;
 use hgu::xml::XmlNode;
 use std::{
     collections::HashMap,
@@ -137,7 +139,7 @@ impl CacheLecturas {
         );
     }
 
-    /// Las lecturas `claves` para mostrar, ya enmascaradas: las guardadas
+    /// Las lecturas `claves` para mostrar, tal cual: las guardadas
     /// que aún valen y, en una sola tanda (un turno de `hgu`: nadie llama al
     /// router entre ellas), las que faltan. Las que fallan se registran (una
     /// vez cada una, aquí) y no se guardan.
@@ -151,7 +153,6 @@ impl CacheLecturas {
     pub async fn leer(
         &self,
         hgu: &hgu::Client,
-        mascara: &Mascara,
         claves: &[Clave],
     ) -> HashMap<Clave, Result<XmlNode, hgu::Error>> {
         let mut out = HashMap::new();
@@ -189,11 +190,10 @@ impl CacheLecturas {
                 .iter()
                 .map(|(k, v)| (k.as_str(), v.as_str()))
                 .collect();
-            let r = turno.call(&c.funcion, &params).await.map(|n| {
-                let n = mascara.enmascarar(&n);
-                self.guardar(hgu, generacion, c.clone(), n.clone());
-                n
-            });
+            let r = turno
+                .call(&c.funcion, &params)
+                .await
+                .inspect(|n| self.guardar(hgu, generacion, c.clone(), n.clone()));
             if let Err(e) = &r {
                 tracing::warn!("no se puede leer {}: {e}", c.funcion);
                 sin_router = matches!(e, hgu::Error::Network(_));

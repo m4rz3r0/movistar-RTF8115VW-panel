@@ -1,411 +1,118 @@
-//! Un secreto en pantalla ([`Secreto`]): la máscara con un botón pequeño
-//! para mostrarlo. Mostrarlo pide la contraseña del panel (salvo con la
-//! ventana de reautenticación abierta), lo deja a la vista
-//! [`VISIBLE`] con «Copiar» (si el navegador tiene portapapeles) y una
-//! cuenta atrás que solo leen los lectores de pantalla, y después lo borra
-//! de la señal y del DOM. El valor nunca va en el HTML del servidor: solo
-//! llega al pulsar, por una server function con `no-store`.
+//! Un secreto en pantalla ([`Secreto`]): un campo de contraseña ya relleno
+//! con su valor, censurado, y un botón con un ojo que lo muestra u oculta al
+//! instante. Por decisión del usuario (2026-10-18), el valor viaja con la
+//! página (que va con `no-store`), no se oculta solo y, si se puede
+//! escribir, se edita en el mismo campo.
 //!
-//! Lo usan la Biblioteca (un campo de una lectura), Ajustes (un campo de un
-//! ajuste) y el Historial (el valor anterior de un paso). La contraseña se
-//! pide con el diálogo de reautenticación de la página
-//! ([`Reautenticacion`]) si lo hay; si no (la Biblioteca), con
-//! [`DialogoRevelar`].
+//! Lo usan Ajustes (los campos de un ajuste, editables o no), la Biblioteca
+//! (una celda de una lectura) y el Historial (los valores de un cambio). Al
+//! salir de la página, el componente se libera y su valor con él.
 
 use crate::t;
-use crate::ui::explorador::{MASCARA, abrir_modal, texto_error};
-use crate::ui::panel_ajustes::Reautenticacion;
-use leptos::{ev::SubmitEvent, html, prelude::*, task::spawn_local};
-use std::time::Duration;
+use leptos::prelude::*;
 
-/// Tiempo que se ve un secreto mostrado.
-pub const VISIBLE: Duration = Duration::from_secs(30);
-
-/// Secreto que se quiere mostrar: de dónde se lee.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ObjetivoSecreto {
-    /// Un campo de una lectura de la Biblioteca (de la fila `instancia`).
-    Funcion {
-        funcion: String,
-        campo: String,
-        instancia: Option<String>,
-        params: Vec<(String, String)>,
-    },
-    /// El campo `campo` del ajuste `ajuste` (de su instancia, en una lista).
-    Ajuste {
-        ajuste: String,
-        campo: String,
-        instancia: Option<String>,
-    },
-    /// El valor anterior del parámetro `campo` del paso `orden` de un cambio.
-    Anterior {
-        cambio: i64,
-        orden: i64,
-        campo: String,
-    },
-}
-
-impl ObjetivoSecreto {
-    /// Pide el valor al servidor (con `contrasena` vacía, solo si la sesión
-    /// tiene abierta la ventana de reautenticación).
-    pub async fn revelar(self, contrasena: String) -> Result<String, ServerFnError> {
-        match self {
-            ObjetivoSecreto::Funcion {
-                funcion,
-                campo,
-                instancia,
-                params,
-            } => {
-                crate::ui::explorador::revelar(funcion, campo, instancia, params, contrasena).await
-            }
-            ObjetivoSecreto::Ajuste {
-                ajuste,
-                campo,
-                instancia,
-            } => crate::ajustes_router::revelar_ajuste(ajuste, campo, instancia, contrasena).await,
-            ObjetivoSecreto::Anterior {
-                cambio,
-                orden,
-                campo,
-            } => crate::ui::historial::revelar_anterior(cambio, orden, campo, contrasena).await,
-        }
-    }
-
-    /// Texto del botón.
-    fn boton(&self) -> String {
-        match self {
-            ObjetivoSecreto::Funcion { .. } => t!("biblioteca-revelar"),
-            ObjetivoSecreto::Ajuste { .. } => t!("secreto-mostrar"),
-            ObjetivoSecreto::Anterior { .. } => t!("historial-mostrar-anterior"),
-        }
-    }
-}
-
-/// ¿Puede la página escribir en el portapapeles? Solo en un contexto seguro
-/// (HTTPS o `localhost`); por HTTP en la red de casa no hay portapapeles.
-#[cfg(feature = "hydrate")]
-fn portapapeles() -> Option<leptos::wasm_bindgen::JsValue> {
-    use leptos::web_sys::js_sys::Reflect;
-    let w = window();
-    if !w.is_secure_context() {
-        return None;
-    }
-    let nav = Reflect::get(&w, &"navigator".into()).ok()?;
-    let c = Reflect::get(&nav, &"clipboard".into()).ok()?;
-    (!c.is_undefined() && !c.is_null()).then_some(c)
-}
-
-#[cfg(not(feature = "hydrate"))]
-fn portapapeles() -> Option<()> {
-    None
-}
-
-/// Copia `texto` al portapapeles y, si sale bien, marca `copiado`. Un fallo
-/// (sin permiso) no da error: el valor sigue a la vista para copiarlo a mano.
-#[cfg(feature = "hydrate")]
-fn copiar(texto: &str, copiado: RwSignal<bool>) {
-    use leptos::wasm_bindgen::{JsCast, JsValue, closure::Closure};
-    use leptos::web_sys::js_sys::{Function, Reflect};
-    let metodo = |objeto: &JsValue, nombre: &str| {
-        Reflect::get(objeto, &nombre.into())
-            .ok()
-            .and_then(|f| f.dyn_into::<Function>().ok())
-    };
-    let Some(c) = portapapeles() else {
-        return;
-    };
-    let Some(promesa) =
-        metodo(&c, "writeText").and_then(|f| f.call1(&c, &JsValue::from_str(texto)).ok())
-    else {
-        return;
-    };
-    let Some(entonces) = metodo(&promesa, "then") else {
-        return;
-    };
-    let bien = Closure::once_into_js(move |_: JsValue| {
-        copiado.try_set(true);
-    });
-    let mal = Closure::once_into_js(|_: JsValue| {});
-    let _ = entonces.call2(&promesa, &bien, &mal);
-}
-
-#[cfg(not(feature = "hydrate"))]
-fn copiar(_texto: &str, _copiado: RwSignal<bool>) {}
-
-/// La máscara de un secreto con su botón para mostrarlo; mostrado, el valor
-/// con «Copiar» y, pasado [`VISIBLE`], otra vez la máscara. `nombre` es lo
-/// que se muestra, para el lector de pantalla («Contraseña»).
+/// El ojo dice lo que hace el botón, como es costumbre: abierto si la clave
+/// está censurada («mostrar»), tachado si está a la vista («ocultar»).
+/// Decorativo: el nombre lo da el botón.
 #[component]
-pub fn Secreto(objetivo: ObjetivoSecreto, #[prop(into)] nombre: String) -> impl IntoView {
-    let valor = RwSignal::new(None::<String>);
-    let restante = RwSignal::new(0u64);
-    let copiado = RwSignal::new(false);
-    let error = RwSignal::new(None::<String>);
-    let pidiendo = RwSignal::new(false);
-    let pide_contrasena = RwSignal::new(false);
-    let intervalo: StoredValue<Option<IntervalHandle>> = StoredValue::new(None);
-    let reauth = use_context::<Reautenticacion>();
-    let boton = objetivo.boton();
-    let o = StoredValue::new(objetivo);
-
-    // Vuelve a la máscara: el valor sale de la señal (y así del DOM).
-    let ocultar = move || {
-        if let Some(Some(h)) = intervalo.try_update_value(Option::take) {
-            h.clear();
-        }
-        valor.try_set(None);
-        restante.try_set(0);
-        copiado.try_set(false);
-    };
-    // La operación que espera a la reautenticación de la página (0: ninguna).
-    let pendiente = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
-    // Al desmontarse se cancela lo que quedó pendiente (el temporizador y la
-    // operación tras reautenticarse); escribir en las señales aquí volvería a
-    // pintar una vista que ya se está liberando.
-    {
-        let pendiente = pendiente.clone();
-        on_cleanup(move || {
-            if let Some(Some(h)) = intervalo.try_update_value(Option::take) {
-                h.clear();
-            }
-            let n = pendiente.swap(0, std::sync::atomic::Ordering::Relaxed);
-            if let (Some(r), true) = (reauth, n != 0) {
-                r.olvidar(n);
-            }
-        });
-    }
-    let mostrar = move |v: String| {
-        ocultar();
-        if valor.try_set(Some(v)).is_some() {
-            // La página ya no está: nada que mostrar.
-            return;
-        }
-        restante.try_set(VISIBLE.as_secs());
-        let paso = move || match restante.try_get_untracked() {
-            Some(r) if r > 1 => {
-                restante.try_set(r - 1);
-            }
-            _ => ocultar(),
-        };
-        if let Ok(h) = set_interval_with_handle(paso, Duration::from_secs(1)) {
-            intervalo.try_update_value(|i| *i = Some(h));
-        }
-    };
-    // Tras reautenticarse en el diálogo de la página: la ventana ya está
-    // abierta, sin contraseña.
-    let tras_reautenticar = Callback::new(move |()| {
-        let Some(obj) = o.try_get_value() else {
-            return;
-        };
-        pidiendo.try_set(true);
-        spawn_local(async move {
-            let r = obj.revelar(String::new()).await;
-            pidiendo.try_set(false);
-            match r {
-                Ok(v) => mostrar(v),
-                Err(e) => {
-                    error.try_set(Some(texto_error(&e)));
-                }
-            }
-        });
-    });
-    let pedir = move |_| {
-        if pidiendo.get_untracked() {
-            return;
-        }
-        error.set(None);
-        pidiendo.set(true);
-        let obj = o.get_value();
-        let pendiente = pendiente.clone();
-        spawn_local(async move {
-            let r = obj.revelar(String::new()).await;
-            pidiendo.try_set(false);
-            match (r, reauth) {
-                (Ok(v), _) => mostrar(v),
-                (Err(e), Some(r)) => {
-                    // Si ya no está (se desmontó mientras esperaba), nada.
-                    if valor.try_get_untracked().is_some()
-                        && let Some(n) = r.tratar(&e, error, tras_reautenticar)
-                    {
-                        pendiente.store(n, std::sync::atomic::Ordering::Relaxed);
-                    }
-                }
-                // Sin diálogo de la página (la Biblioteca): el suyo, que pide
-                // la contraseña y enseña el error.
-                (Err(_), None) => {
-                    pide_contrasena.try_set(true);
-                }
-            }
-        });
-    };
-
-    let lector = format!(" {nombre}");
-    let lector_copiar = lector.clone();
-    let dialogo = {
-        let nombre = nombre.clone();
-        move || {
-            pide_contrasena.get().then(|| {
-                view! {
-                    <DialogoRevelar
-                        objetivo=o.get_value()
-                        nombre=nombre.clone()
-                        on_cerrar=move |_| pide_contrasena.set(false)
-                        on_revelado=move |v: String| mostrar(v)
-                    />
-                }
-            })
-        }
-    };
-    let vista = move || match valor.get() {
-        Some(v) => {
-            let vacio = v.is_empty();
-            let texto = if vacio {
-                t!("secreto-vacio")
-            } else {
-                v.clone()
-            };
-            let copiar_boton = (portapapeles().is_some() && !vacio).then(|| {
-                let lector = lector_copiar.clone();
-                view! {
-                    <button
-                        class="boton-mini"
-                        type="button"
-                        on:click=move |_| copiar(&v, copiado)
-                    >
-                        {move || if copiado.get() { t!("secreto-copiado") } else { t!("secreto-copiar") }}
-                        <span class="solo-lector">{lector.clone()}</span>
-                    </button>
-                }
-            });
-            view! {
-                <span class="secreto-mostrado">
-                    <span class="mono revelado" class:ajuste-vacio=vacio>{texto}</span>
-                    {copiar_boton}
-                    <span class="solo-lector">
-                        {move || t!("secreto-cuenta", s = restante.get())}
-                    </span>
-                </span>
-            }
-            .into_any()
-        }
-        None => {
-            let lector = lector.clone();
-            let boton = boton.clone();
-            view! {
-                <span class="celda-secreta">
-                    <span class="secreto" aria-hidden="true">{MASCARA}</span>
-                    <span class="solo-lector">{t!("comun-valor-oculto")}</span>
-                    <button
-                        class="boton-mini"
-                        type="button"
-                        aria-disabled=move || pidiendo.get().then_some("true")
-                        on:click=pedir.clone()
-                    >
-                        {boton}
-                        <span class="solo-lector">{lector}</span>
-                    </button>
-                </span>
-            }
-            .into_any()
-        }
-    };
+fn IconoOjo(visible: Signal<bool>) -> impl IntoView {
     view! {
-        {vista}
-        {move || error.get().map(|e| view! { <span class="campo-error secreto-error" role="alert">{e}</span> })}
-        {dialogo}
-    }
-}
-
-/// Diálogo para mostrar un secreto cuando la página no tiene el de
-/// reautenticación (la Biblioteca): pide la contraseña del panel.
-#[component]
-fn DialogoRevelar(
-    objetivo: ObjetivoSecreto,
-    nombre: String,
-    #[prop(into)] on_cerrar: Callback<()>,
-    #[prop(into)] on_revelado: Callback<String>,
-) -> impl IntoView {
-    let dlg = NodeRef::<html::Dialog>::new();
-    abrir_modal(dlg);
-    let contrasena = RwSignal::new(String::new());
-    let error = RwSignal::new(None::<String>);
-    let pidiendo = RwSignal::new(false);
-    let objetivo = StoredValue::new(objetivo);
-
-    let enviar = move |ev: SubmitEvent| {
-        ev.prevent_default();
-        if pidiendo.get_untracked() {
-            return;
-        }
-        error.set(None);
-        pidiendo.set(true);
-        let o = objetivo.get_value();
-        let clave = contrasena.get_untracked();
-        spawn_local(async move {
-            match o.revelar(clave).await {
-                Ok(v) => {
-                    contrasena.try_set(String::new());
-                    on_revelado.run(v);
-                    if let Some(d) = dlg.get_untracked() {
-                        d.close();
-                    }
-                }
-                Err(e) => {
-                    contrasena.try_set(String::new());
-                    error.try_set(Some(texto_error(&e)));
-                }
-            }
-            pidiendo.try_set(false);
-        });
-    };
-    let cerrar = move |_| {
-        if let Some(d) = dlg.get_untracked() {
-            d.close();
-        }
-    };
-
-    view! {
-        <dialog
-            class="dialogo dialogo-estrecho"
-            node_ref=dlg
-            aria-labelledby="revelar-titulo"
-            aria-modal="true"
-            on:close=move |_| on_cerrar.run(())
+        <svg
+            class="icono icono-ojo"
+            viewBox="0 0 16 16"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+            focusable="false"
         >
-            <form class="dialogo-cuerpo" on:submit=enviar>
-                <header class="dialogo-cabecera">
-                    <h2 id="revelar-titulo">{t!("biblioteca-revelar-titulo")}</h2>
-                </header>
-                <p>
-                    {t!("biblioteca-revelar-para-ver")}
-                    " "
-                    <span class="mono">{nombre}</span>
-                    {t!("biblioteca-revelar-texto")}
-                </p>
-                <p class="campo">
-                    <label for="revelar-contrasena">{t!("biblioteca-contrasena-panel")}</label>
-                    <input
-                        id="revelar-contrasena"
-                        type="password"
-                        autocomplete="current-password"
-                        required
-                        autofocus
-                        prop:value=contrasena
-                        on:input=move |ev| contrasena.set(event_target_value(&ev))
-                    />
-                </p>
-                <p class="error-formulario" role="alert">
-                    {move || error.get()}
-                </p>
-                <div class="dialogo-pie">
-                    <button class="boton-sutil" type="button" on:click=cerrar>
-                        {t!("biblioteca-cancelar")}
-                    </button>
-                    <button class="boton" type="submit" disabled=move || pidiendo.get()>
-                        {move || if pidiendo.get() { t!("biblioteca-comprobando") } else { t!("biblioteca-revelar") }}
-                    </button>
-                </div>
-            </form>
-        </dialog>
+            <path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" />
+            <circle cx="8" cy="8" r="1.9" />
+            {move || visible.get().then(|| view! { <path d="M2.5 13.5l11-11" /> })}
+        </svg>
+    }
+}
+
+/// Campo de contraseña con su valor (`valor`) y el ojo. Con `editable`, se
+/// escribe en `valor` (el formulario lo envía si cambió); si no, es de solo
+/// lectura. `id` va en el `<input>` (para su `<label for>`); sin etiqueta
+/// visible, `nombre` es su nombre accesible. `vacio` es lo que se lee si no
+/// hay valor (el router no deja leerlo).
+#[component]
+pub fn Secreto(
+    valor: RwSignal<String>,
+    #[prop(into)] nombre: String,
+    #[prop(optional)] editable: bool,
+    #[prop(optional, into)] id: Option<String>,
+    #[prop(optional, into)] vacio: Option<String>,
+    #[prop(optional, into)] descrito: Option<String>,
+    #[prop(optional, into)] invalido: Signal<bool>,
+    #[prop(optional, into)] bloqueado: Signal<bool>,
+    #[prop(optional)] error: Option<RwSignal<Option<String>>>,
+) -> impl IntoView {
+    let visible = RwSignal::new(false);
+    // Sin `<label>` (una celda, una fila de la vista resumida), el nombre.
+    let etiqueta = id.is_none().then(|| nombre.clone());
+    let control = id.clone();
+    // `new-password`: el gestor de contraseñas del navegador no la rellena
+    // ni propone guardarla (es la del router, no la de este sitio).
+    let autocompletar = if editable { "new-password" } else { "off" };
+    view! {
+        <span class="secreto-campo">
+            <input
+                id=id
+                class="secreto-valor"
+                type=move || if visible.get() { "text" } else { "password" }
+                autocomplete=autocompletar
+                autocapitalize="none"
+                spellcheck="false"
+                readonly=!editable
+                aria-label=etiqueta
+                aria-describedby=descrito
+                aria-invalid=move || invalido.get().then_some("true")
+                placeholder=vacio
+                disabled=move || editable && bloqueado.get()
+                // El atributo, para el HTML del servidor; luego manda la
+                // propiedad (lo que se escribe).
+                value=valor.get_untracked()
+                prop:value=move || valor.get()
+                on:input=move |ev| {
+                    if editable {
+                        valor.set(event_target_value(&ev));
+                        if let Some(e) = error {
+                            e.set(None);
+                        }
+                    }
+                }
+            />
+            <button
+                class="boton-ojo"
+                type="button"
+                aria-controls=control
+                aria-pressed=move || visible.get().to_string()
+                aria-label=move || {
+                    if visible.get() { t!("secreto-ocultar") } else { t!("secreto-ver") }
+                }
+                on:click=move |_| visible.update(|v| *v = !*v)
+            >
+                <IconoOjo visible=visible.into() />
+            </button>
+        </span>
+    }
+}
+
+/// [`Secreto`] de solo lectura con el valor `valor` (`None`: el router no
+/// deja leerlo, y se dice).
+#[component]
+pub fn SecretoLeido(valor: Option<String>, #[prop(into)] nombre: String) -> impl IntoView {
+    let vacio = valor.is_none().then(|| t!("secreto-sin-leer"));
+    let valor = RwSignal::new(valor.unwrap_or_default());
+    match vacio {
+        Some(vacio) => view! { <Secreto valor nombre vacio /> }.into_any(),
+        None => view! { <Secreto valor nombre /> }.into_any(),
     }
 }

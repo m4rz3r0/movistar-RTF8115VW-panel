@@ -257,12 +257,17 @@ fn tabla_instancias(
             let celdas = f
                 .valores
                 .into_iter()
-                .map(|v| {
+                .zip(&i.columnas)
+                .map(|(v, columna)| {
                     let c = match v {
                         Valor::Texto(t) => t.into_any(),
                         Valor::Secreto => view! {
                             <span class="secreto">{MASCARA}</span>
                             <span class="solo-lector">{t!("comun-valor-oculto")}</span>
+                        }
+                        .into_any(),
+                        Valor::Clave(v) => view! {
+                            <crate::ui::secreto::SecretoLeido valor=Some(v) nombre=columna.clone() />
                         }
                         .into_any(),
                         Valor::Ausente => view! { <span class="vacia">"—"</span> }.into_any(),

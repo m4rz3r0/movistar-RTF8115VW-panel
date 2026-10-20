@@ -249,7 +249,7 @@ pub(super) struct Compuesto {
 }
 
 /// ¿Es una máscara y no una clave? La del panel, o solo asteriscos o puntos.
-pub(super) fn enmascarado(v: &str) -> bool {
+pub(crate) fn enmascarado(v: &str) -> bool {
     let v = v.trim();
     !v.is_empty() && (v == MASCARA || v.chars().all(|c| matches!(c, '*' | '•' | '●')))
 }
@@ -455,6 +455,11 @@ pub(super) fn comparar(
         let Some(leido) = buscar(actual, &c.nombre) else {
             continue;
         };
+        // Uno que el router da tapado al leer no se puede comprobar: lo que
+        // lee no es su valor (cuentan los demás campos del paso).
+        if f.parametro(&c.nombre).is_some_and(|p| p.tapado) {
+            continue;
+        }
         comparados += 1;
         let esperado = match lado {
             Lado::Nuevo => &c.despues,
@@ -676,6 +681,38 @@ mod tests {
             assert_eq!(r.secretos_tapados, ["wep_key1_data"], "«{mascara}»");
         }
         assert!(enmascarado("****") && !enmascarado("") && !enmascarado("a***"));
+    }
+
+    /// Un secreto tapado al leer no se puede comprobar: tras escribirlo, el
+    /// router lo sigue dando vacío, y eso no es una diferencia.
+    #[test]
+    fn comprobar_no_mira_un_secreto_tapado() {
+        let c = cat();
+        let f = c.funcion("cbSetVoiceLine").unwrap();
+        let campo = |n: &str, a: &str, d: &str| Campo {
+            nombre: n.into(),
+            antes: a.into(),
+            despues: d.into(),
+            secreto: true,
+            leido: true,
+        };
+        let campos = [
+            campo("auth_password", "", "clave-de-prueba-1"),
+            Campo {
+                secreto: false,
+                ..campo("adm_state", "1", "0")
+            },
+        ];
+        let actual = mapa(&[("auth_password", ""), ("adm_state", "0")]);
+        assert_eq!(
+            comparar(f, &campos, &actual, Lado::Nuevo),
+            Comprobacion::Coincide(None)
+        );
+        // Solo ella: no hay nada que comprobar.
+        assert_eq!(
+            comparar(f, &campos[..1], &actual, Lado::Nuevo),
+            Comprobacion::Limitada
+        );
     }
 
     /// La reversión y el deshacer (`explicito`) no se bloquean nunca por un

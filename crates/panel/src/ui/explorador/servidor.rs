@@ -5,7 +5,6 @@
 
 use super::*;
 use crate::{
-    auth::{LoginError, User},
     changes::{CambioError, ChangeManager, ChangeRequest, Estado, buscar, identidad},
     state::AppState,
 };
@@ -293,9 +292,12 @@ impl Ocultar {
         self.mascara.oculta(nombre, valor) || self.catalogo.contains(&nombre.to_ascii_lowercase())
     }
 
+    /// Valor de una lectura: un secreto va con su valor, para el campo
+    /// censurado con el ojo (el XML crudo, que se lee como texto, va
+    /// enmascarado aparte).
     fn valor(&self, nombre: &str, valor: &str) -> Valor {
         if self.oculto(nombre, valor) {
-            Valor::Secreto
+            Valor::Clave(valor.to_owned())
         } else {
             Valor::Texto(valor.to_owned())
         }
@@ -867,133 +869,6 @@ pub async fn estado_cambio(state: &AppState, id: i64) -> Result<CambioVista, Ser
         nota: c.nota,
         restante_s,
     })
-}
-
-// ---- revelar
-
-async fn ip_cliente(state: &AppState) -> Result<std::net::IpAddr, ServerFnError> {
-    use axum::extract::ConnectInfo;
-    use std::net::SocketAddr;
-    let ConnectInfo(peer) = leptos_axum::extract::<ConnectInfo<SocketAddr>>().await?;
-    let headers: axum::http::HeaderMap = leptos_axum::extract().await?;
-    Ok(crate::auth::client_ip(
-        peer.ip(),
-        &headers,
-        &state.cfg.trusted_proxies,
-    ))
-}
-
-/// Valor en claro del campo `campo` de la lectura (de la fila `instancia`
-/// si se da).
-fn valor_de(f: &Funcion, r: &Respuesta, campo: &str, instancia: Option<&str>) -> Option<String> {
-    match (r, instancia) {
-        (Respuesta::Pagina(vars), None) => vars.get(campo).cloned(),
-        (Respuesta::Pagina(_), Some(_)) => None,
-        (Respuesta::Xml(n), None) => n
-            .children
-            .iter()
-            .find(|c| c.children.is_empty() && c.tag == campo)
-            .map(|c| c.text.clone()),
-        (Respuesta::Xml(n), Some(inst)) => {
-            // Las posiciones `#n` cuentan dentro de cada elemento, como en
-            // la vista.
-            let mut pos: BTreeMap<&str, usize> = BTreeMap::new();
-            for c in n.children.iter().filter(|c| !c.children.is_empty()) {
-                let i = pos.entry(c.tag.as_str()).or_default();
-                let mut campos = Vec::new();
-                aplanar(c, "", &mut campos);
-                let id = id_fila(&campos, id_lista(f), *i);
-                *i += 1;
-                if id == inst
-                    && let Some((_, v)) = campos.iter().find(|(k, _)| k == campo)
-                {
-                    return Some(v.text.clone());
-                }
-            }
-            None
-        }
-    }
-}
-
-/// Comprueba la contraseña del panel del usuario de la sesión antes de
-/// revelar, con el freno del login.
-async fn comprobar_contrasena(
-    state: &AppState,
-    user: &User,
-    contrasena: &str,
-) -> Result<(), ServerFnError> {
-    let ip = ip_cliente(state).await?;
-    match crate::auth::reauthenticate(state, ip, user, contrasena).await {
-        Ok(()) => Ok(()),
-        Err(LoginError::Throttled(s)) => Err(con_estado(
-            StatusCode::TOO_MANY_REQUESTS,
-            crate::t!("biblioteca-error-intentos", s = s),
-        )),
-        Err(LoginError::BadCredentials) => Err(con_estado(
-            StatusCode::FORBIDDEN,
-            crate::t!("biblioteca-error-contrasena"),
-        )),
-        Err(LoginError::Internal(e)) => Err(interno(e)),
-    }
-}
-
-/// Usuario que puede ver un secreto: con `contrasena` vacía, el de la sesión
-/// si tiene abierta la ventana de reautenticación (si no, 401 con
-/// [`crate::auth::ERROR_REAUTENTICACION`]); si no, `user` (el de la sesión)
-/// tras comprobar la contraseña con el freno del login, y se abre la ventana.
-pub(crate) async fn usuario_para_revelar(
-    state: &AppState,
-    user: User,
-    contrasena: &str,
-) -> Result<User, ServerFnError> {
-    if contrasena.is_empty() {
-        return crate::auth::require_reauth().await;
-    }
-    comprobar_contrasena(state, &user, contrasena).await?;
-    crate::auth::abrir_ventana_de_reautenticacion().await?;
-    Ok(user)
-}
-
-pub async fn revelar(
-    state: &AppState,
-    user: &User,
-    nombre: &str,
-    campo: &str,
-    instancia: Option<&str>,
-    params: &[(String, String)],
-    contrasena: Option<&str>,
-) -> Result<String, ServerFnError> {
-    let f = funcion(state, nombre)?;
-    if let Some(contrasena) = contrasena {
-        comprobar_contrasena(state, user, contrasena).await?;
-        crate::auth::abrir_ventana_de_reautenticacion().await?;
-    }
-    let r = ejecutar(state, f, params).await?;
-    let valor = valor_de(f, &r, campo, instancia).ok_or_else(|| {
-        con_estado(
-            StatusCode::NOT_FOUND,
-            crate::t!("biblioteca-error-campo-desaparecido", campo = campo),
-        )
-    })?;
-    sqlx::query(
-        "INSERT INTO reveals (ts, user_id, funcion, campo, instancia) VALUES (?, ?, ?, ?, ?)",
-    )
-    .bind(crate::series::now())
-    .bind(user.id)
-    .bind(&f.name)
-    .bind(campo)
-    .bind(instancia)
-    .execute(&state.db)
-    .await
-    .map_err(interno)?;
-    tracing::info!(
-        usuario = %user.username,
-        funcion = %f.name,
-        campo,
-        instancia = instancia.unwrap_or("-"),
-        "valor secreto revelado"
-    );
-    Ok(valor)
 }
 
 #[cfg(test)]

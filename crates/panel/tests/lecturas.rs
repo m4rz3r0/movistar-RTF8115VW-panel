@@ -330,7 +330,7 @@ async fn sin_respuesta_del_router_la_tanda_se_corta() {
     let k = claves(&["cbGetUpnpCfg", "cbGetNatConfig", "cbGetNatPortMapping"]);
     p.sim.control.set_unresponsive(true);
     let inicio = std::time::Instant::now();
-    let r = cache.leer(&c, &p.state.mascara, &k).await;
+    let r = cache.leer(&c, &k).await;
     let tardo = inicio.elapsed();
     p.sim.control.set_unresponsive(false);
     assert!(
@@ -360,7 +360,7 @@ async fn un_error_de_la_funcion_no_corta_la_tanda() {
     let c = cliente(&p, Duration::from_secs(5));
     let cache = CacheLecturas::new(CADUCIDAD_LECTURAS);
     let k = claves(&["cbGetNoExiste", "cbGetUpnpCfg"]);
-    let r = cache.leer(&c, &p.state.mascara, &k).await;
+    let r = cache.leer(&c, &k).await;
     assert!(
         matches!(&r[&k[0]], Err(hgu::Error::CallFailed { .. })),
         "{:?}",
@@ -441,8 +441,8 @@ async fn escritura_mientras_la_tanda_espera_el_turno() {
         tokio::task::yield_now().await;
     }
     let tanda = {
-        let (c, cache, mascara, k) = (c.clone(), cache.clone(), p.state.mascara.clone(), k.clone());
-        tokio::spawn(async move { cache.leer(&c, &mascara, &k).await })
+        let (c, cache, k) = (c.clone(), cache.clone(), k.clone());
+        tokio::spawn(async move { cache.leer(&c, &k).await })
     };
     for _ in 0..10 {
         tokio::task::yield_now().await;
@@ -452,7 +452,7 @@ async fn escritura_mientras_la_tanda_espera_el_turno() {
     let r = tanda.await.unwrap();
     assert!(r[&k[0]].is_ok());
     let antes = p.sim.control.reads().len();
-    cache.leer(&c, &p.state.mascara, &k).await;
+    cache.leer(&c, &k).await;
     assert_eq!(
         lecturas_desde(&p, antes).len(),
         1,
@@ -479,7 +479,7 @@ async fn ip_mostrada(p: &Panel, id: &str) -> String {
     let r = p
         .state
         .lecturas
-        .leer(&p.state.hgu, &p.state.mascara, std::slice::from_ref(&clave))
+        .leer(&p.state.hgu, std::slice::from_ref(&clave))
         .await;
     let n = r[&clave].as_ref().unwrap();
     hgu::models::StaticLease::parse_all(n)

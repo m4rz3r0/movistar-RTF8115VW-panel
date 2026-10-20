@@ -111,31 +111,6 @@ async fn llamada(p: &Panel, nombre: &str, cuerpo: Value, cookie: &str) -> (u16, 
     (status, cache, body_text(resp).await)
 }
 
-fn mostrar(ajuste: &str, campo: &str, contrasena: &str) -> Value {
-    json!({ "ajuste": ajuste, "campo": campo, "instancia": null, "contrasena": contrasena })
-}
-
-/// Filas de `reveals`: (ajuste, campo, cambio_id, funcion).
-async fn revelados(p: &Panel) -> Vec<(Option<String>, String, Option<i64>, String)> {
-    sqlx::query_as("SELECT ajuste, campo, cambio_id, funcion FROM reveals ORDER BY id")
-        .fetch_all(&p.state.db)
-        .await
-        .unwrap()
-}
-
-/// Todo lo que guarda `reveals`, junto.
-async fn todo_reveals(p: &Panel) -> String {
-    let filas: Vec<String> = sqlx::query_scalar(
-        "SELECT COALESCE(funcion,'') || '|' || COALESCE(campo,'') || '|' || \
-         COALESCE(instancia,'') || '|' || COALESCE(ajuste,'') || '|' || \
-         COALESCE(CAST(cambio_id AS TEXT),'') FROM reveals",
-    )
-    .fetch_all(&p.state.db)
-    .await
-    .unwrap();
-    filas.join("\n")
-}
-
 /// Prepara el ajuste con `valores`: estado y cuerpo.
 async fn preparar(p: &Panel, cookie: &str, ajuste: &str, valores: Value) -> (u16, String) {
     llamar(
@@ -195,133 +170,6 @@ async fn html(p: &Panel, cookie: &str, ruta: &str) -> String {
     .await;
     assert_eq!(resp.status(), 200, "{ruta}");
     body_text(resp).await
-}
-
-#[tokio::test]
-async fn mostrar_sin_reautenticacion_401() {
-    let (p, cookie) = panel_con_gestor().await;
-    escribir_punto(&p, "1", &[("key_phrase", CLAVE_1)]).await;
-    let (status, cache, body) = llamada(
-        &p,
-        "revelar_ajuste",
-        mostrar("wifi.red_5", "contrasena", ""),
-        &cookie,
-    )
-    .await;
-    assert_eq!(status, 401, "{body}");
-    assert_eq!(cache, "no-store");
-    assert!(body.contains(panel::auth::ERROR_REAUTENTICACION), "{body}");
-    assert!(!body.contains(CLAVE_1));
-    assert!(revelados(&p).await.is_empty());
-    // Sin sesión, tampoco.
-    let (status, _) = llamar(
-        &p,
-        "revelar_ajuste",
-        mostrar("wifi.red_5", "contrasena", PANEL_PASS),
-        None,
-    )
-    .await;
-    assert_eq!(status, 401);
-}
-
-#[tokio::test]
-async fn mostrar_con_reautenticacion_no_store_y_registro() {
-    let (p, cookie) = panel_con_gestor().await;
-    escribir_punto(&p, "1", &[("key_phrase", CLAVE_1)]).await;
-    let registro = registro_global();
-    let (status, cache, body) = llamada(
-        &p,
-        "revelar_ajuste",
-        mostrar("wifi.red_5", "contrasena", PANEL_PASS),
-        &cookie,
-    )
-    .await;
-    assert_eq!(status, 200, "{body}");
-    assert_eq!(cache, "no-store");
-    assert_eq!(serde_json::from_str::<String>(&body).unwrap(), CLAVE_1);
-    let filas = revelados(&p).await;
-    assert_eq!(filas.len(), 1, "{filas:?}");
-    assert_eq!(filas[0].0.as_deref(), Some("wifi.red_5"));
-    assert_eq!(filas[0].1, "contrasena");
-    assert_eq!(filas[0].2, None);
-    assert!(!todo_reveals(&p).await.contains(CLAVE_1));
-
-    // Con la ventana abierta no vuelve a pedirla, y no sale de la caché de
-    // lecturas: tras leer el tema y cambiar la clave en el router, enseña la
-    // nueva.
-    ok(&p, "leer_tema", json!({ "tema": "wifi" }), &cookie).await;
-    escribir_punto(&p, "1", &[("key_phrase", CLAVE_2)]).await;
-    let (status, cache, body) = llamada(
-        &p,
-        "revelar_ajuste",
-        mostrar("wifi.red_5", "contrasena", ""),
-        &cookie,
-    )
-    .await;
-    assert_eq!(status, 200, "{body}");
-    assert_eq!(cache, "no-store");
-    assert_eq!(serde_json::from_str::<String>(&body).unwrap(), CLAVE_2);
-    assert_eq!(revelados(&p).await.len(), 2, "cada «Mostrar» se anota");
-
-    // Ni el registro ni `reveals` guardan el valor.
-    let texto = registro.texto();
-    assert!(texto.contains("wifi.red_5"), "{texto}");
-    assert!(
-        !texto.contains(CLAVE_1) && !texto.contains(CLAVE_2),
-        "{texto}"
-    );
-    assert!(!todo_reveals(&p).await.contains(CLAVE_2));
-
-    // Un campo que no es secreto, o que no existe, no se «muestra».
-    for (ajuste, campo) in [("wifi.red_5", "nombre"), ("wifi.red_5", "no_existe")] {
-        let (status, _, body) =
-            llamada(&p, "revelar_ajuste", mostrar(ajuste, campo, ""), &cookie).await;
-        assert!(status == 400 || status == 404, "{campo}: {status} {body}");
-    }
-    let (status, _, _) = llamada(
-        &p,
-        "revelar_ajuste",
-        mostrar("wifi.no_existe", "contrasena", ""),
-        &cookie,
-    )
-    .await;
-    assert_eq!(status, 404);
-    assert_eq!(revelados(&p).await.len(), 2);
-}
-
-#[tokio::test]
-async fn mostrar_con_contrasena_mala_frena_como_el_login() {
-    let (p, cookie) = panel_con_gestor().await;
-    escribir_punto(&p, "1", &[("key_phrase", CLAVE_1)]).await;
-    let (status, _, body) = llamada(
-        &p,
-        "revelar_ajuste",
-        mostrar("wifi.red_5", "contrasena", "mala"),
-        &cookie,
-    )
-    .await;
-    assert_eq!(status, 403, "{body}");
-    assert!(!body.contains(CLAVE_1));
-    // El freno del login: justo después, ni con la buena.
-    let (status, _, body) = llamada(
-        &p,
-        "revelar_ajuste",
-        mostrar("wifi.red_5", "contrasena", PANEL_PASS),
-        &cookie,
-    )
-    .await;
-    assert_eq!(status, 429, "{body}");
-    assert!(!body.contains(CLAVE_1));
-    assert!(revelados(&p).await.is_empty());
-    tokio::time::sleep(Duration::from_millis(1100)).await;
-    let v = ok(
-        &p,
-        "revelar_ajuste",
-        mostrar("wifi.red_5", "contrasena", PANEL_PASS),
-        &cookie,
-    )
-    .await;
-    assert_eq!(v, CLAVE_1);
 }
 
 #[tokio::test]
@@ -428,7 +276,7 @@ solo_lectura = "ajuste-puertos-alg-motivo"
         1,
         "solo la escritura de la prueba"
     );
-    // Lo que la página necesita: el motivo, y «Mostrar» sí funciona.
+    // Lo que la página necesita: el motivo, y el valor para el ojo.
     let tema = ok(&p, "leer_tema", json!({ "tema": "wifi" }), &cookie).await;
     let campo = tema["ajustes"][0]["campos"]
         .as_array()
@@ -438,151 +286,7 @@ solo_lectura = "ajuste-puertos-alg-motivo"
         .unwrap()
         .clone();
     assert_eq!(campo["solo_lectura"], "ajuste-puertos-alg-motivo");
-    let v = ok(
-        &p,
-        "revelar_ajuste",
-        mostrar("wifi.red_basica", "contrasena", PANEL_PASS),
-        &cookie,
-    )
-    .await;
-    assert_eq!(v, CLAVE_1);
-}
-
-#[tokio::test]
-async fn revelar_anterior_de_un_paso() {
-    let (p, cookie) = panel_con_gestor().await;
-    escribir_punto(&p, "1", &[("key_phrase", CLAVE_1)]).await;
-    let id = cambiar_clave_5(&p, &cookie, CLAVE_2).await;
-    let anterior = |contrasena: &str| json!({ "cambio": id, "orden": 0, "campo": "key_phrase", "contrasena": contrasena });
-    // Se exige reautenticación.
-    let (status, cache, body) = llamada(&p, "revelar_anterior", anterior(""), &cookie).await;
-    assert_eq!(status, 401, "{body}");
-    assert_eq!(cache, "no-store");
-    assert!(!body.contains(CLAVE_1));
-    let (status, cache, body) =
-        llamada(&p, "revelar_anterior", anterior(PANEL_PASS), &cookie).await;
-    assert_eq!(status, 200, "{body}");
-    assert_eq!(cache, "no-store");
-    assert_eq!(serde_json::from_str::<String>(&body).unwrap(), CLAVE_1);
-    let filas = revelados(&p).await;
-    assert_eq!(filas.len(), 1, "{filas:?}");
-    assert_eq!(filas[0].1, "key_phrase");
-    assert_eq!(filas[0].2, Some(id));
-    assert_eq!(filas[0].3, "cbSetWifiAccPt");
-    assert!(!todo_reveals(&p).await.contains(CLAVE_1));
-
-    // El Historial ofrece «Mostrar el valor anterior» en ese paso.
-    let h = ok(&p, "historial", json!({ "pagina": 1 }), &cookie).await;
-    let texto = h.to_string();
-    assert!(
-        !texto.contains(CLAVE_1) && !texto.contains(CLAVE_2),
-        "{texto}"
-    );
-    let fila = h["entradas"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find_map(|e| e.get("Cambio").filter(|c| c["id"] == id))
-        .unwrap_or_else(|| panic!("falta el cambio {id}: {h}"));
-    assert_eq!(
-        fila["anteriores"],
-        json!([[0, "key_phrase", "Contraseña"]]),
-        "{fila}"
-    );
-    // El revelado, con el cambio al que pertenece.
-    let revelado = h["entradas"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find_map(|e| e.get("Revelado"))
-        .unwrap();
-    assert_eq!(revelado["cambio"], id, "{revelado}");
-
-    // Un campo que no es secreto, otro paso o un cambio que no existe: nada.
-    for cuerpo in [
-        json!({ "cambio": id, "orden": 0, "campo": "ssid", "contrasena": "" }),
-        json!({ "cambio": id, "orden": 1, "campo": "key_phrase", "contrasena": "" }),
-        json!({ "cambio": id + 50, "orden": 0, "campo": "key_phrase", "contrasena": "" }),
-    ] {
-        let (status, _, body) = llamada(&p, "revelar_anterior", cuerpo.clone(), &cookie).await;
-        assert!(status == 400 || status == 404, "{cuerpo}: {status} {body}");
-    }
-    assert_eq!(revelados(&p).await.len(), 1);
-}
-
-/// El Historial muestra un revelado de Ajustes con el título del ajuste y
-/// el campo, sin la función.
-#[tokio::test]
-async fn historial_con_el_titulo_del_ajuste() {
-    let (p, cookie) = panel_con_gestor().await;
-    ok(
-        &p,
-        "revelar_ajuste",
-        mostrar("wifi.red_5", "contrasena", PANEL_PASS),
-        &cookie,
-    )
-    .await;
-    let h = ok(&p, "historial", json!({ "pagina": 1 }), &cookie).await;
-    let r = h["entradas"][0]["Revelado"].clone();
-    assert_eq!(r["ajuste"], "Red WiFi 5 GHz", "{r}");
-    assert_eq!(r["campo"], "Contraseña", "{r}");
-    assert_eq!(r["ruta"], Value::Null, "sin enlace a la función: {r}");
-    let pagina = html(&p, &cookie, "/historial").await;
-    let fila = &pagina[pagina.find("hist-revelado").expect("la fila")..];
-    let fila = &fila[..fila.find("</li>").unwrap()];
-    assert!(
-        fila.contains("Red WiFi 5 GHz") && fila.contains("Contraseña"),
-        "{fila}"
-    );
-    assert!(
-        !fila.contains("cbGetWifiAccPt") && !fila.contains("key_phrase"),
-        "{fila}"
-    );
-}
-
-#[tokio::test]
-async fn html_nunca_contiene_secretos() {
-    let (p, cookie) = panel_con_gestor().await;
-    escribir_punto(&p, "1", &[("key_phrase", CLAVE_1)]).await;
-    ok(
-        &p,
-        "revelar_ajuste",
-        mostrar("wifi.red_5", "contrasena", PANEL_PASS),
-        &cookie,
-    )
-    .await;
-    let id = cambiar_clave_5(&p, &cookie, CLAVE_2).await;
-    ok(
-        &p,
-        "revelar_anterior",
-        json!({ "cambio": id, "orden": 0, "campo": "key_phrase", "contrasena": "" }),
-        &cookie,
-    )
-    .await;
-    for ruta in ["/ajustes/wifi", "/historial"] {
-        let pagina = html(&p, &cookie, ruta).await;
-        assert!(!pagina.contains(CLAVE_1), "{ruta}: la clave vieja");
-        assert!(!pagina.contains(CLAVE_2), "{ruta}: la nueva");
-    }
-    // Tampoco lo que lee la página después.
-    let tema = ok(&p, "leer_tema", json!({ "tema": "wifi" }), &cookie)
-        .await
-        .to_string();
-    assert!(!tema.contains(CLAVE_1) && !tema.contains(CLAVE_2));
-    // Ni lo que se guarda en claro del cambio.
-    let claro: Vec<String> = sqlx::query_scalar(
-        "SELECT CAST(valores_anteriores AS TEXT) || CAST(valores_nuevos AS TEXT) || solicitud || diff \
-         FROM cambio_pasos",
-    )
-    .fetch_all(&p.state.db)
-    .await
-    .unwrap();
-    assert!(
-        claro
-            .iter()
-            .all(|c| !c.contains(CLAVE_1) && !c.contains(CLAVE_2)),
-        "{claro:?}"
-    );
+    assert_eq!(campo["valor_secreto"], CLAVE_1);
 }
 
 const CLAVE_3: &str = "clave-de-prueba-3";
@@ -597,6 +301,22 @@ async fn de_la_voz(p: &Panel, nombre: &str) -> String {
         .await
         .unwrap();
     elemento(&n, nombre).unwrap_or_default()
+}
+
+/// Campo `campo` del ajuste `ajuste` en la respuesta de `leer_tema`.
+fn campo_de(tema: &Value, ajuste: &str, campo: &str) -> Value {
+    tema["ajustes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| a["id"] == ajuste)
+        .unwrap_or_else(|| panic!("falta {ajuste}"))["campos"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["id"] == campo)
+        .unwrap_or_else(|| panic!("falta {ajuste}.{campo}"))
+        .clone()
 }
 
 /// Última escritura de `funcion` en el simulador.
@@ -618,19 +338,10 @@ async fn voz_con_la_clave_escrita_se_guarda() {
     let (p, cookie) = panel_con_gestor().await;
     assert_eq!(de_la_voz(&p, "auth_password").await, "");
     let tema = ok(&p, "leer_tema", json!({ "tema": "telefono" }), &cookie).await;
-    let linea = tema["ajustes"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|a| a["id"] == "telefono.linea")
-        .unwrap();
-    let campo = linea["campos"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|c| c["id"] == "contrasena")
-        .unwrap();
+    let campo = campo_de(&tema, "telefono.linea", "contrasena");
     assert_eq!(campo["tapado"], true, "{campo}");
+    // El router no la deja leer: el campo sale vacío.
+    assert_eq!(campo["valor_secreto"], Value::Null, "{campo}");
     let (status, body) = preparar(
         &p,
         &cookie,
@@ -648,15 +359,8 @@ async fn voz_con_la_clave_escrita_se_guarda() {
         "va la escrita"
     );
     assert_eq!(de_la_voz(&p, "adm_state").await, "0");
-    // No hay nada que «Mostrar»: el router no la deja leer.
-    let (status, _) = llamar(
-        &p,
-        "revelar_ajuste",
-        mostrar("telefono.linea", "contrasena", PANEL_PASS),
-        Some(&cookie),
-    )
-    .await;
-    assert_eq!(status, 400);
+    // Como el router, el simulador sigue sin dejarla leer.
+    assert_eq!(de_la_voz(&p, "auth_password").await, "");
 }
 
 /// Sin escribirla, no se guarda: 400 junto al campo, con el motivo, y nada
@@ -748,7 +452,9 @@ async fn deshacer_la_voz_omite_la_clave_tapada() {
         "{enviado:?}"
     );
     assert_eq!(de_la_voz(&p, "adm_state").await, "1");
-    assert_eq!(de_la_voz(&p, "auth_password").await, CLAVE_3, "no se vacía");
+    // El simulador, como el router, la da vacía al leerla: lo que cuenta es
+    // que el deshacer no ha escrito ninguna (ni vacía).
+    assert_eq!(de_la_voz(&p, "auth_password").await, "");
 }
 
 /// La reversión automática (la WAN cae mientras se vigila) tampoco se
@@ -820,110 +526,247 @@ async fn clave_tapada_no_se_reenvia() {
     assert_eq!(status, 200, "{body}");
 }
 
-/// El Historial de un valor anterior mostrado no enseña el parámetro: el
-/// título del ajuste y la etiqueta del campo, la misma que en Ajustes, en
-/// los dos idiomas. La lista de valores anteriores, igual.
+/// El valor de un secreto llega con la página (`leer_tema`, con `no-store`)
+/// para el campo censurado con el ojo, también después de cambiarlo en el
+/// router (sin la caché vieja). Ver un secreto ya no pide la contraseña ni
+/// anota nada; lo que el router no deja leer (enmascarado o tapado al leer)
+/// llega vacío.
 #[tokio::test]
-async fn historial_del_valor_anterior_sin_nombres_de_la_api() {
+async fn los_secretos_llegan_con_la_pagina() {
     let (p, cookie) = panel_con_gestor().await;
-    let id = cambiar_clave_5(&p, &cookie, CLAVE_2).await;
-    ok(
+    escribir_punto(&p, "1", &[("key_phrase", CLAVE_1)]).await;
+    let (status, cache, body) = llamada(&p, "leer_tema", json!({ "tema": "wifi" }), &cookie).await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(cache, "no-store");
+    let tema: Value = serde_json::from_str(&body).unwrap();
+    let c = campo_de(&tema, "wifi.red_5", "contrasena");
+    assert_eq!(c["valor"], "Secreto", "{c}");
+    assert_eq!(c["valor_secreto"], CLAVE_1, "{c}");
+    // Lo que no es secreto no lleva valor aparte.
+    assert_eq!(
+        campo_de(&tema, "wifi.red_5", "nombre")["valor_secreto"],
+        Value::Null
+    );
+    // Uno que el router da enmascarado no es su valor: vacío.
+    escribir_punto(&p, "1", &[("key_phrase", "********")]).await;
+    p.state.lecturas.invalidar();
+    let tema = ok(&p, "leer_tema", json!({ "tema": "wifi" }), &cookie).await;
+    assert_eq!(
+        campo_de(&tema, "wifi.red_5", "contrasena")["valor_secreto"],
+        Value::Null
+    );
+    let filas: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM reveals")
+        .fetch_one(&p.state.db)
+        .await
+        .unwrap();
+    assert_eq!(filas, 0, "ver un secreto ya no se anota");
+    // Las server functions para revelar ya no existen.
+    for f in ["revelar_ajuste", "revelar_anterior", "revelar"] {
+        let (status, _) = llamar(&p, f, json!({}), Some(&cookie)).await;
+        assert_eq!(status, 404, "{f}");
+    }
+}
+
+/// Un secreto que llega igual que lo leído no es un cambio: el resumen solo
+/// enseña lo que cambia y, solo, no hay nada que guardar.
+#[tokio::test]
+async fn secreto_sin_cambiar_no_se_envia() {
+    let (p, cookie) = panel_con_gestor().await;
+    escribir_punto(&p, "1", &[("key_phrase", CLAVE_1)]).await;
+    let (status, body) = preparar(
         &p,
-        "revelar_anterior",
-        json!({ "cambio": id, "orden": 0, "campo": "key_phrase", "contrasena": PANEL_PASS }),
         &cookie,
+        "wifi.red_5",
+        json!({ "nombre": "otra-red", "contrasena": CLAVE_1 }),
     )
     .await;
+    assert_eq!(status, 200, "{body}");
+    let g: Value = serde_json::from_str(&body).unwrap();
+    let campos = cambios(&g);
+    assert_eq!(campos.len(), 1, "{g}");
+    assert_eq!(campos[0]["campo"], "ajuste-wifi-red_5-nombre");
+    let (status, body) =
+        preparar(&p, &cookie, "wifi.red_5", json!({ "contrasena": CLAVE_1 })).await;
+    assert_eq!(status, 409, "{body}");
+}
+
+/// Solo las páginas que enseñan secretos los llevan, y solo en el `value`
+/// del campo (y en los datos de la página): nunca como texto a la vista. El
+/// resto (Inicio, el Historial plegado, la Biblioteca sin abrir) no los
+/// lleva, y nunca se guardan en claro.
+#[tokio::test]
+async fn secretos_solo_en_el_campo_de_las_paginas_que_los_muestran() {
+    let (p, cookie) = panel_con_gestor().await;
+    escribir_punto(&p, "1", &[("key_phrase", CLAVE_1)]).await;
+    cambiar_clave_5(&p, &cookie, CLAVE_2).await;
+    let wifi = html(&p, &cookie, "/ajustes/wifi").await;
+    assert!(
+        wifi.contains(CLAVE_2),
+        "la página de la WiFi lleva la clave"
+    );
+    let (fuera, _) = partir(&wifi, "<script", "</script>");
+    let visible = texto_visible(&fuera);
+    assert!(!visible.contains(CLAVE_2), "a la vista: {visible}");
+    let en_value = format!("value=\"{CLAVE_2}\"");
+    assert_eq!(
+        fuera.matches(CLAVE_2).count(),
+        fuera.matches(&en_value).count(),
+        "solo en el value del campo"
+    );
+    for ruta in ["/", "/historial", "/explorador", "/ajustes/puertos"] {
+        let pagina = html(&p, &cookie, ruta).await;
+        assert!(!pagina.contains(CLAVE_1), "{ruta}: la clave vieja");
+        assert!(!pagina.contains(CLAVE_2), "{ruta}: la nueva");
+    }
+    let claro: Vec<String> = sqlx::query_scalar(
+        "SELECT CAST(valores_anteriores AS TEXT) || CAST(valores_nuevos AS TEXT) || solicitud || diff \
+         FROM cambio_pasos",
+    )
+    .fetch_all(&p.state.db)
+    .await
+    .unwrap();
+    assert!(
+        claro
+            .iter()
+            .all(|c| !c.contains(CLAVE_1) && !c.contains(CLAVE_2)),
+        "{claro:?}"
+    );
+    // Ni en el registro.
+    let texto = registro_global().texto();
+    assert!(
+        !texto.contains(CLAVE_1) && !texto.contains(CLAVE_2),
+        "{texto}"
+    );
+}
+
+/// El detalle de un cambio del Historial trae, al desplegarlo, el valor
+/// anterior y el nuevo de cada secreto (descifrados solo para ese cambio,
+/// con `no-store`); la lista del Historial no los trae nunca.
+#[tokio::test]
+async fn detalle_de_un_cambio_con_sus_secretos() {
+    let (p, cookie) = panel_con_gestor().await;
+    escribir_punto(&p, "1", &[("key_phrase", CLAVE_1)]).await;
+    let id = cambiar_clave_5(&p, &cookie, CLAVE_2).await;
+    let h = ok(&p, "historial", json!({ "pagina": 1 }), &cookie)
+        .await
+        .to_string();
+    assert!(!h.contains(CLAVE_1) && !h.contains(CLAVE_2), "{h}");
+    let (status, cache, body) =
+        llamada(&p, "secretos_del_cambio", json!({ "cambio": id }), &cookie).await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(cache, "no-store");
+    let v: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(
+        v,
+        json!([{ "orden": 0, "nombre": "key_phrase", "antes": CLAVE_1, "despues": CLAVE_2 }]),
+        "{v}"
+    );
+    // Sin sesión, nada; un cambio que no existe, vacío.
+    let (status, _) = llamar(&p, "secretos_del_cambio", json!({ "cambio": id }), None).await;
+    assert_eq!(status, 401);
+    assert_eq!(
+        ok(
+            &p,
+            "secretos_del_cambio",
+            json!({ "cambio": id + 50 }),
+            &cookie
+        )
+        .await,
+        json!([])
+    );
+    let filas: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM reveals")
+        .fetch_one(&p.state.db)
+        .await
+        .unwrap();
+    assert_eq!(filas, 0);
+}
+
+/// La tabla de diferencias del Historial no enseña parámetros de la API: de
+/// un cambio hecho desde Ajustes, la etiqueta del campo (la de Ajustes) en
+/// los dos idiomas; de uno de la Biblioteca, el nombre técnico solo dentro
+/// de los detalles técnicos plegados.
+#[tokio::test]
+async fn historial_con_las_etiquetas_de_ajustes() {
+    let (p, cookie) = panel_con_gestor().await;
+    let id = cambiar_clave_5(&p, &cookie, CLAVE_2).await;
     for (idioma, ajuste, campo) in [
         ("es", "Red WiFi 5 GHz", "Contraseña"),
         ("en", "5 GHz WiFi network", "Password"),
     ] {
         let con_idioma = format!("{cookie}; rp_lang={idioma}");
         let h = ok(&p, "historial", json!({ "pagina": 1 }), &con_idioma).await;
-        let r = h["entradas"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find_map(|e| e.get("Revelado").filter(|r| r["cambio"] == id))
-            .unwrap_or_else(|| panic!("falta el revelado: {h}"));
-        assert_eq!(r["campo"], campo, "{idioma}: {r}");
-        assert_eq!(r["ajuste"], ajuste, "{idioma}: {r}");
         let c = h["entradas"]
             .as_array()
             .unwrap()
             .iter()
             .find_map(|e| e.get("Cambio").filter(|c| c["id"] == id))
             .unwrap();
-        assert_eq!(
-            c["anteriores"],
-            json!([[0, "key_phrase", campo]]),
-            "{idioma}: {c}"
-        );
+        assert_eq!(c["campos"][0]["etiqueta"], campo, "{idioma}: {c}");
+        assert_eq!(c["titulo"], ajuste, "{idioma}: {c}");
         let pagina = html(&p, &con_idioma, "/historial").await;
-        let fila = &pagina[pagina.find("hist-revelado").expect("la fila")..];
-        let fila = &fila[..fila.find("</li>").unwrap()];
+        let fila = &pagina[pagina
+            .find(&format!("id=\"cambio-{id}\""))
+            .expect("la fila")..];
+        let fila = &fila[..fila
+            .find("<li class=\"hist-entrada")
+            .unwrap_or(fila.find("</ol>").unwrap())];
+        let (fuera, _) = partir(fila, "<details class=\"detalles-tecnicos\"", "</details>");
+        let visible = texto_visible(&fuera);
         assert!(
-            fila.contains(ajuste) && fila.contains(campo),
-            "{idioma}: {fila}"
+            visible.contains(campo) && visible.contains(ajuste),
+            "{idioma}: {visible}"
         );
         assert!(
-            !fila.contains("key_phrase") && !fila.contains("cbSet"),
-            "{idioma}: {fila}"
-        );
-        let lista = &pagina[pagina.find("hist-anteriores").expect("la lista")..];
-        let lista = &lista[..lista.find("</ul>").unwrap()];
-        assert!(
-            lista.contains(campo) && !lista.contains("key_phrase"),
-            "{idioma}: {lista}"
+            !visible.contains("key_phrase") && !visible.contains("cbSet"),
+            "{idioma}: {visible}"
         );
     }
+    // Uno de la Biblioteca: el nombre técnico, solo en los detalles.
+    let (status, body) = llamar(
+        &p,
+        "preparar_cambio",
+        json!({ "peticion": { "funcion": "cbSetUpnpCfg", "instancia": null,
+                "valores": [["adm_state", "1"]], "borrar": false } }),
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    let prep: Value = serde_json::from_str(&body).unwrap();
+    let otro = ok(
+        &p,
+        "confirmar_cambio",
+        json!({ "token": prep["token"], "palabra": null }),
+        &cookie,
+    )
+    .await
+    .as_i64()
+    .unwrap();
+    esperar_final(&p, &cookie, otro).await;
+    let pagina = html(&p, &cookie, "/historial").await;
+    let fila = &pagina[pagina
+        .find(&format!("id=\"cambio-{otro}\""))
+        .expect("la fila")..];
+    let fila = &fila[..fila
+        .find("<li class=\"hist-entrada")
+        .unwrap_or(fila.find("</ol>").unwrap())];
+    let (fuera, tecnicos) = partir(fila, "<details class=\"detalles-tecnicos\"", "</details>");
+    assert!(!texto_visible(&fuera).contains("adm_state"), "{fuera}");
+    assert!(
+        tecnicos.iter().any(|t| t.contains("adm_state")),
+        "{tecnicos:?}"
+    );
 }
 
-/// Sin la ventana de reautenticación, `revelar_anterior` pide la contraseña
-/// antes de mirar (ni descifra ni dice si el cambio existe).
-#[tokio::test]
-async fn revelar_anterior_pide_la_contrasena_antes_de_descifrar() {
-    let (p, cookie) = panel_con_gestor().await;
-    let id = cambiar_clave_5(&p, &cookie, CLAVE_2).await;
-    for cambio in [id, id + 50] {
-        let (status, _, body) = llamada(
-            &p,
-            "revelar_anterior",
-            json!({ "cambio": cambio, "orden": 0, "campo": "key_phrase", "contrasena": "" }),
-            &cookie,
-        )
-        .await;
-        assert_eq!(status, 401, "{cambio}: {body}");
-    }
-}
-
-/// Una contraseña mala en el diálogo de reautenticación de Ajustes, en
-/// «Mostrar» o en «Revelar» de la Biblioteca cuenta para el mismo freno que
-/// el login.
+/// Una contraseña mala en el diálogo de reautenticación (la que se sigue
+/// pidiendo para la contraseña del router y para exportar) cuenta para el
+/// mismo freno que el login.
 #[tokio::test]
 async fn el_freno_es_el_mismo_que_el_del_login() {
     let (p, cookie) = panel_con_gestor().await;
-    let revelar = |contrasena: &str| {
-        json!({ "funcion": "cbGetWifiAccPt", "campo": "key_phrase", "instancia": null,
-                "params": [["dpm_cfg_wifi_acc_pt_id", "1"]], "contrasena": contrasena })
-    };
-    // Diálogo de Ajustes → «Revelar» de la Biblioteca.
     let (status, _) = llamar(
         &p,
         "reautenticar",
         json!({ "contrasena": "mala" }),
-        Some(&cookie),
-    )
-    .await;
-    assert_eq!(status, 403);
-    let (status, _) = llamar(&p, "revelar", revelar(PANEL_PASS), Some(&cookie)).await;
-    assert_eq!(status, 429);
-    tokio::time::sleep(Duration::from_millis(1100)).await;
-    // «Mostrar» de Ajustes → el login.
-    let (status, _) = llamar(
-        &p,
-        "revelar_ajuste",
-        mostrar("wifi.red_5", "contrasena", "mala"),
         Some(&cookie),
     )
     .await;
@@ -938,16 +781,38 @@ async fn el_freno_es_el_mismo_que_el_del_login() {
     )
     .await;
     assert_eq!(resp.status(), 429);
-    tokio::time::sleep(Duration::from_millis(2100)).await;
-    // «Revelar» de la Biblioteca → el diálogo de Ajustes.
-    let (status, _) = llamar(&p, "revelar", revelar("mala"), Some(&cookie)).await;
-    assert_eq!(status, 403);
-    let (status, _) = llamar(
-        &p,
-        "reautenticar",
-        json!({ "contrasena": PANEL_PASS }),
-        Some(&cookie),
-    )
-    .await;
-    assert_eq!(status, 429);
+}
+
+/// `html` sin los bloques `<abre …>…</cierra>` (sin anidar), y esos bloques.
+fn partir<'a>(html: &'a str, abre: &str, cierra: &str) -> (String, Vec<&'a str>) {
+    let mut fuera = String::new();
+    let mut dentro = Vec::new();
+    let mut resto = html;
+    while let Some(i) = resto.find(abre) {
+        fuera.push_str(&resto[..i]);
+        let fin = i + resto[i..].find(cierra).expect("bloque sin cerrar") + cierra.len();
+        dentro.push(&resto[i..fin]);
+        resto = &resto[fin..];
+    }
+    fuera.push_str(resto);
+    (fuera, dentro)
+}
+
+/// Texto que se lee en pantalla de un trozo de HTML: lo de fuera de las
+/// etiquetas (sin los atributos).
+fn texto_visible(html: &str) -> String {
+    let mut out = String::new();
+    let mut dentro = false;
+    for c in html.chars() {
+        match c {
+            '<' => dentro = true,
+            '>' => {
+                dentro = false;
+                out.push(' ');
+            }
+            _ if !dentro => out.push(c),
+            _ => {}
+        }
+    }
+    out
 }
