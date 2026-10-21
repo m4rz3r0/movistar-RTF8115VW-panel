@@ -47,9 +47,18 @@ pub fn safe_next(next: Option<&str>) -> &str {
 /// Inicia sesión. Devuelve la cookie de sesión en `Set-Cookie`; los errores
 /// son "usuario o contraseña incorrectos" (401) o "demasiados intentos" (429),
 /// sin distinguir si el usuario existe.
+///
+/// Sin JavaScript (el formulario enviado antes de hidratar o con el wasm
+/// roto, que piden `text/html`), redirige: si entra, a `next` (solo rutas
+/// locales, [`safe_next`]); si no, de vuelta a la página del formulario
+/// (con su `?next=`) y el error en la dirección, que la página muestra.
 #[server(endpoint = "login")]
-pub async fn login(usuario: String, contrasena: String) -> Result<(), ServerFnError> {
-    server::login_endpoint(usuario, contrasena).await
+pub async fn login(
+    usuario: String,
+    contrasena: String,
+    #[server(default)] next: Option<String>,
+) -> Result<(), ServerFnError> {
+    server::login_endpoint(usuario, contrasena, next).await
 }
 
 /// Cierra la sesión: borra la fila de la cookie (si la hay) y siempre
@@ -733,31 +742,56 @@ mod server {
         }
     }
 
+    /// ¿Lo envió un formulario HTML sin JavaScript? El navegador pide
+    /// `text/html`; el cliente de las server functions, no (el mismo
+    /// criterio que `server_fn` para redirigir).
+    fn sin_javascript(headers: &HeaderMap) -> bool {
+        headers
+            .get(header::ACCEPT)
+            .and_then(|v| v.to_str().ok())
+            .is_some_and(|v| v.contains("text/html"))
+    }
+
     pub(super) async fn login_endpoint(
         usuario: String,
         contrasena: String,
+        next: Option<String>,
     ) -> Result<(), ServerFnError> {
         let state = app_state()?;
         let ConnectInfo(peer) = leptos_axum::extract::<ConnectInfo<SocketAddr>>().await?;
         let headers: HeaderMap = leptos_axum::extract().await?;
         let ip = client_ip(peer.ip(), &headers, &state.cfg.trusted_proxies);
+        let sin_js = sin_javascript(&headers);
+        // Sin JavaScript, un error vuelve a la página del formulario con una
+        // redirección (`server_fn` pone la dirección: la de `Referer`, con
+        // el error); un 4xx dejaría al navegador en una página en blanco.
+        let estado = |s: StatusCode| if sin_js { StatusCode::SEE_OTHER } else { s };
         match attempt_login(&state, ip, &usuario, &contrasena).await {
             Ok(id) => {
                 if let Err(e) = delete_cookie_session(&state.db, &headers).await {
                     return internal(e);
                 }
                 set_cookie(&session_cookie(&id));
+                if sin_js {
+                    leptos_axum::redirect(super::safe_next(next.as_deref()));
+                }
                 Ok(())
             }
             Err(LoginError::Throttled(secs)) => fail(
-                StatusCode::TOO_MANY_REQUESTS,
+                estado(StatusCode::TOO_MANY_REQUESTS),
                 &crate::t!("login-error-intentos", s = secs),
             ),
             Err(LoginError::BadCredentials) => fail(
-                StatusCode::UNAUTHORIZED,
+                estado(StatusCode::UNAUTHORIZED),
                 &crate::t!("login-error-credenciales"),
             ),
-            Err(LoginError::Internal(e)) => internal(e),
+            Err(LoginError::Internal(e)) => {
+                eprintln!("panel: error interno en la autenticación: {e}");
+                fail(
+                    estado(StatusCode::INTERNAL_SERVER_ERROR),
+                    &crate::t!("comun-error-interno"),
+                )
+            }
         }
     }
 
@@ -948,7 +982,23 @@ mod server {
             }
         }
         if path == "/login" {
-            return next.run(req).await;
+            // Con una sesión vigente, el formulario no hace falta: a `next`
+            // (como al entrar).
+            return match user_from_headers(&state.db, req.headers()).await {
+                Ok(Some(_)) => {
+                    let destino = req.uri().query().and_then(|q| {
+                        form_urlencoded::parse(q.as_bytes())
+                            .find(|(k, _)| k == "next")
+                            .map(|(_, v)| v.into_owned())
+                    });
+                    Redirect::to(super::safe_next(destino.as_deref())).into_response()
+                }
+                Ok(None) => next.run(req).await,
+                Err(e) => {
+                    eprintln!("panel: error interno en la autenticación: {e}");
+                    StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                }
+            };
         }
         let (mut parts, body) = req.into_parts();
         match AuthUser::from_request_parts(&mut parts, &state).await {

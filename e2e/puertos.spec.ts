@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
+import { PLAZO_CAMBIO, plazoDeTest } from "./cambios";
 import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 
 // Puertos abiertos (/ajustes/puertos) a 360, 768, 1024, 1280 y 1440 px, en
@@ -13,7 +14,8 @@ import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 //   lo que cambia.
 //
 // Aplicar se hace en una sola combinación (inglés, 1440 px, la última):
-// cada aplicación se vigila 30 s. Se edita la regla de las fixtures (al
+// cada aplicación se vigila (30 s en producción; en el e2e,
+// RP_E2E_VIGILANCIA_S). Se edita la regla de las fixtures (al
 // puerto 8081), se abre el 8080 TCP a host-2, aparece en la lista, se
 // comprueba «Activa» con dos reglas, se borra y la regla de las fixtures
 // vuelve a su puerto. Las demás combinaciones abren el resumen y lo cancelan.
@@ -88,7 +90,7 @@ function sinApi(texto: string) {
 async function aplicar(page: Page, t: Textos) {
   const dialogo = page.locator("dialog[open]");
   await dialogo.getByRole("button", { name: t.aplicar }).click();
-  await expect(dialogo.getByText(t.hecho)).toBeVisible({ timeout: 120_000 });
+  await expect(dialogo.getByText(t.hecho)).toBeVisible({ timeout: PLAZO_CAMBIO });
   await dialogo.getByRole("button", { name: t.cerrar }).click();
   await expect(page.locator("dialog[open]")).toHaveCount(0);
 }
@@ -118,7 +120,8 @@ for (const idioma of ["es", "en"] as const) {
       });
 
       test("puertos abiertos", async ({ page }) => {
-        if (aplicaDeVerdad) test.setTimeout(480_000);
+        // Cuatro cambios: desc-1 a 8081, la regla nueva, borrarla y desc-1 a 8080.
+        if (aplicaDeVerdad) test.setTimeout(plazoDeTest(4));
         const t = textos[idioma];
         const errores = recogerErrores(page);
         await entrar(page);

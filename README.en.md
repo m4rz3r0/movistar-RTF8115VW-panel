@@ -185,10 +185,15 @@ cd e2e && npm ci && npx playwright test
 npx playwright test capturas-readme   # only if the README screenshots change
 ```
 
-The e2e run starts five panels, each with its own simulator
-(`e2e/instancias.ts`), on ports 3195–3199 and 8195–8199 (from `E2E_PORT` and
-`E2E_SIM_PORT`). It uses Playwright's Chromium (`npx playwright install
-chromium` if missing; or `E2E_CHROMIUM=<path>`).
+The e2e run spreads the files over `E2E_WORKERS` workers (by default, one
+per 3 CPU threads, between 1 and 2; 4 on a dedicated machine; at most 16;
+`E2E_WORKERS=1` runs them one after another). It starts one installed panel per worker and four freshly installed
+ones for the setup wizard, each with its own simulator (`e2e/instancias.ts`),
+on consecutive ports from `E2E_PORT` and `E2E_SIM_PORT` (3195 and 8195; with
+4 workers, 3195–3202 and 8195–8202). Each change is watched for 10 s instead
+of 30 s or 2 min (`RP_E2E_VIGILANCIA_S`, honoured only by the debug build).
+It uses Playwright's Chromium (`npx playwright install chromium` if missing;
+or `E2E_CHROMIUM=<path>`).
 
 The README screenshots are saved in `docs/capturas/` without metadata. After
 regenerating them, review them by hand (nothing real must show) and put their

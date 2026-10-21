@@ -129,4 +129,12 @@ mod server {
 pub fn hydrate() {
     console_error_panic_hook::set_once();
     leptos::mount::hydrate_body(app::App);
+    // Marca de «raíz hidratada» para las pruebas de navegador: lo que pintó
+    // el servidor fuera de un `Suspense` ya tiene sus manejadores (antes, un
+    // clic o un envío lo atendería el HTML del servidor). Lo de dentro de un
+    // `Suspense` o un `Transition` se hidrata después, al llegar sus datos.
+    // No cambia nada a la vista.
+    if let Some(body) = leptos::prelude::document().body() {
+        let _ = body.set_attribute("data-hidratado", "");
+    }
 }

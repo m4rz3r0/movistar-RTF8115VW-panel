@@ -1046,7 +1046,13 @@ async fn html_lleva_data_zona() {
     )
     .await;
     for ruta in ["/panel", "/", "/historial", "/login"] {
-        let html = body_text(get_con_cookie(&p.app, ruta, &cookie).await).await;
+        // /login, sin sesión: con ella lleva a la portada.
+        let resp = if ruta == "/login" {
+            common::get(&p.app, ruta).await
+        } else {
+            get_con_cookie(&p.app, ruta, &cookie).await
+        };
+        let html = body_text(resp).await;
         assert!(
             html.contains(r#"data-zona="Atlantic/Canary""#),
             "{ruta}: {html}"

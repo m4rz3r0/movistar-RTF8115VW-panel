@@ -1,9 +1,42 @@
-import { expect, type Page } from "@playwright/test";
-import { CONTRASENA, USUARIO } from "./instancias";
+import { expect, type Page, test } from "@playwright/test";
+import { CONTRASENA, USUARIO, instalado, instalados } from "./instancias";
+
+/**
+ * Espera a que la raíz de la página esté hidratada (`data-hidratado` en
+ * `<body>`, que pone el wasm al terminar `hydrate_body`). Lo que va dentro de
+ * un `Suspense` o un `Transition` se hidrata después, al llegar sus datos:
+ * para eso, `asentar` espera además a la red. Antes de la marca, un clic o un
+ * envío lo atendería el HTML del servidor (el formulario de entrada se
+ * enviaría sin JavaScript).
+ */
+export async function hidratada(page: Page) {
+  await expect(
+    page.locator("body[data-hidratado]"),
+    "la página no se hidrató: ¿falló el wasm? (mira la consola)",
+  ).toBeAttached({ timeout: 15_000 });
+}
+
+/**
+ * Cada worker usa su panel: el del índice que le dio Playwright
+ * (instancias.ts) y, en la página, el puerto de ese panel (`baseURL` de
+ * playwright.config.ts, que se evalúa otra vez en cada worker). Si un día se
+ * evaluase una sola vez, todos irían al primero y casi todo seguiría en
+ * verde.
+ */
+export function suPanel(page: Page) {
+  const { info } = test;
+  const indice = info().parallelIndex;
+  expect(instalado, `el worker ${indice} usa instalados[${indice}]`).toBe(instalados[indice]);
+  expect(new URL(page.url()).port, `el worker ${indice} entra en su panel`).toBe(
+    String(instalado.puerto),
+  );
+}
 
 /** Entra en el panel instalado (formulario en español). */
 export async function entrar(page: Page) {
   await page.goto("/login");
+  suPanel(page);
+  await hidratada(page);
   await page.waitForLoadState("networkidle");
   await page.locator("#usuario").fill(USUARIO);
   await page.locator("#contrasena").fill(CONTRASENA);
@@ -60,6 +93,6 @@ export async function sinDesbordamiento(page: Page, donde: string) {
 
 /** Hidratación y primeras cargas (las páginas sondean: la red nunca queda del todo quieta). */
 export async function asentar(page: Page) {
+  await hidratada(page);
   await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {});
-  await page.waitForTimeout(1_000);
 }

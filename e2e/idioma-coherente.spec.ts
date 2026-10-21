@@ -2,7 +2,7 @@ import { expect, test, type Browser, type BrowserContext, type Page } from "@pla
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { CONTRASENA, USUARIO, instalado } from "./instancias";
-import { asentar, recogerErrores, sinDesbordamiento } from "./util";
+import { asentar, recogerErrores, sinDesbordamiento, suPanel } from "./util";
 
 // Una página en español no lleva ningún texto en inglés: ni al pintarla el
 // servidor (sin JavaScript), ni tras hidratar, ni después de hablar con el
@@ -80,6 +80,7 @@ async function sinIngles(page: Page, donde: string) {
 
 async function entrarCon(page: Page) {
   await page.goto("/login");
+  suPanel(page);
   await asentar(page);
   await page.locator("#usuario").fill(USUARIO);
   await page.locator("#contrasena").fill(CONTRASENA);
@@ -156,6 +157,22 @@ test.describe("idioma coherente", () => {
       await expect(dialogo.locator(".error-formulario")).not.toBeEmpty();
       await sinIngles(page, "reautenticación fallida");
       await dialogo.getByRole("button", { name: "Cancelar" }).click();
+      // Deja el freno del login como estaba: el fallo cuenta para la IP y
+      // el usuario (1 s de espera, que crece con cada fallo) y el login de
+      // la prueba siguiente daría 429. Una contraseña buena lo borra, pero
+      // solo pasada la espera (antes, 429 sin mirarla).
+      await expect
+        .poll(
+          async () =>
+            (
+              await page.request.post("/api/reautenticar", {
+                data: { contrasena: CONTRASENA },
+                headers: { origin: instalado.url, "sec-fetch-site": "same-origin" },
+              })
+            ).status(),
+          { timeout: 10_000, intervals: [500] },
+        )
+        .toBe(200);
       expect(
         errores.filter((e) => !/status of (400|401|403)/.test(e)),
         "errores o avisos en la consola",

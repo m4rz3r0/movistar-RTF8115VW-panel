@@ -592,6 +592,30 @@ fn vista_valores(v: Vista) -> impl IntoView + use<> {
     }
 }
 
+/// `vista` solo en el navegador, ya hidratado; antes (en el HTML del servidor
+/// y al hidratar), `espera`. Para lo que depende de un `LocalResource` creado
+/// dentro de un `Suspend`: el servidor no lo puede pintar, y así el navegador
+/// hidrata lo mismo que pintó el servidor (los `Effect` solo corren en el
+/// navegador, después de hidratar).
+pub(super) fn en_el_navegador<E, V>(
+    espera: impl Fn() -> E + Send + Sync + 'static,
+    vista: impl Fn() -> V + Send + Sync + 'static,
+) -> impl IntoView
+where
+    E: IntoView + 'static,
+    V: IntoView + 'static,
+{
+    let (listo, set_listo) = signal(false);
+    Effect::new(move |_| set_listo.set(true));
+    move || {
+        if listo.get() {
+            vista().into_any()
+        } else {
+            espera().into_any()
+        }
+    }
+}
+
 /// Lectura: parámetros, botón «Leer» y resultado.
 #[component]
 fn VistaLectura(detalle: FuncionDetalle) -> impl IntoView {
@@ -620,13 +644,16 @@ fn VistaLectura(detalle: FuncionDetalle) -> impl IntoView {
         }
     };
     let consulta = RwSignal::new(valores_de());
-    let resultado = Resource::new(
-        {
-            let funcion = funcion.clone();
-            move || (funcion.clone(), consulta.get())
-        },
-        |(f, p)| leer(f, p),
-    );
+    // Solo en el navegador (`LocalResource`, pintado con `en_el_navegador`):
+    // este recurso nace dentro del `Suspend` de `detalle`, y un recurso
+    // anidado que llega en el HTML del servidor puede no casar al hidratar
+    // con el que crea el navegador (pasaba según lo que tardase el router, y
+    // el wasm moría con un pánico de hidratación). Sin JavaScript no hay
+    // lectura: «Leer de nuevo» ya lo necesitaba.
+    let resultado = LocalResource::new({
+        let funcion = funcion.clone();
+        move || leer(funcion.clone(), consulta.get())
+    });
     let leyendo = RwSignal::new(false);
 
     let entradas = campos
@@ -697,7 +724,12 @@ fn VistaLectura(detalle: FuncionDetalle) -> impl IntoView {
                 </div>
             </form>
             <div class="resultado-lectura" aria-live="polite" aria-busy=move || leyendo.get().to_string()>
-                <Transition set_pending=leyendo fallback=|| view! { <p class="estado-espera">{t!("biblioteca-leyendo")}</p> }>{datos}</Transition>
+                {en_el_navegador(
+                    || view! { <p class="estado-espera">{t!("biblioteca-leyendo")}</p> },
+                    move || view! {
+                        <Transition set_pending=leyendo fallback=|| view! { <p class="estado-espera">{t!("biblioteca-leyendo")}</p> }>{datos}</Transition>
+                    },
+                )}
             </div>
         </section>
     }

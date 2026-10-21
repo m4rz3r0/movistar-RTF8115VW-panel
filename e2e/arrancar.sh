@@ -19,6 +19,16 @@ case $MODO in
 instalado | nuevo) ;;
 *) echo "E2E_MODO desconocido: $MODO" >&2; exit 1 ;;
 esac
+# Los puertos, libres antes de tocar nada: si un simulador (o un panel) de
+# otra pasada sigue escuchando, el sim nuevo moriría al no poder abrir el
+# puerto, pero la espera de abajo podría ver responder al viejo y el panel
+# hablaría con él. Y un E2E_DIR en uso no se vacía.
+for p in "$SIM_PORT" "$PORT"; do
+	if curl -s -m 1 -o /dev/null "http://127.0.0.1:$p/"; then
+		echo "el puerto 127.0.0.1:$p ya está en uso (¿otra pasada del e2e? E2E_PORT, E2E_SIM_PORT)" >&2
+		exit 1
+	fi
+done
 if [ -n "${E2E_DIR:-}" ]; then
 	case $E2E_DIR in
 	*routerpanel-e2e-*) ;;
@@ -47,8 +57,8 @@ for f in target/debug/panel target/debug/router-sim target/debug/examples/e2e_gr
 done
 target/debug/router-sim --listen "127.0.0.1:$SIM_PORT" --fixtures crates/hgu/fixtures &
 SIM=$!
-# Que el simulador escuche de verdad (y sea el nuestro) antes de seguir: con
-# el puerto ocupado, el panel sólo vería «Esperando el primer dato».
+# Que el simulador escuche de verdad antes de seguir (el puerto estaba
+# libre: lo que responda es el nuestro).
 n=0
 while :; do
 	if ! kill -0 "$SIM" 2>/dev/null; then
