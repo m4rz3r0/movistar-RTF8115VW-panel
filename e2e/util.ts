@@ -1,5 +1,5 @@
-import { expect, type Page } from "@playwright/test";
-import { CONTRASENA, USUARIO } from "./instancias";
+import { expect, type Page, test } from "@playwright/test";
+import { CONTRASENA, USUARIO, instalado, instalados } from "./instancias";
 
 /**
  * Espera a que la página esté hidratada (`data-hidratado` en `<body>`, que
@@ -11,9 +11,26 @@ export async function hidratada(page: Page) {
   await page.locator("body[data-hidratado]").waitFor({ state: "attached", timeout: 15_000 });
 }
 
+/**
+ * Cada worker usa su panel: el del índice que le dio Playwright
+ * (instancias.ts) y, en la página, el puerto de ese panel (`baseURL` de
+ * playwright.config.ts, que se evalúa otra vez en cada worker). Si un día se
+ * evaluase una sola vez, todos irían al primero y casi todo seguiría en
+ * verde.
+ */
+export function suPanel(page: Page) {
+  const { info } = test;
+  const indice = info().parallelIndex;
+  expect(instalado, `el worker ${indice} usa instalados[${indice}]`).toBe(instalados[indice]);
+  expect(new URL(page.url()).port, `el worker ${indice} entra en su panel`).toBe(
+    String(instalado.puerto),
+  );
+}
+
 /** Entra en el panel instalado (formulario en español). */
 export async function entrar(page: Page) {
   await page.goto("/login");
+  suPanel(page);
   await hidratada(page);
   await page.waitForLoadState("networkidle");
   await page.locator("#usuario").fill(USUARIO);

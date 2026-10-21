@@ -181,8 +181,8 @@ npx playwright test capturas-readme   # only if the README screenshots change
 ```
 
 The e2e run spreads the files over `E2E_WORKERS` workers (by default, one
-per 3 CPU threads, between 1 and 4; `E2E_WORKERS=1` runs them one after
-another). It starts one installed panel per worker and four freshly installed
+per 3 CPU threads, between 1 and 2; 4 on a dedicated machine; at most 16;
+`E2E_WORKERS=1` runs them one after another). It starts one installed panel per worker and four freshly installed
 ones for the setup wizard, each with its own simulator (`e2e/instancias.ts`),
 on consecutive ports from `E2E_PORT` and `E2E_SIM_PORT` (3195 and 8195; with
 4 workers, 3195–3202 and 8195–8202). Each change is watched for 10 s instead

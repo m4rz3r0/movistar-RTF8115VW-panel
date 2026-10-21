@@ -2,7 +2,7 @@ import { expect, test, type Browser, type BrowserContext, type Page } from "@pla
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { CONTRASENA, USUARIO, instalado } from "./instancias";
-import { asentar, recogerErrores, sinDesbordamiento } from "./util";
+import { asentar, recogerErrores, sinDesbordamiento, suPanel } from "./util";
 
 // Una página en español no lleva ningún texto en inglés: ni al pintarla el
 // servidor (sin JavaScript), ni tras hidratar, ni después de hablar con el
@@ -80,6 +80,7 @@ async function sinIngles(page: Page, donde: string) {
 
 async function entrarCon(page: Page) {
   await page.goto("/login");
+  suPanel(page);
   await asentar(page);
   await page.locator("#usuario").fill(USUARIO);
   await page.locator("#contrasena").fill(CONTRASENA);

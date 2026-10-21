@@ -20,21 +20,37 @@ import { join } from "node:path";
 const base = Number(process.env.E2E_PORT ?? 3195);
 const baseSim = Number(process.env.E2E_SIM_PORT ?? 8195);
 
+/** Paneles del asistente (instalar.spec.ts), detrás de los instalados. */
+const NUEVOS = 4;
+
+/**
+ * Tope de E2E_WORKERS: los instalados y los nuevos ocupan WORKERS + 4 puertos
+ * seguidos desde E2E_PORT (y desde E2E_SIM_PORT), y la ventana reservada a
+ * cada prueba es de 20 (p. ej. 3710-3729 y 8710-8729).
+ */
+const VENTANA_DE_PUERTOS = 20;
+const MAX_WORKERS = VENTANA_DE_PUERTOS - NUEVOS;
+
 /**
  * Workers de Playwright (E2E_WORKERS; 1, en serie). Por defecto, uno por
- * cada 3 hilos de la CPU, entre 1 y 4: cada worker mueve un Chromium, un
- * panel y un simulador, y de 4 en adelante la pasada apenas gana (el camino
- * crítico son los tests largos de un mismo fichero).
+ * cada 3 hilos de la CPU, entre 1 y 2: cada worker mueve un Chromium, un
+ * panel y un simulador, y lo que limita en un portátil (memoria, calor, lo
+ * que corre a la vez) no se ve en los hilos. Con 2, el portátil tarda unos
+ * 5,3 min; en una máquina dedicada, E2E_WORKERS=4 (unos 3,2 min en el
+ * sobremesa). La CI (4 vCPU) sigue con 1.
  */
 export const WORKERS = workers(process.env.E2E_WORKERS);
 
 function workers(valor: string | undefined): number {
   if (valor === undefined || valor === "") {
-    return Math.min(4, Math.max(1, Math.floor(availableParallelism() / 3)));
+    return Math.min(2, Math.max(1, Math.floor(availableParallelism() / 3)));
   }
   const n = Number(valor);
-  if (!Number.isInteger(n) || n < 1) {
-    throw new Error(`E2E_WORKERS debe ser un entero mayor que cero: ${valor}`);
+  if (!Number.isInteger(n) || n < 1 || n > MAX_WORKERS) {
+    throw new Error(
+      `E2E_WORKERS debe ser un entero entre 1 y ${MAX_WORKERS} (con ${NUEVOS} paneles del ` +
+        `asistente, ${VENTANA_DE_PUERTOS} puertos seguidos desde E2E_PORT): ${valor}`,
+    );
   }
   return n;
 }

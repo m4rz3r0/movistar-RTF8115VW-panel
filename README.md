@@ -174,7 +174,8 @@ npx playwright test capturas-readme   # solo si cambian las capturas del README
 ```
 
 El e2e reparte los ficheros entre `E2E_WORKERS` workers (por defecto, uno
-por cada 3 hilos de la CPU, entre 1 y 4; `E2E_WORKERS=1`, en serie). Arranca
+por cada 3 hilos de la CPU, entre 1 y 2; en una máquina dedicada, 4; como
+mucho, 16; `E2E_WORKERS=1`, en serie). Arranca
 un panel instalado por worker y cuatro recién instalados para el asistente,
 cada uno con su simulador (`e2e/instancias.ts`), en puertos consecutivos a
 partir de `E2E_PORT` y `E2E_SIM_PORT` (3195 y 8195; con 4 workers,
