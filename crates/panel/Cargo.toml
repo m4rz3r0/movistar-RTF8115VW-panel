@@ -1,14 +1,20 @@
 [package]
 name = "panel"
-version = "0.2.6"
+version = "0.3.0"
 description = "Panel web (Leptos + Axum) para gestionar el router Askey RTF8115VW"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 publish = false
+autotests = false
 
 [lib]
 crate-type = ["cdylib", "rlib"]
+
+[lints.rust]
+# cargo-leptos compila en depuración con `--cfg erase_components` (main.rs
+# lo comprueba para el e2e).
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(erase_components)"] }
 
 [dependencies]
 leptos.workspace = true
@@ -86,86 +92,9 @@ ssr = [
 name = "e2e_grupo"
 required-features = ["ssr"]
 
+# Un solo binario de integración (tests/integracion/main.rs), con un módulo
+# por área: se enlaza una vez en lugar de una por fichero.
 [[test]]
-name = "http"
-required-features = ["ssr"]
-
-[[test]]
-name = "auth"
-required-features = ["ssr"]
-
-[[test]]
-name = "poller"
-required-features = ["ssr"]
-
-[[test]]
-name = "changes"
-required-features = ["ssr"]
-
-[[test]]
-name = "estado"
-required-features = ["ssr"]
-
-[[test]]
-name = "explorador"
-required-features = ["ssr"]
-
-[[test]]
-name = "historial"
-required-features = ["ssr"]
-
-[[test]]
-name = "instancia"
-required-features = ["ssr"]
-
-[[test]]
-name = "idioma"
-required-features = ["ssr"]
-
-[[test]]
-name = "instalar"
-required-features = ["ssr"]
-
-[[test]]
-name = "panel_ajustes"
-required-features = ["ssr"]
-
-[[test]]
-name = "ajustes_catalogo"
-required-features = ["ssr"]
-
-[[test]]
-name = "menu"
-required-features = ["ssr"]
-
-[[test]]
-name = "grupos"
-required-features = ["ssr"]
-
-[[test]]
-name = "red"
-required-features = ["ssr"]
-
-[[test]]
-name = "vista"
-required-features = ["ssr"]
-
-[[test]]
-name = "ajustes"
-required-features = ["ssr"]
-
-[[test]]
-name = "ajustes_ida_y_vuelta"
-required-features = ["ssr"]
-
-[[test]]
-name = "ajustes_listas"
-required-features = ["ssr"]
-
-[[test]]
-name = "lecturas"
-required-features = ["ssr"]
-
-[[test]]
-name = "estaticos"
+name = "integracion"
+path = "tests/integracion/main.rs"
 required-features = ["ssr"]

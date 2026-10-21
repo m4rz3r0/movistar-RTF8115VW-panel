@@ -5,7 +5,6 @@
 
 use super::*;
 use crate::{
-    auth::{LoginError, User},
     changes::{CambioError, ChangeManager, ChangeRequest, Estado, buscar, identidad},
     state::AppState,
 };
@@ -26,6 +25,15 @@ pub fn app_state() -> Result<AppState, ServerFnError> {
     use_context::<AppState>().ok_or_else(|| ServerFnError::new("falta el estado del panel"))
 }
 
+/// Marca la respuesta `no-store`: puede llevar secretos (una lectura con sus
+/// valores, el detalle de un cambio).
+pub(crate) fn sin_guardar() {
+    use axum::http::{HeaderValue, header};
+    if let Some(resp) = use_context::<leptos_axum::ResponseOptions>() {
+        resp.insert_header(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    }
+}
+
 pub(crate) fn con_estado(status: StatusCode, msg: impl Into<String>) -> ServerFnError {
     if let Some(resp) = use_context::<leptos_axum::ResponseOptions>() {
         resp.set_status(status);
@@ -35,6 +43,18 @@ pub(crate) fn con_estado(status: StatusCode, msg: impl Into<String>) -> ServerFn
 
 pub(crate) fn invalida(msg: impl Into<String>) -> ServerFnError {
     con_estado(StatusCode::BAD_REQUEST, msg)
+}
+
+/// La nota (o el error) de un cambio en el idioma de quien la mira (las de
+/// antes, que guardan el texto, tal cual).
+pub(crate) fn nota_legible(guardada: &str) -> String {
+    crate::changes::Nota::texto(guardada, crate::ui::i18n::idioma_actual())
+}
+
+/// Lo técnico de un error guardado (el texto del router), para los
+/// «Detalles técnicos».
+pub(crate) fn error_tecnico(guardado: &str) -> Option<String> {
+    crate::changes::Nota::detalle(guardado, crate::ui::i18n::idioma_actual())
 }
 
 /// Registra el error con un id y devuelve un mensaje genérico con ese id.
@@ -65,6 +85,10 @@ pub(crate) fn error_cambio(e: CambioError) -> ServerFnError {
         E::Bloqueada(m) if m == crate::changes::BLOQUEO_SOLO_LECTURA => {
             (StatusCode::FORBIDDEN, crate::t!("panel-solo-lectura"))
         }
+        E::Bloqueada(m) if m == crate::changes::BLOQUEO_SECRETO_TAPADO => (
+            StatusCode::FORBIDDEN,
+            crate::t!("cambio-error-secreto-tapado"),
+        ),
         E::Bloqueada(m) => (
             StatusCode::FORBIDDEN,
             crate::t!("biblioteca-error-bloqueada", motivo = m),
@@ -289,9 +313,12 @@ impl Ocultar {
         self.mascara.oculta(nombre, valor) || self.catalogo.contains(&nombre.to_ascii_lowercase())
     }
 
+    /// Valor de una lectura: un secreto va con su valor, para el campo
+    /// censurado con el ojo (el XML crudo, que se lee como texto, va
+    /// enmascarado aparte).
     fn valor(&self, nombre: &str, valor: &str) -> Valor {
         if self.oculto(nombre, valor) {
-            Valor::Secreto
+            Valor::Clave(valor.to_owned())
         } else {
             Valor::Texto(valor.to_owned())
         }
@@ -816,6 +843,7 @@ pub(crate) fn vista_preparado(
         riesgo: riesgo(prep.riesgo),
         vigilancia_s: g.tiempos().vigilancia(prep.riesgo).as_secs(),
         palabra: prep.palabra,
+        aviso: None,
     }
 }
 
@@ -859,120 +887,10 @@ pub async fn estado_cambio(state: &AppState, id: i64) -> Result<CambioVista, Ser
     Ok(CambioVista {
         id: c.id,
         estado: estado(c.estado),
-        error: c.error,
-        nota: c.nota,
+        error: c.error.as_deref().map(nota_legible),
+        nota: c.nota.as_deref().map(nota_legible),
         restante_s,
     })
-}
-
-// ---- revelar
-
-async fn ip_cliente(state: &AppState) -> Result<std::net::IpAddr, ServerFnError> {
-    use axum::extract::ConnectInfo;
-    use std::net::SocketAddr;
-    let ConnectInfo(peer) = leptos_axum::extract::<ConnectInfo<SocketAddr>>().await?;
-    let headers: axum::http::HeaderMap = leptos_axum::extract().await?;
-    Ok(crate::auth::client_ip(
-        peer.ip(),
-        &headers,
-        &state.cfg.trusted_proxies,
-    ))
-}
-
-/// Valor en claro del campo `campo` de la lectura (de la fila `instancia`
-/// si se da).
-fn valor_de(f: &Funcion, r: &Respuesta, campo: &str, instancia: Option<&str>) -> Option<String> {
-    match (r, instancia) {
-        (Respuesta::Pagina(vars), None) => vars.get(campo).cloned(),
-        (Respuesta::Pagina(_), Some(_)) => None,
-        (Respuesta::Xml(n), None) => n
-            .children
-            .iter()
-            .find(|c| c.children.is_empty() && c.tag == campo)
-            .map(|c| c.text.clone()),
-        (Respuesta::Xml(n), Some(inst)) => {
-            // Las posiciones `#n` cuentan dentro de cada elemento, como en
-            // la vista.
-            let mut pos: BTreeMap<&str, usize> = BTreeMap::new();
-            for c in n.children.iter().filter(|c| !c.children.is_empty()) {
-                let i = pos.entry(c.tag.as_str()).or_default();
-                let mut campos = Vec::new();
-                aplanar(c, "", &mut campos);
-                let id = id_fila(&campos, id_lista(f), *i);
-                *i += 1;
-                if id == inst
-                    && let Some((_, v)) = campos.iter().find(|(k, _)| k == campo)
-                {
-                    return Some(v.text.clone());
-                }
-            }
-            None
-        }
-    }
-}
-
-/// Comprueba la contraseña del panel del usuario de la sesión antes de
-/// revelar, con el freno del login.
-async fn comprobar_contrasena(
-    state: &AppState,
-    user: &User,
-    contrasena: &str,
-) -> Result<(), ServerFnError> {
-    let ip = ip_cliente(state).await?;
-    match crate::auth::reauthenticate(state, ip, user, contrasena).await {
-        Ok(()) => Ok(()),
-        Err(LoginError::Throttled(s)) => Err(con_estado(
-            StatusCode::TOO_MANY_REQUESTS,
-            crate::t!("biblioteca-error-intentos", s = s),
-        )),
-        Err(LoginError::BadCredentials) => Err(con_estado(
-            StatusCode::FORBIDDEN,
-            crate::t!("biblioteca-error-contrasena"),
-        )),
-        Err(LoginError::Internal(e)) => Err(interno(e)),
-    }
-}
-
-pub async fn revelar(
-    state: &AppState,
-    user: &User,
-    nombre: &str,
-    campo: &str,
-    instancia: Option<&str>,
-    params: &[(String, String)],
-    contrasena: Option<&str>,
-) -> Result<String, ServerFnError> {
-    let f = funcion(state, nombre)?;
-    if let Some(contrasena) = contrasena {
-        comprobar_contrasena(state, user, contrasena).await?;
-        crate::auth::abrir_ventana_de_reautenticacion().await?;
-    }
-    let r = ejecutar(state, f, params).await?;
-    let valor = valor_de(f, &r, campo, instancia).ok_or_else(|| {
-        con_estado(
-            StatusCode::NOT_FOUND,
-            crate::t!("biblioteca-error-campo-desaparecido", campo = campo),
-        )
-    })?;
-    sqlx::query(
-        "INSERT INTO reveals (ts, user_id, funcion, campo, instancia) VALUES (?, ?, ?, ?, ?)",
-    )
-    .bind(crate::series::now())
-    .bind(user.id)
-    .bind(&f.name)
-    .bind(campo)
-    .bind(instancia)
-    .execute(&state.db)
-    .await
-    .map_err(interno)?;
-    tracing::info!(
-        usuario = %user.username,
-        funcion = %f.name,
-        campo,
-        instancia = instancia.unwrap_or("-"),
-        "valor secreto revelado"
-    );
-    Ok(valor)
 }
 
 #[cfg(test)]

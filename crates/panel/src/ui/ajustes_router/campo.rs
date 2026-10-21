@@ -5,12 +5,13 @@
 //! El valor en edición es siempre el legible como texto: la clave de una
 //! opción, `true`/`false` en un sí/no, el texto tal cual. Un valor del
 //! router que el panel no reconoce empieza como [`DESCONOCIDO`] y no se envía
-//! mientras no se elija otro; un secreto empieza vacío (vacío = sin tocar).
+//! mientras no se elija otro; un secreto empieza con su valor leído (y se
+//! envía solo si cambia); uno que el router no deja leer, vacío.
 
 use crate::ajustes_router::{CampoVista, OpcionVista, texto_error_valor};
 use crate::t;
-use crate::ui::explorador::MASCARA;
 use crate::ui::i18n::traducir;
+use crate::ui::secreto::{Secreto, SecretoLeido};
 use crate::ui::{Estado, IconoEstado};
 use ajustes::{Limites, SIN_ELECCION, TipoCampo, ValorLegible, validar_legible};
 use leptos::prelude::*;
@@ -19,7 +20,8 @@ use leptos::prelude::*;
 /// la clave de ninguna opción (solo llevan minúsculas, cifras y `_`).
 pub(crate) const DESCONOCIDO: &str = "?";
 
-/// Valor con que empieza la edición de un campo.
+/// Valor con que empieza la edición de un campo (sin el valor leído de un
+/// secreto: para eso, [`inicial_campo`]).
 pub(crate) fn inicial(v: &ValorLegible) -> String {
     match v {
         ValorLegible::Texto(t) | ValorLegible::Opcion(t) => t.clone(),
@@ -29,11 +31,20 @@ pub(crate) fn inicial(v: &ValorLegible) -> String {
     }
 }
 
-/// ¿Se ha cambiado el campo? Un secreto, si se ha escrito algo; un valor no
-/// reconocido, si se ha elegido otro; el resto, si difiere del inicial.
+/// Valor con que empieza la edición del campo `c`: un secreto, con el que se
+/// leyó del router (vacío si no deja leerlo).
+pub(crate) fn inicial_campo(c: &CampoVista) -> String {
+    match c.valor {
+        ValorLegible::Secreto => c.valor_secreto.clone().unwrap_or_default(),
+        ref v => inicial(v),
+    }
+}
+
+/// ¿Se ha cambiado el campo? Un valor no reconocido, si se ha elegido otro;
+/// el resto (también un secreto), si difiere del que se leyó.
 pub(crate) fn cambiado(c: &CampoVista, v: &str) -> bool {
     match c.tipo {
-        TipoCampo::Secreto => !v.is_empty(),
+        TipoCampo::Secreto => v != inicial_campo(c),
         _ => v != DESCONOCIDO && v != inicial(&c.valor),
     }
 }
@@ -77,14 +88,13 @@ pub(crate) fn texto_legible(c: &CampoVista, v: &str) -> String {
     }
 }
 
-/// Valor actual del campo en la vista resumida.
+/// Valor actual del campo en la vista resumida. Un secreto, censurado con el
+/// ojo (de solo lectura; vacío, con el motivo, si el router no deja leerlo).
 pub(crate) fn valor_resumido(c: &CampoVista) -> AnyView {
     match &c.valor {
-        ValorLegible::Secreto => view! {
-            <span class="secreto" aria-hidden="true">{MASCARA}</span>
-            <span class="solo-lector">{t!("comun-valor-oculto")}</span>
+        ValorLegible::Secreto => {
+            view! { <SecretoLeido valor=c.valor_secreto.clone() nombre=etiqueta(c) /> }.into_any()
         }
-        .into_any(),
         ValorLegible::Desconocido(x) => {
             view! { <span>{t!("ajustes-valor-desconocido", valor = x.clone())}</span> }.into_any()
         }
@@ -162,7 +172,7 @@ fn aviso_de(opciones: &[OpcionVista], v: &str) -> Option<String> {
 
 /// Un campo editable: control según su tipo, con etiqueta, descripción,
 /// recomendación, aviso de la opción elegida y error. `dom` es el prefijo
-/// único de sus ids en la página.
+/// único de sus ids en la página. Un secreto va con [`CampoSecreto`].
 #[component]
 pub(crate) fn Campo(
     c: CampoVista,
@@ -171,6 +181,9 @@ pub(crate) fn Campo(
     error: RwSignal<Option<String>>,
     #[prop(into)] bloqueado: Signal<bool>,
 ) -> impl IntoView {
+    if c.tipo == TipoCampo::Secreto {
+        return view! { <CampoSecreto c dom valor error bloqueado /> }.into_any();
+    }
     let control_id = format!("{dom}-control");
     let desc_id = format!("{dom}-desc");
     let error_id = format!("{dom}-error");
@@ -193,10 +206,7 @@ pub(crate) fn Campo(
         valor.set(event_target_value(&ev));
         error.set(None);
     };
-    let mut desc = traducir(&format!("{}-desc", c.clave), None);
-    if c.tipo == TipoCampo::Secreto {
-        desc = format!("{desc} {}", t!("ajustes-secreto-desc"));
-    }
+    let desc = traducir(&format!("{}-desc", c.clave), None);
     let etiqueta = etiqueta(&c);
     let control = match c.tipo {
         TipoCampo::Booleano => view! {
@@ -261,13 +271,12 @@ pub(crate) fn Campo(
             .into_any()
         }
         tipo => {
+            // (Un secreto va con `CampoSecreto`.)
             let (tipo_html, modo, autocompletar) = match tipo {
-                TipoCampo::Secreto => ("password", None, "new-password"),
                 TipoCampo::Numero => ("number", Some("numeric"), "off"),
                 TipoCampo::Ip => ("text", Some("decimal"), "off"),
                 _ => ("text", None, "off"),
             };
-            let marcador = (tipo == TipoCampo::Secreto).then(|| t!("ajustes-secreto-placeholder"));
             let (min, max) = if tipo == TipoCampo::Numero {
                 (c.min.map(|m| m.to_string()), c.max.map(|m| m.to_string()))
             } else {
@@ -283,7 +292,6 @@ pub(crate) fn Campo(
                     spellcheck="false"
                     min=min
                     max=max
-                    placeholder=marcador
                     aria-describedby=descrito.clone()
                     aria-invalid=invalido
                     disabled=move || bloqueado.get()
@@ -346,6 +354,79 @@ pub(crate) fn Campo(
             <p class="campo-error" id=error_id aria-live="polite">{move || error.get()}</p>
         </div>
     }
+    .into_any()
+}
+
+/// Un secreto al editar: su campo de contraseña con el valor leído,
+/// censurado y con el ojo, que se edita ahí mismo. Si el router no deja
+/// leerlo, sale vacío y lo dice; uno tapado al leer se pide al guardar.
+#[component]
+pub(super) fn CampoSecreto(
+    c: CampoVista,
+    dom: String,
+    valor: RwSignal<String>,
+    error: RwSignal<Option<String>>,
+    bloqueado: Signal<bool>,
+    /// Sin la descripción del campo: quien lo usa ya explica por qué se
+    /// pide (la vuelta a la foto de partida).
+    #[prop(optional)]
+    sin_desc: bool,
+) -> impl IntoView {
+    let control_id = format!("{dom}-control");
+    let desc_id = format!("{dom}-desc");
+    let error_id = format!("{dom}-error");
+    let etiqueta = etiqueta(&c);
+    let sin_leer = c.valor_secreto.is_none();
+    let mut desc = traducir(&format!("{}-desc", c.clave), None);
+    // La de uno tapado ya dice que hay que escribirlo.
+    if sin_leer && !c.tapado {
+        desc = format!("{desc} {}", t!("ajustes-secreto-sin-leer-desc"));
+    }
+    // Corto, para que quepa a 360 px; la explicación va en la ayuda.
+    let vacio = sin_leer.then(|| t!("secreto-sin-leer"));
+    let invalido = Signal::derive(move || error.with(|e| e.is_some()));
+    let descrito = if sin_desc {
+        error_id.clone()
+    } else {
+        format!("{desc_id} {error_id}")
+    };
+    let campo = match vacio {
+        Some(vacio) => view! {
+            <Secreto
+                valor
+                nombre=etiqueta.clone()
+                editable=true
+                id=control_id.clone()
+                vacio
+                descrito=descrito.clone()
+                invalido
+                bloqueado
+                error
+            />
+        }
+        .into_any(),
+        None => view! {
+            <Secreto
+                valor
+                nombre=etiqueta.clone()
+                editable=true
+                id=control_id.clone()
+                descrito=descrito.clone()
+                invalido
+                bloqueado
+                error
+            />
+        }
+        .into_any(),
+    };
+    view! {
+        <div class="campo campo-ajuste campo-secreto">
+            <label for=control_id>{etiqueta}</label>
+            {campo}
+            {(!sin_desc).then(|| view! { <p class="ayuda" id=desc_id>{desc}</p> })}
+            <p class="campo-error" id=error_id aria-live="polite">{move || error.get()}</p>
+        </div>
+    }
 }
 
 #[cfg(test)]
@@ -376,6 +457,8 @@ mod tests {
             ascii: true,
             opcional: false,
             solo_lectura: None,
+            tapado: false,
+            valor_secreto: None,
             recomendado: Some("wpa2".into()),
             motivo_recomendado: None,
             requiere: None,

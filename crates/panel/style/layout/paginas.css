@@ -1,0 +1,66 @@
+/* Rejilla de las páginas: cabecera de página y contenido. */
+/* -------------------------------------------------------------- Páginas */
+
+.pagina-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--esp-4);
+}
+
+.pagina-antetitulo {
+  margin-bottom: var(--esp-1);
+  color: var(--texto-2);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pagina-sub {
+  margin-top: var(--esp-1);
+  color: var(--texto-2);
+}
+
+.seccion {
+  min-width: 0;
+}
+
+.tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-4);
+  padding: var(--esp-5);
+  background: var(--superficie-1);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+}
+
+.rejilla-tarjetas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
+  gap: var(--esp-4);
+}
+
+.rejilla-graficas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr));
+  gap: var(--esp-4);
+}
+
+.insignias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-2);
+}
+
+@media (max-width: 860px) {
+  .tarjeta {
+    padding: var(--esp-4);
+  }
+
+  h1 {
+    font-size: 22px;
+  }
+}

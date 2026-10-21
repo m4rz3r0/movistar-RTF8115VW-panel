@@ -1,0 +1,60 @@
+/* Nombres técnicos de un paso del historial, botones mini y lectura de la biblioteca (respuesta cruda, resultado). */
+/* Historial: los nombres técnicos de un paso, plegados. */
+.hist-tecnico {
+  margin: 0;
+  padding-left: var(--esp-4);
+}
+
+.boton-mini {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 var(--esp-2);
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--texto-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.boton-mini:hover {
+  color: var(--texto-1);
+  border-color: var(--texto-2);
+}
+
+.boton-peligro:hover {
+  color: var(--error);
+  border-color: var(--error);
+}
+
+.tabla .acciones-fila .boton-mini + .boton-mini {
+  margin-left: var(--esp-2);
+}
+
+.crudo {
+  margin-top: var(--esp-3);
+}
+
+.crudo summary {
+  color: var(--texto-2);
+  cursor: pointer;
+}
+
+.crudo pre {
+  max-height: 420px;
+  margin: var(--esp-2) 0 0;
+  padding: var(--esp-3);
+  overflow: auto;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie-1);
+  font-size: 12px;
+}
+
+.resultado-lectura {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-3);
+  margin-top: var(--esp-3);
+}

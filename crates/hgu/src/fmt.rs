@@ -13,6 +13,44 @@ pub fn mess_userpass(s: &str) -> String {
         .collect()
 }
 
+/// Página del router desde la que se cambia la contraseña del usuario con
+/// sesión iniciada.
+pub const PAGINA_CAMBIO_CONTRASENA: &str = "user_profile.asp";
+/// Función del router que cambia la contraseña del usuario con sesión
+/// iniciada.
+pub const CAMBIO_CONTRASENA: &str = "cbModifyPwd";
+
+/// Codifica un valor de [`CAMBIO_CONTRASENA`] (`rqUser`, `rqOPwd` y `rqNPwd`).
+/// Es el único sitio que decide cómo viajan: lo usan el panel al escribir y
+/// el simulador al leer lo recibido.
+///
+/// **Sin validar con el router real.** Aquí no está el JavaScript de su
+/// página y el inicio de sesión sí ofusca usuario y contraseña
+/// ([`mess_userpass`]), pero las demás claves de la web avanzada van en
+/// claro: por eso, de momento, también en claro. La fase 3 lo comprobará con
+/// el router (plan de la fase 2, «Lo que esta fase deja para después»); si es
+/// otro formato, basta con cambiar esta función.
+///
+/// Debe ser involutiva (aplicarla dos veces devuelve el original), como el
+/// claro y como [`mess_userpass`]: el simulador la usa también para leer.
+pub fn codificar_cambio_contrasena(valor: &str) -> String {
+    valor.to_owned()
+}
+
+/// Parámetros de [`CAMBIO_CONTRASENA`] para pasar la contraseña de `usuario`
+/// de `actual` a `nueva`, codificados con [`codificar_cambio_contrasena`].
+pub fn parametros_cambio_contrasena(
+    usuario: &str,
+    actual: &str,
+    nueva: &str,
+) -> [(&'static str, String); 3] {
+    [
+        ("rqUser", codificar_cambio_contrasena(usuario)),
+        ("rqOPwd", codificar_cambio_contrasena(actual)),
+        ("rqNPwd", codificar_cambio_contrasena(nueva)),
+    ]
+}
+
 /// Une los 4 campos de una IP con `.`.
 pub fn join_ip(parts: [&str; 4]) -> String {
     parts.join(".")
@@ -61,6 +99,25 @@ mod tests {
     fn mess_userpass_xor_e_involutivo() {
         assert_eq!(mess_userpass("1234"), ".-,+");
         assert_eq!(mess_userpass(&mess_userpass("admin:Pa$$")), "admin:Pa$$");
+    }
+
+    #[test]
+    fn cambio_de_contrasena_en_claro_e_involutivo() {
+        let p = parametros_cambio_contrasena("1234", "clave-de-prueba-1", "clave-nueva-de-prueba");
+        assert_eq!(
+            p.map(|(k, v)| format!("{k}={v}")),
+            [
+                "rqUser=1234",
+                "rqOPwd=clave-de-prueba-1",
+                "rqNPwd=clave-nueva-de-prueba"
+            ]
+        );
+        for v in ["", "clave-de-prueba-1", "ñ€ $&=+"] {
+            assert_eq!(
+                codificar_cambio_contrasena(&codificar_cambio_contrasena(v)),
+                v
+            );
+        }
     }
 
     #[test]

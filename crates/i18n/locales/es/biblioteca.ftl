@@ -79,13 +79,13 @@ biblioteca-col-despues = Después
 biblioteca-lectura = Lectura
 biblioteca-leyendo = Leyendo…
 biblioteca-leer-de-nuevo = Leer de nuevo
+biblioteca-sin-js = Tu navegador tiene JavaScript desactivado.
+biblioteca-sin-hidratar = La Biblioteca lee del router desde el navegador y necesita JavaScript. Si lo tienes activado y este aviso no se va, recarga la página.
 biblioteca-sin-datos = La respuesta no trae datos.
 biblioteca-xml = XML de la respuesta (enmascarado)
 biblioteca-vacio-par = (vacío)
 biblioteca-vacio = vacío
 biblioteca-valor-desconocido = (valor desconocido: { $valor })
-biblioteca-visible-30 = (visible durante 30 s)
-biblioteca-revelar = Revelar
 biblioteca-instancias = { $n ->
     [one] { $n } instancia
    *[other] { $n } instancias
@@ -152,11 +152,6 @@ biblioteca-aplicando = Aplicando…
 biblioteca-deshacer = Deshacer
 biblioteca-borrar = Borrar
 biblioteca-aplicar = Aplicar
-biblioteca-revelar-titulo = Revelar un secreto
-biblioteca-revelar-para-ver = Para ver
-biblioteca-revelar-texto = {", "}escribe la contraseña del panel (no se volverá a pedir en 5 minutos). Se mostrará 30 s y quedará anotado en el historial (sin el valor).
-biblioteca-contrasena-panel = Contraseña del panel
-biblioteca-comprobando = Comprobando…
 
 ## Errores del servidor
 biblioteca-error-bloqueada = Función bloqueada: { $motivo }.
@@ -175,6 +170,4 @@ biblioteca-error-param-desconocido = { $funcion }: parámetro desconocido { $par
 biblioteca-error-lectura-router = El router no ha respondido a la lectura: { $error }
 biblioteca-error-no-identifica = { $param } no identifica instancias de { $funcion }
 biblioteca-error-lectura-sin-formulario = { $nombre } es una lectura: no tiene formulario
-biblioteca-error-intentos = Demasiados intentos: espera { $s } s y vuelve a probar.
-biblioteca-error-contrasena = Contraseña del panel incorrecta.
 biblioteca-error-campo-desaparecido = La lectura ya no muestra el campo { $campo }; vuelve a leer.

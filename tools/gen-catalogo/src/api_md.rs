@@ -163,6 +163,8 @@ pub fn generar(cat: &Catalogo, fixtures: &Path) -> Result<String, String> {
         "# API del router Askey RTF8115VW (Movistar/O2)\n\n\
          <!-- Generado por `cargo run -p gen-catalogo -- --api-md` a partir de\n\
          crates/catalogo/funciones.toml. No editar a mano. -->\n\n\
+         Las funciones del propio panel (`/api/…`) están en\n\
+         [funciones-del-panel.md](funciones-del-panel.md).\n\n\
          ## Cómo se llama\n\n\
          - **UI avanzada**: `POST /cgi-bin/<función>.xml` con los parámetros como\n  \
            formulario. Inicio de sesión con `cbCheckLogin.xml` (`rqUsername`,\n  \
@@ -247,6 +249,38 @@ mod tests {
         );
         for f in cat.todas() {
             assert!(md.contains(&format!("### `{}`", f.name)), "{}", f.name);
+        }
+    }
+
+    /// Cada función del panel que documenta `docs/funciones-del-panel.md`
+    /// existe (`endpoint = "…"`).
+    #[test]
+    fn funciones_del_panel_existen() {
+        let doc =
+            std::fs::read_to_string(crate::raiz().join("docs/funciones-del-panel.md")).unwrap();
+        let mut fuentes = String::new();
+        let mut pendientes = vec![crate::raiz().join("crates/panel/src")];
+        while let Some(dir) = pendientes.pop() {
+            for e in std::fs::read_dir(&dir).unwrap() {
+                let p = e.unwrap().path();
+                if p.is_dir() {
+                    pendientes.push(p);
+                } else if p.extension().is_some_and(|x| x == "rs") {
+                    fuentes.push_str(&std::fs::read_to_string(&p).unwrap());
+                }
+            }
+        }
+        let fila = Regex::new(r"(?m)^\| `([a-z_]+)` \|").unwrap();
+        let nombres: Vec<&str> = fila
+            .captures_iter(&doc)
+            .map(|c| c.get(1).unwrap().as_str())
+            .collect();
+        assert!(nombres.len() >= 10, "{nombres:?}");
+        for n in nombres {
+            assert!(
+                fuentes.contains(&format!("endpoint = \"{n}\"")),
+                "funciones-del-panel.md: {n} no es una server function del panel"
+            );
         }
     }
 

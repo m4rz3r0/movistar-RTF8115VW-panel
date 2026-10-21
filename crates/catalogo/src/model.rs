@@ -149,6 +149,11 @@ pub struct Parametro {
     /// La página lo edita en varios campos `<nombre>-0..-n`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub partido: Option<Partido>,
+    /// Secreto que el router da tapado (vacío) al leerlo: lo leído no es
+    /// su valor, así que una escritura que lo lleve tiene que traer el
+    /// valor de quien la pide, y no se reenvía nunca desde la lectura.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub tapado: bool,
 }
 
 /// Tipo del valor de un parámetro.

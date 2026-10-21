@@ -18,6 +18,7 @@ pub mod login;
 pub mod panel_ajustes;
 pub mod recomendaciones;
 pub mod router;
+pub mod secreto;
 pub mod table;
 pub mod vista;
 

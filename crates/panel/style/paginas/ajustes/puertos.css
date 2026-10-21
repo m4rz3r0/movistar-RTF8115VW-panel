@@ -1,0 +1,194 @@
+/* Ajustes del router: puertos abiertos. */
+/* Puertos: puertos abiertos. Cada regla es una fila: su nombre (y el aviso
+   si su destino ya no está en la red), el puerto de internet (lo que se
+   abre, en grande) con su protocolo, el dispositivo al que va, si está
+   activa y sus acciones, en columnas bajo una cabecera. Las columnas van en
+   rem (no en em): la cabecera, con letra más pequeña, cae sobre ellas. Si
+   la lista no tiene sitio para todas con un mínimo legible para el nombre y
+   el aviso, cada regla se apila (según el ancho de la lista, no el de la
+   ventana: el menú lateral también ocupa). */
+.reglas {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie-1);
+}
+
+.regla,
+.reglas-cabecera {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) 9rem minmax(8rem, 12rem) 4.5rem 10rem;
+  align-items: center;
+  gap: var(--esp-2) var(--esp-4);
+  padding: var(--esp-3) var(--esp-4);
+  border-bottom: 1px solid var(--borde);
+}
+
+.reglas-cabecera {
+  padding-block: var(--esp-2);
+  background: var(--superficie-2);
+  color: var(--texto-2);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.regla:last-child {
+  border-bottom: 0;
+}
+
+.regla-sin-destino {
+  border-left: 2px solid var(--aviso);
+}
+
+.regla-quien {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-1) var(--esp-2);
+  min-width: 0;
+}
+
+.regla-nombre {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.regla-quien .insignia {
+  max-width: 100%;
+  white-space: normal;
+}
+
+.regla-perdida {
+  grid-column: 1 / -1;
+  max-width: 70ch;
+  margin: 0;
+  color: var(--texto-2);
+  font-size: 12px;
+}
+
+.regla-inactiva .regla-nombre,
+.regla-inactiva .regla-puerto {
+  color: var(--texto-2);
+}
+
+/* En pantallas anchas, cada dato es una columna de la fila. */
+.regla-datos {
+  display: contents;
+}
+
+.regla-datos > div {
+  min-width: 0;
+}
+
+.regla-datos dt {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.regla-datos dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--esp-2);
+  margin: 0;
+}
+
+.regla-puerto {
+  font-size: 15px;
+  color: var(--texto-1);
+}
+
+.regla-interno-nota {
+  flex-basis: 100%;
+  color: var(--texto-2);
+  font-size: 12px;
+}
+
+.regla-dispositivo {
+  overflow-wrap: anywhere;
+}
+
+.regla-ip {
+  color: var(--texto-2);
+  font-size: 12px;
+}
+
+.regla-acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--esp-2);
+}
+
+.reglas-acciones.oculto {
+  display: none;
+}
+
+.regla-formulario {
+  padding: var(--esp-4);
+  border: 1px solid var(--borde);
+  border-left: 2px solid var(--acento);
+  border-radius: var(--radio);
+  background: var(--superficie-2);
+}
+
+.regla-formulario h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.regla-interno > summary {
+  cursor: pointer;
+  color: var(--texto-2);
+  font-size: 0.875rem;
+}
+
+.regla-interno[open] > summary {
+  margin-bottom: var(--esp-2);
+}
+
+@container (max-width: 50rem) {
+  .reglas-cabecera {
+    display: none;
+  }
+
+  .regla {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .regla-datos {
+    display: flex;
+    flex-direction: column;
+    gap: var(--esp-1);
+    margin: 0;
+  }
+
+  .regla-datos > div {
+    display: grid;
+    grid-template-columns: 6em minmax(0, 1fr);
+    align-items: baseline;
+    gap: var(--esp-2);
+  }
+
+  .regla-datos dt {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    color: var(--texto-2);
+    font-size: 12px;
+  }
+
+  .regla-acciones {
+    justify-content: flex-start;
+  }
+}

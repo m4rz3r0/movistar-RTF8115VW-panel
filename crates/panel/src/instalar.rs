@@ -179,7 +179,6 @@ pub(crate) mod servidor {
     use leptos_axum::ResponseOptions;
     use sha2::{Digest, Sha256};
     use std::{
-        collections::BTreeMap,
         io::Write,
         net::{IpAddr, Ipv4Addr, SocketAddr},
         path::{Path, PathBuf},
@@ -514,7 +513,7 @@ pub(crate) mod servidor {
 
     /// Entra en el router con esas credenciales, lee `cbGetSummary` y sale.
     pub(crate) async fn probar(
-        _state: &AppState,
+        state: &AppState,
         url: &str,
         usuario: &str,
         contrasena: &str,
@@ -529,7 +528,7 @@ pub(crate) mod servidor {
             usuario: usuario.to_owned(),
             contrasena: contrasena.to_owned(),
         };
-        let cliente = hgu::Client::new(c.client_config());
+        let cliente = hgu::Client::new(c.client_config(&state.cfg));
         let resumen = hgu::read::summary(&cliente).await;
         cliente.logout().await;
         let s = resumen.map_err(|e| {
@@ -567,9 +566,9 @@ pub(crate) mod servidor {
         instancia::guardar_credenciales(&state.db, &state.history_key, &c)
             .await
             .map_err(interno)?;
-        state.hgu.reconfigurar(c.client_config()).await;
+        state.hgu.reconfigurar(c.client_config(&state.cfg)).await;
         // Otro router puede tener otra conexión a internet.
-        instancia::detectar_sin_esperar_mucho(state, instancia::ESPERA_DETECCION).await;
+        instancia::detectar_sin_esperar_mucho(state, state.cfg.espera_deteccion).await;
         state.poller.despertar();
         instancia::fijar_modo_firmware(&state.db, &info.firmware)
             .await
@@ -647,27 +646,15 @@ pub(crate) mod servidor {
         if !state.hgu.configurado() {
             return Err(fallo(StatusCode::CONFLICT, t!("instalar-error-sin-router")));
         }
-        let mut foto = BTreeMap::new();
-        let mut fallidas = Vec::new();
-        let mut firmware = String::new();
-        {
+        let fotos::FotoLeida {
+            contenido: foto,
+            fallidas,
+            mut firmware,
+        } = {
             // Sin el sondeo en medio: la lectura es una sola foto.
             let _pausa = state.poller.pause().await;
-            for (nombre, params) in lecturas_de_partida(&state.catalogo) {
-                match state.hgu.call(nombre, &params).await {
-                    Ok(n) => {
-                        if nombre == "cbGetSummary" {
-                            firmware = hgu::models::Summary::from_node(&n).firmware;
-                        }
-                        foto.insert(nombre.to_owned(), n.to_xml());
-                    }
-                    Err(e) => {
-                        tracing::warn!("lectura inicial: {nombre}: {e}");
-                        fallidas.push(nombre.to_owned());
-                    }
-                }
-            }
-        }
+            fotos::leer_partida(state).await
+        };
         // La red ya se detectó al guardar las credenciales; si aquello no
         // llegó a tiempo (o falló), se intenta ahora.
         let red = match state.red() {

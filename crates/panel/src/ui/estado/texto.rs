@@ -7,7 +7,9 @@
 //! disponibilidad de internet, en una frase y la tabla de cortes. Todo es
 //! texto y tablas con título: se lee igual con lector de pantalla.
 
-use super::{CorteVista, DatoIndicador, EstadoVista, Rango, SampleVista, selector_rango};
+use super::graficas::selector_rango;
+use super::indicadores::DatoIndicador;
+use super::{CorteVista, EstadoVista, Rango, SampleVista};
 use crate::t;
 use crate::ui::charts::{
     Corte, Unidad, columnas_cortes, filas_cortes, formato_decimal, formato_valor, resumen_cortes,

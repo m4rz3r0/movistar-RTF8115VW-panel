@@ -3610,6 +3610,9 @@ tipo = "secret"
 nombre = "auth_password"
 etiqueta = "Contraseña SIP"
 tipo = "secret"
+# El router la da vacía al leerla (cbGetVoiceLine): sin valor de verdad que
+# reenviar. Fase 3: comprobar en el router real qué devuelve cada secreto.
+tapado = true
 
 [[funcion.parametro]]
 nombre = "vad_state"
@@ -3984,7 +3987,8 @@ origen = "avanzada"
 tipo = "accion"
 pagina = "user_profile.asp"
 descripcion = "Cambia la contraseña del usuario con sesión iniciada (contraseña actual y nueva)."
-riesgo = "bajo"
+# Medio, no bajo: si sale mal, puede dejar al panel sin acceso al router.
+riesgo = "medio"
 bloqueada = "cambia la contraseña con la que el propio panel inicia sesión: la vigilancia no podría volver a entrar ni revertir; se cambia desde el router"
 
 [[funcion.parametro]]

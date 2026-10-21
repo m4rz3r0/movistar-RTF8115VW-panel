@@ -79,13 +79,13 @@ biblioteca-col-despues = After
 biblioteca-lectura = Read
 biblioteca-leyendo = Reading…
 biblioteca-leer-de-nuevo = Read again
+biblioteca-sin-js = JavaScript is turned off in your browser.
+biblioteca-sin-hidratar = The Library reads from the router in the browser and needs JavaScript. If it is on and this notice does not go away, reload the page.
 biblioteca-sin-datos = The response has no data.
 biblioteca-xml = Response XML (masked)
 biblioteca-vacio-par = (empty)
 biblioteca-vacio = empty
 biblioteca-valor-desconocido = (unknown value: { $valor })
-biblioteca-visible-30 = (visible for 30 s)
-biblioteca-revelar = Reveal
 biblioteca-instancias = { $n ->
     [one] { $n } instance
    *[other] { $n } instances
@@ -152,11 +152,6 @@ biblioteca-aplicando = Applying…
 biblioteca-deshacer = Undo
 biblioteca-borrar = Delete
 biblioteca-aplicar = Apply
-biblioteca-revelar-titulo = Reveal a secret
-biblioteca-revelar-para-ver = To see
-biblioteca-revelar-texto = {", "}type the panel password (it won't be asked again for 5 minutes). It will be shown for 30 s and logged in the history (without the value).
-biblioteca-contrasena-panel = Panel password
-biblioteca-comprobando = Checking…
 
 ## Server errors
 biblioteca-error-bloqueada = Function blocked: { $motivo }.
@@ -175,6 +170,4 @@ biblioteca-error-param-desconocido = { $funcion }: unknown parameter { $param }
 biblioteca-error-lectura-router = The router did not answer the read: { $error }
 biblioteca-error-no-identifica = { $param } does not identify instances of { $funcion }
 biblioteca-error-lectura-sin-formulario = { $nombre } is a read: it has no form
-biblioteca-error-intentos = Too many attempts: wait { $s } s and try again.
-biblioteca-error-contrasena = Wrong panel password.
 biblioteca-error-campo-desaparecido = The read no longer shows field { $campo }; read again.

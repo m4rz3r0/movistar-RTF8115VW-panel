@@ -72,6 +72,10 @@ impl RedActual {
     }
 }
 
+/// Espera de cada prueba de acceso al cambiar la contraseña del router (ver
+/// [`AppState::espera_prueba_router`]).
+pub const ESPERA_PRUEBA_ROUTER: std::time::Duration = std::time::Duration::from_secs(20);
+
 /// Estado del servidor, compartido por las rutas Axum y las server functions.
 /// Barato de clonar.
 #[derive(Clone)]
@@ -101,6 +105,10 @@ pub struct AppState {
     pub cambios: changes::Ranura,
     /// Asistente de instalación: token y fase (ver `instalar`).
     pub instalacion: Arc<crate::instalar::Instalacion>,
+    /// Lo más que espera cada prueba de acceso al cambiar la contraseña del
+    /// router ([`crate::contrasena_router`]): si vence, cuenta como «no
+    /// entra». Por defecto [`ESPERA_PRUEBA_ROUTER`]; las pruebas la acortan.
+    pub espera_prueba_router: std::time::Duration,
     /// Idioma por defecto de la instancia (`claves::IDIOMA`), si se ha fijado:
     /// copia en memoria para decidir el idioma de cada página sin ir a la
     /// base de datos. Lo carga [`AppState::new`] y lo cambia
@@ -239,6 +247,7 @@ impl AppState {
             history_key: Arc::new(history_key),
             cambios: changes::Ranura::default(),
             instalacion: Arc::default(),
+            espera_prueba_router: ESPERA_PRUEBA_ROUTER,
             idioma_por_defecto: Arc::new(std::sync::RwLock::new(idioma_por_defecto)),
             zona: Arc::new(std::sync::RwLock::new(zona)),
             red,

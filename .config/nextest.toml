@@ -1,0 +1,17 @@
+# Perfiles de cargo-nextest (https://nexte.st). nextest ejecuta cada test en
+# su propio proceso y los reparte por test, no por binario: con las pruebas
+# del servidor (`--features panel/ssr`), mucho más rápido que `cargo test`.
+# No ejecuta los doctests: para eso, `cargo test --doc`.
+
+[profile.default]
+# Avisa de los tests de más de 20 s y corta los que pasen de 2 min (6 × 20 s):
+# ninguno debería acercarse.
+slow-timeout = { period = "20s", terminate-after = 6 }
+
+# Hereda de `default`.
+[profile.ci]
+# Salida de los fallos en cuanto ocurren y otra vez al final, para no tener
+# que buscarla en el registro.
+failure-output = "immediate-final"
+# Sin cortar a la primera: todos los fallos de una vez.
+fail-fast = false

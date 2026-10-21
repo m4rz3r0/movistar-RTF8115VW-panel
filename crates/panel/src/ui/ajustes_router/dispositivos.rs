@@ -277,10 +277,11 @@ pub(crate) fn Dispositivos(
         };
         let nota = |texto: String| view! { <span class="nota-fijar">{texto}</span> }.into_any();
         let accion = match (se_puede, solo_lectura) {
+            // Un dato, no una acción: una etiqueta, no un botón desactivado.
             (Fijable::YaFija(ip), _) => view! {
-                <button class="boton-sutil" type="button" disabled=true>
+                <span class="chip chip-ya-fija">
                     {t!("ajuste-red_local-dispositivos-ya-fija", ip = ip)}
-                </button>
+                </span>
             }
             .into_any(),
             (_, true) => ().into_any(),

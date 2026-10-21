@@ -1,0 +1,639 @@
+//! Cambiar la contraseña del router (Tarea 12): el flujo propio con prueba
+//! de acceso y restauración, contra el simulador. Y la tarjeta de las
+//! credenciales, que llega con la contraseña guardada (censurada con el ojo)
+//! y no la envía si no se toca.
+
+use crate::comun::{
+    PASS, Panel, PanelPrueba, USER, aplicar, body_text, esperar_final, esperar_hasta,
+    esperar_hasta_con, esperar_libre, get_con_cookie, llamar, ok, post_json, reautenticar,
+    registro_global, send, sesion,
+};
+use hgu::{Client, ClientConfig};
+use i18n::Idioma;
+use panel::{changes::Nota, instancia};
+use serde_json::{Value, json};
+use std::time::{Duration, Instant};
+
+const NUEVA: &str = "clave-nueva-de-prueba";
+
+/// Panel con el gestor, la ventana de reautenticación abierta y la cookie.
+async fn preparado() -> (Panel, String) {
+    registro_global();
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    reautenticar(&p, &cookie).await;
+    (p, cookie)
+}
+
+async fn cambiar(p: &Panel, cookie: &str, nueva: &str) -> (u16, String) {
+    llamar(
+        p,
+        "cambiar_contrasena_router",
+        json!({ "nueva": nueva }),
+        Some(cookie),
+    )
+    .await
+}
+
+async fn contrasena_guardada(p: &Panel) -> String {
+    instancia::leer_credenciales(&p.state.db, &p.state.history_key)
+        .await
+        .unwrap()
+        .unwrap()
+        .contrasena
+}
+
+/// ¿Entra en el simulador con `contrasena`? (Un cliente aparte.)
+async fn entra(p: &Panel, contrasena: &str) -> bool {
+    let mut cfg = ClientConfig::new(&p.sim.base_url, USER, contrasena);
+    cfg.timeout = Duration::from_secs(2);
+    cfg.min_gap = Duration::from_millis(1);
+    let c = Client::new(cfg);
+    let r = hgu::read::summary(&c).await.is_ok();
+    c.logout().await;
+    r
+}
+
+/// Los cambios de contraseña recibidos por el simulador, con sus
+/// parámetros decodificados con la función compartida.
+fn cambios_de_contrasena(p: &Panel) -> Vec<Vec<(String, String)>> {
+    p.sim
+        .control
+        .writes()
+        .into_iter()
+        .filter(|(f, _)| f == hgu::fmt::CAMBIO_CONTRASENA)
+        .map(|(_, ps)| {
+            ps.into_iter()
+                .map(|(k, v)| (k, hgu::fmt::codificar_cambio_contrasena(&v)))
+                .collect()
+        })
+        .collect()
+}
+
+fn valor<'a>(ps: &'a [(String, String)], k: &str) -> &'a str {
+    ps.iter()
+        .find(|(n, _)| n == k)
+        .map(|(_, v)| v.as_str())
+        .unwrap_or_else(|| panic!("falta {k}"))
+}
+
+/// La fila del Historial del último intento: (id, estado, error, nota,
+/// título).
+async fn ultima_fila(p: &Panel) -> (i64, String, Option<String>, Option<String>, Option<String>) {
+    sqlx::query_as(
+        "SELECT id, estado, error, nota, titulo FROM changes WHERE funcion = 'cbModifyPwd' \
+         ORDER BY id DESC LIMIT 1",
+    )
+    .fetch_one(&p.state.db)
+    .await
+    .unwrap()
+}
+
+/// Todo lo guardado en el Historial, como texto.
+async fn historial_en_texto(p: &Panel) -> String {
+    let filas: Vec<String> = sqlx::query_scalar(
+        "SELECT COALESCE(diff, '') || COALESCE(anteriores, '') || COALESCE(error, '') || \
+         COALESCE(nota, '') || COALESCE(solicitud, '') || COALESCE(nuevos, '') FROM changes",
+    )
+    .fetch_all(&p.state.db)
+    .await
+    .unwrap();
+    filas.join("\n")
+}
+
+#[tokio::test]
+async fn contrasena_router_cambia_y_se_guarda() {
+    registro_global();
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    // Un sondeo rápido sobre el mismo cliente del router que el gestor.
+    panel::poller::Poller::spawn_with(
+        p.state.clone(),
+        panel::poller::PollerConfig {
+            fast: Duration::from_millis(50),
+            slow: Duration::from_millis(200),
+            backoff_max: Duration::from_millis(200),
+            ..panel::poller::PollerConfig::default()
+        },
+    );
+    reautenticar(&p, &cookie).await;
+
+    let (status, body) = cambiar(&p, &cookie, NUEVA).await;
+    assert_eq!(status, 200, "{body}");
+    // El router tiene la nueva y el panel la ha guardado.
+    assert!(entra(&p, NUEVA).await);
+    assert!(!entra(&p, PASS).await);
+    assert_eq!(contrasena_guardada(&p).await, NUEVA);
+    let cambios = cambios_de_contrasena(&p);
+    assert_eq!(cambios.len(), 1, "{cambios:?}");
+    assert_eq!(valor(&cambios[0], "rqUser"), USER);
+    assert_eq!(valor(&cambios[0], "rqOPwd"), PASS);
+    assert_eq!(valor(&cambios[0], "rqNPwd"), NUEVA);
+
+    // El sondeo sigue leyendo, ya con la nueva (sin sesiones abiertas).
+    p.sim.control.invalidate_sessions();
+    let antes = p.state.poller.latest().map_or(0, |s| s.at);
+    esperar_hasta_con(Duration::from_secs(10), async || {
+        let s = p.state.poller.latest();
+        if s.as_ref()
+            .is_some_and(|s| s.at > antes && s.error.is_none())
+        {
+            return Ok(());
+        }
+        Err(format!("el sondeo no lee: {:?}", p.state.poller.error()))
+    })
+    .await;
+
+    // Un cambio posterior se aplica y se vigila con la nueva.
+    let id = aplicar(
+        &p,
+        &cookie,
+        json!({ "funcion": "cbSetUpnpCfg", "instancia": null,
+            "valores": [["adm_state", "1"]], "borrar": false }),
+    )
+    .await;
+    let c = esperar_final(&p, &cookie, id).await;
+    assert_eq!(c["estado"], "Aplicado", "{c}");
+    esperar_libre(&p).await;
+
+    // En el Historial: aplicado, sin valores y sin «Deshacer».
+    let (id, estado, error, nota, titulo) = ultima_fila(&p).await;
+    assert_eq!(estado, "aplicado");
+    assert_eq!(error, None);
+    // La nota, como clave: se pinta en el idioma de quien mira.
+    let nota = nota.expect("con nota");
+    assert!(
+        Nota::texto(&nota, Idioma::Es).contains("no se puede deshacer"),
+        "{nota}"
+    );
+    assert!(
+        Nota::texto(&nota, Idioma::En).contains("cannot be undone"),
+        "{nota}"
+    );
+    assert_eq!(
+        titulo.as_deref(),
+        Some("ajuste-seguridad-contrasena_router-titulo")
+    );
+    let g = p.state.cambios().unwrap();
+    assert!(!g.se_puede_deshacer(id).await);
+    let (status, _) = llamar(&p, "deshacer", json!({ "change_id": id }), Some(&cookie)).await;
+    assert_ne!(status, 200, "no se deshace");
+    let hist = historial_en_texto(&p).await;
+    assert!(!hist.contains(NUEVA) && !hist.contains(PASS), "{hist}");
+    // La página del Historial lo enseña con su título, sin la API a la vista
+    // ni las contraseñas.
+    let html = body_text(get_con_cookie(&p.app, "/historial", &cookie).await).await;
+    assert!(html.contains("Contraseña del router"), "{html}");
+    assert!(!html.contains(NUEVA) && !html.contains(PASS));
+}
+
+#[tokio::test]
+async fn contrasena_router_rechazada_conserva_la_anterior() {
+    let (p, cookie) = preparado().await;
+    p.sim.control.modify_pwd_sin_efecto();
+    let (status, body) = cambiar(&p, &cookie, NUEVA).await;
+    assert_eq!(status, 502, "{body}");
+    assert!(body.contains("no aceptó la contraseña nueva"), "{body}");
+    assert!(entra(&p, PASS).await);
+    assert!(!entra(&p, NUEVA).await);
+    assert_eq!(contrasena_guardada(&p).await, PASS);
+    // Sin restaurar: solo el cambio.
+    assert_eq!(cambios_de_contrasena(&p).len(), 1);
+    // El panel sigue entrando.
+    p.sim.control.invalidate_sessions();
+    hgu::read::summary(&p.state.hgu).await.unwrap();
+    let (_, estado, error, _, _) = ultima_fila(&p).await;
+    assert_eq!(estado, "fallido");
+    // Como clave: el Historial lo pinta en el idioma de quien lo mira.
+    let error = error.expect("con error");
+    assert!(
+        Nota::texto(&error, Idioma::Es).contains("no aceptó"),
+        "{error}"
+    );
+    assert!(
+        Nota::texto(&error, Idioma::En).contains("did not accept"),
+        "{error}"
+    );
+}
+
+#[tokio::test]
+async fn contrasena_router_sin_entrar_restaura() {
+    let (p, cookie) = preparado().await;
+    // El router acepta el cambio, pero luego no deja entrar con la nueva.
+    p.sim.control.login_falla_con(NUEVA);
+    let (status, body) = cambiar(&p, &cookie, NUEVA).await;
+    assert_eq!(status, 502, "{body}");
+    assert!(body.contains("ha vuelto a poner la anterior"), "{body}");
+    // El sim vuelve a la actual y las credenciales no cambian.
+    assert!(entra(&p, PASS).await);
+    assert_eq!(contrasena_guardada(&p).await, PASS);
+    // Ida y vuelta, simétricas y con la misma codificación.
+    let cambios = cambios_de_contrasena(&p);
+    assert_eq!(cambios.len(), 2, "{cambios:?}");
+    assert_eq!(valor(&cambios[0], "rqOPwd"), PASS);
+    assert_eq!(valor(&cambios[0], "rqNPwd"), NUEVA);
+    assert_eq!(valor(&cambios[1], "rqUser"), USER);
+    assert_eq!(valor(&cambios[1], "rqOPwd"), NUEVA);
+    assert_eq!(valor(&cambios[1], "rqNPwd"), PASS);
+    p.sim.control.invalidate_sessions();
+    hgu::read::summary(&p.state.hgu).await.unwrap();
+}
+
+#[tokio::test]
+async fn contrasena_router_grave_explica_como_recuperar() {
+    let (p, cookie) = preparado().await;
+    // No entra con la nueva y la vuelta atrás tampoco se aplica.
+    p.sim.control.login_falla_con(NUEVA);
+    p.sim.control.fail_write_n(2);
+    let (status, body) = cambiar(&p, &cookie, NUEVA).await;
+    assert_eq!(status, 502, "{body}");
+    assert!(
+        body.contains("ni con la contraseña nueva ni con la anterior"),
+        "{body}"
+    );
+    assert!(
+        body.contains("pon a mano la contraseña que el panel tiene guardada"),
+        "{body}"
+    );
+    assert!(!body.contains(NUEVA) && !body.contains(PASS), "{body}");
+    // El panel no cambia sus credenciales, el router se queda con la nueva
+    // (la vuelta atrás falló) y hubo exactamente dos escrituras: el cambio
+    // y la vuelta atrás.
+    assert_eq!(contrasena_guardada(&p).await, PASS);
+    assert_eq!(cambios_de_contrasena(&p).len(), 2);
+    p.sim.control.login_falla_con("ninguna-de-las-dos");
+    assert!(entra(&p, NUEVA).await);
+    assert!(!entra(&p, PASS).await);
+    let (_, estado, _, _, _) = ultima_fila(&p).await;
+    assert_eq!(estado, "fallido");
+}
+
+#[tokio::test]
+async fn contrasena_router_con_cambio_activo() {
+    let (p, cookie) = preparado().await;
+    // Un cambio que se queda a medias: el router deja de responder tras la
+    // escritura.
+    let prep = ok(
+        &p,
+        "preparar_cambio",
+        json!({ "peticion": { "funcion": "cbSetUpnpCfg", "instancia": null,
+            "valores": [["adm_state", "1"]], "borrar": false } }),
+        &cookie,
+    )
+    .await;
+    p.sim.control.hang_after_next_write();
+    let cambio = {
+        let app = p.app.clone();
+        let mut req = post_json(
+            "/api/confirmar_cambio",
+            &json!({ "token": prep["token"], "palabra": null }).to_string(),
+            "127.0.0.1",
+        );
+        req.headers_mut().insert("cookie", cookie.parse().unwrap());
+        tokio::spawn(async move { send(&app, req).await.status() })
+    };
+    let gestor = p.state.cambios().unwrap();
+    esperar_hasta(Duration::from_secs(5), "sin cambio activo", async || {
+        gestor.activo().is_some() && !p.sim.control.writes().is_empty()
+    })
+    .await;
+    let (status, body) = cambiar(&p, &cookie, NUEVA).await;
+    assert_eq!(status, 409, "{body}");
+    assert!(body.contains("otro cambio en curso"), "{body}");
+    assert!(cambios_de_contrasena(&p).is_empty());
+    assert_eq!(contrasena_guardada(&p).await, PASS);
+
+    p.sim.control.set_unresponsive(false);
+    let _ = cambio.await;
+    esperar_libre(&p).await;
+}
+
+#[tokio::test]
+async fn contrasena_router_exige_reautenticacion() {
+    registro_global();
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    for f in ["comprobar_contrasena_router", "cambiar_contrasena_router"] {
+        let (status, body) = llamar(&p, f, json!({ "nueva": NUEVA }), Some(&cookie)).await;
+        assert_eq!(status, 401, "{f}: {body}");
+        assert!(body.contains(panel::auth::ERROR_REAUTENTICACION), "{body}");
+        // Sin sesión, tampoco.
+        let (status, _) = llamar(&p, f, json!({ "nueva": NUEVA }), None).await;
+        assert_eq!(status, 401, "{f}");
+    }
+    assert!(cambios_de_contrasena(&p).is_empty());
+    assert_eq!(contrasena_guardada(&p).await, PASS);
+    // Con ella, la comprobación pasa y no escribe nada.
+    reautenticar(&p, &cookie).await;
+    ok(
+        &p,
+        "comprobar_contrasena_router",
+        json!({ "nueva": NUEVA }),
+        &cookie,
+    )
+    .await;
+    assert!(cambios_de_contrasena(&p).is_empty());
+}
+
+#[tokio::test]
+async fn contrasena_router_valida_la_nueva() {
+    let (p, cookie) = preparado().await;
+    for (nueva, texto) in [
+        ("corta", "demasiado corta"),
+        (&*"x".repeat(65), "demasiado larga"),
+        ("clave\nde-prueba", "saltos de línea"),
+        (PASS, "la misma que ya tiene"),
+    ] {
+        for f in ["comprobar_contrasena_router", "cambiar_contrasena_router"] {
+            let (status, body) = llamar(&p, f, json!({ "nueva": nueva }), Some(&cookie)).await;
+            assert_eq!(status, 400, "{f} {nueva:?}: {body}");
+            assert!(body.contains(texto), "{f} {nueva:?}: {body}");
+        }
+    }
+    assert!(cambios_de_contrasena(&p).is_empty());
+    // En solo lectura (firmware sin probar), no.
+    instancia::escribir(&p.state.db, instancia::claves::SOLO_LECTURA, &json!(true))
+        .await
+        .unwrap();
+    // La tarjeta se ve desactivada y dice por qué.
+    let html = body_text(get_con_cookie(&p.app, "/router/conexion", &cookie).await).await;
+    assert!(
+        html.contains("No se puede cambiar mientras el panel esté en solo lectura"),
+        "{html}"
+    );
+    let tarjeta = html
+        .split(r#"id="router-cambiar-contrasena""#)
+        .nth(1)
+        .and_then(|t| t.split("</section>").next())
+        .expect("la tarjeta");
+    // El campo y el botón, los dos desactivados.
+    let etiqueta = |abre: &str, marca: &str| -> String {
+        tarjeta
+            .split(abre)
+            .skip(1)
+            .map(|t| t.split('>').next().unwrap_or("").to_owned())
+            .find(|t| t.contains(marca))
+            .unwrap_or_else(|| panic!("falta {abre} {marca}: {tarjeta}"))
+    };
+    let campo = etiqueta("<input", r#"id="router-contrasena-nueva""#);
+    assert!(campo.contains("disabled"), "{campo}");
+    let boton = etiqueta("<button", r#"type="submit""#);
+    assert!(boton.contains("disabled"), "{boton}");
+    // Y, por si acaso, el servidor tampoco lo deja.
+    let (status, body) = cambiar(&p, &cookie, NUEVA).await;
+    assert_eq!(status, 403, "{body}");
+    assert!(body.contains("solo lectura"), "{body}");
+    assert!(cambios_de_contrasena(&p).is_empty());
+}
+
+/// Ninguna contraseña en el registro, en las respuestas ni en el Historial,
+/// que sí recogen lo que se ha hecho.
+#[tokio::test]
+async fn contrasena_router_no_aparece_en_registros() {
+    let registro = registro_global();
+    let (p, cookie) = preparado().await;
+    // Uno que se restaura y otro que sale bien.
+    p.sim.control.login_falla_con(NUEVA);
+    let (status, fallido) = cambiar(&p, &cookie, NUEVA).await;
+    assert_eq!(status, 502);
+    let otra = "otra-clave-nueva-de-prueba";
+    let mut req = post_json(
+        "/api/cambiar_contrasena_router",
+        &json!({ "nueva": otra }).to_string(),
+        "127.0.0.1",
+    );
+    req.headers_mut().insert("cookie", cookie.parse().unwrap());
+    let resp = send(&p.app, req).await;
+    assert_eq!(resp.status(), 200);
+    assert_eq!(resp.headers()["cache-control"], "no-store");
+    let bien = body_text(resp).await;
+    for texto in [&fallido, &bien, &historial_en_texto(&p).await] {
+        for clave in [PASS, NUEVA, otra] {
+            assert!(!texto.contains(clave), "{clave} en {texto}");
+        }
+    }
+    let texto = registro.texto();
+    assert!(
+        texto.contains("contraseña del router cambiada"),
+        "el registro no recoge nada: {texto}"
+    );
+    assert!(
+        texto.contains("se ha vuelto a poner la anterior"),
+        "{texto}"
+    );
+    for clave in [PASS, NUEVA, otra] {
+        assert!(!texto.contains(clave), "{clave} en el registro");
+    }
+}
+
+// El nombre del brief, con el de la función del router.
+#[allow(non_snake_case)]
+#[tokio::test]
+async fn biblioteca_sigue_bloqueando_cbModifyPwd() {
+    let (p, cookie) = preparado().await;
+    let (status, body) = llamar(
+        &p,
+        "preparar_cambio",
+        json!({ "peticion": { "funcion": "cbModifyPwd", "instancia": null,
+            "valores": [["rqUser", USER], ["rqOPwd", PASS], ["rqNPwd", NUEVA]],
+            "borrar": false } }),
+        Some(&cookie),
+    )
+    .await;
+    assert!((400..500).contains(&status), "{status}: {body}");
+    assert!(body.contains("bloqueada"), "{body}");
+    assert!(p.sim.control.writes().is_empty());
+    // Y el gestor la rechaza también sin pasar por la Biblioteca.
+    let g = p.state.cambios().unwrap();
+    assert!(g.escribible("cbModifyPwd").is_err());
+    assert!(entra(&p, PASS).await);
+}
+
+// ---- Tarjeta de las credenciales: la contraseña guardada, con el ojo
+
+#[tokio::test]
+async fn credenciales_llegan_con_la_contrasena_guardada() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    let v: Value = ok(&p, "leer_conexion_router", json!({}), &cookie).await;
+    assert_eq!(v["contrasena"], PASS);
+    // Su `Debug` la tapa.
+    let c: panel::panel_ajustes::ConexionRouter = serde_json::from_value(v.clone()).unwrap();
+    assert_eq!(c.contrasena, PASS);
+    assert!(!format!("{c:?}").contains(PASS), "{c:?}");
+    // «Ajustes del panel» no la lleva.
+    let (_, panel) = llamar(&p, "leer_panel", json!({}), Some(&cookie)).await;
+    assert!(!panel.contains(PASS), "{panel}");
+    let resp = get_con_cookie(&p.app, "/panel", &cookie).await;
+    assert!(!body_text(resp).await.contains(PASS));
+    // La página la lleva solo en el campo, sin caché.
+    let resp = get_con_cookie(&p.app, "/router/conexion", &cookie).await;
+    assert_eq!(resp.headers()["cache-control"], "no-store");
+    let html = body_text(resp).await;
+    assert!(html.contains(&format!("value=\"{PASS}\"")), "{html}");
+    for marca in [
+        "data-1p-ignore",
+        "data-lpignore=\"true\"",
+        "data-bwignore",
+        "data-form-type=\"other\"",
+        "autocomplete=\"new-password\"",
+    ] {
+        assert!(html.contains(marca), "{marca}");
+    }
+    // Con su nombre, no con el prefijo de Leptos para componentes.
+    assert!(!html.contains("attr:data-"), "{html}");
+    assert!(html.contains("Cambiar la contraseña del router"));
+    assert!(html.contains("Contraseña con la que el panel entra en el router"));
+}
+
+#[tokio::test]
+async fn credenciales_sin_tocar_la_contrasena_se_queda_la_guardada() {
+    let (p, cookie) = preparado().await;
+    let sin = json!({ "url": p.sim.base_url, "usuario": USER, "contrasena": null });
+    let r = ok(&p, "panel_probar_router", sin.clone(), &cookie).await;
+    assert_eq!(r["modelo"], "RTF8115VW", "{r}");
+    ok(&p, "panel_guardar_router", sin, &cookie).await;
+    assert_eq!(contrasena_guardada(&p).await, PASS);
+    // Sin el campo, igual.
+    ok(
+        &p,
+        "panel_guardar_router",
+        json!({ "url": p.sim.base_url, "usuario": USER }),
+        &cookie,
+    )
+    .await;
+    assert_eq!(contrasena_guardada(&p).await, PASS);
+    // Con otra, la prueba (y no entra).
+    let (status, _) = llamar(
+        &p,
+        "panel_guardar_router",
+        json!({ "url": p.sim.base_url, "usuario": USER, "contrasena": NUEVA }),
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(status, 502);
+    assert_eq!(contrasena_guardada(&p).await, PASS);
+    // La guardada solo vale para la dirección y el usuario guardados: con
+    // otros, hay que escribirla (y no se prueba nada).
+    let leidas = p.sim.control.reads().len();
+    for (url, usuario) in [
+        ("http://192.0.2.1", USER),
+        (p.sim.base_url.as_str(), "otro-usuario"),
+    ] {
+        for f in ["panel_probar_router", "panel_guardar_router"] {
+            let (status, body) = llamar(
+                &p,
+                f,
+                json!({ "url": url, "usuario": usuario, "contrasena": null }),
+                Some(&cookie),
+            )
+            .await;
+            assert_eq!(status, 400, "{f} {url} {usuario}: {body}");
+            assert!(body.contains("escribe también la contraseña"), "{body}");
+        }
+    }
+    assert_eq!(p.sim.control.reads().len(), leidas);
+    // La misma dirección escrita de otra forma (con «/» al final) sí.
+    let r = ok(
+        &p,
+        "panel_probar_router",
+        json!({ "url": format!("{}/", p.sim.base_url), "usuario": USER }),
+        &cookie,
+    )
+    .await;
+    assert_eq!(r["modelo"], "RTF8115VW", "{r}");
+}
+
+/// Si el panel no puede guardar la nueva (la base de datos falla), vuelve a
+/// poner la anterior en el router y no cambia nada.
+#[tokio::test]
+async fn contrasena_router_no_guardada_restaura() {
+    let (p, cookie) = preparado().await;
+    sqlx::query(
+        "CREATE TRIGGER sin_guardar BEFORE UPDATE ON router_credenciales \
+         BEGIN SELECT RAISE(ABORT, 'fallo de prueba'); END",
+    )
+    .execute(&p.state.db)
+    .await
+    .unwrap();
+    let (status, body) = cambiar(&p, &cookie, NUEVA).await;
+    assert_eq!(status, 500, "{body}");
+    assert!(body.contains("no pudo guardarla"), "{body}");
+    assert!(entra(&p, PASS).await);
+    assert!(!entra(&p, NUEVA).await);
+    assert_eq!(contrasena_guardada(&p).await, PASS);
+    let cambios = cambios_de_contrasena(&p);
+    assert_eq!(cambios.len(), 2, "{cambios:?}");
+    assert_eq!(valor(&cambios[1], "rqNPwd"), PASS);
+    p.sim.control.invalidate_sessions();
+    hgu::read::summary(&p.state.hgu).await.unwrap();
+}
+
+/// Mientras dura el cambio, nadie más usa el cliente del panel (ni cierra ni
+/// renueva la sesión de la que depende la vuelta atrás): una lectura que
+/// llega en medio espera a que acabe, vuelta atrás incluida.
+#[tokio::test]
+async fn contrasena_router_tiene_la_sesion_en_exclusiva() {
+    let (p, cookie) = preparado().await;
+    p.sim.control.login_falla_con(NUEVA);
+    // Cada respuesta del router tarda: el cambio dura un rato.
+    p.sim.control.set_retardo(Duration::from_millis(60));
+    let cambio = {
+        let app = p.app.clone();
+        let mut req = post_json(
+            "/api/cambiar_contrasena_router",
+            &json!({ "nueva": NUEVA }).to_string(),
+            "127.0.0.1",
+        );
+        req.headers_mut().insert("cookie", cookie.parse().unwrap());
+        tokio::spawn(async move { send(&app, req).await.status() })
+    };
+    esperar_hasta(Duration::from_secs(10), "sin cambio", async || {
+        !cambios_de_contrasena(&p).is_empty()
+    })
+    .await;
+    // Una lectura por el cliente del panel en medio del cambio.
+    hgu::read::summary(&p.state.hgu).await.unwrap();
+    assert_eq!(
+        cambios_de_contrasena(&p).len(),
+        2,
+        "la lectura no esperó a la vuelta atrás"
+    );
+    assert_eq!(cambio.await.unwrap(), 502);
+    p.sim.control.set_retardo(Duration::ZERO);
+    assert!(entra(&p, PASS).await);
+}
+
+/// Sin gestor de cambios instalado (como el panel recién instalado antes de
+/// arrancarlo), el flujo funciona igual.
+#[tokio::test]
+async fn contrasena_router_sin_gestor() {
+    registro_global();
+    let p = PanelPrueba::nuevo().arrancar().await;
+    let cookie = sesion(&p).await;
+    reautenticar(&p, &cookie).await;
+    let (status, body) = cambiar(&p, &cookie, NUEVA).await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(contrasena_guardada(&p).await, NUEVA);
+}
+
+/// Una prueba de acceso que no responde cuenta como «no entra», sin esperar
+/// el tiempo del cliente: aquí, con la espera acortada, el router deja de
+/// responder tras aceptar el cambio y se llega al error grave enseguida.
+#[tokio::test]
+async fn contrasena_router_prueba_sin_respuesta_no_entra() {
+    let (mut p, cookie) = preparado().await;
+    p.state.espera_prueba_router = Duration::from_millis(200);
+    p.app = panel::build_router(p.state.clone());
+    p.sim.control.hang_after_next_write();
+    let inicio = Instant::now();
+    let (status, body) = cambiar(&p, &cookie, NUEVA).await;
+    assert_eq!(status, 502, "{body}");
+    assert!(
+        body.contains("ni con la contraseña nueva ni con la anterior"),
+        "{body}"
+    );
+    assert!(
+        inicio.elapsed() < Duration::from_secs(8),
+        "{:?}",
+        inicio.elapsed()
+    );
+    assert_eq!(contrasena_guardada(&p).await, PASS);
+    p.sim.control.set_unresponsive(false);
+}

@@ -1,0 +1,44 @@
+/* Tokens: colores, espacios, radios y tipografías del tema oscuro. */
+/* ---------------------------------------------------------------- Tokens */
+
+:root {
+  color-scheme: dark;
+
+  --fondo: #0e0f11;
+  --superficie-1: #16181c;
+  --superficie-2: #1e2126;
+  --borde: #2a2e35;
+  --texto-1: #e8eaed;
+  --texto-2: #9aa0a8;
+  --acento: #ffb000;
+  --acento-texto: #0e0f11;
+  --acento-suave: rgb(255 176 0 / 0.1);
+
+  --ok: #3dd68c;
+  --aviso: #f5a524;
+  --error: #f0524f;
+  --ok-suave: rgb(61 214 140 / 0.12);
+  --aviso-suave: rgb(245 165 36 / 0.12);
+  --error-suave: rgb(240 82 79 / 0.12);
+
+  /* Datos (validados contra la superficie #16181C): nunca el acento. */
+  --viz-1: #3399e0;
+  --viz-2: #c27f00;
+  --viz-rejilla: #23262c;
+  --viz-eje: #3a3f47;
+  --viz-cruceta: #6b717a;
+
+  --esp-1: 4px;
+  --esp-2: 8px;
+  --esp-3: 12px;
+  --esp-4: 16px;
+  --esp-5: 24px;
+  --esp-6: 32px;
+  --radio: 8px;
+
+  --fuente-ui: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --fuente-titulos: "Chakra Petch", var(--fuente-ui);
+  --fuente-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --barra-ancho: 232px;
+}

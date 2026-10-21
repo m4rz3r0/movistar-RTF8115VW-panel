@@ -653,13 +653,7 @@ fn SeccionUsuarios(usuarios: Vec<String>, yo: String) -> impl IntoView {
 pub(crate) fn DialogoReautenticar() -> impl IntoView {
     let reauth = expect_context::<Reautenticacion>();
     let dlg = NodeRef::<html::Dialog>::new();
-    Effect::new(move |_| {
-        if let Some(d) = dlg.get()
-            && !d.open()
-        {
-            let _ = d.show_modal();
-        }
-    });
+    crate::ui::explorador::abrir_modal(dlg);
     let contrasena = RwSignal::new(String::new());
     let error = RwSignal::new(None::<String>);
     let pidiendo = RwSignal::new(false);

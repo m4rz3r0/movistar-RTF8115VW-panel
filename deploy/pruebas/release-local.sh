@@ -20,8 +20,9 @@
 #    entorno del panel (RP_LISTEN en 127.0.0.1:RP_PRUEBA_PUERTO_PANEL, por
 #    defecto 3502). El actualizador espera a /salud del panel de verdad.
 # 4. Comprueba lo desplegado (panel, site/, LICENSE, AVISO-LEGAL.md,
-#    deploy/linux/README.md), que el panel sirve su web desde site/ y que
-#    --comprobar dice que está al día.
+#    deploy/linux/README.md), que el panel sirve su web desde site/, que no
+#    atiende RP_E2E_VIGILANCIA_S (la vigilancia corta de las pruebas, que
+#    solo existe con debug-assertions) y que --comprobar dice que está al día.
 #
 # Necesita el panel compilado: RP_PRUEBA_PANEL (por defecto
 # target/release/panel) y RP_PRUEBA_SITE (por defecto target/site), de
@@ -177,6 +178,7 @@ RP_DB=$DATOS/panel.db
 RP_HISTORY_KEY=$DATOS/history.key
 RP_ORIGIN=http://localhost:$PUERTO_PANEL
 RP_LOG=warn
+RP_E2E_VIGILANCIA_S=1
 EOF
 # start: el entorno de la unidad desplegada (Environment=), luego el fichero
 # de entorno (EnvironmentFile=) y ExecStart, en segundo plano; stop: lo para.
@@ -240,6 +242,14 @@ done
 cmp -s "$PANEL" "$PREFIJO/current/panel" || fallo "el panel desplegado no es el empaquetado"
 if ! curl -fsS -m 5 "http://127.0.0.1:$PUERTO_PANEL/salud" | grep -q '"ok":true'; then
 	fallo "el panel desplegado no responde en /salud"
+fi
+# Release no tiene debug-assertions: la vigilancia corta de las pruebas no
+# se activa (el binario de depuración lo anuncia por la salida de error).
+# Sin su registro no se puede saber: también es un fallo.
+if [ ! -f "$TMP/panel.log" ]; then
+	fallo "falta el registro del panel ($TMP/panel.log): no se puede comprobar RP_E2E_VIGILANCIA_S"
+elif grep -q 'vigilancia de pruebas' "$TMP/panel.log"; then
+	fallo "el panel release atiende RP_E2E_VIGILANCIA_S (¿debug-assertions en [profile.release]?)"
 fi
 # La hoja de estilos, con el hash en el nombre si la web lo lleva (hash.txt).
 CSS=pkg/panel.css

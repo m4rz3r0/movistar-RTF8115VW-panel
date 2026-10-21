@@ -5,16 +5,19 @@
 //! único que nombra la API.
 //!
 //! Un ajuste que no se pudo leer muestra el motivo y no se edita. Los
-//! dispositivos y las IP fijas tienen su componente ([`Dispositivos`],
-//! [`Reservas`]); otro componente propio (puertos…) es por ahora un hueco
-//! con su título y descripción; una lista sin componente se ve como tabla.
+//! dispositivos, las IP fijas y los puertos abiertos tienen su componente
+//! ([`Dispositivos`], [`Reservas`], [`Puertos`]); la contraseña del router
+//! se cambia en «Configuración del router» y aquí lleva un enlace; otro
+//! componente propio sería un hueco con su título y descripción; una lista
+//! sin componente se ve como tabla.
 
 use super::Foco;
 use super::campo::{
-    Campo, cambiado, elegido, es_recomendado, etiqueta, inicial, texto_legible, validar,
+    Campo, cambiado, elegido, es_recomendado, etiqueta, inicial_campo, texto_legible, validar,
     valor_resumido,
 };
 use super::dispositivos::Dispositivos;
+use super::puertos::Puertos;
 use super::reservas::Reservas;
 use crate::ajustes_router::{
     AjusteVista, CampoVista, DetallesTecnicos, EstadoLectura, GrupoVista, PeticionAjuste,
@@ -27,6 +30,7 @@ use crate::ui::i18n::traducir;
 use crate::ui::{Estado, IconoEstado, Insignia};
 use ajustes::Nivel;
 use leptos::{ev::SubmitEvent, html, prelude::*, task::spawn_local};
+use leptos_router::components::A;
 use std::collections::BTreeMap;
 
 /// Prefijo de los ids de la tarjeta en la página (`ajuste-wifi-red_24`).
@@ -54,12 +58,18 @@ fn nivel(n: Nivel) -> Option<AnyView> {
             view! { <span class="chip chip-nivel">{t!("ajustes-nivel-avanzado")}</span> }
                 .into_any(),
         ),
-        // Lo que significa va una sola vez en la página (`NOTA_OCULTO`).
+        // Lo que significa va una sola vez en la página (`NOTA_OCULTO`). Un
+        // enlace a esa nota: un lector de pantalla anuncia su descripción
+        // (en un `<span>` sin rol, no siempre) y lleva a ella.
         Nivel::Oculto => Some(
             view! {
-                <span class="chip chip-nivel chip-oculto" aria-describedby=super::NOTA_OCULTO>
+                <a
+                    class="chip chip-nivel chip-oculto"
+                    href=format!("#{}", super::NOTA_OCULTO)
+                    aria-describedby=super::NOTA_OCULTO
+                >
                     {t!("ajustes-nivel-oculto")}
-                </span>
+                </a>
             }
             .into_any(),
         ),
@@ -194,6 +204,10 @@ pub(crate) fn Tarjeta(
         view! { <Dispositivos a solo_lectura recargar /> }.into_any()
     } else if a.componente.as_deref() == Some(super::RESERVAS) {
         view! { <Reservas a solo_lectura recargar /> }.into_any()
+    } else if a.componente.as_deref() == Some(super::PUERTOS) {
+        view! { <Puertos a solo_lectura recargar /> }.into_any()
+    } else if a.componente.as_deref() == Some(super::CONTRASENA_ROUTER) {
+        enlace_contrasena(&a).into_any()
     } else if a.componente.is_some() {
         hueco(&a).into_any()
     } else if a.lista {
@@ -208,7 +222,27 @@ pub(crate) fn Tarjeta(
     }
 }
 
-/// Ajuste con componente propio: por ahora, su título y su descripción.
+/// La contraseña del router: se cambia en «Configuración del router»
+/// (junto a la que usa el panel para entrar); aquí, el enlace.
+fn enlace_contrasena(a: &AjusteVista) -> impl IntoView + use<> {
+    let href = format!(
+        "{}#{}",
+        crate::ui::router::RUTA_CONEXION,
+        crate::ui::router::ID_CAMBIAR_CONTRASENA
+    );
+    view! {
+        {cabecera(a, false)}
+        {ayuda(a)}
+        <p class="ayuda">{t!("contrasena-router-enlace-texto")}</p>
+        <p>
+            <A href=href attr:class="boton-sutil">
+                {t!("contrasena-router-enlace")}
+            </A>
+        </p>
+    }
+}
+
+/// Ajuste con componente propio sin hacer: su título y su descripción.
 fn hueco(a: &AjusteVista) -> impl IntoView + use<> {
     view! {
         {cabecera(a, false)}
@@ -269,9 +303,10 @@ fn lista(a: &AjusteVista) -> impl IntoView + use<> {
     }
 }
 
-/// Una fila de la vista resumida: etiqueta, valor y, si no es el
-/// recomendado, cuál lo es (cuando coincide no se marca: menos ruido). La
-/// marca se despliega con para quién es y sus pros y contras.
+/// Una fila de la vista resumida: etiqueta, valor (un secreto, censurado con
+/// el ojo) y, si no es el recomendado, cuál lo es (cuando coincide no se
+/// marca: menos ruido). La marca se despliega con para quién es y sus pros
+/// y contras.
 fn fila(c: &CampoVista) -> impl IntoView + use<> {
     let marca = (es_recomendado(c) == Some(false)).then(|| {
         let r = c.recomendado.clone().unwrap_or_default();
@@ -305,7 +340,7 @@ fn TarjetaAjuste(a: AjusteVista, solo_lectura: bool, recargar: Callback<()>) -> 
     let valores: Vec<RwSignal<String>> = a
         .campos
         .iter()
-        .map(|c| RwSignal::new(inicial(&c.valor)))
+        .map(|c| RwSignal::new(inicial_campo(c)))
         .collect();
     let errores: Vec<RwSignal<Option<String>>> =
         a.campos.iter().map(|_| RwSignal::new(None)).collect();
@@ -339,7 +374,7 @@ fn TarjetaAjuste(a: AjusteVista, solo_lectura: bool, recargar: Callback<()>) -> 
     let cancelar = move |_| {
         campos.with_value(|cs| {
             for (i, c) in cs.iter().enumerate() {
-                valores.with_value(|v| v[i].set(inicial(&c.valor)));
+                valores.with_value(|v| v[i].set(inicial_campo(c)));
                 errores.with_value(|e| e[i].set(None));
             }
         });
@@ -401,6 +436,19 @@ fn TarjetaAjuste(a: AjusteVista, solo_lectura: bool, recargar: Callback<()>) -> 
                     }
                 }
             });
+            // Guardar reenvía la clave que el router no deja leer: hay que
+            // escribirla (el servidor tampoco guarda sin ella).
+            if !pedir.is_empty() {
+                campos.with_value(|cs| {
+                    for (i, c) in cs.iter().enumerate() {
+                        if c.tapado && c.solo_lectura.is_none() && !pedir.contains_key(&c.id) {
+                            errores
+                                .with_value(|e| e[i].set(Some(t!("ajustes-secreto-tapado-pedir"))));
+                            primero_mal.get_or_insert(i);
+                        }
+                    }
+                });
+            }
             if let Some(i) = primero_mal {
                 enfocar(&control(i));
                 return;

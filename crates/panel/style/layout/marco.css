@@ -1,0 +1,257 @@
+/* Marco: cabecera, zona de sesión y menú lateral. */
+/* ---------------------------------------------------------------- Marco */
+
+.marco {
+  display: grid;
+  grid-template-columns: var(--barra-ancho) minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.barra {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-5);
+  height: 100vh;
+  /* En pantallas bajas se desplaza la barra: «Salir» nunca queda cortado. */
+  overflow-y: auto;
+  padding: var(--esp-5) var(--esp-3) var(--esp-4);
+  background: linear-gradient(180deg, var(--superficie-1), #121417);
+  border-right: 1px solid var(--borde);
+}
+
+.barra-cabeza {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esp-3);
+}
+
+.marca {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-3);
+  padding: 0 var(--esp-2);
+  color: var(--texto-1);
+  text-decoration: none;
+}
+
+.marca-logo {
+  flex: none;
+  color: var(--acento);
+}
+
+.marca-texto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.marca-nombre {
+  font-family: var(--fuente-titulos);
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+}
+
+.marca-sub {
+  color: var(--texto-2);
+  font-size: 12px;
+}
+
+.menu-boton {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: transparent;
+  color: var(--texto-1);
+  cursor: pointer;
+}
+
+.barra-cuerpo {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--esp-5);
+  min-height: 0;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* El nombre de usuario de la zona de sesión (abre «Ajustes del panel») se
+   ve y se marca como un enlace del menú. */
+.nav a,
+.sesion-usuario {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--esp-3);
+  min-height: 40px;
+  padding: 0 var(--esp-3);
+  border-radius: var(--radio);
+  color: var(--texto-2);
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 120ms ease, background 120ms ease;
+}
+
+.nav a:hover,
+.sesion-usuario:hover {
+  color: var(--texto-1);
+  background: var(--superficie-2);
+}
+
+.nav a[aria-current="page"],
+.sesion-usuario[aria-current="page"] {
+  color: var(--texto-1);
+  background: var(--acento-suave);
+}
+
+.nav a[aria-current="page"] .icono,
+.sesion-usuario[aria-current="page"] .icono {
+  color: var(--acento);
+}
+
+.nav a[aria-current="page"]::before,
+.sesion-usuario[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  left: -12px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--acento);
+}
+
+.sesion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-2);
+  padding-top: var(--esp-4);
+  border-top: 1px solid var(--borde);
+}
+
+/* Un nombre largo se corta con puntos suspensivos: no ensancha la barra. */
+.sesion-usuario {
+  min-width: 0;
+}
+
+.sesion-nombre {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.salir {
+  justify-content: flex-start;
+}
+
+.idioma {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.idioma-error {
+  color: var(--error);
+  font-size: 12px;
+}
+
+.idioma-error:empty {
+  display: none;
+}
+
+.idioma-selector {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 var(--esp-3);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: transparent;
+  color: var(--texto-2);
+  font: inherit;
+  cursor: pointer;
+}
+
+.idioma-selector:hover {
+  color: var(--texto-1);
+  border-color: var(--texto-2);
+}
+
+.idioma-selector option {
+  background: var(--fondo);
+  color: var(--texto-1);
+}
+
+.contenido {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-5);
+  width: 100%;
+  max-width: 1440px;
+  min-width: 0;
+  padding: var(--esp-6);
+}
+
+.contenido:focus {
+  outline: none;
+}
+
+@media (max-width: 860px) {
+  /* La barra superior, a su altura; el contenido se queda el resto (en una
+     página corta, la barra no se estira). */
+  .marco {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+  }
+
+  .barra {
+    z-index: 20;
+    height: auto;
+    gap: 0;
+    padding: var(--esp-2) var(--esp-4);
+    border-right: 0;
+    border-bottom: 1px solid var(--borde);
+    background: var(--superficie-1);
+  }
+
+  .marca {
+    padding: 0;
+  }
+
+  .menu-boton {
+    display: inline-flex;
+  }
+
+  .barra-cuerpo {
+    display: none;
+    padding: var(--esp-3) 0 var(--esp-2);
+  }
+
+  .barra.abierta .barra-cuerpo {
+    display: flex;
+  }
+
+  .nav a[aria-current="page"]::before,
+  .sesion-usuario[aria-current="page"]::before {
+    left: 0;
+  }
+
+  .contenido {
+    padding: var(--esp-4);
+    gap: var(--esp-4);
+  }
+}

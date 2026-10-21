@@ -5,6 +5,7 @@ use std::{
     net::SocketAddr,
     path::{Path, PathBuf},
     str::FromStr,
+    time::Duration,
 };
 
 /// Fichero SQLite y clave del historial por defecto, según las costumbres del
@@ -57,6 +58,16 @@ pub struct Config {
     /// Redes que el asistente de instalación acepta además de la red local
     /// (`RP_INSTALL_NETS`, separadas por comas; por defecto, ninguna).
     pub install_nets: Vec<RedIp>,
+    /// Pausa mínima entre peticiones al router: la de serie,
+    /// [`hgu::client::PAUSA_MINIMA`] (150 ms). No sale de ninguna variable
+    /// de entorno (una pausa menor podría saturar el router); solo las
+    /// pruebas la acortan.
+    pub router_min_gap: Duration,
+    /// Lo más que se espera a la detección de la red del router al arrancar
+    /// sin ninguna guardada o al guardar las credenciales: la de serie,
+    /// [`crate::instancia::ESPERA_DETECCION`] (5 s). Tampoco sale de ninguna
+    /// variable; solo las pruebas la acortan.
+    pub espera_deteccion: Duration,
 }
 
 impl Config {
@@ -91,6 +102,8 @@ impl Config {
                 Some(texto) => redes("RP_INSTALL_NETS", &texto)?,
                 None => Vec::new(),
             },
+            router_min_gap: hgu::client::PAUSA_MINIMA,
+            espera_deteccion: crate::instancia::ESPERA_DETECCION,
         })
     }
 }
@@ -235,6 +248,8 @@ mod tests {
         assert_eq!(c.trusted_proxies, [red("127.0.0.1")]);
         assert_eq!(c.public_origins, ["http://localhost:3000"]);
         assert!(c.install_nets.is_empty());
+        assert_eq!(c.router_min_gap, Duration::from_millis(150));
+        assert_eq!(c.espera_deteccion, Duration::from_secs(5));
     }
 
     #[test]

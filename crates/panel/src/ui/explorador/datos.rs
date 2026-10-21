@@ -2,10 +2,10 @@
 //! (la misma en el navegador y en el servidor), enlaces y server functions.
 //!
 //! Los tipos de aquí no dependen de `catalogo` ni de `hgu` (que solo existen
-//! en el servidor). Un valor secreto nunca viaja: va como [`Valor::Secreto`]
-//! (lecturas y diff) o como [`MASCARA`] (formularios, que el gestor entiende
-//! como "sin tocar"). Solo [`revelar`] devuelve un secreto, tras pedir otra
-//! vez la contraseña del panel, y queda registrado en `reveals`.
+//! en el servidor). En una lectura, un secreto viaja con su valor
+//! ([`Valor::Clave`], decisión del usuario del 2026-10-18), para el campo
+//! censurado con el ojo; en el diff va como [`Valor::Secreto`] y en los
+//! formularios como [`MASCARA`] (que el gestor entiende como "sin tocar").
 //!
 //! Toda escritura pasa por el gestor de cambios del servidor
 //! (`AppState::cambios`): `preparar_cambio` y `confirmar_cambio` son sus
@@ -198,8 +198,11 @@ pub struct FuncionDetalle {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Valor {
     Texto(String),
-    /// Secreto: no viaja.
+    /// Secreto sin su valor (un diff, que se enseña enmascarado).
     Secreto,
+    /// Secreto con su valor (una lectura, o los valores de un cambio del
+    /// Historial): se pinta censurado, con el ojo.
+    Clave(String),
     /// La instancia no tiene ese campo.
     Ausente,
     /// Valor de una opción (o sí/no) con su etiqueta; `None` si no es una
@@ -294,14 +297,29 @@ pub struct ListaInstancias {
     pub total: usize,
 }
 
-/// Petición de cambio desde el navegador. Los IP/MAC van unidos.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// Petición de cambio desde el navegador. Los IP/MAC van unidos. Su `Debug`
+/// enseña los nombres de los valores, no los valores (pueden ser secretos).
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Peticion {
     pub funcion: String,
     /// Instancia que se edita o borra; `None` crea una nueva.
     pub instancia: Option<String>,
     pub valores: Vec<(String, String)>,
     pub borrar: bool,
+}
+
+impl std::fmt::Debug for Peticion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Peticion")
+            .field("funcion", &self.funcion)
+            .field("instancia", &self.instancia)
+            .field(
+                "valores",
+                &self.valores.iter().map(|(k, _)| k).collect::<Vec<_>>(),
+            )
+            .field("borrar", &self.borrar)
+            .finish()
+    }
 }
 
 /// Campo del diff.
@@ -325,6 +343,10 @@ pub struct PreparadoVista {
     pub vigilancia_s: u64,
     /// Palabra que hay que escribir para confirmar (acciones).
     pub palabra: Option<String>,
+    /// Un aviso para quien confirma, ya traducido (al deshacer: la clave que
+    /// el router no deja leer se queda como se escribió).
+    #[serde(default)]
+    pub aviso: Option<String>,
 }
 
 /// Estado de un cambio.
@@ -460,6 +482,8 @@ pub async fn detalle_funcion(nombre: String) -> Result<FuncionDetalle, ServerFnE
 /// Ejecuta la lectura `funcion` con `params` y la devuelve enmascarada.
 #[server(endpoint = "leer", input = Json)]
 pub async fn leer(funcion: String, params: Vec<(String, String)>) -> Result<Vista, ServerFnError> {
+    // Lleva los valores de los secretos (para el ojo).
+    super::servidor::sin_guardar();
     crate::auth::require_user().await?;
     let state = super::servidor::app_state()?;
     super::servidor::leer(&state, &funcion, &params).await
@@ -473,6 +497,7 @@ pub async fn formulario(
     instancia: Option<String>,
     claves: Vec<(String, String)>,
 ) -> Result<FormVista, ServerFnError> {
+    super::servidor::sin_guardar();
     crate::auth::require_user().await?;
     let state = super::servidor::app_state()?;
     super::servidor::formulario(&state, &funcion, instancia, claves).await
@@ -484,6 +509,7 @@ pub async fn instancias(
     funcion: String,
     claves: Vec<(String, String)>,
 ) -> Result<ListaInstancias, ServerFnError> {
+    super::servidor::sin_guardar();
     crate::auth::require_user().await?;
     let state = super::servidor::app_state()?;
     super::servidor::instancias(&state, &funcion, claves).await
@@ -514,38 +540,6 @@ pub async fn estado_cambio(id: i64) -> Result<CambioVista, ServerFnError> {
     crate::auth::require_user().await?;
     let state = super::servidor::app_state()?;
     super::servidor::estado_cambio(&state, id).await
-}
-
-/// Valor de un secreto de la lectura `funcion` (con `params`): campo `campo`
-/// de la instancia `instancia` (id de la fila) o suelto. Con `contrasena`
-/// vacía, solo si la sesión tiene abierta la ventana de reautenticación (si
-/// no, 401 con [`crate::auth::ERROR_REAUTENTICACION`]); con la contraseña del
-/// panel, la comprueba con el mismo freno que el login y abre la ventana.
-/// Queda registrado (sin el valor) en `reveals`.
-#[server(endpoint = "revelar", input = Json)]
-pub async fn revelar(
-    funcion: String,
-    campo: String,
-    instancia: Option<String>,
-    params: Vec<(String, String)>,
-    #[server(default)] contrasena: String,
-) -> Result<String, ServerFnError> {
-    let (user, contrasena) = if contrasena.is_empty() {
-        (crate::auth::require_reauth().await?, None)
-    } else {
-        (crate::auth::require_user().await?, Some(contrasena))
-    };
-    let state = super::servidor::app_state()?;
-    super::servidor::revelar(
-        &state,
-        &user,
-        &funcion,
-        &campo,
-        instancia.as_deref(),
-        &params,
-        contrasena.as_deref(),
-    )
-    .await
 }
 
 #[cfg(test)]
@@ -583,6 +577,21 @@ mod tests {
         assert_eq!(
             ruta_funcion("nat", "te_ppp_pm.cmd?action=create"),
             "/explorador/nat/te_ppp_pm.cmd%3Faction%3Dcreate"
+        );
+    }
+
+    #[test]
+    fn debug_de_la_peticion_sin_valores() {
+        let p = Peticion {
+            funcion: "cbSetWifiAccPt".into(),
+            instancia: None,
+            valores: vec![("key_phrase".into(), "clave-en-claro".into())],
+            borrar: false,
+        };
+        let d = format!("{p:?}");
+        assert!(
+            !d.contains("clave-en-claro") && d.contains("key_phrase"),
+            "{d}"
         );
     }
 }

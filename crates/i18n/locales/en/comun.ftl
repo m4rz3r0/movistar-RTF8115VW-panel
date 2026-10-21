@@ -25,6 +25,7 @@ comun-cargando = Loading…
 
 ## Errors
 comun-error-conexion = Cannot reach the panel
+# Stored in the History (router.ftl): never rename or delete it.
 comun-error-interno = Internal panel error
 comun-error-interno-id = Internal panel error (id { $id })
 comun-error-sesion = Not signed in or session expired
@@ -34,6 +35,9 @@ comun-error-idioma = Cannot change the language; try again
 comun-si = Yes
 comun-no = No
 comun-valor-oculto = (hidden value)
+secreto-ver = Show { $campo }
+secreto-ocultar = Hide { $campo }
+secreto-sin-leer = The router won't let it be read
 comun-sin-valor = no value
 comun-sin-datos = No data
 comun-sin-datos-min = no data

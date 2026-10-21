@@ -66,8 +66,9 @@ pub(super) enum Lectura {
     Ninguna,
 }
 
-/// Un campo que cambia, con los valores en claro (solo en memoria).
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// Un campo que cambia, con los valores en claro (solo en memoria; su
+/// `Debug` tapa los de un secreto).
+#[derive(Clone, PartialEq, Eq)]
 pub(super) struct Campo {
     pub(super) nombre: String,
     pub(super) antes: String,
@@ -77,8 +78,28 @@ pub(super) struct Campo {
     pub(super) leido: bool,
 }
 
-/// Cambio listo para escribir y comprobar.
-#[derive(Clone, Debug)]
+impl std::fmt::Debug for Campo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let valor = |v: &str| {
+            if self.secreto {
+                "***".to_owned()
+            } else {
+                v.to_owned()
+            }
+        };
+        f.debug_struct("Campo")
+            .field("nombre", &self.nombre)
+            .field("antes", &valor(&self.antes))
+            .field("despues", &valor(&self.despues))
+            .field("secreto", &self.secreto)
+            .field("leido", &self.leido)
+            .finish()
+    }
+}
+
+/// Cambio listo para escribir y comprobar. Su `Debug` enseña los nombres de
+/// los valores y del payload, no los valores (llevan los secretos en claro).
+#[derive(Clone)]
 pub(super) struct Plan {
     pub(super) funcion: Funcion,
     pub(super) operacion: Operacion,
@@ -94,6 +115,24 @@ pub(super) struct Plan {
     /// que aparece nueva (no la primera con esos valores: puede haber una
     /// igual de antes). `None` si no se leyó (cambios anteriores a v0.1.1).
     pub(super) ids_antes: Option<BTreeSet<String>>,
+}
+
+impl std::fmt::Debug for Plan {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Plan")
+            .field("funcion", &self.funcion.name)
+            .field("operacion", &self.operacion)
+            .field("instancia", &self.instancia)
+            .field("valores", &self.valores.keys().collect::<Vec<_>>())
+            .field(
+                "payload",
+                &self.payload.iter().map(|(k, _)| k).collect::<Vec<_>>(),
+            )
+            .field("campos", &self.campos)
+            .field("lectura", &self.lectura)
+            .field("ids_antes", &self.ids_antes)
+            .finish()
+    }
 }
 
 /// Valor de `nombre` en `m`: primero exacto, luego sin distinguir mayúsculas.
@@ -240,6 +279,26 @@ pub(super) struct Compuesto {
     pub(super) payload: Vec<(String, String)>,
     /// Campos que cambian.
     pub(super) campos: Vec<Campo>,
+    /// Secretos que la carga reenviaría desde la lectura sin que valga como
+    /// clave: uno que el catálogo marca como tapado al leer
+    /// ([`catalogo::Parametro::tapado`]) o uno que llega enmascarado
+    /// ([`enmascarado`]). Reenviarlos podría borrar la clave del router: el
+    /// gestor no escribe. Siempre vacío con `explicito` (ahí se omiten).
+    pub(super) secretos_tapados: Vec<String>,
+}
+
+/// ¿Es una máscara y no una clave? La del panel, o solo asteriscos o puntos.
+pub(crate) fn enmascarado(v: &str) -> bool {
+    let v = v.trim();
+    !v.is_empty() && (v == MASCARA || v.chars().all(|c| matches!(c, '*' | '•' | '●')))
+}
+
+/// ¿El valor leído (o guardado de una lectura) del secreto `p` no sirve para
+/// reenviarlo? Si el catálogo lo marca como tapado al leer, vacío o
+/// enmascarado; si no, solo enmascarado (uno vacío, como una clave WEP sin
+/// usar, se reenvía tal cual).
+fn no_reenviable(p: &Parametro, v: &str) -> bool {
+    enmascarado(v) || (p.tapado && v.trim().is_empty())
 }
 
 /// Une valores de la petición y valores actuales. No hace peticiones.
@@ -259,12 +318,15 @@ pub(super) fn componer(
     // Sin tocar (un secreto vacío o cualquier campo que llega enmascarado):
     // valor actual, o fuera si no se conoce. `MASCARA` nunca se escribe.
     let mut efectivos = BTreeMap::new();
+    // Lo que se reenvía tal como lo da la lectura.
+    let mut de_la_lectura = BTreeSet::new();
     for (k, v) in valores {
         let p = f.parametro(k);
         let vacio = !explicito && es_secreto_param(f, m, k) && v.trim().is_empty();
         if v == MASCARA || vacio {
             if let Some(cur) = buscar(actual, k) {
                 efectivos.insert(k.clone(), cur.to_owned());
+                de_la_lectura.insert(k.clone());
             }
             continue;
         }
@@ -275,14 +337,34 @@ pub(super) fn componer(
         efectivos.insert(k.clone(), v);
     }
     let mut payload = Vec::new();
+    let mut secretos_tapados = Vec::new();
+    // Con `explicito` (reversión o deshacer), un secreto que no sirve para
+    // reenviarlo se omite: la vuelta atrás no se bloquea nunca por esto.
+    let mut omitidos = BTreeSet::new();
     for p in &f.parametros {
-        if let Some(v) = efectivos.get(&p.nombre) {
-            payload.push((p.nombre.clone(), v.clone()));
+        let (v, leido) = if let Some(v) = efectivos.get(&p.nombre) {
+            (v.as_str(), de_la_lectura.contains(&p.nombre))
         } else if op == Operacion::Editar
             && let Some(cur) = buscar(actual, &p.nombre)
         {
-            payload.push((p.nombre.clone(), cur.to_owned()));
+            (cur, true)
+        } else {
+            continue;
+        };
+        let secreto = es_secreto_param(f, m, &p.nombre);
+        // Lo que viene de una lectura: la de ahora o, con `explicito`, el
+        // valor anterior que se guardó de la de entonces.
+        if secreto && (leido || explicito) && no_reenviable(p, v) {
+            if explicito {
+                omitidos.insert(p.nombre.clone());
+                continue;
+            }
+            secretos_tapados.push(p.nombre.clone());
         }
+        payload.push((p.nombre.clone(), v.to_owned()));
+    }
+    for k in &omitidos {
+        efectivos.remove(k);
     }
     let secreto =
         |k: &str, a: &str, b: &str| es_secreto_param(f, m, k) || m.oculta(k, a) || m.oculta(k, b);
@@ -290,7 +372,10 @@ pub(super) fn componer(
     if op == Operacion::Borrar {
         payload.push(("del".into(), "DEL".into()));
         for p in &f.parametros {
-            if ident.contains(&p.nombre) || efectivos.contains_key(&p.nombre) {
+            if ident.contains(&p.nombre)
+                || efectivos.contains_key(&p.nombre)
+                || omitidos.contains(&p.nombre)
+            {
                 continue;
             }
             if let Some(cur) = buscar(actual, &p.nombre) {
@@ -329,6 +414,7 @@ pub(super) fn componer(
         efectivos,
         payload,
         campos,
+        secretos_tapados,
     }
 }
 
@@ -408,6 +494,11 @@ pub(super) fn comparar(
         let Some(leido) = buscar(actual, &c.nombre) else {
             continue;
         };
+        // Uno que el router da tapado al leer no se puede comprobar: lo que
+        // lee no es su valor (cuentan los demás campos del paso).
+        if f.parametro(&c.nombre).is_some_and(|p| p.tapado) {
+            continue;
+        }
         comparados += 1;
         let esperado = match lado {
             Lado::Nuevo => &c.despues,
@@ -492,291 +583,4 @@ pub(super) fn resumen(campos: &[Campo]) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use catalogo::Catalogo;
-
-    fn cat() -> Catalogo {
-        Catalogo::load().unwrap()
-    }
-
-    fn mapa(pares: &[(&str, &str)]) -> BTreeMap<String, String> {
-        pares
-            .iter()
-            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
-            .collect()
-    }
-
-    #[test]
-    fn carga_con_la_instancia_completa_y_secretos_sin_tocar() {
-        let c = cat();
-        let m = Mascara::load().unwrap();
-        let f = c.funcion("cbSetWifiAccPt").unwrap();
-        let actual = mapa(&[
-            ("dpm_cfg_wifi_acc_pt_id", "1"),
-            ("ssid", "Casa"),
-            ("key_phrase", "clave-actual"),
-            ("WMM", "1"),
-            ("bssid", "02:00:00:00:00:01"),
-        ]);
-        let valores = mapa(&[
-            ("dpm_cfg_wifi_acc_pt_id", "1"),
-            ("ssid", "Otra"),
-            ("key_phrase", MASCARA),
-            ("wep_key1_data", ""),
-        ]);
-        let Compuesto {
-            efectivos,
-            payload,
-            campos,
-        } = componer(f, &m, Operacion::Editar, &actual, &valores, false);
-        let p: BTreeMap<_, _> = payload.into_iter().collect();
-        assert_eq!(p["ssid"], "Otra");
-        assert_eq!(p["key_phrase"], "clave-actual", "secreto sin tocar");
-        // Sin distinguir mayúsculas cuando no hay coincidencia exacta.
-        assert_eq!(p["wmm"], "1");
-        assert_eq!(p["dpm_cfg_wifi_acc_pt_id"], "1");
-        // Ni lo que no es parámetro ni lo que no tiene valor.
-        assert!(!p.contains_key("bssid"));
-        assert!(!p.contains_key("wep_key1_data"));
-        assert!(!p.contains_key("validation_only"));
-        assert!(p.values().all(|v| v != MASCARA));
-        assert_eq!(efectivos["key_phrase"], "clave-actual");
-        assert_eq!(campos.len(), 1);
-        assert_eq!(campos[0].nombre, "ssid");
-
-        // Un campo que no es secreto pero llegó enmascarado (p. ej. por la
-        // regla de sufijo numérico) tampoco se escribe enmascarado.
-        let actual = mapa(&[("dpm_cfg_wifi_acc_pt_id", "1"), ("wep_key_idx", "2")]);
-        let valores = mapa(&[("dpm_cfg_wifi_acc_pt_id", "1"), ("wep_key_idx", MASCARA)]);
-        let r = componer(f, &m, Operacion::Editar, &actual, &valores, false);
-        assert!(r.campos.is_empty());
-        assert!(r.payload.contains(&("wep_key_idx".into(), "2".into())));
-        let r = componer(f, &m, Operacion::Editar, &mapa(&[]), &valores, false);
-        assert!(r.payload.iter().all(|(_, v)| v != MASCARA));
-
-        // Explícito (reversión): un secreto vacío es el valor a escribir.
-        let actual = mapa(&[("dpm_cfg_wifi_acc_pt_id", "1"), ("key_phrase", "nueva")]);
-        let valores = mapa(&[("dpm_cfg_wifi_acc_pt_id", "1"), ("key_phrase", "")]);
-        let r = componer(f, &m, Operacion::Editar, &actual, &valores, true);
-        assert!(r.payload.contains(&("key_phrase".into(), String::new())));
-        assert_eq!(r.campos.len(), 1);
-        let r = componer(f, &m, Operacion::Editar, &actual, &valores, false);
-        assert!(r.campos.is_empty(), "sin explícito, vacío = sin tocar");
-    }
-
-    #[test]
-    fn secreto_cambiado_se_marca() {
-        let c = cat();
-        let m = Mascara::load().unwrap();
-        let f = c.funcion("cbSetWifiAccPt").unwrap();
-        let actual = mapa(&[("dpm_cfg_wifi_acc_pt_id", "1"), ("key_phrase", "vieja")]);
-        let valores = mapa(&[("dpm_cfg_wifi_acc_pt_id", "1"), ("key_phrase", "nueva")]);
-        let campos = componer(f, &m, Operacion::Editar, &actual, &valores, false).campos;
-        assert_eq!(campos.len(), 1);
-        assert!(campos[0].secreto && campos[0].leido);
-        let d = visible(&campos);
-        assert_eq!(
-            (d.campos[0].antes.as_str(), d.campos[0].despues.as_str()),
-            (MASCARA, MASCARA)
-        );
-        assert!(!resumen(&campos).contains("nueva"));
-        assert!(!resumen(&campos).contains("vieja"));
-    }
-
-    #[test]
-    fn crear_y_borrar() {
-        let c = cat();
-        let m = Mascara::load().unwrap();
-        let f = c.funcion("cbDhcpV4SvrPoolSetStatic").unwrap();
-        let valores = mapa(&[
-            ("rtm_cfg_dhcpv4_svr_pool_id", "0"),
-            ("rtm_dhcpv4_svr_pool_static_id", "-1"),
-            ("mac_addr", " 02:00:00:00:00:AA "),
-            ("ipv4_addr", "192.168.1.60"),
-        ]);
-        let Compuesto {
-            payload, campos, ..
-        } = componer(f, &m, Operacion::Crear, &BTreeMap::new(), &valores, false);
-        let p: BTreeMap<_, _> = payload.into_iter().collect();
-        assert_eq!(p["rtm_dhcpv4_svr_pool_static_id"], "-1");
-        assert_eq!(p["mac_addr"], "02:00:00:00:00:AA", "IP/MAC sin espacios");
-        let nombres: Vec<_> = campos.iter().map(|c| c.nombre.as_str()).collect();
-        assert_eq!(nombres, ["ipv4_addr", "mac_addr"], "sin los ids");
-
-        let actual = mapa(&[
-            ("rtm_dhcpv4_svr_pool_static_id", "3"),
-            ("adm_state", "1"),
-            ("mac_addr", "02:00:00:00:00:aa"),
-            ("ipv4_addr", "192.168.1.60"),
-        ]);
-        let valores = mapa(&[
-            ("rtm_cfg_dhcpv4_svr_pool_id", "0"),
-            ("rtm_dhcpv4_svr_pool_static_id", "3"),
-        ]);
-        let Compuesto {
-            payload, campos, ..
-        } = componer(f, &m, Operacion::Borrar, &actual, &valores, false);
-        assert_eq!(
-            payload,
-            vec![
-                ("rtm_dhcpv4_svr_pool_static_id".to_owned(), "3".to_owned()),
-                ("rtm_cfg_dhcpv4_svr_pool_id".to_owned(), "0".to_owned()),
-                ("del".to_owned(), "DEL".to_owned()),
-            ]
-        );
-        assert_eq!(campos.len(), 3);
-        assert!(campos.iter().all(|c| c.despues.is_empty() && c.leido));
-    }
-
-    #[test]
-    fn inversa_de_cada_operacion() {
-        let c = cat();
-        let f = c.funcion("cbDhcpV4SvrPoolSetStatic").unwrap().clone();
-        let campo = |n: &str, a: &str, d: &str, leido| Campo {
-            nombre: n.into(),
-            antes: a.into(),
-            despues: d.into(),
-            secreto: false,
-            leido,
-        };
-        let mut plan = Plan {
-            funcion: f,
-            operacion: Operacion::Editar,
-            instancia: Some("0".into()),
-            valores: mapa(&[
-                ("rtm_cfg_dhcpv4_svr_pool_id", "0"),
-                ("rtm_dhcpv4_svr_pool_static_id", "0"),
-                ("ipv4_addr", "192.168.1.80"),
-            ]),
-            payload: Vec::new(),
-            campos: vec![campo("ipv4_addr", "192.168.1.68", "192.168.1.80", true)],
-            lectura: Lectura::Ninguna,
-            ids_antes: None,
-        };
-        let r = inversa(&plan).unwrap();
-        assert_eq!(r.instancia.as_deref(), Some("0"));
-        assert!(!r.borrar);
-        assert_eq!(
-            r.valores,
-            mapa(&[
-                ("rtm_cfg_dhcpv4_svr_pool_id", "0"),
-                ("ipv4_addr", "192.168.1.68")
-            ])
-        );
-        // Sin valores anteriores conocidos no hay inversa.
-        plan.campos = vec![campo("ipv4_addr", "", "192.168.1.80", false)];
-        assert_eq!(inversa(&plan), None);
-
-        plan.operacion = Operacion::Crear;
-        plan.instancia = None;
-        assert_eq!(inversa(&plan), None, "sin el id de la instancia creada");
-        plan.instancia = Some("5".into());
-        let r = inversa(&plan).unwrap();
-        assert!(r.borrar);
-        assert_eq!(r.instancia.as_deref(), Some("5"));
-        assert_eq!(r.valores, mapa(&[("rtm_cfg_dhcpv4_svr_pool_id", "0")]));
-
-        plan.operacion = Operacion::Borrar;
-        plan.campos = vec![campo("ipv4_addr", "192.168.1.60", "", true)];
-        let r = inversa(&plan).unwrap();
-        assert!(!r.borrar);
-        assert_eq!(r.instancia, None);
-        assert_eq!(r.valores["ipv4_addr"], "192.168.1.60");
-
-        plan.operacion = Operacion::Accion;
-        assert_eq!(inversa(&plan), None);
-    }
-
-    #[test]
-    fn lectura_pareada_sustituye_parametros() {
-        let c = cat();
-        let f = c.funcion("cbDhcpV4SvrPoolSetStatic").unwrap();
-        let v = mapa(&[
-            ("rtm_cfg_dhcpv4_svr_pool_id", "0"),
-            ("rtm_dhcpv4_svr_pool_static_id", "4"),
-        ]);
-        let l = lectura_de(f, &v, Some("4")).unwrap();
-        assert_eq!(
-            l,
-            Lectura::Xml {
-                funcion: "cbDhcpV4SvrPoolGetStatic".into(),
-                params: vec![
-                    ("rtm_cfg_dhcpv4_svr_pool_id".into(), "0".into()),
-                    ("rtm_dhcpv4_svr_pool_static_id".into(), "4".into()),
-                ],
-                clave_id: Some("rtm_dhcpv4_svr_pool_static_id".into()),
-            }
-        );
-        let falta = lectura_de(f, &mapa(&[]), Some("4"));
-        assert!(matches!(falta, Err(CambioError::Invalida(_))), "{falta:?}");
-        let wl = c.funcion("te_wifi.wl").unwrap();
-        assert_eq!(
-            lectura_de(wl, &mapa(&[]), None).unwrap(),
-            Lectura::Pagina("te_wifi.asp".into())
-        );
-    }
-
-    #[test]
-    fn validacion_de_valores() {
-        let c = cat();
-        let f = c.funcion("cbDhcpV4SvrPoolSetStatic").unwrap();
-        let p = |n| f.parametro(n).unwrap();
-        assert!(validar(p("ipv4_addr"), "192.168.1.65").is_ok());
-        assert!(validar(p("ipv4_addr"), "192.168.1.256").is_err());
-        assert!(validar(p("mac_addr"), "02:00:00:00:00:aB").is_ok());
-        assert!(validar(p("mac_addr"), "02:00:00:00:00").is_err());
-        assert!(validar(p("mac_addr"), "02:00:00:00:00:zz").is_err());
-        assert!(validar(p("adm_state"), "1").is_ok());
-        assert!(validar(p("adm_state"), "2").is_err());
-        assert!(validar(p("rtm_cfg_dhcpv4_svr_pool_id"), "x").is_err());
-        let w = c.funcion("cbSetWifiAccPt").unwrap();
-        assert!(validar(w.parametro("ssid").unwrap(), "a\nb").is_err());
-        let e = validar(w.parametro("key_phrase").unwrap(), "a\0b").unwrap_err();
-        assert!(!e.contains("a\0b"), "el error no muestra el secreto");
-    }
-
-    #[test]
-    fn comparar_normaliza_y_enmascara() {
-        let c = cat();
-        let f = c.funcion("cbSetWifiAccPt").unwrap();
-        let campos = vec![
-            Campo {
-                nombre: "key_phrase".into(),
-                antes: "vieja".into(),
-                despues: "nueva".into(),
-                secreto: true,
-                leido: true,
-            },
-            Campo {
-                nombre: "ssid".into(),
-                antes: "A".into(),
-                despues: "B".into(),
-                secreto: false,
-                leido: true,
-            },
-        ];
-        let actual = mapa(&[("key_phrase", "otra"), ("ssid", " B ")]);
-        let Comprobacion::Difiere(v) = comparar(f, &campos, &actual, Lado::Nuevo) else {
-            panic!()
-        };
-        assert_eq!(v.len(), 1);
-        assert!(v[0].contains(MASCARA) && !v[0].contains("otra") && !v[0].contains("nueva"));
-        assert_eq!(
-            comparar(f, &campos, &mapa(&[("bssid", "x")]), Lado::Nuevo),
-            Comprobacion::Limitada
-        );
-        let anterior = mapa(&[("key_phrase", "vieja"), ("SSID", "A")]);
-        assert_eq!(
-            comparar(f, &campos, &anterior, Lado::Anterior),
-            Comprobacion::Coincide(None)
-        );
-        let s = c.funcion("cbDhcpV4SvrPoolSetStatic").unwrap();
-        assert!(iguales(
-            s.parametro("mac_addr"),
-            "02:AA:00:00:00:00",
-            " 02:aa:00:00:00:00"
-        ));
-        assert!(!iguales(None, "Casa", "casa"));
-    }
-}
+mod tests;

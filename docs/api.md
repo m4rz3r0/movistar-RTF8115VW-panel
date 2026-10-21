@@ -3,6 +3,9 @@
 <!-- Generado por `cargo run -p gen-catalogo -- --api-md` a partir de
 crates/catalogo/funciones.toml. No editar a mano. -->
 
+Las funciones del propio panel (`/api/…`) están en
+[funciones-del-panel.md](funciones-del-panel.md).
+
 ## Cómo se llama
 
 - **UI avanzada**: `POST /cgi-bin/<función>.xml` con los parámetros como
@@ -1830,7 +1833,7 @@ Elementos de la respuesta: `UserName` 🔒, `UserRole`
 
 ### `cbModifyPwd`
 
-*acción* · UI avanzada · riesgo bajo · página `user_profile.asp`
+*acción* · UI avanzada · riesgo medio · página `user_profile.asp`
 
 Cambia la contraseña del usuario con sesión iniciada (contraseña actual y nueva).
 

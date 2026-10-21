@@ -54,9 +54,14 @@ impl std::fmt::Debug for CredencialesRouter {
 }
 
 impl CredencialesRouter {
-    /// Configuración del cliente del router con los tiempos por defecto.
-    pub fn client_config(&self) -> hgu::ClientConfig {
-        hgu::ClientConfig::new(&self.url, &self.usuario, &self.contrasena)
+    /// Configuración del cliente del router con los tiempos por defecto,
+    /// salvo la pausa entre peticiones, que sale de `cfg`
+    /// ([`config::Config::router_min_gap`]).
+    pub fn client_config(&self, cfg: &config::Config) -> hgu::ClientConfig {
+        hgu::ClientConfig {
+            min_gap: cfg.router_min_gap,
+            ..hgu::ClientConfig::new(&self.url, &self.usuario, &self.contrasena)
+        }
     }
 }
 
@@ -276,11 +281,12 @@ pub async fn detectar_y_guardar(state: &AppState) -> Result<RedDetectada, String
     Ok(red)
 }
 
-/// Lo más que se espera a [`detectar_y_guardar`] al arrancar sin ninguna
-/// detección guardada (p. ej. al actualizar desde una versión sin ella) o al
-/// guardar las credenciales; si tarda más (el router no responde), sigue en
-/// segundo plano y, entretanto, vale la detección guardada o, sin ella,
-/// cualquier conexión de datos.
+/// Lo más que se espera, de serie, a [`detectar_y_guardar`] al arrancar sin
+/// ninguna detección guardada (p. ej. al actualizar desde una versión sin
+/// ella) o al guardar las credenciales; si tarda más (el router no responde),
+/// sigue en segundo plano y, entretanto, vale la detección guardada o, sin
+/// ella, cualquier conexión de datos. La espera de verdad es la de la
+/// configuración ([`config::Config::espera_deteccion`]).
 pub const ESPERA_DETECCION: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// [`detectar_y_guardar`] en segundo plano, esperando como mucho `espera`.
@@ -298,12 +304,12 @@ pub async fn detectar_sin_esperar_mucho(state: &AppState, espera: std::time::Dur
 }
 
 /// Al arrancar: si ya hay una detección guardada, se renueva sin retrasar el
-/// arranque; si no, se espera hasta [`ESPERA_DETECCION`].
+/// arranque; si no, se espera hasta [`config::Config::espera_deteccion`].
 async fn detectar_al_arrancar(state: &AppState) {
     let espera = if state.red().is_some() {
         std::time::Duration::ZERO
     } else {
-        ESPERA_DETECCION
+        state.cfg.espera_deteccion
     };
     detectar_sin_esperar_mucho(state, espera).await;
 }
@@ -383,7 +389,7 @@ pub async fn arrancar_router(state: &AppState) -> Result<(), String> {
     }
     if let Some(c) = leer_credenciales(&state.db, &state.history_key).await? {
         tracing::info!("router: credenciales de la base de datos");
-        state.hgu.reconfigurar(c.client_config()).await;
+        state.hgu.reconfigurar(c.client_config(cfg)).await;
         detectar_al_arrancar(state).await;
         return Ok(());
     }
@@ -399,7 +405,7 @@ pub async fn arrancar_router(state: &AppState) -> Result<(), String> {
                 "router: credenciales importadas del entorno (RP_ROUTER_URL, RP_ROUTER_USER, \
                  RP_ROUTER_SECRET) a la base de datos; a partir de ahora mandan las guardadas"
             );
-            state.hgu.reconfigurar(c.client_config()).await;
+            state.hgu.reconfigurar(c.client_config(cfg)).await;
             detectar_al_arrancar(state).await;
         }
         _ => tracing::info!("router: sin configurar"),

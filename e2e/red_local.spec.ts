@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
+import { PLAZO_CAMBIO, plazoDeTest } from "./cambios";
 import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 
 // Red local (/ajustes/red_local) a 360 y 1440 px, en español y en inglés,
@@ -7,10 +8,10 @@ import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 // junto al campo por qué no vale una IP (la del router).
 //
 // «Fijar esta IP» → aplicado → aparece en IP fijas se hace en una sola
-// combinación (inglés, 1440 px, la última): cada aplicación se vigila 30 s y
-// el dispositivo queda con su IP fija, así que después se borra (otra
-// aplicación) para dejar el simulador como estaba. Las demás abren el
-// resumen y lo cancelan.
+// combinación (inglés, 1440 px, la última): cada aplicación se vigila (30 s
+// en producción; en el e2e, RP_E2E_VIGILANCIA_S) y el dispositivo queda con
+// su IP fija, así que después se borra (otra aplicación) para dejar el
+// simulador como estaba. Las demás abren el resumen y lo cancelan.
 
 const textos = {
   es: {
@@ -68,10 +69,15 @@ function sinApi(texto: string) {
 async function aplicar(page: Page, t: (typeof textos)["es" | "en"]) {
   const dialogo = page.locator("dialog[open]");
   await dialogo.getByRole("button", { name: t.aplicar }).click();
-  await expect(dialogo.getByText(t.hecho)).toBeVisible({ timeout: 120_000 });
+  await expect(dialogo.getByText(t.hecho)).toBeVisible({ timeout: PLAZO_CAMBIO });
   await dialogo.getByRole("button", { name: t.cerrar }).click();
   await expect(page.locator("dialog[open]")).toHaveCount(0);
 }
+
+// Cada test entra con su sesión y deja el simulador como estaba: se
+// reparten entre los workers (cada uno con su panel, ver instancias.ts), y
+// el fichero deja de ir entero en uno.
+test.describe.configure({ mode: "parallel" });
 
 for (const idioma of ["es", "en"] as const) {
   for (const ancho of [360, 1440]) {
@@ -83,7 +89,8 @@ for (const idioma of ["es", "en"] as const) {
       });
 
       test("dispositivos e IP fijas", async ({ page }) => {
-        if (aplicaDeVerdad) test.setTimeout(300_000);
+        // Fijar la IP y borrarla: dos cambios.
+        if (aplicaDeVerdad) test.setTimeout(plazoDeTest(2));
         const t = textos[idioma];
         const errores = recogerErrores(page);
         await entrar(page);
@@ -94,8 +101,10 @@ for (const idioma of ["es", "en"] as const) {
         await expect(dispositivos).toBeVisible();
         await expect(fijas).toBeVisible();
         await sinDesbordamiento(page, `red local ${idioma} ${ancho}`);
-        // Un dispositivo con reserva no se puede fijar otra vez.
-        await expect(dispositivos.getByRole("button", { name: t.yaFija }).first()).toBeDisabled();
+        // Un dispositivo con reserva no se puede fijar otra vez: lo dice una
+        // etiqueta, sin botón.
+        await expect(dispositivos.locator(".chip-ya-fija").first()).toContainText(t.yaFija);
+        await expect(dispositivos.getByRole("button", { name: new RegExp(`^${t.yaFija}`) })).toHaveCount(0);
         sinApi(await dispositivos.innerText());
         sinApi(await fijas.innerText());
         await page.screenshot({
@@ -151,8 +160,8 @@ for (const idioma of ["es", "en"] as const) {
           await expect(fila).toContainText("02:00:00:00:00:03");
           await expect(dispositivos.getByRole("button", { name: t.fijarHost2 })).toHaveCount(0);
           await expect(
-            dispositivos.getByRole("button", { name: `${t.yaFija}: 192.168.1.62` }),
-          ).toBeDisabled();
+            dispositivos.locator(".chip-ya-fija").filter({ hasText: `${t.yaFija}: 192.168.1.62` }),
+          ).toBeVisible();
           await expect(dispositivos.getByRole("heading", { level: 2 })).toBeFocused();
           // Borrarla deja el simulador como estaba.
           await fijas.getByRole("button", { name: t.borrarHost2 }).click();

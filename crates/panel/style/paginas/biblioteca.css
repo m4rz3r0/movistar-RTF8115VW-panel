@@ -1,0 +1,241 @@
+/* Biblioteca (explorador): áreas, funciones y resultados. */
+/* ------------------------------------------------------------ Explorador */
+
+.lista-limpia {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.explorador {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: var(--esp-5);
+  align-items: start;
+}
+
+.explorador-lateral {
+  position: sticky;
+  top: var(--esp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-3);
+  min-width: 0;
+}
+
+.explorador-pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-5);
+  min-width: 0;
+}
+
+.lista-areas,
+.lista-resultados {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lista-areas a,
+.lista-resultados a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esp-2);
+  min-height: 34px;
+  padding: var(--esp-1) var(--esp-3);
+  border-radius: var(--radio);
+  color: var(--texto-2);
+  text-decoration: none;
+  transition: color 120ms ease, background 120ms ease;
+}
+
+.lista-areas a:hover,
+.lista-resultados a:hover {
+  color: var(--texto-1);
+  background: var(--superficie-2);
+}
+
+.lista-areas a[aria-current="page"] {
+  color: var(--acento);
+  background: var(--acento-suave);
+}
+
+.lista-resultados a {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  overflow-wrap: anywhere;
+}
+
+.resultado-area,
+.resultados-cuenta {
+  color: var(--texto-2);
+  font-size: 12px;
+}
+
+.cuenta {
+  min-width: 26px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--superficie-2);
+  color: var(--texto-2);
+  font-size: 12px;
+  text-align: center;
+}
+
+.campo input[type="search"] {
+  width: 100%;
+}
+
+.tarjeta-enlace {
+  height: 100%;
+  gap: var(--esp-1);
+  color: var(--texto-1);
+  text-decoration: none;
+  transition: border-color 120ms ease;
+}
+
+.tarjeta-enlace:hover {
+  border-color: var(--acento);
+}
+
+.lista-funciones {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie-1);
+}
+
+.funcion-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-1);
+  padding: var(--esp-3) var(--esp-4);
+  border-bottom: 1px solid var(--borde);
+}
+
+.funcion-item:last-child {
+  border-bottom: 0;
+}
+
+.funcion-item-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esp-2);
+}
+
+.funcion-nombre {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.funcion-descripcion {
+  color: var(--texto-2);
+}
+
+.etiquetas {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 var(--esp-2);
+  border: 1px solid var(--borde);
+  border-radius: 4px;
+  color: var(--texto-2);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.chip-escritura {
+  border-color: color-mix(in srgb, var(--viz-1) 55%, var(--borde));
+  color: var(--texto-1);
+}
+
+.chip-accion {
+  border-color: color-mix(in srgb, var(--acento) 55%, var(--borde));
+  color: var(--texto-1);
+}
+
+.chip-aviso {
+  border-style: dashed;
+}
+
+.cabecera-funcion {
+  min-width: 0;
+}
+
+.cabecera-funcion h1 {
+  font-family: var(--fuente-mono);
+  font-size: 22px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.miga {
+  margin-bottom: var(--esp-1);
+  font-size: 12px;
+}
+
+.miga a {
+  color: var(--texto-2);
+}
+
+.datos-funcion {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-2) var(--esp-6);
+  margin: 0;
+}
+
+.datos-funcion dt {
+  color: var(--texto-2);
+  font-size: 12px;
+}
+
+.datos-funcion dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.titulo-seccion {
+  margin-bottom: var(--esp-3);
+}
+
+.seccion-cabecera .titulo-seccion {
+  margin-bottom: 0;
+}
+
+.seccion > .seccion-cabecera {
+  margin-bottom: var(--esp-3);
+}
+
+.tabla .celda-larga {
+  min-width: 16em;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.tabla-clave-valor tbody th {
+  color: var(--texto-1);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 400;
+  position: static;
+}

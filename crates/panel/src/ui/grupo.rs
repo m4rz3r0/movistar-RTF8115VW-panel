@@ -16,7 +16,7 @@ use crate::ui::explorador::{
     CambioVista, EstadoDeCambio, MASCARA, RiesgoCambio, duracion, estado_cambio, texto_error,
 };
 use crate::ui::i18n::{idioma_actual, traducir};
-use crate::ui::{Estado, Insignia};
+use crate::ui::{Estado, IconoEstado, Insignia};
 use ajustes::TipoCampo;
 use leptos::{ev::SubmitEvent, html, prelude::*, task::spawn_local};
 use std::time::Duration;
@@ -313,6 +313,16 @@ pub fn DialogoGrupo(
             }
         })
     };
+    let aviso = move || {
+        grupo.with(|g| g.aviso.clone()).map(|a| {
+            view! {
+                <p class="aviso estado-aviso" role="status">
+                    <IconoEstado estado=Estado::Aviso />
+                    <span>{a}</span>
+                </p>
+            }
+        })
+    };
     let vigilancia = move || {
         let plazo = duracion(grupo.with(|g| g.vigilancia_s));
         t!("ajustes-grupo-vigilancia", plazo = plazo.as_str())
@@ -329,6 +339,27 @@ pub fn DialogoGrupo(
             .map(|(i, p)| {
                 let sin_cambios = p.sin_cambios;
                 let id = format!("grupo-paso-{i}");
+                // Su título («TCP») o, sin él, «Paso N».
+                let nombre = p
+                    .titulo
+                    .as_ref()
+                    .map_or_else(|| t!("ajustes-grupo-paso", n = i + 1), |c| traducir(c, None));
+                // La nota de un paso que solo enseña lo que cambia respecto
+                // al primero («Igual que la regla TCP…»): si el primero se
+                // desmarca, su variante `-sin-el-primero` lo dice.
+                let nota_paso = p.nota.clone().map(|c| {
+                    let sin_el_primero = format!("{c}-sin-el-primero");
+                    let texto = move || {
+                        let desmarcado =
+                            i > 0 && !marcados.with(|m| m.first().copied().unwrap_or(true));
+                        if desmarcado && i18n::existe(idioma_actual(), &sin_el_primero) {
+                            traducir(&sin_el_primero, None)
+                        } else {
+                            traducir(&c, None)
+                        }
+                    };
+                    view! { <p class="pagina-sub grupo-paso-nota">{texto}</p> }
+                });
                 let cabeza = varios.then(|| {
                     view! {
                         <legend class="grupo-paso-titulo">
@@ -346,7 +377,7 @@ pub fn DialogoGrupo(
                                     });
                                 }
                             />
-                            <label for=id>{t!("ajustes-grupo-paso", n = i + 1)}</label>
+                            <label for=id>{nombre}</label>
                             {sin_cambios.then(|| view! {
                                 <span class="chip">{t!("ajustes-grupo-ya-esta")}</span>
                             })}
@@ -360,6 +391,7 @@ pub fn DialogoGrupo(
                     <fieldset class="grupo-paso">
                         {cabeza}
                         {nota}
+                        {nota_paso}
                         {tabla(&p.campos)}
                     </fieldset>
                 }
@@ -477,6 +509,7 @@ pub fn DialogoGrupo(
                     {t!("ajustes-grupo-intro")}
                 </p>
                 {pasos}
+                {aviso}
                 {efecto}
                 <p class="pagina-sub">{vigilancia}</p>
                 <p class="error-formulario" role="alert">
@@ -514,6 +547,7 @@ mod tests {
             efecto: Some("efecto-wifi_red".into()),
             vigilancia_s: 120,
             detalle: None,
+            aviso: None,
         }
     }
 
@@ -574,6 +608,8 @@ mod tests {
                     TipoCampo::Secreto,
                 ),
             ],
+            titulo: None,
+            nota: None,
         }]);
         let h = html(g);
         assert!(h.contains("Revisa el cambio"), "{h}");
@@ -619,11 +655,15 @@ mod tests {
                     "b",
                     TipoCampo::Texto,
                 )],
+                titulo: None,
+                nota: None,
             },
             PasoVista {
                 indice: 1,
                 sin_cambios: true,
                 campos: vec![],
+                titulo: None,
+                nota: None,
             },
         ]);
         let h = html(g);
@@ -634,6 +674,41 @@ mod tests {
             1,
             "solo el paso sin cambios: {h}"
         );
+        assert!(h.contains(&t!("ajustes-grupo-paso", n = 2)), "{h}");
+    }
+
+    /// Un paso con título («TCP», «UDP») lo enseña en vez de «Paso N», con
+    /// su nota debajo; sin título, sigue siendo «Paso N».
+    #[test]
+    fn pasos_con_titulo_y_nota() {
+        let paso = |indice, titulo: Option<&str>, nota: Option<&str>| PasoVista {
+            indice,
+            sin_cambios: false,
+            campos: vec![cambio(
+                "ajuste-puertos-reglas-protocolo",
+                "",
+                "udp",
+                TipoCampo::Opcion,
+            )],
+            titulo: titulo.map(str::to_owned),
+            nota: nota.map(str::to_owned),
+        };
+        let h = html(grupo(vec![
+            paso(0, Some("ajuste-puertos-reglas-protocolo-tcp"), None),
+            paso(
+                1,
+                Some("ajuste-puertos-reglas-protocolo-udp"),
+                Some("ajuste-puertos-reglas-paso-igual"),
+            ),
+        ]));
+        assert!(h.contains(">TCP</label>"), "{h}");
+        assert!(h.contains(">UDP</label>"), "{h}");
+        assert!(!h.contains(&t!("ajustes-grupo-paso", n = 1)), "{h}");
+        assert!(
+            h.contains(&traducir("ajuste-puertos-reglas-paso-igual", None)),
+            "{h}"
+        );
+        let h = html(grupo(vec![paso(0, None, None), paso(1, None, None)]));
         assert!(h.contains(&t!("ajustes-grupo-paso", n = 2)), "{h}");
     }
 
@@ -650,6 +725,8 @@ mod tests {
             indice,
             sin_cambios,
             campos: vec![],
+            titulo: None,
+            nota: None,
         };
         let pasos = vec![paso(0, false), paso(1, true), paso(2, false)];
         assert_eq!(desmarcados(&pasos, &[true, false, false]), vec![2]);

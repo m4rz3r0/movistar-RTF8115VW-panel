@@ -6,16 +6,20 @@
 //! tarjetas de lo esencial arriba y el resto bajo «Más opciones». Las
 //! tarjetas ([`tarjeta::Tarjeta`]) se editan en el sitio y guardan con el
 //! diálogo de grupo; los dispositivos y las IP fijas de Red local tienen su
-//! propio componente ([`dispositivos`], [`reservas`]). Un tema que no
-//! existe es «página no encontrada».
+//! propio componente ([`dispositivos`], [`reservas`]), y las reglas de
+//! apertura de puertos el suyo ([`puertos`]). Un tema que no
+//! existe es «página no encontrada». Si hay foto de partida, cada tema
+//! enlaza a «Cómo estaba al instalar» ([`foto`], `/ajustes/foto-de-partida`).
 
 mod campo;
 mod dispositivos;
+mod foto;
+mod puertos;
 mod reservas;
 mod tarjeta;
 
 use crate::ajustes_router::{
-    CADUCIDAD_LECTURAS, TemaVista, leer_dispositivos, leer_red_casa, leer_tema,
+    CADUCIDAD_LECTURAS, TemaVista, leer_dispositivos, leer_red_casa, leer_reservas, leer_tema,
 };
 use crate::t;
 use crate::ui::explorador::texto_error;
@@ -30,6 +34,8 @@ use leptos_router::{
 };
 use std::{collections::HashSet, time::Duration};
 use tarjeta::Tarjeta;
+
+pub use foto::{PaginaFoto, RUTA_FOTO};
 
 /// Espera antes de enseñar «Actualizando…»: una lectura más rápida (de la
 /// caché del servidor) no hace parpadear la página.
@@ -51,6 +57,11 @@ pub(crate) const NOTA_OCULTO: &str = "ajustes-nota-oculto";
 /// que en el navegador no está).
 pub(crate) const DISPOSITIVOS: &str = "dispositivos";
 pub(crate) const RESERVAS: &str = "reservas";
+/// Componente de Puertos (como [`DISPOSITIVOS`]).
+pub(crate) const PUERTOS: &str = "puertos";
+/// Componente de Seguridad (como [`DISPOSITIVOS`]): un enlace a
+/// «Configuración del router», donde se cambia.
+pub(crate) const CONTRASENA_ROUTER: &str = "contrasena_router";
 
 /// Primera página de la sección (la del menú).
 pub const RUTA_AJUSTES: &str = "/ajustes/internet";
@@ -122,11 +133,12 @@ impl Precargados {
 
 /// Precarga de los temas: al dejar el ratón o el foco en una pestaña, lee
 /// su tema en segundo plano para que el servidor lo tenga en su caché
-/// corta cuando se pulse (en Red local, también sus dispositivos y la red
-/// de casa, que piden después sus tarjetas). Una sola a la vez (el
-/// servidor las lee en serie) y cada tema una vez por caducidad de la
-/// caché. Al desmontarse la página, lo programado se cancela; lo que ya
-/// corre no lee señales (solo `try_*` y valores guardados).
+/// corta cuando se pulse (en Red local y en Puertos, también los
+/// dispositivos y la red de casa, y en Puertos las IP fijas, que piden
+/// después sus tarjetas). Una sola a la vez (el servidor las lee en serie)
+/// y cada tema una vez por caducidad de la caché. Al desmontarse la
+/// página, lo programado se cancela; lo que ya corre no lee señales (solo
+/// `try_*` y valores guardados).
 #[derive(Clone, Copy)]
 struct Precarga {
     programada: StoredValue<Option<TimeoutHandle>>,
@@ -167,6 +179,12 @@ impl Precarga {
                 // Las tarjetas de Red local piden esto en cuanto se pintan.
                 if bien && t == Tema::RedLocal {
                     bien = leer_dispositivos().await.is_ok() && leer_red_casa().await.is_ok();
+                }
+                // Las de Puertos, también las IP fijas (el aviso de destino).
+                if bien && t == Tema::Puertos {
+                    bien = leer_dispositivos().await.is_ok()
+                        && leer_reservas().await.is_ok()
+                        && leer_red_casa().await.is_ok();
                 }
                 if bien {
                     self.hechas.update_value(|h| h.hecha(&slug, generacion));
@@ -434,6 +452,12 @@ fn ContenidoTema(t: TemaVista, recargar: Callback<()>) -> impl IntoView {
             .unwrap_or_default();
         provide_context(dispositivos::DatosRed::nuevo(existentes));
     }
+    if t.ajustes
+        .iter()
+        .any(|a| a.componente.as_deref() == Some(PUERTOS))
+    {
+        provide_context(puertos::DatosPuertos::nuevo());
+    }
     let (basicos, otros): (Vec<_>, Vec<_>) = t
         .ajustes
         .into_iter()
@@ -456,6 +480,14 @@ fn ContenidoTema(t: TemaVista, recargar: Callback<()>) -> impl IntoView {
         }
     });
     let tema = format!("ajustes-tema-{}-desc", t.tema);
+    // Solo si hay con qué comparar.
+    let foto = t.foto_de_partida.then(|| {
+        view! {
+            <p class="tema-foto">
+                <a href=RUTA_FOTO>{t!("ajustes-foto-enlace")}</a>
+            </p>
+        }
+    });
     // Qué significa «Oculto», una sola vez, delante de las tarjetas ocultas.
     let nota_oculto = |hay: bool| {
         hay.then(|| {
@@ -498,6 +530,7 @@ fn ContenidoTema(t: TemaVista, recargar: Callback<()>) -> impl IntoView {
     };
     view! {
         <p class="tema-desc">{traducir(&tema, None)}</p>
+        {foto}
         {aviso}
         {cuerpo}
     }

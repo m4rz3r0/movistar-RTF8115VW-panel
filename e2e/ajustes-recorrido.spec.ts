@@ -1,0 +1,253 @@
+import { expect, type Locator, type Page, test } from "@playwright/test";
+import { PLAZO_CAMBIO, plazoDeTest } from "./cambios";
+import { CONTRASENA, USUARIO, recorridos } from "./instancias";
+import { asentar, hidratada, recogerErrores, sinDesbordamiento } from "./util";
+
+// Criterio de éxito 1 del spec de Ajustes: alguien que no conoce este router
+// cambia la contraseña WiFi, apaga el WPS, fija la IP de un dispositivo,
+// abre un puerto y desactiva la gestión remota del operador (TR-069), sin
+// documentación y sin ver ningún nombre de la API (`cb…`) fuera de los
+// detalles técnicos plegados. Un recorrido seguido, en español a 360 px y en
+// inglés a 1440 px, cada uno en su propio panel (instancias.ts): los cinco
+// cambios se aplican de verdad contra router-sim y no se deshacen.
+//
+// La gestión remota se pone «Apagada», la opción recomendada para quien
+// prioriza su privacidad, y su recomendación tiene la forma «Recomendado si
+// …. A favor: …. En contra: …».
+
+const textos = {
+  es: {
+    wifi: "WiFi",
+    redLocal: "Red local",
+    puertos: "Puertos",
+    seguridad: "Seguridad",
+    red24: "Red WiFi 2,4 GHz",
+    contrasena: "Contraseña",
+    wps: "WPS",
+    no: "No",
+    editar: "Editar",
+    guardar: "Guardar",
+    aplicar: "Aplicar",
+    cerrar: "Cerrar",
+    revisar: "Revisa el cambio",
+    hecho: "Hecho: el router tiene ya el cambio.",
+    dispositivos: "Dispositivos conectados",
+    fijas: "IP fijas",
+    fijarHost2: "Fijar esta IP: 192.168.1.62 (host-2)",
+    yaFija: "Ya tiene IP fija: 192.168.1.62",
+    reglas: "Puertos abiertos",
+    abrir: "Abrir un puerto",
+    nombre: "Nombre",
+    protocolo: "Protocolo",
+    puerto: "Puerto de internet",
+    dispositivo: "Dispositivo",
+    nombreRegla: "Servidor web",
+    gestion: "Gestión remota del operador",
+    gestionCampo: "Gestión remota",
+    apagada: "Apagada",
+    recomendada: /^Recomendado: Apagada Recomendado si [^.]+\.$/,
+    pros: /^A favor: .+\. En contra: .+\.$/,
+    historial: "/historial",
+  },
+  en: {
+    wifi: "WiFi",
+    redLocal: "Home network",
+    puertos: "Ports",
+    seguridad: "Security",
+    red24: "2.4 GHz WiFi network",
+    contrasena: "Password",
+    wps: "WPS",
+    no: "No",
+    editar: "Edit",
+    guardar: "Save",
+    aplicar: "Apply",
+    cerrar: "Close",
+    revisar: "Review the change",
+    hecho: "Done: the router now has the change.",
+    dispositivos: "Connected devices",
+    fijas: "Fixed IPs",
+    fijarHost2: "Fix this IP: 192.168.1.62 (host-2)",
+    yaFija: "Already has a fixed IP: 192.168.1.62",
+    reglas: "Open ports",
+    abrir: "Open a port",
+    nombre: "Name",
+    protocolo: "Protocol",
+    puerto: "Internet port",
+    dispositivo: "Device",
+    nombreRegla: "Web server",
+    gestion: "Operator's remote management",
+    gestionCampo: "Remote management",
+    apagada: "Off",
+    recomendada: /^Recommended: Off Recommended if [^.]+\.$/,
+    pros: /^Pros: .+\. Cons: .+\.$/,
+    historial: "/historial",
+  },
+} as const;
+
+type Textos = (typeof textos)["es" | "en"];
+
+/** La tarjeta cuyo título es exactamente `titulo`. */
+function tarjeta(page: Page, titulo: string): Locator {
+  return page.locator("article.ajuste").filter({
+    has: page.getByRole("heading", { level: 2, name: titulo, exact: true }),
+  });
+}
+
+/**
+ * Ningún nombre de la API a la vista: el texto que se ve de la página (lo de
+ * los detalles técnicos plegados no se ve) no nombra funciones `cb…` ni
+ * páginas de la web básica.
+ */
+async function sinApiALaVista(page: Page, donde: string) {
+  const texto = await page.locator("body").innerText();
+  expect(texto, `${donde}: un nombre de la API a la vista`).not.toMatch(/\bcb[A-Z]\w+/);
+  expect(texto, `${donde}: una página de la web básica a la vista`).not.toMatch(
+    /\bte_\w+\.(asp|cmd|cgi|wl)\b/,
+  );
+}
+
+/**
+ * El diálogo del resumen: sin la API a la vista; aplica, espera «hecho» y
+ * lo cierra. La página relee entonces el tema y lleva el foco al título de
+ * `tarjeta`: hasta entonces, la tarjeta puede pintarse de nuevo.
+ */
+async function aplicar(page: Page, t: Textos, donde: string, tarjeta: Locator) {
+  const dialogo = page.locator("dialog[open]");
+  await expect(dialogo.locator("#grupo-titulo")).toHaveText(t.revisar);
+  await sinApiALaVista(page, `${donde}: resumen`);
+  await sinDesbordamiento(page, `${donde}: resumen`);
+  await dialogo.getByRole("button", { name: t.aplicar }).click();
+  await expect(dialogo.getByText(t.hecho)).toBeVisible({ timeout: PLAZO_CAMBIO });
+  await dialogo.getByRole("button", { name: t.cerrar }).click();
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
+  await expect(tarjeta.getByRole("heading", { level: 2 })).toBeFocused();
+}
+
+/** Va a un tema con las pestañas o, en móvil, con el selector de temas. */
+async function irA(page: Page, ancho: number, tema: string, nombre: string) {
+  if (ancho < 640) {
+    await page.locator("#ajustes-tema").selectOption(tema);
+  } else {
+    await page.locator("nav.temas").getByRole("link", { name: nombre, exact: true }).click();
+  }
+  await page.waitForURL((u) => u.pathname === `/ajustes/${tema}`);
+  await asentar(page);
+  await sinApiALaVista(page, tema);
+  await sinDesbordamiento(page, tema);
+}
+
+// Cada pasada en su panel: pueden ir en workers distintos.
+test.describe.configure({ mode: "parallel" });
+
+const pasadas = [
+  { idioma: "es", locale: "es-ES", ancho: 360 },
+  { idioma: "en", locale: "en-GB", ancho: 1440 },
+] as const;
+
+for (const { idioma, locale, ancho } of pasadas) {
+  const panel = recorridos[idioma];
+  const t = textos[idioma];
+
+  test.describe(`recorrido ${idioma} a ${ancho} px`, () => {
+    // Un clic que no llega falla pronto, no al agotar el plazo del test.
+    test.use({
+      locale,
+      viewport: { width: ancho, height: 900 },
+      baseURL: panel.url,
+      actionTimeout: 15_000,
+    });
+
+    test("contraseña WiFi, WPS, IP fija, puerto y gestión remota", async ({ page }) => {
+      test.setTimeout(plazoDeTest(5));
+      const errores = recogerErrores(page);
+      await page.goto("/login");
+      await hidratada(page);
+      await page.waitForLoadState("networkidle");
+      await page.locator("#usuario").fill(USUARIO);
+      await page.locator("#contrasena").fill(CONTRASENA);
+      await page.locator("form button[type=submit]").click();
+      await page.waitForURL((url) => url.pathname === "/");
+      await page.goto("/ajustes/wifi");
+      await asentar(page);
+      await sinApiALaVista(page, "wifi");
+
+      // 1. La contraseña de la red WiFi de 2,4 GHz.
+      const red24 = tarjeta(page, t.red24);
+      await red24.getByRole("button", { name: t.editar }).click();
+      const edicion = red24.locator(".ajuste-edicion");
+      await edicion.getByLabel(t.contrasena, { exact: true }).fill("una-frase-larga-de-prueba");
+      await edicion.getByRole("button", { name: t.guardar }).click();
+      const dialogo = page.locator("dialog[open]");
+      await expect(dialogo.locator("tbody tr")).toHaveCount(1);
+      await expect(dialogo.locator("tbody th")).toHaveText(t.contrasena);
+      // El secreto no sale en claro en el resumen.
+      expect(await dialogo.innerText()).not.toContain("una-frase-larga-de-prueba");
+      await aplicar(page, t, "contraseña WiFi", red24);
+
+      // 2. El WPS de esa red, apagado (el recomendado).
+      await red24.getByRole("button", { name: t.editar }).click();
+      const wps = edicion.getByRole("switch", { name: t.wps, exact: true });
+      await expect(wps).toBeChecked();
+      await wps.click();
+      await edicion.getByRole("button", { name: t.guardar }).click();
+      await expect(dialogo.locator("tbody th")).toHaveText(t.wps);
+      await aplicar(page, t, "WPS", red24);
+      const filaWps = red24.locator(".ajuste-resumen .ajuste-fila").filter({ hasText: t.wps });
+      await expect(filaWps.locator("dd")).toHaveText(t.no);
+
+      // 3. La IP de un dispositivo conectado, fija.
+      await irA(page, ancho, "red_local", t.redLocal);
+      const dispositivos = tarjeta(page, t.dispositivos);
+      await dispositivos.getByRole("button", { name: t.fijarHost2, exact: true }).click();
+      await expect(dialogo).toContainText(`${t.fijas}: host-2`);
+      await aplicar(page, t, "IP fija", dispositivos);
+      await expect(dispositivos.locator(".chip-ya-fija").filter({ hasText: t.yaFija })).toBeVisible();
+      await expect(
+        tarjeta(page, t.fijas).locator("tbody tr").filter({ hasText: "192.168.1.62" }),
+      ).toHaveCount(1);
+
+      // 4. Un puerto abierto hacia ese dispositivo.
+      await irA(page, ancho, "puertos", t.puertos);
+      const reglas = tarjeta(page, t.reglas);
+      await reglas.getByRole("button", { name: t.abrir }).click();
+      const form = reglas.locator("form.regla-formulario");
+      await form.getByLabel(t.nombre, { exact: true }).fill(t.nombreRegla);
+      await form.getByLabel(t.protocolo, { exact: true }).selectOption("tcp");
+      await form.getByLabel(t.puerto, { exact: true }).fill("8443");
+      await form.getByLabel(t.dispositivo, { exact: true }).selectOption("192.168.1.62");
+      await form.getByRole("button", { name: t.guardar }).click();
+      await expect(dialogo).toContainText(`${t.reglas}: ${t.nombreRegla}`);
+      await aplicar(page, t, "puerto", reglas);
+      const regla = reglas.locator("li.regla").filter({ hasText: t.nombreRegla });
+      await expect(regla).toContainText("8443");
+      await expect(regla).toContainText("host-2");
+
+      // 5. La gestión remota del operador (TR-069), apagada.
+      await irA(page, ancho, "seguridad", t.seguridad);
+      const gestion = tarjeta(page, t.gestion);
+      await gestion.getByRole("button", { name: t.editar }).click();
+      await gestion.getByLabel(t.gestionCampo, { exact: true }).selectOption("apagada");
+      // La recomendación: para quién es y, plegado, a favor y en contra.
+      const reco = gestion.locator(".recomendacion");
+      await expect(reco.locator(":scope > p")).toHaveText(t.recomendada);
+      await reco.locator("details.recomendacion-pros > summary").click();
+      await expect(reco.locator("details.recomendacion-pros > p")).toHaveText(t.pros);
+      await sinDesbordamiento(page, "gestión remota");
+      await gestion.getByRole("button", { name: t.guardar }).click();
+      await expect(dialogo.locator("tbody td").nth(1)).toHaveText(t.apagada);
+      await aplicar(page, t, "gestión remota", gestion);
+      await expect(gestion.locator(".ajuste-resumen .ajuste-fila dd").first()).toContainText(
+        t.apagada,
+      );
+      await page.screenshot({ path: `capturas/recorrido-${idioma}-${ancho}.png`, fullPage: true });
+
+      // El Historial: los cinco cambios, sin la API a la vista.
+      await page.goto(t.historial);
+      await asentar(page);
+      await expect(page.locator("li.hist-cambio")).toHaveCount(5 + 2);
+      await sinApiALaVista(page, "historial");
+      await sinDesbordamiento(page, "historial");
+      expect(errores, "errores o avisos en la consola").toEqual([]);
+    });
+  });
+}

@@ -1,5 +1,5 @@
 //! Diálogos modales: revisar y aplicar un cambio (también lo usa el
-//! historial para deshacer) y revelar un secreto.
+//! historial para deshacer).
 //!
 //! Son `<dialog>` nativos abiertos con `showModal()`: el resto de la página
 //! queda inerte (el foco no sale del diálogo), Esc lo cierra salvo mientras
@@ -7,18 +7,19 @@
 
 use super::{
     CambioVista, CampoCambio, EstadoDeCambio, MASCARA, PreparadoVista, Valor, confirmar_cambio,
-    duracion, estado_cambio, revelar, texto_error,
+    duracion, estado_cambio, texto_error,
 };
 use crate::t;
-use crate::ui::{Estado, Insignia};
+use crate::ui::{Estado, IconoEstado, Insignia};
 use leptos::{ev::SubmitEvent, html, prelude::*, task::spawn_local};
 use std::time::Duration;
 
 /// Cada cuánto se pregunta por el estado de un cambio.
 const SONDEO: Duration = Duration::from_secs(2);
 
-/// Abre el `<dialog>` como modal en cuanto existe en el DOM.
-fn abrir_modal(dlg: NodeRef<html::Dialog>) {
+/// Abre el `<dialog>` como modal en cuanto existe en el DOM (lo usan todos
+/// los diálogos del panel).
+pub(crate) fn abrir_modal(dlg: NodeRef<html::Dialog>) {
     Effect::new(move |_| {
         if let Some(d) = dlg.get()
             && !d.open()
@@ -28,8 +29,12 @@ fn abrir_modal(dlg: NodeRef<html::Dialog>) {
     });
 }
 
-fn valor(v: &Valor) -> AnyView {
+fn valor(v: &Valor, nombre: &str) -> AnyView {
     match v {
+        Valor::Clave(v) => view! {
+            <crate::ui::secreto::SecretoLeido valor=Some(v.clone()) nombre=nombre.to_owned() />
+        }
+        .into_any(),
         Valor::Texto(t) => view! { <span class="mono">{t.clone()}</span> }.into_any(),
         Valor::Secreto => view! {
             <span class="secreto">{MASCARA}</span>
@@ -48,24 +53,36 @@ fn valor(v: &Valor) -> AnyView {
     }
 }
 
-/// Tabla de un diff: campo (con su nombre técnico), antes y después. Los
-/// secretos van enmascarados y las opciones con su etiqueta.
+/// Tabla de un diff: campo (con su nombre técnico, salvo con
+/// `sin_nombres`: el Historial lo deja en sus detalles técnicos), antes y
+/// después. Los secretos van enmascarados o, con su valor
+/// ([`Valor::Clave`]), censurados con el ojo; las opciones, con su etiqueta.
 #[component]
-pub fn TablaDiff(campos: Vec<CampoCambio>) -> impl IntoView {
+pub fn TablaDiff(campos: Vec<CampoCambio>, #[prop(optional)] sin_nombres: bool) -> impl IntoView {
     if campos.is_empty() {
         return view! { <p class="pagina-sub">{t!("biblioteca-diff-vacio")}</p> }.into_any();
     }
     let filas = campos
         .iter()
         .map(|c| {
+            let campo = if sin_nombres {
+                view! { <span>{c.etiqueta.clone()}</span> }.into_any()
+            } else {
+                view! {
+                    <span lang="es">{c.etiqueta.clone()}</span>
+                    <span class="mono campo-nombre">{c.nombre.clone()}</span>
+                }
+                .into_any()
+            };
+            let (antes, despues) = (
+                t!("historial-valor-anterior", campo = c.etiqueta.clone()),
+                t!("historial-valor-nuevo", campo = c.etiqueta.clone()),
+            );
             view! {
                 <tr>
-                    <th scope="row">
-                        <span lang="es">{c.etiqueta.clone()}</span>
-                        <span class="mono campo-nombre">{c.nombre.clone()}</span>
-                    </th>
-                    <td>{valor(&c.antes)}</td>
-                    <td>{valor(&c.despues)}</td>
+                    <th scope="row">{campo}</th>
+                    <td>{valor(&c.antes, &antes)}</td>
+                    <td>{valor(&c.despues, &despues)}</td>
                 </tr>
             }
         })
@@ -335,6 +352,12 @@ pub fn DialogoCambio(
                     {instancia}
                 </p>
                 <TablaDiff campos=preparado.campos.clone() />
+                {preparado.aviso.clone().map(|a| view! {
+                    <p class="aviso estado-aviso" role="status">
+                        <IconoEstado estado=Estado::Aviso />
+                        <span>{a}</span>
+                    </p>
+                })}
                 <p class="pagina-sub">{nota}</p>
                 {campo_palabra}
                 <p class="error-formulario" role="alert">
@@ -344,101 +367,6 @@ pub fn DialogoCambio(
                     {estado}
                 </div>
                 <div class="dialogo-pie">{pie}</div>
-            </form>
-        </dialog>
-    }
-}
-
-/// Diálogo para revelar un secreto: pide la contraseña del panel.
-#[component]
-pub(super) fn DialogoRevelar(
-    funcion: String,
-    campo: String,
-    instancia: Option<String>,
-    params: Vec<(String, String)>,
-    #[prop(into)] on_cerrar: Callback<()>,
-    #[prop(into)] on_revelado: Callback<String>,
-) -> impl IntoView {
-    let dlg = NodeRef::<html::Dialog>::new();
-    abrir_modal(dlg);
-    let contrasena = RwSignal::new(String::new());
-    let error = RwSignal::new(None::<String>);
-    let pidiendo = RwSignal::new(false);
-    let datos = StoredValue::new((funcion, campo.clone(), instancia, params));
-
-    let enviar = move |ev: SubmitEvent| {
-        ev.prevent_default();
-        if pidiendo.get_untracked() {
-            return;
-        }
-        error.set(None);
-        pidiendo.set(true);
-        let (f, c, i, p) = datos.get_value();
-        let clave = contrasena.get_untracked();
-        spawn_local(async move {
-            match revelar(f, c, i, p, clave).await {
-                Ok(v) => {
-                    contrasena.set(String::new());
-                    on_revelado.run(v);
-                    if let Some(d) = dlg.get_untracked() {
-                        d.close();
-                    }
-                }
-                Err(e) => {
-                    contrasena.set(String::new());
-                    error.set(Some(texto_error(&e)));
-                }
-            }
-            pidiendo.set(false);
-        });
-    };
-    let cerrar = move |_| {
-        if let Some(d) = dlg.get_untracked() {
-            d.close();
-        }
-    };
-
-    view! {
-        <dialog
-            class="dialogo dialogo-estrecho"
-            node_ref=dlg
-            aria-labelledby="revelar-titulo"
-            aria-modal="true"
-            on:close=move |_| on_cerrar.run(())
-        >
-            <form class="dialogo-cuerpo" on:submit=enviar>
-                <header class="dialogo-cabecera">
-                    <h2 id="revelar-titulo">{t!("biblioteca-revelar-titulo")}</h2>
-                </header>
-                <p>
-                    {t!("biblioteca-revelar-para-ver")}
-                    " "
-                    <span class="mono">{campo}</span>
-                    {t!("biblioteca-revelar-texto")}
-                </p>
-                <p class="campo">
-                    <label for="revelar-contrasena">{t!("biblioteca-contrasena-panel")}</label>
-                    <input
-                        id="revelar-contrasena"
-                        type="password"
-                        autocomplete="current-password"
-                        required
-                        autofocus
-                        prop:value=contrasena
-                        on:input=move |ev| contrasena.set(event_target_value(&ev))
-                    />
-                </p>
-                <p class="error-formulario" role="alert">
-                    {move || error.get()}
-                </p>
-                <div class="dialogo-pie">
-                    <button class="boton-sutil" type="button" on:click=cerrar>
-                        {t!("biblioteca-cancelar")}
-                    </button>
-                    <button class="boton" type="submit" disabled=move || pidiendo.get()>
-                        {move || if pidiendo.get() { t!("biblioteca-comprobando") } else { t!("biblioteca-revelar") }}
-                    </button>
-                </div>
             </form>
         </dialog>
     }

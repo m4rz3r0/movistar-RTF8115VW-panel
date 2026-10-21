@@ -1,0 +1,139 @@
+/* Ajustes del router: dispositivos conectados de la red local. */
+/* Red local: dispositivos conectados. Cada dispositivo es una fila: quién es y por
+   dónde se conecta, su IP (lo que se fija, en grande), su MAC y la acción,
+   en columnas alineadas bajo una cabecera. En pantallas estrechas, uno bajo
+   otro y cada dato con su etiqueta. */
+.dispositivos {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie-1);
+}
+
+.dispositivo,
+.dispositivos-cabecera {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 9.5em 12em 13.5em;
+  align-items: center;
+  gap: var(--esp-2) var(--esp-4);
+  padding: var(--esp-3) var(--esp-4);
+  border-bottom: 1px solid var(--borde);
+}
+
+.dispositivos-cabecera {
+  padding-block: var(--esp-2);
+  background: var(--superficie-2);
+  color: var(--texto-2);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.dispositivo:last-child {
+  border-bottom: 0;
+}
+
+.dispositivo-quien {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-1) var(--esp-2);
+  min-width: 0;
+}
+
+.dispositivo-nombre {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.dispositivo-nombre.ajuste-vacio {
+  font-weight: 400;
+}
+
+.chip-conexion.chip-desconectado {
+  border-style: dashed;
+}
+
+.dispositivo-apagado .dispositivo-nombre,
+.dispositivo-apagado .dispositivo-ip {
+  color: var(--texto-2);
+}
+
+/* En pantallas anchas, cada dato es una columna de la fila. */
+.dispositivo-datos {
+  display: contents;
+}
+
+.dispositivo-datos > div {
+  min-width: 0;
+}
+
+.dispositivo-datos dt {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.dispositivo-datos dd {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.dispositivo-ip {
+  font-size: 15px;
+  color: var(--texto-1);
+}
+
+.nota-fijar {
+  color: var(--texto-2);
+  font-size: 12px;
+}
+
+.dispositivo-accion {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--esp-1);
+}
+
+@media (max-width: 720px) {
+  .dispositivos-cabecera {
+    display: none;
+  }
+
+  .dispositivo {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .dispositivo-datos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--esp-1) var(--esp-4);
+    margin: 0;
+  }
+
+  .dispositivo-datos dt {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    color: var(--texto-2);
+    font-size: 12px;
+  }
+
+  .dispositivo-accion {
+    align-items: flex-start;
+  }
+}
+
+/* «Ya tiene IP fija: …»: un dato, no un botón. En móvil, parte la línea. */
+.chip-ya-fija {
+  white-space: normal;
+}

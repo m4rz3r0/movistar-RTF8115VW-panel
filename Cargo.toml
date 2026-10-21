@@ -45,9 +45,31 @@ tracing-subscriber = { version = "0.3", default-features = false, features = ["f
 # paralelo, agotaba la memoria del servidor que compila las versiones.
 [profile.dev]
 debug = "line-tables-only"
+# La información de depuración en ficheros aparte (.dwo junto a los objetos de
+# target/debug/deps), no dentro de cada binario: los nombres de función de
+# Leptos y Axum dejaban ~400 MB de .debug_str en cada uno de los binarios de
+# pruebas, y tocar la biblioteca reescribía ~15 GB. Medido en el sobremesa
+# (2026-10-21, cargo test -p panel --features ssr --no-run, cada variante con
+# su target): en frío, 146 → 117 s; tras cambiar un literal de
+# changes/mod.rs, 147 y 132 → 13 y 36 s; target, 22 → 12 GB; un binario de
+# pruebas, 636 → 235 MB. Los backtraces siguen dando fichero y línea. Un
+# binario copiado a otro equipo los pierde (los .dwo se quedan aquí).
+split-debuginfo = "unpacked"
 
 [profile.dev.package."*"]
 debug = false
+
+# Argon2 (con su blake2) optimizado también en pruebas y desarrollo: sin
+# optimizar, cada hash de contraseña (el ficticio de AppState::new, crear el
+# usuario y entrar) se lleva la mayor parte de lo que tarda una prueba con
+# panel. No cambia los parámetros ni la versión release. Medido con nextest
+# (2026-10-21): la suma de lo que tardan los tests baja de 836 a 611 s.
+# Optimizar también libsqlite3-sys o chacha20poly1305 no se notó (±1 %).
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.dev.package.blake2]
+opt-level = 3
 
 [profile.release]
 # LTO completo y una unidad de codegen. Medido con LTO "thin" y 16 unidades
@@ -72,6 +94,9 @@ lib-package = "panel"
 site-root = "target/site"
 site-pkg-dir = "pkg"
 style-file = "crates/panel/style/main.css"
+# Lightning CSS incrusta los `@import` de main.css en un único CSS (el mismo
+# panel.<hash>.css de siempre: ni peticiones de más ni cambios en la CSP).
+style-bundle = true
 assets-dir = "crates/panel/public"
 site-addr = "127.0.0.1:3000"
 reload-port = 3001

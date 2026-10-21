@@ -2,7 +2,7 @@
 
 use crate::t;
 use crate::ui::{
-    ajustes_router::{InicioAjustes, PaginaTema, SeccionAjustes},
+    ajustes_router::{InicioAjustes, PaginaFoto, PaginaTema, SeccionAjustes},
     charts::{provide_zona, zona_inicial},
     estado::PaginaEstado,
     explorador::{Explorador, InicioExplorador, PaginaArea, PaginaFuncion},
@@ -94,6 +94,8 @@ pub fn App() -> impl IntoView {
                     <Route path=StaticSegment("") view=PaginaEstado />
                     <ParentRoute path=StaticSegment("ajustes") view=SeccionAjustes>
                         <Route path=StaticSegment("") view=InicioAjustes />
+                        // Antes que los temas: no es uno de ellos.
+                        <Route path=StaticSegment("foto-de-partida") view=PaginaFoto />
                         <Route path=ParamSegment("tema") view=PaginaTema />
                     </ParentRoute>
                     <Route path=StaticSegment("historial") view=PaginaHistorial />

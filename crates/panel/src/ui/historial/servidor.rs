@@ -8,8 +8,8 @@ use crate::{
     ui::explorador::{
         PreparadoVista, ruta_funcion,
         servidor::{
-            Ocultar, campo_cambio, con_estado, error_cambio, estado, gestor, interno, riesgo,
-            vista_preparado,
+            Ocultar, campo_cambio, con_estado, error_cambio, error_tecnico, estado, gestor,
+            interno, nota_legible, riesgo, vista_preparado,
         },
     },
 };
@@ -54,15 +54,41 @@ async fn vinculo(state: &AppState, id: i64) -> Result<Option<Vinculo>, ServerFnE
 async fn fila_cambio(
     state: &AppState,
     o: &Ocultar,
+    de_ajustes: &Etiquetas,
     c: Cambio,
 ) -> Result<CambioFila, ServerFnError> {
     let g = gestor(state)?;
-    // Cada campo con las etiquetas de la función de su paso.
+    let (por, deshace) = g.enlaces_deshacer(c.id).await;
+    // Un deshacer guardado sin título (antes de que lo llevaran) toma el del
+    // cambio que deshace: así no se queda con el nombre de la función.
+    let titulo = match (&c.titulo, deshace) {
+        (Some(t), _) => Some(t.clone()),
+        (None, Some(d)) => g.cambio(d).await.and_then(|d| d.titulo),
+        (None, None) => None,
+    };
+    let de_ajuste = titulo.is_some();
+    // Las etiquetas del catálogo de funciones están en castellano: en otro
+    // idioma, las de Ajustes (traducidas) donde las haya.
+    let en_otro_idioma = crate::ui::i18n::idioma_actual() != i18n::Idioma::Es;
+    // Cada campo con la etiqueta de su campo en Ajustes o, si no, la de la
+    // función de su paso.
     let campos_de = |funcion: &str, diff: crate::changes::Diff| -> Vec<CampoCambio> {
         let f = state.catalogo.funcion(funcion);
         diff.campos
             .into_iter()
-            .map(|d| campo_cambio(f, o, d))
+            .map(|d| {
+                let mut c = campo_cambio(f, o, d);
+                // Un cambio hecho desde Ajustes (lleva su título). Uno de la
+                // Biblioteca se queda en castellano con las etiquetas de su
+                // función, como en la Biblioteca; en otro idioma, toma la de
+                // Ajustes si el catálogo de ajustes la trae.
+                if (de_ajuste || en_otro_idioma)
+                    && let Some(e) = de_ajustes.get(&(funcion.to_owned(), c.nombre.clone()))
+                {
+                    c.etiqueta = e.clone();
+                }
+                c
+            })
             .collect()
     };
     let traducir = |clave: &str| crate::ui::i18n::traducir(clave, None);
@@ -72,15 +98,18 @@ async fn fila_cambio(
             .into_iter()
             .map(|p| PasoFila {
                 numero: p.orden + 1,
+                // Sin etiqueta, un texto genérico: nunca el nombre de la
+                // función (va en los detalles técnicos).
                 etiqueta: p
                     .etiqueta
                     .as_deref()
-                    .map_or_else(|| p.funcion.clone(), traducir),
+                    .map_or_else(|| crate::t!("historial-cambio-router"), traducir),
                 campos: campos_de(&p.funcion, p.diff),
                 funcion: p.funcion,
                 instancia: p.instancia,
                 estado: estado_paso(p.estado),
-                error: p.error,
+                error_tecnico: p.error.as_deref().and_then(error_tecnico),
+                error: p.error.as_deref().map(nota_legible),
             })
             .collect();
         let campos = pasos.iter().flat_map(|p| p.campos.clone()).collect();
@@ -88,7 +117,21 @@ async fn fila_cambio(
     } else {
         (campos_de(&c.funcion, c.diff), Vec::new())
     };
-    let (por, deshace) = g.enlaces_deshacer(c.id).await;
+    let puede_deshacer = g.se_puede_deshacer(c.id).await;
+    // Aplicado y sin deshacer, pero sin nada que volver atrás: solo cambió
+    // lo que el router no deja leer. La fila dice por qué.
+    let sin_deshacer =
+        if !puede_deshacer && por.is_none() && c.estado == crate::changes::Estado::Aplicado {
+            match g.tapados_del_cambio(c.id).await {
+                (true, tapados) => Some(crate::t!(
+                    "cambio-sin-deshacer-tapado",
+                    campos = nombres(de_ajustes, state, &tapados)
+                )),
+                _ => None,
+            }
+        } else {
+            None
+        };
     let enlace = |id: Option<i64>| async move {
         match id {
             Some(id) => vinculo(state, id).await,
@@ -107,14 +150,64 @@ async fn fila_cambio(
         estado: estado(c.estado),
         resumen: resumen(&campos),
         campos,
-        nota: c.nota,
-        error: c.error,
+        nota: c.nota.as_deref().map(nota_legible),
+        // Lo técnico del error o, sin él, de la nota (la de una escritura
+        // sin respuesta, o una clave que este panel no conoce).
+        error_tecnico: c
+            .error
+            .as_deref()
+            .and_then(error_tecnico)
+            .or_else(|| c.nota.as_deref().and_then(error_tecnico)),
+        error: c.error.as_deref().map(nota_legible),
         deshecho_por: enlace(por).await?,
         deshace: enlace(deshace).await?,
-        puede_deshacer: g.se_puede_deshacer(c.id).await,
-        titulo: c.titulo.as_deref().map(traducir),
+        puede_deshacer,
+        sin_deshacer,
+        titulo: titulo.as_deref().map(traducir),
         pasos,
     })
+}
+
+/// Etiquetas de los campos de Ajustes por (función, parámetro).
+type Etiquetas = std::collections::HashMap<(String, String), String>;
+
+/// Las etiquetas de `tapados` (`(función, parámetro)`), juntas: las de
+/// Ajustes o, si no, las del catálogo de funciones.
+pub(crate) fn nombres(e: &Etiquetas, state: &AppState, tapados: &[(String, String)]) -> String {
+    let mut v: Vec<String> = tapados
+        .iter()
+        .map(|(f, p)| {
+            e.get(&(f.clone(), p.clone())).cloned().unwrap_or_else(|| {
+                state
+                    .catalogo
+                    .funcion(f)
+                    .and_then(|func| func.parametro(p))
+                    .map_or_else(|| p.clone(), |x| x.etiqueta.clone())
+            })
+        })
+        .collect();
+    v.dedup();
+    v.join(", ")
+}
+
+/// Los secretos del cambio `cambio` con su valor anterior y el nuevo, para
+/// su detalle desplegado (descifra solo este cambio).
+pub async fn secretos_del_cambio(
+    state: &AppState,
+    cambio: i64,
+) -> Result<Vec<SecretoDelCambio>, ServerFnError> {
+    let g = gestor(state)?;
+    Ok(g.secretos_en_claro(cambio)
+        .await
+        .into_iter()
+        .map(|(orden, nombre, antes, despues, tapado)| SecretoDelCambio {
+            orden,
+            nombre,
+            antes,
+            despues,
+            tapado,
+        })
+        .collect())
 }
 
 fn estado_paso(e: EstadoPaso) -> EstadoPasoVista {
@@ -128,7 +221,43 @@ fn estado_paso(e: EstadoPaso) -> EstadoPasoVista {
     }
 }
 
-async fn fila_revelado(state: &AppState, id: i64) -> Result<Option<ReveladoFila>, ServerFnError> {
+/// El nombre legible del campo `campo` de `funcion` para un revelado: en
+/// castellano, el del catálogo de funciones; en otro idioma, el de Ajustes
+/// si lo trae. Sin ninguno, `None` (la fila dice «una clave»).
+fn etiqueta_revelado(
+    state: &AppState,
+    de_ajustes: &Etiquetas,
+    funcion: &str,
+    campo: &str,
+) -> Option<String> {
+    let del_catalogo = || {
+        state
+            .catalogo
+            .funcion(funcion)
+            .and_then(|f| f.parametro(campo))
+            // Sin la aclaración técnica del final («Clave WiFi (XOR 0x1f)»).
+            .map(|p| match p.etiqueta.rsplit_once(" (") {
+                Some((nombre, _)) if p.etiqueta.ends_with(')') => nombre.to_owned(),
+                _ => p.etiqueta.clone(),
+            })
+    };
+    let de_ajustes = || {
+        de_ajustes
+            .get(&(funcion.to_owned(), campo.to_owned()))
+            .cloned()
+    };
+    if crate::ui::i18n::idioma_actual() == i18n::Idioma::Es {
+        del_catalogo().or_else(de_ajustes)
+    } else {
+        de_ajustes()
+    }
+}
+
+async fn fila_revelado(
+    state: &AppState,
+    de_ajustes: &Etiquetas,
+    id: i64,
+) -> Result<Option<ReveladoFila>, ServerFnError> {
     let fila = sqlx::query(
         "SELECT r.ts, r.funcion, r.campo, r.instancia, u.username \
          FROM reveals r LEFT JOIN users u ON u.id = r.user_id WHERE r.id = ?",
@@ -137,14 +266,19 @@ async fn fila_revelado(state: &AppState, id: i64) -> Result<Option<ReveladoFila>
     .fetch_optional(&state.db)
     .await
     .map_err(interno)?;
-    Ok(fila.map(|f| ReveladoFila {
-        id,
-        ts: f.get("ts"),
-        usuario: f.get("username"),
-        ruta: ruta(state, &f.get::<String, _>("funcion")),
-        funcion: f.get("funcion"),
-        campo: f.get("campo"),
-        instancia: f.get("instancia"),
+    Ok(fila.map(|f| {
+        let funcion: String = f.get("funcion");
+        let campo: String = f.get("campo");
+        ReveladoFila {
+            id,
+            ts: f.get("ts"),
+            usuario: f.get("username"),
+            ruta: ruta(state, &funcion),
+            etiqueta: etiqueta_revelado(state, de_ajustes, &funcion, &campo),
+            funcion,
+            campo,
+            instancia: f.get("instancia"),
+        }
     }))
 }
 
@@ -170,15 +304,21 @@ pub async fn pagina(state: &AppState, pagina: u32) -> Result<PaginaHistorial, Se
     .await
     .map_err(interno)?;
     let o = Ocultar::new(state);
+    // Una vez por página (no por fila): las etiquetas de Ajustes.
+    let de_ajustes = crate::ajustes_router::servidor::etiquetas_de_campos(state);
     let mut entradas = Vec::with_capacity(claves.len());
     for c in &claves {
         let id: i64 = c.get("id");
         let entrada = match c.get::<String, _>("k").as_str() {
             "c" => match g.cambio(id).await {
-                Some(c) => Some(EntradaVista::Cambio(fila_cambio(state, &o, c).await?)),
+                Some(c) => Some(EntradaVista::Cambio(Box::new(
+                    fila_cambio(state, &o, &de_ajustes, c).await?,
+                ))),
                 None => None,
             },
-            _ => fila_revelado(state, id).await?.map(EntradaVista::Revelado),
+            _ => fila_revelado(state, &de_ajustes, id)
+                .await?
+                .map(EntradaVista::Revelado),
         };
         entradas.extend(entrada);
     }
@@ -194,7 +334,30 @@ pub async fn pagina(state: &AppState, pagina: u32) -> Result<PaginaHistorial, Se
 pub async fn deshacer(state: &AppState, change_id: i64) -> Result<PreparadoVista, ServerFnError> {
     let g = gestor(state)?;
     match g.deshacer(change_id).await {
-        Ok(p) => Ok(vista_preparado(state, &g, p)),
+        Ok(p) => {
+            let mut v = vista_preparado(state, &g, p);
+            // Lo que el router no deja leer se queda como se escribió.
+            let (_, tapados) = g.tapados_del_cambio(change_id).await;
+            if !tapados.is_empty() {
+                let e = crate::ajustes_router::servidor::etiquetas_de_campos(state);
+                v.aviso = Some(crate::t!(
+                    "cambio-aviso-tapado",
+                    campos = nombres(&e, state, &tapados)
+                ));
+            }
+            Ok(v)
+        }
+        Err(CambioError::Invalida(m)) if m == crate::changes::DESHACER_SOLO_TAPADOS => {
+            let (_, tapados) = g.tapados_del_cambio(change_id).await;
+            let e = crate::ajustes_router::servidor::etiquetas_de_campos(state);
+            Err(con_estado(
+                StatusCode::BAD_REQUEST,
+                crate::t!(
+                    "cambio-sin-deshacer-tapado",
+                    campos = nombres(&e, state, &tapados)
+                ),
+            ))
+        }
         Err(CambioError::Invalida(m)) => Err(con_estado(
             StatusCode::BAD_REQUEST,
             crate::t!("historial-error-deshacer", motivo = m),

@@ -22,6 +22,9 @@ use tokio::{
 /// larga no los deja sin turno. Un tema de Ajustes hace hasta 5.
 pub const LECTURAS_POR_TURNO: usize = 6;
 
+/// Pausa mínima de serie entre peticiones consecutivas al router.
+pub const PAUSA_MINIMA: Duration = Duration::from_millis(150);
+
 /// Configuración del cliente.
 #[derive(Clone)]
 pub struct ClientConfig {
@@ -33,7 +36,8 @@ pub struct ClientConfig {
     pub password: String,
     /// Tiempo máximo por petición (por defecto 15 s).
     pub timeout: Duration,
-    /// Pausa mínima entre peticiones consecutivas (por defecto 150 ms).
+    /// Pausa mínima entre peticiones consecutivas (por defecto
+    /// [`PAUSA_MINIMA`], 150 ms).
     pub min_gap: Duration,
 }
 
@@ -45,7 +49,7 @@ impl ClientConfig {
             user: user.to_owned(),
             password: password.to_owned(),
             timeout: Duration::from_secs(15),
-            min_gap: Duration::from_millis(150),
+            min_gap: PAUSA_MINIMA,
         }
     }
 }
@@ -199,6 +203,19 @@ impl Client {
             client: self,
             st: Some(self.shared.state.lock().await),
             hechas: 0,
+        }
+    }
+
+    /// Toma el cerrojo del cliente sin cederlo hasta soltar lo devuelto: nadie
+    /// más (el sondeo, el gestor, las páginas) llama al router por este
+    /// cliente mientras tanto, así que nadie cierra ni renueva su sesión. Lo
+    /// usa el cambio de la contraseña del router, que depende de la sesión
+    /// abierta para volver atrás. Las llamadas por este cliente esperan; las
+    /// de otro cliente (otra sesión) no.
+    pub async fn en_exclusiva(&self) -> Exclusiva<'_> {
+        Exclusiva {
+            client: self,
+            st: self.shared.state.lock().await,
         }
     }
 
@@ -586,5 +603,29 @@ impl Turno<'_> {
         self.hechas += 1;
         let st = self.st.as_mut().expect("el turno tiene el cerrojo");
         self.client.call_locked(st, name, params).await
+    }
+}
+
+/// El cerrojo del cliente, sin ceder (ver [`Client::en_exclusiva`]).
+pub struct Exclusiva<'a> {
+    client: &'a Client,
+    st: MutexGuard<'a, State>,
+}
+
+impl Exclusiva<'_> {
+    /// Como [`Client::write`], con el cerrojo ya tomado.
+    pub async fn write(
+        &mut self,
+        page: &str,
+        name: &str,
+        params: &[(&str, &str)],
+    ) -> Result<XmlNode, Error> {
+        self.client.contar_escritura();
+        let r = self
+            .client
+            .write_locked(&mut self.st, page, name, params)
+            .await;
+        self.client.contar_escritura();
+        r
     }
 }

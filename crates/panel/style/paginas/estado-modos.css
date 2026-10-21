@@ -1,0 +1,120 @@
+/* Modos de visualización de Estado (gráfica, texto) y sus opciones. */
+/* ------------------------------------------------ Modos de visualización */
+
+.selector-vista {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--esp-1);
+  max-width: 100%;
+}
+
+/* «Gráfica»: cada gráfico a todo el ancho. */
+.rejilla-estado.una-columna {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.rejilla-estado.una-columna > :last-child {
+  grid-column: auto;
+}
+
+/* «Gráfica»: indicadores compactos, sin minigráfica. */
+.rejilla-indicadores.compactos {
+  grid-template-columns: repeat(auto-fill, minmax(min(140px, 100%), 1fr));
+  gap: var(--esp-2);
+}
+
+.rejilla-indicadores.compactos > :first-child,
+.rejilla-indicadores.compactos > :last-child {
+  grid-column: auto;
+}
+
+.rejilla-indicadores.compactos .indicador {
+  padding: var(--esp-3);
+}
+
+.rejilla-indicadores.compactos .indicador-valor {
+  font-size: 19px;
+}
+
+/* «Texto»: indicadores como pares nombre/valor. */
+.indicadores-texto {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
+  gap: var(--esp-3) var(--esp-4);
+  margin: 0;
+  padding: var(--esp-4);
+  background: var(--superficie-1);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+}
+
+.indicadores-texto .par {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.indicadores-texto dt {
+  color: var(--texto-2);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.indicadores-texto dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--esp-2);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.par-valor {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.par-sub {
+  color: var(--texto-2);
+  font-size: 12px;
+}
+
+/* «Ajustes del panel → Visualización»: opciones con su explicación. */
+.opciones {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-3);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.opcion {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--esp-3);
+}
+
+.opcion input[type="radio"] {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--acento);
+  cursor: pointer;
+}
+
+.opcion-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.opcion-nombre {
+  font-weight: 500;
+  cursor: pointer;
+}

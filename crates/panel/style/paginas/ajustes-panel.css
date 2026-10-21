@@ -1,0 +1,90 @@
+/* Ajustes del panel: usuarios y formularios. */
+/* ---------------------------------------------------- Ajustes del panel */
+
+.ajustes-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr));
+  gap: var(--esp-4);
+  align-items: start;
+}
+
+.ajustes-panel .tarjeta {
+  min-width: 0;
+}
+
+.ajustes-panel .nota {
+  margin: 0;
+  color: var(--texto-2);
+  font-size: 12px;
+}
+
+.ajustes-estado {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--esp-2);
+  overflow-wrap: anywhere;
+}
+
+.ajustes-formulario,
+.ajustes-usuario-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-4);
+  min-width: 0;
+}
+
+.ajustes-formulario p,
+.ajustes-usuario-form p {
+  margin: 0;
+}
+
+.botones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-3);
+}
+
+.ajustes-usuarios {
+  display: flex;
+  flex-direction: column;
+}
+
+.ajustes-usuario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-3);
+  padding: var(--esp-3) 0;
+  border-top: 1px solid var(--borde);
+}
+
+.ajustes-usuario:last-child {
+  border-bottom: 1px solid var(--borde);
+}
+
+.ajustes-usuario-fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esp-2) var(--esp-4);
+}
+
+.ajustes-usuario-nombre {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.boton.boton-borrar {
+  border-color: var(--error);
+  background: var(--error);
+}
+
+.aviso-formulario {
+  color: var(--ok);
+  font-size: 13px;
+}
+
+.aviso-formulario:empty {
+  display: none;
+}

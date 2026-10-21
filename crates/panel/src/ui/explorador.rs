@@ -6,7 +6,7 @@
 //!   panel no las usa, el motivo.
 //! - `/explorador/:area/:funcion` (nombre codificado con [`codificar`]):
 //!   ficha con parámetros; las lecturas se ejecutan y se muestran como tabla
-//!   clave/valor o de instancias (secretos enmascarados, con «Revelar»); las
+//!   clave/valor o de instancias (secretos censurados, con el ojo); las
 //!   escrituras y acciones tienen un formulario generado del catálogo que
 //!   pasa por el gestor de cambios ([`DialogoCambio`]).
 //!
@@ -20,11 +20,12 @@ mod formulario;
 pub(crate) mod servidor;
 
 pub use datos::*;
+pub(crate) use dialogo::abrir_modal;
 pub use dialogo::{DialogoCambio, TablaDiff};
 
 use crate::t;
+use crate::ui::secreto::SecretoLeido;
 use crate::ui::{Estado, IconoEstado, Insignia};
-use dialogo::DialogoRevelar;
 use formulario::Escritura;
 use leptos::prelude::*;
 use leptos_router::{
@@ -184,6 +185,20 @@ pub fn Explorador() -> impl IntoView {
                 </Transition>
             </aside>
             <div class="explorador-pagina">
+                // El catálogo, la ficha, la lectura, la lista y el formulario
+                // llegan o se hacen en el navegador: sin JavaScript, o con el
+                // wasm caído, la página se quedaría en «Cargando…» sin decir
+                // por qué. El aviso lo oculta el CSS en cuanto hidrata. El
+                // `<noscript>` lleva solo texto: con JavaScript, el navegador
+                // lo guarda como texto y así hidrata igual.
+                <p class="aviso estado-neutro aviso-sin-hidratar" role="status">
+                    <IconoEstado estado=Estado::Neutro />
+                    <span>
+                        <noscript>{t!("biblioteca-sin-js")}</noscript>
+                        " "
+                        {t!("biblioteca-sin-hidratar")}
+                    </span>
+                </p>
                 <Outlet />
             </div>
         </div>
@@ -468,59 +483,9 @@ fn ficha(d: FuncionDetalle) -> impl IntoView {
 
 // ------------------------------------------------------------ lectura
 
-/// Secreto que se quiere revelar.
-#[derive(Clone, Debug, PartialEq)]
-struct Objetivo {
-    funcion: String,
-    campo: String,
-    instancia: Option<String>,
-    params: Vec<(String, String)>,
-}
-
-/// Valores revelados (30 s) y el que se está pidiendo.
-#[derive(Clone, Copy)]
-struct Revelados {
-    pidiendo: RwSignal<Option<Objetivo>>,
-    valores: RwSignal<Vec<(Objetivo, String)>>,
-}
-
-/// Tiempo que se muestra un secreto revelado.
-const REVELADO: std::time::Duration = std::time::Duration::from_secs(30);
-
-impl Revelados {
-    /// Muestra `valor` en la celda de `o` durante [`REVELADO`].
-    fn mostrar(self, o: Objetivo, valor: String) {
-        self.valores.update(|v| v.push((o.clone(), valor)));
-        self.pidiendo.set(None);
-        set_timeout(
-            move || self.valores.update(|v| v.retain(|(k, _)| *k != o)),
-            REVELADO,
-        );
-    }
-
-    /// «Revelar»: sin pedir la contraseña si la sesión tiene abierta la
-    /// ventana de reautenticación; si no (o si falla), con el diálogo, que
-    /// la pide y muestra el error.
-    fn pedir(self, o: Objetivo) {
-        leptos::task::spawn_local(async move {
-            let r = revelar(
-                o.funcion.clone(),
-                o.campo.clone(),
-                o.instancia.clone(),
-                o.params.clone(),
-                String::new(),
-            )
-            .await;
-            match r {
-                Ok(valor) => self.mostrar(o, valor),
-                Err(_) => self.pidiendo.set(Some(o)),
-            }
-        });
-    }
-}
-
-/// Celda de un valor de lectura; los secretos, con «Revelar».
-fn celda_valor(v: Valor, objetivo: Objetivo) -> AnyView {
+/// Celda de un valor de lectura (del campo `campo`); los secretos,
+/// censurados con el ojo.
+fn celda_valor(v: Valor, campo: &str) -> AnyView {
     match v {
         Valor::Texto(t) if t.is_empty() => view! {
             <span class="vacia" aria-hidden="true">{t!("biblioteca-vacio-par")}</span>
@@ -536,60 +501,27 @@ fn celda_valor(v: Valor, objetivo: Objetivo) -> AnyView {
             <span class="solo-lector">{t!("comun-sin-valor")}</span>
         }
         .into_any(),
-        Valor::Secreto => view! { <CeldaSecreta objetivo /> }.into_any(),
-    }
-}
-
-#[component]
-fn CeldaSecreta(objetivo: Objetivo) -> impl IntoView {
-    let r = expect_context::<Revelados>();
-    let o = StoredValue::new(objetivo);
-    let revelado = move || {
-        r.valores.with(|v| {
-            v.iter()
-                .find(|(k, _)| o.with_value(|o| k == o))
-                .map(|(_, v)| v.clone())
-        })
-    };
-    move || match revelado() {
-        Some(v) => view! {
-            <span class="mono revelado">{v}</span>
-            <span class="solo-lector">{t!("biblioteca-visible-30")}</span>
+        Valor::Clave(v) => {
+            view! { <SecretoLeido valor=Some(v) nombre=campo.to_owned() /> }.into_any()
         }
-        .into_any(),
-        None => view! {
-            <span class="celda-secreta">
-                <span class="secreto">{MASCARA}</span>
-                <span class="solo-lector">{t!("comun-valor-oculto")}</span>
-                <button
-                    class="boton-mini"
-                    type="button"
-                    on:click=move |_| r.pedir(o.get_value())
-                >
-                    {t!("biblioteca-revelar")}
-                    <span class="solo-lector">{o.with_value(|o| format!(" {}", o.campo))}</span>
-                </button>
-            </span>
+        // Una lectura siempre trae el valor; por si acaso, la máscara.
+        Valor::Secreto => view! {
+            <span class="secreto" aria-hidden="true">{MASCARA}</span>
+            <span class="solo-lector">{t!("comun-valor-oculto")}</span>
         }
         .into_any(),
     }
 }
 
 /// Valores de una lectura: tabla clave/valor, tablas de instancias y XML.
-fn vista_valores(v: Vista, funcion: &str, params: &[(String, String)]) -> impl IntoView + use<> {
-    let objetivo = |campo: &str, instancia: Option<&str>| Objetivo {
-        funcion: funcion.to_owned(),
-        campo: campo.to_owned(),
-        instancia: instancia.map(str::to_owned),
-        params: params.to_vec(),
-    };
+fn vista_valores(v: Vista) -> impl IntoView + use<> {
     let vacia = v.pares.is_empty() && v.grupos.is_empty();
     let pares = (!v.pares.is_empty()).then(|| {
         let filas = v
             .pares
             .into_iter()
             .map(|p| {
-                let celda = celda_valor(p.valor, objetivo(&p.nombre, None));
+                let celda = celda_valor(p.valor, &p.nombre);
                 view! {
                     <tr>
                         <th scope="row"><span class="mono">{p.nombre}</span></th>
@@ -630,7 +562,7 @@ fn vista_valores(v: Vista, funcion: &str, params: &[(String, String)]) -> impl I
                         .valores
                         .into_iter()
                         .zip(&g.columnas)
-                        .map(|(v, c)| view! { <td>{celda_valor(v, objetivo(c, Some(&f.id)))}</td> })
+                        .map(|(v, c)| view! { <td>{celda_valor(v, c)}</td> })
                         .collect_view();
                     view! { <tr>{celdas}</tr> }
                 })
@@ -674,6 +606,30 @@ fn vista_valores(v: Vista, funcion: &str, params: &[(String, String)]) -> impl I
     }
 }
 
+/// `vista` solo en el navegador, ya hidratado; antes (en el HTML del servidor
+/// y al hidratar), `espera`. Para lo que depende de un `LocalResource` creado
+/// dentro de un `Suspend`: el servidor no lo puede pintar, y así el navegador
+/// hidrata lo mismo que pintó el servidor (los `Effect` solo corren en el
+/// navegador, después de hidratar).
+pub(super) fn en_el_navegador<E, V>(
+    espera: impl Fn() -> E + Send + Sync + 'static,
+    vista: impl Fn() -> V + Send + Sync + 'static,
+) -> impl IntoView
+where
+    E: IntoView + 'static,
+    V: IntoView + 'static,
+{
+    let (listo, set_listo) = signal(false);
+    Effect::new(move |_| set_listo.set(true));
+    move || {
+        if listo.get() {
+            vista().into_any()
+        } else {
+            espera().into_any()
+        }
+    }
+}
+
 /// Lectura: parámetros, botón «Leer» y resultado.
 #[component]
 fn VistaLectura(detalle: FuncionDetalle) -> impl IntoView {
@@ -702,19 +658,17 @@ fn VistaLectura(detalle: FuncionDetalle) -> impl IntoView {
         }
     };
     let consulta = RwSignal::new(valores_de());
-    let resultado = Resource::new(
-        {
-            let funcion = funcion.clone();
-            move || (funcion.clone(), consulta.get())
-        },
-        |(f, p)| leer(f, p),
-    );
+    // Solo en el navegador (`LocalResource`, pintado con `en_el_navegador`):
+    // este recurso nace dentro del `Suspend` de `detalle`, y un recurso
+    // anidado que llega en el HTML del servidor puede no casar al hidratar
+    // con el que crea el navegador (pasaba según lo que tardase el router, y
+    // el wasm moría con un pánico de hidratación). Sin JavaScript no hay
+    // lectura: «Leer de nuevo» ya lo necesitaba.
+    let resultado = LocalResource::new({
+        let funcion = funcion.clone();
+        move || leer(funcion.clone(), consulta.get())
+    });
     let leyendo = RwSignal::new(false);
-    let revelados = Revelados {
-        pidiendo: RwSignal::new(None),
-        valores: RwSignal::new(Vec::new()),
-    };
-    provide_context(revelados);
 
     let entradas = campos
         .iter()
@@ -754,13 +708,10 @@ fn VistaLectura(detalle: FuncionDetalle) -> impl IntoView {
     };
 
     let datos = {
-        let funcion = funcion.clone();
         move || {
-            let funcion = funcion.clone();
             Suspend::new(async move {
-                let params = consulta.get_untracked();
                 match resultado.await {
-                    Ok(v) => vista_valores(v, &funcion, &params).into_any(),
+                    Ok(v) => vista_valores(v).into_any(),
                     Err(e) => view! {
                         <p class="aviso estado-error" role="alert">
                             <IconoEstado estado=Estado::Error />
@@ -771,22 +722,6 @@ fn VistaLectura(detalle: FuncionDetalle) -> impl IntoView {
                 }
             })
         }
-    };
-
-    let dialogo = move || {
-        revelados.pidiendo.get().map(|o| {
-            let o2 = o.clone();
-            view! {
-                <DialogoRevelar
-                    funcion=o.funcion.clone()
-                    campo=o.campo.clone()
-                    instancia=o.instancia.clone()
-                    params=o.params.clone()
-                    on_cerrar=move |_| revelados.pidiendo.set(None)
-                    on_revelado=move |valor: String| revelados.mostrar(o2.clone(), valor)
-                />
-            }
-        })
     };
 
     view! {
@@ -803,10 +738,14 @@ fn VistaLectura(detalle: FuncionDetalle) -> impl IntoView {
                 </div>
             </form>
             <div class="resultado-lectura" aria-live="polite" aria-busy=move || leyendo.get().to_string()>
-                <Transition set_pending=leyendo fallback=|| view! { <p class="estado-espera">{t!("biblioteca-leyendo")}</p> }>{datos}</Transition>
+                {en_el_navegador(
+                    || view! { <p class="estado-espera">{t!("biblioteca-leyendo")}</p> },
+                    move || view! {
+                        <Transition set_pending=leyendo fallback=|| view! { <p class="estado-espera">{t!("biblioteca-leyendo")}</p> }>{datos}</Transition>
+                    },
+                )}
             </div>
         </section>
-        {dialogo}
     }
     .into_any()
 }
