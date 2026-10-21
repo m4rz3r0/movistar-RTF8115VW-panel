@@ -94,6 +94,9 @@ lib-package = "panel"
 site-root = "target/site"
 site-pkg-dir = "pkg"
 style-file = "crates/panel/style/main.css"
+# Lightning CSS incrusta los `@import` de main.css en un único CSS (el mismo
+# panel.<hash>.css de siempre: ni peticiones de más ni cambios en la CSP).
+style-bundle = true
 assets-dir = "crates/panel/public"
 site-addr = "127.0.0.1:3000"
 reload-port = 3001
