@@ -49,6 +49,18 @@ debug = "line-tables-only"
 [profile.dev.package."*"]
 debug = false
 
+# Argon2 (con su blake2) optimizado también en pruebas y desarrollo: sin
+# optimizar, cada hash de contraseña (el ficticio de AppState::new, crear el
+# usuario y entrar) se lleva la mayor parte de lo que tarda una prueba con
+# panel. No cambia los parámetros ni la versión release. Medido con nextest
+# (2026-10-21): la suma de lo que tardan los tests baja de 836 a 611 s.
+# Optimizar también libsqlite3-sys o chacha20poly1305 no se notó (±1 %).
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.dev.package.blake2]
+opt-level = 3
+
 [profile.release]
 # LTO completo y una unidad de codegen. Medido con LTO "thin" y 16 unidades
 # en un portátil multinúcleo: el reloj baja de 8m34s a 3m54s, pero la CPU
