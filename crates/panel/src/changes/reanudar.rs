@@ -130,7 +130,7 @@ impl ChangeManager {
         wan_antes: bool,
         reserva: Reserva,
     ) {
-        const RETOMADA: &str = "vigilancia retomada tras un reinicio del panel";
+        let retomada = || Nota::clave(nota::RETOMADA);
         let fallido = |e: String| async move {
             self.marcar_paso(id, orden, EstadoPaso::Fallido, Some(&e))
                 .await;
@@ -145,7 +145,7 @@ impl ChangeManager {
                         .await;
                 }
                 Ok(_) => {
-                    self.marcar(id, Estado::Aplicado, None, Some(RETOMADA))
+                    self.marcar(id, Estado::Aplicado, None, Some(&retomada()))
                         .await
                 }
                 Err(e) => {
@@ -165,7 +165,7 @@ impl ChangeManager {
                     self.fijar_instancia(id, orden, &n).await;
                     plan.instancia = Some(n);
                 }
-                RETOMADA.to_owned()
+                retomada()
             }
             Comprobacion::SinLectura(e) => {
                 fallido(format!(
@@ -174,7 +174,7 @@ impl ChangeManager {
                 .await;
                 return;
             }
-            Comprobacion::Limitada => format!("{RETOMADA}; verificación limitada"),
+            Comprobacion::Limitada => retomada().y(Nota::clave(nota::VERIFICACION_LIMITADA)),
             Comprobacion::Difiere(v) => {
                 let anterior = self.comprobar(&plan, Lado::Anterior).await;
                 let e = if anterior == Comprobacion::Coincide(None) {

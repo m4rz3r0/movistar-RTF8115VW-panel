@@ -36,7 +36,7 @@ impl Default for Tiempos {
 /// Resultado de releer tras una escritura sin respuesta.
 pub(super) enum SinRespuesta {
     /// Hay que seguir (vigilar), con esta comprobación y esta nota.
-    Aplicada(Comprobacion, String),
+    Aplicada(Comprobacion, Nota),
     /// Fallido, con el motivo: el router sigue como antes (no se aplicó) o,
     /// al crear, no se sabe qué instancia es la del cambio.
     Fallido(String),

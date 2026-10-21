@@ -46,3 +46,14 @@ historial-paso-aplicando = applying
 historial-paso-aplicado = applied
 historial-paso-fallido = failed
 historial-paso-revertido = reverted
+# Notes from the change manager (stored as keys and shown in the language
+# of whoever views the History).
+nota-paso = step { $n }: { $nota }
+nota-verificacion-limitada = limited check: the router doesn't show the fields written
+nota-reinicio-sin-respuesta = the router didn't answer the restart command ({ $error })
+nota-sin-confirmar = the router didn't confirm the write ({ $error })
+nota-releido-aplicada = read again: applied
+nota-sin-campos-escritos = the router doesn't show the fields written
+nota-sin-releer = it couldn't be read again either ({ $error })
+nota-wan-caida = the WAN was already down before the change: only access to the router is watched
+nota-retomada = watching resumed after the panel restarted

@@ -8,8 +8,8 @@ use crate::{
     ui::explorador::{
         PreparadoVista, ruta_funcion,
         servidor::{
-            Ocultar, campo_cambio, con_estado, error_cambio, estado, gestor, interno, riesgo,
-            vista_preparado,
+            Ocultar, campo_cambio, con_estado, error_cambio, estado, gestor, interno, nota_legible,
+            riesgo, vista_preparado,
         },
     },
 };
@@ -67,6 +67,9 @@ async fn fila_cambio(
         (None, None) => None,
     };
     let de_ajuste = titulo.is_some();
+    // Las etiquetas del catálogo de funciones están en castellano: en otro
+    // idioma, las de Ajustes (traducidas) donde las haya.
+    let en_otro_idioma = crate::ui::i18n::idioma_actual() != i18n::Idioma::Es;
     // Cada campo con la etiqueta de su campo en Ajustes o, si no, la de la
     // función de su paso.
     let campos_de = |funcion: &str, diff: crate::changes::Diff| -> Vec<CampoCambio> {
@@ -75,9 +78,11 @@ async fn fila_cambio(
             .into_iter()
             .map(|d| {
                 let mut c = campo_cambio(f, o, d);
-                // Solo un cambio hecho desde Ajustes (lleva su título): uno de
-                // la Biblioteca se queda con las etiquetas de su función.
-                if de_ajuste
+                // Un cambio hecho desde Ajustes (lleva su título). Uno de la
+                // Biblioteca se queda en castellano con las etiquetas de su
+                // función, como en la Biblioteca; en otro idioma, toma la de
+                // Ajustes si el catálogo de ajustes la trae.
+                if (de_ajuste || en_otro_idioma)
                     && let Some(e) = de_ajustes.get(&(funcion.to_owned(), c.nombre.clone()))
                 {
                     c.etiqueta = e.clone();
@@ -144,7 +149,7 @@ async fn fila_cambio(
         estado: estado(c.estado),
         resumen: resumen(&campos),
         campos,
-        nota: c.nota,
+        nota: c.nota.as_deref().map(nota_legible),
         error: c.error,
         deshecho_por: enlace(por).await?,
         deshace: enlace(deshace).await?,

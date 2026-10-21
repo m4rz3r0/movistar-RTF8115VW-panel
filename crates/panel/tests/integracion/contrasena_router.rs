@@ -9,7 +9,8 @@ use crate::comun::{
     registro_global, send, sesion,
 };
 use hgu::{Client, ClientConfig};
-use panel::instancia;
+use i18n::Idioma;
+use panel::{changes::Nota, instancia};
 use serde_json::{Value, json};
 use std::time::{Duration, Instant};
 
@@ -157,7 +158,16 @@ async fn contrasena_router_cambia_y_se_guarda() {
     let (id, estado, error, nota, titulo) = ultima_fila(&p).await;
     assert_eq!(estado, "aplicado");
     assert_eq!(error, None);
-    assert!(nota.is_some_and(|n| n.contains("no se puede deshacer")));
+    // La nota, como clave: se pinta en el idioma de quien mira.
+    let nota = nota.expect("con nota");
+    assert!(
+        Nota::texto(&nota, Idioma::Es).contains("no se puede deshacer"),
+        "{nota}"
+    );
+    assert!(
+        Nota::texto(&nota, Idioma::En).contains("cannot be undone"),
+        "{nota}"
+    );
     assert_eq!(
         titulo.as_deref(),
         Some("ajuste-seguridad-contrasena_router-titulo")

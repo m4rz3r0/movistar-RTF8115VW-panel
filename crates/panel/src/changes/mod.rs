@@ -46,6 +46,7 @@
 
 mod consultas;
 mod grupo;
+mod nota;
 mod persistencia;
 pub mod plan;
 mod preparar;
@@ -56,6 +57,7 @@ mod vigilancia;
 
 use grupo::{Ejecucion, PasoGuardado};
 pub use grupo::{EstadoPaso, GrupoRequest, Paso, PasoCambio, PasoPreparado, PreparadoGrupo};
+pub use nota::Nota;
 use plan::*;
 pub use plan::{PALABRA_ACCION, PALABRA_REINICIO};
 /// Reglas del gestor que comparte el explorador (qué identifica una

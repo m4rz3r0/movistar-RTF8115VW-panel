@@ -167,8 +167,9 @@ impl ChangeManager {
         id: i64,
         estado: Estado,
         error: Option<&str>,
-        nota: Option<&str>,
+        nota: Option<&Nota>,
     ) {
+        let nota = nota.map(Nota::guardar);
         let r = sqlx::query(
             "UPDATE changes SET estado = ?, updated = ?, error = COALESCE(?, error), \
              nota = COALESCE(?, nota) WHERE id = ?",
@@ -176,7 +177,7 @@ impl ChangeManager {
         .bind(estado.as_str())
         .bind(series::now())
         .bind(error)
-        .bind(nota)
+        .bind(nota.as_deref())
         .bind(id)
         .execute(&self.state.db)
         .await;
@@ -188,7 +189,9 @@ impl ChangeManager {
             None => tracing::info!(
                 cambio = id,
                 estado = estado.as_str(),
-                nota = nota.unwrap_or(""),
+                nota = nota
+                    .as_deref()
+                    .map_or_else(String::new, |n| Nota::texto(n, i18n::Idioma::Es)),
                 "cambio actualizado"
             ),
         }

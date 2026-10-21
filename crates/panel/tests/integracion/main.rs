@@ -20,6 +20,7 @@ mod estaticos;
 mod explorador;
 mod grupos;
 mod historial;
+mod historial_idioma;
 mod http;
 mod idioma;
 mod instalar;

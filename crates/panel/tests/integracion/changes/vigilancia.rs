@@ -12,8 +12,18 @@ async fn escritura_sin_respuesta_aplicada_se_vigila() {
     p.sim.control.no_answer_next_write(true);
     let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
     let c = esperar_estado(&m, id, Estado::Aplicado).await;
+    // La nota se guarda como claves y se pinta en el idioma de quien mira.
     let nota = c.nota.unwrap_or_default();
-    assert!(nota.contains("no confirmó"), "{nota}");
+    let es = Nota::texto(&nota, Idioma::Es);
+    assert!(
+        es.contains("no confirmó") && es.contains("releído: aplicada"),
+        "{es}"
+    );
+    let en = Nota::texto(&nota, Idioma::En);
+    assert!(
+        en.contains("didn't confirm") && en.contains("read again: applied"),
+        "{en}"
+    );
     assert_eq!(ip_de_lease(&p, "0").await.as_deref(), Some("192.168.1.80"));
     esperar_libre_gestor(&m).await;
     assert!(m.se_puede_deshacer(id).await);
@@ -74,7 +84,15 @@ async fn wan_ya_caida_no_provoca_reversion() {
     let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
     let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
     let c = esperar_estado(&m, id, Estado::Aplicado).await;
-    assert!(c.nota.unwrap().contains("WAN"));
+    let nota = c.nota.unwrap();
+    assert!(
+        Nota::texto(&nota, Idioma::Es).contains("la WAN ya estaba caída"),
+        "{nota}"
+    );
+    assert!(
+        Nota::texto(&nota, Idioma::En).contains("the WAN was already down"),
+        "{nota}"
+    );
     assert_eq!(ip_de_lease(&p, "0").await.as_deref(), Some("192.168.1.80"));
 }
 

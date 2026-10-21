@@ -134,7 +134,7 @@ pub(super) struct Ejecucion {
     /// Pasos aplicados, en orden.
     pub(super) pasos: Vec<PasoEscrito>,
     pub(super) base: Base,
-    pub(super) nota: Option<String>,
+    pub(super) nota: Option<Nota>,
     pub(super) riesgo: Riesgo,
     /// El grupo tiene más de un paso (no omitido): el detalle de un fallo
     /// nombra el paso y una reversión a medias es `revertido_parcial`.

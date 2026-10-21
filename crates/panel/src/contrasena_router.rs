@@ -374,7 +374,9 @@ pub(crate) mod servidor {
             Ok(()) => (
                 "aplicado",
                 None,
-                Some(tr(idioma, "contrasena-router-historial-nota", None)),
+                // La clave, no el texto: el Historial la pinta en el idioma
+                // de quien lo mira.
+                Some(crate::changes::Nota::clave("contrasena-router-historial-nota").guardar()),
             ),
             Err(f) => ("fallido", Some(texto(f, idioma)), None),
         };

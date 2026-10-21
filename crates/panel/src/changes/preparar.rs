@@ -92,19 +92,17 @@ impl ChangeManager {
         pausa: &mut Option<crate::poller::PauseGuard>,
     ) -> SinRespuesta {
         let sin_confirmar = format!("el router no confirmó la escritura ({e})");
+        let nota = |otra: Nota| Nota::con(nota::SIN_CONFIRMAR, &[("error", e.to_string())]).y(otra);
         let fin = Instant::now() + self.tiempos.vigilancia(plan.funcion.riesgo);
         loop {
             match self.comprobar(plan, Lado::Nuevo).await {
                 c @ Comprobacion::Coincide(_) => {
-                    return SinRespuesta::Aplicada(
-                        c,
-                        format!("{sin_confirmar}; releído: aplicada"),
-                    );
+                    return SinRespuesta::Aplicada(c, nota(Nota::clave(nota::RELEIDO_APLICADA)));
                 }
                 Comprobacion::Limitada => {
                     return SinRespuesta::Aplicada(
                         Comprobacion::Limitada,
-                        format!("{sin_confirmar}; el router no muestra los campos escritos"),
+                        nota(Nota::clave(nota::SIN_CAMPOS_ESCRITOS)),
                     );
                 }
                 Comprobacion::Difiere(v) => {
@@ -127,7 +125,7 @@ impl ChangeManager {
                     if Instant::now() >= fin {
                         return SinRespuesta::Aplicada(
                             Comprobacion::Limitada,
-                            format!("{sin_confirmar}; tampoco se pudo releer ({l})"),
+                            nota(Nota::con(nota::SIN_RELEER, &[("error", l.to_string())])),
                         );
                     }
                     // No congelar el sondeo durante los reintentos.

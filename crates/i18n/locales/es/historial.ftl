@@ -46,3 +46,14 @@ historial-paso-aplicando = aplicando
 historial-paso-aplicado = aplicado
 historial-paso-fallido = fallido
 historial-paso-revertido = revertido
+# Notas del gestor de cambios (se guardan como claves y se pintan en el
+# idioma de quien mira el Historial).
+nota-paso = paso { $n }: { $nota }
+nota-verificacion-limitada = verificación limitada: el router no muestra los campos escritos
+nota-reinicio-sin-respuesta = el router no respondió a la orden de reinicio ({ $error })
+nota-sin-confirmar = el router no confirmó la escritura ({ $error })
+nota-releido-aplicada = releído: aplicada
+nota-sin-campos-escritos = el router no muestra los campos escritos
+nota-sin-releer = tampoco se pudo releer ({ $error })
+nota-wan-caida = la WAN ya estaba caída antes del cambio: solo se vigila el acceso al router
+nota-retomada = vigilancia retomada tras un reinicio del panel

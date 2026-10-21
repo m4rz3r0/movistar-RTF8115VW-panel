@@ -7,8 +7,9 @@ use crate::comun::{
 };
 use catalogo::{Riesgo, mask::MASCARA};
 use hgu::read;
+use i18n::Idioma;
 use panel::{
-    changes::{CambioError, ChangeManager, ChangeRequest, Estado, Tiempos},
+    changes::{CambioError, ChangeManager, ChangeRequest, Estado, Nota, Tiempos},
     poller::{Poller, PollerConfig},
 };
 use std::{collections::BTreeMap, sync::Arc, time::Duration};

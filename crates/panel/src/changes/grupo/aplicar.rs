@@ -259,7 +259,7 @@ impl ChangeManager {
             "cambio aplicándose"
         );
         let mut escritos: Vec<PasoEscrito> = Vec::new();
-        let mut notas: Vec<String> = Vec::new();
+        let mut notas: Vec<Nota> = Vec::new();
         let mut siguiente = Some(plan0);
         for i in i0..n {
             let mut plan = match siguiente.take() {
@@ -285,11 +285,7 @@ impl ChangeManager {
                 Ok(nota) => {
                     self.marcar_paso(id, i, EstadoPaso::Aplicado, None).await;
                     if let Some(nota) = nota {
-                        notas.push(if multi {
-                            format!("{}: {nota}", nombre_paso(i, &plan.funcion.name))
-                        } else {
-                            nota
-                        });
+                        notas.push(if multi { nota.del_paso(i) } else { nota });
                     }
                     escritos.push(PasoEscrito {
                         orden: i,
@@ -306,8 +302,8 @@ impl ChangeManager {
                 }
             }
         }
-        let nota = (!notas.is_empty()).then(|| notas.join("; "));
-        self.marcar(id, Estado::Vigilando, None, nota.as_deref())
+        let nota = Nota::juntar(notas);
+        self.marcar(id, Estado::Vigilando, None, nota.as_ref())
             .await;
         drop(pausa);
         Ok(Ejecucion {
@@ -371,7 +367,7 @@ impl ChangeManager {
         plan: &mut Plan,
         pausa: &mut Option<PauseGuard>,
         multi: bool,
-    ) -> Result<Option<String>, FalloPaso> {
+    ) -> Result<Option<Nota>, FalloPaso> {
         let mut nota = None;
         let comprobacion = match self.enviar(plan).await {
             Ok(()) => self.comprobar(plan, Lado::Nuevo).await,
@@ -380,8 +376,9 @@ impl ChangeManager {
                 return Err(FalloPaso::no_aplicado(CambioError::Router(e.to_string())));
             }
             Err(e) if plan.funcion.name == REBOOT => {
-                nota = Some(format!(
-                    "el router no respondió a la orden de reinicio ({e})"
+                nota = Some(Nota::con(
+                    nota::REINICIO_SIN_RESPUESTA,
+                    &[("error", e.to_string())],
                 ));
                 self.comprobar(plan, Lado::Nuevo).await
             }
@@ -420,9 +417,7 @@ impl ChangeManager {
                 }
             }
             Comprobacion::Limitada => {
-                nota = Some(nota.unwrap_or_else(|| {
-                    "verificación limitada: el router no muestra los campos escritos".into()
-                }));
+                nota = Some(nota.unwrap_or_else(|| Nota::clave(nota::VERIFICACION_LIMITADA)));
             }
             Comprobacion::Difiere(v) => {
                 return Err(self

@@ -175,7 +175,7 @@ impl ChangeManager {
         match ej.base {
             Base::Uptime(antes) => match self.esperar_vuelta(antes).await {
                 Ok(()) => {
-                    self.marcar(id, Estado::Aplicado, None, ej.nota.as_deref())
+                    self.marcar(id, Estado::Aplicado, None, ej.nota.as_ref())
                         .await
                 }
                 Err(e) => self.marcar(id, Estado::Fallido, Some(&e), None).await,
@@ -184,19 +184,15 @@ impl ChangeManager {
                 let nota = if wan {
                     ej.nota.clone()
                 } else {
-                    let extra = "la WAN ya estaba caída antes del cambio: \
-                                 solo se vigila el acceso al router";
+                    let extra = Nota::clave(nota::WAN_CAIDA);
                     Some(match &ej.nota {
-                        Some(n) => format!("{n}; {extra}"),
-                        None => extra.to_owned(),
+                        Some(n) => n.clone().y(extra),
+                        None => extra,
                     })
                 };
                 let dur = self.tiempos.vigilancia(ej.riesgo);
                 match self.vigilar(dur, wan).await {
-                    Ok(()) => {
-                        self.marcar(id, Estado::Aplicado, None, nota.as_deref())
-                            .await
-                    }
+                    Ok(()) => self.marcar(id, Estado::Aplicado, None, nota.as_ref()).await,
                     Err(motivo)
                         if ej
                             .pasos
@@ -204,11 +200,11 @@ impl ChangeManager {
                             .any(|p| p.plan.operacion == Operacion::Accion) =>
                     {
                         let e = format!("{motivo}; una acción no se puede revertir");
-                        self.marcar(id, Estado::Fallido, Some(&e), nota.as_deref())
+                        self.marcar(id, Estado::Fallido, Some(&e), nota.as_ref())
                             .await;
                     }
                     Err(motivo) => {
-                        self.revertir_grupo(&ej, &motivo, nota.as_deref(), Estado::Revertido)
+                        self.revertir_grupo(&ej, &motivo, nota.as_ref(), Estado::Revertido)
                             .await
                     }
                 }
@@ -218,7 +214,7 @@ impl ChangeManager {
 
     /// Revierte el grupo entero en orden inverso: `ok` si todo vuelve; si
     /// no, `revertido_parcial` (o `fallido` con un solo paso).
-    async fn revertir_grupo(&self, ej: &Ejecucion, motivo: &str, nota: Option<&str>, ok: Estado) {
+    async fn revertir_grupo(&self, ej: &Ejecucion, motivo: &str, nota: Option<&Nota>, ok: Estado) {
         tracing::warn!(cambio = ej.id, "{motivo}; revirtiendo");
         let fallos = self.revertir_pasos(ej.id, &ej.pasos).await;
         if fallos.is_empty() {
@@ -252,7 +248,6 @@ impl ChangeManager {
         wan_antes: bool,
         reserva: Reserva,
     ) {
-        const RETOMADA: &str = "vigilancia retomada tras un reinicio del panel";
         let mut escritos = Vec::new();
         let mut sin_plan = Vec::new();
         let mut completo = true;
@@ -290,10 +285,9 @@ impl ChangeManager {
                             p.plan.instancia = Some(n);
                         }
                     }
-                    Comprobacion::Limitada => notas.push(format!(
-                        "{}: verificación limitada",
-                        nombre_paso(p.orden, &p.plan.funcion.name)
-                    )),
+                    Comprobacion::Limitada => {
+                        notas.push(Nota::clave(nota::VERIFICACION_LIMITADA).del_paso(p.orden))
+                    }
                     Comprobacion::Difiere(_) | Comprobacion::SinLectura(_) => {
                         completo = false;
                         break;
@@ -311,14 +305,15 @@ impl ChangeManager {
                 self.marcar_paso(id, p.orden, EstadoPaso::Aplicado, None)
                     .await;
             }
-            notas.insert(0, RETOMADA.to_owned());
-            let nota = notas.join("; ");
-            self.marcar(id, Estado::Vigilando, None, Some(&nota)).await;
+            notas.insert(0, Nota::clave(nota::RETOMADA));
+            let nota = Nota::juntar(notas);
+            self.marcar(id, Estado::Vigilando, None, nota.as_ref())
+                .await;
             let ej = Ejecucion {
                 id,
                 pasos: escritos,
                 base: Base::Wan(wan_antes),
-                nota: Some(nota),
+                nota,
                 riesgo,
                 multi: true,
             };

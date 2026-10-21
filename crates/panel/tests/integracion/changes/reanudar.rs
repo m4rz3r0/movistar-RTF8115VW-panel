@@ -22,7 +22,15 @@ async fn reanuda_tras_reinicio() {
     b.reanudar_pendientes().await;
     assert_eq!(b.activo(), Some(id));
     let c = esperar_estado(&b, id, Estado::Aplicado).await;
-    assert!(c.nota.unwrap().contains("reinicio"));
+    let nota = c.nota.unwrap();
+    assert!(
+        Nota::texto(&nota, Idioma::Es).contains("reinicio del panel"),
+        "{nota}"
+    );
+    assert!(
+        Nota::texto(&nota, Idioma::En).contains("panel restarted"),
+        "{nota}"
+    );
     assert_eq!(ip_de_lease(&p, "0").await.as_deref(), Some("192.168.1.80"));
 }
 
