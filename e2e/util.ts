@@ -91,14 +91,3 @@ export async function asentar(page: Page) {
   await hidratada(page);
   await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {});
 }
-
-/**
- * `asentar` y 1 s más, para dar tiempo a las relecturas del servidor tras un
- * cambio. Solo en ajustes.spec.ts: sin esa espera, la Biblioteca abierta
- * justo después de aplicar un cambio ha fallado al hidratar (un fallo de la
- * interfaz aún sin arreglar, que depende de lo que tarde el router).
- */
-export async function asentarDespacio(page: Page) {
-  await asentar(page);
-  await page.waitForTimeout(1_000);
-}

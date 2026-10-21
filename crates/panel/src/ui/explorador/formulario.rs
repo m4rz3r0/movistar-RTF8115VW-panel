@@ -4,8 +4,8 @@
 
 use super::{
     CampoForm, DialogoCambio, EstadoDeCambio, FormVista, FuncionDetalle, ListaInstancias, MASCARA,
-    Operacion, ParamVista, Peticion, PreparadoVista, TipoCampo, TipoFuncion, Valor, formulario,
-    instancias, preparar_cambio, texto_error, validar_campo,
+    Operacion, ParamVista, Peticion, PreparadoVista, TipoCampo, TipoFuncion, Valor,
+    en_el_navegador, formulario, instancias, preparar_cambio, texto_error, validar_campo,
 };
 use crate::t;
 use crate::ui::{Estado, IconoEstado};
@@ -107,10 +107,12 @@ pub(super) fn Escritura(detalle: FuncionDetalle) -> impl IntoView {
 
     // ---- lista de instancias
     let lista = es_lista.then(|| {
-        let res = Resource::new(
-            move || (funcion.get_value(), claves.get(), recarga.get()),
-            |(f, c, _)| instancias(f, c),
-        );
+        // En el navegador, como la lectura (ver `VistaLectura`): nace dentro
+        // del `Suspend` de la ficha.
+        let res = LocalResource::new(move || {
+            recarga.track();
+            instancias(funcion.get_value(), claves.get())
+        });
         let borrar = move |id: String| {
             error.set(None);
             let peticion = Peticion {
@@ -149,26 +151,32 @@ pub(super) fn Escritura(detalle: FuncionDetalle) -> impl IntoView {
                         {t!("biblioteca-anadir")}
                     </button>
                 </div>
-                <Transition fallback=|| view! { <p class="estado-espera">{t!("biblioteca-leyendo")}</p> }>
-                    {tabla}
-                </Transition>
+                {en_el_navegador(
+                    || view! { <p class="estado-espera">{t!("biblioteca-leyendo")}</p> },
+                    move || view! {
+                        <Transition fallback=|| view! { <p class="estado-espera">{t!("biblioteca-leyendo")}</p> }>
+                            {tabla}
+                        </Transition>
+                    },
+                )}
             </section>
         }
     });
 
     // ---- formulario
-    let form_res = Resource::new(
-        move || match modo.get() {
+    // En el navegador, como la lectura (ver `VistaLectura`).
+    let form_res = LocalResource::new(move || {
+        let k = match modo.get() {
             Modo::Form(i) => Some((funcion.get_value(), i, claves.get(), recarga.get())),
             Modo::Ninguno => None,
-        },
-        |k| async move {
+        };
+        async move {
             match k {
                 Some((f, i, c, _)) => Some(formulario(f, i, c).await),
                 None => None,
             }
-        },
-    );
+        }
+    });
     let titulo = move || match (detalle.resumen.tipo, modo.get()) {
         (TipoFuncion::Accion, _) => t!("biblioteca-ejecutar"),
         (_, Modo::Form(Some(i))) => t!("biblioteca-editar-instancia", i = i),
@@ -223,9 +231,14 @@ pub(super) fn Escritura(detalle: FuncionDetalle) -> impl IntoView {
         {form_claves}
         {move || error.get().map(aviso_error)}
         {lista}
-        <Transition fallback=|| view! { <p class="estado-espera">{t!("biblioteca-leyendo-actuales")}</p> }>
-            {form}
-        </Transition>
+        {en_el_navegador(
+            || (),
+            move || view! {
+                <Transition fallback=|| view! { <p class="estado-espera">{t!("biblioteca-leyendo-actuales")}</p> }>
+                    {form}
+                </Transition>
+            },
+        )}
         {dialogo}
     }
 }

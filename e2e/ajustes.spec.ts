@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
-import { asentarDespacio as asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
+import { cambiarUpnp, esperarFinal, estadoCambio } from "./cambios";
+import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 
 // Páginas de Ajustes (/ajustes/<tema>) a 360 y 1440 px, en español y en
 // inglés, contra router-sim: abrir WiFi, cambiar el nombre de la red de
@@ -286,35 +287,6 @@ const textosSecreto = {
     deshacer: "Undo",
   },
 } as const;
-
-/** Un cambio de UPnP (riesgo bajo: se vigila RP_E2E_VIGILANCIA_S), por las server functions. */
-async function cambiarUpnp(page: Page): Promise<number> {
-  const api = async (nombre: string, cuerpo: unknown) => {
-    const r = await page.request.post(`/api/${nombre}`, { data: cuerpo });
-    expect(r.status(), `${nombre}: ${await r.text()}`).toBe(200);
-    return r.json();
-  };
-  const tema = await api("leer_tema", { tema: "puertos" });
-  const upnp = tema.ajustes.find((a: { id: string }) => a.id === "puertos.upnp");
-  const activo = upnp.campos.find((c: { id: string }) => c.id === "activo").valor.Booleano;
-  const grupo = await api("preparar_ajuste", {
-    p: { ajuste: "puertos.upnp", instancia: null, borrar: false, valores: { activo: String(!activo) } },
-  });
-  return api("confirmar_ajuste", { token: grupo.token, desmarcados: [] });
-}
-
-/** Estado del cambio `id` («Vigilando», «Aplicado»…). */
-async function estadoCambio(page: Page, id: number): Promise<string> {
-  const r = await page.request.post("/api/estado_cambio", { data: { id } });
-  return (await r.json()).estado;
-}
-
-/** Espera a que el cambio `id` termine. */
-async function esperarFinal(page: Page, id: number) {
-  await expect
-    .poll(() => estadoCambio(page, id), { timeout: 60_000, intervals: [1_000] })
-    .toBe("Aplicado");
-}
 
 /** El texto que se ve de un trozo de la página (sin los valores de los campos). */
 async function aLaVista(l: Locator): Promise<string> {
