@@ -1,5 +1,5 @@
 import { defineConfig } from "@playwright/test";
-import { instalado, todas, VIGILANCIA_S, WORKERS } from "./instancias";
+import { instalado, todas, WORKERS } from "./instancias";
 
 // Las capturas del README (capturas-readme.spec.ts) sobrescriben
 // docs/capturas/, que está versionado: solo se generan cuando se piden por
@@ -40,7 +40,7 @@ export default defineConfig({
       E2E_DIR: i.dir,
       // Vigilancia de cada cambio en segundos, en vez de 30 s o 2 min (solo
       // la atiende el binario de depuración; ver main.rs e instancias.ts).
-      RP_E2E_VIGILANCIA_S: String(VIGILANCIA_S),
+      RP_E2E_VIGILANCIA_S: String(i.vigilanciaS),
     },
     reuseExistingServer: false,
     // SIGTERM (no SIGKILL): arrancar.sh borra su carpeta al salir.

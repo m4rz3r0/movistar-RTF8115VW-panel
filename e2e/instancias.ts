@@ -14,10 +14,12 @@ import { join } from "node:path";
 //   pasada del asistente, que es de un solo uso. Solo los usa
 //   instalar.spec.ts, que corre entero en un worker.
 // - «recorrido-*»: instalados como los primeros, uno por idioma del
-//   recorrido del criterio de éxito 1 (recorrido.spec.ts). Cambia cinco
-//   ajustes y no los deshace: con su propio panel, no estorba a las demás
-//   pruebas (que esperan las fixtures, o el cambio de e2e_grupo en la
-//   primera página del Historial).
+//   recorrido del criterio de éxito 1 (ajustes-recorrido.spec.ts). Cambia
+//   cinco ajustes y no los deshace: con su propio panel, no estorba a las
+//   demás pruebas (que esperan las fixtures, o el cambio de e2e_grupo en la
+//   primera página del Historial). Su vigilancia es más corta
+//   (VIGILANCIA_RECORRIDO_S): el recorrido no prueba la vigilancia y sus
+//   cinco cambios irían, si no, en el camino crítico de la pasada.
 //
 // Puertos: los instalados en E2E_PORT + 0..WORKERS-1, los nuevos a
 // continuación y, detrás, los del recorrido (igual con E2E_SIM_PORT para
@@ -29,7 +31,7 @@ const baseSim = Number(process.env.E2E_SIM_PORT ?? 8195);
 /** Paneles del asistente (instalar.spec.ts), detrás de los instalados. */
 const NUEVOS = 4;
 
-/** Paneles del recorrido (recorrido.spec.ts), detrás de los del asistente. */
+/** Paneles del recorrido (ajustes-recorrido.spec.ts), detrás de los del asistente. */
 const RECORRIDOS = 2;
 
 /**
@@ -96,12 +98,19 @@ export interface Instancia {
   puertoSim: number;
   /** Carpeta de la base de datos (y del token del asistente). */
   dir: string;
+  /** Vigilancia de cada cambio en segundos (RP_E2E_VIGILANCIA_S). */
+  vigilanciaS: number;
   /** Origen del panel (localhost: Chromium acepta allí la cookie Secure). */
   url: string;
   urlSim: string;
 }
 
-function instancia(nombre: string, modo: Instancia["modo"], n: number): Instancia {
+function instancia(
+  nombre: string,
+  modo: Instancia["modo"],
+  n: number,
+  vigilanciaS = VIGILANCIA_S,
+): Instancia {
   const puerto = base + n;
   const puertoSim = baseSim + n;
   return {
@@ -110,6 +119,7 @@ function instancia(nombre: string, modo: Instancia["modo"], n: number): Instanci
     puerto,
     puertoSim,
     dir: join(tmpdir(), `routerpanel-e2e-${puerto}`),
+    vigilanciaS,
     url: `http://localhost:${puerto}`,
     urlSim: `http://127.0.0.1:${puertoSim}`,
   };
@@ -136,10 +146,13 @@ export const nuevos = {
   "en-1440": instancia("nuevo-en-1440", "nuevo", WORKERS + 3),
 };
 
+/** Vigilancia de los paneles del recorrido, en segundos (la de alto, el doble). */
+const VIGILANCIA_RECORRIDO_S = Math.min(3, VIGILANCIA_S);
+
 /** Un panel instalado por idioma del recorrido del criterio de éxito 1. */
 export const recorridos = {
-  es: instancia("recorrido-es", "instalado", WORKERS + NUEVOS + 0),
-  en: instancia("recorrido-en", "instalado", WORKERS + NUEVOS + 1),
+  es: instancia("recorrido-es", "instalado", WORKERS + NUEVOS + 0, VIGILANCIA_RECORRIDO_S),
+  en: instancia("recorrido-en", "instalado", WORKERS + NUEVOS + 1, VIGILANCIA_RECORRIDO_S),
 };
 
 export const todas: Instancia[] = [
