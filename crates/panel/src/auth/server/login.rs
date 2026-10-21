@@ -138,7 +138,7 @@ pub(super) fn internal<T>(e: impl fmt::Display) -> Result<T, ServerFnError> {
 /// Como [`internal`], con otro estado (el login sin JavaScript redirige
 /// también sus errores).
 fn internal_con<T>(status: StatusCode, e: impl fmt::Display) -> Result<T, ServerFnError> {
-    eprintln!("panel: error interno en la autenticación: {e}");
+    tracing::error!("error interno en la autenticación: {e}");
     fail(status, &crate::t!("comun-error-interno"))
 }
 

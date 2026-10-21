@@ -22,7 +22,7 @@ impl FromRequestParts<AppState> for AuthUser {
                 Err(Redirect::to(&format!("/login?next={next}")).into_response())
             }
             Err(e) => {
-                eprintln!("panel: error interno en la autenticación: {e}");
+                tracing::error!("error interno en la autenticación: {e}");
                 Err(StatusCode::INTERNAL_SERVER_ERROR.into_response())
             }
         }
@@ -53,7 +53,7 @@ pub async fn require_page_session(
         }
         Ok(true) => {}
         Err(e) => {
-            eprintln!("panel: error interno en la autenticación: {e}");
+            tracing::error!("error interno en la autenticación: {e}");
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
     }
@@ -71,7 +71,7 @@ pub async fn require_page_session(
             }
             Ok(None) => next.run(req).await,
             Err(e) => {
-                eprintln!("panel: error interno en la autenticación: {e}");
+                tracing::error!("error interno en la autenticación: {e}");
                 StatusCode::INTERNAL_SERVER_ERROR.into_response()
             }
         };
