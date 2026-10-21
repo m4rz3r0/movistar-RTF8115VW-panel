@@ -67,8 +67,9 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       # nextest reparte cada test en su proceso (perfil ci en
       # .config/nextest.toml); no ejecuta los doctests, que van aparte.
+      # Versión con al menos dos semanas publicada (cadena de suministro).
       - name: Instalar cargo-nextest
-        run: cargo install --locked cargo-nextest@0.9.149
+        run: cargo install --locked cargo-nextest@0.9.146
       - name: Tests
         run: cargo nextest run --workspace --profile ci
       - name: Tests con el servidor (ssr)
