@@ -156,6 +156,22 @@ test.describe("idioma coherente", () => {
       await expect(dialogo.locator(".error-formulario")).not.toBeEmpty();
       await sinIngles(page, "reautenticación fallida");
       await dialogo.getByRole("button", { name: "Cancelar" }).click();
+      // Deja el freno del login como estaba: el fallo cuenta para la IP y
+      // el usuario (1 s de espera, que crece con cada fallo) y el login de
+      // la prueba siguiente daría 429. Una contraseña buena lo borra, pero
+      // solo pasada la espera (antes, 429 sin mirarla).
+      await expect
+        .poll(
+          async () =>
+            (
+              await page.request.post("/api/reautenticar", {
+                data: { contrasena: CONTRASENA },
+                headers: { origin: instalado.url, "sec-fetch-site": "same-origin" },
+              })
+            ).status(),
+          { timeout: 10_000, intervals: [500] },
+        )
+        .toBe(200);
       expect(
         errores.filter((e) => !/status of (400|401|403)/.test(e)),
         "errores o avisos en la consola",
