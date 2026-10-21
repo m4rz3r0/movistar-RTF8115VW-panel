@@ -1,9 +1,20 @@
 import { expect, type Page } from "@playwright/test";
 import { CONTRASENA, USUARIO } from "./instancias";
 
+/**
+ * Espera a que la página esté hidratada (`data-hidratado` en `<body>`, que
+ * pone el wasm al terminar). Antes, un clic o un envío lo atendería el HTML
+ * del servidor: el formulario de entrada, por ejemplo, se enviaría sin
+ * JavaScript y la página se quedaría en /login.
+ */
+export async function hidratada(page: Page) {
+  await page.locator("body[data-hidratado]").waitFor({ state: "attached", timeout: 15_000 });
+}
+
 /** Entra en el panel instalado (formulario en español). */
 export async function entrar(page: Page) {
   await page.goto("/login");
+  await hidratada(page);
   await page.waitForLoadState("networkidle");
   await page.locator("#usuario").fill(USUARIO);
   await page.locator("#contrasena").fill(CONTRASENA);
@@ -60,6 +71,17 @@ export async function sinDesbordamiento(page: Page, donde: string) {
 
 /** Hidratación y primeras cargas (las páginas sondean: la red nunca queda del todo quieta). */
 export async function asentar(page: Page) {
+  await hidratada(page);
   await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {});
+}
+
+/**
+ * `asentar` y 1 s más, para dar tiempo a las relecturas del servidor tras un
+ * cambio. Solo en ajustes.spec.ts: sin esa espera, la Biblioteca abierta
+ * justo después de aplicar un cambio ha fallado al hidratar (un fallo de la
+ * interfaz aún sin arreglar, que depende de lo que tarde el router).
+ */
+export async function asentarDespacio(page: Page) {
+  await asentar(page);
   await page.waitForTimeout(1_000);
 }

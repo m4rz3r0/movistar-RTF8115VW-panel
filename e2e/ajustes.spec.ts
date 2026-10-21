@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
-import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
+import { asentarDespacio as asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 
 // Páginas de Ajustes (/ajustes/<tema>) a 360 y 1440 px, en español y en
 // inglés, contra router-sim: abrir WiFi, cambiar el nombre de la red de

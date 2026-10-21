@@ -129,4 +129,10 @@ mod server {
 pub fn hydrate() {
     console_error_panic_hook::set_once();
     leptos::mount::hydrate_body(app::App);
+    // Marca de «ya hidratado» para las pruebas de navegador: desde aquí los
+    // botones y formularios tienen sus manejadores (antes, un clic o un envío
+    // los atendería el HTML del servidor). No cambia nada a la vista.
+    if let Some(body) = leptos::prelude::document().body() {
+        let _ = body.set_attribute("data-hidratado", "");
+    }
 }
