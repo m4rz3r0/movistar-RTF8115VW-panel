@@ -163,7 +163,7 @@ el router es `http://127.0.0.1:8081`, usuario y contraseña `sim`.
 | `tools/comprobar-publicacion` | revisa que no se publiquen datos personales ni de la red propia |
 | `e2e/` | pruebas de navegador (Playwright) contra el simulador |
 | `deploy/` | las tres vías de instalación ([`deploy/README.md`](deploy/README.md)) |
-| `docs/` | [`api.md`](docs/api.md) (API del router), [`operacion.md`](docs/operacion.md) (día a día), [`proxy-tls.md`](docs/proxy-tls.md) (HTTPS y proxy) |
+| `docs/` | [`api.md`](docs/api.md) (API del router), [`funciones-del-panel.md`](docs/funciones-del-panel.md) (funciones de Ajustes, el Historial y la contraseña del router), [`operacion.md`](docs/operacion.md) (día a día), [`proxy-tls.md`](docs/proxy-tls.md) (HTTPS y proxy) |
 
 ## Comprobaciones
 

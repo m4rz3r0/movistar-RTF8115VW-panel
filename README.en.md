@@ -167,7 +167,7 @@ the router is `http://127.0.0.1:8081`, user and password `sim`.
 | `tools/comprobar-publicacion` | checks that no personal or home-network data gets published |
 | `e2e/` | browser tests (Playwright) against the simulator |
 | `deploy/` | the three ways to install ([`deploy/README.md`](deploy/README.md)) |
-| `docs/` | [`api.md`](docs/api.md) (router API), [`operacion.md`](docs/operacion.md) (day to day), [`proxy-tls.md`](docs/proxy-tls.md) (HTTPS and proxy) |
+| `docs/` | [`api.md`](docs/api.md) (router API), [`funciones-del-panel.md`](docs/funciones-del-panel.md) (the panel functions for Settings, History and the router password, in Spanish), [`operacion.md`](docs/operacion.md) (day to day), [`proxy-tls.md`](docs/proxy-tls.md) (HTTPS and proxy) |
 
 The code, its comments and the documentation in `docs/` and `deploy/` are in
 Spanish.
