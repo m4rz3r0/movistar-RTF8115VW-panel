@@ -74,6 +74,11 @@ async function aplicar(page: Page, t: (typeof textos)["es" | "en"]) {
   await expect(page.locator("dialog[open]")).toHaveCount(0);
 }
 
+// Cada test entra con su sesión y deja el simulador como estaba: se
+// reparten entre los workers (cada uno con su panel, ver instancias.ts), y
+// el fichero deja de ir entero en uno.
+test.describe.configure({ mode: "parallel" });
+
 for (const idioma of ["es", "en"] as const) {
   for (const ancho of [360, 1440]) {
     const aplicaDeVerdad = idioma === "en" && ancho === 1440;

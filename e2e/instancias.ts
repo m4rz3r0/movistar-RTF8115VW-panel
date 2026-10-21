@@ -147,7 +147,7 @@ export const nuevos = {
 };
 
 /** Vigilancia de los paneles del recorrido, en segundos (la de alto, el doble). */
-const VIGILANCIA_RECORRIDO_S = Math.min(3, VIGILANCIA_S);
+const VIGILANCIA_RECORRIDO_S = Math.min(1, VIGILANCIA_S);
 
 /** Un panel instalado por idioma del recorrido del criterio de éxito 1. */
 export const recorridos = {

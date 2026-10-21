@@ -114,6 +114,11 @@ async function puertoDeDesc1(page: Page, reglas: Locator, t: Textos, puerto: str
   await expect(reglas.locator("li.regla").filter({ hasText: "desc-1" })).toContainText(puerto);
 }
 
+// Cada test entra con su sesión y deja el simulador como estaba: se
+// reparten entre los workers (cada uno con su panel, ver instancias.ts), y
+// el fichero deja de ir entero en uno.
+test.describe.configure({ mode: "parallel" });
+
 for (const idioma of ["es", "en"] as const) {
   for (const ancho of [360, 768, 1024, 1280, 1440]) {
     const aplicaDeVerdad = idioma === "en" && ancho === 1440;
