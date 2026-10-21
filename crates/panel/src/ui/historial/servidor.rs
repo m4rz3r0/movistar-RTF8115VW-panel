@@ -215,7 +215,43 @@ fn estado_paso(e: EstadoPaso) -> EstadoPasoVista {
     }
 }
 
-async fn fila_revelado(state: &AppState, id: i64) -> Result<Option<ReveladoFila>, ServerFnError> {
+/// El nombre legible del campo `campo` de `funcion` para un revelado: en
+/// castellano, el del catálogo de funciones; en otro idioma, el de Ajustes
+/// si lo trae. Sin ninguno, `None` (la fila dice «una clave»).
+fn etiqueta_revelado(
+    state: &AppState,
+    de_ajustes: &Etiquetas,
+    funcion: &str,
+    campo: &str,
+) -> Option<String> {
+    let del_catalogo = || {
+        state
+            .catalogo
+            .funcion(funcion)
+            .and_then(|f| f.parametro(campo))
+            // Sin la aclaración técnica del final («Clave WiFi (XOR 0x1f)»).
+            .map(|p| match p.etiqueta.rsplit_once(" (") {
+                Some((nombre, _)) if p.etiqueta.ends_with(')') => nombre.to_owned(),
+                _ => p.etiqueta.clone(),
+            })
+    };
+    let de_ajustes = || {
+        de_ajustes
+            .get(&(funcion.to_owned(), campo.to_owned()))
+            .cloned()
+    };
+    if crate::ui::i18n::idioma_actual() == i18n::Idioma::Es {
+        del_catalogo().or_else(de_ajustes)
+    } else {
+        de_ajustes()
+    }
+}
+
+async fn fila_revelado(
+    state: &AppState,
+    de_ajustes: &Etiquetas,
+    id: i64,
+) -> Result<Option<ReveladoFila>, ServerFnError> {
     let fila = sqlx::query(
         "SELECT r.ts, r.funcion, r.campo, r.instancia, u.username \
          FROM reveals r LEFT JOIN users u ON u.id = r.user_id WHERE r.id = ?",
@@ -224,14 +260,19 @@ async fn fila_revelado(state: &AppState, id: i64) -> Result<Option<ReveladoFila>
     .fetch_optional(&state.db)
     .await
     .map_err(interno)?;
-    Ok(fila.map(|f| ReveladoFila {
-        id,
-        ts: f.get("ts"),
-        usuario: f.get("username"),
-        ruta: ruta(state, &f.get::<String, _>("funcion")),
-        funcion: f.get("funcion"),
-        campo: f.get("campo"),
-        instancia: f.get("instancia"),
+    Ok(fila.map(|f| {
+        let funcion: String = f.get("funcion");
+        let campo: String = f.get("campo");
+        ReveladoFila {
+            id,
+            ts: f.get("ts"),
+            usuario: f.get("username"),
+            ruta: ruta(state, &funcion),
+            etiqueta: etiqueta_revelado(state, de_ajustes, &funcion, &campo),
+            funcion,
+            campo,
+            instancia: f.get("instancia"),
+        }
     }))
 }
 
@@ -269,7 +310,9 @@ pub async fn pagina(state: &AppState, pagina: u32) -> Result<PaginaHistorial, Se
                 ))),
                 None => None,
             },
-            _ => fila_revelado(state, id).await?.map(EntradaVista::Revelado),
+            _ => fila_revelado(state, &de_ajustes, id)
+                .await?
+                .map(EntradaVista::Revelado),
         };
         entradas.extend(entrada);
     }

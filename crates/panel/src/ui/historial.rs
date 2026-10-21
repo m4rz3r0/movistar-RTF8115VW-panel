@@ -148,6 +148,10 @@ pub struct ReveladoFila {
     pub ruta: Option<String>,
     pub campo: String,
     pub instancia: Option<String>,
+    /// El nombre legible del campo, en el idioma de la página, si el
+    /// catálogo de funciones o el de ajustes lo trae.
+    #[serde(default)]
+    pub etiqueta: Option<String>,
 }
 
 /// Un secreto de un cambio con su valor anterior y el nuevo, para el detalle
@@ -324,9 +328,15 @@ fn funcion_enlazada(funcion: String, ruta: Option<String>, instancia: Option<Str
     .into_any()
 }
 
+/// Un secreto mostrado (filas de la 0.2.x: la 0.3 ya no los apunta). La
+/// función y el parámetro, solo en los detalles técnicos.
 #[component]
 fn FilaRevelado(r: ReveladoFila) -> impl IntoView {
     let instancia = r.instancia.map(|i| t!("historial-instancia-par", i = i));
+    let que = match r.etiqueta {
+        Some(campo) => t!("historial-revelado-campo", campo = campo),
+        None => t!("historial-revelado-clave"),
+    };
     view! {
         <li class="hist-entrada hist-revelado" id=format!("revelado-{}", r.id)>
             <div class="hist-cabeza">
@@ -334,19 +344,20 @@ fn FilaRevelado(r: ReveladoFila) -> impl IntoView {
                 <span class="hist-quien">{r.usuario.unwrap_or_else(|| "—".to_owned())}</span>
                 <span class="hist-que">
                     <IconoOjo />
-                    <span>
-                        {t!("historial-revelado")}
-                        " "
-                        <span class="mono">{r.campo}</span>
-                        " "
-                        {t!("historial-revelado-de")}
-                        " "
-                        {funcion_enlazada(r.funcion, r.ruta, None)}
-                        {instancia}
-                    </span>
+                    <span>{que} {instancia}</span>
                 </span>
                 <span class="chip">{t!("historial-secreto")}</span>
             </div>
+            <details class="detalles-tecnicos">
+                <summary>{t!("historial-tecnico")}</summary>
+                <p>
+                    <code class="mono">{r.campo}</code>
+                    " "
+                    {t!("historial-revelado-de")}
+                    " "
+                    {funcion_enlazada(r.funcion, r.ruta, None)}
+                </p>
+            </details>
         </li>
     }
 }

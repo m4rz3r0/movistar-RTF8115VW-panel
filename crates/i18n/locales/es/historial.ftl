@@ -19,8 +19,9 @@ historial-campos = { $n ->
 }: { $nombres }
 historial-instancia-sep = { " · " }instancia { $i }
 historial-instancia-par = { " " }(instancia { $i })
-historial-revelado = Revelado
 historial-revelado-de = de
+historial-revelado-campo = Se mostró «{ $campo }»
+historial-revelado-clave = Se mostró una clave
 historial-tecnico = Detalles técnicos
 historial-cambio-router = Cambio en el router
 historial-clave-sin-leer = (el router no deja leerla)

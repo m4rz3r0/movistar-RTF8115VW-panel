@@ -177,3 +177,52 @@ async fn el_error_de_un_paso_sin_nombres_de_la_api() {
 fn t_paso(idioma: &str) -> String {
     if idioma == "es" { "paso 2:" } else { "step 2:" }.to_owned()
 }
+
+/// Los secretos mostrados de la 0.2.x (la 0.3 ya no los apunta): la fila dice
+/// qué campo se mostró con su nombre legible o, sin él, «una clave»; la
+/// función y el parámetro, solo en los detalles técnicos.
+#[tokio::test]
+async fn revelados_antiguos_sin_nombres_de_la_api() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    for (ts, funcion) in [(2000, "te_wifi.wl"), (3000, "te_desconocida.asp")] {
+        sqlx::query(
+            "INSERT INTO reveals (ts, user_id, funcion, campo, instancia) \
+             VALUES (?, (SELECT id FROM users LIMIT 1), ?, 'wlWpaPsk', NULL)",
+        )
+        .bind(ts)
+        .bind(funcion)
+        .execute(&p.state.db)
+        .await
+        .unwrap();
+    }
+    for (idioma, conocido, desconocido) in [
+        ("es", "Se mostró «Clave WiFi»", "Se mostró una clave"),
+        ("en", "", "A password was shown"),
+    ] {
+        let con_idioma = format!("{cookie}; rp_lang={idioma}");
+        let pagina = crate::ajustes_secretos::html(&p, &con_idioma, "/historial").await;
+        let mut visibles = Vec::new();
+        for id in [1, 2] {
+            let fila = &pagina[pagina
+                .find(&format!("id=\"revelado-{id}\""))
+                .expect("la fila")..];
+            let fila = &fila[..fila.find("</li>").unwrap()];
+            let (fuera, tecnicos) =
+                crate::comun::partir(fila, "<details class=\"detalles-tecnicos\"", "</details>");
+            let visible = crate::ajustes_secretos::texto_visible(&fuera);
+            assert!(
+                !visible.contains("wlWpaPsk") && !visible.contains("te_"),
+                "{idioma}: {visible}"
+            );
+            assert!(tecnicos.concat().contains("wlWpaPsk"), "{idioma}: {fila}");
+            visibles.push(visible);
+        }
+        // El de la función conocida (id 1), con su nombre; el otro, genérico.
+        assert!(visibles[0].contains(conocido), "{idioma}: {}", visibles[0]);
+        assert!(
+            visibles[1].contains(desconocido),
+            "{idioma}: {}",
+            visibles[1]
+        );
+    }
+}

@@ -19,8 +19,9 @@ historial-campos = { $n ->
 }: { $nombres }
 historial-instancia-sep = { " · " }instance { $i }
 historial-instancia-par = { " " }(instance { $i })
-historial-revelado = Revealed
 historial-revelado-de = in
+historial-revelado-campo = Shown: { $campo }
+historial-revelado-clave = A password was shown
 historial-tecnico = Technical details
 historial-cambio-router = Router change
 historial-clave-sin-leer = (the router won't let it be read)
