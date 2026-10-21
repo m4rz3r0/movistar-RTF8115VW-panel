@@ -17,9 +17,14 @@ fn respuesta(funcion: &str, nombre: &str) -> XmlNode {
 /// La foto de `funcion` tras juntar `respuestas` con el mismo código que
 /// usa la lectura de la foto de partida (`fotos::juntar`).
 fn juntadas(funcion: &str, respuestas: Vec<XmlNode>) -> String {
+    let cat = Catalogo::load().unwrap();
+    let id_param = cat
+        .funcion(funcion)
+        .and_then(|f| f.lista.as_ref())
+        .map(|l| l.id_param.clone());
     let mut foto = BTreeMap::new();
     for r in respuestas {
-        crate::fotos::juntar(&mut foto, funcion, r);
+        crate::fotos::juntar(&mut foto, funcion, r, id_param.as_deref());
     }
     foto.remove(funcion).unwrap().to_xml()
 }
@@ -50,7 +55,7 @@ fn valor_en_foto_por_instancia() {
         vec![
             respuesta("cbGetWifiAccPt", "cbGetWifiAccPt__dpm_cfg_wifi_acc_pt_id=1"),
             punto("0"),
-            respuesta("cbGetWifiAccPt", "cbGetWifiAccPt__dpm_cfg_wifi_acc_pt_id=1"),
+            respuesta("cbGetWifiAccPt", "cbGetWifiAccPt__dpm_cfg_wifi_acc_pt_0i=1"),
         ],
     );
     assert_eq!(xml.matches("<ssid>RED-1</ssid>").count(), 1, "sin repetir");

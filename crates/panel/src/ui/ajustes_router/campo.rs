@@ -367,6 +367,10 @@ pub(super) fn CampoSecreto(
     valor: RwSignal<String>,
     error: RwSignal<Option<String>>,
     bloqueado: Signal<bool>,
+    /// Sin la descripción del campo: quien lo usa ya explica por qué se
+    /// pide (la vuelta a la foto de partida).
+    #[prop(optional)]
+    sin_desc: bool,
 ) -> impl IntoView {
     let control_id = format!("{dom}-control");
     let desc_id = format!("{dom}-desc");
@@ -381,6 +385,11 @@ pub(super) fn CampoSecreto(
     // Corto, para que quepa a 360 px; la explicación va en la ayuda.
     let vacio = sin_leer.then(|| t!("secreto-sin-leer"));
     let invalido = Signal::derive(move || error.with(|e| e.is_some()));
+    let descrito = if sin_desc {
+        error_id.clone()
+    } else {
+        format!("{desc_id} {error_id}")
+    };
     let campo = match vacio {
         Some(vacio) => view! {
             <Secreto
@@ -389,7 +398,7 @@ pub(super) fn CampoSecreto(
                 editable=true
                 id=control_id.clone()
                 vacio
-                descrito=format!("{desc_id} {error_id}")
+                descrito=descrito.clone()
                 invalido
                 bloqueado
                 error
@@ -402,7 +411,7 @@ pub(super) fn CampoSecreto(
                 nombre=etiqueta.clone()
                 editable=true
                 id=control_id.clone()
-                descrito=format!("{desc_id} {error_id}")
+                descrito=descrito.clone()
                 invalido
                 bloqueado
                 error
@@ -414,7 +423,7 @@ pub(super) fn CampoSecreto(
         <div class="campo campo-ajuste campo-secreto">
             <label for=control_id>{etiqueta}</label>
             {campo}
-            <p class="ayuda" id=desc_id>{desc}</p>
+            {(!sin_desc).then(|| view! { <p class="ayuda" id=desc_id>{desc}</p> })}
             <p class="campo-error" id=error_id aria-live="polite">{move || error.get()}</p>
         </div>
     }

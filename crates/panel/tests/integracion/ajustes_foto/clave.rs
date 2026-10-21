@@ -48,8 +48,9 @@ async fn volver_con_la_clave_tapada_la_pide() {
         json!({ "ajuste": "telefono.linea", "campo": "silencio", "instancia": null,
                 "clave": clave })
     };
-    // Sin ella (o vacía), no se prepara: no se reenvía vacía.
-    for sin in [None, Some("")] {
+    // Sin ella (o vacía, o solo espacios), no se prepara: no se reenvía
+    // vacía.
+    for sin in [None, Some(""), Some("   ")] {
         let (status, body) =
             llamar(&p, "preparar_volver_a_partida", pedir(sin), Some(&cookie)).await;
         assert_eq!(status, 400, "{body}");

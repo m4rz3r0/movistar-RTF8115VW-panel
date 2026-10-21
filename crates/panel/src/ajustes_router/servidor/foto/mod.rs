@@ -183,6 +183,26 @@ fn descripcion(f: &Catalogo, a: &Ajuste, prefijo: &str, leidos: &Leidos) -> Vec<
         .collect()
 }
 
+/// Lo que dice de qué instancia de una lista es un cambio en su campo
+/// `cambia`: hasta dos de sus otros campos de texto, MAC o IP (no secretos),
+/// con su valor de ahora.
+fn identidad(
+    f: &Catalogo,
+    a: &Ajuste,
+    prefijo: &str,
+    cambia: &Campo,
+    leidos: &Leidos,
+) -> Vec<CampoVista> {
+    a.campos
+        .iter()
+        .filter(|c| {
+            c.id != cambia.id && matches!(c.tipo, TipoCampo::Texto | TipoCampo::Mac | TipoCampo::Ip)
+        })
+        .take(2)
+        .map(|c| campo(f, prefijo, c, a_legible(c, leidos), None))
+        .collect()
+}
+
 /// Diferencias del ajuste `a` entre su respuesta en la foto y la de ahora;
 /// `None` si la foto no tiene su dato.
 fn diferencias(
@@ -197,6 +217,7 @@ fn diferencias(
         ajuste: a.id.clone(),
         clave: prefijo.clone(),
         instancia: instancia.map(str::to_owned),
+        de: Vec::new(),
         cambio,
     };
     if !a.lista {
@@ -220,12 +241,13 @@ fn diferencias(
                 Some(id),
                 Diferencia::Baja(descripcion(f, a, &prefijo, l)),
             )),
-            Some((_, l_ahora)) => out.extend(
-                a.campos
-                    .iter()
-                    .filter_map(|c| diferencia_de_campo(f, a, &prefijo, c, l, l_ahora, true))
-                    .map(|d| fila(Some(id), d)),
-            ),
+            Some((_, l_ahora)) => out.extend(a.campos.iter().filter_map(|c| {
+                let d = diferencia_de_campo(f, a, &prefijo, c, l, l_ahora, true)?;
+                Some(DiferenciaVista {
+                    de: identidad(f, a, &prefijo, c, l_ahora),
+                    ..fila(Some(id), d)
+                })
+            })),
         }
     }
     for (id, l) in &ahora_i {
@@ -387,8 +409,9 @@ pub(in crate::ajustes_router) async fn preparar_volver_a_partida(
         return Err(error_ajuste(CambioError::SinCambios));
     }
     // La clave tapada que va en la misma escritura, si la página la ha
-    // pedido; vacía no se envía (el gestor no escribe sin ella).
-    if let Some(clave) = clave.filter(|v| !v.is_empty()) {
+    // pedido; vacía (o solo espacios) no se envía: el gestor no escribe
+    // sin ella.
+    if let Some(clave) = clave.filter(|v| !v.trim().is_empty()) {
         let funciones: Vec<&str> = valores
             .keys()
             .filter_map(|id| a.campo(id)?.escribible())

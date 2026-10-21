@@ -58,9 +58,6 @@ pub fn PaginaFoto() -> impl IntoView {
                 <h1 id=TITULO tabindex="-1">{t!("ajustes-foto-titulo")}</h1>
             </div>
         </header>
-        <p class="foto-volver">
-            <a href=RUTA_AJUSTES>{t!("ajustes-foto-ir-ajustes")}</a>
-        </p>
         <Transition fallback=|| view! { <p class="estado-espera">{t!("comun-cargando")}</p> }>
             {move || Suspend::new(async move {
                 match datos.await {
@@ -78,6 +75,9 @@ pub fn PaginaFoto() -> impl IntoView {
                 }
             })}
         </Transition>
+        <p class="foto-volver">
+            <a href=RUTA_AJUSTES>{t!("ajustes-foto-ir-ajustes")}</a>
+        </p>
         {move || grupo.get().map(|g| view! { <DialogoGrupo grupo=g on_cerrar=cerrar /> })}
     }
 }
@@ -133,7 +133,7 @@ fn Comparacion(c: ComparacionVista, pagina: Pagina) -> impl IntoView {
         }
     });
     view! {
-        <p class="foto-desc">{desc}</p>
+        <p class="pagina-sub foto-desc">{desc}</p>
         <p class="foto-fecha">{tomada}</p>
         {sin_leer}
         {cuerpo}
@@ -226,6 +226,13 @@ fn fila(d: DiferenciaVista, pagina: Pagina) -> AnyView {
                     .map(|i| format!("-{i}"))
                     .unwrap_or_default()
             );
+            let de = (!d.de.is_empty()).then(|| {
+                let partes =
+                    d.de.iter()
+                        .map(|c| view! { <span>{etiqueta(c)} ": " {valor_resumido(c)}</span> })
+                        .collect_view();
+                view! { <p class="foto-de">{partes}</p> }
+            });
             let boton = (restaurable && !pagina.solo_lectura).then(|| {
                 let pide = pide.map(|c| *c);
                 view! { <BotonVolver ajuste=d.ajuste campo=partida.id.clone() descrito=id.clone() pide pagina /> }
@@ -233,6 +240,7 @@ fn fila(d: DiferenciaVista, pagina: Pagina) -> AnyView {
             view! {
                 <div class="foto-fila">
                     <p class="foto-campo" id=id>{etiqueta(&partida)}</p>
+                    {de}
                     <dl class="foto-valores">
                         <div>
                             <dt>{t!("ajustes-foto-al-instalar")}</dt>
@@ -330,7 +338,7 @@ fn BotonVolver(
         view! {
             <div class="foto-pide">
                 <p class="foto-nota">{t!("ajustes-secreto-tapado-pedir")}</p>
-                <CampoSecreto c dom valor=clave error=error_clave bloqueado=preparando.into() />
+                <CampoSecreto c dom valor=clave error=error_clave bloqueado=preparando.into() sin_desc=true />
             </div>
         }
     });

@@ -50,22 +50,61 @@ fn instancias(n: XmlNode) -> Vec<XmlNode> {
     }]
 }
 
+/// Id de la instancia `i` según el parámetro de instancia `id_param` de su
+/// función (`X_0i` o `X_id`): el valor de `X_id` o, si no lo trae, el de
+/// `X_0i` (leída por id, el router da `X_0i = -1`, que no cuenta).
+fn id_de(i: &XmlNode, id_param: &str) -> Option<String> {
+    let base = id_param
+        .strip_suffix("_0i")
+        .or_else(|| id_param.strip_suffix("_id"))?;
+    let valor = |tag: String| {
+        i.children
+            .iter()
+            .find(|c| c.children.is_empty() && c.tag.eq_ignore_ascii_case(&tag))
+            .map(|c| c.text.clone())
+            .filter(|v| !v.is_empty() && v != "-1")
+    };
+    valor(format!("{base}_id")).or_else(|| valor(format!("{base}_0i")))
+}
+
 /// Junta en `foto` la respuesta `n` de una lectura de `funcion`: si la foto
 /// aún no la tiene, tal cual; si ya tiene otra lectura de la misma función,
-/// le añade las instancias de esta que no estén ya.
-pub fn juntar(foto: &mut BTreeMap<String, XmlNode>, funcion: &str, n: XmlNode) {
+/// le añade las instancias de esta que no estén ya. Con `id_param` (el
+/// parámetro de instancia de la función), una instancia que ya está es la
+/// del mismo id aunque llegue algo distinta (`X_0i = 1` sin parámetros,
+/// `X_0i = -1` leída por id); sin él, la idéntica.
+pub fn juntar(
+    foto: &mut BTreeMap<String, XmlNode>,
+    funcion: &str,
+    n: XmlNode,
+    id_param: Option<&str>,
+) {
     match foto.get_mut(funcion) {
         None => {
             foto.insert(funcion.to_owned(), n);
         }
         Some(actual) => {
             for i in instancias(n) {
-                if !actual.children.contains(&i) {
+                let id = id_param.and_then(|p| id_de(&i, p));
+                let ya = actual.children.iter().any(|c| match (&id, id_param) {
+                    (Some(id), Some(p)) => id_de(c, p).as_ref() == Some(id),
+                    _ => *c == i,
+                });
+                if !ya {
                     actual.children.push(i);
                 }
             }
         }
     }
+}
+
+/// Parámetro de instancia de la función `nombre`, si es una lista.
+fn id_param<'a>(state: &'a AppState, nombre: &str) -> Option<&'a str> {
+    state
+        .catalogo
+        .funcion(nombre)
+        .and_then(|f| f.lista.as_ref())
+        .map(|l| l.id_param.as_str())
 }
 
 /// Lee la foto de partida del router de `state` (ver el módulo). Quien la
@@ -87,7 +126,7 @@ pub async fn leer_partida(state: &AppState) -> FotoLeida {
                 if nombre == "cbGetSummary" {
                     out.firmware = hgu::models::Summary::from_node(&n).firmware;
                 }
-                juntar(&mut nodos, nombre, n);
+                juntar(&mut nodos, nombre, n, id_param(state, nombre));
             }
             Err(e) => fallo(&mut out, nombre, &e),
         }
@@ -95,6 +134,19 @@ pub async fn leer_partida(state: &AppState) -> FotoLeida {
     for a in state.ajustes.todos() {
         let clave = Clave::new(&a.leer.funcion, &a.leer.params);
         if hechas.contains(&clave) {
+            continue;
+        }
+        // Nunca una función que el catálogo bloquea (o no conoce), aunque
+        // un ajuste la lea.
+        if state
+            .catalogo
+            .funcion(&a.leer.funcion)
+            .is_none_or(|f| f.bloqueada.is_some())
+        {
+            tracing::warn!(
+                "foto de partida: {} está bloqueada o no está en el catálogo: no se lee",
+                a.leer.funcion
+            );
             continue;
         }
         hechas.push(clave);
@@ -105,7 +157,12 @@ pub async fn leer_partida(state: &AppState) -> FotoLeida {
             .map(|(k, v)| (k.as_str(), v.as_str()))
             .collect();
         match state.hgu.call(&a.leer.funcion, &params).await {
-            Ok(n) => juntar(&mut nodos, &a.leer.funcion, n),
+            Ok(n) => juntar(
+                &mut nodos,
+                &a.leer.funcion,
+                n,
+                id_param(state, &a.leer.funcion),
+            ),
             Err(e) => fallo(&mut out, &a.leer.funcion, &e),
         }
     }
@@ -145,18 +202,69 @@ mod tests {
             &mut foto,
             "cbX",
             nodo("cbX", vec![i0.clone(), hoja("Result", "0")]),
+            None,
         );
-        juntar(&mut foto, "cbX", nodo("cbX", vec![i1.clone(), i0.clone()]));
+        juntar(
+            &mut foto,
+            "cbX",
+            nodo("cbX", vec![i1.clone(), i0.clone()]),
+            None,
+        );
         assert_eq!(foto["cbX"].children, vec![i0, hoja("Result", "0"), i1]);
         // Sueltos: agrupados con el nombre de la función, sin `Result`.
         juntar(
             &mut foto,
             "cbX",
             nodo("cbX", vec![hoja("s_id", "2"), hoja("Result", "0")]),
+            None,
         );
         assert_eq!(
             foto["cbX"].children.last(),
             Some(&nodo("cbX", vec![hoja("s_id", "2")]))
         );
+    }
+
+    /// Con el parámetro de instancia, la misma instancia leída de dos
+    /// maneras (sin parámetros, `s_0i = 1`; por id, `s_0i = -1`) no se
+    /// repite.
+    #[test]
+    fn juntar_por_id_de_instancia() {
+        let sin_params = nodo(
+            "s",
+            vec![hoja("s_0i", "1"), hoja("s_id", "1"), hoja("a", "x")],
+        );
+        let por_id = nodo(
+            "s",
+            vec![hoja("s_0i", "-1"), hoja("s_id", "1"), hoja("a", "x")],
+        );
+        let otra = nodo(
+            "s",
+            vec![hoja("s_0i", "-1"), hoja("s_id", "0"), hoja("a", "y")],
+        );
+        let mut foto = BTreeMap::new();
+        juntar(
+            &mut foto,
+            "cbX",
+            nodo("cbX", vec![sin_params.clone()]),
+            Some("s_0i"),
+        );
+        juntar(
+            &mut foto,
+            "cbX",
+            nodo("cbX", vec![por_id.clone()]),
+            Some("s_0i"),
+        );
+        juntar(
+            &mut foto,
+            "cbX",
+            nodo("cbX", vec![otra.clone()]),
+            Some("s_0i"),
+        );
+        assert_eq!(foto["cbX"].children, vec![sin_params, otra.clone()]);
+        // Sin parámetro de instancia, solo cuenta la idéntica.
+        let mut foto = BTreeMap::new();
+        juntar(&mut foto, "cbX", nodo("cbX", vec![otra.clone()]), None);
+        juntar(&mut foto, "cbX", nodo("cbX", vec![por_id.clone()]), None);
+        assert_eq!(foto["cbX"].children, vec![otra, por_id]);
     }
 }

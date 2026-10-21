@@ -3697,3 +3697,16 @@ summary.hist-cabeza:hover {
   gap: var(--esp-2);
   max-width: 480px;
 }
+
+/* Bajo el título de la página, como `.pagina-sub` en su cabecera. */
+.foto-desc {
+  margin-top: calc(var(--esp-1) - var(--esp-5));
+}
+
+.foto-de {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-1) var(--esp-3);
+  color: var(--texto-2);
+  font-size: 13px;
+}

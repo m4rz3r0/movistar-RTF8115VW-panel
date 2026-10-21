@@ -314,6 +314,11 @@ pub struct DiferenciaVista {
     pub clave: String,
     /// Instancia de una lista (su id en el router); `None` si no es lista.
     pub instancia: Option<String>,
+    /// En un valor de una lista, los datos que dicen de qué instancia se
+    /// trata (la MAC o la IP de una IP fija, el nombre de una regla), sin
+    /// secretos ni el campo que cambia.
+    #[serde(default)]
+    pub de: Vec<CampoVista>,
     pub cambio: Diferencia,
 }
 

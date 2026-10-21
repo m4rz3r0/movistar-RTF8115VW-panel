@@ -92,3 +92,79 @@ async fn foto_ilegible_lo_dice() {
     let (status, body) = volver(&p, Some(&cookie), "puertos.upnp", Some("activo"), None).await;
     assert_eq!(status, 500, "{body}");
 }
+
+/// La foto nunca lee una función que el catálogo bloquea, aunque un ajuste
+/// la tenga como lectura.
+#[tokio::test]
+async fn la_foto_no_lee_funciones_bloqueadas() {
+    let toml = r#"
+[[ajuste]]
+id = "sistema.prueba"
+tema = "sistema"
+nivel = "avanzado"
+leer = { funcion = "cbCheckLogout" }
+
+[[ajuste.campo]]
+id = "dato"
+lee = "dato"
+tipo = "texto"
+solo_lectura = "motivo"
+"#;
+    let p = PanelPrueba::nuevo().ajustes(toml).arrancar().await;
+    let foto = fotos::leer_partida(&p.state).await;
+    assert!(!foto.contenido.contains_key("cbCheckLogout"), "leída");
+    assert!(
+        !foto.fallidas.iter().any(|f| f == "cbCheckLogout"),
+        "intentada"
+    );
+    // Lo demás sí se lee.
+    assert!(foto.contenido.contains_key("cbGetUpnpCfg"));
+}
+
+/// Un cambio en una IP fija dice de cuál se trata (su MAC).
+#[tokio::test]
+async fn una_ip_fija_dice_cual_es() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    tomar_foto(&p).await;
+    let tema = ok(&p, "leer_tema", json!({ "tema": "red_local" }), &cookie).await;
+    let reservas = tema["ajustes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| a["id"] == "red_local.reservas")
+        .unwrap()
+        .clone();
+    let primera = &reservas["instancias"][0];
+    let mac = primera["campos"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["id"] == "mac")
+        .unwrap()["valor"]["Texto"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let g = ok(
+        &p,
+        "preparar_ajuste",
+        json!({ "p": { "ajuste": "red_local.reservas", "instancia": primera["id"], "borrar": false,
+                       "valores": { "ip": "192.168.1.81" }, "esperados": { "mac": mac } } }),
+        &cookie,
+    )
+    .await;
+    aplicar_ajuste(&p, &cookie, &g).await;
+    let c = ok(&p, "comparar_con_partida", json!({}), &cookie).await;
+    let d = del_ajuste(&c, "red_local.reservas");
+    assert_eq!(d.len(), 1, "{c}");
+    assert_eq!(d[0]["cambio"]["Valor"]["partida"]["id"], "ip");
+    let de = d[0]["de"].as_array().unwrap();
+    assert!(
+        de.iter()
+            .any(|x| x["id"] == "mac" && x["valor"] == json!({ "Texto": mac })),
+        "{c}"
+    );
+    assert!(
+        !de.iter().any(|x| x["id"] == "ip"),
+        "no repite lo que cambia"
+    );
+}
