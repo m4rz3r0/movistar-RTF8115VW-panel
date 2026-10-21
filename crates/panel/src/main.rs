@@ -94,7 +94,11 @@ async fn serve() -> std::process::ExitCode {
 /// depuración con `RP_E2E_VIGILANCIA_S` (segundos, mayor que cero), que usan
 /// las pruebas de navegador para no esperar 30 s o 2 min en cada cambio:
 /// riesgo bajo y medio se vigilan N s, el alto 2N s, comprobando cada
-/// segundo. En release (`depuracion` falso) la variable no hace nada.
+/// segundo. `alto` es también la espera máxima a que el router vuelva tras
+/// un reinicio y el plazo para conseguir revertir (`Tiempos::alto`): con la
+/// variable, esos dos plazos pasan igualmente a 2N s. En release
+/// (`depuracion` falso) la variable no hace nada; lo comprueba
+/// `deploy/pruebas/release-local.sh`.
 #[cfg(feature = "ssr")]
 fn tiempos_del_gestor(vigilancia_e2e: Option<&str>, depuracion: bool) -> panel::changes::Tiempos {
     use panel::changes::Tiempos;

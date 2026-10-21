@@ -1,5 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import { instalado } from "./instancias";
+import { PLAZO_CAMBIO, plazoDeTest } from "./cambios";
 import { entrar, recogerErrores } from "./util";
 
 // Cambio de tema en Ajustes con un router lento (300 ms por respuesta en el
@@ -159,7 +160,7 @@ test.describe("ajustes: carga al cambiar de tema", () => {
   });
 
   test("tras aplicar, una relectura de 300 ms deja el foco en la tarjeta", async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(plazoDeTest(1));
     const errores = recogerErrores(page);
     await entrar(page);
     await page.goto("/ajustes/puertos");
@@ -174,7 +175,7 @@ test.describe("ajustes: carga al cambiar de tema", () => {
     const dialogo = page.locator("dialog[open]");
     await dialogo.getByRole("button", { name: "Aplicar" }).click();
     await expect(dialogo.getByText("Hecho: el router tiene ya el cambio.")).toBeVisible({
-      timeout: 40_000,
+      timeout: PLAZO_CAMBIO,
     });
     // El servidor ya tiene el tema en su caché (leído tras el cambio): la
     // relectura la marca la espera de abajo, no el router.

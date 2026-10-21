@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
+import { PLAZO_CAMBIO, plazoDeTest } from "./cambios";
 import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 
 // Red local (/ajustes/red_local) a 360 y 1440 px, en español y en inglés,
@@ -68,7 +69,7 @@ function sinApi(texto: string) {
 async function aplicar(page: Page, t: (typeof textos)["es" | "en"]) {
   const dialogo = page.locator("dialog[open]");
   await dialogo.getByRole("button", { name: t.aplicar }).click();
-  await expect(dialogo.getByText(t.hecho)).toBeVisible({ timeout: 60_000 });
+  await expect(dialogo.getByText(t.hecho)).toBeVisible({ timeout: PLAZO_CAMBIO });
   await dialogo.getByRole("button", { name: t.cerrar }).click();
   await expect(page.locator("dialog[open]")).toHaveCount(0);
 }
@@ -83,7 +84,8 @@ for (const idioma of ["es", "en"] as const) {
       });
 
       test("dispositivos e IP fijas", async ({ page }) => {
-        if (aplicaDeVerdad) test.setTimeout(120_000);
+        // Fijar la IP y borrarla: dos cambios.
+        if (aplicaDeVerdad) test.setTimeout(plazoDeTest(2));
         const t = textos[idioma];
         const errores = recogerErrores(page);
         await entrar(page);

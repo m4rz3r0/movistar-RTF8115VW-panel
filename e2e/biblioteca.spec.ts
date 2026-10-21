@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { cambiarUpnp, esperarFinal } from "./cambios";
+import { cambiarUpnp, esperarFinal, plazoDeTest } from "./cambios";
 import { instalado } from "./instancias";
 import { entrar, hidratada, recogerErrores } from "./util";
 
@@ -23,7 +23,8 @@ test.describe("Biblioteca tras un cambio", () => {
   });
 
   test("se hidrata y lee justo después de aplicar un cambio", async ({ page }) => {
-    test.setTimeout(120_000);
+    // El cambio y el que lo deshace.
+    test.setTimeout(plazoDeTest(2));
     const errores = recogerErrores(page);
     await entrar(page);
     const id = await cambiarUpnp(page);

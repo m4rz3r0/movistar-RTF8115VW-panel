@@ -1,8 +1,20 @@
 import { expect, type Page } from "@playwright/test";
+import { VIGILANCIA_S } from "./instancias";
 
 // Cambios en el router (el simulador) por las server functions, para las
 // pruebas que necesitan uno en curso o recién aplicado sin pasar por la
 // interfaz.
+
+/**
+ * Lo que puede tardar un cambio hasta «hecho»: su vigilancia (la de riesgo
+ * alto es el doble de VIGILANCIA_S) y 30 s para escribir y releer.
+ */
+export const PLAZO_CAMBIO = (2 * VIGILANCIA_S + 30) * 1_000;
+
+/** Plazo de un test que aplica `cambios` cambios: 1 min para lo demás y PLAZO_CAMBIO por cambio. */
+export function plazoDeTest(cambios: number): number {
+  return 60_000 + cambios * PLAZO_CAMBIO;
+}
 
 /** Llama a la server function `nombre` con la sesión de la página. */
 async function api(page: Page, nombre: string, cuerpo: unknown) {
@@ -35,6 +47,6 @@ export async function estadoCambio(page: Page, id: number): Promise<string> {
 /** Espera a que el cambio `id` termine. */
 export async function esperarFinal(page: Page, id: number) {
   await expect
-    .poll(() => estadoCambio(page, id), { timeout: 60_000, intervals: [1_000] })
+    .poll(() => estadoCambio(page, id), { timeout: PLAZO_CAMBIO, intervals: [1_000] })
     .toBe("Aplicado");
 }

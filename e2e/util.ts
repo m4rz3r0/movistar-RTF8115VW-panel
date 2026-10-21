@@ -2,13 +2,18 @@ import { expect, type Page, test } from "@playwright/test";
 import { CONTRASENA, USUARIO, instalado, instalados } from "./instancias";
 
 /**
- * Espera a que la página esté hidratada (`data-hidratado` en `<body>`, que
- * pone el wasm al terminar). Antes, un clic o un envío lo atendería el HTML
- * del servidor: el formulario de entrada, por ejemplo, se enviaría sin
- * JavaScript y la página se quedaría en /login.
+ * Espera a que la raíz de la página esté hidratada (`data-hidratado` en
+ * `<body>`, que pone el wasm al terminar `hydrate_body`). Lo que va dentro de
+ * un `Suspense` o un `Transition` se hidrata después, al llegar sus datos:
+ * para eso, `asentar` espera además a la red. Antes de la marca, un clic o un
+ * envío lo atendería el HTML del servidor (el formulario de entrada se
+ * enviaría sin JavaScript).
  */
 export async function hidratada(page: Page) {
-  await page.locator("body[data-hidratado]").waitFor({ state: "attached", timeout: 15_000 });
+  await expect(
+    page.locator("body[data-hidratado]"),
+    "la página no se hidrató: ¿falló el wasm? (mira la consola)",
+  ).toBeAttached({ timeout: 15_000 });
 }
 
 /**

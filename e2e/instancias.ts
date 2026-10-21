@@ -56,6 +56,22 @@ function workers(valor: string | undefined): number {
 }
 
 /**
+ * Vigilancia de cada cambio en el e2e, en segundos (RP_E2E_VIGILANCIA_S; 10
+ * por defecto): la de riesgo bajo y medio; la de alto, el doble (main.rs).
+ * Los plazos de los specs salen de aquí (cambios.ts).
+ */
+export const VIGILANCIA_S = vigilancia(process.env.RP_E2E_VIGILANCIA_S);
+
+function vigilancia(valor: string | undefined): number {
+  if (valor === undefined || valor === "") return 10;
+  const n = Number(valor);
+  if (!Number.isInteger(n) || n < 1) {
+    throw new Error(`RP_E2E_VIGILANCIA_S debe ser un entero mayor que cero: ${valor}`);
+  }
+  return n;
+}
+
+/**
  * El worker de este proceso: Playwright pone TEST_PARALLEL_INDEX (0 ..
  * WORKERS-1; el worker que sustituye a uno caído hereda su índice) y vuelve
  * a evaluar la configuración en cada worker. En el proceso principal no
