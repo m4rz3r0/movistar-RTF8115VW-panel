@@ -9,6 +9,12 @@ container) and talks to the router's web interface:
 - **Status**: internet connection, uptime, traffic, load, RAM and clients,
   with 1 h, 24 h and 7 day charts and warnings (TR-069 remote management,
   WPS…).
+- **Settings**: the router's settings grouped by topic (Internet, WiFi, Home
+  network, Ports, Security, Phone and System) and explained in plain
+  language: what each one does, what happens when you change it, its risk
+  and the recommended value, with who it is for, pros and cons. The advanced
+  ones are folded under "More options". A change of several settings is
+  applied, watched and undone together.
 - **Explorer**: every function of the router's API, with its description.
   Changes are **watched**: if the router stops answering or internet goes
   down, they are undone on their own.
@@ -58,8 +64,15 @@ You **configure**:
 - in "Panel settings", the default language and time zone, preferred DNS,
   trusted devices, maintenance window, own server and users.
 
-The rest of the router settings are changed from the Explorer, with
-watching.
+The router settings are changed in "Settings" (`/ajustes/<topic>`), with no
+API names in sight: change the WiFi password, turn off WPS, fix a device's
+IP, open a port or turn off the operator's remote management (TR-069).
+Before applying, a summary shows what changes ("before → after"); afterwards
+the change is watched and can be undone from the summary itself or from the
+History. "How it was at installation" compares the router with the snapshot
+the wizard took and lets you go back to any setting. The passwords the page
+shows are masked, with an eye to reveal them. Whatever is not in Settings is
+changed from the Explorer, also with watching.
 
 ## Installation
 
@@ -177,23 +190,32 @@ cargo audit          # justified exceptions in .cargo/audit.toml
 cargo deny check     # deny.toml
 cargo run -q -p comprobar-publicacion -- --arbol . --sin-locales
 
-# Browser: wizard, languages, no horizontal overflow at 360 px;
-# screenshots in e2e/capturas/
-cargo leptos build && cargo build -p router-sim
+# Browser: wizard, languages, Settings, no horizontal overflow at 360 px;
+# screenshots in e2e/capturas/. `cargo leptos build` goes last (see below).
+cargo build -p router-sim
 cargo build -p panel --features ssr --example e2e_grupo
+cargo leptos build
 cd e2e && npm ci && npx playwright test
 npx playwright test capturas-readme   # only if the README screenshots change
 ```
 
 The e2e run spreads the files over `E2E_WORKERS` workers (by default, one per
-3 CPU threads, between 1 and 2; 4 on a dedicated machine; at most 16;
+3 CPU threads, between 1 and 2; 4 on a dedicated machine; at most 14;
 `E2E_WORKERS=1` runs them one after another). It starts one installed panel
-per worker and four freshly installed ones for the setup wizard, each with its
-own simulator (`e2e/instancias.ts`), on consecutive ports from `E2E_PORT` and
-`E2E_SIM_PORT` (3195 and 8195; with 4 workers, 3195–3202 and 8195–8202). Each
+per worker, four freshly installed ones for the setup wizard and two for the
+Settings walkthrough (one per language), each with its own simulator
+(`e2e/instancias.ts`), on consecutive ports from `E2E_PORT` and
+`E2E_SIM_PORT` (3195 and 8195; with 4 workers, 3195–3204 and 8195–8204). Each
 change is watched for 10 s instead of 30 s or 2 min (`RP_E2E_VIGILANCIA_S`,
 honoured only by the debug build). It uses Playwright's Chromium
 (`npx playwright install chromium` if missing; or `E2E_CHROMIUM=<path>`).
+
+The e2e run uses the `target/debug/panel` from `cargo leptos build`, which is
+compiled like the wasm (with `--cfg erase_components`). `cargo test` and
+`cargo nextest` with `--features panel/ssr` leave a different binary in the
+same place, whose HTML the wasm does not hydrate: if it finds that one, the
+e2e run stops with "ejecuta `cargo leptos build`" (run `cargo leptos build`).
+That is why `cargo leptos build` goes last, after the tests.
 
 The README screenshots are saved in `docs/capturas/` without metadata. After
 regenerating them, review them by hand (nothing real must show) and put their

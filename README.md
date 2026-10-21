@@ -9,6 +9,12 @@ habla con la web del router:
 - **Estado**: conexión a internet, tiempo encendido, tráfico, carga, RAM y
   clientes, con gráficas de 1 h, 24 h y 7 días y avisos (gestión remota
   TR-069, WPS…).
+- **Ajustes**: los ajustes del router agrupados por temas (Internet, WiFi,
+  Red local, Puertos, Seguridad, Teléfono y Sistema) y explicados en lenguaje
+  claro: qué hace cada uno, qué pasa al cambiarlo, su riesgo y el valor
+  recomendado, con para quién es, a favor y en contra. Lo avanzado va
+  plegado en «Más opciones». Un cambio de varios ajustes se aplica, se
+  vigila y se deshace junto.
 - **Explorador**: todas las funciones de la API del router, con su
   descripción. Los cambios se **vigilan**: si el router deja de responder o
   se pierde internet, se deshacen solos.
@@ -55,8 +61,15 @@ Tú **configuras**:
   preferidos, dispositivos de confianza, ventana de mantenimiento, servidor
   propio y usuarios.
 
-El resto de ajustes del router se cambian desde el Explorador, con
-vigilancia.
+Los ajustes del router se cambian en «Ajustes» (`/ajustes/<tema>`), sin
+nombres de la API a la vista: cambiar la contraseña WiFi, apagar el WPS,
+fijar la IP de un dispositivo, abrir un puerto o apagar la gestión remota del
+operador (TR-069). Antes de aplicar, un resumen enseña lo que cambia («antes
+→ después»); después, el cambio se vigila y se puede deshacer desde el propio
+resumen o desde el Historial. «Cómo estaba al instalar» compara el router con
+la foto que tomó el asistente y deja volver a cualquier ajuste. Las
+contraseñas que la página enseña van censuradas, con un ojo para verlas. Lo
+que no está en Ajustes se cambia desde el Explorador, también con vigilancia.
 
 ## Instalación
 
@@ -169,23 +182,32 @@ cargo audit          # excepciones justificadas en .cargo/audit.toml
 cargo deny check     # deny.toml
 cargo run -q -p comprobar-publicacion -- --arbol . --sin-locales
 
-# Navegador: asistente, idiomas, sin desbordamiento horizontal a 360 px;
-# capturas en e2e/capturas/
-cargo leptos build && cargo build -p router-sim
+# Navegador: asistente, idiomas, Ajustes, sin desbordamiento horizontal a
+# 360 px; capturas en e2e/capturas/. `cargo leptos build`, lo último (ver
+# abajo).
+cargo build -p router-sim
 cargo build -p panel --features ssr --example e2e_grupo
+cargo leptos build
 cd e2e && npm ci && npx playwright test
 npx playwright test capturas-readme   # solo si cambian las capturas del README
 ```
 
 El e2e reparte los ficheros entre `E2E_WORKERS` workers (por defecto, uno por
 cada 3 hilos de la CPU, entre 1 y 2; en una máquina dedicada, 4; como mucho,
-16; `E2E_WORKERS=1`, en serie). Arranca un panel instalado por worker y cuatro
-recién instalados para el asistente, cada uno con su simulador
-(`e2e/instancias.ts`), en puertos consecutivos a partir de `E2E_PORT` y
-`E2E_SIM_PORT` (3195 y 8195; con 4 workers, 3195–3202 y 8195–8202). Cada
+14; `E2E_WORKERS=1`, en serie). Arranca un panel instalado por worker, cuatro
+recién instalados para el asistente y dos para el recorrido de Ajustes (uno
+por idioma), cada uno con su simulador (`e2e/instancias.ts`), en puertos
+consecutivos a partir de `E2E_PORT` y `E2E_SIM_PORT` (3195 y 8195; con 4
+workers, 3195–3204 y 8195–8204). Cada
 cambio se vigila 10 s en vez de 30 s o 2 min (`RP_E2E_VIGILANCIA_S`, que solo
 atiende el binario de depuración). Usa el Chromium de Playwright
 (`npx playwright install chromium` si no está; o `E2E_CHROMIUM=<ruta>`).
+
+El e2e usa el `target/debug/panel` de `cargo leptos build`, que se compila
+como el wasm (con `--cfg erase_components`). `cargo test` y `cargo nextest`
+con `--features panel/ssr` dejan otro binario en el mismo sitio, cuyo HTML
+el wasm no hidrata: si lo encuentra, el e2e para con «ejecuta `cargo leptos
+build`». Por eso `cargo leptos build` va lo último, después de las pruebas.
 
 Las capturas del README se guardan en `docs/capturas/` sin metadatos. Tras
 regenerarlas, revísalas a mano (que no salga nada real) y pon su nuevo sha256
