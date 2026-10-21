@@ -13,9 +13,15 @@ import { join } from "node:path";
 // - «nuevo-*»: recién instalados (sin usuarios ni router), uno por cada
 //   pasada del asistente, que es de un solo uso. Solo los usa
 //   instalar.spec.ts, que corre entero en un worker.
+// - «recorrido-*»: instalados como los primeros, uno por idioma del
+//   recorrido del criterio de éxito 1 (recorrido.spec.ts). Cambia cinco
+//   ajustes y no los deshace: con su propio panel, no estorba a las demás
+//   pruebas (que esperan las fixtures, o el cambio de e2e_grupo en la
+//   primera página del Historial).
 //
-// Puertos: los instalados en E2E_PORT + 0..WORKERS-1 y los nuevos a
-// continuación (igual con E2E_SIM_PORT para los simuladores).
+// Puertos: los instalados en E2E_PORT + 0..WORKERS-1, los nuevos a
+// continuación y, detrás, los del recorrido (igual con E2E_SIM_PORT para
+// los simuladores).
 
 const base = Number(process.env.E2E_PORT ?? 3195);
 const baseSim = Number(process.env.E2E_SIM_PORT ?? 8195);
@@ -23,13 +29,16 @@ const baseSim = Number(process.env.E2E_SIM_PORT ?? 8195);
 /** Paneles del asistente (instalar.spec.ts), detrás de los instalados. */
 const NUEVOS = 4;
 
+/** Paneles del recorrido (recorrido.spec.ts), detrás de los del asistente. */
+const RECORRIDOS = 2;
+
 /**
- * Tope de E2E_WORKERS: los instalados y los nuevos ocupan WORKERS + 4 puertos
- * seguidos desde E2E_PORT (y desde E2E_SIM_PORT), y la ventana reservada a
- * cada prueba es de 20 (p. ej. 3710-3729 y 8710-8729).
+ * Tope de E2E_WORKERS: los instalados, los nuevos y los del recorrido ocupan
+ * WORKERS + 6 puertos seguidos desde E2E_PORT (y desde E2E_SIM_PORT), y la
+ * ventana reservada a cada prueba es de 20 (p. ej. 3710-3729 y 8710-8729).
  */
 const VENTANA_DE_PUERTOS = 20;
-const MAX_WORKERS = VENTANA_DE_PUERTOS - NUEVOS;
+const MAX_WORKERS = VENTANA_DE_PUERTOS - NUEVOS - RECORRIDOS;
 
 /**
  * Workers de Playwright (E2E_WORKERS; 1, en serie). Por defecto, uno por
@@ -49,7 +58,8 @@ function workers(valor: string | undefined): number {
   if (!Number.isInteger(n) || n < 1 || n > MAX_WORKERS) {
     throw new Error(
       `E2E_WORKERS debe ser un entero entre 1 y ${MAX_WORKERS} (con ${NUEVOS} paneles del ` +
-        `asistente, ${VENTANA_DE_PUERTOS} puertos seguidos desde E2E_PORT): ${valor}`,
+        `asistente y ${RECORRIDOS} del recorrido, ${VENTANA_DE_PUERTOS} puertos seguidos ` +
+        `desde E2E_PORT): ${valor}`,
     );
   }
   return n;
@@ -126,7 +136,17 @@ export const nuevos = {
   "en-1440": instancia("nuevo-en-1440", "nuevo", WORKERS + 3),
 };
 
-export const todas: Instancia[] = [...instalados, ...Object.values(nuevos)];
+/** Un panel instalado por idioma del recorrido del criterio de éxito 1. */
+export const recorridos = {
+  es: instancia("recorrido-es", "instalado", WORKERS + NUEVOS + 0),
+  en: instancia("recorrido-en", "instalado", WORKERS + NUEVOS + 1),
+};
+
+export const todas: Instancia[] = [
+  ...instalados,
+  ...Object.values(nuevos),
+  ...Object.values(recorridos),
+];
 
 /** Usuario del panel «instalado». */
 export const USUARIO = "e2e";
