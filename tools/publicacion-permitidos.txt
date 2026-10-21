@@ -69,7 +69,7 @@ valor 172.16.0.1 — ejemplo genérico de red privada 172.16/12 en las pruebas
 valor 10.0.0.0 — red privada 10/8 (RFC 1918) del ejemplo de nginx de docs/proxy-tls.md
 valor 172.16.0.0 — red privada 172.16/12 (RFC 1918) del ejemplo de nginx de docs/proxy-tls.md
 valor 192.168.0.0 — red privada 192.168/16 (RFC 1918) del ejemplo de nginx de docs/proxy-tls.md
-ruta crates/router-sim/src/sanitize.rs ipv4 — entradas sintéticas de las pruebas del saneador (LAN y operador sin renumerar)
+ruta crates/router-sim/src/sanitize/tests.rs ipv4 — entradas sintéticas de las pruebas del saneador (LAN y operador sin renumerar)
 
 # Commits de las acciones fijadas en .github/workflows (la versión va en el
 # comentario de cada «uses:»).
