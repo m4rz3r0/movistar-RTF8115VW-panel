@@ -2,13 +2,38 @@
 //! cada campo editable, un valor distinto del actual se prepara, se aplica,
 //! se comprueba en la lectura del simulador, se deshace y se comprueba que
 //! vuelve el valor original. Todo por las server functions, como la página.
+//!
+//! Una prueba por tema, para que se repartan entre hilos (o procesos, con
+//! nextest), y con una vigilancia mínima: aquí no se prueba la vigilancia,
+//! que ya cubre `changes.rs`.
 
 mod common;
 
-use ajustes::{Ajuste, Campo, CatalogoAjustes, TipoCampo};
-use common::{Panel, esperar_final, esperar_libre, llamar, ok, panel_con_gestor};
+use ajustes::{Ajuste, Campo, CatalogoAjustes, Tema, TipoCampo};
+use common::{Panel, esperar_final, esperar_libre, llamar, ok, panel_con_tiempos};
+use panel::changes::Tiempos;
 use serde_json::{Value, json};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::LazyLock, time::Duration};
+
+/// Catálogo de ajustes, cargado una sola vez por proceso.
+static AJUSTES: LazyLock<CatalogoAjustes> = LazyLock::new(|| CatalogoAjustes::load().unwrap());
+
+/// Catálogo de funciones del router, cargado una sola vez por proceso.
+static FUNCIONES: LazyLock<catalogo::Catalogo> =
+    LazyLock::new(|| catalogo::Catalogo::load().unwrap());
+
+/// Vigilancia mínima del gestor: 20 ms (60 ms en riesgo alto) mirando cada
+/// 5 ms.
+fn tiempos_minimos() -> Tiempos {
+    Tiempos {
+        bajo: Duration::from_millis(20),
+        medio: Duration::from_millis(20),
+        alto: Duration::from_millis(60),
+        intervalo: Duration::from_millis(5),
+        fallos_para_revertir: 3,
+        pausa_max: Duration::from_secs(2),
+    }
+}
 
 /// Valor legible actual del campo `campo` del ajuste `ajuste` según
 /// `leer_tema` (`{"Texto": …}`, `{"Opcion": …}`…).
@@ -177,27 +202,33 @@ fn escrito(p: &Panel, param: &str) -> Option<String> {
 /// y el deshacer lo omite (no hay valor anterior de verdad): se queda el
 /// escrito.
 fn tapado(c: &Campo) -> bool {
-    let f = catalogo::Catalogo::load().unwrap();
     c.escribible()
         .and_then(|e| {
-            f.funcion(&e.funcion)
+            FUNCIONES
+                .funcion(&e.funcion)
                 .and_then(|func| func.parametro(&e.parametro))
         })
         .is_some_and(|p| p.tapado)
 }
 
-#[tokio::test]
-async fn cada_ajuste_antes_aplicar_verificar_deshacer() {
-    let (p, cookie) = panel_con_gestor().await;
-    let catalogo = CatalogoAjustes::load().unwrap();
+/// Ida y vuelta de cada campo editable de los ajustes del tema `tema`.
+/// `n` cuenta los campos de todos los temas en el orden del catálogo, como
+/// cuando era una sola prueba: los valores de prueba no cambian.
+async fn ida_y_vuelta(tema: Tema) {
+    let (p, cookie) = panel_con_tiempos(tiempos_minimos()).await;
     let mut n = 0u32;
+    let mut probados = 0u32;
     let mut con_tapado = Vec::new();
-    for a in catalogo.todos() {
+    for a in AJUSTES.todos() {
         if a.lista || a.componente.is_some() {
             continue;
         }
         for c in a.campos.iter().filter(|c| c.escribible().is_some()) {
             n += 1;
+            if a.tema != tema {
+                continue;
+            }
+            probados += 1;
             let que = format!("{} / {}", a.id, c.id);
 
             let todo_antes = foto(&p, &cookie, a).await;
@@ -281,11 +312,48 @@ async fn cada_ajuste_antes_aplicar_verificar_deshacer() {
             assert_eq!(despues, esperado, "{que}: tras deshacer, todo el ajuste");
         }
     }
-    assert!(n > 20, "solo {n} campos: ¿se ha saltado alguno?");
+    assert!(
+        probados > 0,
+        "{}: ningún campo: ¿se ha saltado alguno?",
+        tema.slug()
+    );
     // Solo la línea de voz lleva una clave tapada al leer.
-    assert!(!con_tapado.is_empty(), "ninguno con la clave de la voz");
+    if tema == Tema::Telefono {
+        assert!(!con_tapado.is_empty(), "ninguno con la clave de la voz");
+    }
     assert!(
         con_tapado.iter().all(|q| q.starts_with("telefono.")),
         "{con_tapado:?}"
     );
+}
+
+/// Una prueba por tema y la lista de los temas que tienen la suya.
+macro_rules! por_tema {
+    ($($prueba:ident => $tema:ident),* $(,)?) => {
+        $(
+            #[tokio::test]
+            async fn $prueba() {
+                ida_y_vuelta(Tema::$tema).await;
+            }
+        )*
+        const CON_PRUEBA: &[Tema] = &[$(Tema::$tema),*];
+    };
+}
+
+por_tema! {
+    internet => Internet,
+    wifi => Wifi,
+    red_local => RedLocal,
+    puertos => Puertos,
+    seguridad => Seguridad,
+    telefono => Telefono,
+    sistema => Sistema,
+}
+
+/// Un tema nuevo no se queda sin su prueba de ida y vuelta.
+#[test]
+fn cada_tema_tiene_su_prueba() {
+    for t in Tema::TODOS {
+        assert!(CON_PRUEBA.contains(&t), "{}: sin prueba", t.slug());
+    }
 }
