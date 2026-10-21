@@ -277,10 +277,16 @@ pub(crate) mod servidor {
 
     /// ¿Entra el panel en el router con `c`? (Un cliente y una sesión
     /// aparte, que se cierra: no espera al cerrojo de `state.hgu`.)
+    /// Si tarda más de [`AppState::espera_prueba_router`], no entra.
     async fn entra(state: &AppState, c: &CredencialesRouter) -> bool {
-        probar(state, &c.url, &c.usuario, &c.contrasena)
-            .await
-            .is_ok()
+        let prueba = probar(state, &c.url, &c.usuario, &c.contrasena);
+        match tokio::time::timeout(state.espera_prueba_router, prueba).await {
+            Ok(r) => r.is_ok(),
+            Err(_) => {
+                tracing::warn!("la prueba de acceso al router no respondió a tiempo");
+                false
+            }
+        }
     }
 
     /// Vuelve a poner `actual.contrasena` en el router (que tendría `nueva`)

@@ -1857,6 +1857,15 @@ input {
   border: 0;
 }
 
+/* Las insignias largas de una tarjeta de estado (el modo solo lectura del
+   firmware) parten la línea en vez de salirse a 360 px. */
+.ajustes-estado .insignia {
+  max-width: 100%;
+  padding-block: 2px;
+  border-radius: var(--radio);
+  white-space: normal;
+}
+
 /* En un formulario (Configuración del router), el campo con el ojo ocupa
    lo que un campo normal, con su borde por fuera. */
 .campo-secreto .secreto-campo {

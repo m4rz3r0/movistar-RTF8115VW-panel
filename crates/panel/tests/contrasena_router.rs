@@ -414,7 +414,19 @@ async fn contrasena_router_valida_la_nueva() {
         .nth(1)
         .and_then(|t| t.split("</section>").next())
         .expect("la tarjeta");
-    assert!(tarjeta.contains("disabled"), "{tarjeta}");
+    // El campo y el botón, los dos desactivados.
+    let etiqueta = |abre: &str, marca: &str| -> String {
+        tarjeta
+            .split(abre)
+            .skip(1)
+            .map(|t| t.split('>').next().unwrap_or("").to_owned())
+            .find(|t| t.contains(marca))
+            .unwrap_or_else(|| panic!("falta {abre} {marca}: {tarjeta}"))
+    };
+    let campo = etiqueta("<input", r#"id="router-contrasena-nueva""#);
+    assert!(campo.contains("disabled"), "{campo}");
+    let boton = etiqueta("<button", r#"type="submit""#);
+    assert!(boton.contains("disabled"), "{boton}");
     // Y, por si acaso, el servidor tampoco lo deja.
     let (status, body) = cambiar(&p, &cookie, NUEVA).await;
     assert_eq!(status, 403, "{body}");
@@ -647,4 +659,29 @@ async fn contrasena_router_sin_gestor() {
     let (status, body) = cambiar(&p, &cookie, NUEVA).await;
     assert_eq!(status, 200, "{body}");
     assert_eq!(contrasena_guardada(&p).await, NUEVA);
+}
+
+/// Una prueba de acceso que no responde cuenta como «no entra», sin esperar
+/// el tiempo del cliente: aquí, con la espera acortada, el router deja de
+/// responder tras aceptar el cambio y se llega al error grave enseguida.
+#[tokio::test]
+async fn contrasena_router_prueba_sin_respuesta_no_entra() {
+    let (mut p, cookie) = preparado().await;
+    p.state.espera_prueba_router = Duration::from_millis(200);
+    p.app = panel::build_router(p.state.clone());
+    p.sim.control.hang_after_next_write();
+    let inicio = Instant::now();
+    let (status, body) = cambiar(&p, &cookie, NUEVA).await;
+    assert_eq!(status, 502, "{body}");
+    assert!(
+        body.contains("ni con la contraseña nueva ni con la anterior"),
+        "{body}"
+    );
+    assert!(
+        inicio.elapsed() < Duration::from_secs(8),
+        "{:?}",
+        inicio.elapsed()
+    );
+    assert_eq!(contrasena_guardada(&p).await, PASS);
+    p.sim.control.set_unresponsive(false);
 }

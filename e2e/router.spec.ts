@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { CONTRASENA } from "./instancias";
+import { CONTRASENA, instalado } from "./instancias";
 import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 
 // Sección «Configuración del router»: el enlace de la navegación lleva a
@@ -237,7 +237,8 @@ test.describe("cambiar la contraseña del router", () => {
     // El simulador no sabe dejar al panel fuera con las dos contraseñas a
     // la vez: la respuesta de un error de verdad (la nueva corta), con el
     // texto del error grave (el de router.ftl en inglés).
-    const corta = "The new password is too short: it must take up at least as much as 8 unaccented letters.";
+    const corta =
+      "The new password is too short: it needs at least 8 characters. Accented letters and some symbols take up more than one.";
     const grave =
       "The panel cannot log in to the router with either the new password or the previous one. " +
       "To get access back, log in to the router's web interface (try the new one and, if that " +
@@ -330,4 +331,82 @@ test.describe("cambiar la contraseña del router", () => {
       "errores o avisos en la consola",
     ).toEqual([]);
   });
+});
+
+// La tarjeta de las credenciales con otra dirección que llega al mismo
+// simulador (localhost en lugar de 127.0.0.1) y la contraseña sin tocar:
+// viaja la del campo, prueba, guarda y el panel sigue entrando. Después se
+// deja como estaba.
+test.describe("credenciales con otra dirección y la misma contraseña", () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+
+  test("prueba, guarda y vuelve a la de antes", async ({ page }) => {
+    const errores = recogerErrores(page);
+    await entrar(page);
+    await page.goto("/router/conexion");
+    await asentar(page);
+    const cred = page.locator("section[aria-labelledby=router-credenciales]");
+    const url = cred.locator("#panel-router-url");
+    const antes = await url.inputValue();
+    expect(antes).toBe(instalado.urlSim);
+    const otra = `http://localhost:${instalado.puertoSim}`;
+    for (const [destino, primera] of [
+      [otra, true],
+      [antes, false],
+    ] as const) {
+      await url.fill(destino);
+      await cred.getByRole("button", { name: "Probar la conexión" }).click();
+      await expect(cred).toContainText("RTF8115VW");
+      await expect(cred.locator(".error-formulario")).toBeEmpty();
+      await cred.getByRole("button", { name: "Guardar las credenciales" }).click();
+      if (primera) {
+        const dialogo = page.locator("dialog[open]");
+        await expect(dialogo).toBeVisible();
+        await dialogo.locator("#reautenticar-contrasena").fill(CONTRASENA);
+        await dialogo.locator("button[type=submit]").click();
+      }
+      await expect(cred.locator(".aviso-formulario")).toHaveText(
+        "Credenciales guardadas: el panel ya usa las nuevas.",
+      );
+      await page.reload();
+      await asentar(page);
+      await expect(url).toHaveValue(destino);
+    }
+    const salud = await (await page.request.get("/salud")).json();
+    expect(salud.router).toBe("ok");
+    expect(
+      errores.filter((e) => !/status of 401/.test(e)),
+      "errores o avisos en la consola",
+    ).toEqual([]);
+  });
+});
+
+// Con el panel en solo lectura, la tarjeta se ve desactivada y dice por
+// qué. El panel del e2e tiene un firmware probado: los datos de la página
+// llegan con «solo lectura» puesto (navegación del cliente, que los pide al
+// servidor).
+test("es a 360 px: en solo lectura la tarjeta se ve desactivada", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 900 });
+  await entrar(page);
+  await asentar(page);
+  await page.route(
+    "**/api/leer_conexion_router",
+    async (r) => {
+      const real = await r.fetch();
+      const texto = (await real.text()).replace('"solo_lectura":false', '"solo_lectura":true');
+      expect(texto).toContain('"solo_lectura":true');
+      await r.fulfill({ response: real, body: texto });
+    },
+    { times: 1 },
+  );
+  await page.locator("button.menu-boton").click();
+  await page.getByRole("link", { name: "Configuración del router" }).click();
+  await page.waitForURL((u) => u.pathname === "/router/conexion");
+  const cambio = page.locator("section#router-cambiar-contrasena");
+  await expect(cambio).toContainText("No se puede cambiar mientras el panel esté en solo lectura");
+  await expect(cambio.locator("#router-contrasena-nueva")).toBeDisabled();
+  await expect(cambio.getByRole("button", { name: "Cambiar" })).toBeDisabled();
+  await sinDesbordamiento(page, "solo lectura 360");
+  await cambio.screenshot({ path: `${SDD}/contrasena-solo-lectura-es-360.png` });
+  await page.screenshot({ path: `${SDD}/contrasena-solo-lectura-pagina-es-360.png`, fullPage: true });
 });

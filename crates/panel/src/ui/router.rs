@@ -145,6 +145,9 @@ fn Conexion(
 ) -> impl IntoView {
     let reauth = expect_context::<Reautenticacion>();
     let configurado = !url.is_empty();
+    // Las guardadas (para saber qué se ha cambiado) y las del formulario.
+    let url_guardada = RwSignal::new(url.clone());
+    let usuario_guardado = RwSignal::new(usuario.clone());
     let url = RwSignal::new(url);
     let usuario = RwSignal::new(usuario);
     let info = RwSignal::new(None::<InfoRouter>);
@@ -152,12 +155,18 @@ fn Conexion(
     let aviso = RwSignal::new(None::<String>);
     let pendiente = RwSignal::new(false);
     let error_firmware = RwSignal::new(None::<String>);
-    // La contraseña, solo si se ha tocado (si no, el servidor usa la
-    // guardada).
     let datos = move || {
-        let c = contrasena.get_untracked();
-        let tocada = (c != guardada.get_untracked()).then_some(c);
-        (url.get_untracked(), usuario.get_untracked(), tocada)
+        let (u, us) = (url.get_untracked(), usuario.get_untracked());
+        let c = contrasena_a_enviar(
+            contrasena.get_untracked(),
+            &guardada.get_untracked(),
+            (&u, &us),
+            (
+                &url_guardada.get_untracked(),
+                &usuario_guardado.get_untracked(),
+            ),
+        );
+        (u, us, c)
     };
 
     let probar = move |_| {
@@ -179,7 +188,7 @@ fn Conexion(
         pendiente.set(true);
         let (u, us, c) = datos();
         spawn_local(async move {
-            match guardar_router(u, us, c.clone()).await {
+            match guardar_router(u.clone(), us.clone(), c.clone()).await {
                 Ok(i) => {
                     // Con un firmware probado se quita el solo lectura; con
                     // uno sin probar, queda como estaba (o confirmado).
@@ -190,6 +199,8 @@ fn Conexion(
                     if let Some(c) = c {
                         guardada.set(c);
                     }
+                    url_guardada.set(u);
+                    usuario_guardado.set(us);
                     aviso.set(Some(t!("router-guardadas")));
                 }
                 Err(e) => reauth.tratar(&e, error, yo),
@@ -297,6 +308,20 @@ fn Conexion(
             </div>
         </section>
     }
+}
+
+/// La contraseña que manda la tarjeta de las credenciales: `None` (el
+/// servidor se queda con la guardada) si el campo sigue con la guardada y la
+/// dirección y el usuario son los guardados; si no, la del campo. El
+/// servidor solo usa la guardada con su dirección y su usuario.
+fn contrasena_a_enviar(
+    campo: String,
+    guardada: &str,
+    (url, usuario): (&str, &str),
+    (url_guardada, usuario_guardado): (&str, &str),
+) -> Option<String> {
+    let mismos = url == url_guardada && usuario == usuario_guardado;
+    (campo != guardada || !mismos).then_some(campo)
 }
 
 fn nombre_tipo(t: TipoRed) -> String {
@@ -484,5 +509,32 @@ fn RedDelRouter(
                 </div>
             </form>
         </section>
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::contrasena_a_enviar;
+
+    #[test]
+    fn contrasena_que_se_envia() {
+        let guardados = ("http://192.168.1.1", "1234");
+        let enviar = |campo: &str, datos| {
+            contrasena_a_enviar(campo.into(), "clave-de-prueba-1", datos, guardados)
+        };
+        // Sin tocar nada, no viaja.
+        assert_eq!(enviar("clave-de-prueba-1", guardados), None);
+        // Otra contraseña, sí.
+        assert_eq!(
+            enviar("clave-nueva-de-prueba", guardados).as_deref(),
+            Some("clave-nueva-de-prueba")
+        );
+        // Con otra dirección u otro usuario, la del campo aunque sea la misma.
+        for datos in [("http://192.0.2.1", "1234"), ("http://192.168.1.1", "otro")] {
+            assert_eq!(
+                enviar("clave-de-prueba-1", datos).as_deref(),
+                Some("clave-de-prueba-1")
+            );
+        }
     }
 }
