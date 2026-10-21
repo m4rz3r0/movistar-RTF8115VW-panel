@@ -3,9 +3,7 @@
 //! (también los que usarán las recomendaciones de la fase 4), usuarios y
 //! ventana de reautenticación.
 
-mod comun;
-
-use comun::{
+use crate::comun::{
     PANEL_PASS, PANEL_USER, PASS, Panel, PanelPrueba, USER, body_text, esperar_hasta,
     get_con_cookie, llamar, login_body, ok, post_form, post_json, reautenticar, send, sesion,
     set_cookie,
@@ -989,7 +987,7 @@ async fn zona_valida_y_no_valida() {
     }
     // Al arrancar, la guardada.
     let dir = p.state.cfg.db_path.parent().unwrap();
-    let otro = comun::estado((*p.state.cfg).clone(), dir).await;
+    let otro = crate::comun::estado((*p.state.cfg).clone(), dir).await;
     assert_eq!(otro.zona(), Zona::Canarias);
 }
 
@@ -1011,7 +1009,7 @@ async fn html_lleva_data_zona() {
     for ruta in ["/panel", "/", "/historial", "/login"] {
         // /login, sin sesión: con ella lleva a la portada.
         let resp = if ruta == "/login" {
-            comun::get(&p.app, ruta).await
+            crate::comun::get(&p.app, ruta).await
         } else {
             get_con_cookie(&p.app, ruta, &cookie).await
         };
@@ -1067,7 +1065,7 @@ async fn migracion_zona_utc_por_defecto() {
     let p = PanelPrueba::nuevo().arrancar().await;
     let db = &p.state.db;
     let dir = p.state.cfg.db_path.parent().unwrap();
-    let arrancar = || comun::estado((*p.state.cfg).clone(), dir);
+    let arrancar = || crate::comun::estado((*p.state.cfg).clone(), dir);
     // Base de datos de la versión anterior: sin la marca de la migración.
     let anterior = |zona: &'static str| async move {
         sqlx::query("DELETE FROM ajustes_instancia WHERE clave = ?")

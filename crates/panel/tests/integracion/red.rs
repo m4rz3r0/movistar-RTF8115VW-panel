@@ -2,9 +2,7 @@
 //! telefonía, televisión y radios) y de la red de seguridad WAN del gestor
 //! de cambios con conexiones distintas de `ip2`.
 
-mod comun;
-
-use comun::{
+use crate::comun::{
     Panel, PanelPrueba, body_text, esperar_hasta, esperar_hasta_con, get_con_cookie, sesion,
 };
 use hgu::{
@@ -33,16 +31,16 @@ fn conexiones() -> Vec<WanConn> {
 /// sin detección) detecta `ip2` al arrancar y lo guarda.
 #[tokio::test]
 async fn instancia_existente_detecta_ip2_al_arrancar() {
-    let sim = Sim::start(comun::sim_config()).await;
+    let sim = Sim::start(crate::comun::sim_config()).await;
     let dir = tempfile::tempdir().unwrap();
-    let state = comun::estado(comun::config_en(dir.path()), dir.path()).await;
+    let state = crate::comun::estado(crate::comun::config_en(dir.path()), dir.path()).await;
     instancia::guardar_credenciales(
         &state.db,
         &state.history_key,
         &CredencialesRouter {
             url: sim.base_url.clone(),
-            usuario: comun::USER.into(),
-            contrasena: comun::PASS.into(),
+            usuario: crate::comun::USER.into(),
+            contrasena: crate::comun::PASS.into(),
         },
     )
     .await
@@ -72,29 +70,29 @@ async fn instancia_existente_detecta_ip2_al_arrancar() {
     assert_eq!(guardada, red);
 
     // Al volver a arrancar, la detección guardada está desde el principio.
-    let otro = comun::estado(comun::config_en(dir.path()), dir.path()).await;
+    let otro = crate::comun::estado(crate::comun::config_en(dir.path()), dir.path()).await;
     assert_eq!(otro.wan().as_deref(), Some("ip2"));
 }
 
 /// La conexión elegida a mano manda sobre la detectada.
 #[tokio::test]
 async fn wan_manual_manda() {
-    let sim = Sim::start(comun::sim_config()).await;
+    let sim = Sim::start(crate::comun::sim_config()).await;
     let dir = tempfile::tempdir().unwrap();
     let db = panel::db::open(&dir.path().join("panel.db")).await.unwrap();
     instancia::escribir(&db, claves::WAN_MANUAL, &json!("ip4"))
         .await
         .unwrap();
     db.close().await;
-    let state = comun::estado(comun::config_en(dir.path()), dir.path()).await;
+    let state = crate::comun::estado(crate::comun::config_en(dir.path()), dir.path()).await;
     assert_eq!(state.wan().as_deref(), Some("ip4"));
     instancia::guardar_credenciales(
         &state.db,
         &state.history_key,
         &CredencialesRouter {
             url: sim.base_url.clone(),
-            usuario: comun::USER.into(),
-            contrasena: comun::PASS.into(),
+            usuario: crate::comun::USER.into(),
+            contrasena: crate::comun::PASS.into(),
         },
     )
     .await
@@ -131,7 +129,7 @@ fn sin_wan_detectada_usa_cualquier_conexion_de_datos() {
 
 /// Gestor con un cliente rápido sobre el panel `p` (vigilancia de 300 ms).
 async fn gestor_rapido(p: &mut Panel) -> std::sync::Arc<ChangeManager> {
-    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, comun::USER, comun::PASS);
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, crate::comun::USER, crate::comun::PASS);
     cfg.timeout = Duration::from_millis(500);
     cfg.min_gap = Duration::from_millis(1);
     p.state.hgu = hgu::Client::new(cfg);
@@ -188,7 +186,7 @@ async fn cortar_wan_y_esperar_reversion(p: &Panel, m: &std::sync::Arc<ChangeMana
 #[tokio::test]
 async fn vigilancia_revierte_en_linea_dhcp() {
     let mut p = PanelPrueba::nuevo()
-        .capa(&comun::variante("dhcp-sin-voip"))
+        .capa(&crate::comun::variante("dhcp-sin-voip"))
         .arrancar()
         .await;
     assert_eq!(p.state.wan().as_deref(), Some("ip5"));
@@ -199,7 +197,7 @@ async fn vigilancia_revierte_en_linea_dhcp() {
 
     // Sin nada detectado (la detección falló), igual.
     let mut p = PanelPrueba::nuevo()
-        .capa(&comun::variante("dhcp-sin-voip"))
+        .capa(&crate::comun::variante("dhcp-sin-voip"))
         .arrancar()
         .await;
     p.state.fijar_red(None, None);
@@ -235,7 +233,7 @@ async fn estado_sin_wan_avisa() {
     let red = p.state.red().expect("detección hecha");
     assert_eq!(red.wan, None);
     let cookie = sesion(&p).await;
-    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, comun::USER, comun::PASS);
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, crate::comun::USER, crate::comun::PASS);
     cfg.timeout = Duration::from_millis(200);
     cfg.min_gap = Duration::from_millis(1);
     p.state.hgu = hgu::Client::new(cfg);
@@ -262,7 +260,7 @@ async fn sondeo_redetecta_si_falta_la_wan() {
     let mut red = p.state.red().unwrap();
     red.wan = Some("ip9".into());
     p.state.fijar_red(Some(red), None);
-    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, comun::USER, comun::PASS);
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, crate::comun::USER, crate::comun::PASS);
     cfg.timeout = Duration::from_millis(200);
     cfg.min_gap = Duration::from_millis(1);
     p.state.hgu = hgu::Client::new(cfg);
@@ -293,7 +291,7 @@ async fn sondeo_redetecta_si_falta_la_wan() {
 #[tokio::test]
 async fn deteccion_no_se_anota_con_cambio_activo() {
     let mut p = PanelPrueba::nuevo().arrancar().await;
-    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, comun::USER, comun::PASS);
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, crate::comun::USER, crate::comun::PASS);
     cfg.timeout = Duration::from_millis(500);
     cfg.min_gap = Duration::from_millis(1);
     p.state.hgu = hgu::Client::new(cfg);
@@ -351,7 +349,7 @@ async fn wan_manual_inexistente_usa_la_detectada() {
     assert_eq!(p.state.wan_en(&conns).as_deref(), Some("ip4"));
     p.state.fijar_red(Some(red.clone()), Some("ip9".into()));
 
-    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, comun::USER, comun::PASS);
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, crate::comun::USER, crate::comun::PASS);
     cfg.timeout = Duration::from_millis(200);
     cfg.min_gap = Duration::from_millis(1);
     p.state.hgu = hgu::Client::new(cfg);

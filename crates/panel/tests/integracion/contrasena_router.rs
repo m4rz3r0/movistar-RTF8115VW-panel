@@ -3,9 +3,7 @@
 //! credenciales, que llega con la contraseña guardada (censurada con el ojo)
 //! y no la envía si no se toca.
 
-mod comun;
-
-use comun::{
+use crate::comun::{
     PASS, Panel, PanelPrueba, USER, aplicar, body_text, esperar_final, esperar_hasta,
     esperar_hasta_con, esperar_libre, get_con_cookie, llamar, ok, post_json, reautenticar,
     registro_global, send, sesion,

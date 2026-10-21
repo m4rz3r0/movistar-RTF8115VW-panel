@@ -2,9 +2,7 @@
 //! la base de datos, su importación desde el entorno y el arranque sin
 //! router configurado.
 
-mod comun;
-
-use comun::{Panel, PanelPrueba, body_text, esperar_hasta, get, get_con_cookie, sesion};
+use crate::comun::{Panel, PanelPrueba, body_text, esperar_hasta, get, get_con_cookie, sesion};
 use panel::{
     config::Config,
     crypto::HistoryKey,
@@ -40,9 +38,9 @@ fn config_con_router(dir: &Path, url: &str) -> Config {
     let secreto = dir.join("router.secret");
     Config {
         router_url: Some(url.into()),
-        router_user: Some(comun::USER.into()),
+        router_user: Some(crate::comun::USER.into()),
         router_secret_file: Some(secreto),
-        ..comun::config_en(dir)
+        ..crate::comun::config_en(dir)
     }
 }
 
@@ -128,7 +126,7 @@ async fn ajustes_de_la_instancia() {
 async fn importa_credenciales_del_entorno_una_vez() {
     let dir = tempfile::tempdir().unwrap();
     escribir_secreto(&dir.path().join("router.secret"), "primera");
-    let state = comun::estado(
+    let state = crate::comun::estado(
         config_con_router(dir.path(), "http://192.0.2.1"),
         dir.path(),
     )
@@ -144,7 +142,7 @@ async fn importa_credenciales_del_entorno_una_vez() {
         guardadas,
         CredencialesRouter {
             url: "http://192.0.2.1".into(),
-            usuario: comun::USER.into(),
+            usuario: crate::comun::USER.into(),
             contrasena: "primera".into(),
         }
     );
@@ -154,7 +152,7 @@ async fn importa_credenciales_del_entorno_una_vez() {
     // Segundo arranque con otro contenido en el fichero: manda la base de
     // datos.
     escribir_secreto(&dir.path().join("router.secret"), "segunda");
-    let state = comun::estado(
+    let state = crate::comun::estado(
         config_con_router(dir.path(), "http://192.0.2.9"),
         dir.path(),
     )
@@ -176,7 +174,7 @@ async fn secreto_legible_por_otros_impide_importar() {
     let secreto = dir.path().join("router.secret");
     escribir_secreto(&secreto, "no-debe-salir");
     std::fs::set_permissions(&secreto, std::fs::Permissions::from_mode(0o644)).unwrap();
-    let state = comun::estado(
+    let state = crate::comun::estado(
         config_con_router(dir.path(), "http://192.0.2.1"),
         dir.path(),
     )
@@ -214,7 +212,7 @@ async fn variables_router_parciales_fallan() {
         },
     ];
     for cfg in parciales {
-        let state = comun::estado(cfg, dir.path()).await;
+        let state = crate::comun::estado(cfg, dir.path()).await;
         let e = instancia::arrancar_router(&state).await.unwrap_err();
         for var in ["RP_ROUTER_URL", "RP_ROUTER_USER", "RP_ROUTER_SECRET"] {
             assert!(e.contains(var), "{e}");
@@ -264,7 +262,7 @@ async fn sondeo_sin_configurar_no_cuenta_como_fallo() {
 async fn estado_muestra_router_sin_configurar() {
     let p = sin_router().await;
     let cookie = sesion(&p).await;
-    let (status, body) = comun::llamar(&p, "estado_actual", json!({}), Some(&cookie)).await;
+    let (status, body) = crate::comun::llamar(&p, "estado_actual", json!({}), Some(&cookie)).await;
     assert_eq!(status, 200, "{body}");
     let v: Value = serde_json::from_str(&body).unwrap();
     assert_eq!(v["sin_configurar"], true);
@@ -300,7 +298,7 @@ async fn el_arranque_usa_la_pausa_de_la_configuracion() {
 async fn el_arranque_espera_a_la_deteccion_lo_que_diga_la_configuracion() {
     let dir = tempfile::tempdir().unwrap();
     escribir_secreto(&dir.path().join("router.secret"), "clave");
-    let state = comun::estado(
+    let state = crate::comun::estado(
         config_con_router(dir.path(), "http://192.0.2.1"),
         dir.path(),
     )

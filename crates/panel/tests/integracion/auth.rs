@@ -1,13 +1,11 @@
 //! Pruebas de autenticación: login, sesiones, freno de fuerza bruta, CSRF y
 //! órdenes `panel user …`.
 
-mod comun;
-
-use axum::{body::Body, http::Request};
-use comun::{
+use crate::comun::{
     PANEL_PASS, PANEL_USER, Panel, PanelPrueba, body_text, get, get_con_cookie, login_body,
     post_form, send, sesion, set_cookie,
 };
+use axum::{body::Body, http::Request};
 use std::{
     io::Write,
     process::{Command, Stdio},
@@ -515,7 +513,7 @@ async fn login_sin_js(p: &Panel, cuerpo: &str, consulta: &str) -> axum::response
     );
     h.insert(
         "referer",
-        format!("{}/login{consulta}", comun::ORIGIN)
+        format!("{}/login{consulta}", crate::comun::ORIGIN)
             .parse()
             .unwrap(),
     );
@@ -581,7 +579,7 @@ async fn login_sin_js_malo_vuelve_al_login_con_el_error_y_next() {
             .all(|c| !c.to_str().unwrap().starts_with(&format!("{COOKIE_NAME}="))),
     );
     let ruta = vuelta
-        .strip_prefix(comun::ORIGIN)
+        .strip_prefix(crate::comun::ORIGIN)
         .unwrap_or(&vuelta)
         .to_owned();
     assert!(ruta.starts_with("/login?"), "{ruta}");

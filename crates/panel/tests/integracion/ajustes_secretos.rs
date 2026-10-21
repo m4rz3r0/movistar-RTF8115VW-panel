@@ -3,13 +3,11 @@
 //! anterior de un paso en el Historial, y que ningún secreto acabe en el
 //! HTML, en el registro ni reenviado vacío o tapado al router.
 
-mod comun;
-
-use axum::http::header;
-use comun::{
+use crate::comun::{
     PANEL_PASS, Panel, PanelPrueba, aplicar_ajuste, body_text, cambios_del_grupo, elemento,
     esperar_final, esperar_hasta, llamar, ok, partir, post_json, registro_global, send,
 };
+use axum::http::header;
 use serde_json::{Value, json};
 use std::time::Duration;
 
@@ -378,7 +376,7 @@ async fn deshacer_la_voz_omite_la_clave_tapada() {
 /// bloquea: omite la contraseña y deja la línea como estaba.
 #[tokio::test]
 async fn revertir_la_voz_omite_la_clave_tapada() {
-    let mut t = comun::tiempos_rapidos();
+    let mut t = crate::comun::tiempos_rapidos();
     t.bajo = Duration::from_secs(5);
     t.medio = Duration::from_secs(5);
     let (p, cookie) = PanelPrueba::nuevo().tiempos(t).arrancar_con_gestor().await;
@@ -714,9 +712,9 @@ async fn el_freno_es_el_mismo_que_el_del_login() {
     assert_eq!(status, 403);
     let resp = send(
         &p.app,
-        comun::post_form(
+        crate::comun::post_form(
             "/api/login",
-            &comun::login_body(comun::PANEL_USER, PANEL_PASS),
+            &crate::comun::login_body(crate::comun::PANEL_USER, PANEL_PASS),
             "127.0.0.1",
         ),
     )
@@ -947,7 +945,7 @@ async fn historial_sin_nombres_de_la_api_al_deshacer() {
 /// primero.
 #[tokio::test]
 async fn deshacer_en_vigilancia_da_su_motivo_aunque_sea_una_clave_tapada() {
-    let mut t = comun::tiempos_rapidos();
+    let mut t = crate::comun::tiempos_rapidos();
     t.bajo = Duration::from_secs(10);
     t.medio = Duration::from_secs(10);
     let (p, cookie) = PanelPrueba::nuevo().tiempos(t).arrancar_con_gestor().await;

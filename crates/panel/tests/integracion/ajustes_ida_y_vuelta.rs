@@ -7,10 +7,8 @@
 //! nextest), y con una vigilancia mínima: aquí no se prueba la vigilancia,
 //! que ya cubre `changes.rs`.
 
-mod comun;
-
+use crate::comun::{Panel, PanelPrueba, esperar_final, esperar_libre, llamar, ok, tiempos_minimos};
 use ajustes::{Ajuste, Campo, CatalogoAjustes, Tema, TipoCampo};
-use comun::{Panel, PanelPrueba, esperar_final, esperar_libre, llamar, ok, tiempos_minimos};
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, sync::LazyLock};
 

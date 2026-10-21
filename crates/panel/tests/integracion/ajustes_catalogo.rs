@@ -2,10 +2,8 @@
 //! deja editar, el gestor lo admite (no lo bloquea por la IP LAN, por los
 //! secretos de la web básica ni por otra regla de la v1).
 
-mod comun;
-
+use crate::comun::PanelPrueba;
 use ajustes::{Campo, CatalogoAjustes};
-use comun::PanelPrueba;
 use panel::changes::{ChangeManager, Tiempos};
 
 #[tokio::test]

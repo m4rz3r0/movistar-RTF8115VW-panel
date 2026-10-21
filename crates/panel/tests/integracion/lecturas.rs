@@ -3,14 +3,12 @@
 //! lecturas de otros intercaladas. Lo que prepara un cambio sigue leyendo el
 //! router.
 
-mod comun;
-
-use comun::{Panel, PanelPrueba, Registro, esperar_final, esperar_libre, leer, ok, sesion};
+use crate::comun::{Panel, PanelPrueba, Registro, esperar_final, esperar_libre, leer, ok, sesion};
 use panel::poller::{Poller, PollerConfig};
 use serde_json::{Value, json};
 use std::time::Duration;
 
-use comun::USER;
+use crate::comun::USER;
 use panel::{
     changes::{ChangeManager, ChangeRequest, Estado, Tiempos},
     lecturas::{CADUCIDAD_LECTURAS, CacheLecturas, Clave},
@@ -221,7 +219,7 @@ async fn preparar_ajuste_no_usa_la_cache() {
         json!({ "Texto": "cambiado-fuera" })
     );
     // Otro cliente (como la app del operador): el panel no se entera.
-    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, comun::USER, comun::PASS);
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, crate::comun::USER, crate::comun::PASS);
     cfg.min_gap = Duration::from_millis(1);
     hgu::Client::new(cfg)
         .write(
@@ -300,7 +298,7 @@ async fn las_lecturas_de_un_tema_van_seguidas() {
 /// Cliente del router como el del panel, con un plazo por petición `plazo`
 /// y sin pausa entre peticiones.
 fn cliente(p: &Panel, plazo: Duration) -> hgu::Client {
-    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, USER, comun::PASS);
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, USER, crate::comun::PASS);
     cfg.timeout = plazo;
     cfg.min_gap = Duration::from_millis(1);
     hgu::Client::new(cfg)
@@ -382,7 +380,7 @@ async fn una_linea_por_lectura_fallida() {
             .finish(),
     );
     p.sim.control.set_unresponsive(true);
-    let (estado, _) = comun::llamar(&p, "leer_red_casa", json!({}), Some(&cookie)).await;
+    let (estado, _) = crate::comun::llamar(&p, "leer_red_casa", json!({}), Some(&cookie)).await;
     p.sim.control.set_unresponsive(false);
     assert_eq!(estado, 502);
     let texto = registro.texto();

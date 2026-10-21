@@ -1,13 +1,11 @@
 //! Pruebas del gestor de cambios contra `router-sim`, con tiempos de
 //! vigilancia cortos.
 
-mod comun;
-
-use catalogo::{Riesgo, mask::MASCARA};
-use comun::{
+use crate::comun::{
     Panel, esperar_estado, esperar_hasta, esperar_hasta_con, esperar_libre_gestor, gestor,
     panel_rapido, preparado, req, tiempos_rapidos,
 };
+use catalogo::{Riesgo, mask::MASCARA};
 use hgu::read;
 use panel::{
     changes::{CambioError, ChangeManager, ChangeRequest, Estado, Tiempos},

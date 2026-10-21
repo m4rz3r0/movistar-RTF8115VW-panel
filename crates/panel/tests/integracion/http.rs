@@ -1,14 +1,12 @@
 //! Pruebas HTTP del panel en proceso, contra `router-sim`.
 
-mod comun;
-
+use crate::comun::{
+    ORIGIN, PANEL_PASS, PANEL_USER, Panel, PanelPrueba, body_text, con_usuario, esperar_hasta, get,
+    get_con_cookie, login_body, post_form, send, sesion,
+};
 use axum::{
     body::Body,
     http::{Response, StatusCode},
-};
-use comun::{
-    ORIGIN, PANEL_PASS, PANEL_USER, Panel, PanelPrueba, body_text, con_usuario, esperar_hasta, get,
-    get_con_cookie, login_body, post_form, send, sesion,
 };
 use panel::poller::{Poller, PollerConfig};
 use std::time::Duration;
@@ -25,7 +23,7 @@ async fn json(resp: Response<Body>) -> serde_json::Value {
 /// Arranca el sondeo con intervalos cortos y un cliente del router de tiempo
 /// de espera corto, y espera a que `/salud` lo vea sano.
 async fn con_sondeo(p: &mut Panel) {
-    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, comun::USER, comun::PASS);
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, crate::comun::USER, crate::comun::PASS);
     cfg.timeout = Duration::from_millis(500);
     cfg.min_gap = Duration::from_millis(1);
     p.state.hgu = hgu::Client::new(cfg);
@@ -122,7 +120,7 @@ async fn assert_csp_con_nonce(resp: Response<Body>, uri: &str) {
 #[tokio::test]
 async fn pagina_leptos_lleva_csp_con_su_nonce() {
     let p = PanelPrueba::nuevo().arrancar().await;
-    comun::con_usuario(&p).await;
+    crate::comun::con_usuario(&p).await;
     let resp = get(&p.app, "/login").await;
     assert_eq!(resp.status(), StatusCode::OK);
     assert_csp_con_nonce(resp, "/login").await;

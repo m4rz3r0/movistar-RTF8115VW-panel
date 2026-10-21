@@ -1,9 +1,7 @@
 //! Modos de visualización (texto, gráfica, mixto): preferencia por usuario,
 //! `<html data-vista>` y lo que pinta la página de estado en cada modo.
 
-mod comun;
-
-use comun::{
+use crate::comun::{
     Panel, PanelPrueba, arrancar_sondeo, body_text, esperar_hasta, get_con_cookie, llamar,
     login_body, ok, post_form, send, sesion, set_cookie,
 };
@@ -106,7 +104,7 @@ async fn vista_por_usuario() {
     // Se conserva en otras páginas y en una sesión nueva.
     let html = pagina(&p, "/panel", &cookie).await;
     assert!(html.contains(r#"data-vista="texto""#), "{html}");
-    let nueva = comun::sesion_de(&p).await;
+    let nueva = crate::comun::sesion_de(&p).await;
     assert_eq!(
         ok(&p, "leer_vista", json!({}), &nueva).await,
         json!("texto")

@@ -1,9 +1,7 @@
 //! Pruebas del sondeo en segundo plano contra `router-sim`, con intervalos
 //! cortos.
 
-mod comun;
-
-use comun::{Panel, PanelPrueba, esperar_hasta};
+use crate::comun::{Panel, PanelPrueba, esperar_hasta};
 use panel::{
     poller::{Poller, PollerConfig, PollerHandle},
     series::{self, Rango},
@@ -25,7 +23,7 @@ fn config() -> PollerConfig {
 /// Arranca el sondeo con un cliente del router de tiempo de espera corto
 /// (200 ms) y espera la primera instantánea completa.
 async fn sondeo(p: &mut Panel) -> PollerHandle {
-    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, comun::USER, comun::PASS);
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, crate::comun::USER, crate::comun::PASS);
     cfg.timeout = Duration::from_millis(200);
     cfg.min_gap = Duration::from_millis(1);
     p.state.hgu = hgu::Client::new(cfg);
@@ -251,7 +249,7 @@ async fn despertar_lee_sin_esperar_al_intervalo() {
         async || h.sin_configurar(),
     )
     .await;
-    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, comun::USER, comun::PASS);
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, crate::comun::USER, crate::comun::PASS);
     cfg.min_gap = Duration::from_millis(1);
     p.state.hgu.reconfigurar(cfg).await;
     h.despertar();

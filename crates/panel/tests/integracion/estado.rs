@@ -1,8 +1,6 @@
 //! Pruebas de la página de estado y sus server functions contra `router-sim`.
 
-mod comun;
-
-use comun::{
+use crate::comun::{
     Panel, PanelPrueba, arrancar_sondeo, body_text, esperar_hasta, get_con_cookie, post_form, send,
     sesion,
 };
@@ -75,7 +73,7 @@ async fn estado_sin_router_muestra_error() {
     assert_eq!(v["router_ok"], false, "{body}");
     assert_eq!(v["at"], Value::Null, "{body}");
     assert!(v["error"].as_str().is_some_and(|e| !e.is_empty()), "{body}");
-    assert!(!body.contains(comun::PASS), "{body}");
+    assert!(!body.contains(crate::comun::PASS), "{body}");
     let avisos = v["avisos"].to_string();
     assert!(avisos.contains("Sin conexión con el router"), "{avisos}");
 
@@ -127,7 +125,7 @@ async fn estado_no_envia_claves_wifi() {
         "pre_shared_key",
         "wps_device_pin",
         "acs_password",
-        comun::PASS,
+        crate::comun::PASS,
     ] {
         assert!(!body.contains(prohibido), "{prohibido} en {body}");
     }

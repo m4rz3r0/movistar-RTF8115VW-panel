@@ -1,8 +1,5 @@
 //! Arnés común de las pruebas HTTP: panel en proceso contra `router-sim`.
 
-// Cada binario de pruebas usa solo parte del arnés.
-#![allow(dead_code, unused_imports)]
-
 mod cambios;
 mod esperar;
 mod formularios;

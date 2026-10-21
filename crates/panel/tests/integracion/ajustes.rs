@@ -2,13 +2,11 @@
 //! legibles, secretos que no salen del servidor, lecturas que fallan solas y
 //! el catálogo comprobado al arrancar.
 
-mod comun;
-
-use axum::http::header;
-use comun::{
+use crate::comun::{
     Panel, PanelPrueba, aplicar, body_text, cambios_del_grupo, elemento, esperar_final,
     esperar_libre, leer, llamar, ok, partir, post_json, send, sesion, tiempos_rapidos, variante,
 };
+use axum::http::header;
 use panel::instancia::{self, claves};
 use serde_json::{Value, json};
 use std::time::Duration;

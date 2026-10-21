@@ -3,9 +3,7 @@
 //! con la validación de una reserva (`validar_reserva`) igual en el
 //! servidor y en la página.
 
-mod comun;
-
-use comun::{
+use crate::comun::{
     Panel, PanelPrueba, aplicar_ajuste, esperar_libre, llamar, ok, pagina, sesion, variante,
 };
 use panel::ajustes_router::{ErrorReserva, validar_reserva};
@@ -407,9 +405,9 @@ async fn leer_dispositivos_exige_sesion() {
 async fn pagina_red_local_con_dispositivos_y_reservas() {
     let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
-    let resp = comun::get_con_cookie(&p.app, "/ajustes/red_local", &cookie).await;
+    let resp = crate::comun::get_con_cookie(&p.app, "/ajustes/red_local", &cookie).await;
     assert_eq!(resp.status(), 200);
-    let html = comun::body_text(resp).await;
+    let html = crate::comun::body_text(resp).await;
     assert!(html.contains("Fijar esta IP"), "{html}");
     assert!(html.contains("Añadir IP fija"), "{html}");
     assert!(html.contains("192.168.1.62"), "{html}");
@@ -1175,9 +1173,9 @@ async fn editar_o_borrar_regla_con_esperados() {
 async fn aviso_destino_inexistente_en_la_pagina() {
     let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
-    let resp = comun::get_con_cookie(&p.app, "/ajustes/puertos", &cookie).await;
+    let resp = crate::comun::get_con_cookie(&p.app, "/ajustes/puertos", &cookie).await;
     assert_eq!(resp.status(), 200);
-    let html = comun::body_text(resp).await;
+    let html = crate::comun::body_text(resp).await;
     assert!(
         html.contains("El dispositivo de destino ya no está en la red"),
         "{html}"
@@ -1292,8 +1290,8 @@ async fn protocolo_desconocido_en_la_pagina() {
         .capa(&variante("puertos-protocolo-desconocido"))
         .arrancar_con_gestor()
         .await;
-    let resp = comun::get_con_cookie(&p.app, "/ajustes/puertos", &cookie).await;
-    let html = comun::body_text(resp).await;
+    let resp = crate::comun::get_con_cookie(&p.app, "/ajustes/puertos", &cookie).await;
+    let html = crate::comun::body_text(resp).await;
     assert!(html.contains("Valor no reconocido (47)"), "{html}");
     assert!(!html.contains("ajuste-puertos-reglas-protocolo-"), "{html}");
 }

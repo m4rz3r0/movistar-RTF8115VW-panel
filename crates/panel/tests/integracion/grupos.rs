@@ -1,13 +1,11 @@
 //! Pruebas del gestor de cambios por grupos de pasos contra `router-sim`,
 //! con tiempos de vigilancia cortos.
 
-mod comun;
-
-use catalogo::Riesgo;
-use comun::{
+use crate::comun::{
     Panel, Registro, esperar_estado, esperar_hasta, esperar_hasta_con, esperar_libre_gestor,
     gestor, get, panel_rapido, preparado, req, tiempos_rapidos,
 };
+use catalogo::Riesgo;
 use hgu::read;
 use panel::{
     changes::{
@@ -430,7 +428,7 @@ async fn sin_respuesta_con_otros_valores_se_revierte() {
     })
     .await;
     // Mientras el panel espera, otro cambia la reserva a un tercer valor.
-    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, comun::USER, comun::PASS);
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, crate::comun::USER, crate::comun::PASS);
     cfg.min_gap = Duration::from_millis(1);
     let otro = hgu::Client::new(cfg);
     otro.write(
@@ -494,7 +492,7 @@ async fn pausa_se_suelta_en_relectura() {
     // sondeo (cada uno agota su espera de 300 ms).
     let limite = Duration::from_millis(2500);
     esperar_hasta_con(limite, async || {
-        let body = comun::body_text(get(&p.app, "/salud").await).await;
+        let body = crate::comun::body_text(get(&p.app, "/salud").await).await;
         let v: serde_json::Value = serde_json::from_str(&body).unwrap();
         if v["router"] == "error" {
             return Ok(());

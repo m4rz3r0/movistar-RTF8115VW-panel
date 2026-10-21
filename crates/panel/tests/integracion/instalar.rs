@@ -2,13 +2,11 @@
 //! bloqueo de todo lo demás sin usuarios, foto de partida cifrada y modo solo
 //! lectura con un firmware no probado.
 
-mod comun;
-
-use axum::{body::Body, http::Request};
-use comun::{
+use crate::comun::{
     PANEL_PASS, PANEL_USER, PASS, Panel, PanelPrueba, USER, body_text, get, get_con_cookie,
     post_json, send, set_cookie,
 };
+use axum::{body::Body, http::Request};
 use panel::{
     changes::{CambioError, ChangeManager, ChangeRequest, Tiempos},
     fotos::{self, TipoFoto},
@@ -194,7 +192,7 @@ async fn con_usuarios_no_hay_asistente() {
     .await;
     assert_eq!(status, 404);
     // Con sesión tampoco: la instalación no está en curso.
-    let cookie = comun::sesion_de(&p).await;
+    let cookie = crate::comun::sesion_de(&p).await;
     assert_eq!(
         get_con_cookie(&p.app, "/instalar", &cookie).await.status(),
         404
@@ -493,7 +491,7 @@ async fn por_el_proxy(
     let mut req = if json {
         post_json(uri, cuerpo, "127.0.0.1")
     } else {
-        comun::post_form(uri, cuerpo, "127.0.0.1")
+        crate::comun::post_form(uri, cuerpo, "127.0.0.1")
     };
     req.headers_mut()
         .insert("x-forwarded-for", cliente.parse().unwrap());
@@ -525,12 +523,12 @@ async fn tras_el_proxy_cuenta_la_ip_del_cliente() {
     assert_eq!(status, 200, "{body}");
 
     // El login y su freno cuentan la IP del cliente, no la del proxy.
-    let malo = comun::login_body(PANEL_USER, "no es la buena");
+    let malo = crate::comun::login_body(PANEL_USER, "no es la buena");
     let (status, _) = por_el_proxy(&p, "/api/login", &malo, false, PUBLICA).await;
     assert_eq!(status, 401);
     assert_eq!(fallos_de_ip(&p, PUBLICA).await, Some(1));
     assert_eq!(fallos_de_ip(&p, "127.0.0.1").await, None);
-    let bueno = comun::login_body(PANEL_USER, PANEL_PASS);
+    let bueno = crate::comun::login_body(PANEL_USER, PANEL_PASS);
     let (status, body) = por_el_proxy(&p, "/api/login", &bueno, false, PUBLICA).await;
     assert_eq!(status, 429, "en espera: {body}");
 }

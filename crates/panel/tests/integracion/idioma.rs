@@ -1,15 +1,13 @@
 //! Idioma de la interfaz: cookie `rp_lang`, idioma por defecto de la
 //! instancia, `Accept-Language` y español.
 
-mod comun;
-
+use crate::comun::{PanelPrueba, body_text, ok, post_form, send, sesion};
 use axum::{body::Body, http::Request};
-use comun::{PanelPrueba, body_text, ok, post_form, send, sesion};
 use serde_json::json;
 
 /// HTML de `/login` con las cabeceras dadas.
-async fn login_con(p: &comun::Panel, cabeceras: &[(&str, &str)]) -> String {
-    comun::con_usuario(p).await;
+async fn login_con(p: &crate::comun::Panel, cabeceras: &[(&str, &str)]) -> String {
+    crate::comun::con_usuario(p).await;
     let mut req = Request::get("/login");
     for (k, v) in cabeceras {
         req = req.header(*k, *v);
@@ -71,7 +69,7 @@ async fn cambiar_idioma_fija_la_cookie() {
     )
     .await;
     assert_eq!(resp.status(), 200);
-    let cookie = comun::set_cookie(&resp);
+    let cookie = crate::comun::set_cookie(&resp);
     assert!(cookie.starts_with("rp_lang=en;"), "{cookie}");
     for parte in ["Path=/", "SameSite=Lax", "Secure", "Max-Age=31536000"] {
         assert!(cookie.contains(parte), "{cookie}");
@@ -99,7 +97,7 @@ async fn login_con_selector_de_idioma() {
 
 /// `<html lang>` de `/login` sin cookie ni cabeceras, más con
 /// `Accept-Language: es` y con la cookie `rp_lang=es`.
-async fn idiomas_de_login(p: &comun::Panel) -> [bool; 3] {
+async fn idiomas_de_login(p: &crate::comun::Panel) -> [bool; 3] {
     let en = |html: String| html.contains(r#"<html lang="en""#);
     [
         en(login_con(p, &[]).await),
@@ -127,7 +125,7 @@ async fn idioma_por_defecto_de_la_instancia() {
     // Tras reiniciar el panel (otro estado sobre la misma base de datos),
     // sigue igual.
     let dir = p.state.cfg.db_path.parent().unwrap().to_path_buf();
-    let state = comun::estado(comun::config_en(&dir), &dir).await;
+    let state = crate::comun::estado(crate::comun::config_en(&dir), &dir).await;
     p.app = panel::build_router(state.clone());
     p.state = state;
     assert_eq!(idiomas_de_login(&p).await, [true, true, false]);

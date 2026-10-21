@@ -2,9 +2,7 @@
 //! orden y mezcla de cambios y reveladores, paginación, enlaces de deshacer y
 //! que no sale ningún secreto.
 
-mod comun;
-
-use comun::{
+use crate::comun::{
     Panel, PanelPrueba, aplicar, body_text, esperar_final, esperar_hasta, fijar, get_con_cookie,
     llamar, ok, valores_de,
 };
@@ -91,7 +89,7 @@ async fn historial_lista_cambios_en_orden() {
 
     let c = &e[0]["Cambio"];
     assert_eq!(c["funcion"], LEASES);
-    assert_eq!(c["usuario"], comun::PANEL_USER);
+    assert_eq!(c["usuario"], crate::comun::PANEL_USER);
     assert_eq!(c["estado"], "Aplicado");
     assert_eq!(c["puede_deshacer"], true);
     assert_eq!(c["ruta"], "/explorador/lan_dhcp/cbDhcpV4SvrPoolSetStatic");
@@ -116,7 +114,7 @@ async fn deshacer_desde_historial() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let id = alta_reserva(&p, &cookie, "192.168.1.93", "02:00:00:00:00:93").await;
     assert_eq!(
-        comun::ok(
+        crate::comun::ok(
             &p,
             "instancias",
             json!({ "funcion": LEASES, "claves": [[POOL, "0"]] }),
@@ -256,7 +254,7 @@ async fn revelados_listados_sin_valor() {
     let r = &e[0]["Revelado"];
     assert_eq!(r["funcion"], "te_wifi.asp");
     assert_eq!(r["campo"], "wlWpaPsk");
-    assert_eq!(r["usuario"], comun::PANEL_USER);
+    assert_eq!(r["usuario"], crate::comun::PANEL_USER);
     assert!(r["ts"].as_i64().unwrap() > 0);
     assert!(r["ruta"].is_string());
     assert!(!pag.to_string().contains("psk-sim"), "{pag}");
@@ -313,7 +311,7 @@ async fn exige_sesion_y_sirve_la_pagina() {
     assert_eq!(resp.status(), 200);
     let html = body_text(resp).await;
     assert!(html.contains("Historial"), "{html}");
-    assert_eq!(comun::get(&p.app, "/historial").await.status(), 303);
+    assert_eq!(crate::comun::get(&p.app, "/historial").await.status(), 303);
 }
 
 /// Un grupo es una sola fila con la lista de sus pasos: resumen humano

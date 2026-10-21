@@ -1,13 +1,11 @@
 //! Ficheros de la web: comprimidos si el navegador los acepta, con caché
 //! para siempre si llevan hash en el nombre; las páginas, sin caché.
 
-mod comun;
-
+use crate::comun::{Panel, PanelPrueba, body_text, get, send, sesion};
 use axum::{
     body::Body,
     http::{Request, Response, header},
 };
-use comun::{Panel, PanelPrueba, body_text, get, send, sesion};
 use std::path::PathBuf;
 
 const HASH: &str = "Q1w2E3r4T5y6U7i8O9p0Aa";
@@ -103,7 +101,7 @@ async fn paginas_sin_cache() {
     let resp = get(&p.app, "/login").await;
     assert_eq!(resp.status(), 200);
     assert_eq!(cabecera(&resp, header::CACHE_CONTROL), "no-store");
-    let resp = comun::get_con_cookie(&p.app, "/ajustes/internet", &cookie).await;
+    let resp = crate::comun::get_con_cookie(&p.app, "/ajustes/internet", &cookie).await;
     assert_eq!(resp.status(), 200);
     assert_eq!(cabecera(&resp, header::CACHE_CONTROL), "no-store");
 }

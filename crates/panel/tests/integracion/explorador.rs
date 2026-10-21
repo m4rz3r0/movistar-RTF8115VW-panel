@@ -1,9 +1,7 @@
 //! Pruebas del explorador (server functions y páginas) contra `router-sim`,
 //! con el gestor de cambios del servidor y tiempos de vigilancia cortos.
 
-mod comun;
-
-use comun::{
+use crate::comun::{
     Panel, PanelPrueba, aplicar, body_text, campo, esperar_final, fijar, get_con_cookie, llamar,
     ok, valores_de,
 };
@@ -477,7 +475,7 @@ async fn paginas_del_explorador_con_nombres_codificados() {
     assert!(h.contains("<h1>upload/cfgupload.asp</h1>"), "{h}");
     assert!(h.contains("Bloqueada"), "{h}");
     // Sin sesión, al login.
-    let resp = comun::get(&p.app, "/explorador/wan").await;
+    let resp = crate::comun::get(&p.app, "/explorador/wan").await;
     assert_eq!(resp.status(), 303);
 }
 
@@ -501,9 +499,10 @@ async fn respuestas_con_secretos_no_store() {
                     "claves": [["dpm_cfg_wifi_acc_pt_id", "1"]] }),
         ),
     ] {
-        let mut req = comun::post_json(&format!("/api/{nombre}"), &cuerpo.to_string(), "127.0.0.1");
+        let mut req =
+            crate::comun::post_json(&format!("/api/{nombre}"), &cuerpo.to_string(), "127.0.0.1");
         req.headers_mut().insert("cookie", cookie.parse().unwrap());
-        let resp = comun::send(&p.app, req).await;
+        let resp = crate::comun::send(&p.app, req).await;
         assert_eq!(resp.status(), 200, "{nombre}");
         let cache = resp
             .headers()

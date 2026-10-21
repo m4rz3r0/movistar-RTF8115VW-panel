@@ -2,9 +2,7 @@
 //! usuario como enlace a «Ajustes del panel» y la sección marcada en sus
 //! subrutas.
 
-mod comun;
-
-use comun::{PANEL_USER, PanelPrueba, send, sesion};
+use crate::comun::{PANEL_USER, PanelPrueba, send, sesion};
 
 /// El elemento `<etiqueta …>` que contiene `marca` en su apertura, hasta su
 /// cierre (sin anidar la misma etiqueta).
@@ -43,7 +41,7 @@ fn atributo<'a>(apertura: &'a str, nombre: &str) -> Option<&'a str> {
 /// necesita.
 async fn pagina(ruta: &str) -> String {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
-    comun::pagina(&p, &cookie, ruta).await
+    crate::comun::pagina(&p, &cookie, ruta).await
 }
 
 fn nav_principal(html: &str) -> &str {
