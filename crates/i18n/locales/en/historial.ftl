@@ -52,12 +52,13 @@ historial-paso-revertido = reverted
 # History. Never rename or delete them (only change their text).
 nota-paso = step { $n }: { $nota }
 nota-paso-nombre = step { $n } ({ $nombre }): { $nota }
+nota-desconocida = something did not go as expected (more under “Technical details”)
 nota-verificacion-limitada = limited check: the router doesn't show the fields written
-nota-reinicio-sin-respuesta = the router didn't answer the restart command ({ $error })
-nota-sin-confirmar = the router didn't confirm the write ({ $error })
+nota-reinicio-sin-respuesta = the router didn't answer the restart command
+nota-sin-confirmar = the router didn't confirm the write
 nota-releido-aplicada = read again: applied
 nota-sin-campos-escritos = the router doesn't show the fields written
-nota-sin-releer = it couldn't be read again either ({ $error })
+nota-sin-releer = it couldn't be read again either
 nota-wan-caida = the internet connection was already down before the change: only whether the router answers is watched
 nota-retomada = watching resumed after the panel restarted
 cambio-error-router = the router didn't make the change

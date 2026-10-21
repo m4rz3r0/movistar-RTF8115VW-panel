@@ -78,10 +78,11 @@ async fn tomar_foto(state: &AppState) -> Result<i64, String> {
 
 async fn estado() -> Result<AppState, String> {
     let mut cfg = Config::from_env()?;
-    // Contra el simulador no hace falta la pausa entre peticiones que se
-    // guarda con el router (150 ms): la foto de partida son unas 60
-    // lecturas, y cada panel instalado del e2e la toma al arrancar (en
-    // serie: Playwright levanta los servidores uno tras otro).
+    // Contra el simulador no hace falta la pausa entre peticiones que el
+    // panel respeta con el router real (150 ms, para no saturarlo): la foto
+    // de partida son unas 60 lecturas, y cada panel instalado del e2e la
+    // toma al arrancar (en serie: Playwright levanta los servidores uno tras
+    // otro).
     cfg.router_min_gap = Duration::ZERO;
     let leptos = LeptosOptions::builder().output_name("panel").build();
     let state = AppState::new(cfg, leptos).await?;

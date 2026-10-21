@@ -66,6 +66,10 @@ contrasena-router-confirmar-titulo = Change the router password?
 contrasena-router-confirmar-texto = The router will have the new password. From then on, the new one is used to log in to the router (also from its own web interface); the panel does so by itself.
 contrasena-router-confirmar-nota = If the panel cannot log in with the new one, it puts the previous one back. It takes a few seconds: do not close the page.
 contrasena-router-confirmar-boton = Change the password
+# The keys contrasena-router-error-* and contrasena-router-historial-nota
+# (and panel-solo-lectura and comun-error-interno, in their files) are
+# stored in each installation's database, in the History: never rename or
+# delete them (only change their text).
 contrasena-router-error-corta = The new password is too short: it needs at least { $n } characters. Accented letters and some symbols take up more than one.
 contrasena-router-error-larga = The new password is too long: { $n } characters at most. Accented letters and some symbols take up more than one.
 contrasena-router-error-control = The new password cannot contain line breaks, tabs or other invisible characters.

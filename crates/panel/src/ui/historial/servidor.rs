@@ -151,7 +151,13 @@ async fn fila_cambio(
         resumen: resumen(&campos),
         campos,
         nota: c.nota.as_deref().map(nota_legible),
-        error_tecnico: c.error.as_deref().and_then(error_tecnico),
+        // Lo técnico del error o, sin él, de la nota (la de una escritura
+        // sin respuesta, o una clave que este panel no conoce).
+        error_tecnico: c
+            .error
+            .as_deref()
+            .and_then(error_tecnico)
+            .or_else(|| c.nota.as_deref().and_then(error_tecnico)),
         error: c.error.as_deref().map(nota_legible),
         deshecho_por: enlace(por).await?,
         deshace: enlace(deshace).await?,

@@ -1,4 +1,5 @@
 # Ajustes del panel.
+# Guardada en el Historial (router.ftl): no se renombra ni se borra.
 panel-solo-lectura = El panel está en solo lectura: el firmware del router no se ha probado con el panel. Confírmalo en Configuración del router → Conexión con el router para poder hacer cambios.
 
 ## Página

@@ -393,10 +393,7 @@ impl ChangeManager {
                 return Err(FalloPaso::no_aplicado(CambioError::Router(e.to_string())));
             }
             Err(e) if plan.funcion.name == REBOOT => {
-                nota = Some(Nota::con(
-                    nota::REINICIO_SIN_RESPUESTA,
-                    &[("error", e.to_string())],
-                ));
+                nota = Some(Nota::clave(nota::REINICIO_SIN_RESPUESTA).tecnico(e.to_string()));
                 self.comprobar(plan, Lado::Nuevo).await
             }
             // Sin respuesta (tiempo agotado, conexión cortada, respuesta

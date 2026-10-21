@@ -226,3 +226,46 @@ async fn revelados_antiguos_sin_nombres_de_la_api() {
         );
     }
 }
+
+/// Una clave guardada que este panel no conoce (p. ej. tras volver a una
+/// versión anterior) y una nota ilegible: el Historial dice algo genérico y
+/// traducido, nunca la clave ni el JSON, que van en los detalles técnicos.
+#[tokio::test]
+async fn clave_desconocida_texto_generico() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    let g = p.state.cambios().unwrap();
+    let prep = g.preparar_grupo(grupo_de_la_biblioteca()).await.unwrap();
+    let id = g.confirmar_grupo(&prep.token, &[], "admin").await.unwrap();
+    esperar_estado(&g, id, Estado::Aplicado).await;
+    esperar_libre_gestor(&g).await;
+    for (guardado, en_lo_tecnico) in [
+        (
+            r#"i18n:[{"clave":"cambio-error-de-una-version-futura","tecnico":"cbSetX: Result=1"}]"#,
+            "cambio-error-de-una-version-futura",
+        ),
+        ("i18n:{roto", "i18n:{roto"),
+    ] {
+        sqlx::query("UPDATE changes SET nota = ? WHERE id = ?")
+            .bind(guardado)
+            .bind(id)
+            .execute(&p.state.db)
+            .await
+            .unwrap();
+        for (idioma, generico) in [
+            ("es", "algo no salió como se esperaba"),
+            ("en", "something did not go as expected"),
+        ] {
+            let con_idioma = format!("{cookie}; rp_lang={idioma}");
+            let pagina = crate::ajustes_secretos::html(&p, &con_idioma, "/historial").await;
+            let (visible, tecnicos) = fila_a_la_vista(&pagina, id);
+            assert!(visible.contains(generico), "{idioma}: {visible}");
+            assert!(
+                !visible.contains("version-futura")
+                    && !visible.contains("i18n:")
+                    && !visible.contains("cbSetX"),
+                "{idioma}: {visible}"
+            );
+            assert!(tecnicos.contains(en_lo_tecnico), "{idioma}: {tecnicos}");
+        }
+    }
+}

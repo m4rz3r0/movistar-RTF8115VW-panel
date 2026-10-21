@@ -24,6 +24,15 @@ async fn escritura_sin_respuesta_aplicada_se_vigila() {
         en.contains("didn't confirm") && en.contains("read again: applied"),
         "{en}"
     );
+    // El texto del cliente del router (con la función) no va en la nota a la
+    // vista: va en lo técnico.
+    for texto in [&es, &en] {
+        assert!(!texto.contains("cb"), "{texto}");
+    }
+    let detalle = Nota::detalle(&nota, Idioma::En).expect("lo técnico");
+    for texto in [&es, &en] {
+        assert!(!texto.contains(&detalle), "{texto}");
+    }
     assert_eq!(ip_de_lease(&p, "0").await.as_deref(), Some("192.168.1.80"));
     esperar_libre_gestor(&m).await;
     assert!(m.se_puede_deshacer(id).await);

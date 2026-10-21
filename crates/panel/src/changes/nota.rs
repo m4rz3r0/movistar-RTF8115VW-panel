@@ -28,6 +28,9 @@ pub(crate) const RETOMADA: &str = "nota-retomada";
 const PASO: &str = "nota-paso";
 /// «paso 2 (UDP): …», con el nombre del paso.
 const PASO_NOMBRE: &str = "nota-paso-nombre";
+/// Una clave guardada que este panel no conoce (p. ej. tras volver a una
+/// versión anterior) o una nota que no se puede leer.
+const DESCONOCIDA: &str = "nota-desconocida";
 
 // Errores (columna `error`). Lo técnico, con [`Nota::tecnico`].
 pub(crate) const ERROR_ROUTER: &str = "cambio-error-router";
@@ -146,14 +149,19 @@ impl Nota {
         format!("{PREFIJO}{json}")
     }
 
+    /// Una nota guardada: `None` si es una fila antigua (texto, sin la
+    /// marca); con la marca pero sin poder leerse, un trozo genérico con el
+    /// texto guardado en lo técnico.
     fn leer(guardada: &str) -> Option<Nota> {
-        guardada
-            .strip_prefix(PREFIJO)
-            .and_then(|j| serde_json::from_str::<Nota>(j).ok())
+        let json = guardada.strip_prefix(PREFIJO)?;
+        Some(
+            serde_json::from_str::<Nota>(json)
+                .unwrap_or_else(|_| Nota::clave(DESCONOCIDA).tecnico(guardada)),
+        )
     }
 
     /// El texto de una nota guardada, en `idioma`, sin lo técnico. Una fila
-    /// antigua (o lo que no se pueda leer como claves) se muestra tal cual.
+    /// antigua se muestra tal cual.
     pub fn texto(guardada: &str, idioma: Idioma) -> String {
         match Nota::leer(guardada) {
             Some(n) => n.en(idioma),
@@ -167,6 +175,11 @@ impl Nota {
         Nota::leer(guardada)?.tecnicos(idioma)
     }
 
+    /// ¿Conoce este panel la clave (en `idioma` o, si no, en castellano)?
+    fn conocida(clave: &str, idioma: Idioma) -> bool {
+        i18n::existe(idioma, clave) || i18n::existe(Idioma::Es, clave)
+    }
+
     /// El texto en `idioma`, sin lo técnico.
     pub fn en(&self, idioma: Idioma) -> String {
         self.0
@@ -176,7 +189,14 @@ impl Nota {
                 for (k, v) in &t.args {
                     args.set(k.clone(), v.clone());
                 }
-                Nota::con_paso(t, tr(idioma, &t.clave, Some(&args)), idioma)
+                // Una clave que este panel no conoce: un texto genérico,
+                // nunca la clave (va en lo técnico).
+                let texto = if Nota::conocida(&t.clave, idioma) {
+                    tr(idioma, &t.clave, Some(&args))
+                } else {
+                    tr(idioma, DESCONOCIDA, None)
+                };
+                Nota::con_paso(t, texto, idioma)
             })
             .collect::<Vec<_>>()
             .join("; ")
@@ -187,7 +207,12 @@ impl Nota {
             .0
             .iter()
             .filter_map(|t| {
-                let d = t.tecnico.clone()?;
+                let d = match (&t.tecnico, Nota::conocida(&t.clave, idioma)) {
+                    (Some(d), true) => d.clone(),
+                    (None, true) => return None,
+                    (Some(d), false) => format!("{}: {d}", t.clave),
+                    (None, false) => t.clave.clone(),
+                };
                 Some(match t.paso {
                     Some(n) => {
                         let mut a = FluentArgs::new();
@@ -210,11 +235,11 @@ impl Nota {
         a.set("n", n);
         a.set("nota", texto);
         match &t.nombre_paso {
-            Some(k) => {
+            Some(k) if Nota::conocida(k, idioma) => {
                 a.set("nombre", tr(idioma, k, None));
                 tr(idioma, PASO_NOMBRE, Some(&a))
             }
-            None => tr(idioma, PASO, Some(&a)),
+            _ => tr(idioma, PASO, Some(&a)),
         }
     }
 
@@ -246,6 +271,7 @@ mod tests {
             RETOMADA,
             PASO,
             PASO_NOMBRE,
+            DESCONOCIDA,
             ERROR_ROUTER,
             ERROR_VERIFICACION,
             ERROR_PREPARAR,
@@ -275,16 +301,21 @@ mod tests {
 
     #[test]
     fn se_pinta_en_el_idioma_de_quien_mira() {
-        let nota = Nota::con(SIN_CONFIRMAR, &[("error", "sin respuesta".into())])
+        let nota = Nota::clave(SIN_CONFIRMAR)
+            .tecnico("cbSetUpnpCfg: sin respuesta")
             .y(Nota::clave(RELEIDO_APLICADA));
         let guardada = nota.guardar();
         assert_eq!(
             Nota::texto(&guardada, Idioma::Es),
-            "el router no confirmó la escritura (sin respuesta); releído: aplicada"
+            "el router no confirmó la escritura; releído: aplicada"
         );
         assert_eq!(
             Nota::texto(&guardada, Idioma::En),
-            "the router didn't confirm the write (sin respuesta); read again: applied"
+            "the router didn't confirm the write; read again: applied"
+        );
+        assert_eq!(
+            Nota::detalle(&guardada, Idioma::En).as_deref(),
+            Some("cbSetUpnpCfg: sin respuesta")
         );
     }
 
@@ -342,12 +373,40 @@ mod tests {
         );
     }
 
+    /// Una clave que este panel no conoce (guardada por otra versión) o una
+    /// nota ilegible: un texto genérico traducido, nunca la clave ni el
+    /// JSON; lo guardado, en lo técnico.
+    #[test]
+    fn clave_desconocida_o_nota_ilegible() {
+        let g = Nota::clave("cambio-error-de-una-version-futura")
+            .tecnico("cbSetX: Result=1")
+            .del_paso_nombrado(0, Some("clave-de-paso-futura"))
+            .y(Nota::clave(ERROR_REVERTIDO))
+            .guardar();
+        assert_eq!(
+            Nota::texto(&g, Idioma::Es),
+            "paso 1: algo no salió como se esperaba (más en «Detalles técnicos»); se volvió a los \
+             valores anteriores"
+        );
+        let en = Nota::texto(&g, Idioma::En);
+        assert!(!en.contains("version-futura") && !en.contains("cb"), "{en}");
+        let d = Nota::detalle(&g, Idioma::En).unwrap();
+        assert!(
+            d.contains("cambio-error-de-una-version-futura") && d.contains("cbSetX"),
+            "{d}"
+        );
+        let rota = "i18n:{roto";
+        for idioma in Idioma::TODOS {
+            let t = Nota::texto(rota, idioma);
+            assert!(!t.contains("roto") && !t.contains("i18n:"), "{t}");
+            assert_eq!(Nota::detalle(rota, idioma).as_deref(), Some(rota));
+        }
+    }
+
     #[test]
     fn una_fila_antigua_se_muestra_tal_cual() {
         let antigua = "vigilancia retomada tras un reinicio del panel; verificación limitada";
         assert_eq!(Nota::texto(antigua, Idioma::En), antigua);
-        // Con la marca pero sin claves que leer, también tal cual.
-        assert_eq!(Nota::texto("i18n:{roto", Idioma::En), "i18n:{roto");
         assert_eq!(Nota::juntar([]), None);
     }
 }

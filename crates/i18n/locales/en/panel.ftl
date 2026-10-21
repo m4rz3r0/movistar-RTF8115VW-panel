@@ -1,4 +1,5 @@
 # Panel settings.
+# Stored in the History (router.ftl): never rename or delete it.
 panel-solo-lectura = The panel is read-only: the router's firmware has not been tested with the panel. Confirm it in Router settings → Router connection to make changes.
 
 ## Page

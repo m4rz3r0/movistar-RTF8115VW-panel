@@ -66,6 +66,10 @@ contrasena-router-confirmar-titulo = ¿Cambiar la contraseña del router?
 contrasena-router-confirmar-texto = El router pasará a tener la contraseña nueva. A partir de ese momento, para entrar en el router (también desde su propia web) se usa la nueva; el panel lo hará solo.
 contrasena-router-confirmar-nota = Si el panel no consigue entrar con la nueva, vuelve a poner la anterior. Tarda unos segundos: no cierres la página.
 contrasena-router-confirmar-boton = Cambiar la contraseña
+# Las claves contrasena-router-error-* y contrasena-router-historial-nota
+# (y panel-solo-lectura y comun-error-interno, en sus ficheros) se guardan
+# en la base de datos de cada instalación, en el Historial: no se renombran
+# ni se borran (solo se cambia su texto).
 contrasena-router-error-corta = La contraseña nueva es demasiado corta: tiene que tener al menos { $n } caracteres. Las letras con tilde, la ñ y algunos símbolos ocupan más de uno.
 contrasena-router-error-larga = La contraseña nueva es demasiado larga: como mucho { $n } caracteres. Las letras con tilde, la ñ y algunos símbolos ocupan más de uno.
 contrasena-router-error-control = La contraseña nueva no puede llevar saltos de línea, tabuladores ni otros caracteres invisibles.

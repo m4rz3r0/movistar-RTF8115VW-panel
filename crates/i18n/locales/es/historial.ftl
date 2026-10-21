@@ -52,12 +52,13 @@ historial-paso-revertido = revertido
 # Historial. No se renombran ni se borran (solo se cambia su texto).
 nota-paso = paso { $n }: { $nota }
 nota-paso-nombre = paso { $n } ({ $nombre }): { $nota }
+nota-desconocida = algo no salió como se esperaba (más en «Detalles técnicos»)
 nota-verificacion-limitada = verificación limitada: el router no muestra los campos escritos
-nota-reinicio-sin-respuesta = el router no respondió a la orden de reinicio ({ $error })
-nota-sin-confirmar = el router no confirmó la escritura ({ $error })
+nota-reinicio-sin-respuesta = el router no respondió a la orden de reinicio
+nota-sin-confirmar = el router no confirmó la escritura
 nota-releido-aplicada = releído: aplicada
 nota-sin-campos-escritos = el router no muestra los campos escritos
-nota-sin-releer = tampoco se pudo releer ({ $error })
+nota-sin-releer = tampoco se pudo releer
 nota-wan-caida = la conexión a internet ya estaba caída antes del cambio: solo se vigila que el router responda
 nota-retomada = vigilancia retomada tras un reinicio del panel
 cambio-error-router = el router no hizo el cambio

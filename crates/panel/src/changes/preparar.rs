@@ -92,7 +92,12 @@ impl ChangeManager {
         pausa: &mut Option<crate::poller::PauseGuard>,
     ) -> SinRespuesta {
         let sin_confirmar = format!("el router no confirmó la escritura ({e})");
-        let nota = |otra: Nota| Nota::con(nota::SIN_CONFIRMAR, &[("error", e.to_string())]).y(otra);
+        // El texto del cliente del router (con la función) va a lo técnico.
+        let nota = |otra: Nota| {
+            Nota::clave(nota::SIN_CONFIRMAR)
+                .tecnico(e.to_string())
+                .y(otra)
+        };
         let fin = Instant::now() + self.tiempos.vigilancia(plan.funcion.riesgo);
         loop {
             match self.comprobar(plan, Lado::Nuevo).await {
@@ -125,7 +130,7 @@ impl ChangeManager {
                     if Instant::now() >= fin {
                         return SinRespuesta::Aplicada(
                             Comprobacion::Limitada,
-                            nota(Nota::con(nota::SIN_RELEER, &[("error", l.to_string())])),
+                            nota(Nota::clave(nota::SIN_RELEER).tecnico(l.to_string())),
                         );
                     }
                     // No congelar el sondeo durante los reintentos.

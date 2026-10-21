@@ -66,8 +66,8 @@ pub struct CambioFila {
     pub nota: Option<String>,
     /// Por qué falló, en lenguaje claro y ya traducido.
     pub error: Option<String>,
-    /// Lo técnico del fallo (el texto del router), para los detalles
-    /// técnicos.
+    /// Lo técnico del fallo o, sin él, de la nota (el texto del router),
+    /// para los detalles técnicos.
     #[serde(default)]
     pub error_tecnico: Option<String>,
     /// Cambio que lo deshizo.
@@ -575,7 +575,21 @@ fn FilaCambio(
     });
     let secretos = Signal::from(secretos);
     let detalle = if n_pasos > 0 {
-        lista_pasos(c.pasos, secretos).into_any()
+        // Lo técnico del grupo entero (p. ej. lo que dijo el router en una
+        // escritura sin respuesta); el de cada paso va en el suyo.
+        let tecnico = c.error_tecnico.clone().map(|e| {
+            view! {
+                <details class="detalles-tecnicos">
+                    <summary>{t!("historial-tecnico")}</summary>
+                    <p class="mono hist-error-tecnico">{e}</p>
+                </details>
+            }
+        });
+        view! {
+            {lista_pasos(c.pasos, secretos)}
+            {tecnico}
+        }
+        .into_any()
     } else {
         let campos = c.campos.clone();
         let tabla = move || {

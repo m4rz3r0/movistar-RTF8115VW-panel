@@ -25,6 +25,7 @@ comun-cargando = Loading…
 
 ## Errors
 comun-error-conexion = Cannot reach the panel
+# Stored in the History (router.ftl): never rename or delete it.
 comun-error-interno = Internal panel error
 comun-error-interno-id = Internal panel error (id { $id })
 comun-error-sesion = Not signed in or session expired

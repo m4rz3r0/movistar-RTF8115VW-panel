@@ -25,6 +25,7 @@ comun-cargando = Cargando…
 
 ## Errores
 comun-error-conexion = No se puede contactar con el panel
+# Guardada en el Historial (router.ftl): no se renombra ni se borra.
 comun-error-interno = Error interno del panel
 comun-error-interno-id = Error interno del panel (id { $id })
 comun-error-sesion = Sesión no iniciada o caducada
