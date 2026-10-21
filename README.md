@@ -177,16 +177,15 @@ cd e2e && npm ci && npx playwright test
 npx playwright test capturas-readme   # solo si cambian las capturas del README
 ```
 
-El e2e reparte los ficheros entre `E2E_WORKERS` workers (por defecto, uno
-por cada 3 hilos de la CPU, entre 1 y 2; en una máquina dedicada, 4; como
-mucho, 16; `E2E_WORKERS=1`, en serie). Arranca
-un panel instalado por worker y cuatro recién instalados para el asistente,
-cada uno con su simulador (`e2e/instancias.ts`), en puertos consecutivos a
-partir de `E2E_PORT` y `E2E_SIM_PORT` (3195 y 8195; con 4 workers,
-3195–3202 y 8195–8202). Cada cambio se vigila 10 s en vez de 30 s o 2 min
-(`RP_E2E_VIGILANCIA_S`, que solo atiende el binario de depuración). Usa el
-Chromium de Playwright (`npx playwright install chromium` si no está; o
-`E2E_CHROMIUM=<ruta>`).
+El e2e reparte los ficheros entre `E2E_WORKERS` workers (por defecto, uno por
+cada 3 hilos de la CPU, entre 1 y 2; en una máquina dedicada, 4; como mucho,
+16; `E2E_WORKERS=1`, en serie). Arranca un panel instalado por worker y cuatro
+recién instalados para el asistente, cada uno con su simulador
+(`e2e/instancias.ts`), en puertos consecutivos a partir de `E2E_PORT` y
+`E2E_SIM_PORT` (3195 y 8195; con 4 workers, 3195–3202 y 8195–8202). Cada
+cambio se vigila 10 s en vez de 30 s o 2 min (`RP_E2E_VIGILANCIA_S`, que solo
+atiende el binario de depuración). Usa el Chromium de Playwright
+(`npx playwright install chromium` si no está; o `E2E_CHROMIUM=<ruta>`).
 
 Las capturas del README se guardan en `docs/capturas/` sin metadatos. Tras
 regenerarlas, revísalas a mano (que no salga nada real) y pon su nuevo sha256

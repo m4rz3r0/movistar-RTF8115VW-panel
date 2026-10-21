@@ -725,6 +725,28 @@ button {
   color: var(--texto-2);
 }
 
+/* Biblioteca sin JavaScript o con el wasm caído: el catálogo, la ficha, la
+   lectura, la lista y el formulario llegan o se hacen en el navegador. El aviso aparece a los 3 s (sin
+   destellos mientras hidrata) y nunca tras hidratar (data-hidratado lo pone
+   el wasm en <body>). */
+.aviso-sin-hidratar {
+  animation: aparece-tarde 0s 3s both;
+}
+
+body[data-hidratado] .aviso-sin-hidratar {
+  display: none;
+}
+
+@keyframes aparece-tarde {
+  from {
+    visibility: hidden;
+  }
+
+  to {
+    visibility: visible;
+  }
+}
+
 .tarjeta.estado-espera {
   color: var(--texto-1);
   gap: var(--esp-2);
