@@ -39,6 +39,8 @@ const textos = {
     perdido: "El dispositivo de destino ya no está en la red",
     solapa: "Ese puerto ya está abierto en otra regla con el mismo protocolo",
     pasoIgual: "Igual que la regla TCP, pero con el protocolo UDP.",
+    pasoIgualSinTcp:
+      "Con los mismos datos que la regla TCP de arriba, que no se aplicará, pero con el protocolo UDP.",
     nombreNuevo: "Servidor web",
     editarDesc1: "Editar la regla desc-1",
     activaDesc1: "Regla desc-1 activa",
@@ -63,6 +65,8 @@ const textos = {
     perdido: "The destination device is no longer on the network",
     solapa: "That port is already open in another rule with the same protocol",
     pasoIgual: "Same as the TCP rule, but with the UDP protocol.",
+    pasoIgualSinTcp:
+      "With the same details as the TCP rule above, which will not be applied, but with the UDP protocol.",
     nombreNuevo: "Web server",
     editarDesc1: "Edit the rule desc-1",
     activaDesc1: "Rule desc-1 active",
@@ -247,6 +251,13 @@ for (const idioma of ["es", "en"] as const) {
           await expect(pasos.nth(0).locator("legend label")).toHaveText("TCP");
           await expect(pasos.nth(1).locator("legend label")).toHaveText("UDP");
           await expect(pasos.nth(1)).toContainText(t.pasoIgual);
+          // Sin el paso TCP, la nota del UDP lo dice; al volver a marcarlo,
+          // como antes.
+          const tcp = pasos.nth(0).locator("legend input[type=checkbox]");
+          await tcp.uncheck();
+          await expect(pasos.nth(1).locator(".grupo-paso-nota")).toHaveText(t.pasoIgualSinTcp);
+          await tcp.check();
+          await expect(pasos.nth(1).locator(".grupo-paso-nota")).toHaveText(t.pasoIgual);
           await expect(pasos.nth(1).locator("tbody tr")).toHaveCount(1);
           await expect(pasos.nth(0).getByText("192.168.1.62")).toBeVisible();
           sinApi(await dialogo.innerText());

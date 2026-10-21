@@ -28,6 +28,7 @@ ajuste-puertos-reglas-activa-recomendado = Recomendado si quieres que el puerto 
 ajuste-puertos-reglas-protocolo-ambos = TCP y UDP
 ajuste-puertos-reglas-protocolo-ambos-desc = Para lo que pide los dos, como muchas consolas. Se guardan dos reglas, una con cada protocolo, en un solo cambio.
 ajuste-puertos-reglas-paso-igual = Igual que la regla TCP, pero con el protocolo UDP.
+ajuste-puertos-reglas-paso-igual-sin-el-primero = Con los mismos datos que la regla TCP de arriba, que no se aplicará, pero con el protocolo UDP.
 ajuste-puertos-reglas-abrir = Abrir un puerto
 ajuste-puertos-reglas-nueva = Abrir un puerto
 ajuste-puertos-reglas-cambiar = Cambiar la regla

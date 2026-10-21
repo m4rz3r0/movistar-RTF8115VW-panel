@@ -252,6 +252,7 @@ mod catalogo_toml {
                     "protocolo-ambos",
                     "protocolo-ambos-desc",
                     "paso-igual",
+                    "paso-igual-sin-el-primero",
                     "abrir",
                     "nueva",
                     "cambiar",

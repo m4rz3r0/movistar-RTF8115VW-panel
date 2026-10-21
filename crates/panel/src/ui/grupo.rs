@@ -344,10 +344,22 @@ pub fn DialogoGrupo(
                     .titulo
                     .as_ref()
                     .map_or_else(|| t!("ajustes-grupo-paso", n = i + 1), |c| traducir(c, None));
-                let nota_paso = p
-                    .nota
-                    .as_ref()
-                    .map(|c| view! { <p class="pagina-sub">{traducir(c, None)}</p> });
+                // La nota de un paso que solo enseña lo que cambia respecto
+                // al primero («Igual que la regla TCP…»): si el primero se
+                // desmarca, su variante `-sin-el-primero` lo dice.
+                let nota_paso = p.nota.clone().map(|c| {
+                    let sin_el_primero = format!("{c}-sin-el-primero");
+                    let texto = move || {
+                        let desmarcado =
+                            i > 0 && !marcados.with(|m| m.first().copied().unwrap_or(true));
+                        if desmarcado && i18n::existe(idioma_actual(), &sin_el_primero) {
+                            traducir(&sin_el_primero, None)
+                        } else {
+                            traducir(&c, None)
+                        }
+                    };
+                    view! { <p class="pagina-sub grupo-paso-nota">{texto}</p> }
+                });
                 let cabeza = varios.then(|| {
                     view! {
                         <legend class="grupo-paso-titulo">

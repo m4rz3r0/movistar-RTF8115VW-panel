@@ -28,6 +28,7 @@ ajuste-puertos-reglas-activa-recomendado = Recommended if you want the port to o
 ajuste-puertos-reglas-protocolo-ambos = TCP and UDP
 ajuste-puertos-reglas-protocolo-ambos-desc = For things that need both, like many consoles. Two rules are saved, one with each protocol, in a single change.
 ajuste-puertos-reglas-paso-igual = Same as the TCP rule, but with the UDP protocol.
+ajuste-puertos-reglas-paso-igual-sin-el-primero = With the same details as the TCP rule above, which will not be applied, but with the UDP protocol.
 ajuste-puertos-reglas-abrir = Open a port
 ajuste-puertos-reglas-nueva = Open a port
 ajuste-puertos-reglas-cambiar = Change the rule
