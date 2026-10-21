@@ -132,11 +132,14 @@ pub(super) fn fail<T>(status: StatusCode, msg: &str) -> Result<T, ServerFnError>
 }
 
 pub(super) fn internal<T>(e: impl fmt::Display) -> Result<T, ServerFnError> {
+    internal_con(StatusCode::INTERNAL_SERVER_ERROR, e)
+}
+
+/// Como [`internal`], con otro estado (el login sin JavaScript redirige
+/// también sus errores).
+fn internal_con<T>(status: StatusCode, e: impl fmt::Display) -> Result<T, ServerFnError> {
     eprintln!("panel: error interno en la autenticación: {e}");
-    fail(
-        StatusCode::INTERNAL_SERVER_ERROR,
-        &crate::t!("comun-error-interno"),
-    )
+    fail(status, &crate::t!("comun-error-interno"))
 }
 
 /// Pone en la respuesta la cookie de la sesión `id` (de
@@ -181,7 +184,7 @@ pub(in crate::auth) async fn login_endpoint(
     match attempt_login(&state, ip, &usuario, &contrasena).await {
         Ok(id) => {
             if let Err(e) = delete_cookie_session(&state.db, &headers).await {
-                return internal(e);
+                return internal_con(estado(StatusCode::INTERNAL_SERVER_ERROR), e);
             }
             set_cookie(&session_cookie(&id));
             if sin_js {
@@ -197,13 +200,7 @@ pub(in crate::auth) async fn login_endpoint(
             estado(StatusCode::UNAUTHORIZED),
             &crate::t!("login-error-credenciales"),
         ),
-        Err(LoginError::Internal(e)) => {
-            eprintln!("panel: error interno en la autenticación: {e}");
-            fail(
-                estado(StatusCode::INTERNAL_SERVER_ERROR),
-                &crate::t!("comun-error-interno"),
-            )
-        }
+        Err(LoginError::Internal(e)) => internal_con(estado(StatusCode::INTERNAL_SERVER_ERROR), e),
     }
 }
 

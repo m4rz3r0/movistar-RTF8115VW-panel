@@ -185,6 +185,20 @@ pub fn Explorador() -> impl IntoView {
                 </Transition>
             </aside>
             <div class="explorador-pagina">
+                // El catálogo, la ficha, la lectura, la lista y el formulario
+                // llegan o se hacen en el navegador: sin JavaScript, o con el
+                // wasm caído, la página se quedaría en «Cargando…» sin decir
+                // por qué. El aviso lo oculta el CSS en cuanto hidrata. El
+                // `<noscript>` lleva solo texto: con JavaScript, el navegador
+                // lo guarda como texto y así hidrata igual.
+                <p class="aviso estado-neutro aviso-sin-hidratar" role="status">
+                    <IconoEstado estado=Estado::Neutro />
+                    <span>
+                        <noscript>{t!("biblioteca-sin-js")}</noscript>
+                        " "
+                        {t!("biblioteca-sin-hidratar")}
+                    </span>
+                </p>
                 <Outlet />
             </div>
         </div>

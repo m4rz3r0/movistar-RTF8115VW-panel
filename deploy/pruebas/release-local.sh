@@ -245,7 +245,10 @@ if ! curl -fsS -m 5 "http://127.0.0.1:$PUERTO_PANEL/salud" | grep -q '"ok":true'
 fi
 # Release no tiene debug-assertions: la vigilancia corta de las pruebas no
 # se activa (el binario de depuración lo anuncia por la salida de error).
-if grep -q 'vigilancia de pruebas' "$TMP/panel.log" 2>/dev/null; then
+# Sin su registro no se puede saber: también es un fallo.
+if [ ! -f "$TMP/panel.log" ]; then
+	fallo "falta el registro del panel ($TMP/panel.log): no se puede comprobar RP_E2E_VIGILANCIA_S"
+elif grep -q 'vigilancia de pruebas' "$TMP/panel.log"; then
 	fallo "el panel release atiende RP_E2E_VIGILANCIA_S (¿debug-assertions en [profile.release]?)"
 fi
 # La hoja de estilos, con el hash en el nombre si la web lo lleva (hash.txt).
