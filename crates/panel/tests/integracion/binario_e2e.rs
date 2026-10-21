@@ -9,9 +9,22 @@ fn el_binario_de_cargo_test_no_vale_para_el_e2e() {
         .env("RP_E2E_CARGO_LEPTOS", "1")
         .output()
         .unwrap();
+    // Si las pruebas se compilaron con `--cfg erase_components` (p. ej. con
+    // los RUSTFLAGS de cargo-leptos), el binario también, y sí vale para el
+    // e2e: la prueba no tiene sentido, y lo dice.
+    if cfg!(erase_components) {
+        panic!(
+            "las pruebas se compilaron con `--cfg erase_components` (los RUSTFLAGS de \
+             cargo-leptos): compílalas sin él"
+        );
+    }
     assert!(!salida.status.success());
     let error = String::from_utf8_lossy(&salida.stderr);
-    assert!(error.contains("ejecuta `cargo leptos build`"), "{error}");
+    assert!(
+        error.contains("ejecuta `cargo leptos build`"),
+        "el binario de las pruebas no se reconoció como el de `cargo test`: ¿se \
+         compiló con `--cfg erase_components` (RUSTFLAGS, .cargo/config.toml)? {error}"
+    );
 }
 
 #[test]
