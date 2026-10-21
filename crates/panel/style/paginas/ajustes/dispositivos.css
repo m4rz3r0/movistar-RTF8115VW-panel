@@ -132,3 +132,8 @@
     align-items: flex-start;
   }
 }
+
+/* «Ya tiene IP fija: …»: un dato, no un botón. En móvil, parte la línea. */
+.chip-ya-fija {
+  white-space: normal;
+}

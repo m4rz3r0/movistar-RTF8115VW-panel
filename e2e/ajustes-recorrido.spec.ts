@@ -201,7 +201,7 @@ for (const { idioma, locale, ancho } of pasadas) {
       await dispositivos.getByRole("button", { name: t.fijarHost2, exact: true }).click();
       await expect(dialogo).toContainText(`${t.fijas}: host-2`);
       await aplicar(page, t, "IP fija", dispositivos);
-      await expect(dispositivos.getByRole("button", { name: t.yaFija })).toBeDisabled();
+      await expect(dispositivos.locator(".chip-ya-fija").filter({ hasText: t.yaFija })).toBeVisible();
       await expect(
         tarjeta(page, t.fijas).locator("tbody tr").filter({ hasText: "192.168.1.62" }),
       ).toHaveCount(1);

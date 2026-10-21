@@ -96,8 +96,10 @@ for (const idioma of ["es", "en"] as const) {
         await expect(dispositivos).toBeVisible();
         await expect(fijas).toBeVisible();
         await sinDesbordamiento(page, `red local ${idioma} ${ancho}`);
-        // Un dispositivo con reserva no se puede fijar otra vez.
-        await expect(dispositivos.getByRole("button", { name: t.yaFija }).first()).toBeDisabled();
+        // Un dispositivo con reserva no se puede fijar otra vez: lo dice una
+        // etiqueta, sin botón.
+        await expect(dispositivos.locator(".chip-ya-fija").first()).toContainText(t.yaFija);
+        await expect(dispositivos.getByRole("button", { name: new RegExp(`^${t.yaFija}`) })).toHaveCount(0);
         sinApi(await dispositivos.innerText());
         sinApi(await fijas.innerText());
         await page.screenshot({
@@ -153,8 +155,8 @@ for (const idioma of ["es", "en"] as const) {
           await expect(fila).toContainText("02:00:00:00:00:03");
           await expect(dispositivos.getByRole("button", { name: t.fijarHost2 })).toHaveCount(0);
           await expect(
-            dispositivos.getByRole("button", { name: `${t.yaFija}: 192.168.1.62` }),
-          ).toBeDisabled();
+            dispositivos.locator(".chip-ya-fija").filter({ hasText: `${t.yaFija}: 192.168.1.62` }),
+          ).toBeVisible();
           await expect(dispositivos.getByRole("heading", { level: 2 })).toBeFocused();
           // Borrarla deja el simulador como estaba.
           await fijas.getByRole("button", { name: t.borrarHost2 }).click();

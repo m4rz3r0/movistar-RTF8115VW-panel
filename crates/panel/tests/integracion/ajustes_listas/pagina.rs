@@ -69,7 +69,11 @@ async fn ya_tiene_ip_fija_dice_la_reservada() {
     assert_eq!(por_mac(&d, "02:00:00:00:00:01")["ip_fija"], "192.168.1.69");
     assert_eq!(por_mac(&d, "02:00:00:00:00:03")["ip_fija"], Value::Null);
     let html = pagina(&p, &cookie, "/ajustes/red_local").await;
-    assert!(html.contains("Ya tiene IP fija: 192.168.1.69"), "{html}");
+    // Un dato, no una acción: una etiqueta, no un botón desactivado.
+    assert!(
+        html.contains("<span class=\"chip chip-ya-fija\">Ya tiene IP fija: 192.168.1.69</span>"),
+        "{html}"
+    );
 }
 
 /// Sin «Fijar esta IP» donde el servidor la rechazaría siempre (una IP de
