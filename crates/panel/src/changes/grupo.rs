@@ -18,6 +18,7 @@
 //! Una acción (p. ej. `cbReboot`) solo puede ir sola: no se puede revertir si
 //! falla otro paso.
 
+use super::persistencia::{NuevoGrupo, nuevo_token};
 use super::*;
 use crate::poller::PauseGuard;
 
