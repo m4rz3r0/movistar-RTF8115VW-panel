@@ -1,0 +1,305 @@
+/* Página Historial. */
+/* ------------------------------------------------------------ Historial */
+
+.hist-lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hist-entrada {
+  position: relative;
+  min-width: 0;
+  background: var(--superficie-1);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+}
+
+.hist-entrada:target {
+  border-color: var(--acento);
+  box-shadow: 0 0 0 1px var(--acento);
+}
+
+.hist-cabeza {
+  display: grid;
+  grid-template-columns: 138px 84px minmax(0, 1.1fr) minmax(0, 1.2fr) auto;
+  align-items: center;
+  gap: var(--esp-1) var(--esp-4);
+  min-height: 48px;
+  padding: var(--esp-2) var(--esp-4);
+}
+
+summary.hist-cabeza {
+  padding-left: calc(var(--esp-4) + 18px);
+  cursor: pointer;
+  list-style: none;
+}
+
+summary.hist-cabeza::-webkit-details-marker {
+  display: none;
+}
+
+summary.hist-cabeza::before {
+  content: "";
+  position: absolute;
+  left: var(--esp-4);
+  top: 21px;
+  width: 7px;
+  height: 7px;
+  border-right: 1.6px solid var(--texto-2);
+  border-bottom: 1.6px solid var(--texto-2);
+  transform: rotate(-45deg);
+  transition: transform 120ms ease;
+}
+
+details[open] > summary.hist-cabeza::before {
+  top: 19px;
+  transform: rotate(45deg);
+}
+
+summary.hist-cabeza:hover {
+  background: var(--superficie-2);
+  border-radius: var(--radio);
+}
+
+.hist-hora,
+.hist-quien,
+.hist-diff {
+  color: var(--texto-2);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.hist-quien {
+  color: var(--texto-1);
+}
+
+.hist-que {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--esp-2);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.hist-id {
+  color: var(--texto-2);
+  font-size: 12px;
+}
+
+.hist-instancia {
+  color: var(--texto-2);
+}
+
+.hist-insignias {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--esp-2);
+}
+
+.hist-revelado .hist-que {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: var(--esp-2);
+}
+
+.hist-revelado .icono-ojo {
+  flex: none;
+  margin-top: 2px;
+  color: var(--acento);
+}
+
+.hist-revelado .hist-cabeza {
+  grid-template-columns: 138px 84px minmax(0, 1fr) auto;
+}
+
+.hist-revelado .chip {
+  justify-self: start;
+}
+
+.hist-detalle .tabla td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.hist-nota {
+  margin: 0;
+  padding: 0 var(--esp-4) var(--esp-3) calc(var(--esp-4) + 18px);
+  color: var(--texto-2);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.hist-error {
+  color: var(--error);
+}
+
+.hist-acciones {
+  display: flex;
+  padding: 0 var(--esp-4) var(--esp-3) calc(var(--esp-4) + 18px);
+}
+
+.hist-deshacer {
+  position: relative;
+}
+
+.hist-detalle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-3);
+  padding: var(--esp-2) var(--esp-4) var(--esp-4);
+  border-top: 1px solid var(--borde);
+}
+
+.hist-tiempos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-1) var(--esp-5);
+  margin: 0;
+  font-size: 13px;
+}
+
+.hist-tiempos dt {
+  color: var(--texto-2);
+}
+
+.hist-tiempos dd {
+  margin: 0;
+}
+
+.hist-enlaces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-1) var(--esp-4);
+  margin: 0;
+  font-size: 13px;
+}
+
+.hist-vacio {
+  align-items: flex-start;
+}
+
+.hist-pasos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hist-paso {
+  min-width: 0;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+}
+
+.hist-paso-cabeza {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-1) var(--esp-2);
+  padding: var(--esp-2) var(--esp-3);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.hist-paso-n {
+  color: var(--texto-2);
+  font-size: 12px;
+}
+
+.hist-paso-estado {
+  margin-left: auto;
+}
+
+.hist-paso-cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-2);
+  padding: 0 var(--esp-3) var(--esp-3);
+}
+
+.paginacion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esp-2) var(--esp-4);
+}
+
+.paginacion-lado {
+  min-width: 140px;
+}
+
+.paginacion-fin {
+  text-align: right;
+}
+
+@media (max-width: 860px) {
+  .hist-cabeza {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "hora quien"
+      "que que"
+      "diff diff"
+      "insignias insignias";
+    gap: var(--esp-1) var(--esp-3);
+  }
+
+  .hist-hora {
+    grid-area: hora;
+  }
+
+  .hist-quien {
+    grid-area: quien;
+    text-align: right;
+  }
+
+  .hist-que {
+    grid-area: que;
+  }
+
+  .hist-diff {
+    grid-area: diff;
+  }
+
+  .hist-insignias {
+    grid-area: insignias;
+    justify-content: flex-start;
+  }
+
+  .hist-revelado .hist-cabeza {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .paginacion-lado {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  summary.hist-cabeza {
+    padding-right: var(--esp-3);
+  }
+
+  .hist-detalle .tabla .campo-nombre {
+    display: none;
+  }
+
+  .hist-detalle .tabla th,
+  .hist-detalle .tabla td {
+    padding: 7px var(--esp-2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}

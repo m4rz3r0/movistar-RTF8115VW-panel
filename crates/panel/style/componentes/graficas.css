@@ -1,0 +1,315 @@
+/* Gráficas y disponibilidad. */
+/* ------------------------------------------------------------ Gráficas */
+
+.grafica,
+.franja {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-3);
+  min-width: 0;
+  margin: 0;
+}
+
+.grafica {
+  padding: var(--esp-4) var(--esp-4) var(--esp-3);
+  background: var(--superficie-1);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+}
+
+.grafica-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--esp-2) var(--esp-4);
+}
+
+.grafica-titulo {
+  font-family: var(--fuente-titulos);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.grafica-nota {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--texto-2);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-1) var(--esp-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--texto-2);
+  font-size: 12px;
+}
+
+.leyenda li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.clave-linea {
+  display: inline-block;
+  width: 14px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+.clave-bloque {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.clave-linea.tono-1 {
+  background: var(--viz-1);
+}
+
+.clave-linea.tono-2 {
+  background: var(--viz-2);
+}
+
+.grafica-lienzo,
+.franja-lienzo {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
+.grafica-lienzo svg,
+.franja-lienzo svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  touch-action: pan-y;
+  cursor: crosshair;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.grafica-lienzo svg:focus,
+.franja-lienzo svg:focus {
+  outline: none;
+}
+
+.grafica-lienzo svg:focus-visible,
+.franja-lienzo svg:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 4px;
+}
+
+.grafica svg text,
+.franja svg text {
+  font-family: var(--fuente-ui);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.eje-texto {
+  fill: var(--texto-2);
+}
+
+.eje-unidad {
+  fill: var(--texto-2);
+  font-weight: 500;
+}
+
+.rejilla {
+  stroke: var(--viz-rejilla);
+  stroke-width: 1px;
+  shape-rendering: crispEdges;
+}
+
+.eje-base {
+  stroke: var(--viz-eje);
+  stroke-width: 1px;
+  shape-rendering: crispEdges;
+}
+
+.linea {
+  fill: none;
+  stroke-width: 2px;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.area {
+  stroke: none;
+  fill-opacity: 0.1;
+}
+
+.linea.tono-1,
+.mini-fin.tono-1 {
+  stroke: var(--viz-1);
+}
+
+.linea.tono-2,
+.mini-fin.tono-2 {
+  stroke: var(--viz-2);
+}
+
+.area.tono-1,
+.marcador.tono-1 {
+  fill: var(--viz-1);
+}
+
+.area.tono-2,
+.marcador.tono-2 {
+  fill: var(--viz-2);
+}
+
+/* El anillo del color de la superficie separa el punto de las líneas. */
+.marcador {
+  stroke: var(--superficie-1);
+  stroke-width: 2px;
+}
+
+.grafica svg .etiqueta-directa {
+  fill: var(--texto-1);
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: var(--superficie-1);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.grafica-vacia {
+  fill: var(--texto-2);
+}
+
+.cruceta {
+  stroke: var(--viz-cruceta);
+  stroke-width: 1px;
+  shape-rendering: crispEdges;
+  pointer-events: none;
+}
+
+.lectura {
+  pointer-events: none;
+}
+
+.lectura-fondo {
+  fill: var(--superficie-2);
+  stroke: var(--borde);
+  stroke-width: 1px;
+  filter: drop-shadow(0 4px 12px rgb(0 0 0 / 0.45));
+}
+
+.grafica svg .lectura text,
+.franja svg .lectura text {
+  font-size: 12px;
+}
+
+.grafica svg .lectura .lectura-cabecera,
+.franja svg .lectura .lectura-cabecera {
+  fill: var(--texto-2);
+  font-size: 11px;
+}
+
+.lectura-valor {
+  fill: var(--texto-1);
+  font-weight: 600;
+}
+
+.lectura-nombre {
+  fill: var(--texto-2);
+}
+
+.clave {
+  stroke-width: 2px;
+  stroke-linecap: round;
+}
+
+.clave.tono-1 {
+  stroke: var(--viz-1);
+}
+
+.clave.tono-2 {
+  stroke: var(--viz-2);
+}
+
+.grafica-datos {
+  color: var(--texto-2);
+  font-size: 12px;
+}
+
+.grafica-datos summary {
+  width: fit-content;
+  padding: 2px 0;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.grafica-datos summary:hover {
+  color: var(--texto-1);
+}
+
+.grafica-datos[open] summary {
+  margin-bottom: var(--esp-2);
+}
+
+.grafica-datos .tabla-scroll {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+/* Disponibilidad */
+
+.franja-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-2) var(--esp-3);
+}
+
+.franja-detalle {
+  color: var(--texto-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.franja-ok {
+  fill: color-mix(in srgb, var(--ok) 28%, var(--superficie-1));
+}
+
+.franja-corte {
+  fill: var(--error);
+}
+
+.franja-resalte {
+  fill: none;
+  stroke: var(--texto-1);
+  stroke-width: 1.5px;
+  pointer-events: none;
+}
+
+.franja-tick {
+  stroke: var(--viz-eje);
+  stroke-width: 1px;
+  shape-rendering: crispEdges;
+}
+
+.clave-bloque.franja-clave-ok {
+  background: color-mix(in srgb, var(--ok) 28%, var(--superficie-1));
+}
+
+.clave-bloque.franja-clave-corte {
+  background: var(--error);
+}
+
+.clave.franja-clave-ok {
+  stroke: color-mix(in srgb, var(--ok) 60%, var(--superficie-1));
+}
+
+.clave.franja-clave-corte {
+  stroke: var(--error);
+}

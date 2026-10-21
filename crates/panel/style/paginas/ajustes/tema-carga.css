@@ -1,0 +1,39 @@
+/* Ajustes del router: contenido de un tema mientras se lee otro. */
+/* Contenido de un tema: mientras se lee otro, lo anterior atenuado (e
+   inerte) y el aviso «Actualizando…» encima, sin mover nada. El aviso va
+   fuera de la zona con aria-busy (que aplaza los avisos de lo que contiene)
+   y, vacío, sigue en la página sin tamaño para que el lector de pantalla
+   lo anuncie al llenarse. */
+.tema-zona {
+  position: relative;
+  min-width: 0;
+}
+
+.tema-contenido {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-5);
+  min-width: 0;
+}
+
+.tema-contenido[aria-busy="true"] {
+  opacity: 0.45;
+  transition: opacity 150ms ease;
+}
+
+.tema-actualizando {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  margin: 0;
+}
+
+.tema-actualizando:not(:empty) {
+  padding: var(--esp-1) var(--esp-3);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie-2);
+  color: var(--texto-1);
+  font-size: 0.875rem;
+}

@@ -1,0 +1,76 @@
+/* Indicadores de Estado. */
+/* ----------------------------------------------------------- Indicadores */
+
+.indicador {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-1);
+  min-width: 0;
+  padding: var(--esp-4) var(--esp-4) var(--esp-3);
+  background: var(--superficie-1);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  overflow: hidden;
+}
+
+.indicador[class*="estado-"]::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--estado);
+}
+
+.indicador-titulo {
+  color: var(--texto-2);
+  font-family: var(--fuente-ui);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.indicador-valor {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-2);
+  min-width: 0;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.indicador-valor .icono {
+  width: 20px;
+  height: 20px;
+}
+
+.indicador-sub {
+  color: var(--texto-2);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.indicador .minigrafica {
+  margin-top: auto;
+  padding-top: var(--esp-2);
+}
+
+.minigrafica {
+  display: block;
+  width: 100%;
+  height: 40px;
+  overflow: visible;
+}
+
+.minigrafica .linea {
+  stroke-width: 1.5px;
+}
+
+.mini-fin {
+  fill: none;
+  stroke-width: 6px;
+  stroke-linecap: round;
+}

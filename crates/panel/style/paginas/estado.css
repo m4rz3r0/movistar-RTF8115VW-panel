@@ -1,0 +1,206 @@
+/* Página Estado: rejilla de indicadores y aviso sin hidratar. */
+/* ---------------------------------------------------------------- Estado */
+
+.seccion-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esp-3) var(--esp-4);
+}
+
+.graficas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-4);
+}
+
+/* Siete indicadores sin huecos: en 3 columnas, «Internet» ocupa la primera
+   fila; en 4, «Clientes» ocupa dos columnas; en 2, «Internet» la primera
+   fila. */
+.rejilla-indicadores {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--esp-3);
+}
+
+.rejilla-indicadores > :first-child {
+  grid-column: 1 / -1;
+}
+
+.rejilla-estado {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--esp-4);
+}
+
+@media (min-width: 861px) {
+  .rejilla-estado {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rejilla-estado > :last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 1200px) {
+  .rejilla-indicadores {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .rejilla-indicadores > :first-child {
+    grid-column: auto;
+  }
+
+  .rejilla-indicadores > :last-child {
+    grid-column: span 2;
+  }
+}
+
+@media (min-width: 1360px) {
+  .rejilla-estado {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .rejilla-estado > :last-child {
+    grid-column: auto;
+  }
+}
+
+.avisos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--esp-2);
+  margin: 0;
+  padding: var(--esp-2) var(--esp-3);
+  border: 1px solid color-mix(in srgb, var(--estado) 35%, transparent);
+  border-left-width: 3px;
+  border-left-color: var(--estado);
+  border-radius: var(--radio);
+  background: var(--estado-suave);
+  overflow-wrap: anywhere;
+}
+
+.aviso .icono {
+  margin-top: 2px;
+}
+
+.aviso a {
+  font-weight: 600;
+}
+
+.selector {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie-1);
+}
+
+.selector-boton {
+  min-width: 52px;
+  min-height: 32px;
+  padding: 0 var(--esp-3);
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--texto-2);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 120ms ease, background 120ms ease;
+}
+
+.selector-boton:hover {
+  color: var(--texto-1);
+}
+
+.selector-boton[aria-pressed="true"] {
+  background: var(--acento-suave);
+  color: var(--acento);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--acento) 45%, transparent);
+}
+
+.franja-tarjeta {
+  gap: var(--esp-3);
+  padding: var(--esp-4);
+}
+
+.franja-titulo {
+  font-size: 15px;
+}
+
+.estado-espera {
+  color: var(--texto-2);
+}
+
+/* Biblioteca sin JavaScript o con el wasm caído: el catálogo, la ficha, la
+   lectura, la lista y el formulario llegan o se hacen en el navegador. El aviso aparece a los 3 s (sin
+   destellos mientras hidrata) y nunca tras hidratar (data-hidratado lo pone
+   el wasm en <body>). */
+.aviso-sin-hidratar {
+  animation: aparece-tarde 0s 3s both;
+}
+
+body[data-hidratado] .aviso-sin-hidratar {
+  display: none;
+}
+
+@keyframes aparece-tarde {
+  from {
+    visibility: hidden;
+  }
+
+  to {
+    visibility: visible;
+  }
+}
+
+.tarjeta.estado-espera {
+  color: var(--texto-1);
+  gap: var(--esp-2);
+}
+
+.tarjeta.estado-espera h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-2);
+}
+
+.tarjeta.estado-error {
+  border-color: color-mix(in srgb, var(--error) 45%, var(--borde));
+}
+
+.estado-espera-detalle {
+  color: var(--texto-2);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 480px) {
+  .rejilla-indicadores {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--esp-2);
+  }
+
+  .rejilla-indicadores > :last-child {
+    grid-column: auto;
+  }
+
+  .rejilla-indicadores .indicador {
+    padding: var(--esp-3) var(--esp-3) var(--esp-2);
+  }
+
+  .rejilla-indicadores .indicador-valor {
+    font-size: 19px;
+  }
+}
