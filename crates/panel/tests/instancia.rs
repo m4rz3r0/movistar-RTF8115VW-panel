@@ -293,3 +293,22 @@ async fn el_arranque_usa_la_pausa_de_la_configuracion() {
     let tarda = inicio.elapsed();
     assert!(tarda < Duration::from_millis(1500), "{tarda:?}");
 }
+
+/// Sin detección guardada y con un router que no responde, el arranque
+/// espera a la detección lo que diga la configuración (200 ms en las
+/// pruebas), no los 5 s de serie.
+#[tokio::test]
+async fn el_arranque_espera_a_la_deteccion_lo_que_diga_la_configuracion() {
+    let dir = tempfile::tempdir().unwrap();
+    escribir_secreto(&dir.path().join("router.secret"), "clave");
+    let state = common::estado(
+        config_con_router(dir.path(), "http://192.0.2.1"),
+        dir.path(),
+    )
+    .await;
+    let inicio = Instant::now();
+    instancia::arrancar_router(&state).await.unwrap();
+    let tarda = inicio.elapsed();
+    assert!(state.hgu.configurado());
+    assert!(tarda < Duration::from_secs(2), "{tarda:?}");
+}

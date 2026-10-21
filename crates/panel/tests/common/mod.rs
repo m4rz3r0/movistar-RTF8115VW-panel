@@ -128,8 +128,9 @@ async fn panel_sin_router_con(ajustar: impl FnOnce(&mut Config), sim: SimConfig)
 }
 
 /// Configuración del panel con la base de datos y la clave en `dir`, sin
-/// variables del router, con el proxy de confianza `127.0.0.1` y 1 ms entre
-/// peticiones al simulador (en vez de 150 ms).
+/// variables del router, con el proxy de confianza `127.0.0.1`, 1 ms entre
+/// peticiones al simulador (en vez de 150 ms) y 200 ms de espera a la
+/// detección de la red (en vez de 5 s).
 pub fn config_en(dir: &Path) -> Config {
     Config {
         listen: "127.0.0.1:0".parse().unwrap(),
@@ -142,6 +143,7 @@ pub fn config_en(dir: &Path) -> Config {
         public_origins: vec![ORIGIN.into()],
         install_nets: Vec::new(),
         router_min_gap: Duration::from_millis(1),
+        espera_deteccion: Duration::from_millis(200),
     }
 }
 

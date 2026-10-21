@@ -281,11 +281,12 @@ pub async fn detectar_y_guardar(state: &AppState) -> Result<RedDetectada, String
     Ok(red)
 }
 
-/// Lo más que se espera a [`detectar_y_guardar`] al arrancar sin ninguna
-/// detección guardada (p. ej. al actualizar desde una versión sin ella) o al
-/// guardar las credenciales; si tarda más (el router no responde), sigue en
-/// segundo plano y, entretanto, vale la detección guardada o, sin ella,
-/// cualquier conexión de datos.
+/// Lo más que se espera, de serie, a [`detectar_y_guardar`] al arrancar sin
+/// ninguna detección guardada (p. ej. al actualizar desde una versión sin
+/// ella) o al guardar las credenciales; si tarda más (el router no responde),
+/// sigue en segundo plano y, entretanto, vale la detección guardada o, sin
+/// ella, cualquier conexión de datos. La espera de verdad es la de la
+/// configuración ([`config::Config::espera_deteccion`]).
 pub const ESPERA_DETECCION: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// [`detectar_y_guardar`] en segundo plano, esperando como mucho `espera`.
@@ -303,12 +304,12 @@ pub async fn detectar_sin_esperar_mucho(state: &AppState, espera: std::time::Dur
 }
 
 /// Al arrancar: si ya hay una detección guardada, se renueva sin retrasar el
-/// arranque; si no, se espera hasta [`ESPERA_DETECCION`].
+/// arranque; si no, se espera hasta [`config::Config::espera_deteccion`].
 async fn detectar_al_arrancar(state: &AppState) {
     let espera = if state.red().is_some() {
         std::time::Duration::ZERO
     } else {
-        ESPERA_DETECCION
+        state.cfg.espera_deteccion
     };
     detectar_sin_esperar_mucho(state, espera).await;
 }

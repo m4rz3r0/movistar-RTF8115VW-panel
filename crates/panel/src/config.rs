@@ -63,6 +63,11 @@ pub struct Config {
     /// de entorno (una pausa menor podría saturar el router); solo las
     /// pruebas la acortan.
     pub router_min_gap: Duration,
+    /// Lo más que se espera a la detección de la red del router al arrancar
+    /// sin ninguna guardada o al guardar las credenciales: la de serie,
+    /// [`crate::instancia::ESPERA_DETECCION`] (5 s). Tampoco sale de ninguna
+    /// variable; solo las pruebas la acortan.
+    pub espera_deteccion: Duration,
 }
 
 impl Config {
@@ -98,6 +103,7 @@ impl Config {
                 None => Vec::new(),
             },
             router_min_gap: hgu::client::PAUSA_MINIMA,
+            espera_deteccion: crate::instancia::ESPERA_DETECCION,
         })
     }
 }
@@ -243,6 +249,7 @@ mod tests {
         assert_eq!(c.public_origins, ["http://localhost:3000"]);
         assert!(c.install_nets.is_empty());
         assert_eq!(c.router_min_gap, Duration::from_millis(150));
+        assert_eq!(c.espera_deteccion, Duration::from_secs(5));
     }
 
     #[test]
