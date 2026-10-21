@@ -207,6 +207,16 @@ async fn nota_de_oculto_una_vez() {
     let (_, _, html) = pagina(&p, &cookie, "/ajustes/telefono").await;
     let (visible, _) = partir(&html, "<script", "</script>");
     assert!(visible.matches("chip-oculto").count() >= 2, "{visible}");
+    // Cada etiqueta «Oculto» es un enlace a la nota, que la describe (un
+    // lector de pantalla no siempre anuncia la descripción de un `<span>`).
+    let chip = "<a href=\"#ajustes-nota-oculto\" aria-describedby=\"ajustes-nota-oculto\" \
+                class=\"chip chip-nivel chip-oculto\"";
+    assert_eq!(
+        visible.matches(chip).count(),
+        visible.matches("chip-oculto").count(),
+        "{visible}"
+    );
+    assert!(visible.contains("id=\"ajustes-nota-oculto\""), "{visible}");
     assert_eq!(
         visible.matches("No aparece en la web del operador").count(),
         1,

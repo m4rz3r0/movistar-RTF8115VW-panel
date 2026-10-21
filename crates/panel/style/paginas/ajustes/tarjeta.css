@@ -359,3 +359,14 @@
 .mas-opciones[open] > summary {
   margin-bottom: var(--esp-4);
 }
+
+/* «Oculto» enlaza con la nota que lo explica: se ve como las demás
+   etiquetas, con el subrayado solo al pasar por encima. */
+a.chip-oculto {
+  color: var(--texto-1);
+  text-decoration: none;
+}
+
+a.chip-oculto:hover {
+  text-decoration: underline;
+}

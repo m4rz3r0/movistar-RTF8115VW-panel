@@ -58,12 +58,18 @@ fn nivel(n: Nivel) -> Option<AnyView> {
             view! { <span class="chip chip-nivel">{t!("ajustes-nivel-avanzado")}</span> }
                 .into_any(),
         ),
-        // Lo que significa va una sola vez en la página (`NOTA_OCULTO`).
+        // Lo que significa va una sola vez en la página (`NOTA_OCULTO`). Un
+        // enlace a esa nota: un lector de pantalla anuncia su descripción
+        // (en un `<span>` sin rol, no siempre) y lleva a ella.
         Nivel::Oculto => Some(
             view! {
-                <span class="chip chip-nivel chip-oculto" aria-describedby=super::NOTA_OCULTO>
+                <a
+                    class="chip chip-nivel chip-oculto"
+                    href=format!("#{}", super::NOTA_OCULTO)
+                    aria-describedby=super::NOTA_OCULTO
+                >
                     {t!("ajustes-nivel-oculto")}
-                </span>
+                </a>
             }
             .into_any(),
         ),
