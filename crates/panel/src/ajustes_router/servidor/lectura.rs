@@ -103,7 +103,11 @@ pub(super) fn lista(
 
 /// Instancias de una lista con su id (ver [`lista`]) y sus elementos tal
 /// cual los da el router.
-fn instancias_con_id(f: &Catalogo, a: &Ajuste, n: &XmlNode) -> Option<Vec<(String, Leidos)>> {
+pub(super) fn instancias_con_id(
+    f: &Catalogo,
+    a: &Ajuste,
+    n: &XmlNode,
+) -> Option<Vec<(String, Leidos)>> {
     let se_escribe = a.campos.iter().any(|c| c.escribible().is_some());
     let id_param = id_instancia(f, a);
     let mut elementos: Vec<&str> = a
@@ -166,7 +170,7 @@ pub(crate) fn tapado(f: &Catalogo, c: &Campo) -> bool {
 /// Valor leído del secreto `c` para su campo con el ojo; `None` si no es
 /// un secreto o el router no deja leerlo (lo da enmascarado, o vacío
 /// uno tapado al leer).
-fn valor_secreto(f: &Catalogo, c: &Campo, leidos: &Leidos) -> Option<String> {
+pub(super) fn valor_secreto(f: &Catalogo, c: &Campo, leidos: &Leidos) -> Option<String> {
     if c.tipo != TipoCampo::Secreto {
         return None;
     }
@@ -224,7 +228,7 @@ pub(super) fn campo(
 
 /// Elementos hoja de `n` a cualquier profundidad; si uno se repite, vale
 /// el primero.
-fn hojas(n: &XmlNode, out: &mut Leidos) {
+pub(super) fn hojas(n: &XmlNode, out: &mut Leidos) {
     for c in &n.children {
         if c.tag == "Result" || c.tag == "ErrorString" {
             continue;

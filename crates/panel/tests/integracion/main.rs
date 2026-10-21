@@ -8,6 +8,7 @@ mod comun;
 
 mod ajustes;
 mod ajustes_catalogo;
+mod ajustes_foto;
 mod ajustes_ida_y_vuelta;
 mod ajustes_listas;
 mod ajustes_secretos;

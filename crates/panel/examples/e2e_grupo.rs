@@ -1,11 +1,16 @@
 //! Preparación del e2e (no es parte del panel): con la configuración `RP_*`
-//! del panel que va a arrancar (`e2e/arrancar.sh`), aplica contra el
+//! del panel que va a arrancar (`e2e/arrancar.sh`), toma la foto de partida
+//! (como el asistente de instalación) y después aplica contra el
 //! simulador un cambio de dos pasos (un grupo: UPnP y la IP de una reserva
 //! DHCP) por el gestor de cambios, con una vigilancia corta, y espera a que
 //! quede aplicado. Así el Historial tiene un grupo que mostrar. Después,
 //! como desde Ajustes, cambia la contraseña de la red WiFi de 5 GHz a
 //! [`CLAVE_5`]: el Historial tiene un paso con «Mostrar el valor anterior» y
-//! Ajustes, una clave conocida que mostrar.
+//! Ajustes, una clave conocida que mostrar. Así «Cómo estaba al instalar»
+//! tiene diferencias (UPnP y esa clave).
+//!
+//! Con el argumento `foto`, solo toma otra foto de partida (sin
+//! diferencias desde ese momento), para ver la página así.
 //!
 //! `cargo build -p panel --features ssr --example e2e_grupo`
 
@@ -13,7 +18,8 @@ use leptos::prelude::LeptosOptions;
 use panel::{
     changes::{ChangeManager, ChangeRequest, Estado, GrupoRequest, Paso, Tiempos},
     config::Config,
-    instancia,
+    fotos::{self, TipoFoto},
+    instalar, instancia,
     state::AppState,
 };
 use std::{collections::BTreeMap, process::ExitCode, sync::Arc, time::Duration};
@@ -58,11 +64,29 @@ async fn aplicar_grupo(gestor: &Arc<ChangeManager>, grupo: GrupoRequest) -> Resu
     Err(format!("el cambio {id} no terminó en 20 s"))
 }
 
-async fn aplicar() -> Result<i64, String> {
+/// Toma la foto de partida como el asistente: cada lectura de partida del
+/// router (las que fallen, fuera); su id.
+async fn tomar_foto(state: &AppState) -> Result<i64, String> {
+    let mut foto = BTreeMap::new();
+    for (nombre, params) in instalar::lecturas_de_partida(&state.catalogo) {
+        if let Ok(n) = state.hgu.call(nombre, &params).await {
+            foto.insert(nombre.to_owned(), n.to_xml());
+        }
+    }
+    fotos::guardar(&state.db, &state.history_key, TipoFoto::Partida, &foto).await
+}
+
+async fn estado() -> Result<AppState, String> {
     let cfg = Config::from_env()?;
     let leptos = LeptosOptions::builder().output_name("panel").build();
     let state = AppState::new(cfg, leptos).await?;
     instancia::arrancar_router(&state).await?;
+    Ok(state)
+}
+
+async fn aplicar() -> Result<i64, String> {
+    let state = estado().await?;
+    tomar_foto(&state).await?;
     let gestor = ChangeManager::new(
         state,
         Tiempos {
@@ -114,6 +138,18 @@ async fn aplicar() -> Result<i64, String> {
 
 #[tokio::main]
 async fn main() -> ExitCode {
+    if std::env::args().nth(1).as_deref() == Some("foto") {
+        return match async { tomar_foto(&estado().await?).await }.await {
+            Ok(id) => {
+                println!("foto {id} tomada");
+                ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("e2e_grupo: {e}");
+                ExitCode::FAILURE
+            }
+        };
+    }
     match aplicar().await {
         Ok(id) => {
             println!("grupo {id} aplicado");

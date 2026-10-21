@@ -72,3 +72,25 @@ pub async fn ultima(
     }
     contenido.map(|c| (id, c))
 }
+
+/// ¿Hay alguna foto de `tipo`? Sin descifrarla (`false` si no se puede
+/// mirar; el error queda registrado).
+pub async fn hay(db: &SqlitePool, tipo: TipoFoto) -> bool {
+    sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM fotos WHERE tipo = ?)")
+        .bind(tipo.como_texto())
+        .fetch_one(db)
+        .await
+        .inspect_err(|e| tracing::error!("no se puede mirar la foto {}: {e}", tipo.como_texto()))
+        .unwrap_or(false)
+}
+
+/// Cuándo se tomó la foto `id` (segundos Unix).
+pub async fn momento(db: &SqlitePool, id: i64) -> Option<i64> {
+    sqlx::query_scalar("SELECT momento FROM fotos WHERE id = ?")
+        .bind(id)
+        .fetch_optional(db)
+        .await
+        .inspect_err(|e| tracing::error!("no se puede leer la fecha de la foto {id}: {e}"))
+        .ok()
+        .flatten()
+}

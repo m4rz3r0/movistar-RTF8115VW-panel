@@ -13,6 +13,9 @@ pub struct TemaVista {
     /// El panel está en modo solo lectura (firmware sin confirmar): los
     /// ajustes se ven pero no se cambian.
     pub solo_lectura: bool,
+    /// Hay foto de partida: la cabecera enlaza a su comparación.
+    #[serde(default)]
+    pub foto_de_partida: bool,
     /// En el orden del catálogo.
     pub ajustes: Vec<AjusteVista>,
 }
@@ -252,4 +255,57 @@ pub enum Conexion {
     Invitados,
     /// No se sabe: no está conectado ahora o no se pudo leer la WiFi.
     Desconocida,
+}
+
+/// Lo que ha cambiado desde la foto de partida (la lectura del asistente
+/// de instalación). Los secretos que difieren llevan su valor en los dos
+/// lados (como [`CampoVista::valor_secreto`]): la respuesta va con
+/// `no-store` y solo la pide la página de la foto.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ComparacionVista {
+    /// Cuándo se tomó la foto (segundos Unix); `None` si no hay foto (una
+    /// instalación anterior al asistente) y entonces no hay nada más.
+    pub momento: Option<i64>,
+    /// El panel está en modo solo lectura: no se ofrece volver a un valor.
+    pub solo_lectura: bool,
+    /// Por temas, en el orden de las pestañas y del catálogo.
+    pub diferencias: Vec<DiferenciaVista>,
+    /// Prefijos de traducción (`ajuste-red_local-reservas`) de los ajustes
+    /// cuya lectura no está en la foto.
+    pub sin_dato: Vec<String>,
+    /// Los de los ajustes que ahora no se han podido leer del router.
+    pub sin_leer: Vec<String>,
+}
+
+/// Una diferencia entre la foto de partida y el router ahora.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DiferenciaVista {
+    /// Tema del ajuste (`puertos`).
+    pub tema: String,
+    /// Id del ajuste (`puertos.upnp`).
+    pub ajuste: String,
+    /// Prefijo de sus claves de traducción (`ajuste-puertos-upnp`).
+    pub clave: String,
+    /// Instancia de una lista (su id en el router); `None` si no es lista.
+    pub instancia: Option<String>,
+    pub cambio: Diferencia,
+}
+
+/// Qué ha cambiado.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Diferencia {
+    /// Un campo vale otra cosa: en la foto y ahora. `restaurable` si se
+    /// puede volver al de la foto (se escribe, el valor se reconoce y, si es
+    /// un secreto, el router lo dejaba leer); en una lista, nunca. En una
+    /// caja: es mucho más grande que las otras variantes.
+    Valor {
+        partida: Box<CampoVista>,
+        actual: Box<CampoVista>,
+        restaurable: bool,
+    },
+    /// Una instancia de una lista que no estaba en la foto, con sus campos
+    /// (sin los secretos). Solo informativa.
+    Alta(Vec<CampoVista>),
+    /// Una instancia de la foto que ya no está (como [`Diferencia::Alta`]).
+    Baja(Vec<CampoVista>),
 }

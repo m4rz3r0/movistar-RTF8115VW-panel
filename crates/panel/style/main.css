@@ -3554,3 +3554,126 @@ summary.hist-cabeza:hover {
     justify-content: flex-start;
   }
 }
+
+/* ------------------------------------------- Cómo estaba al instalar (foto) */
+
+.tema-foto {
+  max-width: 880px;
+  margin-top: calc(-1 * var(--esp-2));
+}
+
+.foto-volver,
+.foto-fecha,
+.foto-aviso,
+.foto-sin-dato {
+  max-width: 880px;
+}
+
+.foto-fecha {
+  color: var(--texto-2);
+}
+
+.foto-tema {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-3);
+  max-width: 880px;
+}
+
+.foto-tema-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--esp-1) var(--esp-4);
+}
+
+.foto-ajuste {
+  gap: var(--esp-3);
+  min-width: 0;
+}
+
+.foto-filas {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--borde);
+}
+
+.foto-fila {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-2);
+  padding: var(--esp-3) 0;
+  border-bottom: 1px solid var(--borde);
+  min-width: 0;
+}
+
+.foto-campo {
+  font-weight: 600;
+}
+
+/* «Al instalar» y «Ahora», lado a lado; en móvil, uno bajo otro. */
+.foto-valores {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--esp-2) var(--esp-4);
+  margin: 0;
+}
+
+.foto-valores dt {
+  color: var(--texto-2);
+  font-size: 13px;
+}
+
+.foto-valores dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-2);
+  margin: var(--esp-1) 0 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.foto-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-2) var(--esp-3);
+}
+
+.foto-nota {
+  color: var(--texto-2);
+  font-size: 13px;
+}
+
+.foto-nombres {
+  margin: var(--esp-2) 0 0;
+  padding-left: var(--esp-5);
+}
+
+.foto-sin-dato summary {
+  width: fit-content;
+  color: var(--texto-2);
+  cursor: pointer;
+}
+
+.foto-sin-dato summary:hover {
+  color: var(--texto-1);
+}
+
+.foto-sin-dato > p {
+  max-width: 72ch;
+  margin-top: var(--esp-2);
+  color: var(--texto-2);
+}
+
+#foto-titulo:focus {
+  outline: none;
+}
+
+@media (max-width: 480px) {
+  .foto-valores {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

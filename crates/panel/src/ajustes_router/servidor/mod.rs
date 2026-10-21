@@ -1,5 +1,6 @@
 //! Lado del servidor de Ajustes: lectura, guardado y errores comunes.
 
+mod foto;
 mod guardar;
 mod historial;
 mod lectura;
@@ -8,6 +9,8 @@ mod red_local;
 #[cfg(test)]
 mod tests;
 
+pub use foto::valor_en_foto;
+pub(super) use foto::{comparar_con_partida, preparar_volver_a_partida};
 pub(super) use guardar::{confirmar_ajuste, preparar_ajuste};
 pub(super) use historial::deshacer_ajuste;
 pub(crate) use historial::etiquetas_de_campos;
@@ -67,6 +70,7 @@ pub(super) async fn leer_tema(tema: String) -> Result<TemaVista, ServerFnError> 
     Ok(TemaVista {
         tema: tema.slug().to_owned(),
         solo_lectura: instancia::solo_lectura(&state.db).await,
+        foto_de_partida: crate::fotos::hay(&state.db, crate::fotos::TipoFoto::Partida).await,
         ajustes,
     })
 }

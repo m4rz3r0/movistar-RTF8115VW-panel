@@ -5,7 +5,8 @@
 # E2E_MODO:
 #   instalado  (por defecto) con el usuario «e2e», las credenciales del router
 #              en RP_ROUTER_* (el panel las importa, como al actualizar un
-#              servidor) y un grupo de dos pasos ya aplicado (e2e_grupo);
+#              servidor), la foto de partida y un grupo de dos pasos ya
+#              aplicado (e2e_grupo);
 #   nuevo      recién instalado: sin usuarios ni router (el asistente).
 # Necesita antes, en la raíz del repositorio: `cargo leptos build`, `cargo
 # build -p router-sim` y `cargo build -p panel --features ssr --example

@@ -8,10 +8,12 @@
 //! diálogo de grupo; los dispositivos y las IP fijas de Red local tienen su
 //! propio componente ([`dispositivos`], [`reservas`]), y las reglas de
 //! apertura de puertos el suyo ([`puertos`]). Un tema que no
-//! existe es «página no encontrada».
+//! existe es «página no encontrada». Si hay foto de partida, cada tema
+//! enlaza a «Cómo estaba al instalar» ([`foto`], `/ajustes/foto-de-partida`).
 
 mod campo;
 mod dispositivos;
+mod foto;
 mod puertos;
 mod reservas;
 mod tarjeta;
@@ -32,6 +34,8 @@ use leptos_router::{
 };
 use std::{collections::HashSet, time::Duration};
 use tarjeta::Tarjeta;
+
+pub use foto::{PaginaFoto, RUTA_FOTO};
 
 /// Espera antes de enseñar «Actualizando…»: una lectura más rápida (de la
 /// caché del servidor) no hace parpadear la página.
@@ -476,6 +480,14 @@ fn ContenidoTema(t: TemaVista, recargar: Callback<()>) -> impl IntoView {
         }
     });
     let tema = format!("ajustes-tema-{}-desc", t.tema);
+    // Solo si hay con qué comparar.
+    let foto = t.foto_de_partida.then(|| {
+        view! {
+            <p class="tema-foto">
+                <a href=RUTA_FOTO>{t!("ajustes-foto-enlace")}</a>
+            </p>
+        }
+    });
     // Qué significa «Oculto», una sola vez, delante de las tarjetas ocultas.
     let nota_oculto = |hay: bool| {
         hay.then(|| {
@@ -518,6 +530,7 @@ fn ContenidoTema(t: TemaVista, recargar: Callback<()>) -> impl IntoView {
     };
     view! {
         <p class="tema-desc">{traducir(&tema, None)}</p>
+        {foto}
         {aviso}
         {cuerpo}
     }

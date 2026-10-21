@@ -16,12 +16,12 @@ mod guardar;
 mod historial;
 mod ver;
 
-const CLAVE_1: &str = "clave-de-prueba-1";
+pub(crate) const CLAVE_1: &str = "clave-de-prueba-1";
 
-const CLAVE_2: &str = "clave-de-prueba-2";
+pub(crate) const CLAVE_2: &str = "clave-de-prueba-2";
 
 /// Escribe en el punto de acceso `id` del simulador, como lo haría el router.
-async fn escribir_punto(p: &Panel, id: &str, pares: &[(&str, &str)]) {
+pub(crate) async fn escribir_punto(p: &Panel, id: &str, pares: &[(&str, &str)]) {
     let mut params = vec![("dpm_cfg_wifi_acc_pt_id", id)];
     params.extend_from_slice(pares);
     p.state
@@ -43,7 +43,12 @@ async fn clave_del_punto(p: &Panel, id: &str) -> String {
 }
 
 /// Llamada a una server function: estado, `Cache-Control` y cuerpo.
-async fn llamada(p: &Panel, nombre: &str, cuerpo: Value, cookie: &str) -> (u16, String, String) {
+pub(crate) async fn llamada(
+    p: &Panel,
+    nombre: &str,
+    cuerpo: Value,
+    cookie: &str,
+) -> (u16, String, String) {
     let mut req = post_json(&format!("/api/{nombre}"), &cuerpo.to_string(), "127.0.0.1");
     req.headers_mut().insert("cookie", cookie.parse().unwrap());
     let resp = send(&p.app, req).await;
@@ -76,7 +81,7 @@ async fn cambiar_clave_5(p: &Panel, cookie: &str, nueva: &str) -> i64 {
 }
 
 /// La página `ruta` como la pide el navegador: su HTML.
-async fn html(p: &Panel, cookie: &str, ruta: &str) -> String {
+pub(crate) async fn html(p: &Panel, cookie: &str, ruta: &str) -> String {
     let resp = send(
         &p.app,
         axum::http::Request::get(ruta)
@@ -135,7 +140,7 @@ fn ultima_escritura(p: &Panel, funcion: &str) -> Vec<(String, String)> {
 
 /// Texto que se lee en pantalla de un trozo de HTML: lo de fuera de las
 /// etiquetas (sin los atributos).
-fn texto_visible(html: &str) -> String {
+pub(crate) fn texto_visible(html: &str) -> String {
     let mut out = String::new();
     let mut dentro = false;
     for c in html.chars() {

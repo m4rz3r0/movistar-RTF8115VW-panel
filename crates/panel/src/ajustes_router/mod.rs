@@ -89,6 +89,30 @@ pub async fn leer_reservas() -> Result<Vec<String>, ServerFnError> {
     servidor::leer_reservas().await
 }
 
+/// Lo que ha cambiado desde la foto de partida (la lectura del asistente
+/// de instalación), con el router de ahora (lecturas para mostrar, como
+/// [`leer_tema`]). Sin foto, [`ComparacionVista::momento`] es `None`. Los
+/// secretos se comparan aquí y solo viajan los que difieren, para su campo
+/// con el ojo. Exige sesión; la respuesta va con `no-store`.
+#[server(endpoint = "comparar_con_partida", input = Json)]
+pub async fn comparar_con_partida() -> Result<ComparacionVista, ServerFnError> {
+    servidor::comparar_con_partida().await
+}
+
+/// Prepara el cambio que vuelve el campo `campo` del ajuste `ajuste` (o,
+/// sin campo, todos los que se pueden) al valor de la foto de partida, como
+/// [`preparar_ajuste`]: se confirma con [`confirmar_ajuste`] y el resumen
+/// enmascara los secretos. Las listas no se restauran (400), ni un valor
+/// que el panel no reconoce o un secreto que el router no dejaba leer.
+#[server(endpoint = "preparar_volver_a_partida", input = Json)]
+pub async fn preparar_volver_a_partida(
+    ajuste: String,
+    campo: Option<String>,
+    instancia: Option<String>,
+) -> Result<GrupoVista, ServerFnError> {
+    servidor::preparar_volver_a_partida(ajuste, campo, instancia).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -111,3 +135,5 @@ mod tests {
 
 #[cfg(feature = "ssr")]
 pub(crate) mod servidor;
+#[cfg(feature = "ssr")]
+pub use servidor::valor_en_foto;
