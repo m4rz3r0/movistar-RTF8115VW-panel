@@ -179,7 +179,6 @@ pub(crate) mod servidor {
     use leptos_axum::ResponseOptions;
     use sha2::{Digest, Sha256};
     use std::{
-        collections::BTreeMap,
         io::Write,
         net::{IpAddr, Ipv4Addr, SocketAddr},
         path::{Path, PathBuf},
@@ -647,27 +646,15 @@ pub(crate) mod servidor {
         if !state.hgu.configurado() {
             return Err(fallo(StatusCode::CONFLICT, t!("instalar-error-sin-router")));
         }
-        let mut foto = BTreeMap::new();
-        let mut fallidas = Vec::new();
-        let mut firmware = String::new();
-        {
+        let fotos::FotoLeida {
+            contenido: foto,
+            fallidas,
+            mut firmware,
+        } = {
             // Sin el sondeo en medio: la lectura es una sola foto.
             let _pausa = state.poller.pause().await;
-            for (nombre, params) in lecturas_de_partida(&state.catalogo) {
-                match state.hgu.call(nombre, &params).await {
-                    Ok(n) => {
-                        if nombre == "cbGetSummary" {
-                            firmware = hgu::models::Summary::from_node(&n).firmware;
-                        }
-                        foto.insert(nombre.to_owned(), n.to_xml());
-                    }
-                    Err(e) => {
-                        tracing::warn!("lectura inicial: {nombre}: {e}");
-                        fallidas.push(nombre.to_owned());
-                    }
-                }
-            }
-        }
+            fotos::leer_partida(state).await
+        };
         // La red ya se detectó al guardar las credenciales; si aquello no
         // llegó a tiempo (o falló), se intenta ahora.
         let red = match state.red() {

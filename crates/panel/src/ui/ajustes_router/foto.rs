@@ -9,7 +9,7 @@
 //! informativas, sin botón. Un secreto que ha cambiado se ve en sus dos
 //! campos censurados con el ojo (de solo lectura).
 
-use super::campo::{etiqueta, valor_resumido};
+use super::campo::{CampoSecreto, etiqueta, validar, valor_resumido};
 use super::tarjeta::enfocar;
 use super::{RUTA_AJUSTES, nombre, ruta};
 use crate::ajustes_router::{
@@ -56,7 +56,6 @@ pub fn PaginaFoto() -> impl IntoView {
         <header class="pagina-cabecera">
             <div>
                 <h1 id=TITULO tabindex="-1">{t!("ajustes-foto-titulo")}</h1>
-                <p class="pagina-sub">{t!("ajustes-foto-desc")}</p>
             </div>
         </header>
         <p class="foto-volver">
@@ -100,6 +99,8 @@ fn Comparacion(c: ComparacionVista, pagina: Pagina) -> impl IntoView {
         .into_any();
     };
     let tomada = t!("ajustes-foto-tomada", fecha = fecha_hora(momento, false));
+    // Lo que hace la página, solo si hay con qué comparar.
+    let desc = t!("ajustes-foto-desc");
     let cuerpo = if c.diferencias.is_empty() {
         view! {
             <p class="aviso estado-ok foto-aviso" role="status">
@@ -132,6 +133,7 @@ fn Comparacion(c: ComparacionVista, pagina: Pagina) -> impl IntoView {
         }
     });
     view! {
+        <p class="foto-desc">{desc}</p>
         <p class="foto-fecha">{tomada}</p>
         {sin_leer}
         {cuerpo}
@@ -213,6 +215,7 @@ fn fila(d: DiferenciaVista, pagina: Pagina) -> AnyView {
             partida,
             actual,
             restaurable,
+            pide,
         } => {
             let id = format!(
                 "foto-{}-{}{}",
@@ -224,7 +227,8 @@ fn fila(d: DiferenciaVista, pagina: Pagina) -> AnyView {
                     .unwrap_or_default()
             );
             let boton = (restaurable && !pagina.solo_lectura).then(|| {
-                view! { <BotonVolver ajuste=d.ajuste campo=partida.id.clone() descrito=id.clone() pagina /> }
+                let pide = pide.map(|c| *c);
+                view! { <BotonVolver ajuste=d.ajuste campo=partida.id.clone() descrito=id.clone() pide pagina /> }
             });
             view! {
                 <div class="foto-fila">
@@ -272,27 +276,66 @@ fn instancia(que: String, campos: &[CampoVista]) -> AnyView {
 }
 
 /// «Volver a este valor»: prepara el cambio y abre el diálogo; un error se
-/// ve junto al botón.
+/// ve junto al botón. Si en la misma escritura va una clave que el router no
+/// deja leer (`pide`), la pide aquí, como la tarjeta del ajuste: sin ella no
+/// se prepara nada.
 #[component]
-fn BotonVolver(ajuste: String, campo: String, descrito: String, pagina: Pagina) -> impl IntoView {
+fn BotonVolver(
+    ajuste: String,
+    campo: String,
+    descrito: String,
+    pide: Option<CampoVista>,
+    pagina: Pagina,
+) -> impl IntoView {
     let preparando = RwSignal::new(false);
     let error = RwSignal::new(None::<String>);
+    let clave = RwSignal::new(String::new());
+    let error_clave = RwSignal::new(None::<String>);
+    let dom = format!("{descrito}-clave");
+    let control = format!("{dom}-control");
+    let pedida = pide.clone();
     let volver = move |_| {
         if preparando.get_untracked() {
             return;
         }
-        preparando.set(true);
         error.set(None);
+        let enviada = match &pedida {
+            None => None,
+            Some(c) => {
+                let v = clave.get_untracked();
+                let mal = if v.is_empty() {
+                    Some(t!("ajustes-error-vacio"))
+                } else {
+                    validar(c, &v).err()
+                };
+                if let Some(m) = mal {
+                    error_clave.set(Some(m));
+                    enfocar(&control);
+                    return;
+                }
+                Some(v)
+            }
+        };
+        preparando.set(true);
         let (ajuste, id) = (ajuste.clone(), campo.clone());
         spawn_local(async move {
-            match preparar_volver_a_partida(ajuste, Some(id), None).await {
+            match preparar_volver_a_partida(ajuste, Some(id), None, enviada).await {
                 Ok(g) => pagina.grupo.set(Some(g)),
                 Err(e) => error.set(Some(texto_error(&e))),
             }
             preparando.set(false);
         });
     };
+    let pedir = pide.map(|c| {
+        view! {
+            <div class="foto-pide">
+                <p class="foto-nota">{t!("ajustes-secreto-tapado-pedir")}</p>
+                <CampoSecreto c dom valor=clave error=error_clave bloqueado=preparando.into() />
+            </div>
+        }
+    });
     view! {
+        {pedir}
         <div class="foto-acciones">
             // Sin `disabled`: el botón conserva el foco y el diálogo se lo
             // devuelve al cerrarse.

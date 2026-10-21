@@ -3677,3 +3677,23 @@ summary.hist-cabeza:hover {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.foto-desc {
+  max-width: 880px;
+}
+
+.foto-tema-cabecera h2 {
+  font-size: 20px;
+}
+
+/* Como el título de las tarjetas de los temas. */
+.foto-ajuste h3 {
+  font-size: 17px;
+}
+
+.foto-pide {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-2);
+  max-width: 480px;
+}

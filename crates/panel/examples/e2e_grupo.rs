@@ -19,7 +19,7 @@ use panel::{
     changes::{ChangeManager, ChangeRequest, Estado, GrupoRequest, Paso, Tiempos},
     config::Config,
     fotos::{self, TipoFoto},
-    instalar, instancia,
+    instancia,
     state::AppState,
 };
 use std::{collections::BTreeMap, process::ExitCode, sync::Arc, time::Duration};
@@ -64,16 +64,16 @@ async fn aplicar_grupo(gestor: &Arc<ChangeManager>, grupo: GrupoRequest) -> Resu
     Err(format!("el cambio {id} no terminó en 20 s"))
 }
 
-/// Toma la foto de partida como el asistente: cada lectura de partida del
-/// router (las que fallen, fuera); su id.
+/// Toma la foto de partida como el asistente (la misma lectura); su id.
 async fn tomar_foto(state: &AppState) -> Result<i64, String> {
-    let mut foto = BTreeMap::new();
-    for (nombre, params) in instalar::lecturas_de_partida(&state.catalogo) {
-        if let Ok(n) = state.hgu.call(nombre, &params).await {
-            foto.insert(nombre.to_owned(), n.to_xml());
-        }
-    }
-    fotos::guardar(&state.db, &state.history_key, TipoFoto::Partida, &foto).await
+    let foto = fotos::leer_partida(state).await;
+    fotos::guardar(
+        &state.db,
+        &state.history_key,
+        TipoFoto::Partida,
+        &foto.contenido,
+    )
+    .await
 }
 
 async fn estado() -> Result<AppState, String> {

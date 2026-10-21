@@ -9,7 +9,6 @@ mod red_local;
 #[cfg(test)]
 mod tests;
 
-pub use foto::valor_en_foto;
 pub(super) use foto::{comparar_con_partida, preparar_volver_a_partida};
 pub(super) use guardar::{confirmar_ajuste, preparar_ajuste};
 pub(super) use historial::deshacer_ajuste;

@@ -8,30 +8,32 @@ use crate::comun::{
 };
 use panel::fotos::{self, TipoFoto};
 use serde_json::{Value, json};
-use std::collections::BTreeMap;
 
+mod clave;
+mod completa;
 mod pagina;
 
 const RUTA: &str = "/ajustes/foto-de-partida";
 
-/// Toma la foto de partida como el asistente: cada lectura de partida del
-/// simulador, cifrada en la tabla `fotos`.
+/// Toma la foto de partida con la misma lectura que el asistente, cifrada
+/// en la tabla `fotos`.
 pub(crate) async fn tomar_foto(p: &Panel) {
-    let mut foto = BTreeMap::new();
-    for (nombre, params) in panel::instalar::lecturas_de_partida(&p.state.catalogo) {
-        if let Ok(n) = p.state.hgu.call(nombre, &params).await {
-            foto.insert(nombre.to_owned(), n.to_xml());
-        }
-    }
-    fotos::guardar(&p.state.db, &p.state.history_key, TipoFoto::Partida, &foto)
-        .await
-        .unwrap();
+    let foto = fotos::leer_partida(&p.state).await;
+    assert_eq!(foto.fallidas, Vec::<String>::new());
+    fotos::guardar(
+        &p.state.db,
+        &p.state.history_key,
+        TipoFoto::Partida,
+        &foto.contenido,
+    )
+    .await
+    .unwrap();
     // Lo de ahora, del router (no de una lectura anterior a la foto).
     p.state.lecturas.invalidar();
 }
 
 /// Las diferencias de la comparación del ajuste `ajuste`.
-fn del_ajuste<'a>(c: &'a Value, ajuste: &str) -> Vec<&'a Value> {
+pub(crate) fn del_ajuste<'a>(c: &'a Value, ajuste: &str) -> Vec<&'a Value> {
     c["diferencias"]
         .as_array()
         .unwrap()
@@ -60,7 +62,7 @@ async fn upnp(p: &Panel) -> String {
 }
 
 /// Pide volver `campo` del ajuste `ajuste` a la foto: estado y cuerpo.
-async fn volver(
+pub(crate) async fn volver(
     p: &Panel,
     cookie: Option<&str>,
     ajuste: &str,
@@ -83,13 +85,8 @@ async fn comparar_tras_un_cambio() {
     let c = ok(&p, "comparar_con_partida", json!({}), &cookie).await;
     assert!(c["momento"].as_i64().is_some_and(|m| m > 0), "{c}");
     assert_eq!(c["diferencias"], json!([]), "recién tomada");
-    // Las IP fijas se leen con un parámetro que la foto no lleva.
-    let sin_dato = c["sin_dato"].as_array().unwrap();
-    assert!(
-        sin_dato.contains(&json!("ajuste-red_local-reservas")),
-        "{c}"
-    );
     // Los dispositivos conectados no son un ajuste que comparar.
+    let sin_dato = c["sin_dato"].as_array().unwrap();
     assert!(
         !sin_dato.contains(&json!("ajuste-red_local-dispositivos")),
         "{c}"
@@ -186,13 +183,11 @@ async fn volver_a_partida_rechaza_lo_que_no_se_restaura() {
     let (status, body) = volver(&p, c, "puertos.reglas", None, Some("0")).await;
     assert_eq!(status, 400, "{body}");
     assert!(body.contains("listas"), "{body}");
-    // Un ajuste sin dato en la foto.
-    assert_eq!(
-        volver(&p, c, "red_local.dhcp", Some("activo"), None)
-            .await
-            .0,
-        404
-    );
+    // Una instancia en un ajuste que no es lista no vale (y no habla de
+    // listas).
+    let (status, body) = volver(&p, c, "puertos.upnp", Some("activo"), Some("0")).await;
+    assert_eq!(status, 400, "{body}");
+    assert!(!body.contains("listas"), "{body}");
     // Ni un ajuste o un campo que no existen.
     assert_eq!(volver(&p, c, "puertos.nada", None, None).await.0, 404);
     assert_eq!(

@@ -361,7 +361,7 @@ pub(crate) fn Campo(
 /// censurado y con el ojo, que se edita ahí mismo. Si el router no deja
 /// leerlo, sale vacío y lo dice; uno tapado al leer se pide al guardar.
 #[component]
-fn CampoSecreto(
+pub(super) fn CampoSecreto(
     c: CampoVista,
     dom: String,
     valor: RwSignal<String>,

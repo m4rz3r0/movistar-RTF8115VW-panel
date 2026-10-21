@@ -1,6 +1,10 @@
 //! Fotos de la configuración del router: la respuesta de cada lectura, por
 //! nombre de función, guardada cifrada con la clave maestra (tabla `fotos`).
 
+mod partida;
+
+pub use partida::{FotoLeida, juntar, leer_partida};
+
 use crate::crypto::HistoryKey;
 use sqlx::SqlitePool;
 use std::collections::BTreeMap;
@@ -41,36 +45,58 @@ pub async fn guardar(
         .map_err(|e| format!("no se puede guardar la foto: {e}"))
 }
 
+/// Por qué no se puede leer una foto que hay.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FotoIlegible {
+    /// La base de datos no responde.
+    BaseDeDatos,
+    /// No se descifra: la clave maestra (`RP_HISTORY_KEY`) ya no es la de
+    /// cuando se tomó.
+    Cifrado,
+}
+
 /// La foto más reciente de `tipo` con su id; `None` si no hay o no se puede
-/// leer o descifrar (el error queda registrado, sin el contenido).
+/// leer o descifrar (el error queda registrado, sin el contenido). Para
+/// distinguir esos casos, [`leer_ultima`].
 pub async fn ultima(
     db: &SqlitePool,
     clave: &HistoryKey,
     tipo: TipoFoto,
 ) -> Option<(i64, BTreeMap<String, String>)> {
-    let fila: Option<(i64, Vec<u8>)> = match sqlx::query_as(
-        "SELECT id, contenido FROM fotos WHERE tipo = ? ORDER BY id DESC LIMIT 1",
-    )
-    .bind(tipo.como_texto())
-    .fetch_optional(db)
-    .await
-    {
-        Ok(f) => f,
-        Err(e) => {
-            tracing::error!("no se puede leer la foto {}: {e}", tipo.como_texto());
-            return None;
-        }
+    leer_ultima(db, clave, tipo).await.ok().flatten()
+}
+
+/// La foto más reciente de `tipo` con su id: `Ok(None)` si no hay, `Err` si
+/// la hay y no se puede leer (el error queda registrado, sin el contenido).
+pub async fn leer_ultima(
+    db: &SqlitePool,
+    clave: &HistoryKey,
+    tipo: TipoFoto,
+) -> Result<Option<(i64, BTreeMap<String, String>)>, FotoIlegible> {
+    let fila: Option<(i64, Vec<u8>)> =
+        sqlx::query_as("SELECT id, contenido FROM fotos WHERE tipo = ? ORDER BY id DESC LIMIT 1")
+            .bind(tipo.como_texto())
+            .fetch_optional(db)
+            .await
+            .map_err(|e| {
+                tracing::error!("no se puede leer la foto {}: {e}", tipo.como_texto());
+                FotoIlegible::BaseDeDatos
+            })?;
+    let Some((id, cifrado)) = fila else {
+        return Ok(None);
     };
-    let (id, cifrado) = fila?;
     let contenido = clave
         .open(&cifrado)
         .and_then(|plano| serde_json::from_slice(&plano).ok());
-    if contenido.is_none() {
-        tracing::error!(
-            "no se puede descifrar la foto {id}: ¿ha cambiado la clave maestra (RP_HISTORY_KEY)?"
-        );
+    match contenido {
+        Some(c) => Ok(Some((id, c))),
+        None => {
+            tracing::error!(
+                "no se puede descifrar la foto {id}: ¿ha cambiado la clave maestra (RP_HISTORY_KEY)?"
+            );
+            Err(FotoIlegible::Cifrado)
+        }
     }
-    contenido.map(|c| (id, c))
 }
 
 /// ¿Hay alguna foto de `tipo`? Sin descifrarla (`false` si no se puede

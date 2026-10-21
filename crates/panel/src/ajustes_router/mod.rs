@@ -104,19 +104,58 @@ pub async fn comparar_con_partida() -> Result<ComparacionVista, ServerFnError> {
 /// [`preparar_ajuste`]: se confirma con [`confirmar_ajuste`] y el resumen
 /// enmascara los secretos. Las listas no se restauran (400), ni un valor
 /// que el panel no reconoce o un secreto que el router no dejaba leer.
+/// `clave` es la que el router no deja leer y va en la misma escritura
+/// ([`Diferencia::Valor`]`::pide`): sin ella, el router no escribe.
 #[server(endpoint = "preparar_volver_a_partida", input = Json)]
 pub async fn preparar_volver_a_partida(
     ajuste: String,
     campo: Option<String>,
     instancia: Option<String>,
+    clave: Option<String>,
 ) -> Result<GrupoVista, ServerFnError> {
-    servidor::preparar_volver_a_partida(ajuste, campo, instancia).await
+    servidor::preparar_volver_a_partida(ajuste, campo, instancia, clave).await
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::collections::BTreeMap;
+
+    /// El valor de un secreto no sale en el `Debug` de su campo (ni en el de
+    /// lo que lo lleva, como una comparación con la foto de partida).
+    #[test]
+    fn debug_del_campo_no_ensena_el_secreto() {
+        let c = CampoVista {
+            id: "contrasena".into(),
+            clave: "ajuste-wifi-red_5-contrasena".into(),
+            tipo: ajustes::TipoCampo::Secreto,
+            valor: ajustes::ValorLegible::Secreto,
+            opciones: Vec::new(),
+            min: None,
+            max: None,
+            ascii: true,
+            opcional: false,
+            solo_lectura: None,
+            tapado: false,
+            valor_secreto: Some("clave-de-prueba-9".into()),
+            recomendado: None,
+            motivo_recomendado: None,
+            requiere: None,
+            sin_eleccion: false,
+        };
+        let d = Diferencia::Valor {
+            partida: Box::new(c.clone()),
+            actual: Box::new(c),
+            restaurable: true,
+            pide: None,
+        };
+        let texto = format!("{d:?}");
+        assert!(!texto.contains("clave-de-prueba-9"), "{texto}");
+        assert!(
+            texto.contains("contrasena") && texto.contains("(oculto)"),
+            "{texto}"
+        );
+    }
 
     #[test]
     fn debug_de_la_peticion_no_ensena_los_valores() {
@@ -135,5 +174,3 @@ mod tests {
 
 #[cfg(feature = "ssr")]
 pub(crate) mod servidor;
-#[cfg(feature = "ssr")]
-pub use servidor::valor_en_foto;

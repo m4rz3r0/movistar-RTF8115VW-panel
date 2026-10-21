@@ -2,12 +2,15 @@
 //! instalación ([`comparar_con_partida`]) y volver un ajuste a como estaba
 //! ([`preparar_volver_a_partida`]).
 //!
-//! La foto guarda la respuesta de cada función de lectura leída sin
-//! parámetros (o con `all=ALL`): en una función con varias instancias (los
-//! puntos de acceso WiFi, las radios) trae todas, y la de un ajuste se busca
-//! por los parámetros de su `leer` y sus `fijos` ([`valor_en_foto`]).
+//! La foto ([`fotos::leer_partida`]) guarda, por función, lo que leyó el
+//! asistente: la lectura de partida de cada función y la exacta de cada
+//! ajuste (un punto de acceso WiFi o una radio por su id…), con las
+//! instancias de una misma función juntas en su nodo. La de un ajuste se
+//! busca ahí por los parámetros de su `leer` y sus `fijos`
+//! ([`valor_en_foto`]). Una foto tomada con una versión anterior del panel
+//! solo tiene la lectura de partida: lo que no trae sale «sin dato».
 
-use super::lectura::{campo, hojas, instancias_con_id, valor_secreto};
+use super::lectura::{campo, hojas, instancias_con_id, tapado, valor_secreto};
 use super::*;
 use crate::fotos::{self, TipoFoto};
 use crate::ui::explorador::servidor::sin_guardar;
@@ -90,7 +93,7 @@ fn instancia_en_foto(a: &Ajuste, n: &XmlNode) -> Option<Leidos> {
 /// Valor del router (tal cual) del campo `campo` de `a` en la foto `xml`
 /// de su lectura: en una lista, el de la instancia `instancia`; si no, el
 /// de la instancia que eligen su `leer` y sus `fijos`. `None` si no está.
-pub fn valor_en_foto(
+fn valor_en_foto(
     f: &Catalogo,
     a: &Ajuste,
     campo: &Campo,
@@ -115,6 +118,7 @@ pub fn valor_en_foto(
 /// del router, que solo sale en el campo con el ojo de cada lado.
 fn diferencia_de_campo(
     f: &Catalogo,
+    a: &Ajuste,
     prefijo: &str,
     c: &Campo,
     antes: &Leidos,
@@ -139,10 +143,34 @@ fn diferencia_de_campo(
             ValorLegible::Secreto => secreto_antes.as_deref().is_some_and(|v| !v.is_empty()),
             _ => true,
         };
+    let pide = restaurable
+        .then(|| clave_que_falta(f, a, c, ahora))
+        .flatten()
+        .map(|t| Box::new(campo(f, prefijo, t, ValorLegible::Secreto, None)));
     Some(Diferencia::Valor {
         partida: Box::new(campo(f, prefijo, c, l_antes, secreto_antes)),
         actual: Box::new(campo(f, prefijo, c, l_ahora, valor_secreto(f, c, ahora))),
         restaurable,
+        pide,
+    })
+}
+
+/// La clave que el router no deja leer (tapada al leerla) y que va en la
+/// misma escritura que el campo `c`: sin ella el router no escribe `c`
+/// (reenviarla vacía la borraría), así que hay que pedirla. `None` si no
+/// hay ninguna o el router sí da su valor.
+fn clave_que_falta<'a>(
+    f: &Catalogo,
+    a: &'a Ajuste,
+    c: &Campo,
+    ahora: &Leidos,
+) -> Option<&'a Campo> {
+    let funcion = &c.escribible()?.funcion;
+    a.campos.iter().find(|o| {
+        o.id != c.id
+            && tapado(f, o)
+            && o.escribible().is_some_and(|e| e.funcion == *funcion)
+            && valor_secreto(f, o, ahora).is_none()
     })
 }
 
@@ -178,7 +206,7 @@ fn diferencias(
         return Some(
             a.campos
                 .iter()
-                .filter_map(|c| diferencia_de_campo(f, &prefijo, c, &antes, &ahora_l, false))
+                .filter_map(|c| diferencia_de_campo(f, a, &prefijo, c, &antes, &ahora_l, false))
                 .map(|d| fila(None, d))
                 .collect(),
         );
@@ -195,7 +223,7 @@ fn diferencias(
             Some((_, l_ahora)) => out.extend(
                 a.campos
                     .iter()
-                    .filter_map(|c| diferencia_de_campo(f, &prefijo, c, l, l_ahora, true))
+                    .filter_map(|c| diferencia_de_campo(f, a, &prefijo, c, l, l_ahora, true))
                     .map(|d| fila(Some(id), d)),
             ),
         }
@@ -226,8 +254,7 @@ pub(in crate::ajustes_router) async fn comparar_con_partida()
     let (state, _) = preparar().await?;
     sin_guardar();
     let solo_lectura = instancia::solo_lectura(&state.db).await;
-    let Some((id, foto)) = fotos::ultima(&state.db, &state.history_key, TipoFoto::Partida).await
-    else {
+    let Some((id, foto)) = ultima(&state).await? else {
         return Ok(ComparacionVista {
             momento: None,
             solo_lectura,
@@ -267,6 +294,25 @@ pub(in crate::ajustes_router) async fn comparar_con_partida()
     Ok(c)
 }
 
+/// La foto de partida, si hay; una que no se puede descifrar es un error
+/// que lo dice (no «no hay foto»).
+async fn ultima(
+    state: &AppState,
+) -> Result<Option<(i64, BTreeMap<String, String>)>, ServerFnError> {
+    fotos::leer_ultima(&state.db, &state.history_key, TipoFoto::Partida)
+        .await
+        .map_err(|e| {
+            let clave = match e {
+                fotos::FotoIlegible::Cifrado => "ajustes-foto-error-cifrado",
+                fotos::FotoIlegible::BaseDeDatos => "ajustes-foto-error-leer",
+            };
+            fallo(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                crate::ui::i18n::traducir(clave, None),
+            )
+        })
+}
+
 /// Error 400 de volver a la foto, con su mensaje.
 fn no_se_puede(clave: &str) -> ServerFnError {
     fallo(
@@ -296,19 +342,22 @@ pub(in crate::ajustes_router) async fn preparar_volver_a_partida(
     ajuste: String,
     campo: Option<String>,
     instancia: Option<String>,
+    clave: Option<String>,
 ) -> Result<GrupoVista, ServerFnError> {
     let (state, _) = preparar().await?;
     let a = ajuste_por_id(&state, &ajuste)?;
-    if a.lista || instancia.is_some() {
+    if a.lista {
         return Err(no_se_puede("ajustes-foto-error-lista"));
     }
+    if instancia.is_some() {
+        return Err(no_se_puede("ajustes-error-invalida"));
+    }
     let sin_dato = || fallo(StatusCode::NOT_FOUND, t!("ajustes-foto-error-sin-dato"));
-    let (_, foto) = fotos::ultima(&state.db, &state.history_key, TipoFoto::Partida)
-        .await
+    let (_, foto) = ultima(&state)
+        .await?
         .ok_or_else(|| fallo(StatusCode::NOT_FOUND, t!("ajustes-foto-error-sin-foto")))?;
-    let leidos = foto
-        .get(&a.leer.funcion)
-        .and_then(|xml| nodo(a, xml))
+    let xml = foto.get(&a.leer.funcion).ok_or_else(sin_dato)?;
+    let leidos = nodo(a, xml)
         .and_then(|n| instancia_en_foto(a, &n))
         .ok_or_else(sin_dato)?;
     let mut valores = BTreeMap::new();
@@ -317,7 +366,7 @@ pub(in crate::ajustes_router) async fn preparar_volver_a_partida(
             let c = a
                 .campo(&id)
                 .ok_or_else(|| fallo(StatusCode::NOT_FOUND, t!("ajustes-error-campo")))?;
-            if leido(&leidos, &c.lee).is_none() {
+            if valor_en_foto(&state.catalogo, a, c, xml, None).is_none() {
                 return Err(sin_dato());
             }
             let v = valor_para_volver(&state.catalogo, c, &leidos).map_err(no_se_puede)?;
@@ -336,6 +385,24 @@ pub(in crate::ajustes_router) async fn preparar_volver_a_partida(
     }
     if valores.is_empty() {
         return Err(error_ajuste(CambioError::SinCambios));
+    }
+    // La clave tapada que va en la misma escritura, si la página la ha
+    // pedido; vacía no se envía (el gestor no escribe sin ella).
+    if let Some(clave) = clave.filter(|v| !v.is_empty()) {
+        let funciones: Vec<&str> = valores
+            .keys()
+            .filter_map(|id| a.campo(id)?.escribible())
+            .map(|e| e.funcion.as_str())
+            .collect();
+        let tapada = a.campos.iter().find(|o| {
+            tapado(&state.catalogo, o)
+                && !valores.contains_key(&o.id)
+                && o.escribible()
+                    .is_some_and(|e| funciones.contains(&e.funcion.as_str()))
+        });
+        if let Some(o) = tapada {
+            valores.insert(o.id.clone(), clave);
+        }
     }
     super::preparar_ajuste(PeticionAjuste {
         ajuste,

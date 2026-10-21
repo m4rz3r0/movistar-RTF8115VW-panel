@@ -6,7 +6,9 @@ import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 // panel instalado del e2e tiene foto de partida y, después, UPnP y la clave
 // de la red de 5 GHz cambiados (e2e_grupo). Se entra desde la cabecera de
 // Puertos, se vuelve UPnP a su valor de la foto con el diálogo de siempre y
-// se deja como estaba; a 360 px, la clave que cambió se ve con el ojo.
+// se deja como estaba; a 360 px, la clave que cambió se ve con el ojo; en
+// Teléfono, volver a un valor pide la clave de la línea (el router no la
+// deja leer).
 //
 // Cada test deja el panel como estaba: se reparten entre los workers.
 test.describe.configure({ mode: "parallel" });
@@ -110,5 +112,55 @@ test("a 360 px, la clave que cambió con el ojo", async ({ page }) => {
   await expect(campo).toHaveAttribute("type", "text");
   await expect(campo).toHaveValue("clave-de-prueba-1");
   await sinDesbordamiento(page, "foto 360 con el ojo abierto");
+  expect(errores).toEqual([]);
+});
+
+test("Teléfono: volver a un valor pide la clave que el router no deja leer", async ({ page }) => {
+  // Dos cambios: provocar la diferencia y volver.
+  test.setTimeout(plazoDeTest(2));
+  await page.setViewportSize({ width: 1024, height: 900 });
+  const errores = recogerErrores(page);
+  await entrar(page);
+  // Cambia «Ahorro en los silencios» desde Ajustes (con la clave de la línea).
+  const tema = await api(page, "leer_tema", { tema: "telefono" });
+  const linea = tema.ajustes.find((a: { id: string }) => a.id === "telefono.linea");
+  const silencio = linea.campos.find((c: { id: string }) => c.id === "silencio").valor.Booleano;
+  const grupo = await api(page, "preparar_ajuste", {
+    p: {
+      ajuste: "telefono.linea",
+      instancia: null,
+      borrar: false,
+      valores: { silencio: String(!silencio), contrasena: "clave-de-prueba-3" },
+    },
+  });
+  await esperarFinal(page, await api(page, "confirmar_ajuste", { token: grupo.token, desmarcados: [] }));
+
+  await page.goto(RUTA);
+  await asentar(page);
+  const tarjeta = page.locator("article.foto-ajuste").filter({
+    has: page.getByRole("heading", { level: 3, name: "Línea de teléfono", exact: true }),
+  });
+  const fila = tarjeta.locator(".foto-fila").filter({ hasText: "Ahorro en los silencios" });
+  await expect(fila.getByText("El router no deja leer esta clave: escríbela para guardar los cambios.")).toBeVisible();
+  // Sin la clave, no se prepara nada.
+  await fila.getByRole("button", { name: "Volver a este valor" }).click();
+  await expect(fila.getByText("Este campo no puede quedar vacío.")).toBeVisible();
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
+  // Con ella, el diálogo de siempre, y aplicado.
+  const clave = fila.getByLabel("Contraseña de la línea", { exact: true });
+  await expect(clave).toBeFocused();
+  await clave.fill("clave-de-prueba-3");
+  await fila.getByRole("button", { name: "Volver a este valor" }).click();
+  const dialogo = page.locator("dialog[open]");
+  await expect(dialogo.locator("#grupo-titulo")).toHaveText("Revisa el cambio");
+  sinApi(await dialogo.innerText());
+  expect(await dialogo.innerText()).not.toContain("clave-de-prueba-3");
+  await dialogo.getByRole("button", { name: "Aplicar", exact: true }).click();
+  await expect(dialogo.getByText("Hecho: el router tiene ya el cambio.")).toBeVisible({
+    timeout: PLAZO_CAMBIO,
+  });
+  await dialogo.getByRole("button", { name: "Cerrar", exact: true }).click();
+  await expect(tarjeta).toHaveCount(0);
+  await sinDesbordamiento(page, "foto teléfono 1024");
   expect(errores).toEqual([]);
 });

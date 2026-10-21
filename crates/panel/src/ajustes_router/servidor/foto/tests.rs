@@ -9,40 +9,51 @@ fn fixture(nombre: &str) -> String {
     std::fs::read_to_string(format!("{ruta}{nombre}.xml")).unwrap()
 }
 
-/// Una foto de `cbGetWifiAccPt` con los dos puntos de acceso principales
-/// (el 0 de la lista de la radio de 2,4 GHz y el 1 leído por su id),
-/// como la daría el router leído sin parámetros.
-fn foto_de_los_dos_puntos() -> String {
-    let instancia = |raw: &str, funcion: &str, id: &str| {
-        let n = hgu::xml::parse_response(funcion, raw).unwrap();
-        n.children
-            .into_iter()
-            .find(|c| c.text_of("dpm_cfg_wifi_acc_pt_id") == Some(id))
-            .unwrap()
-    };
-    let p0 = instancia(
-        &fixture("cbListWifiAccPt__dpm_cfg_wifi_id=0"),
-        "cbListWifiAccPt",
-        "0",
-    );
-    let p1 = instancia(
-        &fixture("cbGetWifiAccPt__dpm_cfg_wifi_acc_pt_id=1"),
-        "cbGetWifiAccPt",
-        "1",
-    );
+/// Respuesta de la fixture `nombre` a una lectura de `funcion`.
+fn respuesta(funcion: &str, nombre: &str) -> XmlNode {
+    hgu::xml::parse_response(funcion, &fixture(nombre)).unwrap()
+}
+
+/// La foto de `funcion` tras juntar `respuestas` con el mismo código que
+/// usa la lectura de la foto de partida (`fotos::juntar`).
+fn juntadas(funcion: &str, respuestas: Vec<XmlNode>) -> String {
+    let mut foto = BTreeMap::new();
+    for r in respuestas {
+        crate::fotos::juntar(&mut foto, funcion, r);
+    }
+    foto.remove(funcion).unwrap().to_xml()
+}
+
+/// La respuesta del punto de acceso `id` leído por su id, como la da el
+/// router: la instancia de la lista de su radio, en un `cbGetWifiAccPt`.
+fn punto(id: &str) -> XmlNode {
+    let lista = respuesta("cbListWifiAccPt", "cbListWifiAccPt__dpm_cfg_wifi_id=0");
     XmlNode {
         tag: "cbGetWifiAccPt".into(),
         text: String::new(),
-        children: vec![p0, p1],
+        children: lista
+            .children
+            .into_iter()
+            .filter(|c| c.text_of("dpm_cfg_wifi_acc_pt_id") == Some(id))
+            .collect(),
     }
-    .to_xml()
 }
 
 #[test]
 fn valor_en_foto_por_instancia() {
     let f = Catalogo::load().unwrap();
     let cat = CatalogoAjustes::load().unwrap();
-    let xml = foto_de_los_dos_puntos();
+    // La de partida (sin parámetros: el 1) y las de cada ajuste (el 0 y,
+    // otra vez, el 1, que no se repite).
+    let xml = juntadas(
+        "cbGetWifiAccPt",
+        vec![
+            respuesta("cbGetWifiAccPt", "cbGetWifiAccPt__dpm_cfg_wifi_acc_pt_id=1"),
+            punto("0"),
+            respuesta("cbGetWifiAccPt", "cbGetWifiAccPt__dpm_cfg_wifi_acc_pt_id=1"),
+        ],
+    );
+    assert_eq!(xml.matches("<ssid>RED-1</ssid>").count(), 1, "sin repetir");
     let nombre = |ajuste: &str| {
         let a = cat.ajuste(ajuste).unwrap();
         valor_en_foto(&f, a, a.campo("nombre").unwrap(), &xml, None)
@@ -52,22 +63,13 @@ fn valor_en_foto_por_instancia() {
     // El de invitados (2) no está en esta foto.
     assert_eq!(nombre("wifi.invitados"), None);
     // Las radios, por `dpm_cfg_wifi_0i` (su `leer`) y `dpm_cfg_wifi_id`.
-    let radios = XmlNode {
-        tag: "cbGetWifi".into(),
-        text: String::new(),
-        children: ["0", "1"]
+    let radios = juntadas(
+        "cbGetWifi",
+        ["0", "1"]
             .into_iter()
-            .flat_map(|i| {
-                let raw = fixture(&format!("cbGetWifi__dpm_cfg_wifi_0i={i}"));
-                hgu::xml::parse_response("cbGetWifi", &raw)
-                    .unwrap()
-                    .children
-                    .into_iter()
-                    .filter(|c| !c.children.is_empty())
-            })
+            .map(|i| respuesta("cbGetWifi", &format!("cbGetWifi__dpm_cfg_wifi_0i={i}")))
             .collect(),
-    }
-    .to_xml();
+    );
     for (ajuste, id) in [("wifi.radio_24", "0"), ("wifi.radio_5", "1")] {
         let a = cat.ajuste(ajuste).unwrap();
         let encendida = a.campo("encendida").unwrap();

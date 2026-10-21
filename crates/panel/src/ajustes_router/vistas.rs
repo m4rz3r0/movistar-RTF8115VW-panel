@@ -57,8 +57,8 @@ pub enum EstadoLectura {
 }
 
 /// Un campo con su valor actual y lo que la página necesita para pintarlo y
-/// validarlo sin el catálogo.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// validarlo sin el catálogo. Su `Debug` no enseña el valor de un secreto.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CampoVista {
     pub id: String,
     /// Prefijo de sus claves de traducción (`ajuste-wifi-red_24-seguridad`):
@@ -101,6 +101,32 @@ pub struct CampoVista {
     /// la toma del espejo apagado): se ve como una opción más, pero no se
     /// escribe ni cuenta como elegida.
     pub sin_eleccion: bool,
+}
+
+impl std::fmt::Debug for CampoVista {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CampoVista")
+            .field("id", &self.id)
+            .field("clave", &self.clave)
+            .field("tipo", &self.tipo)
+            .field("valor", &self.valor)
+            .field("opciones", &self.opciones)
+            .field("min", &self.min)
+            .field("max", &self.max)
+            .field("ascii", &self.ascii)
+            .field("opcional", &self.opcional)
+            .field("solo_lectura", &self.solo_lectura)
+            .field("tapado", &self.tapado)
+            .field(
+                "valor_secreto",
+                &self.valor_secreto.as_ref().map(|_| "(oculto)"),
+            )
+            .field("recomendado", &self.recomendado)
+            .field("motivo_recomendado", &self.motivo_recomendado)
+            .field("requiere", &self.requiere)
+            .field("sin_eleccion", &self.sin_eleccion)
+            .finish()
+    }
 }
 
 /// Una opción de un campo `opcion`.
@@ -302,6 +328,10 @@ pub enum Diferencia {
         partida: Box<CampoVista>,
         actual: Box<CampoVista>,
         restaurable: bool,
+        /// La clave que el router no deja leer y va en la misma escritura:
+        /// para volver, la página la pide (sin ella no se escribe).
+        #[serde(default)]
+        pide: Option<Box<CampoVista>>,
     },
     /// Una instancia de una lista que no estaba en la foto, con sus campos
     /// (sin los secretos). Solo informativa.
