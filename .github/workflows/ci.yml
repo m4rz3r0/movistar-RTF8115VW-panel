@@ -65,10 +65,16 @@ jobs:
       - name: Toolchain (rust-toolchain.toml)
         run: rustup toolchain install
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      # nextest reparte cada test en su proceso (perfil ci en
+      # .config/nextest.toml); no ejecuta los doctests, que van aparte.
+      - name: Instalar cargo-nextest
+        run: cargo install --locked cargo-nextest@0.9.149
       - name: Tests
-        run: cargo test --workspace
+        run: cargo nextest run --workspace --profile ci
       - name: Tests con el servidor (ssr)
-        run: cargo test --workspace --features panel/ssr
+        run: cargo nextest run --workspace --features panel/ssr --profile ci
+      - name: Doctests
+        run: cargo test --doc --workspace --features panel/ssr
 
   audit:
     runs-on: ubuntu-24.04

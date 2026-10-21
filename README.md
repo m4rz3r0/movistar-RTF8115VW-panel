@@ -159,8 +159,12 @@ cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo clippy -p panel --all-targets --features ssr -- -D warnings
 cargo clippy -p panel --lib --target wasm32-unknown-unknown --no-default-features --features hydrate -- -D warnings
-cargo test --workspace
-cargo test --workspace --features panel/ssr
+# Pruebas con cargo-nextest (cargo install --locked cargo-nextest), que
+# reparte cada test en su proceso; perfiles en .config/nextest.toml. Sin él,
+# cargo test --workspace [--features panel/ssr] prueba lo mismo, más despacio.
+cargo nextest run --workspace
+cargo nextest run --workspace --features panel/ssr
+cargo test --doc --workspace --features panel/ssr   # nextest no ejecuta los doctests
 cargo audit          # excepciones justificadas en .cargo/audit.toml
 cargo deny check     # deny.toml
 cargo run -q -p comprobar-publicacion -- --arbol . --sin-locales
