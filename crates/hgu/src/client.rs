@@ -202,6 +202,19 @@ impl Client {
         }
     }
 
+    /// Toma el cerrojo del cliente sin cederlo hasta soltar lo devuelto: nadie
+    /// más (el sondeo, el gestor, las páginas) llama al router por este
+    /// cliente mientras tanto, así que nadie cierra ni renueva su sesión. Lo
+    /// usa el cambio de la contraseña del router, que depende de la sesión
+    /// abierta para volver atrás. Las llamadas por este cliente esperan; las
+    /// de otro cliente (otra sesión) no.
+    pub async fn en_exclusiva(&self) -> Exclusiva<'_> {
+        Exclusiva {
+            client: self,
+            st: self.shared.state.lock().await,
+        }
+    }
+
     /// Si hay un router configurado.
     pub fn configurado(&self) -> bool {
         self.shared.configurado.load(Ordering::SeqCst)
@@ -586,5 +599,29 @@ impl Turno<'_> {
         self.hechas += 1;
         let st = self.st.as_mut().expect("el turno tiene el cerrojo");
         self.client.call_locked(st, name, params).await
+    }
+}
+
+/// El cerrojo del cliente, sin ceder (ver [`Client::en_exclusiva`]).
+pub struct Exclusiva<'a> {
+    client: &'a Client,
+    st: MutexGuard<'a, State>,
+}
+
+impl Exclusiva<'_> {
+    /// Como [`Client::write`], con el cerrojo ya tomado.
+    pub async fn write(
+        &mut self,
+        page: &str,
+        name: &str,
+        params: &[(&str, &str)],
+    ) -> Result<XmlNode, Error> {
+        self.client.contar_escritura();
+        let r = self
+            .client
+            .write_locked(&mut self.st, page, name, params)
+            .await;
+        self.client.contar_escritura();
+        r
     }
 }

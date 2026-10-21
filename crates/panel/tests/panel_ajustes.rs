@@ -687,8 +687,30 @@ async fn conexion_con_el_router_en_su_seccion() {
         })
         .collect();
     assert_eq!(fuera.matches(PASS).count(), 1, "{fuera}");
-    assert!(fuera.contains(r#"id="panel-router-contrasena""#));
-    assert!(fuera.contains(&format!(r#"value="{PASS}""#)));
+    // Y en el `<input>` de su campo, no en otro.
+    let input = fuera
+        .split("<input")
+        .skip(1)
+        .map(|t| t.split('>').next().unwrap_or(""))
+        .find(|t| t.contains(r#"id="panel-router-contrasena""#))
+        .expect("el campo de la contraseña");
+    assert!(input.contains(&format!(r#"value="{PASS}""#)), "{input}");
+    assert!(input.contains(r#"type="password""#), "{input}");
+    // Ninguna otra página la lleva: ni el Estado ni Ajustes.
+    for ruta in [
+        "/",
+        "/ajustes/internet",
+        "/ajustes/wifi",
+        "/ajustes/red_local",
+        "/ajustes/puertos",
+        "/ajustes/seguridad",
+        "/ajustes/telefono",
+        "/ajustes/sistema",
+    ] {
+        let resp = get_con_cookie(&p.app, ruta, &cookie).await;
+        assert_eq!(resp.status(), 200, "{ruta}");
+        assert!(!body_text(resp).await.contains(PASS), "{ruta}");
+    }
 
     let html = body_text(get_con_cookie(&p.app, "/panel", &cookie).await).await;
     assert!(html.contains("Ajustes del panel"), "{html}");

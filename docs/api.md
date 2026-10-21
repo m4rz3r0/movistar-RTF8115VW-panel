@@ -1830,7 +1830,7 @@ Elementos de la respuesta: `UserName` 🔒, `UserRole`
 
 ### `cbModifyPwd`
 
-*acción* · UI avanzada · riesgo bajo · página `user_profile.asp`
+*acción* · UI avanzada · riesgo medio · página `user_profile.asp`
 
 Cambia la contraseña del usuario con sesión iniciada (contraseña actual y nueva).
 

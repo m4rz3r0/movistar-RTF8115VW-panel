@@ -19,11 +19,14 @@ pub const ID_TARJETA: &str = "router-cambiar-contrasena";
 
 /// Tarjeta para cambiar la contraseña del router. Al cambiarla, la tarjeta
 /// de las credenciales pasa a tener la nueva: `contrasena_panel` es su
-/// campo y `guardada`, la que tiene guardada el panel.
+/// campo y `guardada`, la que tiene guardada el panel. Con el panel en
+/// `solo_lectura` (firmware sin confirmar), la tarjeta se ve desactivada y
+/// dice por qué (el servidor también lo rechaza).
 #[component]
 pub fn CambiarContrasena(
     contrasena_panel: RwSignal<String>,
     guardada: RwSignal<String>,
+    solo_lectura: RwSignal<bool>,
 ) -> impl IntoView {
     let reauth = expect_context::<Reautenticacion>();
     let nueva = RwSignal::new(String::new());
@@ -35,6 +38,18 @@ pub fn CambiarContrasena(
     let nueva_mala = RwSignal::new(false);
     let titulo = NodeRef::<html::H2>::new();
     let dialogo = NodeRef::<html::Dialog>::new();
+    let bloqueada = Signal::derive(move || pendiente.get() || solo_lectura.get());
+
+    // Con el enlace desde Ajustes → Seguridad (`#router-cambiar-contrasena`):
+    // la tarjeta llega dentro de la carga de la página, después de que el
+    // navegador busque el ancla; se lleva a la vista al pintarse.
+    Effect::new(move |_| {
+        if let Some(h) = titulo.get()
+            && window().location().hash().ok().as_deref() == Some(&*format!("#{ID_TARJETA}"))
+        {
+            h.scroll_into_view();
+        }
+    });
 
     // Con la contraseña del panel ya escrita: comprueba la nueva y pide la
     // confirmación.
@@ -86,7 +101,7 @@ pub fn CambiarContrasena(
     });
     let enviar = move |ev: SubmitEvent| {
         ev.prevent_default();
-        if !pendiente.get_untracked() {
+        if !bloqueada.get_untracked() {
             comprobar.run(());
         }
     };
@@ -112,14 +127,25 @@ pub fn CambiarContrasena(
                         id="router-contrasena-nueva"
                         descrito="router-contrasena-nueva-ayuda"
                         invalido
-                        bloqueado=pendiente
+                        bloqueado=bloqueada
                         error
                     />
                     <span class="nota" id="router-contrasena-nueva-ayuda">{ayuda}</span>
                 </div>
+                {move || {
+                    solo_lectura
+                        .get()
+                        .then(|| {
+                            view! {
+                                <p class="nota-solo-lectura">
+                                    {t!("contrasena-router-solo-lectura")}
+                                </p>
+                            }
+                        })
+                }}
                 {mensajes(error, aviso)}
                 <div class="botones">
-                    <button class="boton" type="submit" disabled=move || pendiente.get()>
+                    <button class="boton" type="submit" disabled=move || bloqueada.get()>
                         {t!("contrasena-router-cambiar")}
                     </button>
                 </div>

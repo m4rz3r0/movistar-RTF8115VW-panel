@@ -84,6 +84,9 @@ pub fn PaginaConexion() -> impl IntoView {
                         // del router.
                         let guardada = RwSignal::new(c.contrasena.clone());
                         let contrasena = RwSignal::new(c.contrasena);
+                        // Lo comparten el firmware (al confirmarlo) y la
+                        // tarjeta que cambia la contraseña.
+                        let solo_lectura = RwSignal::new(a.solo_lectura);
                         view! {
                             <div class="ajustes-panel">
                                 <Conexion
@@ -91,7 +94,7 @@ pub fn PaginaConexion() -> impl IntoView {
                                     usuario=a.router.usuario
                                     contrasena
                                     guardada
-                                    solo_lectura=a.solo_lectura
+                                    solo_lectura
                                     firmware=a.firmware
                                 >
                                     {configurado
@@ -100,6 +103,7 @@ pub fn PaginaConexion() -> impl IntoView {
                                                 <contrasena::CambiarContrasena
                                                     contrasena_panel=contrasena
                                                     guardada
+                                                    solo_lectura
                                                 />
                                             }
                                         })}
@@ -135,7 +139,7 @@ fn Conexion(
     usuario: String,
     contrasena: RwSignal<String>,
     guardada: RwSignal<String>,
-    solo_lectura: bool,
+    solo_lectura: RwSignal<bool>,
     firmware: Option<String>,
     children: Children,
 ) -> impl IntoView {
@@ -147,7 +151,6 @@ fn Conexion(
     let error = RwSignal::new(None::<String>);
     let aviso = RwSignal::new(None::<String>);
     let pendiente = RwSignal::new(false);
-    let solo_lectura = RwSignal::new(solo_lectura);
     let error_firmware = RwSignal::new(None::<String>);
     // La contraseña, solo si se ha tocado (si no, el servidor usa la
     // guardada).

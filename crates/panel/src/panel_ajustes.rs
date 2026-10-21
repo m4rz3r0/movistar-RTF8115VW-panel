@@ -285,7 +285,7 @@ pub async fn probar_router(
     #[server(default)] contrasena: Option<String>,
 ) -> Result<InfoRouter, ServerFnError> {
     let (state, _) = servidor::preparar().await?;
-    let contrasena = servidor::contrasena_o_guardada(&state, contrasena).await?;
+    let contrasena = servidor::contrasena_o_guardada(&state, &url, &usuario, contrasena).await?;
     crate::instalar::servidor::probar(&state, &url, &usuario, &contrasena)
         .await
         .map(|(info, _)| info)
@@ -301,7 +301,7 @@ pub async fn guardar_router(
     #[server(default)] contrasena: Option<String>,
 ) -> Result<InfoRouter, ServerFnError> {
     let (state, _) = servidor::preparar_delicada().await?;
-    let contrasena = servidor::contrasena_o_guardada(&state, contrasena).await?;
+    let contrasena = servidor::contrasena_o_guardada(&state, &url, &usuario, contrasena).await?;
     crate::instalar::servidor::guardar(&state, &url, &usuario, &contrasena).await
 }
 
@@ -485,19 +485,33 @@ pub(crate) mod servidor {
         })
     }
 
-    /// `contrasena` si llegó; si no (el campo sin tocar), la guardada (vacía
-    /// si no hay: la prueba lo dirá).
+    /// `contrasena` si llegó; si no (el campo sin tocar), la guardada, pero
+    /// solo para la misma dirección y el mismo usuario que tiene guardados:
+    /// la contraseña guardada no se manda a otro sitio ni con otro usuario.
+    /// Con otros, 400 pidiendo que se escriba.
     pub(super) async fn contrasena_o_guardada(
         state: &AppState,
+        url: &str,
+        usuario: &str,
         contrasena: Option<String>,
     ) -> Result<String, ServerFnError> {
-        match contrasena {
-            Some(c) => Ok(c),
-            None => Ok(instancia::leer_credenciales(&state.db, &state.history_key)
-                .await
-                .map_err(interno)?
-                .map(|c| c.contrasena)
-                .unwrap_or_default()),
+        if let Some(c) = contrasena {
+            return Ok(c);
+        }
+        let guardadas = instancia::leer_credenciales(&state.db, &state.history_key)
+            .await
+            .map_err(interno)?;
+        match guardadas {
+            Some(c)
+                if crate::instalar::servidor::validar_url(url).as_deref() == Some(&*c.url)
+                    && c.usuario == usuario =>
+            {
+                Ok(c.contrasena)
+            }
+            _ => Err(fallo(
+                StatusCode::BAD_REQUEST,
+                t!("router-error-escribe-contrasena"),
+            )),
         }
     }
 

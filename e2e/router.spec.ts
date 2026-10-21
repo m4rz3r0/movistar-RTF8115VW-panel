@@ -208,7 +208,7 @@ test.describe("cambiar la contraseña del router", () => {
       await pedirCambio(page, NUEVA_ROUTER);
       const dialogo = page.locator("dialog[open]");
       await expect(dialogo.locator("h2")).toHaveText("¿Cambiar la contraseña del router?");
-      await expect(dialogo).toContainText("el panel la usará para entrar");
+      await expect(dialogo).toContainText("también desde su propia web");
       sinApiNiClave(await dialogo.innerText());
       await sinDesbordamiento(page, `diálogo ${ancho}`);
       await page.screenshot({ path: `${SDD}/contrasena-dialogo-es-${ancho}.png` });
@@ -237,7 +237,7 @@ test.describe("cambiar la contraseña del router", () => {
     // El simulador no sabe dejar al panel fuera con las dos contraseñas a
     // la vez: la respuesta de un error de verdad (la nueva corta), con el
     // texto del error grave (el de router.ftl en inglés).
-    const corta = "The new password is too short: it needs at least 8 characters.";
+    const corta = "The new password is too short: it must take up at least as much as 8 unaccented letters.";
     const grave =
       "The panel cannot log in to the router with either the new password or the previous one. " +
       "To get access back, log in to the router's web interface (try the new one and, if that " +
@@ -277,7 +277,14 @@ test.describe("cambiar la contraseña del router", () => {
     });
     await enlace.click();
     await page.waitForURL((url) => url.pathname === "/router/conexion");
-    await expect(page.locator("section#router-cambiar-contrasena")).toBeVisible();
+    // La vista llega hasta la tarjeta, aunque se pinte tras la carga.
+    await expect(page.locator("section#router-cambiar-contrasena h2")).toBeInViewport();
+    // También al abrir el enlace directamente (carga completa).
+    await page.goto("/");
+    await asentar(page);
+    await page.goto("/router/conexion#router-cambiar-contrasena");
+    await asentar(page);
+    await expect(page.locator("section#router-cambiar-contrasena h2")).toBeInViewport();
   });
 
   test("es a 1440 px: la cambia en el simulador y el Estado sigue al día", async ({ page }) => {

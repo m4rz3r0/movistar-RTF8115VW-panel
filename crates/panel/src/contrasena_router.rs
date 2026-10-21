@@ -93,6 +93,7 @@ pub(crate) mod servidor {
     };
     use ::i18n::{FluentArgs, Idioma, tr};
     use axum::http::StatusCode;
+    use hgu::client::Exclusiva;
     use std::time::Duration;
 
     /// Lo más que se espera a que se pare el sondeo (acaba su ciclo).
@@ -244,17 +245,17 @@ pub(crate) mod servidor {
         r
     }
 
-    /// Escribe el cambio de `de` a `a` por la sesión del panel. Es la única
+    /// Escribe el cambio de `de` a `a` por la sesión del panel (`sesion`, con
+    /// su cerrojo tomado). Es la única
     /// escritura del panel que no pasa por el gestor de cambios ni por el
     /// bloqueo del catálogo (`bloqueada`): el gestor no podría vigilarla ni
     /// revertirla, porque cambia las credenciales con las que entra. La
     /// Biblioteca la sigue teniendo bloqueada. El resultado solo se anota:
     /// lo que vale es si después se entra.
-    async fn escribir(state: &AppState, usuario: &str, de: &str, a: &str) {
+    async fn escribir(sesion: &mut Exclusiva<'_>, usuario: &str, de: &str, a: &str) {
         let params = hgu::fmt::parametros_cambio_contrasena(usuario, de, a);
         let params: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
-        let r = state
-            .hgu
+        let r = sesion
             .write(
                 hgu::fmt::PAGINA_CAMBIO_CONTRASENA,
                 hgu::fmt::CAMBIO_CONTRASENA,
@@ -274,8 +275,8 @@ pub(crate) mod servidor {
         }
     }
 
-    /// ¿Entra el panel en el router con `c`? (Una sesión aparte, que se
-    /// cierra.)
+    /// ¿Entra el panel en el router con `c`? (Un cliente y una sesión
+    /// aparte, que se cierra: no espera al cerrojo de `state.hgu`.)
     async fn entra(state: &AppState, c: &CredencialesRouter) -> bool {
         probar(state, &c.url, &c.usuario, &c.contrasena)
             .await
@@ -285,8 +286,13 @@ pub(crate) mod servidor {
     /// Vuelve a poner `actual.contrasena` en el router (que tendría `nueva`)
     /// por la sesión del panel, que sigue abierta, y dice si se entra con
     /// ella.
-    async fn restaurar(state: &AppState, actual: &CredencialesRouter, nueva: &str) -> bool {
-        escribir(state, &actual.usuario, nueva, &actual.contrasena).await;
+    async fn restaurar(
+        state: &AppState,
+        sesion: &mut Exclusiva<'_>,
+        actual: &CredencialesRouter,
+        nueva: &str,
+    ) -> bool {
+        escribir(sesion, &actual.usuario, nueva, &actual.contrasena).await;
         entra(state, actual).await
     }
 
@@ -295,7 +301,13 @@ pub(crate) mod servidor {
         actual: &CredencialesRouter,
         nueva: &str,
     ) -> Result<(), Fallo> {
-        escribir(state, &actual.usuario, &actual.contrasena, nueva).await;
+        // El cerrojo del cliente del panel, sin ceder, durante todo el
+        // cambio: ninguna otra llamada por él (una página de Ajustes, la
+        // Biblioteca) puede cerrar ni renovar la sesión de la que depende la
+        // vuelta atrás. Las pruebas de acceso usan su propio cliente, así que
+        // no esperan por él. Se suelta antes de `reconfigurar`, que lo toma.
+        let mut sesion = state.hgu.en_exclusiva().await;
+        escribir(&mut sesion, &actual.usuario, &actual.contrasena, nueva).await;
         let c = CredencialesRouter {
             contrasena: nueva.to_owned(),
             ..actual.clone()
@@ -306,9 +318,10 @@ pub(crate) mod servidor {
                 // El router ya tiene la nueva, pero el panel seguiría con la
                 // anterior: se vuelve a poner la anterior.
                 tracing::error!("contraseña del router cambiada pero sin guardar: {e}");
-                let restaurada = restaurar(state, actual, nueva).await;
+                let restaurada = restaurar(state, &mut sesion, actual, nueva).await;
                 return Err(Fallo::NoGuardada { restaurada });
             }
+            drop(sesion);
             state.hgu.reconfigurar(c.client_config()).await;
             state.poller.despertar();
             tracing::info!("contraseña del router cambiada: el panel ya entra con la nueva");
@@ -320,7 +333,7 @@ pub(crate) mod servidor {
             );
             return Err(Fallo::Rechazada);
         }
-        if restaurar(state, actual, nueva).await {
+        if restaurar(state, &mut sesion, actual, nueva).await {
             tracing::warn!(
                 "el panel no pudo entrar con la contraseña nueva del router: se ha vuelto a poner \
                  la anterior"
@@ -332,6 +345,19 @@ pub(crate) mod servidor {
                  sigue con la anterior guardada"
             );
             Err(Fallo::Grave)
+        }
+    }
+
+    /// Riesgo del cambio en el Historial: el de la función en el catálogo.
+    fn riesgo(state: &AppState) -> &'static str {
+        match state
+            .catalogo
+            .funcion(hgu::fmt::CAMBIO_CONTRASENA)
+            .map(|f| f.riesgo)
+        {
+            Some(catalogo::Riesgo::Bajo) => "bajo",
+            Some(catalogo::Riesgo::Alto) => "alto",
+            _ => "medio",
         }
     }
 
@@ -350,14 +376,15 @@ pub(crate) mod servidor {
         let fila = sqlx::query(
             "INSERT INTO changes (ts, updated, user_id, usuario, funcion, riesgo, estado, \
              operacion, diff, anteriores, error, nota, titulo) VALUES (?, ?, \
-             (SELECT id FROM users WHERE username = ?), ?, ?, 'medio', ?, 'accion', '[]', '{}', \
-             ?, ?, ?)",
+             (SELECT id FROM users WHERE username = ?), ?, ?, ?, ?, 'accion', '[]', '{}', ?, ?, \
+             ?)",
         )
         .bind(ahora)
         .bind(ahora)
         .bind(usuario)
         .bind(usuario)
         .bind(hgu::fmt::CAMBIO_CONTRASENA)
+        .bind(riesgo(state))
         .bind(estado)
         .bind(error)
         .bind(nota)
