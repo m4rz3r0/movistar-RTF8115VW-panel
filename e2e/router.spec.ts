@@ -349,31 +349,45 @@ test.describe("credenciales con otra dirección y la misma contraseña", () => {
     const url = cred.locator("#panel-router-url");
     const antes = await url.inputValue();
     expect(antes).toBe(instalado.urlSim);
+    const usuario = await cred.locator("#panel-router-usuario").inputValue();
+    const clave = await cred.locator("#panel-router-contrasena").inputValue();
     const otra = `http://localhost:${instalado.puertoSim}`;
-    for (const [destino, primera] of [
-      [otra, true],
-      [antes, false],
-    ] as const) {
-      await url.fill(destino);
-      await cred.getByRole("button", { name: "Probar la conexión" }).click();
-      await expect(cred).toContainText("RTF8115VW");
-      await expect(cred.locator(".error-formulario")).toBeEmpty();
-      await cred.getByRole("button", { name: "Guardar las credenciales" }).click();
-      if (primera) {
-        const dialogo = page.locator("dialog[open]");
-        await expect(dialogo).toBeVisible();
-        await dialogo.locator("#reautenticar-contrasena").fill(CONTRASENA);
-        await dialogo.locator("button[type=submit]").click();
+    try {
+      for (const [destino, primera] of [
+        [otra, true],
+        [antes, false],
+      ] as const) {
+        await url.fill(destino);
+        await cred.getByRole("button", { name: "Probar la conexión" }).click();
+        await expect(cred).toContainText("RTF8115VW");
+        await expect(cred.locator(".error-formulario")).toBeEmpty();
+        await cred.getByRole("button", { name: "Guardar las credenciales" }).click();
+        if (primera) {
+          const dialogo = page.locator("dialog[open]");
+          await expect(dialogo).toBeVisible();
+          await dialogo.locator("#reautenticar-contrasena").fill(CONTRASENA);
+          await dialogo.locator("button[type=submit]").click();
+        }
+        await expect(cred.locator(".aviso-formulario")).toHaveText(
+          "Credenciales guardadas: el panel ya usa las nuevas.",
+        );
+        await page.reload();
+        await asentar(page);
+        await expect(url).toHaveValue(destino);
       }
-      await expect(cred.locator(".aviso-formulario")).toHaveText(
-        "Credenciales guardadas: el panel ya usa las nuevas.",
-      );
-      await page.reload();
-      await asentar(page);
-      await expect(url).toHaveValue(destino);
+      const salud = await (await page.request.get("/salud")).json();
+      expect(salud.router).toBe("ok");
+    } finally {
+      // Pase lo que pase, la dirección de antes (por la API, como la página).
+      const api = (fn: string, datos: object) =>
+        page.request.post(`/api/${fn}`, {
+          data: datos,
+          headers: { origin: instalado.url, "sec-fetch-site": "same-origin" },
+        });
+      expect((await api("reautenticar", { contrasena: CONTRASENA })).status()).toBe(200);
+      const r = await api("panel_guardar_router", { url: antes, usuario, contrasena: clave });
+      expect(r.status(), await r.text()).toBe(200);
     }
-    const salud = await (await page.request.get("/salud")).json();
-    expect(salud.router).toBe("ok");
     expect(
       errores.filter((e) => !/status of 401/.test(e)),
       "errores o avisos en la consola",
@@ -406,7 +420,10 @@ test("es a 360 px: en solo lectura la tarjeta se ve desactivada", async ({ page 
   await expect(cambio).toContainText("No se puede cambiar mientras el panel esté en solo lectura");
   await expect(cambio.locator("#router-contrasena-nueva")).toBeDisabled();
   await expect(cambio.getByRole("button", { name: "Cambiar" })).toBeDisabled();
+  // Y se ve apagado, como los botones desactivados.
+  await expect(cambio.locator(".secreto-campo")).toHaveCSS("opacity", "0.6");
   await sinDesbordamiento(page, "solo lectura 360");
   await cambio.screenshot({ path: `${SDD}/contrasena-solo-lectura-es-360.png` });
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: `${SDD}/contrasena-solo-lectura-pagina-es-360.png`, fullPage: true });
 });

@@ -1861,9 +1861,17 @@ input {
    firmware) parten la línea en vez de salirse a 360 px. */
 .ajustes-estado .insignia {
   max-width: 100%;
-  padding-block: 2px;
-  border-radius: var(--radio);
   white-space: normal;
+}
+
+/* Un secreto desactivado (Cambiar la contraseña del router en solo
+   lectura) se ve apagado, como los botones desactivados. */
+.secreto-campo:has(.secreto-valor:disabled) {
+  opacity: 0.6;
+}
+
+.secreto-valor:disabled {
+  cursor: not-allowed;
 }
 
 /* En un formulario (Configuración del router), el campo con el ojo ocupa
