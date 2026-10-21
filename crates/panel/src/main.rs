@@ -4,6 +4,10 @@
 #[cfg(feature = "ssr")]
 #[tokio::main]
 async fn main() -> std::process::ExitCode {
+    if let Err(e) = comprobar_binario_del_e2e(std::env::var_os(E2E_CARGO_LEPTOS).is_some()) {
+        eprintln!("panel: {e}");
+        return std::process::ExitCode::FAILURE;
+    }
     init_logging();
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.is_empty() {
@@ -11,6 +15,29 @@ async fn main() -> std::process::ExitCode {
     } else {
         panel::cli::run(&args).await
     }
+}
+
+/// La pone `e2e/arrancar.sh`: el e2e exige el binario de `cargo leptos build`.
+#[cfg(feature = "ssr")]
+const E2E_CARGO_LEPTOS: &str = "RP_E2E_CARGO_LEPTOS";
+
+/// En el e2e, el binario de depuración tiene que ser el de `cargo leptos
+/// build`, que compila con `--cfg erase_components` como el wasm. `cargo
+/// test` o `cargo nextest` con `--features ssr` compilan otro sin esa
+/// marca y lo dejan en el mismo sitio (`target/debug/panel`): su HTML no
+/// casa con el wasm y la página no se hidrata. Así se para con un motivo
+/// claro en vez de fallar luego en cada prueba.
+#[cfg(feature = "ssr")]
+fn comprobar_binario_del_e2e(en_el_e2e: bool) -> Result<(), String> {
+    if en_el_e2e && !cfg!(erase_components) {
+        return Err(format!(
+            "este binario no es el de `cargo leptos build` (lo dejó `cargo test` o \
+             `cargo nextest` con `--features ssr`, sin `--cfg erase_components`) y la \
+             página no se hidrataría: ejecuta `cargo leptos build` antes del e2e \
+             ({E2E_CARGO_LEPTOS})"
+        ));
+    }
+    Ok(())
 }
 
 /// Registros a stderr; nivel según `RP_LOG` (sintaxis de `EnvFilter`), por

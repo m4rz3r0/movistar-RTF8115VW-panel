@@ -8,9 +8,12 @@
 #              servidor), la foto de partida y un grupo de dos pasos ya
 #              aplicado (e2e_grupo);
 #   nuevo      recién instalado: sin usuarios ni router (el asistente).
-# Necesita antes, en la raíz del repositorio: `cargo leptos build`, `cargo
-# build -p router-sim` y `cargo build -p panel --features ssr --example
-# e2e_grupo`. Lo lanza playwright.config.ts (ver instancias.ts).
+# Necesita antes, en la raíz del repositorio: `cargo build -p router-sim`,
+# `cargo build -p panel --features ssr --example e2e_grupo` y, lo último,
+# `cargo leptos build`. Lo lanza playwright.config.ts (ver instancias.ts).
+# `cargo test`/`cargo nextest` con `--features ssr` dejan en
+# target/debug/panel otro binario, cuyo HTML el wasm no hidrata: con
+# RP_E2E_CARGO_LEPTOS el panel lo detecta y para pidiendo `cargo leptos build`.
 set -eu
 cd "$(dirname "$0")/.."
 SIM_PORT=${E2E_SIM_PORT:-8195}
@@ -51,8 +54,8 @@ trap limpiar EXIT
 trap 'exit 143' INT TERM
 for f in target/debug/panel target/debug/router-sim target/debug/examples/e2e_grupo target/site/pkg; do
 	[ -e "$f" ] || {
-		echo "falta $f: cargo leptos build && cargo build -p router-sim &&" \
-			"cargo build -p panel --features ssr --example e2e_grupo" >&2
+		echo "falta $f: cargo build -p router-sim &&" \
+			"cargo build -p panel --features ssr --example e2e_grupo && cargo leptos build" >&2
 		exit 1
 	}
 done
@@ -77,7 +80,8 @@ while :; do
 	sleep 0.1
 done
 export RP_DB="$DIR/panel.db" RP_HISTORY_KEY="$DIR/history.key" \
-	RP_TRUSTED_PROXY=127.0.0.1 RP_ORIGIN="http://localhost:$PORT" RP_LOG=warn
+	RP_TRUSTED_PROXY=127.0.0.1 RP_ORIGIN="http://localhost:$PORT" RP_LOG=warn \
+	RP_E2E_CARGO_LEPTOS=1
 if [ "$MODO" = instalado ]; then
 	printf 'sim' >"$DIR/router.secret"
 	chmod 600 "$DIR/router.secret"

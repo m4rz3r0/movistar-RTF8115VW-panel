@@ -11,6 +11,11 @@ autotests = false
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[lints.rust]
+# cargo-leptos compila en depuración con `--cfg erase_components` (main.rs
+# lo comprueba para el e2e).
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(erase_components)"] }
+
 [dependencies]
 leptos.workspace = true
 leptos_meta.workspace = true
