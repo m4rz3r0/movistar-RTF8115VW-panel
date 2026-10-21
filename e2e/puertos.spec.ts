@@ -13,7 +13,8 @@ import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 //   lo que cambia.
 //
 // Aplicar se hace en una sola combinación (inglés, 1440 px, la última):
-// cada aplicación se vigila 30 s. Se edita la regla de las fixtures (al
+// cada aplicación se vigila (30 s en producción; en el e2e,
+// RP_E2E_VIGILANCIA_S). Se edita la regla de las fixtures (al
 // puerto 8081), se abre el 8080 TCP a host-2, aparece en la lista, se
 // comprueba «Activa» con dos reglas, se borra y la regla de las fixtures
 // vuelve a su puerto. Las demás combinaciones abren el resumen y lo cancelan.
@@ -88,7 +89,7 @@ function sinApi(texto: string) {
 async function aplicar(page: Page, t: Textos) {
   const dialogo = page.locator("dialog[open]");
   await dialogo.getByRole("button", { name: t.aplicar }).click();
-  await expect(dialogo.getByText(t.hecho)).toBeVisible({ timeout: 120_000 });
+  await expect(dialogo.getByText(t.hecho)).toBeVisible({ timeout: 60_000 });
   await dialogo.getByRole("button", { name: t.cerrar }).click();
   await expect(page.locator("dialog[open]")).toHaveCount(0);
 }
@@ -118,7 +119,7 @@ for (const idioma of ["es", "en"] as const) {
       });
 
       test("puertos abiertos", async ({ page }) => {
-        if (aplicaDeVerdad) test.setTimeout(480_000);
+        if (aplicaDeVerdad) test.setTimeout(180_000);
         const t = textos[idioma];
         const errores = recogerErrores(page);
         await entrar(page);

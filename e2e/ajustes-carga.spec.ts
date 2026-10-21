@@ -159,7 +159,7 @@ test.describe("ajustes: carga al cambiar de tema", () => {
   });
 
   test("tras aplicar, una relectura de 300 ms deja el foco en la tarjeta", async ({ page }) => {
-    test.setTimeout(150_000);
+    test.setTimeout(60_000);
     const errores = recogerErrores(page);
     await entrar(page);
     await page.goto("/ajustes/puertos");
@@ -174,7 +174,7 @@ test.describe("ajustes: carga al cambiar de tema", () => {
     const dialogo = page.locator("dialog[open]");
     await dialogo.getByRole("button", { name: "Aplicar" }).click();
     await expect(dialogo.getByText("Hecho: el router tiene ya el cambio.")).toBeVisible({
-      timeout: 120_000,
+      timeout: 40_000,
     });
     // El servidor ya tiene el tema en su caché (leído tras el cambio): la
     // relectura la marca la espera de abajo, no el router.

@@ -35,6 +35,9 @@ export default defineConfig({
       E2E_PORT: String(i.puerto),
       E2E_SIM_PORT: String(i.puertoSim),
       E2E_DIR: i.dir,
+      // Vigilancia de cada cambio en segundos, en vez de 30 s o 2 min (solo
+      // la atiende el binario de depuración; ver main.rs).
+      RP_E2E_VIGILANCIA_S: process.env.RP_E2E_VIGILANCIA_S ?? "10",
     },
     reuseExistingServer: false,
     // SIGTERM (no SIGKILL): arrancar.sh borra su carpeta al salir.

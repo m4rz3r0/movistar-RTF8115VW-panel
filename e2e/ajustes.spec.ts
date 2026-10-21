@@ -10,10 +10,10 @@ import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 // (también un <select> tocado varias veces) como los leyó la página.
 //
 // Aplicar, esperar «aplicado» y deshacer se hace en una sola combinación
-// (inglés, 1440 px, la última, para que un fallo no deje un cambio vigilándose
-// a las demás): la WiFi es de riesgo medio y cada aplicación se vigila
-// 2 min, así que repetirlo en las cuatro alargaría la pasada unos 16 min.
-// Las demás llegan hasta el resumen y lo cancelan.
+// (inglés, 1440 px): cada aplicación se vigila (2 min en producción; en el
+// e2e, RP_E2E_VIGILANCIA_S, 10 s por defecto, ver playwright.config.ts), y
+// los plazos de abajo cuentan con esa vigilancia corta. Las demás llegan
+// hasta el resumen y lo cancelan.
 
 const textos = {
   es: {
@@ -79,7 +79,7 @@ for (const idioma of ["es", "en"] as const) {
       });
 
       test("WiFi: cambiar el nombre de la red de 5 GHz", async ({ page }) => {
-        if (aplicaDeVerdad) test.setTimeout(420_000);
+        if (aplicaDeVerdad) test.setTimeout(120_000);
         const t = textos[idioma];
         const errores = recogerErrores(page);
         await entrar(page);
@@ -146,7 +146,7 @@ for (const idioma of ["es", "en"] as const) {
           await expect(dialogo.getByRole("button", { name: t.aplicando })).toBeVisible();
           await page.keyboard.press("Escape");
           await expect(dialogo).toBeVisible();
-          await expect(dialogo.getByText(t.hecho)).toBeVisible({ timeout: 200_000 });
+          await expect(dialogo.getByText(t.hecho)).toBeVisible({ timeout: 60_000 });
           // Deshacer: mientras prepara, Escape tampoco cierra.
           await page.route(
             "**/api/deshacer_ajuste",
@@ -165,7 +165,7 @@ for (const idioma of ["es", "en"] as const) {
           await expect(dialogo.locator("tbody td").nth(0)).toHaveText(nuevo);
           await expect(dialogo.locator("tbody td").nth(1)).toHaveText(antes);
           await dialogo.getByRole("button", { name: t.deshacer }).click();
-          await expect(dialogo.getByText(t.hecho)).toBeVisible({ timeout: 200_000 });
+          await expect(dialogo.getByText(t.hecho)).toBeVisible({ timeout: 60_000 });
           await dialogo.getByRole("button", { name: t.cerrar }).click();
           await expect(page.locator("dialog[open]")).toHaveCount(0);
           // La página relee el tema y el foco va al título de la tarjeta (eso
@@ -281,7 +281,7 @@ const textosSecreto = {
   },
 } as const;
 
-/** Un cambio de UPnP (riesgo bajo: se vigila 30 s), por las server functions. */
+/** Un cambio de UPnP (riesgo bajo: se vigila RP_E2E_VIGILANCIA_S), por las server functions. */
 async function cambiarUpnp(page: Page): Promise<number> {
   const api = async (nombre: string, cuerpo: unknown) => {
     const r = await page.request.post(`/api/${nombre}`, { data: cuerpo });
@@ -297,16 +297,16 @@ async function cambiarUpnp(page: Page): Promise<number> {
   return api("confirmar_ajuste", { token: grupo.token, desmarcados: [] });
 }
 
+/** Estado del cambio `id` («Vigilando», «Aplicado»…). */
+async function estadoCambio(page: Page, id: number): Promise<string> {
+  const r = await page.request.post("/api/estado_cambio", { data: { id } });
+  return (await r.json()).estado;
+}
+
 /** Espera a que el cambio `id` termine. */
 async function esperarFinal(page: Page, id: number) {
   await expect
-    .poll(
-      async () => {
-        const r = await page.request.post("/api/estado_cambio", { data: { id } });
-        return (await r.json()).estado;
-      },
-      { timeout: 90_000, intervals: [1_000] },
-    )
+    .poll(() => estadoCambio(page, id), { timeout: 60_000, intervals: [1_000] })
     .toBe("Aplicado");
 }
 
@@ -318,7 +318,8 @@ async function aLaVista(l: Locator): Promise<string> {
 for (const idioma of ["es", "en"] as const) {
   for (const ancho of [360, 1024, 1440]) {
     // Con un cambio en curso en el Historial y guardando de verdad la clave
-    // de la voz, una sola combinación cada uno (se vigilan 30 s).
+    // de la voz, una sola combinación cada uno (cada cambio se vigila
+    // RP_E2E_VIGILANCIA_S).
     const conCambioEnCurso = idioma === "en" && ancho === 1024;
     const guardaLaVoz = (idioma === "es" && ancho === 1024) || (idioma === "en" && ancho === 1440);
     test.describe(`secretos ${idioma} a ${ancho} px`, () => {
@@ -328,7 +329,7 @@ for (const idioma of ["es", "en"] as const) {
       });
 
       test("el ojo en Ajustes, Teléfono, la Biblioteca y el Historial", async ({ page }) => {
-        if (conCambioEnCurso || guardaLaVoz) test.setTimeout(240_000);
+        if (conCambioEnCurso || guardaLaVoz) test.setTimeout(120_000);
         const t = textosSecreto[idioma];
         const errores = recogerErrores(page);
         await page.clock.install();
@@ -424,7 +425,7 @@ for (const idioma of ["es", "en"] as const) {
           await lineaEdicion.getByRole("button", { name: t.guardar }).click();
           const dialogo = page.locator("dialog[open]");
           await dialogo.getByRole("button", { name: t.aplicar }).click();
-          await expect(dialogo.getByText(t.hecho)).toBeVisible({ timeout: 90_000 });
+          await expect(dialogo.getByText(t.hecho)).toBeVisible({ timeout: 60_000 });
           await dialogo.getByRole("button", { name: t.cerrar }).click();
           // Sigue sin poder leerse: vacía otra vez.
           await expect(
@@ -487,8 +488,11 @@ for (const idioma of ["es", "en"] as const) {
         expect(fuera).toContain(t.contrasena);
         expect(fuera).not.toMatch(/key_phrase|cbSet/);
         await expect(cambio.locator("details.detalles-tecnicos > summary")).toHaveText(t.tecnico);
-        if (conCambioEnCurso) {
-          // Aguanta los refrescos de 2 s del cambio en curso.
+        if (enCurso !== null) {
+          // Aguanta los refrescos de 2 s del cambio en curso. Con la
+          // vigilancia corta del e2e, el cambio podría haber terminado ya y
+          // la espera no probaría nada: tiene que seguir vigilándose.
+          expect(await estadoCambio(page, enCurso), "el cambio sigue en curso").toBe("Vigilando");
           await page.waitForTimeout(5_000);
           await expect(valores.nth(1)).toHaveAttribute("type", "text");
           await expect(valores.nth(1)).toHaveValue(CLAVE_5);

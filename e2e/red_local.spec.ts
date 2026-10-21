@@ -7,10 +7,10 @@ import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 // junto al campo por qué no vale una IP (la del router).
 //
 // «Fijar esta IP» → aplicado → aparece en IP fijas se hace en una sola
-// combinación (inglés, 1440 px, la última): cada aplicación se vigila 30 s y
-// el dispositivo queda con su IP fija, así que después se borra (otra
-// aplicación) para dejar el simulador como estaba. Las demás abren el
-// resumen y lo cancelan.
+// combinación (inglés, 1440 px, la última): cada aplicación se vigila (30 s
+// en producción; en el e2e, RP_E2E_VIGILANCIA_S) y el dispositivo queda con
+// su IP fija, así que después se borra (otra aplicación) para dejar el
+// simulador como estaba. Las demás abren el resumen y lo cancelan.
 
 const textos = {
   es: {
@@ -68,7 +68,7 @@ function sinApi(texto: string) {
 async function aplicar(page: Page, t: (typeof textos)["es" | "en"]) {
   const dialogo = page.locator("dialog[open]");
   await dialogo.getByRole("button", { name: t.aplicar }).click();
-  await expect(dialogo.getByText(t.hecho)).toBeVisible({ timeout: 120_000 });
+  await expect(dialogo.getByText(t.hecho)).toBeVisible({ timeout: 60_000 });
   await dialogo.getByRole("button", { name: t.cerrar }).click();
   await expect(page.locator("dialog[open]")).toHaveCount(0);
 }
@@ -83,7 +83,7 @@ for (const idioma of ["es", "en"] as const) {
       });
 
       test("dispositivos e IP fijas", async ({ page }) => {
-        if (aplicaDeVerdad) test.setTimeout(300_000);
+        if (aplicaDeVerdad) test.setTimeout(120_000);
         const t = textos[idioma];
         const errores = recogerErrores(page);
         await entrar(page);
