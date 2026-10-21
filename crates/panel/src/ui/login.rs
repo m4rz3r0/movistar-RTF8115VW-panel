@@ -6,7 +6,8 @@ use crate::ui::i18n::SelectorIdioma;
 use leptos::prelude::*;
 use leptos_router::hooks::{use_navigate, use_query_map};
 
-/// Formulario de login. Al entrar, navega a `next` (solo rutas locales).
+/// Formulario de login. Al entrar, navega a `next` (solo rutas locales). Sin
+/// JavaScript también funciona: el servidor redirige (ver [`crate::auth::login`]).
 #[component]
 pub fn PaginaLogin() -> impl IntoView {
     let action = ServerAction::<Login>::new();
@@ -32,6 +33,12 @@ pub fn PaginaLogin() -> impl IntoView {
                 </div>
                 <h1 id="login-titulo">{t!("login-titulo")}</h1>
                 <ActionForm action>
+                    // Para el envío sin JavaScript: el servidor redirige allí.
+                    <input
+                        type="hidden"
+                        name="next"
+                        value=move || query.with(|q| q.get_str("next").unwrap_or_default().to_owned())
+                    />
                     <p class="campo">
                         <label for="usuario">{t!("login-usuario")}</label>
                         <input
