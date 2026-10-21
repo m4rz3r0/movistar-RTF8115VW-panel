@@ -3,22 +3,18 @@
 //! lecturas de otros intercaladas. Lo que prepara un cambio sigue leyendo el
 //! router.
 
-mod common;
+mod comun;
 
-use common::{Panel, esperar_final, esperar_libre, ok, panel, panel_con_gestor, sesion};
+use comun::{Panel, PanelPrueba, Registro, esperar_final, esperar_libre, leer, ok, sesion};
 use panel::poller::{Poller, PollerConfig};
 use serde_json::{Value, json};
 use std::time::Duration;
 
-use common::USER;
+use comun::USER;
 use panel::{
     changes::{ChangeManager, ChangeRequest, Estado, Tiempos},
     lecturas::{CADUCIDAD_LECTURAS, CacheLecturas, Clave},
 };
-
-async fn leer(p: &Panel, cookie: &str, tema: &str) -> Value {
-    ok(p, "leer_tema", json!({ "tema": tema }), cookie).await
-}
 
 /// Lecturas que ha recibido el simulador desde `desde`.
 fn lecturas_desde(p: &Panel, desde: usize) -> Vec<(String, Vec<(String, String)>)> {
@@ -55,7 +51,7 @@ fn valor(tema: &Value, ajuste: &str, campo: &str) -> Value {
 
 #[tokio::test]
 async fn volver_a_un_tema_no_lee_el_router() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     for tema in ["wifi", "red_local", "seguridad"] {
         let antes = p.sim.control.reads().len();
@@ -73,7 +69,7 @@ async fn volver_a_un_tema_no_lee_el_router() {
 /// solo lee lo suyo, y `leer_red_casa` lo suyo. La segunda vez, nada.
 #[tokio::test]
 async fn dispositivos_y_red_de_casa_tambien_de_la_cache() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     let antes = p.sim.control.reads().len();
     leer(&p, &cookie, "red_local").await;
@@ -120,7 +116,7 @@ async fn dispositivos_y_red_de_casa_tambien_de_la_cache() {
 /// guardan lo leído.
 #[tokio::test]
 async fn dispositivos_y_red_de_casa_se_guardan() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     let primera = ok(&p, "leer_dispositivos", json!({}), &cookie).await;
     let red = ok(&p, "leer_red_casa", json!({}), &cookie).await;
@@ -137,7 +133,7 @@ async fn dispositivos_y_red_de_casa_se_guardan() {
 /// el valor nuevo.
 #[tokio::test]
 async fn tras_escribir_vuelve_a_leer_el_valor_nuevo() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let antes = leer(&p, &cookie, "puertos").await;
     sin_leer_el_router(&p, &cookie, "puertos").await;
     assert_eq!(
@@ -181,7 +177,7 @@ async fn tras_escribir_vuelve_a_leer_el_valor_nuevo() {
 /// invalida lo guardado.
 #[tokio::test]
 async fn cualquier_escritura_del_cliente_invalida() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     leer(&p, &cookie, "puertos").await;
     sin_leer_el_router(&p, &cookie, "puertos").await;
@@ -199,7 +195,7 @@ async fn cualquier_escritura_del_cliente_invalida() {
 
 #[tokio::test]
 async fn tras_caducar_vuelve_a_leer() {
-    let mut p = panel().await;
+    let mut p = PanelPrueba::nuevo().arrancar().await;
     p.state.lecturas = std::sync::Arc::new(panel::lecturas::CacheLecturas::new(
         Duration::from_millis(300),
     ));
@@ -218,14 +214,14 @@ async fn tras_caducar_vuelve_a_leer() {
 /// el «antes» es lo que tiene el router ahora, cambiado fuera del panel.
 #[tokio::test]
 async fn preparar_ajuste_no_usa_la_cache() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let pagina = leer(&p, &cookie, "wifi").await;
     assert_ne!(
         valor(&pagina, "wifi.red_24", "nombre"),
         json!({ "Texto": "cambiado-fuera" })
     );
     // Otro cliente (como la app del operador): el panel no se entera.
-    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, common::USER, common::PASS);
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, comun::USER, comun::PASS);
     cfg.min_gap = Duration::from_millis(1);
     hgu::Client::new(cfg)
         .write(
@@ -258,7 +254,7 @@ async fn preparar_ajuste_no_usa_la_cache() {
 /// seguidas: el sondeo no se cuela entre ellas.
 #[tokio::test]
 async fn las_lecturas_de_un_tema_van_seguidas() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     p.sim.control.set_retardo(Duration::from_millis(20));
     // Un sondeo que siempre quiere el turno.
@@ -304,7 +300,7 @@ async fn las_lecturas_de_un_tema_van_seguidas() {
 /// Cliente del router como el del panel, con un plazo por petición `plazo`
 /// y sin pausa entre peticiones.
 fn cliente(p: &Panel, plazo: Duration) -> hgu::Client {
-    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, USER, common::PASS);
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, USER, comun::PASS);
     cfg.timeout = plazo;
     cfg.min_gap = Duration::from_millis(1);
     hgu::Client::new(cfg)
@@ -322,7 +318,7 @@ fn claves(nombres: &[&str]) -> Vec<Clave> {
 /// el turno queda libre para el gestor y el sondeo.
 #[tokio::test]
 async fn sin_respuesta_del_router_la_tanda_se_corta() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let plazo = Duration::from_millis(300);
     let c = cliente(&p, plazo);
     c.call("cbGetSummary", &[]).await.unwrap();
@@ -356,7 +352,7 @@ async fn sin_respuesta_del_router_la_tanda_se_corta() {
 /// de 0) no corta la tanda.
 #[tokio::test]
 async fn un_error_de_la_funcion_no_corta_la_tanda() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let c = cliente(&p, Duration::from_secs(5));
     let cache = CacheLecturas::new(CADUCIDAD_LECTURAS);
     let k = claves(&["cbGetNoExiste", "cbGetUpnpCfg"]);
@@ -369,34 +365,11 @@ async fn un_error_de_la_funcion_no_corta_la_tanda() {
     assert!(r[&k[1]].is_ok(), "{:?}", r[&k[1]]);
 }
 
-/// Destino del registro en memoria.
-#[derive(Clone, Default)]
-struct Registro(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
-
-impl std::io::Write for Registro {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.0.lock().unwrap().extend_from_slice(buf);
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
-impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Registro {
-    type Writer = Registro;
-
-    fn make_writer(&'a self) -> Registro {
-        self.clone()
-    }
-}
-
 /// Una lectura que falla deja una sola línea en el registro, también en
 /// `leer_dispositivos` y `leer_red_casa` (que responden 502).
 #[tokio::test]
 async fn una_linea_por_lectura_fallida() {
-    let mut p = panel().await;
+    let mut p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     p.state.hgu = cliente(&p, Duration::from_millis(200));
     p.state.hgu.call("cbGetSummary", &[]).await.unwrap();
@@ -409,10 +382,10 @@ async fn una_linea_por_lectura_fallida() {
             .finish(),
     );
     p.sim.control.set_unresponsive(true);
-    let (estado, _) = common::llamar(&p, "leer_red_casa", json!({}), Some(&cookie)).await;
+    let (estado, _) = comun::llamar(&p, "leer_red_casa", json!({}), Some(&cookie)).await;
     p.sim.control.set_unresponsive(false);
     assert_eq!(estado, 502);
-    let texto = String::from_utf8_lossy(&registro.0.lock().unwrap()).into_owned();
+    let texto = registro.texto();
     let lineas: Vec<&str> = texto.lines().filter(|l| l.contains("WARN")).collect();
     assert_eq!(lineas.len(), 1, "{texto}");
     assert!(lineas[0].contains("cbGetLanIPv4Addr"), "{texto}");
@@ -423,7 +396,7 @@ async fn una_linea_por_lectura_fallida() {
 /// lectura vuelve al router.
 #[tokio::test]
 async fn escritura_mientras_la_tanda_espera_el_turno() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let c = cliente(&p, Duration::from_secs(5));
     let cache = std::sync::Arc::new(CacheLecturas::new(CADUCIDAD_LECTURAS));
     let k = claves(&["cbGetUpnpCfg"]);
@@ -523,7 +496,7 @@ fn tiempos(vigilancia: Duration) -> Tiempos {
 /// vigilancia, la página ya ve lo que el router tiene.
 #[tokio::test]
 async fn comprobar_un_cambio_invalida_lo_guardado() {
-    let mut p = panel().await;
+    let mut p = PanelPrueba::nuevo().arrancar().await;
     p.state.hgu = cliente(&p, Duration::from_millis(500));
     let lento = tiempos(Duration::from_secs(60));
     let a = ChangeManager::new(p.state.clone(), lento.clone());
@@ -549,7 +522,7 @@ async fn comprobar_un_cambio_invalida_lo_guardado() {
 /// apartó), la caché se invalida.
 #[tokio::test]
 async fn soltar_el_gestor_invalida_lo_guardado() {
-    let mut p = panel().await;
+    let mut p = PanelPrueba::nuevo().arrancar().await;
     p.state.hgu = cliente(&p, Duration::from_secs(5));
     let m = ChangeManager::new(p.state.clone(), tiempos(Duration::from_millis(300)));
     m.reanudar_pendientes().await;

@@ -2,12 +2,12 @@
 //! bloqueo de todo lo demás sin usuarios, foto de partida cifrada y modo solo
 //! lectura con un firmware no probado.
 
-mod common;
+mod comun;
 
 use axum::{body::Body, http::Request};
-use common::{
-    PANEL_PASS, PANEL_USER, PASS, Panel, USER, body_text, get, get_con_cookie, panel_sin_router,
-    panel_sin_router_ajustado, post_json, send, set_cookie,
+use comun::{
+    PANEL_PASS, PANEL_USER, PASS, Panel, PanelPrueba, USER, body_text, get, get_con_cookie,
+    post_json, send, set_cookie,
 };
 use panel::{
     changes::{CambioError, ChangeManager, ChangeRequest, Tiempos},
@@ -29,7 +29,7 @@ fn fichero_token(p: &Panel) -> PathBuf {
 /// Panel recién instalado (sin usuarios ni router) con el token generado al
 /// arrancar.
 async fn recien_instalado() -> Panel {
-    let p = panel_sin_router().await;
+    let p = PanelPrueba::nuevo().sin_router().arrancar().await;
     assert!(instalar::token_inicial(&p.state).await.is_some());
     p
 }
@@ -160,19 +160,23 @@ async fn red_de_instalacion_opcional() {
         let (status, body, _) = llamar_desde(&p, "crear_admin", admin, None, VPN).await;
         (status, body, usuarios(&p).await)
     };
-    let (status, body, n) = crear_desde_la_vpn(panel_sin_router().await).await;
+    let (status, body, n) =
+        crear_desde_la_vpn(PanelPrueba::nuevo().sin_router().arrancar().await).await;
     assert_eq!((status, n), (403, 0), "{body}");
-    let p = panel_sin_router_ajustado(|c| {
-        c.install_nets = panel::redes::lista("203.0.113.0/24").unwrap();
-    })
-    .await;
+    let p = PanelPrueba::nuevo()
+        .sin_router()
+        .config(|c| {
+            c.install_nets = panel::redes::lista("203.0.113.0/24").unwrap();
+        })
+        .arrancar()
+        .await;
     let (status, body, n) = crear_desde_la_vpn(p).await;
     assert_eq!((status, n), (200, 1), "{body}");
 }
 
 #[tokio::test]
 async fn con_usuarios_no_hay_asistente() {
-    let p = panel_sin_router().await;
+    let p = PanelPrueba::nuevo().sin_router().arrancar().await;
     // Un token que quedó de otra vez.
     std::fs::write(fichero_token(&p), "viejo\n").unwrap();
     panel::auth::create_user(&p.state.db, PANEL_USER, PANEL_PASS)
@@ -190,7 +194,7 @@ async fn con_usuarios_no_hay_asistente() {
     .await;
     assert_eq!(status, 404);
     // Con sesión tampoco: la instalación no está en curso.
-    let cookie = common::sesion_de(&p).await;
+    let cookie = comun::sesion_de(&p).await;
     assert_eq!(
         get_con_cookie(&p.app, "/instalar", &cookie).await.status(),
         404
@@ -489,7 +493,7 @@ async fn por_el_proxy(
     let mut req = if json {
         post_json(uri, cuerpo, "127.0.0.1")
     } else {
-        common::post_form(uri, cuerpo, "127.0.0.1")
+        comun::post_form(uri, cuerpo, "127.0.0.1")
     };
     req.headers_mut()
         .insert("x-forwarded-for", cliente.parse().unwrap());
@@ -521,12 +525,12 @@ async fn tras_el_proxy_cuenta_la_ip_del_cliente() {
     assert_eq!(status, 200, "{body}");
 
     // El login y su freno cuentan la IP del cliente, no la del proxy.
-    let malo = common::login_body(PANEL_USER, "no es la buena");
+    let malo = comun::login_body(PANEL_USER, "no es la buena");
     let (status, _) = por_el_proxy(&p, "/api/login", &malo, false, PUBLICA).await;
     assert_eq!(status, 401);
     assert_eq!(fallos_de_ip(&p, PUBLICA).await, Some(1));
     assert_eq!(fallos_de_ip(&p, "127.0.0.1").await, None);
-    let bueno = common::login_body(PANEL_USER, PANEL_PASS);
+    let bueno = comun::login_body(PANEL_USER, PANEL_PASS);
     let (status, body) = por_el_proxy(&p, "/api/login", &bueno, false, PUBLICA).await;
     assert_eq!(status, 429, "en espera: {body}");
 }

@@ -1,14 +1,14 @@
 //! Pruebas HTTP del panel en proceso, contra `router-sim`.
 
-mod common;
+mod comun;
 
 use axum::{
     body::Body,
     http::{Response, StatusCode},
 };
-use common::{
-    ORIGIN, PANEL_PASS, PANEL_USER, Panel, body_text, con_usuario, get, get_con_cookie, login_body,
-    panel, panel_ajustado, post_form, send, sesion,
+use comun::{
+    ORIGIN, PANEL_PASS, PANEL_USER, Panel, PanelPrueba, body_text, con_usuario, esperar_hasta, get,
+    get_con_cookie, login_body, post_form, send, sesion,
 };
 use panel::poller::{Poller, PollerConfig};
 use std::time::Duration;
@@ -25,7 +25,7 @@ async fn json(resp: Response<Body>) -> serde_json::Value {
 /// Arranca el sondeo con intervalos cortos y un cliente del router de tiempo
 /// de espera corto, y espera a que `/salud` lo vea sano.
 async fn con_sondeo(p: &mut Panel) {
-    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, common::USER, common::PASS);
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, comun::USER, comun::PASS);
     cfg.timeout = Duration::from_millis(500);
     cfg.min_gap = Duration::from_millis(1);
     p.state.hgu = hgu::Client::new(cfg);
@@ -36,16 +36,15 @@ async fn con_sondeo(p: &mut Panel) {
             ..PollerConfig::default()
         },
     );
-    let start = std::time::Instant::now();
-    while !h.healthy() {
-        assert!(start.elapsed() < Duration::from_secs(5), "sondeo sin datos");
-        tokio::time::sleep(Duration::from_millis(10)).await;
-    }
+    esperar_hasta(Duration::from_secs(5), "sondeo sin datos", async || {
+        h.healthy()
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn salud_sin_sondeo_es_error() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let body = json(get(&p.app, "/salud").await).await;
     assert_eq!(body["ok"], true);
     assert_eq!(body["router"], "error");
@@ -53,7 +52,7 @@ async fn salud_sin_sondeo_es_error() {
 
 #[tokio::test]
 async fn salud_ok() {
-    let mut p = panel().await;
+    let mut p = PanelPrueba::nuevo().arrancar().await;
     con_sondeo(&mut p).await;
     let resp = get(&p.app, "/salud").await;
     assert_eq!(resp.status(), StatusCode::OK);
@@ -65,7 +64,7 @@ async fn salud_ok() {
 
 #[tokio::test]
 async fn salud_responde_aunque_el_router_no() {
-    let mut p = panel().await;
+    let mut p = PanelPrueba::nuevo().arrancar().await;
     con_sondeo(&mut p).await;
     p.sim.control.set_unresponsive(true);
     // Sin datos nuevos en 3 intervalos (300 ms) deja de estar sano.
@@ -92,7 +91,7 @@ fn assert_cabeceras_fijas(resp: &Response<Body>, uri: &str) {
 
 #[tokio::test]
 async fn cabeceras_de_seguridad_presentes() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let resp = get(&p.app, "/salud").await;
     assert_eq!(resp.headers()["content-security-policy"], CSP);
     assert_cabeceras_fijas(&resp, "/salud");
@@ -122,8 +121,8 @@ async fn assert_csp_con_nonce(resp: Response<Body>, uri: &str) {
 
 #[tokio::test]
 async fn pagina_leptos_lleva_csp_con_su_nonce() {
-    let p = panel().await;
-    common::con_usuario(&p).await;
+    let p = PanelPrueba::nuevo().arrancar().await;
+    comun::con_usuario(&p).await;
     let resp = get(&p.app, "/login").await;
     assert_eq!(resp.status(), StatusCode::OK);
     assert_csp_con_nonce(resp, "/login").await;
@@ -132,7 +131,7 @@ async fn pagina_leptos_lleva_csp_con_su_nonce() {
 /// La 404 la genera Leptos (página HTML con sus scripts): también lleva nonce.
 #[tokio::test]
 async fn pagina_no_encontrada_lleva_csp_con_su_nonce() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let resp = get(&p.app, "/no-existe").await;
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     assert_csp_con_nonce(resp, "/no-existe").await;
@@ -140,7 +139,7 @@ async fn pagina_no_encontrada_lleva_csp_con_su_nonce() {
 
 #[tokio::test]
 async fn fichero_estatico_con_cabeceras() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let resp = get(&p.app, "/pkg/panel.css").await;
     assert_eq!(resp.status(), StatusCode::OK);
     assert_eq!(resp.headers()["content-security-policy"], CSP);
@@ -150,7 +149,7 @@ async fn fichero_estatico_con_cabeceras() {
 
 #[tokio::test]
 async fn portada_renderiza_en_servidor() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     let resp = get_con_cookie(&p.app, "/", &cookie).await;
     assert_eq!(resp.status(), StatusCode::OK);
@@ -165,7 +164,7 @@ async fn portada_renderiza_en_servidor() {
 
 #[tokio::test]
 async fn migraciones_crean_tablas() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let tablas: Vec<String> =
         sqlx::query_scalar("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
             .fetch_all(&p.state.db)
@@ -191,7 +190,10 @@ async fn migraciones_crean_tablas() {
 #[tokio::test]
 async fn segundo_origen_aceptado_y_ajeno_rechazado() {
     const SEGUNDO: &str = "https://panel.example";
-    let p = panel_ajustado(|c| c.public_origins = vec![ORIGIN.into(), SEGUNDO.into()]).await;
+    let p = PanelPrueba::nuevo()
+        .config(|c| c.public_origins = vec![ORIGIN.into(), SEGUNDO.into()])
+        .arrancar()
+        .await;
     con_usuario(&p).await;
     // Sin `Sec-Fetch-Site`, manda `Origin`.
     let desde = |origen: &'static str| {

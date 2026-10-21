@@ -1,48 +1,23 @@
 //! Modos de visualización (texto, gráfica, mixto): preferencia por usuario,
 //! `<html data-vista>` y lo que pinta la página de estado en cada modo.
 
-mod common;
+mod comun;
 
-use common::{
-    Panel, body_text, get_con_cookie, llamar, login_body, ok, panel, post_form, send, sesion,
-    set_cookie,
+use comun::{
+    Panel, PanelPrueba, arrancar_sondeo, body_text, esperar_hasta, get_con_cookie, llamar,
+    login_body, ok, post_form, send, sesion, set_cookie,
 };
-use panel::poller::{Poller, PollerConfig, PollerHandle};
+use panel::poller::PollerHandle;
 use serde_json::json;
-use std::time::{Duration, Instant};
-
-/// Arranca el sondeo con intervalos cortos contra el simulador.
-fn arrancar_sondeo(p: &mut Panel) -> PollerHandle {
-    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, common::USER, common::PASS);
-    cfg.timeout = Duration::from_millis(200);
-    cfg.min_gap = Duration::from_millis(1);
-    p.state.hgu = hgu::Client::new(cfg);
-    Poller::spawn_with(
-        p.state.clone(),
-        PollerConfig {
-            fast: Duration::from_millis(50),
-            slow: Duration::from_millis(200),
-            backoff_max: Duration::from_millis(200),
-            ..PollerConfig::default()
-        },
-    )
-}
-
-async fn esperar(que: &str, mut cond: impl FnMut() -> bool) {
-    let start = Instant::now();
-    while !cond() {
-        assert!(start.elapsed() < Duration::from_secs(5), "no llega: {que}");
-        tokio::time::sleep(Duration::from_millis(10)).await;
-    }
-}
+use std::time::Duration;
 
 /// Panel con sesión y con datos del router (la página de estado pinta los
 /// indicadores solo cuando hay un dato).
 async fn panel_con_datos() -> (Panel, String, PollerHandle) {
-    let mut p = panel().await;
+    let mut p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     let h = arrancar_sondeo(&mut p);
-    esperar("primer dato", || h.healthy()).await;
+    esperar_hasta(Duration::from_secs(5), "primer dato", async || h.healthy()).await;
     (p, cookie, h)
 }
 
@@ -131,7 +106,7 @@ async fn vista_por_usuario() {
     // Se conserva en otras páginas y en una sesión nueva.
     let html = pagina(&p, "/panel", &cookie).await;
     assert!(html.contains(r#"data-vista="texto""#), "{html}");
-    let nueva = common::sesion_de(&p).await;
+    let nueva = comun::sesion_de(&p).await;
     assert_eq!(
         ok(&p, "leer_vista", json!({}), &nueva).await,
         json!("texto")
@@ -208,7 +183,7 @@ async fn vista_grafica_sin_minigraficas() {
 
 #[tokio::test]
 async fn guardar_vista_exige_sesion() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let (status, body) = llamar(&p, "guardar_vista", json!({ "modo": "texto" }), None).await;
     assert_eq!(status, 401, "{body}");
     let (status, body) = llamar(&p, "leer_vista", json!({}), None).await;

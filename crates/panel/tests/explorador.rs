@@ -1,11 +1,11 @@
 //! Pruebas del explorador (server functions y páginas) contra `router-sim`,
 //! con el gestor de cambios del servidor y tiempos de vigilancia cortos.
 
-mod common;
+mod comun;
 
-use common::{
-    Panel, aplicar, body_text, campo, esperar_final, fijar, get_con_cookie, llamar, ok,
-    panel_con_gestor as explorador, valores_de,
+use comun::{
+    Panel, PanelPrueba, aplicar, body_text, campo, esperar_final, fijar, get_con_cookie, llamar,
+    ok, valores_de,
 };
 use serde_json::{Value, json};
 
@@ -34,7 +34,7 @@ async fn ids_de_reservas(p: &Panel, cookie: &str) -> Vec<String> {
 /// se lee como texto, sigue enmascarado.
 #[tokio::test]
 async fn leer_trae_los_secretos_para_el_ojo() {
-    let (p, cookie) = explorador().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     // Página básica: variables con nombres de secretos del catálogo.
     let v = ok(
         &p,
@@ -137,7 +137,7 @@ async fn leer_trae_los_secretos_para_el_ojo() {
 
 #[tokio::test]
 async fn formulario_static_lease_rellena_valores() {
-    let (p, cookie) = explorador().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let f = ok(
         &p,
         "formulario",
@@ -196,7 +196,7 @@ async fn formulario_static_lease_rellena_valores() {
 /// como MASCARA) nunca escribe MASCARA y conserva el valor actual.
 #[tokio::test]
 async fn preparar_con_secreto_sin_tocar_no_cambia_secreto() {
-    let (p, cookie) = explorador().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let antes = p
         .state
         .hgu
@@ -284,7 +284,7 @@ async fn preparar_con_secreto_sin_tocar_no_cambia_secreto() {
 
 #[tokio::test]
 async fn bloqueada_sin_formulario() {
-    let (p, cookie) = explorador().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     for (f, motivo) in [
         ("cbRestoreConfig", ""),
         ("te_wifi.wl", "v1"),
@@ -335,7 +335,7 @@ async fn bloqueada_sin_formulario() {
 /// Review Focus #3: dos confirmaciones a la vez; una recibe "en curso".
 #[tokio::test]
 async fn confirmar_a_la_vez_uno_en_curso() {
-    let (p, cookie) = explorador().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let a = ok(
         &p,
         "preparar_cambio",
@@ -371,7 +371,7 @@ async fn confirmar_a_la_vez_uno_en_curso() {
 
 #[tokio::test]
 async fn reserva_estatica_alta_edicion_y_baja() {
-    let (p, cookie) = explorador().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     // Alta con el formulario de crear.
     let f = ok(
         &p,
@@ -453,7 +453,7 @@ async fn reserva_estatica_alta_edicion_y_baja() {
 
 #[tokio::test]
 async fn paginas_del_explorador_con_nombres_codificados() {
-    let (p, cookie) = explorador().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let html = |uri: &'static str| {
         let app = p.app.clone();
         let cookie = cookie.clone();
@@ -477,7 +477,7 @@ async fn paginas_del_explorador_con_nombres_codificados() {
     assert!(h.contains("<h1>upload/cfgupload.asp</h1>"), "{h}");
     assert!(h.contains("Bloqueada"), "{h}");
     // Sin sesión, al login.
-    let resp = common::get(&p.app, "/explorador/wan").await;
+    let resp = comun::get(&p.app, "/explorador/wan").await;
     assert_eq!(resp.status(), 303);
 }
 
@@ -485,7 +485,7 @@ async fn paginas_del_explorador_con_nombres_codificados() {
 /// las instancias de una lista, el formulario) van con `no-store`.
 #[tokio::test]
 async fn respuestas_con_secretos_no_store() {
-    let (p, cookie) = explorador().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     for (nombre, cuerpo) in [
         (
             "leer",
@@ -501,10 +501,9 @@ async fn respuestas_con_secretos_no_store() {
                     "claves": [["dpm_cfg_wifi_acc_pt_id", "1"]] }),
         ),
     ] {
-        let mut req =
-            common::post_json(&format!("/api/{nombre}"), &cuerpo.to_string(), "127.0.0.1");
+        let mut req = comun::post_json(&format!("/api/{nombre}"), &cuerpo.to_string(), "127.0.0.1");
         req.headers_mut().insert("cookie", cookie.parse().unwrap());
-        let resp = common::send(&p.app, req).await;
+        let resp = comun::send(&p.app, req).await;
         assert_eq!(resp.status(), 200, "{nombre}");
         let cache = resp
             .headers()

@@ -3,70 +3,18 @@
 //! anterior de un paso en el Historial, y que ningún secreto acabe en el
 //! HTML, en el registro ni reenviado vacío o tapado al router.
 
-mod common;
+mod comun;
 
 use axum::http::header;
-use common::{
-    PANEL_PASS, Panel, body_text, esperar_final, esperar_libre, llamar, ok, panel_con_ajustes,
-    panel_con_gestor, post_json, send,
+use comun::{
+    PANEL_PASS, Panel, PanelPrueba, aplicar_ajuste, body_text, cambios_del_grupo, elemento,
+    esperar_final, esperar_hasta, llamar, ok, partir, post_json, registro_global, send,
 };
 use serde_json::{Value, json};
-use std::sync::Arc;
 use std::time::Duration;
 
 const CLAVE_1: &str = "clave-de-prueba-1";
 const CLAVE_2: &str = "clave-de-prueba-2";
-
-/// Destino del registro en memoria, para comprobar lo que se anota.
-#[derive(Clone, Default)]
-struct Registro(Arc<std::sync::Mutex<Vec<u8>>>);
-
-impl Registro {
-    fn texto(&self) -> String {
-        String::from_utf8_lossy(&self.0.lock().unwrap()).into_owned()
-    }
-}
-
-impl std::io::Write for Registro {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.0.lock().unwrap().extend_from_slice(buf);
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
-impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Registro {
-    type Writer = Registro;
-
-    fn make_writer(&'a self) -> Registro {
-        self.clone()
-    }
-}
-
-/// El registro de todo este binario de pruebas (todas las pruebas, en
-/// todos los hilos): uno de hilo pierde eventos cuando otras pruebas corren
-/// a la vez (la caché de interés de `tracing`). Que tampoco las demás
-/// pruebas anoten un secreto es más estricto, no menos.
-fn registro_global() -> Registro {
-    static REGISTRO: std::sync::OnceLock<Registro> = std::sync::OnceLock::new();
-    REGISTRO
-        .get_or_init(|| {
-            let registro = Registro::default();
-            tracing::subscriber::set_global_default(
-                tracing_subscriber::fmt()
-                    .with_writer(registro.clone())
-                    .with_max_level(tracing::Level::DEBUG)
-                    .with_ansi(false)
-                    .finish(),
-            )
-            .expect("el único registro global de estas pruebas");
-            registro
-        })
-        .clone()
-}
 
 /// Escribe en el punto de acceso `id` del simulador, como lo haría el router.
 async fn escribir_punto(p: &Panel, id: &str, pares: &[(&str, &str)]) {
@@ -77,13 +25,6 @@ async fn escribir_punto(p: &Panel, id: &str, pares: &[(&str, &str)]) {
         .write("wifi.asp", "cbSetWifiAccPt", &params)
         .await
         .unwrap();
-}
-
-/// Elemento `nombre` de una respuesta del router, a cualquier profundidad.
-fn elemento(n: &hgu::xml::XmlNode, nombre: &str) -> Option<String> {
-    n.text_of(nombre)
-        .map(str::to_owned)
-        .or_else(|| n.children.iter().find_map(|c| elemento(c, nombre)))
 }
 
 /// Clave WiFi del punto de acceso `id` en el simulador.
@@ -122,39 +63,12 @@ async fn preparar(p: &Panel, cookie: &str, ajuste: &str, valores: Value) -> (u16
     .await
 }
 
-/// Confirma el resumen `grupo` y espera a que quede aplicado; su id.
-async fn aplicar(p: &Panel, cookie: &str, grupo: &Value) -> i64 {
-    let id = ok(
-        p,
-        "confirmar_ajuste",
-        json!({ "token": grupo["token"], "desmarcados": [] }),
-        cookie,
-    )
-    .await
-    .as_i64()
-    .unwrap();
-    let c = esperar_final(p, cookie, id).await;
-    assert_eq!(c["estado"], "Aplicado", "{c}");
-    esperar_libre(p).await;
-    id
-}
-
-/// Campos cambiados de todos los pasos de un resumen.
-fn cambios(grupo: &Value) -> Vec<&Value> {
-    grupo["pasos"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .flat_map(|p| p["campos"].as_array().unwrap())
-        .collect()
-}
-
 /// Cambia la clave de la red de 5 GHz a `nueva` desde Ajustes; el id.
 async fn cambiar_clave_5(p: &Panel, cookie: &str, nueva: &str) -> i64 {
     let (status, body) = preparar(p, cookie, "wifi.red_5", json!({ "contrasena": nueva })).await;
     assert_eq!(status, 200, "{body}");
     let g: Value = serde_json::from_str(&body).unwrap();
-    aplicar(p, cookie, &g).await
+    aplicar_ajuste(p, cookie, &g).await
 }
 
 /// La página `ruta` como la pide el navegador: su HTML.
@@ -174,7 +88,7 @@ async fn html(p: &Panel, cookie: &str, ruta: &str) -> String {
 
 #[tokio::test]
 async fn cambiar_contrasena_wifi_y_deshacer() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let original = clave_del_punto(&p, "1").await;
     let (status, body) =
         preparar(&p, &cookie, "wifi.red_5", json!({ "contrasena": CLAVE_2 })).await;
@@ -184,13 +98,13 @@ async fn cambiar_contrasena_wifi_y_deshacer() {
         "{body}"
     );
     let g: Value = serde_json::from_str(&body).unwrap();
-    let campos = cambios(&g);
+    let campos = cambios_del_grupo(&g);
     assert_eq!(campos.len(), 1, "{g}");
     assert_eq!(campos[0]["campo"], "ajuste-wifi-red_5-contrasena");
     assert_eq!(campos[0]["secreto"], true);
     assert_eq!(campos[0]["antes"], panel::ui::explorador::MASCARA);
     assert_eq!(campos[0]["despues"], panel::ui::explorador::MASCARA);
-    let id = aplicar(&p, &cookie, &g).await;
+    let id = aplicar_ajuste(&p, &cookie, &g).await;
     assert_eq!(clave_del_punto(&p, "1").await, CLAVE_2);
 
     let (status, body) = llamar(
@@ -206,11 +120,11 @@ async fn cambiar_contrasena_wifi_y_deshacer() {
         "{body}"
     );
     let inverso: Value = serde_json::from_str(&body).unwrap();
-    let campos = cambios(&inverso);
+    let campos = cambios_del_grupo(&inverso);
     assert_eq!(campos.len(), 1, "{inverso}");
     assert_eq!(campos[0]["antes"], panel::ui::explorador::MASCARA);
     assert_eq!(campos[0]["despues"], panel::ui::explorador::MASCARA);
-    aplicar(&p, &cookie, &inverso).await;
+    aplicar_ajuste(&p, &cookie, &inverso).await;
     assert_eq!(clave_del_punto(&p, "1").await, original);
 }
 
@@ -218,7 +132,7 @@ async fn cambiar_contrasena_wifi_y_deshacer() {
 /// petición no vale.
 #[tokio::test]
 async fn contrasena_vacia_no_se_envia() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let (status, body) = preparar(&p, &cookie, "wifi.red_5", json!({ "contrasena": "" })).await;
     assert_eq!(status, 400, "{body}");
     assert!(p.sim.control.writes().is_empty());
@@ -249,7 +163,10 @@ lee = "key_phrase"
 tipo = "secreto"
 solo_lectura = "ajuste-puertos-alg-motivo"
 "#;
-    let (p, cookie) = panel_con_ajustes(toml).await;
+    let (p, cookie) = PanelPrueba::nuevo()
+        .ajustes(toml)
+        .arrancar_con_gestor()
+        .await;
     escribir_punto(&p, "1", &[("key_phrase", CLAVE_1)]).await;
     for v in [CLAVE_2, panel::ui::explorador::MASCARA] {
         let (status, body) =
@@ -335,7 +252,7 @@ fn ultima_escritura(p: &Panel, funcion: &str) -> Vec<(String, String)> {
 /// guarda, y va la escrita.
 #[tokio::test]
 async fn voz_con_la_clave_escrita_se_guarda() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     assert_eq!(de_la_voz(&p, "auth_password").await, "");
     let tema = ok(&p, "leer_tema", json!({ "tema": "telefono" }), &cookie).await;
     let campo = campo_de(&tema, "telefono.linea", "contrasena");
@@ -352,7 +269,7 @@ async fn voz_con_la_clave_escrita_se_guarda() {
     assert_eq!(status, 200, "{body}");
     assert!(!body.contains(CLAVE_3));
     let g: Value = serde_json::from_str(&body).unwrap();
-    aplicar(&p, &cookie, &g).await;
+    aplicar_ajuste(&p, &cookie, &g).await;
     let enviado = ultima_escritura(&p, "cbSetVoiceLine");
     assert!(
         enviado.contains(&("auth_password".into(), CLAVE_3.into())),
@@ -367,7 +284,7 @@ async fn voz_con_la_clave_escrita_se_guarda() {
 /// se escribe. Desde la Biblioteca, el gestor tampoco la reenvía vacía.
 #[tokio::test]
 async fn voz_con_la_clave_vacia_se_bloquea_con_el_motivo() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     for valores in [
         json!({ "activa": "false" }),
         json!({ "activa": "false", "contrasena": panel::ui::explorador::MASCARA }),
@@ -400,7 +317,7 @@ async fn voz_con_la_clave_vacia_se_bloquea_con_el_motivo() {
 /// y la WiFi se guarda.
 #[tokio::test]
 async fn wifi_con_wep_vacias_se_guarda() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let vacias: Vec<(&str, &str)> = (1..=4)
         .map(|i| match i {
             1 => ("wep_key1_data", ""),
@@ -413,7 +330,7 @@ async fn wifi_con_wep_vacias_se_guarda() {
     let (status, body) = preparar(&p, &cookie, "wifi.red_5", json!({ "nombre": "otra-red" })).await;
     assert_eq!(status, 200, "{body}");
     let g: Value = serde_json::from_str(&body).unwrap();
-    aplicar(&p, &cookie, &g).await;
+    aplicar_ajuste(&p, &cookie, &g).await;
     let enviado = ultima_escritura(&p, "cbSetWifiAccPt");
     for (k, _) in &vacias {
         assert!(
@@ -427,7 +344,7 @@ async fn wifi_con_wep_vacias_se_guarda() {
 /// (su valor anterior es el vacío que dio el router) y vuelve lo demás.
 #[tokio::test]
 async fn deshacer_la_voz_omite_la_clave_tapada() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let (status, body) = preparar(
         &p,
         &cookie,
@@ -436,7 +353,7 @@ async fn deshacer_la_voz_omite_la_clave_tapada() {
     )
     .await;
     assert_eq!(status, 200, "{body}");
-    let id = aplicar(&p, &cookie, &serde_json::from_str(&body).unwrap()).await;
+    let id = aplicar_ajuste(&p, &cookie, &serde_json::from_str(&body).unwrap()).await;
     let (status, body) = llamar(
         &p,
         "deshacer_ajuste",
@@ -445,7 +362,7 @@ async fn deshacer_la_voz_omite_la_clave_tapada() {
     )
     .await;
     assert_eq!(status, 200, "{body}");
-    aplicar(&p, &cookie, &serde_json::from_str(&body).unwrap()).await;
+    aplicar_ajuste(&p, &cookie, &serde_json::from_str(&body).unwrap()).await;
     let enviado = ultima_escritura(&p, "cbSetVoiceLine");
     assert!(
         enviado.iter().all(|(k, _)| k != "auth_password"),
@@ -461,10 +378,10 @@ async fn deshacer_la_voz_omite_la_clave_tapada() {
 /// bloquea: omite la contraseña y deja la línea como estaba.
 #[tokio::test]
 async fn revertir_la_voz_omite_la_clave_tapada() {
-    let mut t = common::tiempos_rapidos();
+    let mut t = comun::tiempos_rapidos();
     t.bajo = Duration::from_secs(5);
     t.medio = Duration::from_secs(5);
-    let (p, cookie) = common::panel_con_tiempos(t).await;
+    let (p, cookie) = PanelPrueba::nuevo().tiempos(t).arrancar_con_gestor().await;
     let (status, body) = preparar(
         &p,
         &cookie,
@@ -483,14 +400,10 @@ async fn revertir_la_voz_omite_la_clave_tapada() {
     .await
     .as_i64()
     .unwrap();
-    let inicio = std::time::Instant::now();
-    while ok(&p, "estado_cambio", json!({ "id": id }), &cookie).await["estado"] != "Vigilando" {
-        assert!(
-            inicio.elapsed() < Duration::from_secs(5),
-            "no llega a vigilarse"
-        );
-        tokio::time::sleep(Duration::from_millis(20)).await;
-    }
+    esperar_hasta(Duration::from_secs(5), "no llega a vigilarse", async || {
+        ok(&p, "estado_cambio", json!({ "id": id }), &cookie).await["estado"] == "Vigilando"
+    })
+    .await;
     p.sim.control.set_wan_up(false);
     let c = esperar_final(&p, &cookie, id).await;
     assert_eq!(c["estado"], "Revertido", "{c}");
@@ -506,7 +419,7 @@ async fn revertir_la_voz_omite_la_clave_tapada() {
 /// reenvía al cambiar otro campo.
 #[tokio::test]
 async fn clave_tapada_no_se_reenvia() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     for tapada in ["********", panel::ui::explorador::MASCARA] {
         escribir_punto(&p, "1", &[("key_phrase", tapada)]).await;
         let antes = p.sim.control.writes().len();
@@ -533,7 +446,7 @@ async fn clave_tapada_no_se_reenvia() {
 /// llega vacío.
 #[tokio::test]
 async fn los_secretos_llegan_con_la_pagina() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     escribir_punto(&p, "1", &[("key_phrase", CLAVE_1)]).await;
     let (status, cache, body) = llamada(&p, "leer_tema", json!({ "tema": "wifi" }), &cookie).await;
     assert_eq!(status, 200, "{body}");
@@ -571,7 +484,7 @@ async fn los_secretos_llegan_con_la_pagina() {
 /// enseña lo que cambia y, solo, no hay nada que guardar.
 #[tokio::test]
 async fn secreto_sin_cambiar_no_se_envia() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     escribir_punto(&p, "1", &[("key_phrase", CLAVE_1)]).await;
     let (status, body) = preparar(
         &p,
@@ -582,7 +495,7 @@ async fn secreto_sin_cambiar_no_se_envia() {
     .await;
     assert_eq!(status, 200, "{body}");
     let g: Value = serde_json::from_str(&body).unwrap();
-    let campos = cambios(&g);
+    let campos = cambios_del_grupo(&g);
     assert_eq!(campos.len(), 1, "{g}");
     assert_eq!(campos[0]["campo"], "ajuste-wifi-red_5-nombre");
     let (status, body) =
@@ -598,7 +511,7 @@ async fn secreto_sin_cambiar_no_se_envia() {
 async fn secretos_solo_en_el_campo_de_las_paginas_que_los_muestran() {
     // El registro, antes de hacer nada: así recoge todo lo de este test.
     let registro = registro_global();
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     escribir_punto(&p, "1", &[("key_phrase", CLAVE_1)]).await;
     cambiar_clave_5(&p, &cookie, CLAVE_2).await;
     // Dos veces: la segunda sale de la caché de lecturas (sin enmascarar).
@@ -671,7 +584,7 @@ async fn secretos_solo_en_el_campo_de_las_paginas_que_los_muestran() {
 /// con `no-store`); la lista del Historial no los trae nunca.
 #[tokio::test]
 async fn detalle_de_un_cambio_con_sus_secretos() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     escribir_punto(&p, "1", &[("key_phrase", CLAVE_1)]).await;
     let id = cambiar_clave_5(&p, &cookie, CLAVE_2).await;
     let h = ok(&p, "historial", json!({ "pagina": 1 }), &cookie)
@@ -715,7 +628,7 @@ async fn detalle_de_un_cambio_con_sus_secretos() {
 /// de los detalles técnicos plegados.
 #[tokio::test]
 async fn historial_con_las_etiquetas_de_ajustes() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let id = cambiar_clave_5(&p, &cookie, CLAVE_2).await;
     for (idioma, ajuste, campo) in [
         ("es", "Red WiFi 5 GHz", "Contraseña"),
@@ -790,7 +703,7 @@ async fn historial_con_las_etiquetas_de_ajustes() {
 /// mismo freno que el login.
 #[tokio::test]
 async fn el_freno_es_el_mismo_que_el_del_login() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let (status, _) = llamar(
         &p,
         "reautenticar",
@@ -801,29 +714,14 @@ async fn el_freno_es_el_mismo_que_el_del_login() {
     assert_eq!(status, 403);
     let resp = send(
         &p.app,
-        common::post_form(
+        comun::post_form(
             "/api/login",
-            &common::login_body(common::PANEL_USER, PANEL_PASS),
+            &comun::login_body(comun::PANEL_USER, PANEL_PASS),
             "127.0.0.1",
         ),
     )
     .await;
     assert_eq!(resp.status(), 429);
-}
-
-/// `html` sin los bloques `<abre …>…</cierra>` (sin anidar), y esos bloques.
-fn partir<'a>(html: &'a str, abre: &str, cierra: &str) -> (String, Vec<&'a str>) {
-    let mut fuera = String::new();
-    let mut dentro = Vec::new();
-    let mut resto = html;
-    while let Some(i) = resto.find(abre) {
-        fuera.push_str(&resto[..i]);
-        let fin = i + resto[i..].find(cierra).expect("bloque sin cerrar") + cierra.len();
-        dentro.push(&resto[i..fin]);
-        resto = &resto[fin..];
-    }
-    fuera.push_str(resto);
-    (fuera, dentro)
 }
 
 /// Texto que se lee en pantalla de un trozo de HTML: lo de fuera de las
@@ -851,7 +749,7 @@ fn texto_visible(html: &str) -> String {
 /// da 400 con ese motivo. Su detalle no enseña un «antes».
 #[tokio::test]
 async fn deshacer_solo_la_clave_tapada_no_se_ofrece() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let (status, body) = preparar(
         &p,
         &cookie,
@@ -860,7 +758,7 @@ async fn deshacer_solo_la_clave_tapada_no_se_ofrece() {
     )
     .await;
     assert_eq!(status, 200, "{body}");
-    let id = aplicar(&p, &cookie, &serde_json::from_str(&body).unwrap()).await;
+    let id = aplicar_ajuste(&p, &cookie, &serde_json::from_str(&body).unwrap()).await;
     for (idioma, motivo) in [
         ("es", "no se puede volver atrás"),
         ("en", "can't be put back"),
@@ -905,7 +803,7 @@ async fn deshacer_solo_la_clave_tapada_no_se_ofrece() {
 /// avisa de que la clave se queda como se escribió.
 #[tokio::test]
 async fn deshacer_mixto_avisa_de_la_clave_tapada() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let (status, body) = preparar(
         &p,
         &cookie,
@@ -914,7 +812,7 @@ async fn deshacer_mixto_avisa_de_la_clave_tapada() {
     )
     .await;
     assert_eq!(status, 200, "{body}");
-    let id = aplicar(&p, &cookie, &serde_json::from_str(&body).unwrap()).await;
+    let id = aplicar_ajuste(&p, &cookie, &serde_json::from_str(&body).unwrap()).await;
     let h = ok(&p, "historial", json!({ "pagina": 1 }), &cookie).await;
     let c = h["entradas"][0]["Cambio"].clone();
     assert_eq!(c["puede_deshacer"], true, "{c}");
@@ -963,12 +861,12 @@ fn fila_del_cambio(pagina: &str, id: i64) -> String {
 /// título, sale como «Cambio en el router».
 #[tokio::test]
 async fn historial_sin_nombres_de_la_api_al_deshacer() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let (status, body) = preparar(&p, &cookie, "wifi.red_5", json!({ "nombre": "otra-red" })).await;
     assert_eq!(status, 200, "{body}");
-    let id = aplicar(&p, &cookie, &serde_json::from_str(&body).unwrap()).await;
+    let id = aplicar_ajuste(&p, &cookie, &serde_json::from_str(&body).unwrap()).await;
     let g = ok(&p, "deshacer_ajuste", json!({ "cambio": id }), &cookie).await;
-    let deshecho = aplicar(&p, &cookie, &g).await;
+    let deshecho = aplicar_ajuste(&p, &cookie, &g).await;
     let titulo: Option<String> = sqlx::query_scalar("SELECT titulo FROM changes WHERE id = ?")
         .bind(deshecho)
         .fetch_one(&p.state.db)
@@ -1049,10 +947,10 @@ async fn historial_sin_nombres_de_la_api_al_deshacer() {
 /// primero.
 #[tokio::test]
 async fn deshacer_en_vigilancia_da_su_motivo_aunque_sea_una_clave_tapada() {
-    let mut t = common::tiempos_rapidos();
+    let mut t = comun::tiempos_rapidos();
     t.bajo = Duration::from_secs(10);
     t.medio = Duration::from_secs(10);
-    let (p, cookie) = common::panel_con_tiempos(t).await;
+    let (p, cookie) = PanelPrueba::nuevo().tiempos(t).arrancar_con_gestor().await;
     let (status, body) = preparar(
         &p,
         &cookie,
@@ -1071,14 +969,10 @@ async fn deshacer_en_vigilancia_da_su_motivo_aunque_sea_una_clave_tapada() {
     .await
     .as_i64()
     .unwrap();
-    let inicio = std::time::Instant::now();
-    while ok(&p, "estado_cambio", json!({ "id": id }), &cookie).await["estado"] != "Vigilando" {
-        assert!(
-            inicio.elapsed() < Duration::from_secs(5),
-            "no llega a vigilarse"
-        );
-        tokio::time::sleep(Duration::from_millis(20)).await;
-    }
+    esperar_hasta(Duration::from_secs(5), "no llega a vigilarse", async || {
+        ok(&p, "estado_cambio", json!({ "id": id }), &cookie).await["estado"] == "Vigilando"
+    })
+    .await;
     let (status, body) = llamar(
         &p,
         "deshacer_ajuste",

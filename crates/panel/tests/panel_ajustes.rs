@@ -3,28 +3,18 @@
 //! (también los que usarán las recomendaciones de la fase 4), usuarios y
 //! ventana de reautenticación.
 
-mod common;
+mod comun;
 
-use common::{
-    PANEL_PASS, PANEL_USER, PASS, Panel, USER, body_text, get_con_cookie, llamar, login_body, ok,
-    panel, panel_con_gestor, post_form, post_json, send, sesion, set_cookie,
+use comun::{
+    PANEL_PASS, PANEL_USER, PASS, Panel, PanelPrueba, USER, body_text, esperar_hasta,
+    get_con_cookie, llamar, login_body, ok, post_form, post_json, reautenticar, send, sesion,
+    set_cookie,
 };
 use panel::instancia::{self, claves};
 use serde_json::{Value, json};
 use std::time::{Duration, Instant};
 
 const NUEVA: &str = "nueva-clave-del-router";
-
-/// Abre la ventana de reautenticación de la sesión `cookie`.
-async fn reautenticar(p: &Panel, cookie: &str) {
-    ok(
-        p,
-        "reautenticar",
-        json!({ "contrasena": PANEL_PASS }),
-        cookie,
-    )
-    .await;
-}
 
 fn router(p: &Panel, contrasena: &str) -> Value {
     json!({ "url": p.sim.base_url, "usuario": USER, "contrasena": contrasena })
@@ -50,7 +40,7 @@ fn campos() -> Value {
 
 #[tokio::test]
 async fn credenciales_no_se_cambian_con_cambio_activo() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     reautenticar(&p, &cookie).await;
     let antes = credenciales(&p).await;
     // Un cambio que se queda a medias: el router deja de responder tras la
@@ -75,14 +65,10 @@ async fn credenciales_no_se_cambian_con_cambio_activo() {
         tokio::spawn(async move { send(&app, req).await.status() })
     };
     let gestor = p.state.cambios().unwrap();
-    let start = Instant::now();
-    while gestor.activo().is_none() || p.sim.control.writes().is_empty() {
-        assert!(
-            start.elapsed() < Duration::from_secs(5),
-            "sin cambio activo"
-        );
-        tokio::time::sleep(Duration::from_millis(5)).await;
-    }
+    esperar_hasta(Duration::from_secs(5), "sin cambio activo", async || {
+        gestor.activo().is_some() && !p.sim.control.writes().is_empty()
+    })
+    .await;
     p.sim.control.set_password(NUEVA);
     let (status, body) = llamar(&p, "panel_guardar_router", router(&p, NUEVA), Some(&cookie)).await;
     assert_eq!(status, 409, "{body}");
@@ -93,19 +79,15 @@ async fn credenciales_no_se_cambian_con_cambio_activo() {
     p.sim.control.set_password(PASS);
     p.sim.control.set_unresponsive(false);
     let _ = cambio.await;
-    let start = Instant::now();
-    while gestor.activo().is_some() {
-        assert!(
-            start.elapsed() < Duration::from_secs(10),
-            "el cambio no acaba"
-        );
-        tokio::time::sleep(Duration::from_millis(20)).await;
-    }
+    esperar_hasta(Duration::from_secs(10), "el cambio no acaba", async || {
+        gestor.activo().is_none()
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn guardar_router_exige_reautenticacion() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     p.sim.control.set_password(NUEVA);
     let (status, body) = llamar(&p, "panel_guardar_router", router(&p, NUEVA), Some(&cookie)).await;
@@ -148,7 +130,7 @@ async fn guardar_router_exige_reautenticacion() {
 
 #[tokio::test]
 async fn reautenticacion_dura_5_minutos() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     reautenticar(&p, &cookie).await;
     let hasta: i64 = sqlx::query_scalar("SELECT reautenticado_hasta FROM sessions")
@@ -173,7 +155,7 @@ async fn reautenticacion_dura_5_minutos() {
 
 #[tokio::test]
 async fn guardar_router_prueba_antes_de_guardar() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     reautenticar(&p, &cookie).await;
     let (status, body) = llamar(
@@ -194,7 +176,7 @@ async fn guardar_router_prueba_antes_de_guardar() {
 
 #[tokio::test]
 async fn confirmar_firmware_quita_solo_lectura() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     instancia::escribir(&p.state.db, claves::SOLO_LECTURA, &json!(true))
         .await
@@ -222,7 +204,7 @@ async fn usuarios(p: &Panel, cookie: &str) -> Vec<String> {
 
 #[tokio::test]
 async fn no_se_borra_el_ultimo_usuario() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     let (status, _) = llamar(
         &p,
@@ -303,7 +285,7 @@ async fn no_se_borra_el_ultimo_usuario() {
 
 #[tokio::test]
 async fn cambiar_contrasena_propia_mantiene_la_sesion() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     let nueva = json!({ "usuario": PANEL_USER, "contrasena": "contraseña nueva y larga" });
     let (status, _) = llamar(&p, "cambiar_contrasena", nueva.clone(), Some(&cookie)).await;
@@ -333,7 +315,7 @@ async fn cambiar_contrasena_propia_mantiene_la_sesion() {
 
 #[tokio::test]
 async fn instancia_valida_dns_y_macs() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     let mut c = campos();
     c["dns_preferidos"] = json!(["9.9.9.9", " 2620:fe::fe ", "194.242.2.2"]);
@@ -416,7 +398,7 @@ async fn instancia_valida_dns_y_macs() {
 
 #[tokio::test]
 async fn leer_panel_no_devuelve_contrasena() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let (status, _) = llamar(&p, "leer_panel", json!({}), None).await;
     assert_eq!(status, 401);
     let cookie = sesion(&p).await;
@@ -465,14 +447,12 @@ fn sondeo_rapido(p: &mut Panel) {
 }
 
 async fn esperar_solo_lectura(p: &Panel, valor: bool) {
-    let start = Instant::now();
-    while instancia::solo_lectura(&p.state.db).await != valor {
-        assert!(
-            start.elapsed() < Duration::from_secs(5),
-            "solo lectura no pasa a {valor}"
-        );
-        tokio::time::sleep(Duration::from_millis(20)).await;
-    }
+    esperar_hasta(
+        Duration::from_secs(5),
+        &format!("solo lectura no pasa a {valor}"),
+        async || instancia::solo_lectura(&p.state.db).await == valor,
+    )
+    .await;
 }
 
 const SIN_PROBAR_A: &str = "ES_g99.00_RTF_TEF001_V99.00_V001";
@@ -480,7 +460,7 @@ const SIN_PROBAR_B: &str = "ES_g99.01_RTF_TEF001_V99.01_V001";
 
 #[tokio::test]
 async fn firmware_confirmado_solo_vale_para_esa_version() {
-    let mut p = panel().await;
+    let mut p = PanelPrueba::nuevo().arrancar().await;
     p.sim.control.set_firmware(SIN_PROBAR_A);
     sondeo_rapido(&mut p);
     let cookie = sesion(&p).await;
@@ -520,7 +500,7 @@ async fn frenar_usuario(p: &Panel) {
 
 #[tokio::test]
 async fn cambiar_contrasena_propia_con_usuario_frenado() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     reautenticar(&p, &cookie).await;
     frenar_usuario(&p).await;
@@ -535,7 +515,7 @@ async fn cambiar_contrasena_propia_con_usuario_frenado() {
 
 #[tokio::test]
 async fn contrasena_demasiado_larga() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     reautenticar(&p, &cookie).await;
     let larga = "x".repeat(1025);
@@ -579,7 +559,7 @@ async fn contrasena_demasiado_larga() {
 
 #[tokio::test]
 async fn cada_seccion_guarda_solo_lo_suyo() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     ok(
         &p,
@@ -619,7 +599,7 @@ async fn cada_seccion_guarda_solo_lo_suyo() {
 
 #[tokio::test]
 async fn leer_preferencias_exige_sesion() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let (status, _) = llamar(&p, "leer_preferencias", json!({}), None).await;
     assert_eq!(status, 401);
     let cookie = sesion(&p).await;
@@ -643,7 +623,7 @@ async fn leer_preferencias_exige_sesion() {
 /// con sus tarjetas).
 #[tokio::test]
 async fn preferencias_fuera_de_ajustes_del_panel() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     let html = body_text(get_con_cookie(&p.app, "/panel", &cookie).await).await;
     assert!(html.contains(r#"id="panel-idioma""#), "{html}");
@@ -657,7 +637,7 @@ async fn preferencias_fuera_de_ajustes_del_panel() {
 /// lleva allí.
 #[tokio::test]
 async fn conexion_con_el_router_en_su_seccion() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     let resp = get_con_cookie(&p.app, "/router/conexion", &cookie).await;
     assert_eq!(resp.status(), 200);
@@ -742,7 +722,7 @@ async fn conexion_con_el_router_en_su_seccion() {
 /// router tenga. Volver a detectar, también reautenticación.
 #[tokio::test]
 async fn guardar_wan_exige_reautenticacion_y_nombre_valido() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     let v = ok(&p, "leer_panel", json!({}), &cookie).await;
     assert_eq!(v["red"]["wan"], "ip2", "{v}");
@@ -794,7 +774,7 @@ async fn guardar_wan_exige_reautenticacion_y_nombre_valido() {
 /// cambia de conexión a mitad.
 #[tokio::test]
 async fn guardar_wan_rechazada_con_cambio_activo() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     reautenticar(&p, &cookie).await;
     let prep = ok(
         &p,
@@ -816,14 +796,10 @@ async fn guardar_wan_rechazada_con_cambio_activo() {
         tokio::spawn(async move { send(&app, req).await.status() })
     };
     let gestor = p.state.cambios().unwrap();
-    let start = Instant::now();
-    while gestor.activo().is_none() || p.sim.control.writes().is_empty() {
-        assert!(
-            start.elapsed() < Duration::from_secs(5),
-            "sin cambio activo"
-        );
-        tokio::time::sleep(Duration::from_millis(5)).await;
-    }
+    esperar_hasta(Duration::from_secs(5), "sin cambio activo", async || {
+        gestor.activo().is_some() && !p.sim.control.writes().is_empty()
+    })
+    .await;
     let (status, body) = llamar(&p, "guardar_wan", json!({ "manual": "ip4" }), Some(&cookie)).await;
     assert_eq!(status, 409, "{body}");
     let (status, body) = llamar(&p, "redetectar", json!({}), Some(&cookie)).await;
@@ -833,14 +809,10 @@ async fn guardar_wan_rechazada_con_cambio_activo() {
 
     p.sim.control.set_unresponsive(false);
     let _ = cambio.await;
-    let start = Instant::now();
-    while gestor.activo().is_some() {
-        assert!(
-            start.elapsed() < Duration::from_secs(10),
-            "el cambio no acaba"
-        );
-        tokio::time::sleep(Duration::from_millis(20)).await;
-    }
+    esperar_hasta(Duration::from_secs(10), "el cambio no acaba", async || {
+        gestor.activo().is_none()
+    })
+    .await;
     ok(&p, "guardar_wan", json!({ "manual": "ip4" }), &cookie).await;
     assert_eq!(p.state.wan().as_deref(), Some("ip4"));
 }
@@ -850,7 +822,7 @@ async fn guardar_wan_rechazada_con_cambio_activo() {
 /// ofrece las conexiones que conoce el panel.
 #[tokio::test]
 async fn leer_panel_sin_sondeo_no_pregunta_al_router() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     assert!(p.state.poller.latest().is_none());
     p.state.fijar_red(p.state.red(), Some("ip4".into()));
@@ -888,11 +860,10 @@ async fn leer_panel_sin_sondeo_no_pregunta_al_router() {
             ..panel::poller::PollerConfig::default()
         },
     );
-    let start = Instant::now();
-    while !h.healthy() {
-        assert!(start.elapsed() < Duration::from_secs(5), "sin primer dato");
-        tokio::time::sleep(Duration::from_millis(10)).await;
-    }
+    esperar_hasta(Duration::from_secs(5), "sin primer dato", async || {
+        h.healthy()
+    })
+    .await;
     let v = ok(&p, "leer_panel", json!({}), &cookie).await;
     assert_eq!(v["conexiones"], json!(["ip2", "ip3", "ip4"]), "{v}");
 }
@@ -903,7 +874,7 @@ async fn leer_panel_sin_sondeo_no_pregunta_al_router() {
 #[tokio::test]
 async fn red_bloqueada_mientras_se_retoman_cambios() {
     use panel::changes::{ChangeManager, ChangeRequest, Tiempos};
-    let mut p = panel().await;
+    let mut p = PanelPrueba::nuevo().arrancar().await;
     let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, USER, PASS);
     cfg.timeout = Duration::from_millis(500);
     cfg.min_gap = Duration::from_millis(1);
@@ -939,11 +910,7 @@ async fn red_bloqueada_mientras_se_retoman_cambios() {
         let b = b.clone();
         async move { b.reanudar_pendientes().await }
     });
-    let start = Instant::now();
-    while !b.ocupado() {
-        assert!(start.elapsed() < Duration::from_secs(5), "no retoma");
-        tokio::time::sleep(Duration::from_millis(5)).await;
-    }
+    esperar_hasta(Duration::from_secs(5), "no retoma", async || b.ocupado()).await;
     assert_eq!(b.activo(), None, "aún sin cambio activo: solo retomando");
 
     // Estos 409 los da la reserva que mantiene `hueco`, no la comprobación de
@@ -962,11 +929,7 @@ async fn red_bloqueada_mientras_se_retoman_cambios() {
 
     drop(hueco);
     retomar.await.unwrap();
-    let start = Instant::now();
-    while b.ocupado() {
-        assert!(start.elapsed() < Duration::from_secs(10), "no termina");
-        tokio::time::sleep(Duration::from_millis(20)).await;
-    }
+    esperar_hasta(Duration::from_secs(10), "no termina", async || !b.ocupado()).await;
     ok(&p, "guardar_wan", json!({ "manual": "ip4" }), &cookie).await;
 }
 
@@ -976,7 +939,7 @@ async fn red_bloqueada_mientras_se_retoman_cambios() {
 #[tokio::test]
 async fn zona_valida_y_no_valida() {
     use panel::ui::charts::Zona;
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     assert_eq!(p.state.zona(), Zona::Peninsular);
     for (zona, guardada, en_memoria) in [
@@ -1026,7 +989,7 @@ async fn zona_valida_y_no_valida() {
     }
     // Al arrancar, la guardada.
     let dir = p.state.cfg.db_path.parent().unwrap();
-    let otro = common::estado((*p.state.cfg).clone(), dir).await;
+    let otro = comun::estado((*p.state.cfg).clone(), dir).await;
     assert_eq!(otro.zona(), Zona::Canarias);
 }
 
@@ -1034,7 +997,7 @@ async fn zona_valida_y_no_valida() {
 /// y las fechas de la página salen en ella.
 #[tokio::test]
 async fn html_lleva_data_zona() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     let html = body_text(get_con_cookie(&p.app, "/panel", &cookie).await).await;
     assert!(html.contains(r#"data-zona="Europe/Madrid""#), "{html}");
@@ -1048,7 +1011,7 @@ async fn html_lleva_data_zona() {
     for ruta in ["/panel", "/", "/historial", "/login"] {
         // /login, sin sesión: con ella lleva a la portada.
         let resp = if ruta == "/login" {
-            common::get(&p.app, ruta).await
+            comun::get(&p.app, ruta).await
         } else {
             get_con_cookie(&p.app, ruta, &cookie).await
         };
@@ -1101,10 +1064,10 @@ async fn html_lleva_data_zona() {
 #[tokio::test]
 async fn migracion_zona_utc_por_defecto() {
     use panel::ui::charts::Zona;
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let db = &p.state.db;
     let dir = p.state.cfg.db_path.parent().unwrap();
-    let arrancar = || common::estado((*p.state.cfg).clone(), dir);
+    let arrancar = || comun::estado((*p.state.cfg).clone(), dir);
     // Base de datos de la versión anterior: sin la marca de la migración.
     let anterior = |zona: &'static str| async move {
         sqlx::query("DELETE FROM ajustes_instancia WHERE clave = ?")

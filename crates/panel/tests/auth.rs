@@ -1,12 +1,12 @@
 //! Pruebas de autenticación: login, sesiones, freno de fuerza bruta, CSRF y
 //! órdenes `panel user …`.
 
-mod common;
+mod comun;
 
 use axum::{body::Body, http::Request};
-use common::{
-    PANEL_PASS, PANEL_USER, Panel, body_text, get, get_con_cookie, login_body, panel,
-    panel_con_proxy, post_form, send, sesion, set_cookie,
+use comun::{
+    PANEL_PASS, PANEL_USER, Panel, PanelPrueba, body_text, get, get_con_cookie, login_body,
+    post_form, send, sesion, set_cookie,
 };
 use std::{
     io::Write,
@@ -52,7 +52,7 @@ async fn login_desde(p: &Panel, usuario: &str, contrasena: &str, peer: &str) -> 
 
 #[tokio::test]
 async fn login_ok_crea_cookie_con_atributos() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     crear_usuario(&p).await;
     let resp = send(
         &p.app,
@@ -102,7 +102,7 @@ async fn login_ok_crea_cookie_con_atributos() {
 
 #[tokio::test]
 async fn login_mal_incrementa_retardo() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     crear_usuario(&p).await;
 
     let (status, body) = login_desde(&p, PANEL_USER, "contraseña equivocada", "127.0.0.1").await;
@@ -140,7 +140,7 @@ async fn login_mal_incrementa_retardo() {
 
 #[tokio::test]
 async fn retardo_maximo_60_s() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     // El último fallo, ahora mismo (en milisegundos: `strftime('%s')`
     // redondeaba al segundo y, con la máquina cargada, la espera que quedaba
     // ya era de 59 s).
@@ -168,7 +168,7 @@ async fn retardo_maximo_60_s() {
 
 #[tokio::test]
 async fn usuario_inexistente_mismo_error() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     crear_usuario(&p).await;
     let (status, body) = login_desde(&p, "nadie", "contraseña cualquiera", "127.0.0.1").await;
     assert_eq!(status, 401);
@@ -178,7 +178,7 @@ async fn usuario_inexistente_mismo_error() {
 
 #[tokio::test]
 async fn xff_ignorado_si_no_viene_del_proxy() {
-    let p = panel_con_proxy("192.0.2.100").await;
+    let p = PanelPrueba::nuevo().proxy("192.0.2.100").arrancar().await;
     let mut req = post_form("/api/login", &login_body("x", "mala"), "127.0.0.1");
     req.headers_mut()
         .insert("x-forwarded-for", "198.51.100.4".parse().unwrap());
@@ -189,7 +189,7 @@ async fn xff_ignorado_si_no_viene_del_proxy() {
 
 #[tokio::test]
 async fn xff_usado_si_viene_del_proxy() {
-    let p = panel().await; // proxy de confianza: 127.0.0.1
+    let p = PanelPrueba::nuevo().arrancar().await; // proxy de confianza: 127.0.0.1
     let mut req = post_form("/api/login", &login_body("x", "mala"), "127.0.0.1");
     req.headers_mut()
         .insert("x-forwarded-for", "9.9.9.9, 198.51.100.4".parse().unwrap());
@@ -203,7 +203,10 @@ async fn xff_usado_si_viene_del_proxy() {
 /// `X-Forwarded-For` si el par está en la red, y no si está fuera.
 #[tokio::test]
 async fn proxy_de_confianza_por_red() {
-    let p = panel_con_proxy("198.51.100.0/24").await;
+    let p = PanelPrueba::nuevo()
+        .proxy("198.51.100.0/24")
+        .arrancar()
+        .await;
     // Un usuario distinto en cada intento, para que su freno no cuente.
     let intento = |peer: &str, cliente: &'static str| {
         let mut req = post_form("/api/login", &login_body(peer, "mala"), peer);
@@ -231,7 +234,7 @@ async fn proxy_de_confianza_por_red() {
 
 #[tokio::test]
 async fn sesion_caduca_por_inactividad() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     sqlx::query("UPDATE sessions SET last_seen = last_seen - 30 * 60")
         .execute(&p.state.db)
@@ -249,7 +252,7 @@ async fn sesion_caduca_por_inactividad() {
 
 #[tokio::test]
 async fn sesion_caduca_a_las_12_horas() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     sqlx::query("UPDATE sessions SET created = created - 12 * 3600")
         .execute(&p.state.db)
@@ -261,7 +264,7 @@ async fn sesion_caduca_a_las_12_horas() {
 
 #[tokio::test]
 async fn actividad_renueva_la_sesion_como_mucho_cada_minuto() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     let last_seen = || async {
         sqlx::query_scalar::<_, i64>("SELECT last_seen FROM sessions")
@@ -283,7 +286,7 @@ async fn actividad_renueva_la_sesion_como_mucho_cada_minuto() {
 
 #[tokio::test]
 async fn pagina_sin_sesion_redirige_a_login() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     crear_usuario(&p).await;
     let resp = get(&p.app, "/?a=1&b=2").await;
     assert_eq!(resp.status(), 303);
@@ -297,7 +300,7 @@ async fn pagina_sin_sesion_redirige_a_login() {
 
 #[tokio::test]
 async fn pagina_de_login_es_publica() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     crear_usuario(&p).await;
     let resp = get(&p.app, "/login?next=%2F").await;
     assert_eq!(resp.status(), 200);
@@ -315,14 +318,14 @@ async fn pagina_de_login_es_publica() {
 
 #[tokio::test]
 async fn server_fn_sin_sesion_401() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let resp = send(&p.app, post_form("/api/quien_soy", "", "127.0.0.1")).await;
     assert_eq!(resp.status(), 401);
 }
 
 #[tokio::test]
 async fn quien_soy_con_sesion() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     let mut req = post_form("/api/quien_soy", "", "127.0.0.1");
     req.headers_mut().insert("cookie", cookie.parse().unwrap());
@@ -333,7 +336,7 @@ async fn quien_soy_con_sesion() {
 
 #[tokio::test]
 async fn logout_sin_sesion_caduca_la_cookie() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let mut req = post_form("/api/logout", "", "127.0.0.1");
     req.headers_mut().insert(
         "cookie",
@@ -348,7 +351,7 @@ async fn logout_sin_sesion_caduca_la_cookie() {
 
 #[tokio::test]
 async fn login_con_cookie_previa_la_sustituye() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let vieja = sesion(&p).await;
     let mut req = post_form(
         "/api/login",
@@ -368,7 +371,7 @@ async fn login_con_cookie_previa_la_sustituye() {
 
 #[tokio::test]
 async fn contrasena_enorme_es_un_fallo_normal() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     crear_usuario(&p).await;
     let enorme = "x".repeat(1025);
     let (status, body) = login_desde(&p, PANEL_USER, &enorme, "127.0.0.1").await;
@@ -379,7 +382,7 @@ async fn contrasena_enorme_es_un_fallo_normal() {
 
 #[tokio::test]
 async fn logout_borra_la_sesion() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     let mut req = post_form("/api/logout", "", "127.0.0.1");
     req.headers_mut().insert("cookie", cookie.parse().unwrap());
@@ -396,7 +399,7 @@ async fn logout_borra_la_sesion() {
 
 #[tokio::test]
 async fn post_con_origin_ajeno_403() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     crear_usuario(&p).await;
     let ajeno = |h: &'static str, v: &'static str| {
         let mut req = post_form(
@@ -463,7 +466,7 @@ fn panel_cli(db: &std::path::Path, args: &[&str], stdin: &str) -> std::process::
 
 #[tokio::test]
 async fn cli_alta_y_cambio_de_contrasena() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let db = p.state.cfg.db_path.clone();
 
     let out = panel_cli(&db, &["user", "add", "admin"], "corta\n");
@@ -512,7 +515,7 @@ async fn login_sin_js(p: &Panel, cuerpo: &str, consulta: &str) -> axum::response
     );
     h.insert(
         "referer",
-        format!("{}/login{consulta}", common::ORIGIN)
+        format!("{}/login{consulta}", comun::ORIGIN)
             .parse()
             .unwrap(),
     );
@@ -530,7 +533,7 @@ fn destino(resp: &axum::response::Response) -> String {
 
 #[tokio::test]
 async fn login_sin_js_bueno_lleva_a_next() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     crear_usuario(&p).await;
     let cuerpo = format!("{}&next=%2Fhistorial", login_body(PANEL_USER, PANEL_PASS));
     let resp = login_sin_js(&p, &cuerpo, "?next=%2Fhistorial").await;
@@ -548,7 +551,7 @@ async fn login_sin_js_bueno_lleva_a_next() {
 
 #[tokio::test]
 async fn login_sin_js_bueno_sin_next_o_ajeno_lleva_a_la_portada() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     crear_usuario(&p).await;
     let bueno = login_body(PANEL_USER, PANEL_PASS);
     let resp = login_sin_js(&p, &bueno, "").await;
@@ -565,7 +568,7 @@ async fn login_sin_js_bueno_sin_next_o_ajeno_lleva_a_la_portada() {
 
 #[tokio::test]
 async fn login_sin_js_malo_vuelve_al_login_con_el_error_y_next() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     crear_usuario(&p).await;
     let cuerpo = format!("{}&next=%2Fhistorial", login_body(PANEL_USER, "mala"));
     let resp = login_sin_js(&p, &cuerpo, "?next=%2Fhistorial").await;
@@ -578,7 +581,7 @@ async fn login_sin_js_malo_vuelve_al_login_con_el_error_y_next() {
             .all(|c| !c.to_str().unwrap().starts_with(&format!("{COOKIE_NAME}="))),
     );
     let ruta = vuelta
-        .strip_prefix(common::ORIGIN)
+        .strip_prefix(comun::ORIGIN)
         .unwrap_or(&vuelta)
         .to_owned();
     assert!(ruta.starts_with("/login?"), "{ruta}");
@@ -597,7 +600,7 @@ async fn login_sin_js_malo_vuelve_al_login_con_el_error_y_next() {
 async fn login_con_javascript_sigue_sin_redirigir() {
     // Lo que manda el wasm (sin `Accept: text/html`): 200 y la cookie; la
     // página navega ella misma.
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     crear_usuario(&p).await;
     let cuerpo = format!("{}&next=%2Fhistorial", login_body(PANEL_USER, PANEL_PASS));
     let resp = send(&p.app, post_form("/api/login", &cuerpo, "127.0.0.1")).await;
@@ -608,7 +611,7 @@ async fn login_con_javascript_sigue_sin_redirigir() {
 
 #[tokio::test]
 async fn login_con_sesion_valida_lleva_a_next() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let sesion = sesion(&p).await;
     let resp = get_con_cookie(&p.app, "/login", &sesion).await;
     assert_eq!(resp.status(), 303);

@@ -1,13 +1,13 @@
 //! Ficheros de la web: comprimidos si el navegador los acepta, con caché
 //! para siempre si llevan hash en el nombre; las páginas, sin caché.
 
-mod common;
+mod comun;
 
 use axum::{
     body::Body,
     http::{Request, Response, header},
 };
-use common::{Panel, body_text, get, panel, send, sesion};
+use comun::{Panel, PanelPrueba, body_text, get, send, sesion};
 use std::path::PathBuf;
 
 const HASH: &str = "Q1w2E3r4T5y6U7i8O9p0Aa";
@@ -55,7 +55,7 @@ fn web_con_hash(p: &Panel) {
 
 #[tokio::test]
 async fn wasm_comprimido_y_para_siempre() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     web_con_hash(&p);
     let uri = format!("/pkg/panel.{HASH}.wasm");
     let resp = get_con(&p, &uri, "gzip, deflate, br").await;
@@ -84,7 +84,7 @@ async fn wasm_comprimido_y_para_siempre() {
 
 #[tokio::test]
 async fn sin_hash_se_revalida() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let resp = get(&p.app, "/pkg/panel.css").await;
     assert_eq!(resp.status(), 200);
     assert_eq!(cabecera(&resp, header::CACHE_CONTROL), "no-cache");
@@ -98,12 +98,12 @@ async fn sin_hash_se_revalida() {
 
 #[tokio::test]
 async fn paginas_sin_cache() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     let resp = get(&p.app, "/login").await;
     assert_eq!(resp.status(), 200);
     assert_eq!(cabecera(&resp, header::CACHE_CONTROL), "no-store");
-    let resp = common::get_con_cookie(&p.app, "/ajustes/internet", &cookie).await;
+    let resp = comun::get_con_cookie(&p.app, "/ajustes/internet", &cookie).await;
     assert_eq!(resp.status(), 200);
     assert_eq!(cabecera(&resp, header::CACHE_CONTROL), "no-store");
 }
@@ -112,7 +112,7 @@ async fn paginas_sin_cache() {
 /// los de siempre.
 #[tokio::test]
 async fn la_pagina_pide_los_ficheros_con_hash() {
-    let mut p = panel().await;
+    let mut p = PanelPrueba::nuevo().arrancar().await;
     // Con un usuario: si no, `/login` lleva al asistente.
     sesion(&p).await;
     let html = body_text(get(&p.app, "/login").await).await;

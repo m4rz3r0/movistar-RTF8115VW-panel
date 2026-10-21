@@ -3,83 +3,24 @@
 //! credenciales, que llega con la contraseña guardada (censurada con el ojo)
 //! y no la envía si no se toca.
 
-mod common;
+mod comun;
 
-use common::{
-    PANEL_PASS, PASS, Panel, USER, aplicar, body_text, esperar_final, esperar_libre,
-    get_con_cookie, llamar, ok, panel_con_gestor, post_json, send, sesion,
+use comun::{
+    PASS, Panel, PanelPrueba, USER, aplicar, body_text, esperar_final, esperar_hasta,
+    esperar_hasta_con, esperar_libre, get_con_cookie, llamar, ok, post_json, reautenticar,
+    registro_global, send, sesion,
 };
 use hgu::{Client, ClientConfig};
 use panel::instancia;
 use serde_json::{Value, json};
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 const NUEVA: &str = "clave-nueva-de-prueba";
 
-/// Destino del registro en memoria (como en `ajustes_secretos.rs`).
-#[derive(Clone, Default)]
-struct Registro(Arc<std::sync::Mutex<Vec<u8>>>);
-
-impl Registro {
-    fn texto(&self) -> String {
-        String::from_utf8_lossy(&self.0.lock().unwrap()).into_owned()
-    }
-}
-
-impl std::io::Write for Registro {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.0.lock().unwrap().extend_from_slice(buf);
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
-impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Registro {
-    type Writer = Registro;
-
-    fn make_writer(&'a self) -> Registro {
-        self.clone()
-    }
-}
-
-/// El registro de todo este binario de pruebas (todas las pruebas, en todos
-/// los hilos): que ninguna anote una contraseña es más estricto.
-fn registro_global() -> Registro {
-    static REGISTRO: std::sync::OnceLock<Registro> = std::sync::OnceLock::new();
-    REGISTRO
-        .get_or_init(|| {
-            let registro = Registro::default();
-            tracing::subscriber::set_global_default(
-                tracing_subscriber::fmt()
-                    .with_writer(registro.clone())
-                    .with_max_level(tracing::Level::DEBUG)
-                    .with_ansi(false)
-                    .finish(),
-            )
-            .expect("el único registro global de estas pruebas");
-            registro
-        })
-        .clone()
-}
-
-async fn reautenticar(p: &Panel, cookie: &str) {
-    ok(
-        p,
-        "reautenticar",
-        json!({ "contrasena": PANEL_PASS }),
-        cookie,
-    )
-    .await;
-}
-
 /// Panel con el gestor, la ventana de reautenticación abierta y la cookie.
 async fn preparado() -> (Panel, String) {
     registro_global();
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     reautenticar(&p, &cookie).await;
     (p, cookie)
 }
@@ -163,7 +104,7 @@ async fn historial_en_texto(p: &Panel) -> String {
 #[tokio::test]
 async fn contrasena_router_cambia_y_se_guarda() {
     registro_global();
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     // Un sondeo rápido sobre el mismo cliente del router que el gestor.
     panel::poller::Poller::spawn_with(
         p.state.clone(),
@@ -191,21 +132,16 @@ async fn contrasena_router_cambia_y_se_guarda() {
     // El sondeo sigue leyendo, ya con la nueva (sin sesiones abiertas).
     p.sim.control.invalidate_sessions();
     let antes = p.state.poller.latest().map_or(0, |s| s.at);
-    let inicio = Instant::now();
-    loop {
+    esperar_hasta_con(Duration::from_secs(10), async || {
         let s = p.state.poller.latest();
         if s.as_ref()
             .is_some_and(|s| s.at > antes && s.error.is_none())
         {
-            break;
+            return Ok(());
         }
-        assert!(
-            inicio.elapsed() < Duration::from_secs(10),
-            "el sondeo no lee: {:?}",
-            p.state.poller.error()
-        );
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    }
+        Err(format!("el sondeo no lee: {:?}", p.state.poller.error()))
+    })
+    .await;
 
     // Un cambio posterior se aplica y se vigila con la nueva.
     let id = aplicar(
@@ -338,14 +274,10 @@ async fn contrasena_router_con_cambio_activo() {
         tokio::spawn(async move { send(&app, req).await.status() })
     };
     let gestor = p.state.cambios().unwrap();
-    let inicio = Instant::now();
-    while gestor.activo().is_none() || p.sim.control.writes().is_empty() {
-        assert!(
-            inicio.elapsed() < Duration::from_secs(5),
-            "sin cambio activo"
-        );
-        tokio::time::sleep(Duration::from_millis(5)).await;
-    }
+    esperar_hasta(Duration::from_secs(5), "sin cambio activo", async || {
+        gestor.activo().is_some() && !p.sim.control.writes().is_empty()
+    })
+    .await;
     let (status, body) = cambiar(&p, &cookie, NUEVA).await;
     assert_eq!(status, 409, "{body}");
     assert!(body.contains("otro cambio en curso"), "{body}");
@@ -360,7 +292,7 @@ async fn contrasena_router_con_cambio_activo() {
 #[tokio::test]
 async fn contrasena_router_exige_reautenticacion() {
     registro_global();
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     for f in ["comprobar_contrasena_router", "cambiar_contrasena_router"] {
         let (status, body) = llamar(&p, f, json!({ "nueva": NUEVA }), Some(&cookie)).await;
         assert_eq!(status, 401, "{f}: {body}");
@@ -501,7 +433,7 @@ async fn biblioteca_sigue_bloqueando_cbModifyPwd() {
 
 #[tokio::test]
 async fn credenciales_llegan_con_la_contrasena_guardada() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let v: Value = ok(&p, "leer_conexion_router", json!({}), &cookie).await;
     assert_eq!(v["contrasena"], PASS);
     // «Ajustes del panel» no la lleva.
@@ -631,11 +563,10 @@ async fn contrasena_router_tiene_la_sesion_en_exclusiva() {
         req.headers_mut().insert("cookie", cookie.parse().unwrap());
         tokio::spawn(async move { send(&app, req).await.status() })
     };
-    let inicio = Instant::now();
-    while cambios_de_contrasena(&p).is_empty() {
-        assert!(inicio.elapsed() < Duration::from_secs(10), "sin cambio");
-        tokio::time::sleep(Duration::from_millis(5)).await;
-    }
+    esperar_hasta(Duration::from_secs(10), "sin cambio", async || {
+        !cambios_de_contrasena(&p).is_empty()
+    })
+    .await;
     // Una lectura por el cliente del panel en medio del cambio.
     hgu::read::summary(&p.state.hgu).await.unwrap();
     assert_eq!(
@@ -653,7 +584,7 @@ async fn contrasena_router_tiene_la_sesion_en_exclusiva() {
 #[tokio::test]
 async fn contrasena_router_sin_gestor() {
     registro_global();
-    let p = common::panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     reautenticar(&p, &cookie).await;
     let (status, body) = cambiar(&p, &cookie, NUEVA).await;

@@ -2,9 +2,9 @@
 //! usuario como enlace a «Ajustes del panel» y la sección marcada en sus
 //! subrutas.
 
-mod common;
+mod comun;
 
-use common::{PANEL_USER, body_text, get_con_cookie, panel, panel_con_gestor, send, sesion};
+use comun::{PANEL_USER, PanelPrueba, send, sesion};
 
 /// El elemento `<etiqueta …>` que contiene `marca` en su apertura, hasta su
 /// cierre (sin anidar la misma etiqueta).
@@ -42,10 +42,8 @@ fn atributo<'a>(apertura: &'a str, nombre: &str) -> Option<&'a str> {
 /// El HTML de la página `ruta`. Con el gestor de cambios: el Historial lo
 /// necesita.
 async fn pagina(ruta: &str) -> String {
-    let (p, cookie) = panel_con_gestor().await;
-    let resp = get_con_cookie(&p.app, ruta, &cookie).await;
-    assert_eq!(resp.status(), 200, "{ruta}");
-    body_text(resp).await
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    comun::pagina(&p, &cookie, ruta).await
 }
 
 fn nav_principal(html: &str) -> &str {
@@ -128,7 +126,7 @@ async fn seccion_marcada_en_subrutas() {
 /// Estado: los enlaces guardados no se rompen.
 #[tokio::test]
 async fn recomendaciones_lleva_al_estado() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     for ruta in ["/recomendaciones", "/recomendaciones/preferencias"] {
         // Como la pide el navegador.

@@ -1,100 +1,26 @@
 //! Pruebas del gestor de cambios contra `router-sim`, con tiempos de
 //! vigilancia cortos.
 
-mod common;
+mod comun;
 
 use catalogo::{Riesgo, mask::MASCARA};
-use common::{Panel, panel};
+use comun::{
+    Panel, esperar_estado, esperar_hasta, esperar_hasta_con, esperar_libre_gestor, gestor,
+    panel_rapido, preparado, req, tiempos_rapidos,
+};
 use hgu::read;
 use panel::{
-    changes::{Cambio, CambioError, ChangeManager, ChangeRequest, Estado, Tiempos},
+    changes::{CambioError, ChangeManager, ChangeRequest, Estado, Tiempos},
     poller::{Poller, PollerConfig},
 };
-use std::{
-    collections::BTreeMap,
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 const LEASES: &str = "cbDhcpV4SvrPoolSetStatic";
 const POOL: &str = "rtm_cfg_dhcpv4_svr_pool_id";
 
-/// Vigilancia de 300 ms (bajo/medio) o 600 ms (alto), un sondeo cada 30 ms.
-fn tiempos() -> Tiempos {
-    Tiempos {
-        bajo: Duration::from_millis(300),
-        medio: Duration::from_millis(300),
-        alto: Duration::from_millis(600),
-        intervalo: Duration::from_millis(30),
-        fallos_para_revertir: 3,
-        pausa_max: Duration::from_secs(2),
-    }
-}
-
-/// Panel contra el simulador con un cliente rápido (1 ms entre peticiones,
-/// `timeout` de espera por petición).
-async fn panel_rapido(timeout: Duration) -> Panel {
-    let mut p = panel().await;
-    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, common::USER, common::PASS);
-    cfg.timeout = timeout;
-    cfg.min_gap = Duration::from_millis(1);
-    p.state.hgu = hgu::Client::new(cfg);
-    p
-}
-
-/// Gestor listo para confirmar (sin cambios pendientes que retomar).
-async fn gestor(p: &Panel, t: Tiempos) -> Arc<ChangeManager> {
-    let m = ChangeManager::new(p.state.clone(), t);
-    m.reanudar_pendientes().await;
-    m
-}
-
-async fn preparado() -> (Panel, Arc<ChangeManager>) {
-    let p = panel_rapido(Duration::from_millis(500)).await;
-    let m = gestor(&p, tiempos()).await;
-    (p, m)
-}
-
-fn req(funcion: &str, instancia: Option<&str>, valores: &[(&str, &str)]) -> ChangeRequest {
-    ChangeRequest {
-        funcion: funcion.into(),
-        instancia: instancia.map(str::to_owned),
-        valores: valores
-            .iter()
-            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
-            .collect::<BTreeMap<_, _>>(),
-        borrar: false,
-    }
-}
-
 /// Cambia la IP de la reserva 0 (`192.168.1.68` en las fixtures).
 fn lease0(ip: &str) -> ChangeRequest {
     req(LEASES, Some("0"), &[(POOL, "0"), ("ipv4_addr", ip)])
-}
-
-async fn esperar_estado(m: &ChangeManager, id: i64, estado: Estado) -> Cambio {
-    let start = Instant::now();
-    loop {
-        let c = m.cambio(id).await.expect("el cambio existe");
-        if c.estado == estado {
-            return c;
-        }
-        assert!(
-            start.elapsed() < Duration::from_secs(10),
-            "el cambio {id} sigue en {:?} (esperado {estado:?}): {:?}",
-            c.estado,
-            c.error
-        );
-        tokio::time::sleep(Duration::from_millis(10)).await;
-    }
-}
-
-async fn esperar_libre(m: &ChangeManager) {
-    let start = Instant::now();
-    while m.activo().is_some() {
-        assert!(start.elapsed() < Duration::from_secs(10), "sigue activo");
-        tokio::time::sleep(Duration::from_millis(10)).await;
-    }
 }
 
 async fn ip_de_lease(p: &Panel, id: &str) -> Option<String> {
@@ -159,7 +85,7 @@ async fn aplica_y_verifica_static_lease() {
     let params: BTreeMap<_, _> = w[0].1.iter().cloned().collect();
     assert_eq!(params["rtm_dhcpv4_svr_pool_static_id"], "-1");
     assert_eq!(params["mac_addr"], "02:00:00:00:00:99");
-    esperar_libre(&m).await;
+    esperar_libre_gestor(&m).await;
     assert!(h.latest().is_some());
 }
 
@@ -281,7 +207,7 @@ async fn escritura_sin_respuesta_aplicada_se_vigila() {
     let nota = c.nota.unwrap_or_default();
     assert!(nota.contains("no confirmó"), "{nota}");
     assert_eq!(ip_de_lease(&p, "0").await.as_deref(), Some("192.168.1.80"));
-    esperar_libre(&m).await;
+    esperar_libre_gestor(&m).await;
     assert!(m.se_puede_deshacer(id).await);
 }
 
@@ -330,7 +256,7 @@ async fn revierte_si_se_pierde_la_wan() {
     let revert: BTreeMap<_, _> = w[1].1.iter().cloned().collect();
     assert_eq!(revert["ipv4_addr"], "192.168.1.68");
     assert_eq!(revert["rtm_dhcpv4_svr_pool_static_id"], "0");
-    esperar_libre(&m).await;
+    esperar_libre_gestor(&m).await;
 }
 
 #[tokio::test]
@@ -347,7 +273,7 @@ async fn wan_ya_caida_no_provoca_reversion() {
 #[tokio::test]
 async fn revierte_si_el_router_deja_de_responder() {
     let p = panel_rapido(Duration::from_millis(100)).await;
-    let m = gestor(&p, tiempos()).await;
+    let m = gestor(&p, tiempos_rapidos()).await;
     let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
     let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
     p.sim.control.set_unresponsive(true);
@@ -380,7 +306,7 @@ async fn secreto_enmascarado_no_se_escribe() {
         assert_eq!(nombres, ["ssid"], "el secreto sin tocar no es un cambio");
         let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
         esperar_estado(&m, id, Estado::Aplicado).await;
-        esperar_libre(&m).await;
+        esperar_libre_gestor(&m).await;
     }
     let w = p.sim.control.writes();
     assert_eq!(w.len(), 2);
@@ -423,7 +349,7 @@ async fn secreto_cambiado_se_enmascara_y_se_guarda_cifrado() {
     assert_eq!((c.antes.as_str(), c.despues.as_str()), (MASCARA, MASCARA));
     let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
     esperar_estado(&m, id, Estado::Aplicado).await;
-    esperar_libre(&m).await;
+    esperar_libre_gestor(&m).await;
     // Ni el valor nuevo ni el anterior aparecen en claro en la base de datos.
     let fila: (String, String, String, String, Vec<u8>, Vec<u8>) = sqlx::query_as(
         "SELECT diff, anteriores, solicitud, nuevos, anteriores_cifrados, nuevos_cifrados \
@@ -470,7 +396,7 @@ async fn cambios_concurrentes_no_se_intercalan() {
     let r = m.confirmar(&token_otro, None, "admin").await;
     assert!(matches!(r, Err(CambioError::EnCurso)), "{r:?}");
     esperar_estado(&m, ok, Estado::Aplicado).await;
-    esperar_libre(&m).await;
+    esperar_libre_gestor(&m).await;
     // El token rechazado por estar ocupado sigue valiendo.
     let id = m.confirmar(&token_otro, None, "admin").await.unwrap();
     esperar_estado(&m, id, Estado::Aplicado).await;
@@ -483,7 +409,7 @@ async fn token_de_un_solo_uso() {
     let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
     let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
     esperar_estado(&m, id, Estado::Aplicado).await;
-    esperar_libre(&m).await;
+    esperar_libre_gestor(&m).await;
     let r = m.confirmar(&prep.token, None, "admin").await;
     assert!(matches!(r, Err(CambioError::TokenInvalido)), "{r:?}");
     let r = m.confirmar("inventado", None, "admin").await;
@@ -497,7 +423,7 @@ async fn pausa_que_no_llega_no_escribe() {
         &p,
         Tiempos {
             pausa_max: Duration::from_millis(300),
-            ..tiempos()
+            ..tiempos_rapidos()
         },
     )
     .await;
@@ -528,7 +454,7 @@ async fn reanuda_tras_reinicio() {
     let p = panel_rapido(Duration::from_millis(500)).await;
     let lento = Tiempos {
         bajo: Duration::from_secs(60),
-        ..tiempos()
+        ..tiempos_rapidos()
     };
     let a = gestor(&p, lento).await;
     let prep = a.preparar(lease0("192.168.1.80")).await.unwrap();
@@ -539,7 +465,7 @@ async fn reanuda_tras_reinicio() {
     tokio::time::sleep(Duration::from_millis(50)).await;
     assert_eq!(a.cambio(id).await.unwrap().estado, Estado::Vigilando);
 
-    let b = ChangeManager::new(p.state.clone(), tiempos());
+    let b = ChangeManager::new(p.state.clone(), tiempos_rapidos());
     b.reanudar_pendientes().await;
     assert_eq!(b.activo(), Some(id));
     let c = esperar_estado(&b, id, Estado::Aplicado).await;
@@ -552,7 +478,7 @@ async fn reanuda_y_marca_fallido_si_no_llego_a_aplicarse() {
     let p = panel_rapido(Duration::from_millis(500)).await;
     let lento = Tiempos {
         bajo: Duration::from_secs(60),
-        ..tiempos()
+        ..tiempos_rapidos()
     };
     let a = gestor(&p, lento).await;
     let prep = a.preparar(lease0("192.168.1.80")).await.unwrap();
@@ -572,7 +498,7 @@ async fn reanuda_y_marca_fallido_si_no_llego_a_aplicarse() {
         )
         .await
         .unwrap();
-    let b = ChangeManager::new(p.state.clone(), tiempos());
+    let b = ChangeManager::new(p.state.clone(), tiempos_rapidos());
     b.reanudar_pendientes().await;
     let c = b.cambio(id).await.unwrap();
     assert_eq!(c.estado, Estado::Fallido);
@@ -589,7 +515,7 @@ async fn deshacer_restaura_valor_anterior() {
     let r = m.deshacer(id).await;
     assert!(matches!(r, Err(CambioError::Invalida(_))), "{r:?}");
     esperar_estado(&m, id, Estado::Aplicado).await;
-    esperar_libre(&m).await;
+    esperar_libre_gestor(&m).await;
 
     let deshacer = m.deshacer(id).await.unwrap();
     let c = &deshacer.diff.campos[0];
@@ -608,7 +534,7 @@ async fn deshacer_una_reserva_nueva_la_borra() {
     let prep = m.preparar(nueva_reserva()).await.unwrap();
     let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
     esperar_estado(&m, id, Estado::Aplicado).await;
-    esperar_libre(&m).await;
+    esperar_libre_gestor(&m).await;
     let deshacer = m.deshacer(id).await.unwrap();
     assert!(
         deshacer
@@ -625,7 +551,7 @@ async fn deshacer_una_reserva_nueva_la_borra() {
     assert_eq!(borrado["del"], "DEL");
     assert_eq!(borrado["rtm_dhcpv4_svr_pool_static_id"], "2");
     assert_eq!(borrado[POOL], "0");
-    esperar_libre(&m).await;
+    esperar_libre_gestor(&m).await;
     // Y deshacer el borrado la vuelve a crear.
     let otra = m.deshacer(id2).await.unwrap();
     let id3 = m.confirmar(&otra.token, None, "admin").await.unwrap();
@@ -662,7 +588,7 @@ async fn reboot_exige_palabra() {
 #[tokio::test]
 async fn reboot_sin_vuelta_es_fallido() {
     let p = panel_rapido(Duration::from_millis(100)).await;
-    let m = gestor(&p, tiempos()).await;
+    let m = gestor(&p, tiempos_rapidos()).await;
     let prep = m.preparar(req("cbReboot", None, &[])).await.unwrap();
     let id = m
         .confirmar(&prep.token, Some("REINICIAR"), "admin")
@@ -733,7 +659,7 @@ async fn historial_en_orden() {
         let prep = m.preparar(lease0(ip)).await.unwrap();
         let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
         esperar_estado(&m, id, Estado::Aplicado).await;
-        esperar_libre(&m).await;
+        esperar_libre_gestor(&m).await;
         ids.push(id);
     }
     let h = m.historial(10).await;
@@ -749,7 +675,7 @@ async fn reanuda_con_la_wan_de_antes_del_cambio() {
     let p = panel_rapido(Duration::from_millis(500)).await;
     let lento = Tiempos {
         bajo: Duration::from_secs(60),
-        ..tiempos()
+        ..tiempos_rapidos()
     };
     let a = gestor(&p, lento).await;
     let prep = a.preparar(lease0("192.168.1.80")).await.unwrap();
@@ -758,7 +684,7 @@ async fn reanuda_con_la_wan_de_antes_del_cambio() {
     // El cambio tumbó la WAN y el panel se reinició: se vigila con la WAN de
     // antes (arriba), así que se revierte.
     p.sim.control.set_wan_up(false);
-    let b = ChangeManager::new(p.state.clone(), tiempos());
+    let b = ChangeManager::new(p.state.clone(), tiempos_rapidos());
     b.reanudar_pendientes().await;
     let c = esperar_estado(&b, id, Estado::Revertido).await;
     assert!(c.error.unwrap().contains("WAN"));
@@ -890,16 +816,16 @@ async fn confirmar_abandonado_termina_igual() {
     )
     .await;
     assert!(r.is_err(), "debía abandonarse antes de terminar: {r:?}");
-    let start = Instant::now();
-    let id = loop {
-        if let Some(c) = m.historial(1).await.first() {
-            break c.id;
-        }
-        assert!(start.elapsed() < Duration::from_secs(10), "sin cambio");
-        tokio::time::sleep(Duration::from_millis(10)).await;
-    };
+    let id = esperar_hasta_con(Duration::from_secs(10), async || {
+        m.historial(1)
+            .await
+            .first()
+            .map(|c| c.id)
+            .ok_or_else(|| "sin cambio".to_owned())
+    })
+    .await;
     esperar_estado(&m, id, Estado::Aplicado).await;
-    esperar_libre(&m).await;
+    esperar_libre_gestor(&m).await;
 }
 
 #[tokio::test]
@@ -911,11 +837,10 @@ async fn relectura_fallida_tras_revertir_se_reintenta() {
         .control
         .fail_reads_after_next_write("cbDhcpV4SvrPoolGetStatic");
     p.sim.control.set_wan_up(false);
-    let start = Instant::now();
-    while p.sim.control.writes().len() < 2 {
-        assert!(start.elapsed() < Duration::from_secs(5), "sin reversión");
-        tokio::time::sleep(Duration::from_millis(5)).await;
-    }
+    esperar_hasta(Duration::from_secs(5), "sin reversión", async || {
+        p.sim.control.writes().len() >= 2
+    })
+    .await;
     tokio::time::sleep(Duration::from_millis(100)).await;
     assert_eq!(m.cambio(id).await.unwrap().estado, Estado::Vigilando);
     p.sim.control.fail_reads("cbDhcpV4SvrPoolGetStatic", false);
@@ -971,7 +896,7 @@ async fn no_se_deshace_dos_veces() {
     let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
     let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
     esperar_estado(&m, id, Estado::Aplicado).await;
-    esperar_libre(&m).await;
+    esperar_libre_gestor(&m).await;
     let u1 = m.deshacer(id).await.unwrap();
     let u2 = m.deshacer(id).await.unwrap();
     let id2 = m.confirmar(&u1.token, None, "admin").await.unwrap();
@@ -982,7 +907,7 @@ async fn no_se_deshace_dos_veces() {
         "{r:?}"
     );
     esperar_estado(&m, id2, Estado::Aplicado).await;
-    esperar_libre(&m).await;
+    esperar_libre_gestor(&m).await;
     let r = m.confirmar(&u2.token, None, "admin").await;
     assert!(
         matches!(&r, Err(CambioError::Invalida(e)) if e.contains("ya se ha deshecho")),
@@ -999,14 +924,14 @@ async fn confirmar_espera_a_que_se_retome_lo_pendiente() {
     let p = panel_rapido(Duration::from_millis(500)).await;
     let lento = Tiempos {
         bajo: Duration::from_secs(60),
-        ..tiempos()
+        ..tiempos_rapidos()
     };
     let a = gestor(&p, lento).await;
     let prep = a.preparar(lease0("192.168.1.80")).await.unwrap();
     let pendiente = a.confirmar(&prep.token, None, "admin").await.unwrap();
     a.detener();
 
-    let b = ChangeManager::new(p.state.clone(), tiempos());
+    let b = ChangeManager::new(p.state.clone(), tiempos_rapidos());
     let otro = b
         .preparar(req("cbSetUpnpCfg", None, &[("adm_state", "1")]))
         .await
@@ -1019,7 +944,7 @@ async fn confirmar_espera_a_que_se_retome_lo_pendiente() {
     assert!(matches!(r, Err(CambioError::EnCurso)), "{r:?}");
     assert_eq!(b.activo(), Some(pendiente));
     esperar_estado(&b, pendiente, Estado::Aplicado).await;
-    esperar_libre(&b).await;
+    esperar_libre_gestor(&b).await;
     let id = b.confirmar(&otro.token, None, "admin").await.unwrap();
     esperar_estado(&b, id, Estado::Aplicado).await;
 }
@@ -1028,8 +953,8 @@ async fn confirmar_espera_a_que_se_retome_lo_pendiente() {
 async fn instalar_deja_un_solo_gestor() {
     let p = panel_rapido(Duration::from_millis(500)).await;
     assert!(p.state.cambios().is_none());
-    let a = ChangeManager::instalar(&p.state, tiempos());
-    let b = ChangeManager::instalar(&p.state.clone(), tiempos());
+    let a = ChangeManager::instalar(&p.state, tiempos_rapidos());
+    let b = ChangeManager::instalar(&p.state.clone(), tiempos_rapidos());
     assert!(Arc::ptr_eq(&a, &b));
     assert!(Arc::ptr_eq(&p.state.cambios().unwrap(), &a));
 }
@@ -1042,11 +967,10 @@ async fn revertir_con_relectura_fallida(p: &Panel, m: &ChangeManager, id: i64) {
         .control
         .fail_reads_after_next_write("cbDhcpV4SvrPoolGetStatic");
     p.sim.control.set_wan_up(false);
-    let start = Instant::now();
-    while p.sim.control.writes().len() < 2 {
-        assert!(start.elapsed() < Duration::from_secs(5), "sin reversión");
-        tokio::time::sleep(Duration::from_millis(5)).await;
-    }
+    esperar_hasta(Duration::from_secs(5), "sin reversión", async || {
+        p.sim.control.writes().len() >= 2
+    })
+    .await;
     tokio::time::sleep(Duration::from_millis(100)).await;
     p.sim.control.fail_reads("cbDhcpV4SvrPoolGetStatic", false);
     esperar_estado(m, id, Estado::Revertido).await;
@@ -1085,16 +1009,15 @@ async fn reintento_de_revertir_una_creacion_acepta_que_ya_no_exista() {
     // Cliente con 100 ms de espera: la relectura tras la reversión agota el
     // tiempo (no es un "no existe" del router) y hay que reintentar.
     let p = panel_rapido(Duration::from_millis(100)).await;
-    let m = gestor(&p, tiempos()).await;
+    let m = gestor(&p, tiempos_rapidos()).await;
     let prep = m.preparar(nueva_reserva()).await.unwrap();
     let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
     p.sim.control.hang_after_next_write();
     p.sim.control.set_wan_up(false);
-    let start = Instant::now();
-    while p.sim.control.writes().len() < 2 {
-        assert!(start.elapsed() < Duration::from_secs(5), "sin reversión");
-        tokio::time::sleep(Duration::from_millis(5)).await;
-    }
+    esperar_hasta(Duration::from_secs(5), "sin reversión", async || {
+        p.sim.control.writes().len() >= 2
+    })
+    .await;
     tokio::time::sleep(Duration::from_millis(250)).await;
     assert_eq!(m.cambio(id).await.unwrap().estado, Estado::Vigilando);
     p.sim.control.set_unresponsive(false);

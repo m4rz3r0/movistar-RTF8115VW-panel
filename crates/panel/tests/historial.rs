@@ -2,11 +2,11 @@
 //! orden y mezcla de cambios y reveladores, paginación, enlaces de deshacer y
 //! que no sale ningún secreto.
 
-mod common;
+mod comun;
 
-use common::{
-    Panel, aplicar, body_text, esperar_final, fijar, get_con_cookie, llamar, ok,
-    panel_con_gestor as historial_panel, valores_de,
+use comun::{
+    Panel, PanelPrueba, aplicar, body_text, esperar_final, esperar_hasta, fijar, get_con_cookie,
+    llamar, ok, valores_de,
 };
 use serde_json::{Value, json};
 use std::time::Duration;
@@ -53,7 +53,7 @@ fn cambios(pag: &Value) -> Vec<&Value> {
 
 #[tokio::test]
 async fn historial_lista_cambios_en_orden() {
-    let (p, cookie) = historial_panel().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let vacia = pagina(&p, &cookie, 1).await;
     assert_eq!(vacia["entradas"], json!([]));
     assert_eq!(vacia["total"], 0);
@@ -91,7 +91,7 @@ async fn historial_lista_cambios_en_orden() {
 
     let c = &e[0]["Cambio"];
     assert_eq!(c["funcion"], LEASES);
-    assert_eq!(c["usuario"], common::PANEL_USER);
+    assert_eq!(c["usuario"], comun::PANEL_USER);
     assert_eq!(c["estado"], "Aplicado");
     assert_eq!(c["puede_deshacer"], true);
     assert_eq!(c["ruta"], "/explorador/lan_dhcp/cbDhcpV4SvrPoolSetStatic");
@@ -113,10 +113,10 @@ async fn historial_lista_cambios_en_orden() {
 
 #[tokio::test]
 async fn deshacer_desde_historial() {
-    let (p, cookie) = historial_panel().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let id = alta_reserva(&p, &cookie, "192.168.1.93", "02:00:00:00:00:93").await;
     assert_eq!(
-        common::ok(
+        comun::ok(
             &p,
             "instancias",
             json!({ "funcion": LEASES, "claves": [[POOL, "0"]] }),
@@ -172,7 +172,7 @@ async fn deshacer_desde_historial() {
 
 #[tokio::test]
 async fn sin_boton_en_lo_que_no_se_puede_deshacer() {
-    let (p, cookie) = historial_panel().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let id = alta_reserva(&p, &cookie, "192.168.1.94", "02:00:00:00:00:94").await;
     for estado in ["fallido", "revertido", "vigilando", "aplicando"] {
         sqlx::query("UPDATE changes SET estado = ? WHERE id = ?")
@@ -198,7 +198,7 @@ async fn sin_boton_en_lo_que_no_se_puede_deshacer() {
 
 #[tokio::test]
 async fn secretos_enmascarados_y_deshacer_los_restaura() {
-    let (p, cookie) = historial_panel().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let antes = p
         .state
         .hgu
@@ -240,7 +240,7 @@ async fn secretos_enmascarados_y_deshacer_los_restaura() {
 
 #[tokio::test]
 async fn revelados_listados_sin_valor() {
-    let (p, cookie) = historial_panel().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     // Un revelado antiguo (antes de la Tarea 11 se anotaba cada uno).
     sqlx::query(
         "INSERT INTO reveals (ts, user_id, funcion, campo, instancia) \
@@ -256,7 +256,7 @@ async fn revelados_listados_sin_valor() {
     let r = &e[0]["Revelado"];
     assert_eq!(r["funcion"], "te_wifi.asp");
     assert_eq!(r["campo"], "wlWpaPsk");
-    assert_eq!(r["usuario"], common::PANEL_USER);
+    assert_eq!(r["usuario"], comun::PANEL_USER);
     assert!(r["ts"].as_i64().unwrap() > 0);
     assert!(r["ruta"].is_string());
     assert!(!pag.to_string().contains("psk-sim"), "{pag}");
@@ -264,7 +264,7 @@ async fn revelados_listados_sin_valor() {
 
 #[tokio::test]
 async fn paginacion_en_los_limites() {
-    let (p, cookie) = historial_panel().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     for i in 0..60 {
         sqlx::query(
             "INSERT INTO reveals (ts, user_id, funcion, campo, instancia) \
@@ -304,7 +304,7 @@ async fn paginacion_en_los_limites() {
 
 #[tokio::test]
 async fn exige_sesion_y_sirve_la_pagina() {
-    let (p, cookie) = historial_panel().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let (status, _) = llamar(&p, "historial", json!({ "pagina": 1 }), None).await;
     assert_eq!(status, 401);
     let (status, _) = llamar(&p, "deshacer", json!({ "change_id": 1 }), None).await;
@@ -313,7 +313,7 @@ async fn exige_sesion_y_sirve_la_pagina() {
     assert_eq!(resp.status(), 200);
     let html = body_text(resp).await;
     assert!(html.contains("Historial"), "{html}");
-    assert_eq!(common::get(&p.app, "/historial").await.status(), 303);
+    assert_eq!(comun::get(&p.app, "/historial").await.status(), 303);
 }
 
 /// Un grupo es una sola fila con la lista de sus pasos: resumen humano
@@ -321,7 +321,7 @@ async fn exige_sesion_y_sirve_la_pagina() {
 #[tokio::test]
 async fn grupo_es_una_fila_con_sus_pasos() {
     use panel::changes::{ChangeManager, ChangeRequest, Estado, GrupoRequest, Paso, Tiempos};
-    let (p, cookie) = historial_panel().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let solo = alta_reserva(&p, &cookie, "192.168.1.93", "02:00:00:00:00:93").await;
     let m = ChangeManager::instalar(&p.state, Tiempos::default());
     let paso = |funcion: &str, instancia: Option<&str>, v: &[(&str, &str)], e: Option<&str>| Paso {
@@ -357,11 +357,10 @@ async fn grupo_es_una_fila_con_sus_pasos() {
         .await
         .unwrap();
     let id = m.confirmar_grupo(&prep.token, &[], "admin").await.unwrap();
-    let inicio = std::time::Instant::now();
-    while m.cambio(id).await.unwrap().estado != Estado::Aplicado {
-        assert!(inicio.elapsed() < Duration::from_secs(10));
-        tokio::time::sleep(Duration::from_millis(10)).await;
-    }
+    esperar_hasta(Duration::from_secs(10), "aplicado", async || {
+        m.cambio(id).await.unwrap().estado == Estado::Aplicado
+    })
+    .await;
     let pag = pagina(&p, &cookie, 1).await;
     let c = cambios(&pag);
     assert_eq!(c.len(), 2, "una fila por grupo");

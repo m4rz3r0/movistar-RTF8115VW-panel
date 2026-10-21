@@ -2,13 +2,12 @@
 //! legibles, secretos que no salen del servidor, lecturas que fallan solas y
 //! el catálogo comprobado al arrancar.
 
-mod common;
+mod comun;
 
 use axum::http::header;
-use common::{
-    Panel, aplicar, body_text, esperar_final, esperar_libre, llamar, ok, panel, panel_con_ajustes,
-    panel_con_capa, panel_con_gestor, panel_con_tiempos, post_json, send, sesion, tiempos_rapidos,
-    variante,
+use comun::{
+    Panel, PanelPrueba, aplicar, body_text, cambios_del_grupo, elemento, esperar_final,
+    esperar_libre, leer, llamar, ok, partir, post_json, send, sesion, tiempos_rapidos, variante,
 };
 use panel::instancia::{self, claves};
 use serde_json::{Value, json};
@@ -32,18 +31,6 @@ fn campo<'a>(ajuste: &'a Value, id: &str) -> &'a Value {
         .iter()
         .find(|c| c["id"] == id)
         .unwrap_or_else(|| panic!("falta el campo {id}: {ajuste}"))
-}
-
-/// Primer elemento `nombre` de una respuesta del router, a cualquier
-/// profundidad.
-fn elemento(n: &hgu::xml::XmlNode, nombre: &str) -> Option<String> {
-    n.text_of(nombre)
-        .map(str::to_owned)
-        .or_else(|| n.children.iter().find_map(|c| elemento(c, nombre)))
-}
-
-async fn leer(p: &Panel, cookie: &str, tema: &str) -> Value {
-    ok(p, "leer_tema", json!({ "tema": tema }), cookie).await
 }
 
 /// Escribe en el punto de acceso 0 del simulador, como lo haría el router.
@@ -80,7 +67,7 @@ async fn peticion(p: &Panel, tema: &str, cookie: Option<&str>) -> (u16, String, 
 
 #[tokio::test]
 async fn leer_tema_exige_sesion() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let (status, cache, body) = peticion(&p, "wifi", None).await;
     assert_eq!(status, 401, "{body}");
     assert_eq!(cache, "no-store");
@@ -88,7 +75,7 @@ async fn leer_tema_exige_sesion() {
 
 #[tokio::test]
 async fn leer_tema_wifi_con_valores_legibles() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     let ssid = elemento(
         &p.state
@@ -147,7 +134,7 @@ async fn leer_tema_wifi_con_valores_legibles() {
 
 #[tokio::test]
 async fn secretos_solo_en_su_campo() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     let clave = "clave-conocida-del-sim-7319";
     escribir_red_24(&p, &[("key_phrase", clave)]).await;
@@ -164,7 +151,7 @@ async fn secretos_solo_en_su_campo() {
 
 #[tokio::test]
 async fn usuarios_del_router_por_pares_y_secretos() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     let tema = leer(&p, &cookie, "seguridad").await;
     let usuarios = ajuste(&tema, "seguridad.usuarios_router");
@@ -198,7 +185,7 @@ async fn usuarios_del_router_por_pares_y_secretos() {
 
 #[tokio::test]
 async fn listas_con_sus_instancias() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     let tema = leer(&p, &cookie, "puertos").await;
     let reglas = ajuste(&tema, "puertos.reglas");
@@ -248,7 +235,7 @@ async fn listas_con_sus_instancias() {
 
 #[tokio::test]
 async fn lectura_fallida_deja_solo_ese_ajuste_sin_leer() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     p.sim.control.fail_reads("cbGetUpnpCfg", true);
     let tema = leer(&p, &cookie, "puertos").await;
@@ -264,7 +251,7 @@ async fn lectura_fallida_deja_solo_ese_ajuste_sin_leer() {
 
 #[tokio::test]
 async fn opcion_desconocida_se_muestra_y_se_conserva() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     escribir_red_24(&p, &[("authentication", "99")]).await;
     let tema = leer(&p, &cookie, "wifi").await;
@@ -277,7 +264,7 @@ async fn opcion_desconocida_se_muestra_y_se_conserva() {
 
 #[tokio::test]
 async fn tema_desconocido_404() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     let (status, cache, body) = peticion(&p, "nada", Some(&cookie)).await;
     assert_eq!(status, 404, "{body}");
@@ -288,7 +275,7 @@ async fn tema_desconocido_404() {
 /// Toda clave de traducción que da la vista existe en los dos idiomas.
 #[tokio::test]
 async fn claves_de_la_vista_existen() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     let mut claves = Vec::new();
     let de_campo = |c: &Value, claves: &mut Vec<String>| {
@@ -339,7 +326,7 @@ async fn claves_de_la_vista_existen() {
 
 #[tokio::test]
 async fn respuesta_no_store() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     let (status, cache, body) = peticion(&p, "puertos", Some(&cookie)).await;
     assert_eq!(status, 200, "{body}");
@@ -351,7 +338,7 @@ async fn respuesta_no_store() {
 /// `wifi.red_24_avanzado`).
 #[tokio::test]
 async fn cada_lectura_una_sola_vez() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     for tema in ["wifi", "seguridad"] {
         let antes = p.sim.control.reads().len();
@@ -389,7 +376,7 @@ async fn cada_lectura_una_sola_vez() {
 /// primera reserva, la que queda conserva el suyo.
 #[tokio::test]
 async fn ids_de_instancia_no_son_la_posicion() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     p.state
         .hgu
@@ -420,7 +407,10 @@ async fn ids_de_instancia_no_son_la_posicion() {
 /// instancia. El resto del tema se lee.
 #[tokio::test]
 async fn lista_escrita_sin_id_queda_sin_leer() {
-    let p = panel_con_capa(&variante("listas-irregulares")).await;
+    let p = PanelPrueba::nuevo()
+        .capa(&variante("listas-irregulares"))
+        .arrancar()
+        .await;
     let cookie = sesion(&p).await;
     let tema = leer(&p, &cookie, "red_local").await;
     let reservas = ajuste(&tema, "red_local.reservas");
@@ -434,7 +424,10 @@ async fn lista_escrita_sin_id_queda_sin_leer() {
 /// campos: una hoja suelta en la respuesta no crea un usuario de más.
 #[tokio::test]
 async fn usuarios_emparejados_solo_por_sus_elementos() {
-    let p = panel_con_capa(&variante("listas-irregulares")).await;
+    let p = PanelPrueba::nuevo()
+        .capa(&variante("listas-irregulares"))
+        .arrancar()
+        .await;
     let cookie = sesion(&p).await;
     let tema = leer(&p, &cookie, "seguridad").await;
     let usuarios = ajuste(&tema, "seguridad.usuarios_router");
@@ -461,7 +454,7 @@ async fn usuarios_emparejados_solo_por_sus_elementos() {
 /// no, y el resto vacío.
 #[tokio::test]
 async fn plantilla_de_lista_sin_desconocidos() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     let tema = leer(&p, &cookie, "puertos").await;
     let reglas = ajuste(&tema, "puertos.reglas");
@@ -568,19 +561,9 @@ async fn del_punto_de_acceso(p: &Panel, id: &str, nombre: &str) -> String {
     elemento(&n, nombre).unwrap_or_else(|| panic!("falta {nombre}"))
 }
 
-/// Campos cambiados de todos los pasos de un resumen.
-fn cambios(grupo: &Value) -> Vec<&Value> {
-    grupo["pasos"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .flat_map(|p| p["campos"].as_array().unwrap())
-        .collect()
-}
-
 #[tokio::test]
 async fn guardar_nombre_no_toca_la_contrasena() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let clave = del_punto_de_acceso(&p, "0", "key_phrase").await;
     let seguridad = del_punto_de_acceso(&p, "0", "authentication").await;
     let g = resumen(
@@ -590,7 +573,7 @@ async fn guardar_nombre_no_toca_la_contrasena() {
         json!({ "nombre": "casa-nueva" }),
     )
     .await;
-    let campos = cambios(&g);
+    let campos = cambios_del_grupo(&g);
     assert_eq!(campos.len(), 1, "{g}");
     assert_eq!(campos[0]["campo"], "ajuste-wifi-red_24-nombre");
     assert_eq!(campos[0]["despues"], "casa-nueva");
@@ -609,7 +592,7 @@ async fn guardar_nombre_no_toca_la_contrasena() {
 
 #[tokio::test]
 async fn guardar_otro_campo_conserva_la_opcion_desconocida() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     escribir_red_24(&p, &[("authentication", "99")]).await;
     let g = resumen(
         &p,
@@ -618,7 +601,7 @@ async fn guardar_otro_campo_conserva_la_opcion_desconocida() {
         json!({ "nombre": "casa-nueva" }),
     )
     .await;
-    assert_eq!(cambios(&g).len(), 1, "{g}");
+    assert_eq!(cambios_del_grupo(&g).len(), 1, "{g}");
     let id = confirmar(&p, &cookie, &g, &[]).await;
     assert_eq!(esperar_final(&p, &cookie, id).await["estado"], "Aplicado");
     assert_eq!(del_punto_de_acceso(&p, "0", "authentication").await, "99");
@@ -627,7 +610,7 @@ async fn guardar_otro_campo_conserva_la_opcion_desconocida() {
 
 #[tokio::test]
 async fn antes_es_el_valor_del_router_no_el_de_la_pagina() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let tema = leer(&p, &cookie, "wifi").await;
     let en_la_pagina = campo(ajuste(&tema, "wifi.red_24"), "nombre")["valor"]["Texto"].clone();
     escribir_red_24(&p, &[("ssid", "cambiado-fuera")]).await;
@@ -639,7 +622,7 @@ async fn antes_es_el_valor_del_router_no_el_de_la_pagina() {
         json!({ "nombre": "casa-nueva" }),
     )
     .await;
-    let campos = cambios(&g);
+    let campos = cambios_del_grupo(&g);
     assert_eq!(campos[0]["antes"], "cambiado-fuera", "{g}");
     assert_eq!(campos[0]["despues"], "casa-nueva");
 }
@@ -668,7 +651,10 @@ tipo = "texto"
 
 #[tokio::test]
 async fn desmarcar_un_paso_no_lo_escribe() {
-    let (p, cookie) = panel_con_ajustes(DOS_FUNCIONES).await;
+    let (p, cookie) = PanelPrueba::nuevo()
+        .ajustes(DOS_FUNCIONES)
+        .arrancar_con_gestor()
+        .await;
     let g = resumen(
         &p,
         &cookie,
@@ -696,7 +682,7 @@ async fn panel_vigilando() -> (Panel, String) {
     t.bajo = Duration::from_secs(30);
     t.medio = Duration::from_secs(30);
     t.alto = Duration::from_secs(30);
-    panel_con_tiempos(t).await
+    PanelPrueba::nuevo().tiempos(t).arrancar_con_gestor().await
 }
 
 /// Aplica `primero` y, mientras se vigila, prepara `segundo`: 409.
@@ -731,7 +717,7 @@ async fn par_basico_y_avanzado_con_cambio_activo_da_409() {
 
 #[tokio::test]
 async fn guardar_lo_mismo_da_409_ya_esta_asi() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let ssid = del_punto_de_acceso(&p, "0", "ssid").await;
     let (status, body) =
         preparar_ajuste(&p, &cookie, "wifi.red_24", json!({ "nombre": ssid })).await;
@@ -741,7 +727,7 @@ async fn guardar_lo_mismo_da_409_ya_esta_asi() {
 
 #[tokio::test]
 async fn solo_lectura_da_403() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     instancia::escribir(&p.state.db, claves::SOLO_LECTURA, &json!(true))
         .await
         .unwrap();
@@ -759,7 +745,7 @@ async fn solo_lectura_da_403() {
 
 #[tokio::test]
 async fn valor_invalido_da_400_en_el_idioma() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let largo = "x".repeat(33);
     let (status, body) =
         preparar_ajuste(&p, &cookie, "wifi.red_24", json!({ "nombre": largo })).await;
@@ -796,7 +782,7 @@ fn detecta_funciones_de_la_api() {
 
 #[tokio::test]
 async fn resumen_sin_nombres_de_api() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let g = resumen(
         &p,
         &cookie,
@@ -810,7 +796,7 @@ async fn resumen_sin_nombres_de_api() {
         assert!(!texto.contains(api), "{api}: {texto}");
     }
     assert!(!texto.contains("clave-secreta-1"), "{texto}");
-    let clave = cambios(&g)
+    let clave = cambios_del_grupo(&g)
         .into_iter()
         .find(|c| c["campo"] == "ajuste-wifi-red_24-contrasena")
         .unwrap()
@@ -818,7 +804,7 @@ async fn resumen_sin_nombres_de_api() {
     assert_eq!(clave["secreto"], true);
     assert_eq!(clave["antes"], clave["despues"]);
     assert_eq!(clave["antes"], "••••••");
-    let seguridad = cambios(&g)
+    let seguridad = cambios_del_grupo(&g)
         .into_iter()
         .find(|c| c["campo"] == "ajuste-wifi-red_24-seguridad")
         .unwrap()
@@ -829,7 +815,7 @@ async fn resumen_sin_nombres_de_api() {
 
 #[tokio::test]
 async fn guardar_exige_sesion() {
-    let (p, _) = panel_con_gestor().await;
+    let (p, _) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let (status, body) = llamar(
         &p,
         "preparar_ajuste",
@@ -842,7 +828,7 @@ async fn guardar_exige_sesion() {
 
 #[tokio::test]
 async fn borrar_en_un_ajuste_que_no_es_lista_da_400() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let (status, body) = llamar(
         &p,
         "preparar_ajuste",
@@ -862,7 +848,7 @@ async fn deshacer(p: &Panel, cookie: &str, id: i64) -> (u16, String) {
 
 #[tokio::test]
 async fn deshacer_un_cambio_que_no_es_de_ajustes_da_404() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     // Un cambio del explorador: sin título de ajuste.
     let id = aplicar(
         &p,
@@ -895,7 +881,7 @@ async fn deshacer_en_vigilancia_da_400() {
 
 #[tokio::test]
 async fn deshacer_dos_veces_da_400() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let g = resumen(
         &p,
         &cookie,
@@ -926,7 +912,7 @@ async fn deshacer_dos_veces_da_400() {
 /// lo acepta con la toma; la vista lleva la regla para la página.
 #[tokio::test]
 async fn espejo_sin_toma_da_400() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let tema = leer(&p, &cookie, "sistema").await;
     let espejo = campo(ajuste(&tema, "sistema.diagnostico"), "espejo");
     assert_eq!(
@@ -983,22 +969,6 @@ async fn pagina(p: &Panel, cookie: &str, ruta: &str) -> (u16, String, String) {
     (status, location, body_text(resp).await)
 }
 
-/// `html` sin los bloques `<abre …>…</cierra>` cuya apertura empieza por
-/// `abre` (sin anidar), y esos bloques aparte.
-fn partir<'a>(html: &'a str, abre: &str, cierra: &str) -> (String, Vec<&'a str>) {
-    let mut fuera = String::new();
-    let mut dentro = Vec::new();
-    let mut resto = html;
-    while let Some(i) = resto.find(abre) {
-        fuera.push_str(&resto[..i]);
-        let fin = i + resto[i..].find(cierra).expect("bloque sin cerrar") + cierra.len();
-        dentro.push(&resto[i..fin]);
-        resto = &resto[fin..];
-    }
-    fuera.push_str(resto);
-    (fuera, dentro)
-}
-
 /// Texto que se lee en pantalla (o en voz alta) de un trozo de HTML: el de
 /// fuera de las etiquetas y los atributos que se leen.
 fn texto_legible(html: &str) -> String {
@@ -1052,7 +1022,10 @@ async fn pagina_tema_sin_nombres_de_api_fuera_de_detalles() {
     // La regla de puertos de las fixtures se llama «desc-1» (el seudónimo
     // del simulador), que se lee como el parámetro `desc`: aquí lleva otro
     // nombre que el simulador admite («Default»), que no es de la API.
-    let (p, cookie) = common::panel_con_gestor_y_capa(&variante("puertos-nombre")).await;
+    let (p, cookie) = PanelPrueba::nuevo()
+        .capa(&variante("puertos-nombre"))
+        .arrancar_con_gestor()
+        .await;
     let funcion = regex::Regex::new(r"\bcb[A-Z]\w+").unwrap();
     let pagina_api = regex::Regex::new(r"\bte_\w+\.(asp|cmd|cgi|wl)\b").unwrap();
     let parametros: Vec<regex::Regex> = parametros_del_catalogo()
@@ -1102,7 +1075,7 @@ async fn pagina_tema_sin_nombres_de_api_fuera_de_detalles() {
 /// campo (y en los datos de la página), nunca como texto a la vista.
 #[tokio::test]
 async fn pagina_tema_con_el_secreto_solo_en_su_campo() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let clave = "clave-conocida-del-sim-7";
     escribir_red_24(&p, &[("key_phrase", clave)]).await;
     let (status, _, html) = pagina(&p, &cookie, "/ajustes/wifi").await;
@@ -1120,7 +1093,7 @@ async fn pagina_tema_con_el_secreto_solo_en_su_campo() {
 
 #[tokio::test]
 async fn ajustes_lleva_a_internet() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     for ruta in ["/ajustes", "/ajustes/"] {
         let (status, location, body) = pagina(&p, &cookie, ruta).await;
         assert_eq!(status, 302, "{ruta}: {body}");
@@ -1130,7 +1103,7 @@ async fn ajustes_lleva_a_internet() {
 
 #[tokio::test]
 async fn tema_desconocido_no_encontrada() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let (status, _, html) = pagina(&p, &cookie, "/ajustes/no-existe").await;
     assert_eq!(status, 404, "{html}");
     assert!(html.contains("Página no encontrada"), "{html}");
@@ -1141,7 +1114,7 @@ async fn tema_desconocido_no_encontrada() {
 /// no reconocido) y no cuenta como elegida al encenderlo.
 #[tokio::test]
 async fn espejo_apagado_es_ninguna() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let tema = leer(&p, &cookie, "sistema").await;
     let puerto = campo(ajuste(&tema, "sistema.diagnostico"), "puerto");
     assert_eq!(puerto["valor"], json!({ "Opcion": "ninguna" }), "{puerto}");
@@ -1163,7 +1136,7 @@ async fn espejo_apagado_es_ninguna() {
 /// opciones»: sus tarjetas se ven directamente.
 #[tokio::test]
 async fn tema_sin_basicos_sin_plegar() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let (_, _, html) = pagina(&p, &cookie, "/ajustes/sistema").await;
     assert!(html.contains("Hora del router"), "{html}");
     assert!(!html.contains(r#"<details class="mas-opciones""#), "{html}");
@@ -1175,7 +1148,7 @@ async fn tema_sin_basicos_sin_plegar() {
 /// tarjetas ocultas (Teléfono tiene dos).
 #[tokio::test]
 async fn nota_de_oculto_una_vez() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let (_, _, html) = pagina(&p, &cookie, "/ajustes/telefono").await;
     let (visible, _) = partir(&html, "<script", "</script>");
     assert!(visible.matches("chip-oculto").count() >= 2, "{visible}");
@@ -1190,7 +1163,7 @@ async fn nota_de_oculto_una_vez() {
 /// en «Editar»; la opción del selector no repite la marca.
 #[tokio::test]
 async fn recomendacion_visible_en_el_resumen() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let (_, _, html) = pagina(&p, &cookie, "/ajustes/wifi").await;
     let (visible, _) = partir(&html, "<script", "</script>");
     let (_, resumenes) = partir(
@@ -1215,7 +1188,7 @@ async fn recomendacion_visible_en_el_resumen() {
 /// `<select>` (`aria-describedby`).
 #[tokio::test]
 async fn descripcion_de_la_opcion_en_el_selector() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let (_, _, html) = pagina(&p, &cookie, "/ajustes/wifi").await;
     let (visible, _) = partir(&html, "<script", "</script>");
     let describe = regex::Regex::new(r#"<select[^>]*aria-describedby="([^"]*)""#).unwrap();

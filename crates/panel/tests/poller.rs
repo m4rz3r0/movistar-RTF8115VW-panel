@@ -1,14 +1,14 @@
 //! Pruebas del sondeo en segundo plano contra `router-sim`, con intervalos
 //! cortos.
 
-mod common;
+mod comun;
 
-use common::{Panel, panel};
+use comun::{Panel, PanelPrueba, esperar_hasta};
 use panel::{
     poller::{Poller, PollerConfig, PollerHandle},
     series::{self, Rango},
 };
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 /// Sondeo rápido: 50 ms entre lecturas, 200 ms para hosts/WiFi, espera
 /// máxima de 400 ms tras errores.
@@ -25,24 +25,18 @@ fn config() -> PollerConfig {
 /// Arranca el sondeo con un cliente del router de tiempo de espera corto
 /// (200 ms) y espera la primera instantánea completa.
 async fn sondeo(p: &mut Panel) -> PollerHandle {
-    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, common::USER, common::PASS);
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, comun::USER, comun::PASS);
     cfg.timeout = Duration::from_millis(200);
     cfg.min_gap = Duration::from_millis(1);
     p.state.hgu = hgu::Client::new(cfg);
     let h = Poller::spawn_with(p.state.clone(), config());
-    esperar("primera instantánea con datos de 60 s", || {
-        h.latest().is_some_and(|s| s.slow_at.is_some())
-    })
+    esperar_hasta(
+        Duration::from_secs(5),
+        "primera instantánea con datos de 60 s",
+        async || h.latest().is_some_and(|s| s.slow_at.is_some()),
+    )
     .await;
     h
-}
-
-async fn esperar(que: &str, mut cond: impl FnMut() -> bool) {
-    let start = Instant::now();
-    while !cond() {
-        assert!(start.elapsed() < Duration::from_secs(5), "no llega: {que}");
-        tokio::time::sleep(Duration::from_millis(10)).await;
-    }
 }
 
 async fn eventos_wan(p: &Panel) -> Vec<(i64, Option<i64>)> {
@@ -54,7 +48,7 @@ async fn eventos_wan(p: &Panel) -> Vec<(i64, Option<i64>)> {
 
 #[tokio::test]
 async fn poller_lee_estado_y_guarda_muestras() {
-    let mut p = panel().await;
+    let mut p = PanelPrueba::nuevo().arrancar().await;
     let h = sondeo(&mut p).await;
     let s = h.latest().unwrap();
     assert_eq!(s.summary.model, "RTF8115VW");
@@ -85,22 +79,20 @@ async fn poller_lee_estado_y_guarda_muestras() {
 
 #[tokio::test]
 async fn poller_registra_corte_wan() {
-    let mut p = panel().await;
+    let mut p = PanelPrueba::nuevo().arrancar().await;
     let _h = sondeo(&mut p).await;
     assert!(eventos_wan(&p).await.is_empty());
 
     p.sim.control.set_wan_up(false);
-    let start = Instant::now();
-    loop {
+    esperar_hasta(Duration::from_secs(5), "no hay corte", async || {
         let ev = eventos_wan(&p).await;
         if !ev.is_empty() {
             assert_eq!(ev.len(), 1);
             assert_eq!(ev[0].1, None);
-            break;
         }
-        assert!(start.elapsed() < Duration::from_secs(5), "no hay corte");
-        tokio::time::sleep(Duration::from_millis(20)).await;
-    }
+        !ev.is_empty()
+    })
+    .await;
     let cortes = series::cortes(&p.state.db, Rango::Hora).await.unwrap();
     assert_eq!(cortes.len(), 1);
     assert_eq!(cortes[0].hasta, None);
@@ -111,20 +103,19 @@ async fn poller_registra_corte_wan() {
     assert!(caidas >= 1);
 
     p.sim.control.set_wan_up(true);
-    let start = Instant::now();
-    loop {
-        let ev = eventos_wan(&p).await;
-        assert_eq!(ev.len(), 1, "{ev:?}");
-        if let Some(hasta) = ev[0].1 {
-            assert!(hasta >= ev[0].0);
-            break;
-        }
-        assert!(
-            start.elapsed() < Duration::from_secs(5),
-            "el corte no se cierra"
-        );
-        tokio::time::sleep(Duration::from_millis(20)).await;
-    }
+    esperar_hasta(
+        Duration::from_secs(5),
+        "el corte no se cierra",
+        async || {
+            let ev = eventos_wan(&p).await;
+            assert_eq!(ev.len(), 1, "{ev:?}");
+            if let Some(hasta) = ev[0].1 {
+                assert!(hasta >= ev[0].0);
+            }
+            ev[0].1.is_some()
+        },
+    )
+    .await;
     let cortes = series::cortes(&p.state.db, Rango::Hora).await.unwrap();
     assert_eq!(cortes.len(), 1);
     assert!(cortes[0].hasta.is_some());
@@ -132,12 +123,15 @@ async fn poller_registra_corte_wan() {
 
 #[tokio::test]
 async fn poller_backoff_si_router_no_responde() {
-    let mut p = panel().await;
+    let mut p = PanelPrueba::nuevo().arrancar().await;
     let h = sondeo(&mut p).await;
     let antes = h.latest().unwrap();
 
     p.sim.control.set_unresponsive(true);
-    esperar("error visible", || h.latest().unwrap().error.is_some()).await;
+    esperar_hasta(Duration::from_secs(5), "error visible", async || {
+        h.latest().unwrap().error.is_some()
+    })
+    .await;
     assert!(!h.healthy());
     // Sin espera creciente habría un intento cada 250 ms (200 de tiempo de
     // espera + 50 de intervalo), unos 8 en 2 s; con ella (100, 200, 400,
@@ -152,7 +146,7 @@ async fn poller_backoff_si_router_no_responde() {
     assert_eq!(s.summary, antes.summary);
 
     p.sim.control.set_unresponsive(false);
-    esperar("recuperación", || {
+    esperar_hasta(Duration::from_secs(5), "recuperación", async || {
         h.latest().unwrap().error.is_none() && h.failures() == 0
     })
     .await;
@@ -161,7 +155,7 @@ async fn poller_backoff_si_router_no_responde() {
 
 #[tokio::test]
 async fn pausa_espera_al_ciclo_en_curso_y_detiene_el_sondeo() {
-    let mut p = panel().await;
+    let mut p = PanelPrueba::nuevo().arrancar().await;
     let h = sondeo(&mut p).await;
 
     // Con el router colgado, el ciclo en curso tarda el tiempo de espera del
@@ -178,7 +172,7 @@ async fn pausa_espera_al_ciclo_en_curso_y_detiene_el_sondeo() {
 
     p.sim.control.set_unresponsive(false);
     pausa.resume();
-    esperar("sondeo reanudado", || {
+    esperar_hasta(Duration::from_secs(5), "sondeo reanudado", async || {
         h.latest().unwrap().error.is_none() && h.failures() == 0
     })
     .await;
@@ -186,12 +180,17 @@ async fn pausa_espera_al_ciclo_en_curso_y_detiene_el_sondeo() {
 
 #[tokio::test]
 async fn fallo_de_lectura_lenta_no_descarta_el_ciclo() {
-    let mut p = panel().await;
+    let mut p = PanelPrueba::nuevo().arrancar().await;
     let h = sondeo(&mut p).await;
     let antes = h.latest().unwrap();
 
     p.sim.control.fail_reads("cbGetTr69Config", true);
-    esperar("error de las lecturas de 60 s", || h.slow_error().is_some()).await;
+    esperar_hasta(
+        Duration::from_secs(5),
+        "error de las lecturas de 60 s",
+        async || h.slow_error().is_some(),
+    )
+    .await;
     let filas = || async {
         sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM samples_raw")
             .fetch_one(&p.state.db)
@@ -216,15 +215,17 @@ async fn fallo_de_lectura_lenta_no_descarta_el_ciclo() {
 
     // Se reintentan en el ciclo siguiente.
     p.sim.control.fail_reads("cbGetTr69Config", false);
-    esperar("lecturas de 60 s recuperadas", || {
-        h.slow_error().is_none() && h.latest().unwrap().slow_at > antes.slow_at
-    })
+    esperar_hasta(
+        Duration::from_secs(5),
+        "lecturas de 60 s recuperadas",
+        async || h.slow_error().is_none() && h.latest().unwrap().slow_at > antes.slow_at,
+    )
     .await;
 }
 
 #[tokio::test]
 async fn sigue_sano_durante_una_pausa() {
-    let mut p = panel().await;
+    let mut p = PanelPrueba::nuevo().arrancar().await;
     let h = sondeo(&mut p).await;
     let pausa = h.pause().await;
     // Más de 3 intervalos (150 ms) sin datos nuevos.
@@ -236,7 +237,7 @@ async fn sigue_sano_durante_una_pausa() {
 
 #[tokio::test]
 async fn despertar_lee_sin_esperar_al_intervalo() {
-    let p = common::panel_sin_router().await;
+    let p = PanelPrueba::nuevo().sin_router().arrancar().await;
     let h = Poller::spawn_with(
         p.state.clone(),
         PollerConfig {
@@ -244,10 +245,20 @@ async fn despertar_lee_sin_esperar_al_intervalo() {
             ..config()
         },
     );
-    esperar("primer ciclo sin router", || h.sin_configurar()).await;
-    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, common::USER, common::PASS);
+    esperar_hasta(
+        Duration::from_secs(5),
+        "primer ciclo sin router",
+        async || h.sin_configurar(),
+    )
+    .await;
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, comun::USER, comun::PASS);
     cfg.min_gap = Duration::from_millis(1);
     p.state.hgu.reconfigurar(cfg).await;
     h.despertar();
-    esperar("lectura tras despertar", || h.latest().is_some()).await;
+    esperar_hasta(
+        Duration::from_secs(5),
+        "lectura tras despertar",
+        async || h.latest().is_some(),
+    )
+    .await;
 }

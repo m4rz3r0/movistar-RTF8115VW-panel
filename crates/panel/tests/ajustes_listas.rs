@@ -3,11 +3,10 @@
 //! con la validación de una reserva (`validar_reserva`) igual en el
 //! servidor y en la página.
 
-mod common;
+mod comun;
 
-use common::{
-    Panel, esperar_final, esperar_libre, llamar, ok, panel_con_gestor, panel_con_gestor_y_capa,
-    sesion, variante,
+use comun::{
+    Panel, PanelPrueba, aplicar_ajuste, esperar_libre, llamar, ok, pagina, sesion, variante,
 };
 use panel::ajustes_router::{ErrorReserva, validar_reserva};
 use panel::ajustes_router::{PeticionAjuste, valida_la_reserva};
@@ -214,27 +213,10 @@ async fn preparar(
     .await
 }
 
-/// Confirma el resumen y espera a que acabe aplicado (y el gestor libre).
-async fn aplicar(p: &Panel, cookie: &str, grupo: &Value) -> i64 {
-    let id = ok(
-        p,
-        "confirmar_ajuste",
-        json!({ "token": grupo["token"], "desmarcados": [] }),
-        cookie,
-    )
-    .await
-    .as_i64()
-    .unwrap();
-    let c = esperar_final(p, cookie, id).await;
-    assert_eq!(c["estado"], "Aplicado", "{c}");
-    esperar_libre(p).await;
-    id
-}
-
 /// Deshace el cambio `id` y lo aplica.
 async fn deshacer(p: &Panel, cookie: &str, id: i64) {
     let g = ok(p, "deshacer_ajuste", json!({ "cambio": id }), cookie).await;
-    aplicar(p, cookie, &g).await;
+    aplicar_ajuste(p, cookie, &g).await;
 }
 
 /// «Fijar esta IP»: la reserva nueva con la MAC y la IP actuales del
@@ -242,7 +224,7 @@ async fn deshacer(p: &Panel, cookie: &str, id: i64) {
 /// borra.
 #[tokio::test]
 async fn fijar_ip_crea_reserva_y_deshacer_la_borra() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let antes = reservas(&p, &cookie).await;
     let d = dispositivos(&p, &cookie).await;
     let host = por_mac(&d, "02:00:00:00:00:03");
@@ -259,7 +241,7 @@ async fn fijar_ip_crea_reserva_y_deshacer_la_borra() {
     assert_eq!(status, 200, "{body}");
     let g: Value = serde_json::from_str(&body).unwrap();
     assert_eq!(g["titulo"], "ajuste-red_local-reservas-titulo");
-    let id = aplicar(&p, &cookie, &g).await;
+    let id = aplicar_ajuste(&p, &cookie, &g).await;
 
     let ahora = reservas(&p, &cookie).await;
     assert_eq!(ahora.len(), antes.len() + 1, "{ahora:?}");
@@ -283,7 +265,7 @@ async fn fijar_ip_crea_reserva_y_deshacer_la_borra() {
 
 #[tokio::test]
 async fn borrar_reserva_y_deshacer_la_recrea() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let antes = reservas(&p, &cookie).await;
     assert!(
         antes.contains(&(
@@ -296,7 +278,7 @@ async fn borrar_reserva_y_deshacer_la_recrea() {
     let (status, body) = preparar(&p, &cookie, Some("1"), true, json!({})).await;
     assert_eq!(status, 200, "{body}");
     let g: Value = serde_json::from_str(&body).unwrap();
-    let id = aplicar(&p, &cookie, &g).await;
+    let id = aplicar_ajuste(&p, &cookie, &g).await;
     let sin = reservas(&p, &cookie).await;
     assert!(
         !sin.iter().any(|(_, m, _)| m == "02:00:00:00:00:01"),
@@ -319,7 +301,7 @@ async fn borrar_reserva_y_deshacer_la_recrea() {
 /// idioma) y no escribe nada.
 #[tokio::test]
 async fn reserva_invalida_da_400() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let (status, body) = preparar(
         &p,
         &cookie,
@@ -387,7 +369,10 @@ async fn reserva_invalida_da_400() {
 /// al que está asociado; si no, el cable) y su reserva.
 #[tokio::test]
 async fn leer_dispositivos_con_banda() {
-    let (p, cookie) = panel_con_gestor_y_capa(&variante("dispositivos-wifi")).await;
+    let (p, cookie) = PanelPrueba::nuevo()
+        .capa(&variante("dispositivos-wifi"))
+        .arrancar_con_gestor()
+        .await;
     let d = dispositivos(&p, &cookie).await;
     assert_eq!(d.len(), 10, "{d:?}");
     let conexion = |mac: &str| por_mac(&d, mac)["conexion"].clone();
@@ -411,7 +396,7 @@ async fn leer_dispositivos_con_banda() {
 
 #[tokio::test]
 async fn leer_dispositivos_exige_sesion() {
-    let (p, _) = panel_con_gestor().await;
+    let (p, _) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let (status, body) = llamar(&p, "leer_dispositivos", json!({}), None).await;
     assert_eq!(status, 401, "{body}");
 }
@@ -420,11 +405,11 @@ async fn leer_dispositivos_exige_sesion() {
 /// «todavía no está lista»).
 #[tokio::test]
 async fn pagina_red_local_con_dispositivos_y_reservas() {
-    let p = common::panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
-    let resp = common::get_con_cookie(&p.app, "/ajustes/red_local", &cookie).await;
+    let resp = comun::get_con_cookie(&p.app, "/ajustes/red_local", &cookie).await;
     assert_eq!(resp.status(), 200);
-    let html = common::body_text(resp).await;
+    let html = comun::body_text(resp).await;
     assert!(html.contains("Fijar esta IP"), "{html}");
     assert!(html.contains("Añadir IP fija"), "{html}");
     assert!(html.contains("192.168.1.62"), "{html}");
@@ -432,13 +417,6 @@ async fn pagina_red_local_con_dispositivos_y_reservas() {
 }
 
 // ------------------------------------------- ronda de corrección 1
-
-/// HTML de `/ajustes/red_local`.
-async fn pagina(p: &Panel, cookie: &str) -> String {
-    let resp = common::get_con_cookie(&p.app, "/ajustes/red_local", cookie).await;
-    assert_eq!(resp.status(), 200);
-    common::body_text(resp).await
-}
 
 /// El `<article>` de la página cuyo título es `titulo` (sin lo que llega
 /// después por streaming).
@@ -473,8 +451,8 @@ fn ip_fijas(html: &str) -> &str {
 /// (WCAG 2.5.3): quien lo pide por voz lo encuentra.
 #[tokio::test]
 async fn fijar_esta_ip_se_nombra_como_se_ve() {
-    let (p, cookie) = panel_con_gestor().await;
-    let html = pagina(&p, &cookie).await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    let html = pagina(&p, &cookie, "/ajustes/red_local").await;
     assert!(
         html.contains(r#"aria-label="Fijar esta IP: 192.168.1.62 (host-2)""#),
         "{html}"
@@ -484,12 +462,12 @@ async fn fijar_esta_ip_se_nombra_como_se_ve() {
 /// Un dispositivo con IP fija dice cuál es, aunque ahora tenga otra.
 #[tokio::test]
 async fn ya_tiene_ip_fija_dice_la_reservada() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let d = dispositivos(&p, &cookie).await;
     assert_eq!(por_mac(&d, "02:00:00:00:00:01")["ip"], "192.168.1.60");
     assert_eq!(por_mac(&d, "02:00:00:00:00:01")["ip_fija"], "192.168.1.69");
     assert_eq!(por_mac(&d, "02:00:00:00:00:03")["ip_fija"], Value::Null);
-    let html = pagina(&p, &cookie).await;
+    let html = pagina(&p, &cookie, "/ajustes/red_local").await;
     assert!(html.contains("Ya tiene IP fija: 192.168.1.69"), "{html}");
 }
 
@@ -498,7 +476,10 @@ async fn ya_tiene_ip_fija_dice_la_reservada() {
 /// IP puede tenerla ya otro): una nota breve en su lugar.
 #[tokio::test]
 async fn sin_fijar_si_no_se_puede() {
-    let (p, cookie) = panel_con_gestor_y_capa(&variante("dispositivos-irregulares")).await;
+    let (p, cookie) = PanelPrueba::nuevo()
+        .capa(&variante("dispositivos-irregulares"))
+        .arrancar_con_gestor()
+        .await;
     // Otra reserva con la IP de host-2.
     p.state
         .hgu
@@ -515,7 +496,7 @@ async fn sin_fijar_si_no_se_puede() {
         )
         .await
         .unwrap();
-    let html = pagina(&p, &cookie).await;
+    let html = pagina(&p, &cookie, "/ajustes/red_local").await;
     let dispositivos = lista_de_dispositivos(&html);
     for ip in ["198.51.100.76", "192.168.1.61", "192.168.1.62"] {
         assert!(
@@ -534,8 +515,11 @@ async fn sin_fijar_si_no_se_puede() {
 /// El nombre del dispositivo de una reserva se busca con las MAC normalizadas.
 #[tokio::test]
 async fn nombre_de_la_reserva_con_mac_normalizada() {
-    let (p, cookie) = panel_con_gestor_y_capa(&variante("dispositivos-irregulares")).await;
-    let html = pagina(&p, &cookie).await;
+    let (p, cookie) = PanelPrueba::nuevo()
+        .capa(&variante("dispositivos-irregulares"))
+        .arrancar_con_gestor()
+        .await;
+    let html = pagina(&p, &cookie, "/ajustes/red_local").await;
     let fijas = ip_fijas(&html);
     let fila = fijas
         .split("<tr")
@@ -547,8 +531,8 @@ async fn nombre_de_la_reserva_con_mac_normalizada() {
 /// Una sola región de alerta por tarjeta, no una por dispositivo.
 #[tokio::test]
 async fn una_alerta_por_tarjeta() {
-    let (p, cookie) = panel_con_gestor().await;
-    let html = pagina(&p, &cookie).await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    let html = pagina(&p, &cookie, "/ajustes/red_local").await;
     let alertas = |t: &str| t.matches(r#"role="alert""#).count();
     let n =
         alertas(tarjeta(&html, "Dispositivos conectados")) + alertas(lista_de_dispositivos(&html));
@@ -561,7 +545,7 @@ async fn una_alerta_por_tarjeta() {
 /// corregir la IP; activarla, sí.
 #[tokio::test]
 async fn desactivar_sin_corregir_la_ip() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     p.state
         .hgu
         .write(
@@ -634,7 +618,7 @@ fn que_se_valida_de_una_reserva() {
 /// El resumen de una reserva nombra el dispositivo, si se conoce.
 #[tokio::test]
 async fn el_resumen_nombra_el_dispositivo() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let (status, body) = preparar(
         &p,
         &cookie,
@@ -681,7 +665,7 @@ async fn preparar_esperando(
 /// y nada escrito. Con la que se esperaba, sí se prepara.
 #[tokio::test]
 async fn editar_o_borrar_otra_reserva_da_409() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let base = &[("rtm_cfg_dhcpv4_svr_pool_id", "0")];
     let escribir = |extra: &[(&'static str, &'static str)]| {
         let mut params = base.to_vec();
@@ -742,7 +726,7 @@ async fn editar_o_borrar_otra_reserva_da_409() {
 /// Editar una reserva que no existe y crear una con la IP de difusión.
 #[tokio::test]
 async fn reserva_inexistente_o_de_difusion_da_400() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let (status, body) =
         preparar(&p, &cookie, Some("77"), false, json!({ "activa": "false" })).await;
     assert_eq!(status, 400, "{body}");
@@ -765,7 +749,7 @@ async fn reserva_inexistente_o_de_difusion_da_400() {
 /// (400, nada escrito).
 #[tokio::test]
 async fn editar_o_borrar_sin_mac_esperada_da_400() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     for (borrar, valores) in [(true, json!({})), (false, json!({ "activa": "false" }))] {
         let (status, body) = llamar(
             &p,
@@ -1013,7 +997,7 @@ fn esperados_0() -> Value {
 
 #[tokio::test]
 async fn abrir_puerto_y_deshacer() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let antes = reglas_del_tema(&p, &cookie).await;
     let (status, body) =
         preparar_regla(&p, &cookie, None, false, nueva("tcp", "9000"), json!({})).await;
@@ -1022,7 +1006,7 @@ async fn abrir_puerto_y_deshacer() {
     assert_eq!(g["titulo"], "ajuste-puertos-reglas-titulo");
     assert_eq!(g["detalle"], "Consola", "{g}");
     assert_eq!(g["pasos"].as_array().unwrap().len(), 1, "{g}");
-    let id = aplicar(&p, &cookie, &g).await;
+    let id = aplicar_ajuste(&p, &cookie, &g).await;
     let ahora = reglas_del_tema(&p, &cookie).await;
     assert_eq!(ahora.len(), antes.len() + 1, "{ahora:?}");
     let n = ahora
@@ -1038,7 +1022,7 @@ async fn abrir_puerto_y_deshacer() {
 /// un solo deshacer que borra las dos.
 #[tokio::test]
 async fn abrir_puerto_en_ambos_es_un_grupo_y_un_deshacer() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let antes = reglas_del_tema(&p, &cookie).await;
     let (status, body) =
         preparar_regla(&p, &cookie, None, false, nueva("ambos", "9000"), json!({})).await;
@@ -1056,7 +1040,7 @@ async fn abrir_puerto_en_ambos_es_un_grupo_y_un_deshacer() {
     };
     assert_eq!(protocolo(&pasos[0]), Some(json!("tcp")), "{g}");
     assert_eq!(protocolo(&pasos[1]), Some(json!("udp")), "{g}");
-    let id = aplicar(&p, &cookie, &g).await;
+    let id = aplicar_ajuste(&p, &cookie, &g).await;
     let ahora = reglas_del_tema(&p, &cookie).await;
     let nuevas: Vec<&[String; 5]> = ahora.iter().filter(|r| r[3] == "9000").collect();
     assert_eq!(nuevas.len(), 2, "{ahora:?}");
@@ -1071,7 +1055,7 @@ async fn abrir_puerto_en_ambos_es_un_grupo_y_un_deshacer() {
 /// el otro protocolo, sí.
 #[tokio::test]
 async fn regla_solapada_da_400() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     for protocolo in ["tcp", "ambos"] {
         let (status, body) = preparar_regla(
             &p,
@@ -1122,7 +1106,7 @@ async fn regla_solapada_da_400() {
 /// 409; nada escrito. «Ambos» solo vale al crear.
 #[tokio::test]
 async fn editar_o_borrar_regla_con_esperados() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     for borrar in [true, false] {
         let valores = if borrar {
             json!({})
@@ -1189,11 +1173,11 @@ async fn editar_o_borrar_regla_con_esperados() {
 /// dispositivo ni de ninguna IP fija: la página lo avisa.
 #[tokio::test]
 async fn aviso_destino_inexistente_en_la_pagina() {
-    let p = common::panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
-    let resp = common::get_con_cookie(&p.app, "/ajustes/puertos", &cookie).await;
+    let resp = comun::get_con_cookie(&p.app, "/ajustes/puertos", &cookie).await;
     assert_eq!(resp.status(), 200);
-    let html = common::body_text(resp).await;
+    let html = comun::body_text(resp).await;
     assert!(
         html.contains("El dispositivo de destino ya no está en la red"),
         "{html}"
@@ -1204,7 +1188,7 @@ async fn aviso_destino_inexistente_en_la_pagina() {
 
 #[tokio::test]
 async fn leer_reservas_de_la_cache() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let r = ok(&p, "leer_reservas", json!({}), &cookie).await;
     // Solo las IP: es lo único que usa la página.
     assert_eq!(r, json!(["192.168.1.68", "192.168.1.69"]));
@@ -1219,7 +1203,7 @@ async fn leer_reservas_de_la_cache() {
 /// lista vuelve a ser la de antes.
 #[tokio::test]
 async fn ambos_con_la_segunda_escritura_fallida_no_deja_nada() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let antes = reglas_del_tema(&p, &cookie).await;
     let (status, body) =
         preparar_regla(&p, &cookie, None, false, nueva("ambos", "9000"), json!({})).await;
@@ -1251,11 +1235,11 @@ async fn ambos_con_la_segunda_escritura_fallida_no_deja_nada() {
 /// cambio que vale se aplica.
 #[tokio::test]
 async fn editar_regla_valida_con_lo_del_router() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let (status, body) =
         preparar_regla(&p, &cookie, None, false, nueva("tcp", "9000"), json!({})).await;
     assert_eq!(status, 200, "{body}");
-    aplicar(&p, &cookie, &serde_json::from_str(&body).unwrap()).await;
+    aplicar_ajuste(&p, &cookie, &serde_json::from_str(&body).unwrap()).await;
     let escritas = p.sim.control.writes().len();
     // La 0 al puerto 9000 de internet (el de dentro sigue en 8080).
     let (status, body) = preparar_regla(
@@ -1294,7 +1278,7 @@ async fn editar_regla_valida_con_lo_del_router() {
     )
     .await;
     assert_eq!(status, 200, "{body}");
-    aplicar(&p, &cookie, &serde_json::from_str(&body).unwrap()).await;
+    aplicar_ajuste(&p, &cookie, &serde_json::from_str(&body).unwrap()).await;
     let ahora = reglas_del_tema(&p, &cookie).await;
     let r0 = ahora.iter().find(|r| r[0] == "0").unwrap();
     assert_eq!(r0[2..], ["tcp", "8080", "192.168.1.62"]);
@@ -1304,9 +1288,12 @@ async fn editar_regla_valida_con_lo_del_router() {
 /// («Valor no reconocido (47)»), nunca con su clave de traducción.
 #[tokio::test]
 async fn protocolo_desconocido_en_la_pagina() {
-    let (p, cookie) = panel_con_gestor_y_capa(&variante("puertos-protocolo-desconocido")).await;
-    let resp = common::get_con_cookie(&p.app, "/ajustes/puertos", &cookie).await;
-    let html = common::body_text(resp).await;
+    let (p, cookie) = PanelPrueba::nuevo()
+        .capa(&variante("puertos-protocolo-desconocido"))
+        .arrancar_con_gestor()
+        .await;
+    let resp = comun::get_con_cookie(&p.app, "/ajustes/puertos", &cookie).await;
+    let html = comun::body_text(resp).await;
     assert!(html.contains("Valor no reconocido (47)"), "{html}");
     assert!(!html.contains("ajuste-puertos-reglas-protocolo-"), "{html}");
 }
@@ -1315,7 +1302,10 @@ async fn protocolo_desconocido_en_la_pagina() {
 /// a la vez (8080 UDP choca con ella).
 #[tokio::test]
 async fn protocolo_desconocido_solapa_con_los_dos() {
-    let (p, cookie) = panel_con_gestor_y_capa(&variante("puertos-protocolo-desconocido")).await;
+    let (p, cookie) = PanelPrueba::nuevo()
+        .capa(&variante("puertos-protocolo-desconocido"))
+        .arrancar_con_gestor()
+        .await;
     for protocolo in ["tcp", "udp"] {
         let (status, body) = preparar_regla(
             &p,
@@ -1338,7 +1328,7 @@ async fn protocolo_desconocido_solapa_con_los_dos() {
 /// lo que cambia respecto al primero (el resto, en su nota).
 #[tokio::test]
 async fn ambos_con_un_titulo_por_paso() {
-    let (p, cookie) = panel_con_gestor().await;
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let (status, body) =
         preparar_regla(&p, &cookie, None, false, nueva("ambos", "9000"), json!({})).await;
     assert_eq!(status, 200, "{body}");

@@ -1,15 +1,15 @@
 //! Idioma de la interfaz: cookie `rp_lang`, idioma por defecto de la
 //! instancia, `Accept-Language` y español.
 
-mod common;
+mod comun;
 
 use axum::{body::Body, http::Request};
-use common::{body_text, ok, panel, post_form, send, sesion};
+use comun::{PanelPrueba, body_text, ok, post_form, send, sesion};
 use serde_json::json;
 
 /// HTML de `/login` con las cabeceras dadas.
-async fn login_con(p: &common::Panel, cabeceras: &[(&str, &str)]) -> String {
-    common::con_usuario(p).await;
+async fn login_con(p: &comun::Panel, cabeceras: &[(&str, &str)]) -> String {
+    comun::con_usuario(p).await;
     let mut req = Request::get("/login");
     for (k, v) in cabeceras {
         req = req.header(*k, *v);
@@ -21,7 +21,7 @@ async fn login_con(p: &common::Panel, cabeceras: &[(&str, &str)]) -> String {
 
 #[tokio::test]
 async fn idioma_desconocido_es_espanol() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let html = login_con(&p, &[("cookie", "rp_lang=xx"), ("accept-language", "fr")]).await;
     assert!(html.contains(r#"<html lang="es""#), "{html}");
     assert!(html.contains("Acceso al panel"), "{html}");
@@ -32,7 +32,7 @@ async fn idioma_desconocido_es_espanol() {
 
 #[tokio::test]
 async fn idioma_por_cookie_y_cabecera() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let html = login_con(&p, &[("cookie", "rp_lang=en")]).await;
     assert!(html.contains(r#"<html lang="en""#), "{html}");
     assert!(html.contains("Panel sign-in"), "{html}");
@@ -53,7 +53,7 @@ async fn idioma_por_cookie_y_cabecera() {
 
 #[tokio::test]
 async fn errores_del_servidor_en_el_idioma_de_la_peticion() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let _ = sesion(&p).await;
     let mut req = post_form("/api/login", "usuario=admin&contrasena=mala", "127.0.0.1");
     req.headers_mut()
@@ -64,14 +64,14 @@ async fn errores_del_servidor_en_el_idioma_de_la_peticion() {
 
 #[tokio::test]
 async fn cambiar_idioma_fija_la_cookie() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let resp = send(
         &p.app,
         post_form("/api/cambiar_idioma", "idioma=En", "127.0.0.1"),
     )
     .await;
     assert_eq!(resp.status(), 200);
-    let cookie = common::set_cookie(&resp);
+    let cookie = comun::set_cookie(&resp);
     assert!(cookie.starts_with("rp_lang=en;"), "{cookie}");
     for parte in ["Path=/", "SameSite=Lax", "Secure", "Max-Age=31536000"] {
         assert!(cookie.contains(parte), "{cookie}");
@@ -87,7 +87,7 @@ async fn cambiar_idioma_fija_la_cookie() {
 
 #[tokio::test]
 async fn login_con_selector_de_idioma() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let html = login_con(&p, &[("accept-language", "en")]).await;
     assert!(html.contains("idioma-selector"), "{html}");
     // Cada idioma con su nombre y su `lang`.
@@ -99,7 +99,7 @@ async fn login_con_selector_de_idioma() {
 
 /// `<html lang>` de `/login` sin cookie ni cabeceras, más con
 /// `Accept-Language: es` y con la cookie `rp_lang=es`.
-async fn idiomas_de_login(p: &common::Panel) -> [bool; 3] {
+async fn idiomas_de_login(p: &comun::Panel) -> [bool; 3] {
     let en = |html: String| html.contains(r#"<html lang="en""#);
     [
         en(login_con(p, &[]).await),
@@ -110,7 +110,7 @@ async fn idiomas_de_login(p: &common::Panel) -> [bool; 3] {
 
 #[tokio::test]
 async fn idioma_por_defecto_de_la_instancia() {
-    let mut p = panel().await;
+    let mut p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     // Sin fijar: manda `Accept-Language` (y sin nada, español).
     assert_eq!(idiomas_de_login(&p).await, [false, false, false]);
@@ -127,7 +127,7 @@ async fn idioma_por_defecto_de_la_instancia() {
     // Tras reiniciar el panel (otro estado sobre la misma base de datos),
     // sigue igual.
     let dir = p.state.cfg.db_path.parent().unwrap().to_path_buf();
-    let state = common::estado(common::config_en(&dir), &dir).await;
+    let state = comun::estado(comun::config_en(&dir), &dir).await;
     p.app = panel::build_router(state.clone());
     p.state = state;
     assert_eq!(idiomas_de_login(&p).await, [true, true, false]);
@@ -138,7 +138,7 @@ async fn idioma_por_defecto_de_la_instancia() {
 /// volver a eso después de fijar uno.
 #[tokio::test]
 async fn idioma_por_defecto_sin_fijar_es_el_del_navegador() {
-    let p = panel().await;
+    let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     let v = ok(&p, "leer_panel", json!({}), &cookie).await;
     assert_eq!(v["idioma"], "Navegador", "{v}");

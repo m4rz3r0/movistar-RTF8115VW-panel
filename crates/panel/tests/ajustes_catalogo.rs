@@ -2,15 +2,15 @@
 //! deja editar, el gestor lo admite (no lo bloquea por la IP LAN, por los
 //! secretos de la web básica ni por otra regla de la v1).
 
-mod common;
+mod comun;
 
 use ajustes::{Campo, CatalogoAjustes};
-use common::panel_sin_router;
+use comun::PanelPrueba;
 use panel::changes::{ChangeManager, Tiempos};
 
 #[tokio::test]
 async fn ajustes_escribibles_por_el_gestor() {
-    let p = panel_sin_router().await;
+    let p = PanelPrueba::nuevo().sin_router().arrancar().await;
     let m = ChangeManager::new(p.state.clone(), Tiempos::default());
     let catalogo = CatalogoAjustes::load().unwrap();
     let mut campos = 0;

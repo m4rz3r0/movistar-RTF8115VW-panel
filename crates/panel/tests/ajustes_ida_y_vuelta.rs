@@ -7,13 +7,12 @@
 //! nextest), y con una vigilancia mínima: aquí no se prueba la vigilancia,
 //! que ya cubre `changes.rs`.
 
-mod common;
+mod comun;
 
 use ajustes::{Ajuste, Campo, CatalogoAjustes, Tema, TipoCampo};
-use common::{Panel, esperar_final, esperar_libre, llamar, ok, panel_con_tiempos};
-use panel::changes::Tiempos;
+use comun::{Panel, PanelPrueba, esperar_final, esperar_libre, llamar, ok, tiempos_minimos};
 use serde_json::{Value, json};
-use std::{collections::BTreeMap, sync::LazyLock, time::Duration};
+use std::{collections::BTreeMap, sync::LazyLock};
 
 /// Catálogo de ajustes, cargado una sola vez por proceso.
 static AJUSTES: LazyLock<CatalogoAjustes> = LazyLock::new(|| CatalogoAjustes::load().unwrap());
@@ -21,19 +20,6 @@ static AJUSTES: LazyLock<CatalogoAjustes> = LazyLock::new(|| CatalogoAjustes::lo
 /// Catálogo de funciones del router, cargado una sola vez por proceso.
 static FUNCIONES: LazyLock<catalogo::Catalogo> =
     LazyLock::new(|| catalogo::Catalogo::load().unwrap());
-
-/// Vigilancia mínima del gestor: 20 ms (60 ms en riesgo alto) mirando cada
-/// 5 ms.
-fn tiempos_minimos() -> Tiempos {
-    Tiempos {
-        bajo: Duration::from_millis(20),
-        medio: Duration::from_millis(20),
-        alto: Duration::from_millis(60),
-        intervalo: Duration::from_millis(5),
-        fallos_para_revertir: 3,
-        pausa_max: Duration::from_secs(2),
-    }
-}
 
 /// Valor legible actual del campo `campo` del ajuste `ajuste` según
 /// `leer_tema` (`{"Texto": …}`, `{"Opcion": …}`…).
@@ -215,7 +201,10 @@ fn tapado(c: &Campo) -> bool {
 /// `n` cuenta los campos de todos los temas en el orden del catálogo, como
 /// cuando era una sola prueba: los valores de prueba no cambian.
 async fn ida_y_vuelta(tema: Tema) {
-    let (p, cookie) = panel_con_tiempos(tiempos_minimos()).await;
+    let (p, cookie) = PanelPrueba::nuevo()
+        .tiempos(tiempos_minimos())
+        .arrancar_con_gestor()
+        .await;
     let mut n = 0u32;
     let mut probados = 0u32;
     let mut con_tapado = Vec::new();

@@ -1,10 +1,13 @@
 //! Pruebas del gestor de cambios por grupos de pasos contra `router-sim`,
 //! con tiempos de vigilancia cortos.
 
-mod common;
+mod comun;
 
 use catalogo::Riesgo;
-use common::{Panel, get, panel};
+use comun::{
+    Panel, Registro, esperar_estado, esperar_hasta, esperar_hasta_con, esperar_libre_gestor,
+    gestor, get, panel_rapido, preparado, req, tiempos_rapidos,
+};
 use hgu::read;
 use panel::{
     changes::{
@@ -13,60 +16,12 @@ use panel::{
     },
     poller::{Poller, PollerConfig},
 };
-use std::{
-    collections::BTreeMap,
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{sync::Arc, time::Duration};
 
 const LEASES: &str = "cbDhcpV4SvrPoolSetStatic";
 const POOL: &str = "rtm_cfg_dhcpv4_svr_pool_id";
 const UPNP: &str = "cbSetUpnpCfg";
 const WIFI: &str = "cbSetWifiAccPt";
-
-fn tiempos() -> Tiempos {
-    Tiempos {
-        bajo: Duration::from_millis(300),
-        medio: Duration::from_millis(300),
-        alto: Duration::from_millis(600),
-        intervalo: Duration::from_millis(30),
-        fallos_para_revertir: 3,
-        pausa_max: Duration::from_secs(2),
-    }
-}
-
-async fn panel_rapido(timeout: Duration) -> Panel {
-    let mut p = panel().await;
-    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, common::USER, common::PASS);
-    cfg.timeout = timeout;
-    cfg.min_gap = Duration::from_millis(1);
-    p.state.hgu = hgu::Client::new(cfg);
-    p
-}
-
-async fn gestor(p: &Panel, t: Tiempos) -> Arc<ChangeManager> {
-    let m = ChangeManager::new(p.state.clone(), t);
-    m.reanudar_pendientes().await;
-    m
-}
-
-async fn preparado() -> (Panel, Arc<ChangeManager>) {
-    let p = panel_rapido(Duration::from_millis(500)).await;
-    let m = gestor(&p, tiempos()).await;
-    (p, m)
-}
-
-fn req(funcion: &str, instancia: Option<&str>, valores: &[(&str, &str)]) -> ChangeRequest {
-    ChangeRequest {
-        funcion: funcion.into(),
-        instancia: instancia.map(str::to_owned),
-        valores: valores
-            .iter()
-            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
-            .collect::<BTreeMap<_, _>>(),
-        borrar: false,
-    }
-}
 
 fn paso(r: ChangeRequest, etiqueta: &str) -> Paso {
     Paso {
@@ -103,46 +58,16 @@ fn grupo(pasos: Vec<Paso>) -> GrupoRequest {
     }
 }
 
-async fn esperar_estado(m: &ChangeManager, id: i64, estado: Estado) -> Cambio {
-    let start = Instant::now();
-    loop {
-        let c = m.cambio(id).await.expect("el cambio existe");
-        if c.estado == estado {
-            return c;
-        }
-        assert!(
-            start.elapsed() < Duration::from_secs(10),
-            "el cambio {id} sigue en {:?} (esperado {estado:?}): {:?}",
-            c.estado,
-            c.error
-        );
-        tokio::time::sleep(Duration::from_millis(10)).await;
-    }
-}
-
 /// Espera a que el cambio llegue a un estado final.
 async fn esperar_final(m: &ChangeManager, id: i64) -> Cambio {
-    let start = Instant::now();
-    loop {
+    esperar_hasta_con(Duration::from_secs(10), async || {
         let c = m.cambio(id).await.expect("el cambio existe");
         if !matches!(c.estado, Estado::Aplicando | Estado::Vigilando) {
-            return c;
+            return Ok(c);
         }
-        assert!(
-            start.elapsed() < Duration::from_secs(10),
-            "el cambio {id} sigue en {:?}",
-            c.estado
-        );
-        tokio::time::sleep(Duration::from_millis(10)).await;
-    }
-}
-
-async fn esperar_libre(m: &ChangeManager) {
-    let start = Instant::now();
-    while m.activo().is_some() {
-        assert!(start.elapsed() < Duration::from_secs(10), "sigue activo");
-        tokio::time::sleep(Duration::from_millis(10)).await;
-    }
+        Err(format!("el cambio {id} sigue en {:?}", c.estado))
+    })
+    .await
 }
 
 async fn ip_de_lease0(p: &Panel) -> String {
@@ -216,7 +141,7 @@ async fn grupo_aplica_en_orden_y_verifica() {
     assert_eq!(c.titulo.as_deref(), Some("ajuste-prueba"));
     // El diff del grupo junta los de los pasos.
     assert_eq!(c.diff.campos.len(), 2);
-    esperar_libre(&m).await;
+    esperar_libre_gestor(&m).await;
 }
 
 #[tokio::test]
@@ -289,7 +214,7 @@ async fn vigilancia_revierte_grupo_entero() {
     let t = Tiempos {
         bajo: Duration::from_millis(50),
         medio: Duration::from_secs(5),
-        ..tiempos()
+        ..tiempos_rapidos()
     };
     let m = gestor(&p, t).await;
     let prep = m
@@ -312,7 +237,7 @@ async fn vigilancia_revierte_grupo_entero() {
         estados_pasos(&c),
         [EstadoPaso::Revertido, EstadoPaso::Revertido]
     );
-    esperar_libre(&m).await;
+    esperar_libre_gestor(&m).await;
 }
 
 #[tokio::test]
@@ -324,7 +249,7 @@ async fn deshacer_grupo() {
         .unwrap();
     let id = m.confirmar_grupo(&prep.token, &[], "admin").await.unwrap();
     esperar_estado(&m, id, Estado::Aplicado).await;
-    esperar_libre(&m).await;
+    esperar_libre_gestor(&m).await;
     assert!(m.se_puede_deshacer(id).await);
 
     let d = m.deshacer(id).await.unwrap();
@@ -339,7 +264,7 @@ async fn deshacer_grupo() {
     assert_eq!(escritas(&p), [UPNP, LEASES, LEASES, UPNP]);
     assert_eq!(upnp_actual(&p).await, "0");
     assert_eq!(ip_de_lease0(&p).await, "192.168.1.68");
-    esperar_libre(&m).await;
+    esperar_libre_gestor(&m).await;
     assert!(!m.se_puede_deshacer(id).await, "ya deshecho");
 }
 
@@ -348,7 +273,7 @@ async fn reanuda_grupo_a_medias() {
     let p = panel_rapido(Duration::from_millis(500)).await;
     let lento = Tiempos {
         bajo: Duration::from_secs(60),
-        ..tiempos()
+        ..tiempos_rapidos()
     };
     let a = gestor(&p, lento).await;
     let prep = a
@@ -361,18 +286,17 @@ async fn reanuda_grupo_a_medias() {
     let a2 = a.clone();
     let token = prep.token.clone();
     let tarea = tokio::spawn(async move { a2.confirmar_grupo(&token, &[], "admin").await });
-    let start = Instant::now();
-    while p.sim.control.writes().len() < 2 {
-        assert!(start.elapsed() < Duration::from_secs(5), "sin paso 2");
-        tokio::time::sleep(Duration::from_millis(5)).await;
-    }
+    esperar_hasta(Duration::from_secs(5), "sin paso 2", async || {
+        p.sim.control.writes().len() >= 2
+    })
+    .await;
     tokio::time::sleep(Duration::from_millis(100)).await;
     a.detener();
     tarea.abort();
     let id = a.historial(1).await.remove(0).id;
     p.sim.control.set_unresponsive(false);
 
-    let b = ChangeManager::new(p.state.clone(), tiempos());
+    let b = ChangeManager::new(p.state.clone(), tiempos_rapidos());
     b.reanudar_pendientes().await;
     let c = esperar_final(&b, id).await;
     let (upnp, ip) = (upnp_actual(&p).await, ip_de_lease0(&p).await);
@@ -383,14 +307,14 @@ async fn reanuda_grupo_a_medias() {
         }
         e => panic!("estado {e:?}: {:?}", c.error),
     }
-    esperar_libre(&b).await;
+    esperar_libre_gestor(&b).await;
 }
 
 /// Interrumpido antes de escribir el paso 2: al retomar se revierte el 1.
 #[tokio::test]
 async fn reanuda_grupo_sin_terminar_revierte_lo_escrito() {
     let p = panel_rapido(Duration::from_millis(500)).await;
-    let a = gestor(&p, tiempos()).await;
+    let a = gestor(&p, tiempos_rapidos()).await;
     let prep = a
         .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.80")]))
         .await
@@ -400,11 +324,10 @@ async fn reanuda_grupo_sin_terminar_revierte_lo_escrito() {
     let a2 = a.clone();
     let token = prep.token.clone();
     let tarea = tokio::spawn(async move { a2.confirmar_grupo(&token, &[], "admin").await });
-    let start = Instant::now();
-    while p.sim.control.writes().is_empty() {
-        assert!(start.elapsed() < Duration::from_secs(5), "sin paso 1");
-        tokio::time::sleep(Duration::from_millis(5)).await;
-    }
+    esperar_hasta(Duration::from_secs(5), "sin paso 1", async || {
+        !p.sim.control.writes().is_empty()
+    })
+    .await;
     tokio::time::sleep(Duration::from_millis(100)).await;
     a.detener();
     tarea.abort();
@@ -413,7 +336,7 @@ async fn reanuda_grupo_sin_terminar_revierte_lo_escrito() {
     assert_eq!(antes.pasos[1].estado, EstadoPaso::Pendiente);
     p.sim.control.set_unresponsive(false);
 
-    let b = ChangeManager::new(p.state.clone(), tiempos());
+    let b = ChangeManager::new(p.state.clone(), tiempos_rapidos());
     b.reanudar_pendientes().await;
     let c = esperar_final(&b, id).await;
     assert_eq!(c.estado, Estado::Fallido, "{:?}", c.error);
@@ -421,7 +344,7 @@ async fn reanuda_grupo_sin_terminar_revierte_lo_escrito() {
     assert_eq!(ip_de_lease0(&p).await, "192.168.1.68");
     assert_eq!(escritas(&p), [UPNP, UPNP]);
     assert_eq!(c.pasos[0].estado, EstadoPaso::Revertido);
-    esperar_libre(&b).await;
+    esperar_libre_gestor(&b).await;
 }
 
 #[tokio::test]
@@ -456,7 +379,7 @@ async fn pasos_sin_cambio_y_desmarcados_se_omiten() {
             EstadoPaso::Omitido
         ]
     );
-    esperar_libre(&m).await;
+    esperar_libre_gestor(&m).await;
 
     // Todo desmarcado: nada que hacer, nada guardado.
     let prep = m
@@ -502,13 +425,12 @@ async fn sin_respuesta_con_otros_valores_se_revierte() {
     let m2 = m.clone();
     let token = prep.token.clone();
     let tarea = tokio::spawn(async move { m2.confirmar(&token, None, "admin").await });
-    let start = Instant::now();
-    while p.sim.control.writes().is_empty() {
-        assert!(start.elapsed() < Duration::from_secs(5), "sin escritura");
-        tokio::time::sleep(Duration::from_millis(5)).await;
-    }
+    esperar_hasta(Duration::from_secs(5), "sin escritura", async || {
+        !p.sim.control.writes().is_empty()
+    })
+    .await;
     // Mientras el panel espera, otro cambia la reserva a un tercer valor.
-    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, common::USER, common::PASS);
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, comun::USER, comun::PASS);
     cfg.min_gap = Duration::from_millis(1);
     let otro = hgu::Client::new(cfg);
     otro.write(
@@ -547,16 +469,15 @@ async fn pausa_se_suelta_en_relectura() {
             ..PollerConfig::default()
         },
     );
-    let start = Instant::now();
-    while !sondeo.healthy() {
-        assert!(start.elapsed() < Duration::from_secs(5), "sondeo sin datos");
-        tokio::time::sleep(Duration::from_millis(10)).await;
-    }
+    esperar_hasta(Duration::from_secs(5), "sondeo sin datos", async || {
+        sondeo.healthy()
+    })
+    .await;
     // La relectura se reintentaría durante un minuto.
     let lento = Tiempos {
         bajo: Duration::from_secs(60),
         intervalo: Duration::from_millis(50),
-        ..tiempos()
+        ..tiempos_rapidos()
     };
     let m = gestor(&p, lento).await;
     let prep = m.preparar(lease0("192.168.1.80").req).await.unwrap();
@@ -565,28 +486,22 @@ async fn pausa_se_suelta_en_relectura() {
     let m2 = m.clone();
     let token = prep.token.clone();
     tokio::spawn(async move { m2.confirmar(&token, None, "admin").await });
-    let start = Instant::now();
-    while p.sim.control.writes().is_empty() {
-        assert!(start.elapsed() < Duration::from_secs(5), "sin escritura");
-        tokio::time::sleep(Duration::from_millis(5)).await;
-    }
+    esperar_hasta(Duration::from_secs(5), "sin escritura", async || {
+        !p.sim.control.writes().is_empty()
+    })
+    .await;
     // Escritura (300 ms) + primera relectura (300 ms) + dos ciclos del
     // sondeo (cada uno agota su espera de 300 ms).
     let limite = Duration::from_millis(2500);
-    let start = Instant::now();
-    loop {
-        let body = common::body_text(get(&p.app, "/salud").await).await;
+    esperar_hasta_con(limite, async || {
+        let body = comun::body_text(get(&p.app, "/salud").await).await;
         let v: serde_json::Value = serde_json::from_str(&body).unwrap();
         if v["router"] == "error" {
-            break;
+            return Ok(());
         }
-        assert!(
-            start.elapsed() < limite,
-            "/salud sigue congelado en {:?}",
-            v["router"]
-        );
-        tokio::time::sleep(Duration::from_millis(20)).await;
-    }
+        Err(format!("/salud sigue congelado en {:?}", v["router"]))
+    })
+    .await;
     p.sim.control.set_unresponsive(false);
     m.detener();
 }
@@ -707,14 +622,12 @@ fn confirmar_en_segundo_plano(
 }
 
 async fn esperar_escrituras(p: &Panel, n: usize) {
-    let start = Instant::now();
-    while p.sim.control.writes().len() < n {
-        assert!(
-            start.elapsed() < Duration::from_secs(5),
-            "sin escritura {n}"
-        );
-        tokio::time::sleep(Duration::from_millis(5)).await;
-    }
+    esperar_hasta(
+        Duration::from_secs(5),
+        &format!("sin escritura {n}"),
+        async || p.sim.control.writes().len() >= n,
+    )
+    .await;
 }
 
 /// En un grupo, una creación sin respuesta tras la que el router no muestra
@@ -750,7 +663,7 @@ async fn creacion_incierta_en_grupo_es_revertido_parcial() {
 #[tokio::test]
 async fn credenciales_durante_la_reanudacion_no_cierran_el_grupo() {
     let p = panel_rapido(Duration::from_millis(500)).await;
-    let a = gestor(&p, tiempos()).await;
+    let a = gestor(&p, tiempos_rapidos()).await;
     let prep = a
         .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.80")]))
         .await
@@ -773,7 +686,7 @@ async fn credenciales_durante_la_reanudacion_no_cierran_el_grupo() {
             .with_ansi(false)
             .finish(),
     );
-    let b = ChangeManager::new(p.state.clone(), tiempos());
+    let b = ChangeManager::new(p.state.clone(), tiempos_rapidos());
     // Guardar credenciales ganó la carrera: tiene el hueco.
     let credenciales = b.excluir_cambios().unwrap();
     let b2 = b.clone();
@@ -801,7 +714,7 @@ async fn credenciales_durante_la_reanudacion_no_cierran_el_grupo() {
     assert_eq!(c.estado, Estado::Fallido, "{:?}", c.error);
     assert_eq!(upnp_actual(&p).await, "0");
     assert_eq!(escritas(&p), [UPNP, UPNP]);
-    esperar_libre(&b).await;
+    esperar_libre_gestor(&b).await;
     assert!(b.excluir_cambios().is_ok(), "retomado: ya se puede");
 }
 
@@ -816,7 +729,7 @@ async fn deshacer_revertido_en_parte_no_se_repite() {
         .unwrap();
     let id = m.confirmar_grupo(&prep.token, &[], "admin").await.unwrap();
     esperar_estado(&m, id, Estado::Aplicado).await;
-    esperar_libre(&m).await;
+    esperar_libre_gestor(&m).await;
     let d = m.deshacer(id).await.unwrap();
     // Falla el paso 2 del deshacer (UPnP) y la reversión de su paso 1.
     p.sim.control.fail_write_n(2);
@@ -837,7 +750,7 @@ async fn deshacer_revertido_en_parte_no_se_repite() {
 #[tokio::test]
 async fn reanuda_a_mitad_de_revertir() {
     let p = panel_rapido(Duration::from_millis(500)).await;
-    let a = gestor(&p, tiempos()).await;
+    let a = gestor(&p, tiempos_rapidos()).await;
     let prep = a
         .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.80"), ssid("OTRA")]))
         .await
@@ -853,7 +766,7 @@ async fn reanuda_a_mitad_de_revertir() {
     assert_eq!(a.cambio(id).await.unwrap().estado, Estado::Aplicando);
     p.sim.control.set_unresponsive(false);
 
-    let b = ChangeManager::new(p.state.clone(), tiempos());
+    let b = ChangeManager::new(p.state.clone(), tiempos_rapidos());
     b.reanudar_pendientes().await;
     let c = esperar_final(&b, id).await;
     assert_eq!(c.estado, Estado::Fallido, "{:?}", c.error);
@@ -868,7 +781,7 @@ async fn reanuda_a_mitad_de_revertir() {
             EstadoPaso::Fallido
         ]
     );
-    esperar_libre(&b).await;
+    esperar_libre_gestor(&b).await;
 }
 
 /// Cortado mientras se vigilaba un grupo; al retomar la WAN cae: se
@@ -878,7 +791,7 @@ async fn reanuda_vigilancia_de_grupo_y_revierte_si_cae_la_wan() {
     let p = panel_rapido(Duration::from_millis(500)).await;
     let lento = Tiempos {
         bajo: Duration::from_secs(60),
-        ..tiempos()
+        ..tiempos_rapidos()
     };
     let a = gestor(&p, lento).await;
     let prep = a
@@ -889,7 +802,7 @@ async fn reanuda_vigilancia_de_grupo_y_revierte_si_cae_la_wan() {
     assert_eq!(a.cambio(id).await.unwrap().estado, Estado::Vigilando);
     a.detener();
 
-    let b = ChangeManager::new(p.state.clone(), tiempos());
+    let b = ChangeManager::new(p.state.clone(), tiempos_rapidos());
     b.reanudar_pendientes().await;
     assert_eq!(b.activo(), Some(id));
     p.sim.control.set_wan_up(false);
@@ -898,7 +811,7 @@ async fn reanuda_vigilancia_de_grupo_y_revierte_si_cae_la_wan() {
     assert_eq!(upnp_actual(&p).await, "0");
     assert_eq!(ip_de_lease0(&p).await, "192.168.1.68");
     assert_eq!(escritas(&p), [UPNP, LEASES, LEASES, UPNP]);
-    esperar_libre(&b).await;
+    esperar_libre_gestor(&b).await;
 }
 
 /// Un paso sin verificar cuya reversión falló sigue pendiente de revertir
@@ -906,7 +819,7 @@ async fn reanuda_vigilancia_de_grupo_y_revierte_si_cae_la_wan() {
 #[tokio::test]
 async fn reversion_fallida_sigue_pendiente_al_retomar() {
     let p = panel_rapido(Duration::from_millis(500)).await;
-    let a = gestor(&p, tiempos()).await;
+    let a = gestor(&p, tiempos_rapidos()).await;
     let prep = a
         .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.80")]))
         .await
@@ -917,54 +830,21 @@ async fn reversion_fallida_sigue_pendiente_al_retomar() {
     let tarea = confirmar_en_segundo_plano(&a, &prep.token);
     esperar_escrituras(&p, 2).await;
     let id = a.historial(1).await.remove(0).id;
-    let start = Instant::now();
-    while a.cambio(id).await.unwrap().pasos[1].error.is_none() {
-        assert!(
-            start.elapsed() < Duration::from_secs(5),
-            "sin fallo del paso 2"
-        );
-        tokio::time::sleep(Duration::from_millis(10)).await;
-    }
+    esperar_hasta(Duration::from_secs(5), "sin fallo del paso 2", async || {
+        a.cambio(id).await.unwrap().pasos[1].error.is_some()
+    })
+    .await;
     tokio::time::sleep(Duration::from_millis(100)).await;
     a.detener();
     tarea.abort();
     assert_eq!(a.cambio(id).await.unwrap().estado, Estado::Aplicando);
     p.sim.control.set_unresponsive(false);
 
-    let b = ChangeManager::new(p.state.clone(), tiempos());
+    let b = ChangeManager::new(p.state.clone(), tiempos_rapidos());
     b.reanudar_pendientes().await;
     let c = esperar_final(&b, id).await;
     assert_eq!(c.estado, Estado::Fallido, "{:?}", c.error);
     assert_eq!(upnp_actual(&p).await, "0");
     assert_eq!(ip_de_lease0(&p).await, "192.168.1.68", "el paso 2 también");
-    esperar_libre(&b).await;
-}
-
-/// Destino del registro en memoria, para comprobar lo que se anota.
-#[derive(Clone, Default)]
-struct Registro(Arc<std::sync::Mutex<Vec<u8>>>);
-
-impl Registro {
-    fn texto(&self) -> String {
-        String::from_utf8_lossy(&self.0.lock().unwrap()).into_owned()
-    }
-}
-
-impl std::io::Write for Registro {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.0.lock().unwrap().extend_from_slice(buf);
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
-impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Registro {
-    type Writer = Registro;
-
-    fn make_writer(&'a self) -> Registro {
-        self.clone()
-    }
+    esperar_libre_gestor(&b).await;
 }
