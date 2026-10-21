@@ -132,9 +132,28 @@ term) kill -TERM $$ ;;
 esac
 DRV
 sed -i 's/^die() .*/die() { echo "ERROR: $*" >\&2; exit 1; }/' "$TMP/drv.sh"
+# Una señal que llega ya ignorada (con nohup, o lanzando las pruebas en
+# segundo plano desde un sh no interactivo, que ignora SIGINT) no se puede
+# volver a capturar en sh: el trap no hace nada y el modo de esa señal
+# fallaría sin que el guion tenga culpa. Se comprueba antes y se salta.
+senal_capturable()
+{
+	rc=0
+	sh -c "trap 'exit 7' $1; kill -$1 \$\$; exit 0" >/dev/null 2>&1 || rc=$?
+	[ "$rc" = 7 ]
+}
 for par in ok:0 falla:3 diez:10 doble:1 hup:1 int:1 term:1 mktemp:1; do
 	modo=${par%:*}
 	esperado=${par#*:}
+	case $modo in
+	hup | int | term)
+		senal=$(printf '%s' "$modo" | tr '[:lower:]' '[:upper:]')
+		if ! senal_capturable "$senal"; then
+			echo "aviso: SIG$senal llega ignorada (nohup o segundo plano); no se prueba plantillas_de_root ($modo)" >&2
+			continue
+		fi
+		;;
+	esac
 	rm -f "$TMP/ruta" "$TMP/ruta.modo"
 	rc=0
 	TMPDIR=$DEPLOY sh "$TMP/drv.sh" "$TMP/pdr.sh" "$modo" "$TMP/ruta" >/dev/null 2>&1 || rc=$?

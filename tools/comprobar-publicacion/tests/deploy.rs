@@ -15,12 +15,20 @@ fn raiz() -> PathBuf {
 }
 
 /// Ejecuta `deploy/pruebas/<guion>` y falla con su salida si no sale con 0.
+/// Los avisos del guion (lo que no ha podido probar, p. ej. una señal que
+/// llega ignorada) salen siempre por la salida de error de la prueba.
 fn ejecutar(guion: &str) {
     let salida = Command::new("sh")
         .arg(raiz().join("deploy/pruebas").join(guion))
         .env("COMPROBAR", env!("CARGO_BIN_EXE_comprobar-publicacion"))
         .output()
         .expect("no se puede ejecutar sh");
+    for aviso in String::from_utf8_lossy(&salida.stderr)
+        .lines()
+        .filter(|l| l.starts_with("aviso:"))
+    {
+        eprintln!("{guion}: {aviso}");
+    }
     assert!(
         salida.status.success(),
         "{guion} falla:\n{}{}",
