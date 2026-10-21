@@ -328,7 +328,7 @@ pub(crate) mod servidor {
                 return Err(Fallo::NoGuardada { restaurada });
             }
             drop(sesion);
-            state.hgu.reconfigurar(c.client_config()).await;
+            state.hgu.reconfigurar(c.client_config(&state.cfg)).await;
             state.poller.despertar();
             tracing::info!("contraseña del router cambiada: el panel ya entra con la nueva");
             return Ok(());

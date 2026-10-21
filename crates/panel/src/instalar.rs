@@ -514,7 +514,7 @@ pub(crate) mod servidor {
 
     /// Entra en el router con esas credenciales, lee `cbGetSummary` y sale.
     pub(crate) async fn probar(
-        _state: &AppState,
+        state: &AppState,
         url: &str,
         usuario: &str,
         contrasena: &str,
@@ -529,7 +529,7 @@ pub(crate) mod servidor {
             usuario: usuario.to_owned(),
             contrasena: contrasena.to_owned(),
         };
-        let cliente = hgu::Client::new(c.client_config());
+        let cliente = hgu::Client::new(c.client_config(&state.cfg));
         let resumen = hgu::read::summary(&cliente).await;
         cliente.logout().await;
         let s = resumen.map_err(|e| {
@@ -567,7 +567,7 @@ pub(crate) mod servidor {
         instancia::guardar_credenciales(&state.db, &state.history_key, &c)
             .await
             .map_err(interno)?;
-        state.hgu.reconfigurar(c.client_config()).await;
+        state.hgu.reconfigurar(c.client_config(&state.cfg)).await;
         // Otro router puede tener otra conexión a internet.
         instancia::detectar_sin_esperar_mucho(state, instancia::ESPERA_DETECCION).await;
         state.poller.despertar();

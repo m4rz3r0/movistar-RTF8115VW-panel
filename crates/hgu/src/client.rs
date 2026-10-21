@@ -22,6 +22,9 @@ use tokio::{
 /// larga no los deja sin turno. Un tema de Ajustes hace hasta 5.
 pub const LECTURAS_POR_TURNO: usize = 6;
 
+/// Pausa mínima de serie entre peticiones consecutivas al router.
+pub const PAUSA_MINIMA: Duration = Duration::from_millis(150);
+
 /// Configuración del cliente.
 #[derive(Clone)]
 pub struct ClientConfig {
@@ -33,7 +36,8 @@ pub struct ClientConfig {
     pub password: String,
     /// Tiempo máximo por petición (por defecto 15 s).
     pub timeout: Duration,
-    /// Pausa mínima entre peticiones consecutivas (por defecto 150 ms).
+    /// Pausa mínima entre peticiones consecutivas (por defecto
+    /// [`PAUSA_MINIMA`], 150 ms).
     pub min_gap: Duration,
 }
 
@@ -45,7 +49,7 @@ impl ClientConfig {
             user: user.to_owned(),
             password: password.to_owned(),
             timeout: Duration::from_secs(15),
-            min_gap: Duration::from_millis(150),
+            min_gap: PAUSA_MINIMA,
         }
     }
 }

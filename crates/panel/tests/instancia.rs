@@ -279,3 +279,17 @@ async fn estado_muestra_router_sin_configurar() {
         "{html}"
     );
 }
+
+/// El cliente que deja el arranque usa la pausa entre peticiones de la
+/// configuración (1 ms en las pruebas), no la de serie (150 ms): 20
+/// lecturas seguidas tardarían al menos 3 s con la de serie.
+#[tokio::test]
+async fn el_arranque_usa_la_pausa_de_la_configuracion() {
+    let p = common::panel().await;
+    let inicio = Instant::now();
+    for _ in 0..20 {
+        hgu::read::summary(&p.state.hgu).await.unwrap();
+    }
+    let tarda = inicio.elapsed();
+    assert!(tarda < Duration::from_millis(1500), "{tarda:?}");
+}

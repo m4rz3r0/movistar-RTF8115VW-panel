@@ -128,7 +128,8 @@ async fn panel_sin_router_con(ajustar: impl FnOnce(&mut Config), sim: SimConfig)
 }
 
 /// Configuración del panel con la base de datos y la clave en `dir`, sin
-/// variables del router, con el proxy de confianza `127.0.0.1`.
+/// variables del router, con el proxy de confianza `127.0.0.1` y 1 ms entre
+/// peticiones al simulador (en vez de 150 ms).
 pub fn config_en(dir: &Path) -> Config {
     Config {
         listen: "127.0.0.1:0".parse().unwrap(),
@@ -140,6 +141,7 @@ pub fn config_en(dir: &Path) -> Config {
         trusted_proxies: redes::lista("127.0.0.1").unwrap(),
         public_origins: vec![ORIGIN.into()],
         install_nets: Vec::new(),
+        router_min_gap: Duration::from_millis(1),
     }
 }
 
@@ -302,7 +304,7 @@ async fn gestor_y_sesion(p: Panel) -> (Panel, String) {
 async fn gestor_y_sesion_con(mut p: Panel, t: Tiempos) -> (Panel, String) {
     let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, USER, PASS);
     cfg.timeout = Duration::from_millis(500);
-    cfg.min_gap = Duration::from_millis(1);
+    cfg.min_gap = p.state.cfg.router_min_gap;
     p.state.hgu = hgu::Client::new(cfg);
     // Un solo cliente del router para las server functions y el gestor.
     p.app = panel::build_router(p.state.clone());

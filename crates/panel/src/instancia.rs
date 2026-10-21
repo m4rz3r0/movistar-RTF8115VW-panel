@@ -54,9 +54,14 @@ impl std::fmt::Debug for CredencialesRouter {
 }
 
 impl CredencialesRouter {
-    /// Configuración del cliente del router con los tiempos por defecto.
-    pub fn client_config(&self) -> hgu::ClientConfig {
-        hgu::ClientConfig::new(&self.url, &self.usuario, &self.contrasena)
+    /// Configuración del cliente del router con los tiempos por defecto,
+    /// salvo la pausa entre peticiones, que sale de `cfg`
+    /// ([`config::Config::router_min_gap`]).
+    pub fn client_config(&self, cfg: &config::Config) -> hgu::ClientConfig {
+        hgu::ClientConfig {
+            min_gap: cfg.router_min_gap,
+            ..hgu::ClientConfig::new(&self.url, &self.usuario, &self.contrasena)
+        }
     }
 }
 
@@ -383,7 +388,7 @@ pub async fn arrancar_router(state: &AppState) -> Result<(), String> {
     }
     if let Some(c) = leer_credenciales(&state.db, &state.history_key).await? {
         tracing::info!("router: credenciales de la base de datos");
-        state.hgu.reconfigurar(c.client_config()).await;
+        state.hgu.reconfigurar(c.client_config(cfg)).await;
         detectar_al_arrancar(state).await;
         return Ok(());
     }
@@ -399,7 +404,7 @@ pub async fn arrancar_router(state: &AppState) -> Result<(), String> {
                 "router: credenciales importadas del entorno (RP_ROUTER_URL, RP_ROUTER_USER, \
                  RP_ROUTER_SECRET) a la base de datos; a partir de ahora mandan las guardadas"
             );
-            state.hgu.reconfigurar(c.client_config()).await;
+            state.hgu.reconfigurar(c.client_config(cfg)).await;
             detectar_al_arrancar(state).await;
         }
         _ => tracing::info!("router: sin configurar"),
