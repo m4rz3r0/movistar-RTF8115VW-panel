@@ -166,17 +166,18 @@ impl ChangeManager {
         &self,
         id: i64,
         estado: Estado,
-        error: Option<&str>,
+        error: Option<&Nota>,
         nota: Option<&Nota>,
     ) {
         let nota = nota.map(Nota::guardar);
+        let guardado = error.map(Nota::guardar);
         let r = sqlx::query(
             "UPDATE changes SET estado = ?, updated = ?, error = COALESCE(?, error), \
              nota = COALESCE(?, nota) WHERE id = ?",
         )
         .bind(estado.as_str())
         .bind(series::now())
-        .bind(error)
+        .bind(guardado.as_deref())
         .bind(nota.as_deref())
         .bind(id)
         .execute(&self.state.db)
@@ -185,7 +186,12 @@ impl ChangeManager {
             tracing::error!(cambio = id, "no se puede guardar el estado {estado:?}: {e}");
         }
         match error {
-            Some(e) => tracing::warn!(cambio = id, estado = estado.as_str(), "{e}"),
+            Some(e) => tracing::warn!(
+                cambio = id,
+                estado = estado.as_str(),
+                "{}",
+                e.para_registro()
+            ),
             None => tracing::info!(
                 cambio = id,
                 estado = estado.as_str(),
@@ -203,14 +209,15 @@ impl ChangeManager {
         id: i64,
         orden: usize,
         estado: EstadoPaso,
-        error: Option<&str>,
+        error: Option<&Nota>,
     ) {
+        let error = error.map(Nota::guardar);
         let r = sqlx::query(
             "UPDATE cambio_pasos SET estado = ?, error = COALESCE(?, error) \
              WHERE cambio_id = ? AND orden = ?",
         )
         .bind(estado.as_str())
-        .bind(error)
+        .bind(error.as_deref())
         .bind(id)
         .bind(orden as i64)
         .execute(&self.state.db)

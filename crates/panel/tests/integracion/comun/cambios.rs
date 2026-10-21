@@ -152,3 +152,15 @@ pub async fn esperar_estado(m: &ChangeManager, id: i64, estado: Estado) -> Cambi
     })
     .await
 }
+
+/// Un error o una nota guardados por el gestor, en castellano y con lo
+/// técnico entre corchetes (para comprobar su contenido; las filas antiguas,
+/// tal cual).
+pub fn legible(guardado: &str) -> String {
+    use panel::changes::Nota;
+    let es = Nota::texto(guardado, i18n::Idioma::Es);
+    match Nota::detalle(guardado, i18n::Idioma::Es) {
+        Some(d) => format!("{es} [{d}]"),
+        None => es,
+    }
+}

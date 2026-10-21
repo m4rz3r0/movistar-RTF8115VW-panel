@@ -63,7 +63,7 @@ async fn reanuda_y_marca_fallido_si_no_llego_a_aplicarse() {
     b.reanudar_pendientes().await;
     let c = b.cambio(id).await.unwrap();
     assert_eq!(c.estado, Estado::Fallido);
-    assert!(c.error.unwrap().contains("interrumpido antes de aplicar"));
+    assert!(crate::comun::legible(&c.error.unwrap()).contains("interrumpido antes de aplicar"));
     assert_eq!(b.activo(), None);
 }
 
@@ -84,7 +84,7 @@ async fn reanuda_con_la_wan_de_antes_del_cambio() {
     let b = ChangeManager::new(p.state.clone(), tiempos_rapidos());
     b.reanudar_pendientes().await;
     let c = esperar_estado(&b, id, Estado::Revertido).await;
-    assert!(c.error.unwrap().contains("WAN"));
+    assert!(crate::comun::legible(&c.error.unwrap()).contains("WAN"));
     assert_eq!(ip_de_lease(&p, "0").await.as_deref(), Some("192.168.1.68"));
 }
 

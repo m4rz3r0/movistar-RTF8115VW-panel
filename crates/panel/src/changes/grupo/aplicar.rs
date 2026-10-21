@@ -271,9 +271,17 @@ impl ChangeManager {
                     Err(fallo) => {
                         // Las reversiones pausan el sondeo en cada intento.
                         drop(pausa.take());
-                        let funcion = &p.pasos[i].req.funcion;
+                        let paso = &p.pasos[i];
                         return Err(self
-                            .fallo_en_paso(id, i, funcion, None, fallo, escritos, multi)
+                            .fallo_en_paso(
+                                id,
+                                i,
+                                (&paso.req.funcion, paso.etiqueta.as_deref()),
+                                None,
+                                fallo,
+                                escritos,
+                                multi,
+                            )
                             .await);
                     }
                 },
@@ -296,8 +304,17 @@ impl ChangeManager {
                 Err(fallo) => {
                     drop(pausa.take());
                     let funcion = plan.funcion.name.clone();
+                    let etiqueta = p.pasos[i].etiqueta.as_deref();
                     return Err(self
-                        .fallo_en_paso(id, i, &funcion, Some(plan), fallo, escritos, multi)
+                        .fallo_en_paso(
+                            id,
+                            i,
+                            (&funcion, etiqueta),
+                            Some(plan),
+                            fallo,
+                            escritos,
+                            multi,
+                        )
                         .await);
                 }
             }

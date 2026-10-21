@@ -26,26 +26,33 @@ impl ChangeManager {
     /// pudo quedar aplicado) y deja el grupo `fallido` o, si alguna
     /// reversión no se verifica, `revertido_parcial` (en un grupo de un
     /// paso, `fallido`). Devuelve el error para quien confirmó.
+    ///
+    /// `(funcion, etiqueta)`: la función del paso (solo para el registro) y
+    /// la clave de su nombre, que es lo que dice el Historial.
     #[allow(clippy::too_many_arguments)]
     pub(super) async fn fallo_en_paso(
         &self,
         id: i64,
         k: usize,
-        funcion: &str,
+        (funcion, etiqueta): (&str, Option<&str>),
         plan: Option<Plan>,
         fallo: FalloPaso,
         mut escritos: Vec<PasoEscrito>,
         multi: bool,
     ) -> CambioError {
-        let texto = match &fallo.error {
-            CambioError::Verificacion(v) => v.join("; "),
-            e => e.to_string(),
-        };
+        let texto = Nota::de_error(&fallo.error);
         let texto = if multi {
-            format!("{}: {texto}", nombre_paso(k, funcion))
+            texto.del_paso_nombrado(k, etiqueta)
         } else {
             texto
         };
+        tracing::warn!(
+            cambio = id,
+            paso = k + 1,
+            funcion,
+            "paso fallido: {}",
+            texto.para_registro()
+        );
         match plan {
             Some(plan) if fallo.revertir => escritos.push(PasoEscrito {
                 orden: k,
@@ -61,27 +68,21 @@ impl ChangeManager {
             self.marcar(id, Estado::Fallido, Some(&texto), None).await;
             return fallo.error;
         }
-        tracing::warn!(cambio = id, "{texto}; revirtiendo lo aplicado");
+        tracing::warn!(cambio = id, "revirtiendo lo aplicado");
         let fallos = self.revertir_pasos(id, &escritos).await;
         let (estado, e) = if fallos.is_empty() {
-            (
-                Estado::Fallido,
-                format!("{texto}; revertido a los valores anteriores"),
-            )
+            (Estado::Fallido, texto.y(Nota::clave(nota::ERROR_REVERTIDO)))
         } else {
             let estado = if multi {
                 Estado::RevertidoParcial
             } else {
                 Estado::Fallido
             };
-            (
-                estado,
-                format!("{texto}; {}", detalle_reversion(multi, &fallos)),
-            )
+            (estado, texto.y(detalle_reversion(multi, &fallos)))
         };
         self.marcar(id, estado, Some(&e), None).await;
         self.cerrar_sin_revertir(id, &escritos, &fallos).await;
-        CambioError::Router(e)
+        CambioError::Router(e.para_registro())
     }
 
     /// Revierte `pasos` en orden inverso y marca cada uno. Devuelve los que
@@ -108,8 +109,7 @@ impl ChangeManager {
                     } else {
                         EstadoPaso::Aplicando
                     };
-                    self.marcar_paso(id, p.orden, estado, Some(&e.to_string()))
-                        .await;
+                    self.marcar_paso(id, p.orden, estado, Some(&e.nota())).await;
                     fallos.push((p.orden, p.plan.funcion.name.clone(), e));
                 }
             }
@@ -199,12 +199,12 @@ impl ChangeManager {
                             .iter()
                             .any(|p| p.plan.operacion == Operacion::Accion) =>
                     {
-                        let e = format!("{motivo}; una acción no se puede revertir");
+                        let e = motivo.y(Nota::clave(nota::ERROR_ACCION));
                         self.marcar(id, Estado::Fallido, Some(&e), nota.as_ref())
                             .await;
                     }
                     Err(motivo) => {
-                        self.revertir_grupo(&ej, &motivo, nota.as_ref(), Estado::Revertido)
+                        self.revertir_grupo(&ej, motivo, nota.as_ref(), Estado::Revertido)
                             .await
                     }
                 }
@@ -214,11 +214,11 @@ impl ChangeManager {
 
     /// Revierte el grupo entero en orden inverso: `ok` si todo vuelve; si
     /// no, `revertido_parcial` (o `fallido` con un solo paso).
-    async fn revertir_grupo(&self, ej: &Ejecucion, motivo: &str, nota: Option<&Nota>, ok: Estado) {
-        tracing::warn!(cambio = ej.id, "{motivo}; revirtiendo");
+    async fn revertir_grupo(&self, ej: &Ejecucion, motivo: Nota, nota: Option<&Nota>, ok: Estado) {
+        tracing::warn!(cambio = ej.id, "{}; revirtiendo", motivo.para_registro());
         let fallos = self.revertir_pasos(ej.id, &ej.pasos).await;
         if fallos.is_empty() {
-            let e = format!("{motivo}; revertido a los valores anteriores");
+            let e = motivo.y(Nota::clave(nota::ERROR_REVERTIDO));
             self.marcar(ej.id, ok, Some(&e), nota).await;
         } else {
             let estado = if ej.multi {
@@ -226,7 +226,7 @@ impl ChangeManager {
             } else {
                 Estado::Fallido
             };
-            let e = format!("{motivo}; {}", detalle_reversion(ej.multi, &fallos));
+            let e = motivo.y(detalle_reversion(ej.multi, &fallos));
             self.marcar(ej.id, estado, Some(&e), nota).await;
             self.cerrar_sin_revertir(ej.id, &ej.pasos, &fallos).await;
         }
@@ -322,11 +322,11 @@ impl ChangeManager {
         }
         let m = self.clone();
         let h = tokio::spawn(async move {
-            let motivo = "interrumpido por un reinicio del panel antes de terminar";
+            let motivo = || Nota::clave(nota::ERROR_INTERRUMPIDO);
             let mut fallos = m.revertir_pasos(id, &escritos).await;
             fallos.extend(sin_plan);
             if fallos.is_empty() && escritos.is_empty() {
-                let e = format!("{motivo}; no quedó ningún paso aplicado");
+                let e = motivo().y(Nota::clave(nota::ERROR_NINGUN_PASO));
                 m.marcar(id, Estado::Fallido, Some(&e), None).await;
             } else if fallos.is_empty() {
                 // Cortado mientras se vigilaba: como una vigilancia fallida.
@@ -335,10 +335,10 @@ impl ChangeManager {
                 } else {
                     Estado::Revertido
                 };
-                let e = format!("{motivo}; revertido a los valores anteriores");
+                let e = motivo().y(Nota::clave(nota::ERROR_REVERTIDO));
                 m.marcar(id, ok, Some(&e), None).await;
             } else {
-                let e = format!("{motivo}; {}", detalle_reversion(true, &fallos));
+                let e = motivo().y(detalle_reversion(true, &fallos));
                 m.marcar(id, Estado::RevertidoParcial, Some(&e), None).await;
                 m.cerrar_sin_revertir(id, &escritos, &fallos).await;
             }

@@ -64,7 +64,12 @@ pub struct CambioFila {
     pub resumen: String,
     pub campos: Vec<CampoCambio>,
     pub nota: Option<String>,
+    /// Por qué falló, en lenguaje claro y ya traducido.
     pub error: Option<String>,
+    /// Lo técnico del fallo (el texto del router), para los detalles
+    /// técnicos.
+    #[serde(default)]
+    pub error_tecnico: Option<String>,
     /// Cambio que lo deshizo.
     pub deshecho_por: Option<Vinculo>,
     /// Cambio que este deshace.
@@ -125,7 +130,11 @@ pub struct PasoFila {
     pub instancia: Option<String>,
     pub estado: EstadoPasoVista,
     pub campos: Vec<CampoCambio>,
+    /// Por qué falló, en lenguaje claro y ya traducido.
     pub error: Option<String>,
+    /// Lo técnico del fallo, para los detalles técnicos.
+    #[serde(default)]
+    pub error_tecnico: Option<String>,
 }
 
 /// Un secreto revelado (sin su valor).
@@ -424,6 +433,9 @@ fn lista_pasos(
                 view! { <TablaDiff campos sin_nombres=true /> }
             };
             let tecnico = tecnico_de(p.funcion.clone(), None, p.instancia.clone(), &p.campos);
+            let error_tecnico = p
+                .error_tecnico
+                .map(|e| view! { <p class="mono hist-error-tecnico">{e}</p> });
             view! {
                 <li class="hist-paso">
                     <details>
@@ -442,6 +454,7 @@ fn lista_pasos(
                             <details class="detalles-tecnicos">
                                 <summary>{t!("historial-tecnico")}</summary>
                                 {tecnico}
+                                {error_tecnico}
                             </details>
                             {error}
                         </div>
@@ -564,11 +577,16 @@ fn FilaCambio(
             c.instancia.clone(),
             &c.campos,
         );
+        let error_tecnico = c
+            .error_tecnico
+            .clone()
+            .map(|e| view! { <p class="mono hist-error-tecnico">{e}</p> });
         view! {
             {tabla}
             <details class="detalles-tecnicos">
                 <summary>{t!("historial-tecnico")}</summary>
                 {tecnico}
+                {error_tecnico}
             </details>
         }
         .into_any()

@@ -46,14 +46,36 @@ historial-paso-aplicando = applying
 historial-paso-aplicado = applied
 historial-paso-fallido = failed
 historial-paso-revertido = reverted
-# Notes from the change manager (stored as keys and shown in the language
-# of whoever views the History).
+# Notes and errors from the change manager: stored as keys in each
+# installation's database and shown in the language of whoever views the
+# History. Never rename or delete them (only change their text).
 nota-paso = step { $n }: { $nota }
+nota-paso-nombre = step { $n } ({ $nombre }): { $nota }
 nota-verificacion-limitada = limited check: the router doesn't show the fields written
 nota-reinicio-sin-respuesta = the router didn't answer the restart command ({ $error })
 nota-sin-confirmar = the router didn't confirm the write ({ $error })
 nota-releido-aplicada = read again: applied
 nota-sin-campos-escritos = the router doesn't show the fields written
 nota-sin-releer = it couldn't be read again either ({ $error })
-nota-wan-caida = the WAN was already down before the change: only access to the router is watched
+nota-wan-caida = the internet connection was already down before the change: only whether the router answers is watched
 nota-retomada = watching resumed after the panel restarted
+cambio-error-router = the router didn't make the change
+cambio-error-verificacion = the router doesn't show the values written
+cambio-error-preparar = the step couldn't be prepared
+cambio-error-revertido = the previous values were put back
+cambio-error-sin-revertir = the previous values couldn't be put back
+cambio-error-sin-inversa = it can't be put back: the previous values aren't known
+cambio-error-router-no-responde = the router stopped answering
+cambio-error-internet-caida = the internet connection went down
+cambio-error-reinicio-sin-vuelta = the router didn't come back after restarting within { $s } s
+cambio-error-accion = an action can't be undone
+cambio-error-interrumpido = interrupted by a panel restart before finishing
+cambio-error-ningun-paso = no step was left applied
+cambio-error-sin-pasos = interrupted: the change has no steps
+cambio-error-no-aplicado = interrupted: the change wasn't left applied
+cambio-error-reinicio-incierto = interrupted: it isn't known whether the router restarted
+cambio-error-sin-respuesta-tras-panel = the router doesn't answer after the panel restarted
+cambio-error-sin-comprobar = interrupted: it can't be checked how the router was left
+cambio-error-antes-de-aplicar = interrupted before applying: the router has the previous values
+cambio-error-sin-cambio = interrupted: the router doesn't show the change
+cambio-error-paso-ilegible = the saved step can't be read

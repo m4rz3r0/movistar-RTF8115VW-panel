@@ -170,7 +170,7 @@ async fn cortar_wan_y_esperar_reversion(p: &Panel, m: &std::sync::Arc<ChangeMana
     esperar_hasta_con(Duration::from_secs(10), async || {
         let c = m.cambio(id).await.unwrap();
         if c.estado == Estado::Revertido {
-            return Ok(c.error.unwrap_or_default());
+            return Ok(crate::comun::legible(&c.error.unwrap_or_default()));
         }
         assert!(
             !matches!(c.estado, Estado::Aplicado | Estado::Fallido),

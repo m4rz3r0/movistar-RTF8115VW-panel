@@ -203,7 +203,7 @@ async fn reanuda_vigilancia_de_grupo_y_revierte_si_cae_la_wan() {
     assert_eq!(b.activo(), Some(id));
     p.sim.control.set_wan_up(false);
     let c = esperar_estado(&b, id, Estado::Revertido).await;
-    assert!(c.error.as_deref().unwrap().contains("WAN"));
+    assert!(crate::comun::legible(c.error.as_deref().unwrap()).contains("WAN"));
     assert_eq!(upnp_actual(&p).await, "0");
     assert_eq!(ip_de_lease0(&p).await, "192.168.1.68");
     assert_eq!(escritas(&p), [UPNP, LEASES, LEASES, UPNP]);

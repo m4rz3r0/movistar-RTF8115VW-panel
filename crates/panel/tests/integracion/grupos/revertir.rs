@@ -48,7 +48,7 @@ async fn fallo_al_revertir_es_revertido_parcial() {
     assert!(e.contains("paso 1"), "{e}");
     let c = m.historial(1).await.remove(0);
     assert_eq!(c.estado, Estado::RevertidoParcial);
-    let detalle = c.error.clone().unwrap();
+    let detalle = crate::comun::legible(&c.error.clone().unwrap());
     assert!(detalle.contains("paso 1"), "{detalle}");
     assert!(!detalle.contains("paso 2:"), "{detalle}");
     assert_eq!(ip_de_lease0(&p).await, "192.168.1.68");
@@ -87,7 +87,7 @@ async fn vigilancia_revierte_grupo_entero() {
     assert_eq!(m.cambio(id).await.unwrap().estado, Estado::Vigilando);
     p.sim.control.set_wan_up(false);
     let c = esperar_estado(&m, id, Estado::Revertido).await;
-    assert!(c.error.as_deref().unwrap().contains("WAN"));
+    assert!(crate::comun::legible(c.error.as_deref().unwrap()).contains("WAN"));
     assert_eq!(escritas(&p), [LEASES, WIFI, WIFI, LEASES]);
     assert_eq!(ip_de_lease0(&p).await, "192.168.1.68");
     assert_eq!(ssid_actual(&p).await, "RED-1");
@@ -162,7 +162,9 @@ async fn sin_respuesta_con_otros_valores_se_revierte() {
     );
     let c = m.historial(1).await.remove(0);
     assert_eq!(c.estado, Estado::Fallido, "{:?}", c.error);
-    assert!(c.error.unwrap().contains("revertido"));
+    assert!(
+        crate::comun::legible(&c.error.unwrap()).contains("se volvió a los valores anteriores")
+    );
     assert_eq!(ip_de_lease0(&p).await, "192.168.1.68");
     assert_eq!(m.activo(), None);
 }
@@ -234,9 +236,9 @@ async fn creacion_incierta_en_grupo_es_revertido_parcial() {
     assert!(r.is_err(), "{r:?}");
     let c = m.historial(1).await.remove(0);
     assert_eq!(c.estado, Estado::RevertidoParcial, "{:?}", c.error);
-    let e = c.error.clone().unwrap();
+    let e = crate::comun::legible(&c.error.clone().unwrap());
     assert!(e.contains("paso 1"), "{e}");
-    assert!(!e.contains("revertido a los valores anteriores"), "{e}");
+    assert!(!e.contains("se volvió a los valores anteriores"), "{e}");
     assert_eq!(escritas(&p), [LEASES], "no sigue con el paso 2");
     assert_eq!(
         estados_pasos(&c),

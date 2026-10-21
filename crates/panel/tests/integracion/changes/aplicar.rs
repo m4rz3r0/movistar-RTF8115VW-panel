@@ -147,7 +147,7 @@ async fn error_del_router_deja_fallido() {
     );
     let ultimo = m.historial(1).await.remove(0);
     assert_eq!(ultimo.estado, Estado::Fallido);
-    assert!(ultimo.error.unwrap().contains("no se puede"));
+    assert!(crate::comun::legible(&ultimo.error.unwrap()).contains("no se puede"));
     assert_eq!(m.activo(), None);
 }
 
@@ -261,7 +261,7 @@ async fn reboot_sin_vuelta_es_fallido() {
     p.sim.control.set_unresponsive(true);
     let c = esperar_estado(&m, id, Estado::Fallido).await;
     p.sim.control.set_unresponsive(false);
-    assert!(c.error.unwrap().contains("no volvió"));
+    assert!(crate::comun::legible(&c.error.unwrap()).contains("no volvió"));
 }
 
 #[tokio::test]

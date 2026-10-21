@@ -105,7 +105,7 @@ async fn router_que_rechaza_la_reversion_falla_sin_reintentar() {
     p.sim.control.fail_next_write("valores no admitidos");
     p.sim.control.set_wan_up(false);
     let c = esperar_estado(&m, id, Estado::Fallido).await;
-    let e = c.error.unwrap();
+    let e = crate::comun::legible(&c.error.unwrap());
     assert!(e.contains("valores no admitidos"), "{e}");
     // Sin reintentos: el cambio y un único intento de reversión.
     tokio::time::sleep(Duration::from_millis(100)).await;

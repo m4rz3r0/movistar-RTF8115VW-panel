@@ -45,13 +45,19 @@ pub(crate) fn invalida(msg: impl Into<String>) -> ServerFnError {
     con_estado(StatusCode::BAD_REQUEST, msg)
 }
 
-/// Registra el error con un id y devuelve un mensaje genérico con ese id.
-/// La nota de un cambio en el idioma de quien la mira (las de antes, que
-/// guardan el texto, tal cual).
+/// La nota (o el error) de un cambio en el idioma de quien la mira (las de
+/// antes, que guardan el texto, tal cual).
 pub(crate) fn nota_legible(guardada: &str) -> String {
     crate::changes::Nota::texto(guardada, crate::ui::i18n::idioma_actual())
 }
 
+/// Lo técnico de un error guardado (el texto del router), para los
+/// «Detalles técnicos».
+pub(crate) fn error_tecnico(guardado: &str) -> Option<String> {
+    crate::changes::Nota::detalle(guardado, crate::ui::i18n::idioma_actual())
+}
+
+/// Registra el error con un id y devuelve un mensaje genérico con ese id.
 pub(crate) fn interno(e: impl fmt::Display) -> ServerFnError {
     let mut id = [0u8; 4];
     if getrandom::fill(&mut id).is_err() {
@@ -881,7 +887,7 @@ pub async fn estado_cambio(state: &AppState, id: i64) -> Result<CambioVista, Ser
     Ok(CambioVista {
         id: c.id,
         estado: estado(c.estado),
-        error: c.error,
+        error: c.error.as_deref().map(nota_legible),
         nota: c.nota.as_deref().map(nota_legible),
         restante_s,
     })

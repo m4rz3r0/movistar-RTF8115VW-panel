@@ -202,7 +202,16 @@ async fn contrasena_router_rechazada_conserva_la_anterior() {
     hgu::read::summary(&p.state.hgu).await.unwrap();
     let (_, estado, error, _, _) = ultima_fila(&p).await;
     assert_eq!(estado, "fallido");
-    assert!(error.is_some_and(|e| e.contains("no aceptó")));
+    // Como clave: el Historial lo pinta en el idioma de quien lo mira.
+    let error = error.expect("con error");
+    assert!(
+        Nota::texto(&error, Idioma::Es).contains("no aceptó"),
+        "{error}"
+    );
+    assert!(
+        Nota::texto(&error, Idioma::En).contains("did not accept"),
+        "{error}"
+    );
 }
 
 #[tokio::test]

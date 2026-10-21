@@ -67,7 +67,7 @@ async fn revierte_si_se_pierde_la_wan() {
     let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
     p.sim.control.set_wan_up(false);
     let c = esperar_estado(&m, id, Estado::Revertido).await;
-    assert!(c.error.unwrap().contains("WAN"));
+    assert!(crate::comun::legible(&c.error.unwrap()).contains("WAN"));
     assert_eq!(ip_de_lease(&p, "0").await.as_deref(), Some("192.168.1.68"));
     let w = p.sim.control.writes();
     assert_eq!(w.len(), 2, "cambio y reversión");
@@ -86,11 +86,11 @@ async fn wan_ya_caida_no_provoca_reversion() {
     let c = esperar_estado(&m, id, Estado::Aplicado).await;
     let nota = c.nota.unwrap();
     assert!(
-        Nota::texto(&nota, Idioma::Es).contains("la WAN ya estaba caída"),
+        Nota::texto(&nota, Idioma::Es).contains("la conexión a internet ya estaba caída"),
         "{nota}"
     );
     assert!(
-        Nota::texto(&nota, Idioma::En).contains("the WAN was already down"),
+        Nota::texto(&nota, Idioma::En).contains("the internet connection was already down"),
         "{nota}"
     );
     assert_eq!(ip_de_lease(&p, "0").await.as_deref(), Some("192.168.1.80"));
@@ -108,7 +108,7 @@ async fn revierte_si_el_router_deja_de_responder() {
     tokio::time::sleep(Duration::from_millis(600)).await;
     p.sim.control.set_unresponsive(false);
     let c = esperar_estado(&m, id, Estado::Revertido).await;
-    assert!(c.error.unwrap().contains("no responde"));
+    assert!(crate::comun::legible(&c.error.unwrap()).contains("dejó de responder"));
     assert_eq!(ip_de_lease(&p, "0").await.as_deref(), Some("192.168.1.68"));
 }
 

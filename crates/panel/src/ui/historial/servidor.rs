@@ -8,8 +8,8 @@ use crate::{
     ui::explorador::{
         PreparadoVista, ruta_funcion,
         servidor::{
-            Ocultar, campo_cambio, con_estado, error_cambio, estado, gestor, interno, nota_legible,
-            riesgo, vista_preparado,
+            Ocultar, campo_cambio, con_estado, error_cambio, error_tecnico, estado, gestor,
+            interno, nota_legible, riesgo, vista_preparado,
         },
     },
 };
@@ -108,7 +108,8 @@ async fn fila_cambio(
                 funcion: p.funcion,
                 instancia: p.instancia,
                 estado: estado_paso(p.estado),
-                error: p.error,
+                error_tecnico: p.error.as_deref().and_then(error_tecnico),
+                error: p.error.as_deref().map(nota_legible),
             })
             .collect();
         let campos = pasos.iter().flat_map(|p| p.campos.clone()).collect();
@@ -150,7 +151,8 @@ async fn fila_cambio(
         resumen: resumen(&campos),
         campos,
         nota: c.nota.as_deref().map(nota_legible),
-        error: c.error,
+        error_tecnico: c.error.as_deref().and_then(error_tecnico),
+        error: c.error.as_deref().map(nota_legible),
         deshecho_por: enlace(por).await?,
         deshace: enlace(deshace).await?,
         puede_deshacer,

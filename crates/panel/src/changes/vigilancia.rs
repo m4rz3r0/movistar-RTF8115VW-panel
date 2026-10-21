@@ -6,7 +6,7 @@ impl ChangeManager {
     /// Comprueba el router cada `intervalo` durante `dur`. Error con el
     /// motivo tras `fallos_para_revertir` fallos seguidos. Si el plazo acaba
     /// con fallos pendientes, sigue hasta un acierto o la reversión.
-    pub(super) async fn vigilar(&self, dur: Duration, wan: bool) -> Result<(), String> {
+    pub(super) async fn vigilar(&self, dur: Duration, wan: bool) -> Result<(), Nota> {
         let fin = Instant::now() + dur;
         let mut seguidos = 0;
         loop {
@@ -15,9 +15,9 @@ impl ChangeManager {
                 Ok(()) => seguidos = 0,
                 Err(e) => {
                     seguidos += 1;
-                    tracing::warn!("vigilancia: fallo {seguidos}: {e}");
+                    tracing::warn!("vigilancia: fallo {seguidos}: {}", e.para_registro());
                     if seguidos >= self.tiempos.fallos_para_revertir {
-                        return Err(format!("vigilancia: {seguidos} fallos seguidos ({e})"));
+                        return Err(e);
                     }
                 }
             }
@@ -29,26 +29,28 @@ impl ChangeManager {
 
     /// El router deja iniciar sesión y (si `wan`) la conexión a internet
     /// está arriba.
-    async fn salud(&self, wan: bool) -> Result<(), String> {
+    async fn salud(&self, wan: bool) -> Result<(), Nota> {
         let c = &self.state.hgu;
-        let no_responde = |e: hgu::Error| format!("el router no responde: {e}");
+        let no_responde =
+            |e: hgu::Error| Nota::clave(nota::ERROR_ROUTER_NO_RESPONDE).tecnico(e.to_string());
         read::summary(c).await.map_err(no_responde)?;
         if !wan {
             return Ok(());
         }
         let (vigilada, arriba) = self.state.wan_vigilada().await.map_err(no_responde)?;
         if !arriba {
-            return Err(match vigilada {
+            let detalle = match vigilada {
                 Some(n) => format!("la WAN ({n}) está caída"),
                 None => "la WAN está caída (ninguna conexión de datos arriba)".to_owned(),
-            });
+            };
+            return Err(Nota::clave(nota::ERROR_INTERNET_CAIDA).tecnico(detalle));
         }
         Ok(())
     }
 
     /// Tras `cbReboot`: espera hasta `alto` a que el router vuelva (responde
     /// y su tiempo encendido es menor que antes, o se le vio caído).
-    pub(super) async fn esperar_vuelta(&self, uptime_antes: u64) -> Result<(), String> {
+    pub(super) async fn esperar_vuelta(&self, uptime_antes: u64) -> Result<(), Nota> {
         let fin = Instant::now() + self.tiempos.alto;
         let mut caido = false;
         while Instant::now() < fin {
@@ -59,9 +61,9 @@ impl ChangeManager {
                 Err(_) => caido = true,
             }
         }
-        Err(format!(
-            "el router no volvió tras el reinicio en {} s",
-            self.tiempos.alto.as_secs_f32()
+        Err(Nota::con(
+            nota::ERROR_REINICIO_SIN_VUELTA,
+            &[("s", format!("{}", self.tiempos.alto.as_secs_f32()))],
         ))
     }
 

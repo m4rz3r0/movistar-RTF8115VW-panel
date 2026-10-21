@@ -85,13 +85,14 @@ pub async fn cambiar_contrasena_router(nueva: String) -> Result<(), ServerFnErro
 #[cfg(feature = "ssr")]
 pub(crate) mod servidor {
     use super::*;
+    use crate::changes::Nota;
     use crate::{
         instalar::servidor::{fallo, interno, probar},
         instancia::{self, CredencialesRouter},
         panel_ajustes::servidor::preparar_delicada,
         state::AppState,
     };
-    use ::i18n::{FluentArgs, Idioma, tr};
+    use ::i18n::Idioma;
     use axum::http::StatusCode;
     use hgu::client::Exclusiva;
     use std::time::Duration;
@@ -128,40 +129,35 @@ pub(crate) mod servidor {
         Interno(String),
     }
 
-    /// Texto de un [`Fallo`] que llegó a hablar con el router, en `idioma`
-    /// (para la respuesta y para el Historial).
-    fn texto(f: &Fallo, idioma: Idioma) -> String {
-        let n = |n: usize| {
-            let mut a = FluentArgs::new();
-            a.set("n", n);
-            a
-        };
+    /// Un [`Fallo`] como clave de traducción con sus argumentos: para la
+    /// respuesta (en el idioma de la página) y para el Historial, que lo
+    /// pinta en el idioma de quien lo mira. Las claves quedan guardadas en
+    /// la base de datos: no se renombran ni se borran.
+    fn nota(f: &Fallo) -> Nota {
+        let n = |clave: &str, n: usize| Nota::con(clave, &[("n", n.to_string())]);
         match f {
-            Fallo::EnCurso => tr(idioma, "contrasena-router-error-en-curso", None),
-            Fallo::SinRouter => tr(idioma, "contrasena-router-error-sin-router", None),
-            Fallo::SoloLectura => tr(idioma, "panel-solo-lectura", None),
-            Fallo::Nueva(ErrorNueva::Corta) => {
-                tr(idioma, "contrasena-router-error-corta", Some(&n(MIN_BYTES)))
-            }
-            Fallo::Nueva(ErrorNueva::Larga) => {
-                tr(idioma, "contrasena-router-error-larga", Some(&n(MAX_BYTES)))
-            }
-            Fallo::Nueva(ErrorNueva::Control) => {
-                tr(idioma, "contrasena-router-error-control", None)
-            }
-            Fallo::Nueva(ErrorNueva::Igual) => tr(idioma, "contrasena-router-error-igual", None),
-            Fallo::Sondeo => tr(idioma, "contrasena-router-error-sondeo", None),
-            Fallo::Rechazada => tr(idioma, "contrasena-router-error-rechazada", None),
-            Fallo::Restaurada => tr(idioma, "contrasena-router-error-restaurada", None),
-            Fallo::Grave => tr(idioma, "contrasena-router-error-grave", None),
+            Fallo::EnCurso => Nota::clave("contrasena-router-error-en-curso"),
+            Fallo::SinRouter => Nota::clave("contrasena-router-error-sin-router"),
+            Fallo::SoloLectura => Nota::clave("panel-solo-lectura"),
+            Fallo::Nueva(ErrorNueva::Corta) => n("contrasena-router-error-corta", MIN_BYTES),
+            Fallo::Nueva(ErrorNueva::Larga) => n("contrasena-router-error-larga", MAX_BYTES),
+            Fallo::Nueva(ErrorNueva::Control) => Nota::clave("contrasena-router-error-control"),
+            Fallo::Nueva(ErrorNueva::Igual) => Nota::clave("contrasena-router-error-igual"),
+            Fallo::Sondeo => Nota::clave("contrasena-router-error-sondeo"),
+            Fallo::Rechazada => Nota::clave("contrasena-router-error-rechazada"),
+            Fallo::Restaurada => Nota::clave("contrasena-router-error-restaurada"),
+            Fallo::Grave => Nota::clave("contrasena-router-error-grave"),
             Fallo::NoGuardada { restaurada: true } => {
-                tr(idioma, "contrasena-router-error-no-guardada", None)
+                Nota::clave("contrasena-router-error-no-guardada")
             }
-            Fallo::NoGuardada { restaurada: false } => {
-                tr(idioma, "contrasena-router-error-grave", None)
-            }
-            Fallo::Interno(_) => tr(idioma, "comun-error-interno", None),
+            Fallo::NoGuardada { restaurada: false } => Nota::clave("contrasena-router-error-grave"),
+            Fallo::Interno(_) => Nota::clave("comun-error-interno"),
         }
+    }
+
+    /// Texto de un [`Fallo`] que llegó a hablar con el router, en `idioma`.
+    fn texto(f: &Fallo, idioma: Idioma) -> String {
+        nota(f).en(idioma)
     }
 
     /// Error de la server function para `f` (con su código HTTP).
@@ -199,9 +195,7 @@ pub(crate) mod servidor {
         // el panel. Las guardas (el gestor apartado, el sondeo en pausa) se
         // sueltan al acabar, también con un pánico.
         let tarea =
-            tokio::spawn(
-                async move { cambiar_y_anotar(&state, &yo.username, &nueva, idioma).await },
-            );
+            tokio::spawn(async move { cambiar_y_anotar(&state, &yo.username, &nueva).await });
         match tarea.await {
             Ok(r) => r.map_err(|f| a_error(f, idioma)),
             Err(e) => Err(interno(format!(
@@ -212,12 +206,7 @@ pub(crate) mod servidor {
 
     /// El flujo completo de [`cambiar_contrasena_router`] para el usuario
     /// del panel `usuario` (para el Historial).
-    async fn cambiar_y_anotar(
-        state: &AppState,
-        usuario: &str,
-        nueva: &str,
-        idioma: Idioma,
-    ) -> Result<(), Fallo> {
+    async fn cambiar_y_anotar(state: &AppState, usuario: &str, nueva: &str) -> Result<(), Fallo> {
         // Mientras viva, el gestor no empieza ningún cambio; al soltarse,
         // invalida la caché de lecturas.
         let _reserva = state
@@ -239,7 +228,7 @@ pub(crate) mod servidor {
             .await
             .map_err(|_| Fallo::Sondeo)?;
         let r = en_el_router(state, &actual, nueva).await;
-        anotar(state, usuario, &r, idioma).await;
+        anotar(state, usuario, &r).await;
         // Lo leído para mostrar pudo ser con la sesión de antes.
         state.lecturas.invalidar();
         r
@@ -369,16 +358,16 @@ pub(crate) mod servidor {
 
     /// Apunta el intento en el Historial: aplicado o fallido con el motivo,
     /// sin ningún valor y sin nada que deshacer (sin pasos).
-    async fn anotar(state: &AppState, usuario: &str, r: &Result<(), Fallo>, idioma: Idioma) {
+    async fn anotar(state: &AppState, usuario: &str, r: &Result<(), Fallo>) {
         let (estado, error, nota) = match r {
             Ok(()) => (
                 "aplicado",
                 None,
                 // La clave, no el texto: el Historial la pinta en el idioma
                 // de quien lo mira.
-                Some(crate::changes::Nota::clave("contrasena-router-historial-nota").guardar()),
+                Some(Nota::clave("contrasena-router-historial-nota").guardar()),
             ),
-            Err(f) => ("fallido", Some(texto(f, idioma)), None),
+            Err(f) => ("fallido", Some(nota(f).guardar()), None),
         };
         let ahora = crate::series::now();
         let fila = sqlx::query(

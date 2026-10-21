@@ -87,8 +87,8 @@ impl ChangeManager {
                 .collect();
             match activos.as_slice() {
                 [] => {
-                    let e = "interrumpido; el cambio no tiene pasos";
-                    self.marcar(id, Estado::Fallido, Some(e), None).await;
+                    let e = Nota::clave(nota::ERROR_SIN_PASOS);
+                    self.marcar(id, Estado::Fallido, Some(&e), None).await;
                 }
                 [_] => {
                     let p = pasos.into_iter().find(|p| p.estado != EstadoPaso::Omitido);
@@ -99,6 +99,7 @@ impl ChangeManager {
                                 .await
                         }
                         (EstadoPaso::Aplicando | EstadoPaso::Aplicado, Err(e)) => {
+                            let e = Nota::clave(nota::ERROR_PASO_ILEGIBLE).tecnico(e);
                             self.marcar_paso(id, p.orden, EstadoPaso::Fallido, Some(&e))
                                 .await;
                             self.marcar(id, Estado::Fallido, Some(&e), None).await;
@@ -106,8 +107,8 @@ impl ChangeManager {
                         // Sin escribir, fallido o ya revertido: nada aplicado
                         // que retomar.
                         _ => {
-                            let e = "interrumpido: el cambio no quedó aplicado";
-                            self.marcar(id, Estado::Fallido, Some(e), None).await;
+                            let e = Nota::clave(nota::ERROR_NO_APLICADO);
+                            self.marcar(id, Estado::Fallido, Some(&e), None).await;
                         }
                     }
                 }
@@ -131,7 +132,7 @@ impl ChangeManager {
         reserva: Reserva,
     ) {
         let retomada = || Nota::clave(nota::RETOMADA);
-        let fallido = |e: String| async move {
+        let fallido = |e: Nota| async move {
             self.marcar_paso(id, orden, EstadoPaso::Fallido, Some(&e))
                 .await;
             self.marcar(id, Estado::Fallido, Some(&e), None).await;
@@ -141,17 +142,16 @@ impl ChangeManager {
             match read::summary(c).await {
                 // No se sabe si la orden llegó al router.
                 Ok(_) if aplicando => {
-                    fallido("interrumpido: no se sabe si el router llegó a reiniciarse".into())
-                        .await;
+                    fallido(Nota::clave(nota::ERROR_REINICIO_INCIERTO)).await;
                 }
                 Ok(_) => {
                     self.marcar(id, Estado::Aplicado, None, Some(&retomada()))
                         .await
                 }
                 Err(e) => {
-                    fallido(format!(
-                        "el router no responde tras reiniciar el panel: {e}"
-                    ))
+                    fallido(
+                        Nota::clave(nota::ERROR_SIN_RESPUESTA_TRAS_PANEL).tecnico(e.to_string()),
+                    )
                     .await
                 }
             }
@@ -168,23 +168,16 @@ impl ChangeManager {
                 retomada()
             }
             Comprobacion::SinLectura(e) => {
-                fallido(format!(
-                    "interrumpido; no se puede comprobar el estado: {e}"
-                ))
-                .await;
+                fallido(Nota::clave(nota::ERROR_SIN_COMPROBAR).tecnico(e)).await;
                 return;
             }
             Comprobacion::Limitada => retomada().y(Nota::clave(nota::VERIFICACION_LIMITADA)),
             Comprobacion::Difiere(v) => {
                 let anterior = self.comprobar(&plan, Lado::Anterior).await;
                 let e = if anterior == Comprobacion::Coincide(None) {
-                    "interrumpido antes de aplicar: el router tiene los valores anteriores"
-                        .to_owned()
+                    Nota::clave(nota::ERROR_ANTES_DE_APLICAR)
                 } else {
-                    format!(
-                        "interrumpido; el router no muestra el cambio: {}",
-                        v.join("; ")
-                    )
+                    Nota::clave(nota::ERROR_SIN_CAMBIO).tecnico(v.join("; "))
                 };
                 fallido(e).await;
                 return;

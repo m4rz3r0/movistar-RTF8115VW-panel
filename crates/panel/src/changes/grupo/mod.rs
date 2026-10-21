@@ -178,22 +178,25 @@ impl std::fmt::Display for ErrorReversion {
     }
 }
 
-/// «paso 2 (cbSetUpnpCfg)».
-pub(super) fn nombre_paso(orden: usize, funcion: &str) -> String {
-    format!("paso {} ({funcion})", orden + 1)
+impl ErrorReversion {
+    /// El texto legible (y, aparte, lo técnico) para el Historial.
+    pub(super) fn nota(&self) -> Nota {
+        match self {
+            ErrorReversion::SinInversa => Nota::clave(nota::ERROR_SIN_INVERSA),
+            ErrorReversion::Fallo(e) => Nota::clave(nota::ERROR_SIN_REVERTIR).tecnico(e.clone()),
+        }
+    }
 }
 
 /// Detalle de las reversiones fallidas: en un grupo de un paso, el motivo
-/// tal cual (como en el núcleo); en uno de varios, cada paso con su motivo.
-pub(super) fn detalle_reversion(multi: bool, fallos: &[(usize, String, ErrorReversion)]) -> String {
+/// tal cual (como en el núcleo); en uno de varios, cada paso con su motivo
+/// (por su número, nunca por su función).
+pub(super) fn detalle_reversion(multi: bool, fallos: &[(usize, String, ErrorReversion)]) -> Nota {
     if !multi && let [(_, _, e)] = fallos {
-        return e.to_string();
+        return e.nota();
     }
-    fallos
-        .iter()
-        .map(|(o, f, e)| format!("{}: {e}", nombre_paso(*o, f)))
-        .collect::<Vec<_>>()
-        .join("; ")
+    Nota::juntar(fallos.iter().map(|(o, _, e)| e.nota().del_paso(*o)))
+        .unwrap_or_else(|| Nota::clave(nota::ERROR_SIN_REVERTIR))
 }
 
 /// Un paso guardado, para retomar un grupo.
