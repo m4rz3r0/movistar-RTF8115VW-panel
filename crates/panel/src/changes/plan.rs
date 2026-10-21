@@ -66,8 +66,9 @@ pub(super) enum Lectura {
     Ninguna,
 }
 
-/// Un campo que cambia, con los valores en claro (solo en memoria).
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// Un campo que cambia, con los valores en claro (solo en memoria; su
+/// `Debug` tapa los de un secreto).
+#[derive(Clone, PartialEq, Eq)]
 pub(super) struct Campo {
     pub(super) nombre: String,
     pub(super) antes: String,
@@ -77,8 +78,28 @@ pub(super) struct Campo {
     pub(super) leido: bool,
 }
 
-/// Cambio listo para escribir y comprobar.
-#[derive(Clone, Debug)]
+impl std::fmt::Debug for Campo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let valor = |v: &str| {
+            if self.secreto {
+                "***".to_owned()
+            } else {
+                v.to_owned()
+            }
+        };
+        f.debug_struct("Campo")
+            .field("nombre", &self.nombre)
+            .field("antes", &valor(&self.antes))
+            .field("despues", &valor(&self.despues))
+            .field("secreto", &self.secreto)
+            .field("leido", &self.leido)
+            .finish()
+    }
+}
+
+/// Cambio listo para escribir y comprobar. Su `Debug` enseña los nombres de
+/// los valores y del payload, no los valores (llevan los secretos en claro).
+#[derive(Clone)]
 pub(super) struct Plan {
     pub(super) funcion: Funcion,
     pub(super) operacion: Operacion,
@@ -94,6 +115,24 @@ pub(super) struct Plan {
     /// que aparece nueva (no la primera con esos valores: puede haber una
     /// igual de antes). `None` si no se leyó (cambios anteriores a v0.1.1).
     pub(super) ids_antes: Option<BTreeSet<String>>,
+}
+
+impl std::fmt::Debug for Plan {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Plan")
+            .field("funcion", &self.funcion.name)
+            .field("operacion", &self.operacion)
+            .field("instancia", &self.instancia)
+            .field("valores", &self.valores.keys().collect::<Vec<_>>())
+            .field(
+                "payload",
+                &self.payload.iter().map(|(k, _)| k).collect::<Vec<_>>(),
+            )
+            .field("campos", &self.campos)
+            .field("lectura", &self.lectura)
+            .field("ids_antes", &self.ids_antes)
+            .finish()
+    }
 }
 
 /// Valor de `nombre` en `m`: primero exacto, luego sin distinguir mayúsculas.

@@ -16,8 +16,9 @@ use crate::state::AppState;
 use hgu::xml::XmlNode;
 use std::collections::BTreeMap;
 
-/// Lo leído para la foto de partida.
-#[derive(Debug, Default)]
+/// Lo leído para la foto de partida. Su `Debug` no enseña el XML (lleva los
+/// secretos), solo de qué funciones es.
+#[derive(Default)]
 pub struct FotoLeida {
     /// Función → XML de su nodo (`XmlNode::to_xml`).
     pub contenido: BTreeMap<String, String>,
@@ -25,6 +26,16 @@ pub struct FotoLeida {
     pub fallidas: Vec<String>,
     /// Firmware del resumen del router (vacío si no llegó).
     pub firmware: String,
+}
+
+impl std::fmt::Debug for FotoLeida {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FotoLeida")
+            .field("contenido", &self.contenido.keys().collect::<Vec<_>>())
+            .field("fallidas", &self.fallidas)
+            .field("firmware", &self.firmware)
+            .finish()
+    }
 }
 
 /// Instancias de una respuesta: sus elementos con hijos o, si la respuesta

@@ -297,14 +297,29 @@ pub struct ListaInstancias {
     pub total: usize,
 }
 
-/// Petición de cambio desde el navegador. Los IP/MAC van unidos.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// Petición de cambio desde el navegador. Los IP/MAC van unidos. Su `Debug`
+/// enseña los nombres de los valores, no los valores (pueden ser secretos).
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Peticion {
     pub funcion: String,
     /// Instancia que se edita o borra; `None` crea una nueva.
     pub instancia: Option<String>,
     pub valores: Vec<(String, String)>,
     pub borrar: bool,
+}
+
+impl std::fmt::Debug for Peticion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Peticion")
+            .field("funcion", &self.funcion)
+            .field("instancia", &self.instancia)
+            .field(
+                "valores",
+                &self.valores.iter().map(|(k, _)| k).collect::<Vec<_>>(),
+            )
+            .field("borrar", &self.borrar)
+            .finish()
+    }
 }
 
 /// Campo del diff.
@@ -562,6 +577,21 @@ mod tests {
         assert_eq!(
             ruta_funcion("nat", "te_ppp_pm.cmd?action=create"),
             "/explorador/nat/te_ppp_pm.cmd%3Faction%3Dcreate"
+        );
+    }
+
+    #[test]
+    fn debug_de_la_peticion_sin_valores() {
+        let p = Peticion {
+            funcion: "cbSetWifiAccPt".into(),
+            instancia: None,
+            valores: vec![("key_phrase".into(), "clave-en-claro".into())],
+            borrar: false,
+        };
+        let d = format!("{p:?}");
+        assert!(
+            !d.contains("clave-en-claro") && d.contains("key_phrase"),
+            "{d}"
         );
     }
 }

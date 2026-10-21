@@ -168,3 +168,22 @@ async fn una_ip_fija_dice_cual_es() {
         "no repite lo que cambia"
     );
 }
+
+/// El `Debug` de lo leído para la foto no enseña el XML (lleva los
+/// secretos), solo de qué funciones es.
+#[tokio::test]
+async fn debug_de_la_foto_sin_secretos() {
+    let (p, _cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    let foto = fotos::leer_partida(&p.state).await;
+    let xml = foto.contenido.values().cloned().collect::<String>();
+    let psk = p
+        .sim
+        .control
+        .fixture_valor("cbGetWifiAccPt", "key_phrase")
+        .expect("la fixture trae una clave WiFi");
+    assert!(xml.contains(&psk), "la foto lleva la clave");
+    let debug = format!("{foto:?}");
+    assert!(!debug.contains(&psk), "{debug}");
+    assert!(!debug.contains('<'), "{debug}");
+    assert!(debug.contains("cbGetWifiAccPt"), "{debug}");
+}

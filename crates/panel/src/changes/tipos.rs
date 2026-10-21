@@ -64,7 +64,10 @@ impl Tiempos {
 /// En las funciones con `lista`, `instancia` es el id de la instancia que se
 /// edita o borra (`borrar`); `None` crea una nueva (id `-1`). Los campos
 /// IP/MAC partidos llegan unidos con su nombre base.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+///
+/// Su `Debug` enseña los nombres de los valores, no los valores (pueden ser
+/// secretos).
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChangeRequest {
     pub funcion: String,
     pub instancia: Option<String>,
@@ -72,13 +75,43 @@ pub struct ChangeRequest {
     pub borrar: bool,
 }
 
-/// Un campo del diff. Si `secreto`, `antes` y `despues` valen [`MASCARA`].
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+impl std::fmt::Debug for ChangeRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ChangeRequest")
+            .field("funcion", &self.funcion)
+            .field("instancia", &self.instancia)
+            .field("valores", &self.valores.keys().collect::<Vec<_>>())
+            .field("borrar", &self.borrar)
+            .finish()
+    }
+}
+
+/// Un campo del diff. Si `secreto`, `antes` y `despues` valen [`MASCARA`]
+/// (y su `Debug` los tapa aunque no fuera así).
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CampoDiff {
     pub nombre: String,
     pub antes: String,
     pub despues: String,
     pub secreto: bool,
+}
+
+impl std::fmt::Debug for CampoDiff {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let valor = |v: &str| {
+            if self.secreto {
+                "***".to_owned()
+            } else {
+                v.to_owned()
+            }
+        };
+        f.debug_struct("CampoDiff")
+            .field("nombre", &self.nombre)
+            .field("antes", &valor(&self.antes))
+            .field("despues", &valor(&self.despues))
+            .field("secreto", &self.secreto)
+            .finish()
+    }
 }
 
 /// Diferencias entre el router y la petición.
@@ -299,3 +332,42 @@ pub const DESHACER_SOLO_TAPADOS: &str =
     "solo cambió una clave que el router no deja leer: no hay valor anterior al que volver";
 pub(super) const BLOQUEO_SECRETOS_BASICA: &str = "bloqueada en v1: falta validar con el router real el \
                                        formato de los secretos de la web básica";
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn debug_sin_valores_ni_secretos() {
+        let r = ChangeRequest {
+            funcion: "cbSetWifiAccPt".into(),
+            instancia: None,
+            valores: [("key_phrase".to_owned(), "clave-en-claro".to_owned())].into(),
+            borrar: false,
+        };
+        let d = format!("{r:?}");
+        assert!(
+            !d.contains("clave-en-claro") && d.contains("key_phrase"),
+            "{d}"
+        );
+        let c = CampoDiff {
+            nombre: "key_phrase".into(),
+            antes: "clave-de-antes".into(),
+            despues: "clave-en-claro".into(),
+            secreto: true,
+        };
+        let d = format!("{c:?}");
+        assert!(
+            !d.contains("clave-en-claro") && !d.contains("clave-de-antes"),
+            "{d}"
+        );
+        let c = CampoDiff {
+            secreto: false,
+            ..c
+        };
+        assert!(
+            format!("{c:?}").contains("clave-en-claro"),
+            "lo que no es secreto, sí"
+        );
+    }
+}

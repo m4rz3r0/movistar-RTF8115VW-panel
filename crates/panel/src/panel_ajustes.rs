@@ -263,11 +263,21 @@ pub async fn leer_panel() -> Result<AjustesPanel, ServerFnError> {
 /// «Conexión con el router»: lo de [`leer_panel`] y la contraseña del
 /// router guardada, que la página muestra censurada con el ojo (decisión
 /// del usuario del 2026-10-18). Solo para esa página; con `no-store`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// Su `Debug` tapa la contraseña.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConexionRouter {
     pub ajustes: AjustesPanel,
     /// Vacía si el router no está configurado.
     pub contrasena: String,
+}
+
+impl std::fmt::Debug for ConexionRouter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ConexionRouter")
+            .field("ajustes", &self.ajustes)
+            .field("contrasena", &"***")
+            .finish()
+    }
 }
 
 /// Lo de «Conexión con el router», con la contraseña del router guardada.

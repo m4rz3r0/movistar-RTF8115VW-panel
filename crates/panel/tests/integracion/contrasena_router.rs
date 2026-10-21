@@ -453,6 +453,10 @@ async fn credenciales_llegan_con_la_contrasena_guardada() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let v: Value = ok(&p, "leer_conexion_router", json!({}), &cookie).await;
     assert_eq!(v["contrasena"], PASS);
+    // Su `Debug` la tapa.
+    let c: panel::panel_ajustes::ConexionRouter = serde_json::from_value(v.clone()).unwrap();
+    assert_eq!(c.contrasena, PASS);
+    assert!(!format!("{c:?}").contains(PASS), "{c:?}");
     // «Ajustes del panel» no la lleva.
     let (_, panel) = llamar(&p, "leer_panel", json!({}), Some(&cookie)).await;
     assert!(!panel.contains(PASS), "{panel}");

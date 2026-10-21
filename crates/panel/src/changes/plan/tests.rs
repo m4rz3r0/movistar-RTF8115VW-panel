@@ -419,3 +419,43 @@ fn comparar_normaliza_y_enmascara() {
     ));
     assert!(!iguales(None, "Casa", "casa"));
 }
+
+#[test]
+fn debug_sin_valores_ni_secretos() {
+    let c = cat();
+    let f = c.funcion("cbSetWifiAccPt").unwrap().clone();
+    let plan = Plan {
+        funcion: f,
+        operacion: Operacion::Editar,
+        instancia: None,
+        valores: mapa(&[
+            ("dpm_cfg_wifi_acc_pt_id", "1"),
+            ("key_phrase", "clave-en-claro"),
+        ]),
+        payload: vec![("key_phrase".into(), "clave-en-claro".into())],
+        campos: vec![
+            Campo {
+                nombre: "key_phrase".into(),
+                antes: "clave-de-antes".into(),
+                despues: "clave-en-claro".into(),
+                secreto: true,
+                leido: true,
+            },
+            Campo {
+                nombre: "ssid".into(),
+                antes: "RED-1".into(),
+                despues: "RED-2".into(),
+                secreto: false,
+                leido: true,
+            },
+        ],
+        lectura: Lectura::Ninguna,
+        ids_antes: None,
+    };
+    let d = format!("{plan:?}");
+    assert!(
+        !d.contains("clave-en-claro") && !d.contains("clave-de-antes"),
+        "{d}"
+    );
+    assert!(d.contains("key_phrase") && d.contains("RED-2"), "{d}");
+}
