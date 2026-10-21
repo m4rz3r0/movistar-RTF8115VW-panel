@@ -1,6 +1,6 @@
 [package]
 name = "hgu"
-version = "0.2.6"
+version = "0.3.0"
 description = "Utilidades para hablar con el router Askey RTF8115VW"
 edition.workspace = true
 rust-version.workspace = true
