@@ -14,6 +14,12 @@ import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 // e2e, RP_E2E_VIGILANCIA_S, 10 s por defecto, ver playwright.config.ts), y
 // los plazos de abajo cuentan con esa vigilancia corta. Las demás llegan
 // hasta el resumen y lo cancelan.
+//
+// Cada test entra con su propia sesión y deja el panel como estaba, así que
+// se reparten entre los workers (cada uno con su panel, ver instancias.ts):
+// este fichero es el más largo y, entero en un worker, sería el camino
+// crítico de la pasada.
+test.describe.configure({ mode: "parallel" });
 
 const textos = {
   es: {

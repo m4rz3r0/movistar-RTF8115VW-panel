@@ -1,5 +1,5 @@
 import { defineConfig } from "@playwright/test";
-import { instalado, todas } from "./instancias";
+import { instalado, todas, WORKERS } from "./instancias";
 
 // Las capturas del README (capturas-readme.spec.ts) sobrescriben
 // docs/capturas/, que está versionado: solo se generan cuando se piden por
@@ -14,8 +14,11 @@ export default defineConfig({
   testDir: ".",
   testIgnore: process.env.E2E_CAPTURAS_README ? [] : ["**/capturas-readme.spec.ts"],
   outputDir: "test-results",
+  // Cada worker con su panel (instancias.ts): los ficheros se reparten entre
+  // ellos y, dentro de cada uno, van en serie salvo los que piden lo
+  // contrario (ajustes.spec.ts).
   fullyParallel: false,
-  workers: 1,
+  workers: WORKERS,
   reporter: "list",
   use: {
     // Las páginas del panel instalado; el asistente usa el suyo.
