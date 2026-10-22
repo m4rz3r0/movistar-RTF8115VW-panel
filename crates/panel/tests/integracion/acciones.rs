@@ -118,7 +118,7 @@ async fn accion_ya_estaba_asi() {
     aplicar_ajuste(&p, &cookie, &g).await;
     // Solo se escribe la que cambia.
     let escritas = p.sim.control.writes();
-    let a_la_5 = escritas
+    let escrituras_red_24 = escritas
         .iter()
         .filter(|(f, params)| {
             f == "cbSetWifiAccPt"
@@ -127,7 +127,10 @@ async fn accion_ya_estaba_asi() {
                     .any(|(k, v)| k == "dpm_cfg_wifi_acc_pt_id" && v == "0")
         })
         .count();
-    assert_eq!(a_la_5, 1, "solo la escritura de la prueba: {escritas:?}");
+    assert_eq!(
+        escrituras_red_24, 1,
+        "solo la escritura de la prueba: {escritas:?}"
+    );
 
     // Las dos ya lo tienen: 409, sin ningún cambio nuevo en el Historial.
     let cambios = || async {
