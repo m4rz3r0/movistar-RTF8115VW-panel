@@ -371,3 +371,33 @@ fn encabezado_por_pestana() {
     let h = html(grupo(vec![paso(0, None), paso(1, None)]));
     assert!(!h.contains("<h3"), "{h}");
 }
+
+/// En un lote, la casilla de cada paso se nombra con lo que hace y su
+/// elemento: dos pasos de la misma red no se llaman igual. Fuera de un
+/// lote (sin pestaña), con el título, como siempre.
+#[test]
+fn casillas_de_un_lote_con_nombre_propio() {
+    let paso = |indice, nota: &str, pestana: Option<&str>| PasoVista {
+        indice,
+        titulo: Some("ajuste-wifi-red_5-titulo".into()),
+        nota: Some(nota.into()),
+        pestana: pestana.map(str::to_owned),
+        campos: vec![cambio("c", "a", "b", TipoCampo::Texto)],
+        ..Default::default()
+    };
+    let wifi = Some("ajustes-tema-wifi");
+    let h = html(grupo(vec![
+        paso(0, "mejoras-paso-wps", wifi),
+        paso(1, "mejoras-paso-wpa2", wifi),
+    ]));
+    let red = t!("ajuste-wifi-red_5-titulo");
+    for nota in ["mejoras-paso-wps", "mejoras-paso-wpa2"] {
+        let nombre = format!(r#"aria-label="{} · {red}""#, traducir(nota, None));
+        assert_eq!(h.matches(&nombre).count(), 1, "{nombre}: {h}");
+    }
+    let h = html(grupo(vec![
+        paso(0, "mejoras-paso-wps", None),
+        paso(1, "mejoras-paso-wpa2", None),
+    ]));
+    assert!(!h.contains(&format!(" · {red}")), "{h}");
+}

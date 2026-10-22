@@ -171,12 +171,21 @@ fn paso(
         };
         view! { <p class="pagina-sub grupo-paso-nota">{texto}</p> }
     });
+    // En un lote, varios pasos son del mismo ajuste (el WPS y el WPA2 de
+    // una red): la casilla se nombra con el paso y su elemento («Quitar el
+    // WPS · Red WiFi 5 GHz»).
+    let nombre_casilla = p
+        .pestana
+        .as_ref()
+        .and(p.nota.as_ref())
+        .map(|nota| format!("{} · {nombre}", traducir(nota, None)));
     let cabeza = varios.then(|| {
         view! {
             <legend class="grupo-paso-titulo">
                 <input
                     id=id.clone()
                     type="checkbox"
+                    aria-label=nombre_casilla
                     prop:checked=move || marcados.with(|m| m.get(i).copied().unwrap_or(false))
                     disabled=move || sin_cambios || bloqueado.get()
                     on:change=move |ev| {

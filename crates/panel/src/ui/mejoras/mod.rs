@@ -57,32 +57,40 @@ pub fn PaginaMejoras() -> impl IntoView {
         },
     );
     // El contador de la barra toma el total de esta lectura: no hace la suya.
+    // Si la lectura falla, no se queda con una cuenta que no se comprobó.
     Effect::new(move |_| {
-        if let Some(Ok(m)) = datos.get() {
-            proveedores.set_value(m.proveedores);
-            if let Some(CuentaMejoras(c)) = cuenta {
-                c.set(Some(m.pendientes));
+        let pendientes = match datos.get() {
+            None => return,
+            Some(Ok(m)) => {
+                proveedores.set_value(m.proveedores);
+                m.pendientes
             }
+            Some(Err(_)) => None,
+        };
+        if let Some(CuentaMejoras(c)) = cuenta {
+            c.set(Some(pendientes));
         }
     });
+    // El lote que se está preparando y el último error al prepararlo (ya
+    // aplicado, pasos sin leer, otro cambio en curso): va en su tarjeta, sin
+    // abrir el diálogo. Una lectura nueva lo borra: puede no ser ya cierto.
+    let preparando = RwSignal::new(None::<String>);
+    let error = RwSignal::new(None::<(String, String)>);
     let volver_a_leer = Callback::new(move |()| {
+        error.set(None);
         fresca.set_value(true);
         datos.refetch();
     });
     // Al terminar un cambio (aplicado o deshecho), lo leído ya no vale: la
     // página vuelve a leer (el marco, con el propio `Seguimiento`).
     let recargar = Callback::new(move |()| {
+        error.set(None);
         fresca.set_value(true);
         datos.refetch();
     });
     let seguimiento = Seguimiento::nuevo(recargar, Borradores::nuevos(), Seleccion::nueva());
     provide_context(seguimiento);
     let selector = SelectorDns::nuevo();
-    // El lote que se está preparando y el último error al prepararlo (ya
-    // aplicado, pasos sin leer, otro cambio en curso): va en su tarjeta, sin
-    // abrir el diálogo.
-    let preparando = RwSignal::new(None::<String>);
-    let error = RwSignal::new(None::<(String, String)>);
     let al_revisar = Callback::new(move |lote: String| {
         if preparando.get_untracked().is_some() {
             return;
