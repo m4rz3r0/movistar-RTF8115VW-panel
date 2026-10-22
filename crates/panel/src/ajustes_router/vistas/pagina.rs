@@ -139,6 +139,10 @@ pub struct RecomendacionVista {
     pub ajuste: String,
     pub campo: String,
     pub valor: String,
+    /// Los lotes de Mejoras que cambian ese campo, por su clave de texto
+    /// (`mejoras-lote-<id>`), en el orden del catálogo.
+    #[serde(default)]
+    pub lotes: Vec<String>,
 }
 
 /// El pie de la tarjeta: información viva.

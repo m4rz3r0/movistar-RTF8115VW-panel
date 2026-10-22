@@ -33,6 +33,7 @@ mod lista;
 mod mejoras;
 mod menu;
 mod pagina_tema;
+mod pagina_tema_lotes;
 mod pagina_temas;
 mod panel_ajustes;
 mod poller;

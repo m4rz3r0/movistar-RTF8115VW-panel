@@ -17,6 +17,7 @@ use crate::ui::comun::EstadoVisual;
 use crate::ui::explorador::{CambioVista, EstadoDeCambio, estado_cambio, texto_error};
 use crate::ui::grupo::{DialogoGrupo, texto_valor};
 use crate::ui::i18n::traducir;
+use crate::ui::layout::RecargaMarco;
 use leptos::{prelude::*, task::spawn_local};
 use std::time::Duration;
 
@@ -90,6 +91,9 @@ pub(crate) struct Seguimiento {
     /// Grupo preparado a la espera de que se revise en el diálogo.
     dialogo: RwSignal<Option<Revision>>,
     recargar: Callback<()>,
+    /// El marco (el contador de Mejoras de la barra lateral), que vuelve a
+    /// contar cuando termina un cambio.
+    marco: Option<RecargaMarco>,
     /// Lo editado en cada detalle: el de lo que se aplica se olvida.
     borradores: Borradores,
     /// Elementos que se acaban de cerrar así: la página deja su dirección.
@@ -116,6 +120,7 @@ impl Seguimiento {
             error: RwSignal::new(None),
             dialogo: RwSignal::new(None),
             recargar,
+            marco: use_context::<RecargaMarco>(),
             borradores,
             cerrados: RwSignal::new(Vec::new()),
         };
@@ -183,6 +188,11 @@ impl Seguimiento {
                 }
             }
             self.recargar.run(());
+            // Aplicado o deshecho, lo pendiente de Mejoras cambia: el
+            // contador de la barra lateral vuelve a contar al momento.
+            if let Some(RecargaMarco(r)) = self.marco {
+                r.try_update(|n| *n += 1);
+            }
         }
     }
 

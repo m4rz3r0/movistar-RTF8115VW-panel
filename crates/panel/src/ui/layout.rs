@@ -87,8 +87,8 @@ const ICONO_USUARIO: &str =
 const ICONO_MENU: &str = "M3 5.5h14M3 10h14M3 14.5h14";
 
 /// Pide al marco que vuelva a contar lo que muestra la barra lateral (el
-/// contador de Mejoras): quien cambia algo del router fuera de Mejoras
-/// incrementa la señal.
+/// contador de Mejoras): el seguimiento de los cambios (Ajustes y Mejoras)
+/// incrementa la señal al terminar uno, aplicado o deshecho.
 #[derive(Clone, Copy)]
 pub struct RecargaMarco(pub RwSignal<u32>);
 

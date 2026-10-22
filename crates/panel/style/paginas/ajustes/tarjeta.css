@@ -167,6 +167,29 @@
   color: var(--suave);
 }
 
+/* «Forma parte de «…» · Ver en Mejoras»: una línea bajo el problema. */
+.tarjeta-rec-lotes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 6px;
+  margin-top: 4px;
+  color: var(--suave);
+}
+
+.tarjeta-rec-lotes-texto::after {
+  content: "·" / "";
+  margin-left: 6px;
+}
+
+.tarjeta-rec-lotes .b-txt {
+  min-height: 24px;
+  margin-left: -4px;
+  padding: 0 4px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .tarjeta-sin-leer {
   display: flex;
   flex-wrap: wrap;

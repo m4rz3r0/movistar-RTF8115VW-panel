@@ -6,11 +6,30 @@ use super::super::campo::partir_motivo;
 use crate::ajustes_router::{ElementoVista, PeticionAjuste, preparar_ajuste};
 use crate::t;
 use crate::ui::explorador::texto_error;
+use crate::ui::i18n::traducir;
 use leptos::{prelude::*, task::spawn_local};
 use std::collections::BTreeMap;
 
+/// De qué lotes de Mejoras forma parte el campo de la recomendación
+/// («Forma parte de «Seguridad recomendada»»), o nada si de ninguno.
+fn texto_lotes(lotes: &[String]) -> Option<String> {
+    match lotes {
+        [] => None,
+        [lote] => Some(t!(
+            "ajustes-recomendacion-lote",
+            lote = traducir(lote, None)
+        )),
+        [primero, segundo, ..] => Some(t!(
+            "ajustes-recomendacion-lotes",
+            primero = traducir(primero, None),
+            segundo = traducir(segundo, None),
+        )),
+    }
+}
+
 /// La recomendación pendiente más importante de `e`: qué pasa ahora, para
-/// quién es lo recomendado y el
+/// quién es lo recomendado, de qué lotes de Mejoras forma parte (con un
+/// enlace a Mejoras) y el
 /// botón que prepara el cambio a lo recomendado (se revisa en el diálogo).
 /// Fondo ámbar si es un riesgo de seguridad; neutro, si no. En solo
 /// lectura, el botón se ve desactivado y dice por qué.
@@ -21,6 +40,17 @@ pub(super) fn recomendacion(
     let r = e.recomendacion.clone()?;
     let s = expect_context::<Seguimiento>();
     let (para_quien, _) = partir_motivo(&r.texto, &t!("ajustes-recomendado-marca"));
+    let lotes = texto_lotes(&r.lotes).map(|texto| {
+        view! {
+            <span class="tarjeta-rec-lotes">
+                <span class="tarjeta-rec-lotes-texto">{texto}</span>
+                " "
+                <a class="b-txt" href="/mejoras">
+                    {t!("ajustes-recomendacion-ver-mejoras")}
+                </a>
+            </span>
+        }
+    });
     let id = e.id.clone();
     let preparando = RwSignal::new(false);
     let (ajuste, campo, valor) = (r.ajuste.clone(), r.campo.clone(), r.valor.clone());
@@ -51,6 +81,7 @@ pub(super) fn recomendacion(
                 {r.problema.clone()}
                 " "
                 <span class="tarjeta-rec-quien">{para_quien}</span>
+                {lotes}
             </p>
             <button
                 type="button"

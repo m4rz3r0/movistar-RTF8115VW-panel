@@ -132,6 +132,10 @@ pub(super) fn recomendacion(
             .unwrap_or_default(),
         riesgo: *riesgo,
         boton,
+        lotes: ajustes::lotes_del_campo(cat, &v.id, &c.id)
+            .into_iter()
+            .map(ajustes::clave_lote)
+            .collect(),
         ajuste: v.id.clone(),
         campo: c.id.clone(),
         valor,

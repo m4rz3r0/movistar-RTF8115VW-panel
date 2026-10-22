@@ -385,3 +385,78 @@ test.describe("Revisión de un lote: casos raros", () => {
     expect(errores, "errores o avisos en la consola").toEqual([]);
   });
 });
+
+// Desde Ajustes: la recomendación de una tarjeta dice de qué lote forma
+// parte su ajuste y lleva a Mejoras (solo lee: las fixtures siguen igual).
+const CAPTURAS_AJUSTES = "capturas/mejoras-6";
+
+/** La tarjeta de Ajustes cuyo título es `titulo`. */
+function tarjetaDeAjustes(page: Page, titulo: string): Locator {
+  return page.locator("article.tarjeta-el").filter({
+    has: page.getByRole("heading", { level: 2, name: titulo, exact: true }),
+  });
+}
+
+for (const ancho of [360, 1440]) {
+  test.describe(`Enlace desde Ajustes a ${ancho} px`, () => {
+    test.use({ locale: "es-ES", baseURL: mejoras.url, viewport: { width: ancho, height: 900 } });
+
+    test("enlace desde Ajustes", async ({ page }) => {
+      const errores = recogerErrores(page);
+      await entrarEnSuPanel(page);
+      await page.goto("/ajustes/wifi");
+      await asentar(page);
+      const red24 = tarjetaDeAjustes(page, "Red WiFi 2,4 GHz");
+      const rec = red24.locator(".tarjeta-rec");
+      await expect(rec).toContainText("Forma parte de «Seguridad recomendada»");
+      // Una sola recomendación en la tarjeta, con su enlace dentro.
+      await expect(rec).toHaveCount(1);
+      const enlace = rec.getByRole("link", { name: "Ver en Mejoras" });
+      await expect(enlace).toHaveAttribute("href", "/mejoras");
+      await sinDesbordamiento(page, `ajustes wifi ${ancho}`);
+      expect.soft(await violacionesGraves(page), `ajustes wifi ${ancho}`).toEqual([]);
+      await quieta(page);
+      await red24.screenshot({
+        path: `${CAPTURAS_AJUSTES}/tarjeta-wifi-${ancho}.png`,
+        animations: "disabled",
+      });
+      await enlace.click();
+      await page.waitForURL((u) => u.pathname === "/mejoras");
+      await expect(page.locator("main h1")).toHaveText("Mejoras recomendadas para tu router");
+      expect(errores, "errores o avisos en la consola").toEqual([]);
+    });
+  });
+}
+
+// Un cambio aplicado o deshecho desde Ajustes pone al día el contador de la
+// barra lateral al momento, sin cambiar de página.
+test.describe("contador tras un cambio en Ajustes", () => {
+  test.use({ locale: "es-ES", baseURL: mejoras.url, viewport: { width: 1440, height: 900 } });
+
+  test("quitar el WPS desde Ajustes", async ({ page }) => {
+    test.setTimeout(plazoDeTest(2));
+    const errores = recogerErrores(page);
+    await entrarEnSuPanel(page);
+    await page.goto("/ajustes/wifi");
+    await asentar(page);
+    const cuenta = page.locator("nav .cuenta");
+    await expect(cuenta).toHaveText("6");
+    const rec = tarjetaDeAjustes(page, "Red WiFi 2,4 GHz").locator(".tarjeta-rec");
+    await rec.getByRole("button", { name: "Quitar WPS" }).click();
+    const dialogo = page.locator("dialog[open]");
+    await expect(dialogo.locator("#grupo-titulo")).toHaveText("Revisa el cambio");
+    await dialogo.getByRole("button", { name: "Aplicar", exact: true }).click();
+    const cambio = page.locator(".avisos-cambio [role=status] .aviso-cambio");
+    await expect(cambio).toContainText(HECHO, { timeout: PLAZO_CAMBIO });
+    await expect(cuenta).toHaveText("5", { timeout: PLAZO_CAMBIO });
+    // Deshacerlo también lo pone al día (y deja las fixtures como estaban).
+    await cambio.getByRole("button", { name: "Deshacer", exact: true }).click();
+    await expect(dialogo.locator("#grupo-titulo")).toHaveText("Volver a como estaba");
+    await dialogo.getByRole("button", { name: "Deshacer", exact: true }).click();
+    await expect(page.locator("dialog[open]")).toHaveCount(0);
+    await expect(cuenta).toHaveText("6", { timeout: PLAZO_CAMBIO });
+    await expect(cambio).toContainText(HECHO);
+    await expect(page).toHaveURL(/\/ajustes\/wifi$/);
+    expect(errores, "errores o avisos en la consola").toEqual([]);
+  });
+});

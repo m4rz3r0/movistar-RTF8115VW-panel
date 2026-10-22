@@ -16,7 +16,7 @@ use crate::ajustes_router::{OpcionesLote, ProveedorVista, leer_mejoras, preparar
 use crate::t;
 use crate::ui::ajustes_router::{AvisoCambio, Borradores, Seguimiento, Seleccion};
 use crate::ui::explorador::texto_error;
-use crate::ui::layout::{CuentaMejoras, RecargaMarco};
+use crate::ui::layout::CuentaMejoras;
 use crate::ui::{Estado, IconoEstado};
 use leptos::{prelude::*, task::spawn_local};
 use revision::SelectorDns;
@@ -47,7 +47,6 @@ pub fn PaginaMejoras() -> impl IntoView {
     // «Volver a leer»: la próxima lectura no sale de la caché del servidor.
     let fresca = StoredValue::new(false);
     let cuenta = use_context::<CuentaMejoras>();
-    let marco = use_context::<RecargaMarco>();
     // Los proveedores de DNS del selector, de la última lectura.
     let proveedores = StoredValue::new(Vec::<ProveedorVista>::new());
     let datos = Resource::new(
@@ -71,13 +70,10 @@ pub fn PaginaMejoras() -> impl IntoView {
         datos.refetch();
     });
     // Al terminar un cambio (aplicado o deshecho), lo leído ya no vale: la
-    // página y el marco vuelven a leer.
+    // página vuelve a leer (el marco, con el propio `Seguimiento`).
     let recargar = Callback::new(move |()| {
         fresca.set_value(true);
         datos.refetch();
-        if let Some(RecargaMarco(r)) = marco {
-            r.update(|n| *n += 1);
-        }
     });
     let seguimiento = Seguimiento::nuevo(recargar, Borradores::nuevos(), Seleccion::nueva());
     provide_context(seguimiento);
