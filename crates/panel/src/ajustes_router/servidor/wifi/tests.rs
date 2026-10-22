@@ -152,7 +152,9 @@ fn sin_la_lista_no_hay_nota() {
 }
 
 /// Encendida (`adm_state=1`) con la radio encendida, pero sin emitir
-/// (`opr_status=0`): ni «Apagada» ni «Encendida».
+/// (`opr_status=0`): ni «Apagada» ni «Encendida». La radio lleva la nota
+/// de que ninguna de sus redes emite (no de que estén apagadas: la
+/// insignia dice que esta está encendida).
 #[test]
 fn encendida_que_no_emite_lo_dice() {
     let mut lecturas = todo_apagado();
@@ -164,6 +166,14 @@ fn encendida_que_no_emite_lo_dice() {
         Some(NotaRadio::SinRedes),
         "no emite ninguna"
     );
+    // El texto de la nota habla de emitir, no de estar encendidas.
+    for idioma in i18n::Idioma::TODOS {
+        let nota = i18n::tr(idioma, "ajustes-wifi-radio-sin-redes", None);
+        assert!(
+            !nota.contains("activa") && !nota.contains("active"),
+            "{nota}"
+        );
+    }
 }
 
 /// Si emite manda sobre lo encendida; sin él, vale lo encendida.

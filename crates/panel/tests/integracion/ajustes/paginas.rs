@@ -297,13 +297,8 @@ async fn cada_red_dice_si_esta_encendida() {
         .await
         .unwrap();
     let casos = [
-        (
-            "es",
-            "Apagada",
-            "Encendida",
-            "ninguna de sus redes está activa",
-        ),
-        ("en", "Off", "On", "none of its networks is active"),
+        ("es", "Apagada", "Encendida", "ninguna de sus redes emite"),
+        ("en", "Off", "On", "none of its networks is broadcasting"),
     ];
     for (idioma, apagada, encendida, nota) in casos {
         let cookie = format!("{cookie}; rp_lang={idioma}");

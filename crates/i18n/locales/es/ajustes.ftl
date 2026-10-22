@@ -157,7 +157,7 @@ ajustes-foto-error-secreto = Al instalar, el router no dejaba leer esta clave, a
 ajustes-wifi-red-encendida = Encendida
 ajustes-wifi-red-apagada = Apagada
 ajustes-wifi-red-sin-radio = No emite: la radio está apagada
-ajustes-wifi-radio-sin-redes = La radio está encendida, pero ninguna de sus redes está activa: no emite ninguna WiFi.
+ajustes-wifi-radio-sin-redes = La radio está encendida, pero ninguna de sus redes emite: en esta banda no hay WiFi.
 ajustes-wifi-red-no-emite = Encendida, pero no emite
 ajustes-wifi-radio-ocultas = { $n ->
     [one] La radio emite una red que el panel no muestra.

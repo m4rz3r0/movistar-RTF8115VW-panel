@@ -157,7 +157,7 @@ ajustes-foto-error-secreto = At installation, the router did not let this key be
 ajustes-wifi-red-encendida = On
 ajustes-wifi-red-apagada = Off
 ajustes-wifi-red-sin-radio = Not broadcasting: the radio is off
-ajustes-wifi-radio-sin-redes = The radio is on, but none of its networks is active: it does not broadcast any WiFi.
+ajustes-wifi-radio-sin-redes = The radio is on, but none of its networks is broadcasting: there is no WiFi on this band.
 ajustes-wifi-red-no-emite = On, but not broadcasting
 ajustes-wifi-radio-ocultas = { $n ->
     [one] The radio broadcasts one network that the panel does not show.
