@@ -50,10 +50,19 @@ pub struct AjusteVista {
     /// resto o si la lectura no lo dice.
     #[serde(default)]
     pub red_wifi: Option<EmisionRed>,
-    /// En la de una radio WiFi: está encendida, pero ninguna de sus redes
-    /// lo está, así que no emite ninguna WiFi (lleva una nota).
+    /// En la de una radio WiFi encendida, lo que no se ve en sus redes (lleva
+    /// una nota); `None` si no hay nada que avisar o no se sabe.
     #[serde(default)]
-    pub radio_sin_redes: bool,
+    pub nota_radio: Option<NotaRadio>,
+}
+
+/// Nota de la tarjeta de una radio WiFi encendida.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum NotaRadio {
+    /// No emite ninguna red: ni las que muestra el panel ni las demás.
+    SinRedes,
+    /// Emite tantas redes que el panel no muestra (se ven en la Biblioteca).
+    Ocultas(u32),
 }
 
 /// Si una red WiFi emite, para la insignia de su tarjeta.
@@ -63,6 +72,8 @@ pub enum EmisionRed {
     Apagada,
     /// Encendida, pero su radio está apagada: no emite.
     SinRadio,
+    /// Encendida, con la radio encendida, pero el router dice que no emite.
+    NoEmite,
 }
 
 /// Si se pudo leer el valor actual de un ajuste.

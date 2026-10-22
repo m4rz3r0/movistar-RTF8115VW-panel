@@ -58,7 +58,13 @@ pub(super) async fn leer_tema(tema: String) -> Result<TemaVista, ServerFnError> 
         .ok_or_else(|| fallo(StatusCode::NOT_FOUND, t!("ajustes-error-tema")))?;
     let del_tema: Vec<&Ajuste> = state.ajustes.por_tema(tema).collect();
     let claves: Vec<Clave> = del_tema.iter().map(|a| clave(a)).collect();
-    let leidas = state.lecturas.leer(&state.hgu, &claves).await;
+    let de_listas = wifi::claves_de_listas(&del_tema);
+    let todas: Vec<Clave> = claves
+        .iter()
+        .cloned()
+        .chain(de_listas.iter().map(|(_, c)| c.clone()))
+        .collect();
+    let leidas = state.lecturas.leer(&state.hgu, &todas).await;
     let nodos: Vec<Option<&XmlNode>> = claves
         .iter()
         .map(|c| leidas.get(c).and_then(|r| r.as_ref().ok()))
@@ -68,7 +74,14 @@ pub(super) async fn leer_tema(tema: String) -> Result<TemaVista, ServerFnError> 
         .zip(&nodos)
         .map(|(a, nodo)| vista(&state.catalogo, a, *nodo))
         .collect();
-    wifi::marcar_emision(&mut ajustes, &nodos);
+    let listas: Vec<(String, Option<&XmlNode>)> = de_listas
+        .into_iter()
+        .map(|(radio, c)| {
+            let n = leidas.get(&c).and_then(|r| r.as_ref().ok());
+            (radio, n)
+        })
+        .collect();
+    wifi::marcar_emision(&del_tema, &mut ajustes, &nodos, &listas);
     Ok(TemaVista {
         tema: tema.slug().to_owned(),
         solo_lectura: instancia::solo_lectura(&state.db).await,

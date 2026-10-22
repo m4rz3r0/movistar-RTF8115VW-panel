@@ -319,3 +319,45 @@ async fn cada_red_dice_si_esta_encendida() {
         assert!(!tarjeta(&html, "wifi.red_24").contains(nota), "{idioma}");
     }
 }
+
+/// Un punto de acceso que el panel no muestra (el 4, en la radio de
+/// 2,4 GHz) encendido: la radio no dice que no emite ninguna WiFi, sino
+/// que emite una red que no se ve aquí, con el enlace a la Biblioteca.
+#[tokio::test]
+async fn red_oculta_encendida_se_avisa() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    p.state
+        .hgu
+        .write(
+            "wifi.asp",
+            "cbSetWifiAccPt",
+            &[("dpm_cfg_wifi_acc_pt_id", "4"), ("adm_state", "1")],
+        )
+        .await
+        .unwrap();
+    let casos = [
+        (
+            "es",
+            "La radio emite una red que el panel no muestra.",
+            "ninguna de sus redes",
+        ),
+        (
+            "en",
+            "The radio broadcasts one network that the panel does not show.",
+            "none of its networks",
+        ),
+    ];
+    for (idioma, ocultas, ninguna) in casos {
+        let cookie = format!("{cookie}; rp_lang={idioma}");
+        let (status, _, html) = pagina(&p, &cookie, "/ajustes/wifi").await;
+        assert_eq!(status, 200, "{html}");
+        let radio = tarjeta(&html, "wifi.radio_24");
+        assert!(radio.contains(ocultas), "{idioma}: {radio}");
+        assert!(
+            radio.contains("href=\"/explorador/wifi\""),
+            "{idioma}: {radio}"
+        );
+        assert!(!radio.contains(ninguna), "{idioma}: {radio}");
+        assert!(tarjeta(&html, "wifi.radio_5").contains(ninguna), "{idioma}");
+    }
+}
