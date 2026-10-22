@@ -114,7 +114,7 @@ mod tests {
         let ana = Some("Móvil de Ana".to_owned());
         assert_eq!(texto_dispositivos(&[]), None);
         assert_eq!(
-            texto_dispositivos(&[ana.clone()]).as_deref(),
+            texto_dispositivos(std::slice::from_ref(&ana)).as_deref(),
             Some("1 dispositivo conectado: Móvil de Ana")
         );
         assert_eq!(
