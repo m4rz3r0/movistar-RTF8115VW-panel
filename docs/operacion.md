@@ -54,7 +54,8 @@ bajo `RP_ORIGIN`; cualquier otra página lleva allí):
    modelo y firmware y sale sin guardar; «Guardar y seguir» las guarda
    **cifradas** en la base de datos (con la clave maestra) solo si entran.
    Con un firmware que no es uno de los probados el panel queda en **solo
-   lectura** hasta confirmarlo en «Router → Conexión con el router».
+   lectura** hasta confirmarlo en «Configuración del router → Conexión con el
+   router».
 4. **Lectura inicial.** Lee todas las funciones de lectura y guarda la «foto
    de partida» cifrada. Con eso la instalación termina: `/instalar` responde
    404 y el panel se usa como siempre.
@@ -62,7 +63,7 @@ bajo `RP_ORIGIN`; cualquier otra página lleva allí):
 Si el proceso se reinicia a medias, el asistente sigue donde se quedó (con un
 token nuevo si aún no había administrador).
 
-## Router (`/router`)
+## Configuración del router (`/router`)
 
 Sección de la navegación principal con los ajustes del router, cada uno en su
 página; `/router` lleva a la primera:
@@ -79,15 +80,15 @@ En el menú del usuario; solo lo del panel. Secciones:
 - **Panel**: idioma por defecto de la instancia («El del navegador» si no se
   fija ninguno) y zona horaria. Al cambiar el idioma por defecto la página se
   recarga para pintarse con el que le toque.
-- **Privacidad e instancia**: DNS preferidos, dispositivos de confianza,
-  ventana de mantenimiento y servidor propio (opcionales).
+- **Visualización** y **Tema**: el modo de visualización (texto, gráfica o
+  mixto) y el tema de los colores; cada usuario elige los suyos.
 - **Usuarios**: alta, baja y cambio de contraseña.
 
-Las operaciones delicadas (credenciales del router, confirmar el firmware y
-todo lo de usuarios) piden volver a escribir la contraseña del panel; durante
-5 minutos no se vuelve a pedir en esa sesión. «Revelar» un secreto en el
-Explorador usa la misma ventana. Con un cambio aplicándose o vigilándose, las
-credenciales del router no se pueden cambiar (se pide esperar).
+Las operaciones delicadas (credenciales y contraseña del router, la conexión
+de internet, confirmar el firmware y todo lo de usuarios) piden volver a
+escribir la contraseña del panel; durante 5 minutos no se vuelve a pedir en
+esa sesión. Con un cambio aplicándose o vigilándose, las credenciales del
+router no se pueden cambiar (se pide esperar).
 
 ## Idioma
 
@@ -136,10 +137,10 @@ contraseña cifrada con la clave maestra. Para cambiarla:
 
 1. Cambia la contraseña **en el router** (en su web). Hasta el paso
    siguiente el sondeo del panel fallará (`"router":"error"` en `/salud`).
-2. En «Router → Conexión con el router», escribe la nueva (y la dirección y el
-   usuario si cambian), «Probar la conexión» y «Guardar las credenciales». El
-   panel prueba a entrar antes de guardar y desde ese momento usa las nuevas;
-   no hace falta reiniciar nada.
+2. En «Configuración del router → Conexión con el router», escribe la nueva
+   (y la dirección y el usuario si cambian), «Probar la conexión» y «Guardar
+   las credenciales». El panel prueba a entrar antes de guardar y desde ese
+   momento usa las nuevas; no hace falta reiniciar nada.
 3. Comprueba `/salud` desde el equipo del panel (o desde el proxy):
 
    ```sh
@@ -250,9 +251,10 @@ en un fichero (`router.secret`) y el servicio la pasaba con `RP_ROUTER_URL`,
 - Las tres variables van juntas o ninguna: con una o dos, el panel no arranca
   (error claro en el registro).
 
-Una vez importadas (ver el registro, o «Router → Conexión con el router»), se
-pueden quitar las variables y borrar el fichero. En FreeBSD, el
-`routerpanel.rc` que instala `install.sh` solo las pasa si existe el fichero:
+Una vez importadas (ver el registro, o «Configuración del router → Conexión
+con el router»), se pueden quitar las variables y borrar el fichero. En
+FreeBSD, el `routerpanel.rc` que instala `install.sh` solo las pasa si existe
+el fichero:
 
 ```sh
 doas jexec -U routerpanel <JAIL_PANEL> rm /usr/local/etc/routerpanel/router.secret
