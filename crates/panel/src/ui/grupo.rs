@@ -503,6 +503,33 @@ mod tests {
         Owner::new().with(|| view! { <DialogoGrupo grupo=g on_cerrar=|_| {} /> }.to_html())
     }
 
+    /// Una MAC tal cual lleva un `<wbr>` tras cada «:» (se parte solo por
+    /// ahí); un sí/no traducido, ninguno.
+    #[test]
+    fn valor_tal_cual_se_parte_por_sus_separadores() {
+        let paso = PasoVista {
+            campos: vec![
+                cambio(
+                    "ajuste-red_local-reservas-mac",
+                    "",
+                    "02:00:00:00:00:03",
+                    TipoCampo::Texto,
+                ),
+                cambio(
+                    "ajuste-red_local-reservas-activa",
+                    "false",
+                    "true",
+                    TipoCampo::Booleano,
+                ),
+            ],
+            ..PasoVista::default()
+        };
+        let h = html(grupo(vec![paso]));
+        assert!(h.contains("02:<wbr>"), "{h}");
+        assert!(h.contains("03<wbr>"), "{h}");
+        assert_eq!(h.matches("<wbr>").count(), 6, "solo los de la MAC: {h}");
+    }
+
     /// El resumen nombra a qué se refiere el cambio si el título no basta
     /// (el dispositivo de una IP fija).
     #[test]

@@ -15,7 +15,36 @@ fn valor(c: &CambioLegible, v: &str) -> AnyView {
         }
         .into_any();
     }
-    view! { <span>{texto_valor(c, v)}</span> }.into_any()
+    let texto = texto_valor(c, v);
+    if texto != v {
+        // Un texto traducido (un sí/no, una opción): se parte por palabras.
+        return view! { <span>{texto}</span> }.into_any();
+    }
+    // Un valor tal cual (una MAC, una IP, una dirección web): se parte solo
+    // tras sus separadores.
+    let trozos = trozos(v)
+        .into_iter()
+        .map(|t| view! { {t.to_owned()}<wbr /> })
+        .collect_view();
+    view! { <span>{trozos}</span> }.into_any()
+}
+
+/// `texto` en trozos que acaban en «:», «.» o «/»: tras cada uno puede
+/// partirse la línea (una MAC por sus «:», una dirección web por sus «.» y
+/// «/»), y en ningún otro sitio salvo un espacio o un «-».
+fn trozos(texto: &str) -> Vec<&str> {
+    let mut out = Vec::new();
+    let mut inicio = 0;
+    for (i, c) in texto.char_indices() {
+        if matches!(c, ':' | '.' | '/') {
+            out.push(&texto[inicio..=i]);
+            inicio = i + 1;
+        }
+    }
+    if inicio < texto.len() {
+        out.push(&texto[inicio..]);
+    }
+    out
 }
 
 /// Tabla «antes → después» de los campos de un paso.
@@ -209,5 +238,28 @@ pub(super) fn lista(
     view! {
         {varios.then(|| view! { <p class="pagina-sub">{t!("ajustes-grupo-pasos-desc")}</p> })}
         <div class="grupo-pasos">{bloques}</div>
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::trozos;
+
+    /// Una MAC, una IP y una dirección web se cortan tras sus separadores;
+    /// lo demás, entero.
+    #[test]
+    fn trozos_tras_los_separadores() {
+        assert_eq!(
+            trozos("02:00:00:00:00:03"),
+            ["02:", "00:", "00:", "00:", "00:", "03"]
+        );
+        assert_eq!(trozos("192.168.1.62"), ["192.", "168.", "1.", "62"]);
+        assert_eq!(
+            trozos("https://a.example/cwmp"),
+            ["https:", "/", "/", "a.", "example/", "cwmp"]
+        );
+        assert_eq!(trozos("RED-1"), ["RED-1"]);
+        assert_eq!(trozos("hora.roa.es."), ["hora.", "roa.", "es."]);
+        assert!(trozos("").is_empty());
     }
 }

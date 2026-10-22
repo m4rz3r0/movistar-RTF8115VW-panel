@@ -150,18 +150,19 @@
   }
 
   /* Los pasos del grupo caben sin desplazar: los valores largos (un
-     servidor de hora) se parten. */
+     servidor de hora, una dirección web, una MAC) se parten tras «:», «.»,
+     «/» o «-» (los <wbr> de ui/grupo/pasos.rs), nunca en mitad de una
+     palabra ni de un título de columna. */
   .dialogo-grupo .tabla th,
   .dialogo-grupo .tabla td {
     white-space: normal;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
   }
 
   /* El nombre del dato se parte por palabras y deja a los valores (una IP)
      el ancho para ir enteros. */
   .dialogo-grupo .tabla tbody th[scope="row"] {
     width: 34%;
-    overflow-wrap: normal;
   }
 
   .cabecera-funcion h1 {
