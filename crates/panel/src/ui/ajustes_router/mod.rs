@@ -13,6 +13,7 @@
 
 mod campo;
 mod dispositivos;
+mod emision;
 mod foto;
 mod puertos;
 mod reservas;

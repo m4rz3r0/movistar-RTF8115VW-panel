@@ -549,8 +549,8 @@ fn forma(
 }
 
 /// Las tres redes WiFi tienen los mismos campos, parámetros, validaciones y
-/// opciones; solo difiere la recomendación del aislamiento (sí en
-/// invitados). Las dos radios, igual, salvo canales, anchos y modos (propios
+/// opciones; solo difieren la recomendación del aislamiento (sí en
+/// invitados) y la de encender la red (apagada en invitados). Las dos radios, igual, salvo canales, anchos y modos (propios
 /// de cada banda) y la señal dirigida, que solo está en 5 GHz.
 #[test]
 fn redes_y_radios_wifi_iguales_salvo_lo_previsto() {
@@ -560,7 +560,13 @@ fn redes_y_radios_wifi_iguales_salvo_lo_previsto() {
         for otra in ["red_5", "invitados"] {
             let a = c.ajuste(&format!("wifi.{otra}{sufijo}")).unwrap();
             assert_eq!(forma(a), forma(base), "{}", a.id);
-            let quita = |x: &Campo| sin(x, x.id == "aislamiento", false);
+            let quita = |x: &Campo| {
+                let mut x = sin(x, x.id == "aislamiento", false);
+                if x.id == "activa" {
+                    x.opciones.iter_mut().for_each(|o| o.recomendada = false);
+                }
+                x
+            };
             let campos: Vec<Campo> = a.campos.iter().map(quita).collect();
             let esperados: Vec<Campo> = base.campos.iter().map(quita).collect();
             assert_eq!(campos, esperados, "{}", a.id);

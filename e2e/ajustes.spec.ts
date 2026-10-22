@@ -25,6 +25,7 @@ test.describe.configure({ mode: "parallel" });
 const textos = {
   es: {
     red5: "Red WiFi 5 GHz",
+    red: "Red",
     nombre: "Nombre de la red",
     seguridad: "Seguridad",
     aplicando: "Aplicando…",
@@ -44,6 +45,7 @@ const textos = {
   },
   en: {
     red5: "5 GHz WiFi network",
+    red: "Network",
     nombre: "Network name",
     seguridad: "Security",
     aplicando: "Applying…",
@@ -112,13 +114,19 @@ for (const idioma of ["es", "en"] as const) {
         await expect(red5).toBeVisible();
         await asentar(page);
         await sinDesbordamiento(page, `wifi ${idioma} ${ancho}`);
-        const antes = (await red5.locator(".ajuste-fila dd").first().innerText()).trim();
+        // (La primera fila es si la red está encendida: el nombre, después.)
+        const filaNombre = red5
+          .locator(".ajuste-resumen .ajuste-fila")
+          .filter({ has: page.getByText(t.nombre, { exact: true }) })
+          .locator("dd");
+        const antes = (await filaNombre.innerText()).trim();
         expect(antes.length).toBeGreaterThan(0);
 
         // 2. Cambiar el nombre.
         await red5.getByRole("button", { name: t.editar }).click();
+        // El foco, al primer campo: encender o apagar la red.
+        await expect(red5.getByLabel(t.red, { exact: true })).toBeFocused();
         const nombre = red5.getByLabel(t.nombre, { exact: true });
-        await expect(nombre).toBeFocused();
         const nuevo = `prueba-e2e-${idioma}-${ancho}`;
         await nombre.fill(nuevo);
         const guardar = red5.getByRole("button", { name: t.guardar });
@@ -178,7 +186,7 @@ for (const idioma of ["es", "en"] as const) {
           await expect(page.locator("dialog[open]")).toHaveCount(0);
           // La página relee el tema y el foco va al título de la tarjeta (eso
           // prueba la relectura: el nombre de antes ya estaba antes de aplicar).
-          await expect(red5.locator(".ajuste-fila dd").first()).toHaveText(antes);
+          await expect(filaNombre).toHaveText(antes);
           await expect(red5.getByRole("heading", { level: 2 })).toBeFocused();
         } else {
           // Cancelar: el foco vuelve a «Guardar» y nada se escribe.

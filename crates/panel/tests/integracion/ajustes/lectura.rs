@@ -235,13 +235,28 @@ async fn cada_lectura_una_sola_vez() {
             assert!(!vistas.contains(l), "{tema}: {l:?} repetida");
             vistas.push(l.clone());
         }
-        let distintas: std::collections::BTreeSet<_> = p
+        let mut distintas: std::collections::BTreeSet<_> = p
             .state
             .ajustes
             .por_tema(ajustes::Tema::from_slug(tema).unwrap())
             .map(|a| (a.leer.funcion.clone(), a.leer.params.clone()))
             .collect();
+        // La WiFi lee además la lista de puntos de acceso de cada radio
+        // (para saber si emite alguna red que el panel no muestra).
+        if tema == "wifi" {
+            for radio in ["0", "1"] {
+                let params = vec![("dpm_cfg_wifi_id".to_owned(), radio.to_owned())];
+                distintas.insert(("cbListWifiAccPt".to_owned(), params));
+            }
+        }
         assert_eq!(leidas.len(), distintas.len(), "{tema}: {leidas:#?}");
+        for radio in ["0", "1"].iter().filter(|_| tema == "wifi") {
+            let lista = (
+                "cbListWifiAccPt".to_owned(),
+                vec![("dpm_cfg_wifi_id".to_owned(), (*radio).to_owned())],
+            );
+            assert!(leidas.contains(&lista), "{tema}: {leidas:#?}");
+        }
     }
     let red_24 = (
         "cbGetWifiAccPt".to_owned(),

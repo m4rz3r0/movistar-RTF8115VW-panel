@@ -29,6 +29,11 @@
   gap: var(--esp-2);
 }
 
+/* Si la red WiFi emite: su insignia, como las demás etiquetas. */
+.emision-red {
+  display: inline-flex;
+}
+
 .chip-nivel {
   color: var(--texto-1);
 }

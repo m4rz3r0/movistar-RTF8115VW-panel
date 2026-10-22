@@ -152,3 +152,15 @@ ajustes-foto-error-sin-dato = How this setting was at installation was not saved
 ajustes-foto-error-lista = Lists cannot be put back as they were from here: change them in their section.
 ajustes-foto-error-desconocido = At installation, the router had a value here that the panel does not recognise, so it cannot put it back.
 ajustes-foto-error-secreto = At installation, the router did not let this key be read, so the panel cannot put it back.
+
+## Whether each network broadcasts: badge on a network's card and note on a radio's
+ajustes-wifi-red-encendida = On
+ajustes-wifi-red-apagada = Off
+ajustes-wifi-red-sin-radio = Not broadcasting: the radio is off
+ajustes-wifi-radio-sin-redes = The radio is on, but none of its networks is broadcasting: there is no WiFi on this band.
+ajustes-wifi-red-no-emite = On, but not broadcasting
+ajustes-wifi-radio-ocultas = { $n ->
+    [one] The radio broadcasts one network that the panel does not show.
+   *[other] The radio broadcasts { $n } networks that the panel does not show.
+}
+ajustes-wifi-radio-ocultas-enlace = View in the Library

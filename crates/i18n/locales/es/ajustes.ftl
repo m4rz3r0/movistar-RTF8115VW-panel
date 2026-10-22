@@ -152,3 +152,15 @@ ajustes-foto-error-sin-dato = De este ajuste no se guardó cómo estaba al insta
 ajustes-foto-error-lista = Las listas no se pueden volver a como estaban desde aquí: cámbialas en su tema.
 ajustes-foto-error-desconocido = Al instalar, el router tenía aquí un valor que el panel no reconoce, así que no puede volver a ponerlo.
 ajustes-foto-error-secreto = Al instalar, el router no dejaba leer esta clave, así que el panel no puede volver a ponerla.
+
+## Si cada red emite: insignia de la tarjeta de una red y nota de la de una radio
+ajustes-wifi-red-encendida = Encendida
+ajustes-wifi-red-apagada = Apagada
+ajustes-wifi-red-sin-radio = No emite: la radio está apagada
+ajustes-wifi-radio-sin-redes = La radio está encendida, pero ninguna de sus redes emite: en esta banda no hay WiFi.
+ajustes-wifi-red-no-emite = Encendida, pero no emite
+ajustes-wifi-radio-ocultas = { $n ->
+    [one] La radio emite una red que el panel no muestra.
+   *[other] La radio emite { $n } redes que el panel no muestra.
+}
+ajustes-wifi-radio-ocultas-enlace = Ver en la Biblioteca

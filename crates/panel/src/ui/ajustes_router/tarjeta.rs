@@ -17,6 +17,7 @@ use super::campo::{
     valor_resumido,
 };
 use super::dispositivos::Dispositivos;
+use super::emision;
 use super::puertos::Puertos;
 use super::reservas::Reservas;
 use crate::ajustes_router::{
@@ -89,19 +90,22 @@ fn riesgo(r: RiesgoCambio) -> AnyView {
     .into_any()
 }
 
-/// Cabecera común: título (enfocable, para volver a él tras guardar), nivel,
-/// riesgo si se puede cambiar, y la descripción corta.
+/// Cabecera común: título (enfocable, para volver a él tras guardar), si
+/// emite una red WiFi, nivel, riesgo si se puede cambiar, la descripción
+/// corta y, en una radio que no emite ninguna red, su nota.
 pub(super) fn cabecera(a: &AjusteVista, editable: bool) -> impl IntoView + use<> {
     let titulo_id = format!("{}-titulo", dom(a));
     view! {
         <header class="ajuste-cabecera">
             <h2 id=titulo_id tabindex="-1">{traducir(&format!("{}-titulo", a.clave), None)}</h2>
             <div class="ajuste-etiquetas">
+                {emision::insignia(a)}
                 {nivel(a.nivel)}
                 {editable.then(|| riesgo(a.riesgo))}
             </div>
         </header>
         <p class="ajuste-desc">{traducir(&format!("{}-desc", a.clave), None)}</p>
+        {emision::nota_radio(a)}
     }
 }
 

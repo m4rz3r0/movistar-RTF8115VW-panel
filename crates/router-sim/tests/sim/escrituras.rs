@@ -201,3 +201,33 @@ async fn escritura_del_pool_dhcp_se_lee() {
         Some("0")
     );
 }
+
+/// Encender o apagar una red WiFi (`adm_state`) cambia también si emite
+/// (`opr_status`), en su lectura y en la lista por radio, como en el router.
+#[tokio::test]
+async fn encender_una_red_wifi_la_pone_a_emitir() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    let uno = [("dpm_cfg_wifi_acc_pt_id", "1")];
+    let radio = [("dpm_cfg_wifi_id", "1")];
+    let emite = |n: &XmlNode| valor(n, "opr_status").unwrap();
+    assert_eq!(emite(&c.call("cbGetWifiAccPt", &uno).await.unwrap()), "0");
+    for estado in ["1", "0"] {
+        c.write(
+            "wifi.asp",
+            "cbSetWifiAccPt",
+            &[("dpm_cfg_wifi_acc_pt_id", "1"), ("adm_state", estado)],
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            emite(&c.call("cbGetWifiAccPt", &uno).await.unwrap()),
+            estado
+        );
+        assert_eq!(
+            emite(&c.call("cbListWifiAccPt", &radio).await.unwrap()),
+            estado,
+            "la lista por radio también lo refleja"
+        );
+    }
+}
