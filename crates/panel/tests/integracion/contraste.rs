@@ -151,3 +151,75 @@ fn automatico_en_claro_es_el_tema_claro() {
     // tema claro (el bloque está repetido: el CSS no depende de JavaScript).
     assert_eq!(colores(AUTOMATICO_CLARO), colores(CLARO));
 }
+
+/// Las reglas de todos los `.css` de `style/`: (fichero, selector,
+/// declaraciones), sin comentarios. Solo los bloques sin otros dentro (las
+/// reglas de un `@media` salen sueltas).
+fn reglas_css() -> Vec<(String, String, String)> {
+    fn recorrer(dir: &std::path::Path, ficheros: &mut Vec<std::path::PathBuf>) {
+        for e in std::fs::read_dir(dir).unwrap() {
+            let p = e.unwrap().path();
+            if p.is_dir() {
+                recorrer(&p, ficheros);
+            } else if p.extension().is_some_and(|x| x == "css") {
+                ficheros.push(p);
+            }
+        }
+    }
+    let raiz = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("style");
+    let mut ficheros = Vec::new();
+    recorrer(&raiz, &mut ficheros);
+    let mut reglas = Vec::new();
+    for f in ficheros {
+        let mut css = std::fs::read_to_string(&f).unwrap();
+        while let Some(i) = css.find("/*") {
+            let fin = i + css[i..].find("*/").expect("comentario cerrado") + 2;
+            css.replace_range(i..fin, "");
+        }
+        let mut desde = 0;
+        let mut selector = None;
+        for (i, c) in css.char_indices() {
+            match c {
+                '{' => {
+                    selector = Some(css[desde..i].trim().to_owned());
+                    desde = i + 1;
+                }
+                '}' => {
+                    if let Some(s) = selector.take() {
+                        let nombre = f.strip_prefix(&raiz).unwrap().display().to_string();
+                        reglas.push((nombre, s, css[desde..i].to_owned()));
+                    }
+                    desde = i + 1;
+                }
+                _ => {}
+            }
+        }
+    }
+    reglas
+}
+
+#[test]
+fn sobre_acento_solo_sobre_el_acento() {
+    // `--sobre-acento` (casi negro) solo se lee sobre el ámbar relleno: la
+    // misma regla tiene que pintar el fondo con `--acento`. Sobre un velo o
+    // un fondo transparente va `--acento-texto`.
+    let reglas = reglas_css();
+    assert!(reglas.len() > 100, "{}", reglas.len());
+    let malas: Vec<_> = reglas
+        .iter()
+        .filter(|(_, _, d)| d.contains("var(--sobre-acento)"))
+        .filter(|(_, _, d)| {
+            !d.split(';').any(|decl| {
+                decl.split_once(':').is_some_and(|(n, v)| {
+                    matches!(n.trim(), "background" | "background-color")
+                        && v.trim() == "var(--acento)"
+                })
+            })
+        })
+        .map(|(f, s, _)| format!("{f}: {s}"))
+        .collect();
+    assert!(
+        malas.is_empty(),
+        "--sobre-acento sin fondo --acento: {malas:#?}"
+    );
+}

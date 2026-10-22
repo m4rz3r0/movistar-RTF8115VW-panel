@@ -23,8 +23,14 @@
   --emision: var(--ok);
 }
 
-.emision-aviso {
-  --emision: var(--aviso);
+/* Una radio sin redes: los arcos exteriores y el punto en ámbar; el
+   interior, gris (como en la maqueta). */
+.emision-aviso path:nth-child(-n + 2) {
+  stroke: var(--aviso);
+}
+
+.emision-aviso circle {
+  fill: var(--aviso);
 }
 
 .emision-peligro {

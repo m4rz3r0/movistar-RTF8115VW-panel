@@ -60,13 +60,13 @@ button {
 .b-sec[aria-pressed="true"] {
   border-color: var(--acento-borde);
   background: var(--acento-velo);
-  color: var(--sobre-acento);
+  color: var(--acento-texto);
 }
 
 .b-rec {
   background: transparent;
   border-color: var(--acento-borde);
-  color: var(--sobre-acento);
+  color: var(--acento-texto);
 }
 
 .b-rec:hover {

@@ -97,7 +97,9 @@ mod tests {
             .into_any()
         });
         assert!(h.contains(r#"aria-checked="false""#), "{h}");
-        assert!(h.contains("disabled"), "{h}");
+        // Desactivado sin perder el foco: aria-disabled, no disabled.
+        assert!(h.contains(r#"aria-disabled="true""#), "{h}");
+        assert!(!h.contains(" disabled"), "{h}");
     }
 
     #[test]

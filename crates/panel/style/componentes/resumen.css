@@ -44,7 +44,7 @@
 
 .resumen-dato.pendiente strong,
 .resumen-dato.pendiente span {
-  color: var(--sobre-acento);
+  color: var(--acento-texto);
 }
 
 @media (max-width: 900px) {

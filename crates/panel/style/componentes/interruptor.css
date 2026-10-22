@@ -40,7 +40,7 @@
   outline-offset: 2px;
 }
 
-.int:disabled {
+.int[aria-disabled="true"] {
   opacity: 0.5;
   cursor: not-allowed;
 }
