@@ -1,9 +1,10 @@
-//! Marco de las páginas con sesión: barra lateral (Estado, Ajustes,
-//! Historial, Biblioteca y Configuración del router; debajo, el selector de
-//! idioma y la zona de sesión: el nombre de usuario, que abre «Ajustes del
-//! panel», y «Salir») que en pantallas estrechas pasa a ser una barra
-//! superior con el menú plegable.
+//! Marco de las páginas con sesión: barra lateral (Estado, Ajustes, Mejoras
+//! con su contador, Historial, Biblioteca y Configuración del router; debajo,
+//! el selector de idioma y la zona de sesión: el nombre de usuario, que abre
+//! «Ajustes del panel», y «Salir») que en pantallas estrechas pasa a ser una
+//! barra superior con el menú plegable.
 
+use crate::ajustes_router::contar_mejoras;
 use crate::auth::{Logout, quien_soy};
 use crate::t;
 use crate::ui::i18n::SelectorIdioma;
@@ -68,6 +69,8 @@ const ICONO_AJUSTES: &str = "M3 6h9M16 6h1M3 14h1M8 14h9M14 4v4M6 12v4";
 /// Rejilla de bloques (Biblioteca).
 const ICONO_BIBLIOTECA: &str =
     "M3 3h5.5v5.5H3zM11.5 3H17v5.5h-5.5zM3 11.5h5.5V17H3zM11.5 11.5H17V17h-5.5z";
+/// Flecha hacia arriba en un círculo (Mejoras).
+const ICONO_MEJORAS: &str = "M10 2.75a7.25 7.25 0 1 1 0 14.5 7.25 7.25 0 0 1 0-14.5zM10 13.75v-7.5M6.75 9.5 10 6.25l3.25 3.25";
 /// Reloj (Historial).
 const ICONO_HISTORIAL: &str =
     "M10 2.75a7.25 7.25 0 1 1 0 14.5 7.25 7.25 0 0 1 0-14.5zM10 6v4l2.75 1.75";
@@ -82,6 +85,43 @@ const ICONO_USUARIO: &str =
     "M10 3a3.25 3.25 0 1 1 0 6.5A3.25 3.25 0 0 1 10 3zM3.75 17c.6-3.1 3.1-5 6.25-5s5.65 1.9 6.25 5";
 /// Tres rayas (menú).
 const ICONO_MENU: &str = "M3 5.5h14M3 10h14M3 14.5h14";
+
+/// Pide al marco que vuelva a contar lo que muestra la barra lateral (el
+/// contador de Mejoras): quien lo sabe (una página que acaba de leer o de
+/// aplicar algo) incrementa la señal.
+#[derive(Clone, Copy)]
+pub struct RecargaMarco(pub RwSignal<u32>);
+
+/// El contador de pasos pendientes de Mejoras, en su entrada del menú. Una
+/// consulta propia, que no bloquea ni espera al nombre de usuario; se repite
+/// al cambiar de página o con [`RecargaMarco`]. Sin nada pendiente, o si no
+/// se pudo leer nada, no sale.
+#[component]
+fn ContadorMejoras() -> impl IntoView {
+    let ruta = use_location().pathname;
+    let recarga = use_context::<RecargaMarco>().map(|r| r.0);
+    let cuenta = Resource::new(
+        move || (ruta.get(), recarga.map(|r| r.get())),
+        |_| contar_mejoras(),
+    );
+    view! {
+        <Transition fallback=|| ()>
+            {move || Suspend::new(async move {
+                cuenta.await.ok().flatten().filter(|n| *n > 0).map(|n| {
+                    view! {
+                        <span
+                            class="cuenta"
+                            role="img"
+                            aria-label=t!("comun-nav-mejoras-pendientes", n = n)
+                        >
+                            {n}
+                        </span>
+                    }
+                })
+            })}
+        </Transition>
+    }
+}
 
 /// Marco común: navegación y contenido de la ruta hija.
 #[component]
@@ -98,6 +138,7 @@ pub fn Layout() -> impl IntoView {
         }
     });
     let cerrar = move |_| set_abierto.set(false);
+    provide_context(RecargaMarco(RwSignal::new(0)));
 
     view! {
         <a class="saltar" href="#contenido">
@@ -147,6 +188,11 @@ pub fn Layout() -> impl IntoView {
                         <EnlaceSeccion href=crate::ui::ajustes_router::RUTA_AJUSTES prefijo="/ajustes">
                             {icono(ICONO_AJUSTES)}
                             <span>{t!("comun-nav-ajustes")}</span>
+                        </EnlaceSeccion>
+                        <EnlaceSeccion href="/mejoras" prefijo="/mejoras">
+                            {icono(ICONO_MEJORAS)}
+                            <span>{t!("comun-nav-mejoras")}</span>
+                            <ContadorMejoras />
                         </EnlaceSeccion>
                         <EnlaceSeccion href="/historial" prefijo="/historial">
                             {icono(ICONO_HISTORIAL)}

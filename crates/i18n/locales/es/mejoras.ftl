@@ -73,3 +73,19 @@ mejoras-error-sin-leer = { $n ->
     [one] Lo que se pudo leer ya está, pero un paso no se pudo leer. Vuelve a leer y prueba de nuevo.
    *[other] Lo que se pudo leer ya está, pero { $n } pasos no se pudieron leer. Vuelve a leer y prueba de nuevo.
 }
+
+## Página Mejoras
+mejoras-titulo = Mejoras recomendadas para tu router
+mejoras-desc = Grupos de ajustes que se revisan y se aplican de una vez, con un solo deshacer.
+mejoras-estado-aplicado = Aplicado
+mejoras-estado-pendientes = { $pendientes } de { $total } pendientes
+mejoras-estado-sin-leer = Sin leer
+mejoras-paso-estado-hecho = Hecho
+mejoras-paso-estado-pendiente = Pendiente
+mejoras-paso-estado-sin-leer = Sin leer
+mejoras-paso-estado-no-aplica = No aplica
+mejoras-opcional = Opcional
+mejoras-revisar = Revisar y aplicar
+mejoras-volver-a-leer = Volver a leer
+mejoras-mas-consejos = Más consejos
+mejoras-pasos = Pasos

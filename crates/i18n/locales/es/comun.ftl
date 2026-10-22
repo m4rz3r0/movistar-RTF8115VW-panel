@@ -8,6 +8,12 @@ comun-menu = Menú
 comun-nav-principal = Principal
 comun-nav-estado = Estado
 comun-nav-ajustes = Ajustes
+comun-nav-mejoras = Mejoras
+# Solo para lectores de pantalla: el contador de la entrada «Mejoras».
+comun-nav-mejoras-pendientes = { $n ->
+    [one] 1 paso pendiente
+   *[other] { $n } pasos pendientes
+}
 comun-nav-historial = Historial
 comun-nav-biblioteca = Biblioteca
 comun-nav-router = Configuración del router

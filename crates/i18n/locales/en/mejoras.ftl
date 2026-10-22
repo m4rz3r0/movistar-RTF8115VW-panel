@@ -73,3 +73,19 @@ mejoras-error-sin-leer = { $n ->
     [one] What could be read is already done, but one step could not be read. Read again and retry.
    *[other] What could be read is already done, but { $n } steps could not be read. Read again and retry.
 }
+
+## Improvements page
+mejoras-titulo = Recommended improvements for your router
+mejoras-desc = Groups of settings you review and apply at once, with a single undo.
+mejoras-estado-aplicado = Applied
+mejoras-estado-pendientes = { $pendientes } of { $total } pending
+mejoras-estado-sin-leer = Not read
+mejoras-paso-estado-hecho = Done
+mejoras-paso-estado-pendiente = Pending
+mejoras-paso-estado-sin-leer = Not read
+mejoras-paso-estado-no-aplica = Does not apply
+mejoras-opcional = Optional
+mejoras-revisar = Review and apply
+mejoras-volver-a-leer = Read again
+mejoras-mas-consejos = More tips
+mejoras-pasos = Steps

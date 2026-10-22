@@ -10,6 +10,7 @@ use panel::instancia::{self, claves};
 use serde_json::{Value, json};
 
 mod lecturas;
+mod pagina;
 
 /// `leer_mejoras`, sin caché.
 async fn mejoras(p: &Panel, cookie: &str) -> Value {

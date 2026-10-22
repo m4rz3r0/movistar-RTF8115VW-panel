@@ -50,13 +50,20 @@ const REJILLAS = 2;
 const TEMAS = 1;
 
 /**
+ * Panel de Mejoras (mejoras.spec.ts), detrás del de los temas: el contador
+ * y los «x de y» cuentan con las fixtures sin tocar, y los lotes que se
+ * aplican de verdad no ensucian el Historial de los instalados.
+ */
+const MEJORAS = 1;
+
+/**
  * Tope de E2E_WORKERS: los instalados, los nuevos, los del recorrido, los de
- * la rejilla y el de los temas ocupan WORKERS + 9 puertos seguidos desde
- * E2E_PORT (y desde E2E_SIM_PORT), y la ventana reservada a cada prueba es
- * de 20 (p. ej. 3710-3729 y 8710-8729).
+ * la rejilla, el de los temas y el de Mejoras ocupan WORKERS + 10 puertos
+ * seguidos desde E2E_PORT (y desde E2E_SIM_PORT), y la ventana reservada a
+ * cada prueba es de 20 (p. ej. 3710-3729 y 8710-8729).
  */
 const VENTANA_DE_PUERTOS = 20;
-const MAX_WORKERS = VENTANA_DE_PUERTOS - NUEVOS - RECORRIDOS - REJILLAS - TEMAS;
+const MAX_WORKERS = VENTANA_DE_PUERTOS - NUEVOS - RECORRIDOS - REJILLAS - TEMAS - MEJORAS;
 
 /**
  * Workers de Playwright (E2E_WORKERS; 1, en serie). Por defecto, uno por
@@ -117,6 +124,11 @@ export interface Instancia {
   dir: string;
   /** Vigilancia de cada cambio en segundos (RP_E2E_VIGILANCIA_S). */
   vigilanciaS: number;
+  /**
+   * Instalado sin el grupo de dos pasos de e2e_grupo (solo la foto de
+   * partida): el router, con las fixtures tal cual (E2E_SOLO_FOTO).
+   */
+  soloFoto: boolean;
   /** Origen del panel (localhost: Chromium acepta allí la cookie Secure). */
   url: string;
   urlSim: string;
@@ -127,6 +139,7 @@ function instancia(
   modo: Instancia["modo"],
   n: number,
   vigilanciaS = VIGILANCIA_S,
+  soloFoto = false,
 ): Instancia {
   const puerto = base + n;
   const puertoSim = baseSim + n;
@@ -137,6 +150,7 @@ function instancia(
     puertoSim,
     dir: join(tmpdir(), `routerpanel-e2e-${puerto}`),
     vigilanciaS,
+    soloFoto,
     url: `http://localhost:${puerto}`,
     urlSim: `http://127.0.0.1:${puertoSim}`,
   };
@@ -186,12 +200,26 @@ export const temas = instancia(
   VIGILANCIA_RECORRIDO_S,
 );
 
+/**
+ * El panel de Mejoras: solo con la foto de partida, sin el grupo de
+ * e2e_grupo (que enciende el UPnP), así que el router empieza con las
+ * fixtures tal cual («5 de 11», «3 de 5» y 6 en el contador).
+ */
+export const mejoras = instancia(
+  "mejoras",
+  "instalado",
+  WORKERS + NUEVOS + RECORRIDOS + REJILLAS + TEMAS,
+  VIGILANCIA_RECORRIDO_S,
+  true,
+);
+
 export const todas: Instancia[] = [
   ...instalados,
   ...Object.values(nuevos),
   ...Object.values(recorridos),
   ...Object.values(rejillas),
   temas,
+  mejoras,
 ];
 
 /** Usuario del panel «instalado». */

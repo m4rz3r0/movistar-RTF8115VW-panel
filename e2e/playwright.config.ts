@@ -41,6 +41,7 @@ export default defineConfig({
       // Vigilancia de cada cambio en segundos, en vez de 30 s o 2 min (solo
       // la atiende el binario de depuración; ver main.rs e instancias.ts).
       RP_E2E_VIGILANCIA_S: String(i.vigilanciaS),
+      E2E_SOLO_FOTO: i.soloFoto ? "1" : "0",
     },
     reuseExistingServer: false,
     // SIGTERM (no SIGKILL): arrancar.sh borra su carpeta al salir.

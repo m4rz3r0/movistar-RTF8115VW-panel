@@ -1,0 +1,180 @@
+/* Página Mejoras: las tarjetas de los lotes, sus pasos, avisos y consejos. */
+/* -------------------------------------------------------------- Mejoras */
+
+/* Dos columnas en pantallas anchas; una por debajo de unos 1000 px. */
+.rejilla-lotes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(480px, 100%), 1fr));
+  align-items: start;
+  gap: var(--esp-4);
+}
+
+/* Mientras se lee: la forma de las tarjetas, sin datos. */
+.lote-esqueleto {
+  min-height: 360px;
+}
+
+.tarjeta-lote {
+  min-width: 0;
+}
+
+.lote-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-2) var(--esp-3);
+  min-width: 0;
+}
+
+.lote-cabecera h2 {
+  flex: 1 1 160px;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--fuente-ui);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.lote-para {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+
+.lote-pros {
+  margin: 0;
+  color: var(--suave);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.lote-sin-leer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-3);
+}
+
+.lote-sin-leer .aviso {
+  flex: 1 1 220px;
+}
+
+/* Los pasos: una lista con separadores, cada uno con su estado a la derecha. */
+.lote-pasos {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  list-style: none;
+}
+
+.paso {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--esp-3);
+  padding: 10px var(--esp-3);
+  border-top: 1px solid var(--borde);
+}
+
+.paso:first-child {
+  border-top: 0;
+}
+
+.paso .icono-estado {
+  flex: none;
+  margin-top: 2px;
+}
+
+.paso-texto {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.paso-detalle,
+.paso-motivo {
+  color: var(--suave);
+  font-size: 12.5px;
+}
+
+.paso-opcional {
+  padding: 0 6px;
+  border-radius: 5px;
+  background: var(--sup3);
+  color: var(--suave);
+  font-size: 12px;
+}
+
+.paso-estado {
+  flex: none;
+  color: var(--suave);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.paso-hecho .paso-estado {
+  color: var(--ok);
+}
+
+.paso-pendiente .paso-estado {
+  color: var(--aviso);
+}
+
+/* Lo que no aplica o no se pudo leer queda en segundo plano. */
+.paso-no-aplica .paso-nombre,
+.paso-sin-leer .paso-nombre {
+  color: var(--suave);
+}
+
+.tarjeta-lote > .aviso {
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+/* «Más consejos»: plegados, sin botón. */
+.lote-consejos summary {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  color: var(--suave);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.lote-consejos summary:hover {
+  color: var(--texto);
+}
+
+.lote-consejos ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: var(--esp-2) 0 0;
+  padding-left: 20px;
+  color: var(--suave);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.lote-pie {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: auto;
+  padding-top: var(--esp-3);
+  border-top: 1px solid var(--borde);
+}
+
+@media (max-width: 600px) {
+  .lote-pie .b-pri {
+    width: 100%;
+  }
+}

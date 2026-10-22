@@ -17,6 +17,7 @@ pub mod i18n;
 pub mod instalar;
 pub mod layout;
 pub mod login;
+pub mod mejoras;
 pub mod panel_ajustes;
 pub mod recomendaciones;
 pub mod router;

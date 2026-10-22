@@ -51,6 +51,7 @@ use rejilla::{ContenidoRejilla, esqueleto};
 use seleccion::Seleccion;
 use std::{collections::HashSet, time::Duration};
 
+pub(crate) use campo::partir_motivo;
 pub use foto::{PaginaFoto, RUTA_FOTO};
 
 /// Espera antes de enseñar «Actualizando…»: una lectura más rápida (de la
