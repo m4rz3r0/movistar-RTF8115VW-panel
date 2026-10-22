@@ -655,6 +655,7 @@ mod tests {
             ],
             titulo: None,
             nota: None,
+            ..Default::default()
         }]);
         let h = html(g);
         assert!(h.contains("Revisa el cambio"), "{h}");
@@ -702,6 +703,7 @@ mod tests {
                 )],
                 titulo: None,
                 nota: None,
+                ..Default::default()
             },
             PasoVista {
                 indice: 1,
@@ -709,6 +711,7 @@ mod tests {
                 campos: vec![],
                 titulo: None,
                 nota: None,
+                ..Default::default()
             },
         ]);
         let h = html(g);
@@ -737,6 +740,7 @@ mod tests {
             )],
             titulo: titulo.map(str::to_owned),
             nota: nota.map(str::to_owned),
+            ..Default::default()
         };
         let h = html(grupo(vec![
             paso(0, Some("ajuste-puertos-reglas-protocolo-tcp"), None),
@@ -794,6 +798,7 @@ mod tests {
             campos: vec![],
             titulo: None,
             nota: None,
+            ..Default::default()
         };
         let pasos = vec![paso(0, false), paso(1, true), paso(2, false)];
         assert_eq!(desmarcados(&pasos, &[true, false, false]), vec![2]);

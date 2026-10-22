@@ -8,6 +8,7 @@ mod foto;
 mod guardar;
 mod historial;
 mod lectura;
+mod mejoras;
 mod pagina;
 mod puertos;
 mod red_local;
@@ -19,6 +20,7 @@ pub(super) use foto::{comparar_con_partida, preparar_volver_a_partida};
 pub(super) use guardar::{confirmar_ajuste, preparar_ajuste, preparar_elemento};
 pub(super) use historial::deshacer_ajuste;
 pub(crate) use historial::etiquetas_de_campos;
+pub(super) use mejoras::{contar_mejoras, leer_mejoras, preparar_lote};
 pub(super) use pagina::leer_tema;
 
 use super::*;

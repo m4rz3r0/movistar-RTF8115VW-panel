@@ -34,7 +34,7 @@ mejoras-paso-wpa2-desc = Recomendado si no tienes dispositivos WiFi de antes de 
 mejoras-paso-aislar_invitados = Aislar la red de invitados
 mejoras-paso-aislar_invitados-desc = Recomendado si usas la red de invitados para las visitas o para dispositivos del hogar conectados. A favor: los dispositivos de esa red no se ven entre sí. En contra: entre ellos no se puede enviar contenido a una tele ni imprimir.
 mejoras-paso-espejo = Apagar el espejo del tráfico de internet
-mejoras-paso-espejo-desc = Recomendado si no estás haciendo un diagnóstico de la conexión. A favor: ningún puerto de red de casa recibe una copia de todo el tráfico de internet. En contra: ninguno; se enciende solo para diagnosticar.
+mejoras-paso-espejo-desc = Recomendado si no estás haciendo un diagnóstico de la conexión. A favor: ningún puerto de la red de casa recibe una copia de todo el tráfico de internet. En contra: ninguno; se enciende solo para diagnosticar.
 mejoras-paso-registro = No enviar el registro del sistema a otro equipo
 mejoras-paso-registro-desc = Recomendado si no tienes tu propio servidor para recoger registros, que es lo normal en casa. A favor: el registro, que dice qué dispositivos de tu casa se conectan y cuándo, no sale del router sin cifrar hacia otro equipo. En contra: si usas un servidor propio para los registros, deja de recibir el del router.
 mejoras-paso-dns_casa = Usar DNS neutros en la red de casa
@@ -53,3 +53,14 @@ mejoras-dns-cloudflare = Cloudflare
 mejoras-dns-cloudflare-desc = Muy rápido. Es una empresa de Estados Unidos.
 mejoras-dns-adguard = AdGuard
 mejoras-dns-adguard-desc = Bloquea anuncios y rastreadores. Puede romper alguna web.
+
+## Estado de los lotes y su revisión
+mejoras-motivo-sin-leer = No se pudo leer la pestaña { $pestana }.
+mejoras-motivo-sin-dato = El router no da este dato.
+mejoras-revision-sin-leer = { $n ->
+    [one] Un paso no se pudo leer y no está en la revisión.
+   *[other] { $n } pasos no se pudieron leer y no están en la revisión.
+}
+mejoras-error-lote = Ese lote de mejoras no existe.
+mejoras-error-ya-aplicado = Este lote ya está aplicado: no hay nada que cambiar.
+mejoras-error-proveedor = Ese servicio de DNS no está en la lista.

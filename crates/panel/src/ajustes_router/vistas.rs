@@ -252,7 +252,7 @@ pub struct GrupoVista {
 }
 
 /// Un paso del grupo: los campos de una misma escritura del router.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PasoVista {
     /// Posición en el grupo (desde 0): la que se desmarca al confirmar.
     pub indice: usize,
@@ -265,6 +265,17 @@ pub struct PasoVista {
     /// Clave de traducción de una nota bajo el título (lo que no se repite).
     #[serde(default)]
     pub nota: Option<String>,
+    /// En un lote, clave de la pestaña del paso (`ajustes-tema-wifi`): la
+    /// revisión agrupa los pasos por pestaña.
+    #[serde(default)]
+    pub pestana: Option<String>,
+    /// Sale desmarcado en la revisión (un paso opcional de un lote).
+    #[serde(default)]
+    pub desmarcado: bool,
+    /// En un lote, la clave del paso expandido (`wps@red-24`): la revisión
+    /// conserva las marcas por ella al cambiar de proveedor.
+    #[serde(default)]
+    pub clave: Option<String>,
 }
 
 /// Un campo que cambia, con sus valores legibles. Si es `secreto`, `antes`

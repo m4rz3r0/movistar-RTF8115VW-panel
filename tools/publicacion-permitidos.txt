@@ -6,13 +6,13 @@
 #   ruta <glob> <regla> — <motivo>
 #   binario <ruta> <sha256> — <motivo>
 
-# DNS públicos de ejemplo en las pruebas.
-valor 9.9.9.9 — DNS público (Quad9) de ejemplo en las pruebas
-valor 149.112.112.112 — DNS público (Quad9) de ejemplo en las pruebas
+# DNS públicos: los de los proveedores del lote Privacidad máxima y algunos de ejemplo en las pruebas.
+valor 9.9.9.9 — DNS público (Quad9): proveedor del lote Privacidad máxima
+valor 149.112.112.112 — DNS público (Quad9): proveedor del lote Privacidad máxima
 valor 2620:fe::fe — DNS público IPv6 (Quad9) de ejemplo en las pruebas
 valor 194.242.2.2 — DNS público (Mullvad) de ejemplo en las pruebas
-valor 1.1.1.1 — DNS público (Cloudflare) de ejemplo en las pruebas
-valor 1.0.0.1 — DNS público (Cloudflare) de ejemplo en las pruebas
+valor 1.1.1.1 — DNS público (Cloudflare): proveedor del lote Privacidad máxima
+valor 1.0.0.1 — DNS público (Cloudflare): proveedor del lote Privacidad máxima
 valor 9.9.9.10 — DNS público (Quad9 sin filtro): proveedor del lote Privacidad máxima
 valor 149.112.112.10 — DNS público (Quad9 sin filtro): proveedor del lote Privacidad máxima
 valor 86.54.11.100 — DNS público (DNS4EU): proveedor del lote Privacidad máxima

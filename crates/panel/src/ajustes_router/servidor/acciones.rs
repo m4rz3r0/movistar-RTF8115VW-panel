@@ -4,9 +4,48 @@ use super::guardar::{exigir_tapados, grupo_de, instancias_fijas, paso_vista};
 use super::*;
 use ajustes::{Elemento, titulo_accion};
 
-/// ¿Es `titulo` el de un grupo de una acción ([`titulo_accion`])?
+/// ¿Es `titulo` el de un grupo de una acción ([`titulo_accion`]) o de un
+/// lote de mejoras ([`ajustes::titulo_lote`])? Los dos tienen un paso por
+/// destino, cada uno con el título de su ajuste, y se deshacen igual.
 pub(super) fn es_de_accion(titulo: &str) -> bool {
-    titulo.starts_with("ajuste-accion-") && titulo.ends_with("-titulo")
+    (titulo.starts_with("ajuste-accion-") || titulo.starts_with("mejoras-lote-"))
+        && titulo.ends_with("-titulo")
+}
+
+/// Los pasos que escriben `valores` (legibles, por id de campo) en el ajuste
+/// `aj`, con la instancia de sus `fijos`. 400 si un valor no vale o si la
+/// escritura reenviaría una clave que el router no deja leer: desde una
+/// acción o un lote no se puede escribir.
+pub(crate) fn subgrupo(
+    state: &AppState,
+    aj: &Ajuste,
+    valores: BTreeMap<String, String>,
+) -> Result<GrupoRequest, ServerFnError> {
+    let p = PeticionAjuste {
+        ajuste: aj.id.clone(),
+        instancia: None,
+        borrar: false,
+        valores,
+        esperados: BTreeMap::new(),
+    };
+    let invalida = |m: String| {
+        tracing::warn!("ajustes: {} desde una acción o un lote: {m}", aj.id);
+        fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-invalida"))
+    };
+    let mut sub = grupo_de(aj, &p).map_err(|e| invalida(e.to_string()))?;
+    instancias_fijas(&state.catalogo, aj, &mut sub).map_err(invalida)?;
+    // Una escritura que reenvía una clave que el router no deja leer (la
+    // de una línea de teléfono) la borraría.
+    exigir_tapados(&state.catalogo, aj, std::slice::from_ref(&p), &sub).map_err(|_| {
+        fallo(
+            StatusCode::BAD_REQUEST,
+            t!(
+                "ajustes-accion-tapado",
+                ajuste = crate::ui::i18n::traducir(&format!("{}-titulo", prefijo_i18n(aj)), None)
+            ),
+        )
+    })?;
+    Ok(sub)
 }
 
 /// El ajuste de `e` con el campo `campo` escribible: donde escribe la
@@ -75,32 +114,7 @@ pub(in crate::ajustes_router) async fn preparar_accion(
     // El ajuste de cada paso, para su resumen.
     let mut de_cada_paso: Vec<&Ajuste> = Vec::new();
     for aj in destinos {
-        let p = PeticionAjuste {
-            ajuste: aj.id.clone(),
-            instancia: None,
-            borrar: false,
-            valores: [(campo.clone(), valor.clone())].into(),
-            esperados: BTreeMap::new(),
-        };
-        let invalida = |m: String| {
-            tracing::warn!("ajustes: acción {} en {}: {m}", a.id, aj.id);
-            fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-invalida"))
-        };
-        let mut sub = grupo_de(aj, &p).map_err(|e| invalida(e.to_string()))?;
-        instancias_fijas(&state.catalogo, aj, &mut sub).map_err(invalida)?;
-        // Una escritura que reenvía una clave que el router no deja leer
-        // (la de una línea de teléfono) la borraría: desde la barra no se
-        // puede escribir, así que esa acción no vale aquí.
-        exigir_tapados(&state.catalogo, aj, std::slice::from_ref(&p), &sub).map_err(|_| {
-            fallo(
-                StatusCode::BAD_REQUEST,
-                t!(
-                    "ajustes-accion-tapado",
-                    ajuste =
-                        crate::ui::i18n::traducir(&format!("{}-titulo", prefijo_i18n(aj)), None)
-                ),
-            )
-        })?;
+        let sub = subgrupo(&state, aj, [(campo.clone(), valor.clone())].into())?;
         de_cada_paso.extend(std::iter::repeat_n(aj, sub.pasos.len()));
         grupo.pasos.extend(sub.pasos);
     }
@@ -223,6 +237,14 @@ mod tests {
         );
         assert!(es_de_accion(&titulo_accion("aislar")));
         assert!(!es_de_accion("ajuste-wifi-red_24-titulo"));
+    }
+
+    /// El deshacer de un lote va por el de una acción: un paso por destino.
+    #[test]
+    fn titulo_de_un_lote_se_deshace() {
+        assert!(es_de_accion("mejoras-lote-seguridad-titulo"));
+        assert!(es_de_accion(&ajustes::titulo_lote("privacidad")));
+        assert!(!es_de_accion("mejoras-paso-wps"));
     }
 
     #[test]

@@ -10,10 +10,12 @@
 //! [`ValorLegible::Secreto`](ajustes::ValorLegible::Secreto), y su valor aparte, en
 //! [`CampoVista::valor_secreto`] (la página lo enseña censurado, con un ojo).
 
+mod mejoras;
 mod reglas;
 mod reservas;
 mod vistas;
 
+pub use mejoras::*;
 pub use reglas::*;
 pub use reservas::*;
 pub use vistas::*;

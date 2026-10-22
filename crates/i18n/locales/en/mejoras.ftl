@@ -53,3 +53,14 @@ mejoras-dns-cloudflare = Cloudflare
 mejoras-dns-cloudflare-desc = Very fast. It is a United States company.
 mejoras-dns-adguard = AdGuard
 mejoras-dns-adguard-desc = Blocks ads and trackers. It may break some websites.
+
+## State of the bundles and their review
+mejoras-motivo-sin-leer = The { $pestana } tab could not be read.
+mejoras-motivo-sin-dato = The router does not give this value.
+mejoras-revision-sin-leer = { $n ->
+    [one] One step could not be read and is not in the review.
+   *[other] { $n } steps could not be read and are not in the review.
+}
+mejoras-error-lote = That improvement bundle does not exist.
+mejoras-error-ya-aplicado = This bundle is already applied: there is nothing to change.
+mejoras-error-proveedor = That DNS service is not in the list.
