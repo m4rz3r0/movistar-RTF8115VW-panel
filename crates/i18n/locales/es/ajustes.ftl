@@ -230,7 +230,16 @@ ajustes-leido-hace = { $s ->
    *[other] Leído hace { $s } s
 }
 ajustes-leido-hace-min = Leído hace { $min } min
-ajustes-apagada-desde = Apagada desde { $fecha }
+ajustes-pie-dispositivos = { $n ->
+    [one] 1 dispositivo conectado
+   *[other] { $n } dispositivos conectados
+}
+ajustes-pie-dispositivos-nombres = { $n ->
+    [one] 1 dispositivo conectado: { $nombres }
+   *[other] { $n } dispositivos conectados: { $nombres }
+}
+ajustes-pie-sin-nombre = { $n } sin nombre
+ajustes-apagada-desde = Apagada desde el panel el { $fecha }
 ajustes-elemento-no-existe = No hay nada que se llame «{ $id }» en esta pestaña. Elige una de sus tarjetas.
 
 ## Rejilla de elementos: marca, barra, tarjeta, detalle y aviso del cambio
@@ -274,6 +283,10 @@ ajustes-aviso-conectados = { $n ->
 ## Franja de resumen de la WiFi
 ajustes-resumen-de = { $n } de { $total }
 ajustes-resumen-sin-dato = —
+ajustes-resumen-sin-leer = { $n ->
+    [one] 1 no se ha podido leer y no cuenta.
+   *[other] { $n } no se han podido leer y no cuentan.
+}
 ajustes-resumen-wifi-redes = Redes encendidas
 ajustes-resumen-wifi-redes-detalle = Las que emiten ahora mismo.
 ajustes-resumen-wifi-radios = Radios encendidas

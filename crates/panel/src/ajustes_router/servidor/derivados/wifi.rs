@@ -12,6 +12,14 @@
 use super::super::lectura::{hojas, instancias};
 use super::*;
 
+mod conectados;
+mod historial;
+
+pub(super) use conectados::{conectados, dispositivos};
+
+pub(super) use historial::apagada_desde;
+pub(in crate::ajustes_router) use historial::apagadas_desde;
+
 /// Radio de cada red, por los ids de sus ajustes: la de invitados va en la
 /// de 2,4 GHz (punto de acceso 2, en la lista de la radio 0).
 pub(super) const RADIO_DE_LA_RED: &[(&str, &str)] = &[
@@ -168,7 +176,8 @@ fn ocultas_que_emiten(lista: &XmlNode, vistos: &[&String]) -> u32 {
 const ASOCIADOS: &str = "cbListWifiAccPtAssociation";
 
 /// Lecturas extra del tema WiFi: la lista de puntos de acceso y la de
-/// estaciones asociadas de cada radio. Vacío fuera del tema.
+/// estaciones asociadas de cada radio, y la de dispositivos de Red local.
+/// Vacío fuera del tema.
 pub(super) fn claves_extra(del_tema: &[&Ajuste]) -> Vec<Clave> {
     let listas = claves_de_listas(del_tema);
     let asociados: Vec<Clave> = listas
@@ -176,10 +185,14 @@ pub(super) fn claves_extra(del_tema: &[&Ajuste]) -> Vec<Clave> {
         .filter_map(|(radio, _)| id_de_radio(del_tema, radio))
         .map(|id| Clave::new(ASOCIADOS, &[(ID_RADIO, id)]))
         .collect();
+    // Los nombres de los conectados, de la lista de Red local (la misma
+    // lectura: comparten la caché).
+    let hosts = (!asociados.is_empty()).then(super::super::red_local::clave_hosts);
     listas
         .into_iter()
         .map(|(_, c)| c)
         .chain(asociados)
+        .chain(hosts)
         .collect()
 }
 
@@ -315,20 +328,6 @@ pub(super) fn canal_y_ancho(ctx: &Contexto, e: &Elemento) -> Option<ValorLegible
     Some(ValorLegible::Texto(texto))
 }
 
-/// `derivado:conectados`: estaciones asociadas al punto de acceso de una
-/// red, de la lista de su radio. `None` si no se pudo leer.
-pub(super) fn conectados(ctx: &Contexto, e: &Elemento) -> Option<u32> {
-    let (red, radio) = red_de(e)?;
-    let punto = ctx.ajuste(red)?.fijos.get(ID_PUNTO)?;
-    let id_radio = id_de_radio(ctx.del_tema, radio)?;
-    let lista = ctx.leida(&Clave::new(ASOCIADOS, &[(ID_RADIO, id_radio)]))?;
-    let n = hgu::models::WifiAssoc::parse_all(lista)
-        .into_iter()
-        .filter(|st| st.ap_id == *punto)
-        .count();
-    Some(u32::try_from(n).unwrap_or(u32::MAX))
-}
-
 /// Nota del pie de una radio, ya traducida: no emite ninguna red o emite
 /// algunas que el panel no muestra.
 pub(super) fn nota(ctx: &Contexto, e: &Elemento) -> Option<String> {
@@ -340,81 +339,31 @@ pub(super) fn nota(ctx: &Contexto, e: &Elemento) -> Option<String> {
     })
 }
 
-/// `apagada desde` de una red: si está apagada y lo último que hizo el
-/// panel con ella fue apagarla, cuándo.
-pub(super) fn apagada_desde(ctx: &Contexto, e: &Elemento) -> Option<i64> {
-    let (red, _) = red_de(e)?;
-    if ctx.vista(red)?.red_wifi != Some(EmisionRed::Apagada) {
-        return None;
-    }
-    let punto = ctx.ajuste(red)?.fijos.get(ID_PUNTO)?;
-    ctx.apagadas.get(punto).copied()
-}
-
-/// Un paso aplicado que escribe en un punto de acceso: los valores que
-/// envió (con su id) y su diff (JSON), y cuándo se aplicó su cambio.
-pub(super) struct PasoDeRed {
-    pub valores: Leidos,
-    pub diff: String,
-    pub cuando: i64,
-}
-
-/// Desde cuándo está apagado cada punto de acceso según los pasos
-/// aplicados por el panel, en orden: el último que tocó su `adm_state`
-/// manda (si lo apagó, cuándo; si lo encendió, nada). Pura.
-pub(super) fn ultimo_apagado(pasos: &[PasoDeRed]) -> HashMap<String, i64> {
-    let mut out = HashMap::new();
-    for p in pasos {
-        let Some(punto) = p.valores.get(ID_PUNTO) else {
-            continue;
-        };
-        let diff: Vec<crate::changes::CampoDiff> =
-            serde_json::from_str(&p.diff).unwrap_or_default();
-        let Some(d) = diff.iter().find(|d| d.nombre == "adm_state") else {
-            continue;
-        };
-        if d.despues.trim() == "0" {
-            out.insert(punto.clone(), p.cuando);
-        } else {
-            out.remove(punto);
-        }
-    }
-    out
-}
-
-/// [`ultimo_apagado`] con los pasos del Historial (los de los cambios
-/// aplicados o vigilándose). Sin Historial legible, nada.
-pub(in crate::ajustes_router) async fn apagadas_desde(
-    db: &sqlx::SqlitePool,
-) -> HashMap<String, i64> {
-    use sqlx::Row;
-    let filas = sqlx::query(
-        "SELECT p.valores_nuevos, p.solicitud, p.diff, c.updated FROM cambio_pasos p \
-         JOIN changes c ON c.id = p.cambio_id \
-         WHERE p.funcion = 'cbSetWifiAccPt' AND p.estado = 'aplicado' \
-         AND c.estado IN ('aplicado', 'vigilando') \
-         ORDER BY c.updated, p.cambio_id, p.orden",
-    )
-    .fetch_all(db)
-    .await
-    .inspect_err(|e| tracing::warn!("ajustes: no se puede leer el Historial: {e}"))
-    .unwrap_or_default();
-    let pasos: Vec<PasoDeRed> = filas
+/// Un dato de la franja que cuenta cuántos de los elementos `son` cumplen
+/// `si`: solo entre los que se han leído (uno sin leer no está ni encendido
+/// ni apagado). Los que no se han podido leer se dicen en la explicación, y
+/// el dato va en ámbar; si no se ha leído ninguno, «—».
+fn contar(
+    clave: &str,
+    son: &[&(&Elemento, &ElementoVista)],
+    si: fn(&ElementoVista) -> bool,
+) -> DatoResumen {
+    let (leidos, sin_leer): (Vec<&ElementoVista>, Vec<&ElementoVista>) = son
         .iter()
-        .map(|f| {
-            let mut valores: Leidos =
-                serde_json::from_slice(&f.get::<Vec<u8>, _>("valores_nuevos")).unwrap_or_default();
-            let pedidos: Leidos =
-                serde_json::from_str(&f.get::<String, _>("solicitud")).unwrap_or_default();
-            valores.extend(pedidos);
-            PasoDeRed {
-                valores,
-                diff: f.get("diff"),
-                cuando: f.get("updated"),
-            }
-        })
-        .collect();
-    ultimo_apagado(&pasos)
+        .map(|(_, v)| *v)
+        .partition(|v| v.lectura == EstadoLectura::Leido);
+    let cifra = if leidos.is_empty() {
+        sin_dato()
+    } else {
+        let n = leidos.iter().filter(|v| si(v)).count();
+        t!("ajustes-resumen-de", n = n, total = leidos.len())
+    };
+    let mut detalle = detalle_fijo(clave);
+    if !sin_leer.is_empty() {
+        detalle.push(' ');
+        detalle.push_str(&t!("ajustes-resumen-sin-leer", n = sin_leer.len()));
+    }
+    dato_resumen(clave, cifra, detalle, !sin_leer.is_empty())
 }
 
 /// Franja de resumen de la WiFi: redes y radios encendidas, dispositivos
@@ -424,12 +373,10 @@ pub(super) fn resumen(
     ctx: &Contexto,
     elementos: &[(&Elemento, &ElementoVista)],
 ) -> Vec<DatoResumen> {
-    let de = |n: usize, total: usize| t!("ajustes-resumen-de", n = n, total = total);
     // Una red cuenta si emite; una radio, si está encendida (aunque no
     // emita ninguna red: eso lo dice su tarjeta).
-    let cuenta = |filtro: fn(&Elemento) -> bool, si: fn(&ElementoVista) -> bool| {
-        let son: Vec<_> = elementos.iter().filter(|(e, _)| filtro(e)).collect();
-        de(son.iter().filter(|(_, v)| si(v)).count(), son.len())
+    let de = |filtro: fn(&Elemento) -> bool| -> Vec<&(&Elemento, &ElementoVista)> {
+        elementos.iter().filter(|(e, _)| filtro(e)).collect()
     };
     let emite = |v: &ElementoVista| v.estado == EstadoVisual::Emite;
     let encendida = |v: &ElementoVista| v.interruptor.as_ref().is_some_and(|i| i.encendido);
@@ -438,19 +385,14 @@ pub(super) fn resumen(
         .filter(|(e, _)| es_red(e))
         .map(|(e, _)| conectados(ctx, e))
         .sum();
-    let dato = |clave: &str, cifra: String, atencion: bool| {
-        dato_resumen(clave, cifra, detalle_fijo(clave), atencion)
-    };
+    let clave = "ajustes-resumen-wifi-conectados";
     vec![
-        dato("ajustes-resumen-wifi-redes", cuenta(es_red, emite), false),
-        dato(
-            "ajustes-resumen-wifi-radios",
-            cuenta(es_radio, encendida),
-            false,
-        ),
-        dato(
-            "ajustes-resumen-wifi-conectados",
+        contar("ajustes-resumen-wifi-redes", &de(es_red), emite),
+        contar("ajustes-resumen-wifi-radios", &de(es_radio), encendida),
+        dato_resumen(
+            clave,
             conectados.map_or_else(sin_dato, |n| n.to_string()),
+            detalle_fijo(clave),
             false,
         ),
         recomendaciones(elementos),

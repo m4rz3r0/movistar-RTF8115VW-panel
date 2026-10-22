@@ -113,7 +113,9 @@ input {
   font: inherit;
 }
 
-.campo input {
+/* Los campos de texto; la casilla de encendido (`.interruptor`) tiene su
+   propio dibujo (componentes/interruptor.css). */
+.campo input:not([type="checkbox"]) {
   min-height: 40px;
   padding: 0 var(--esp-3);
   border: 1px solid var(--borde);
@@ -122,11 +124,11 @@ input {
   color: var(--texto);
 }
 
-.campo input:hover {
+.campo input:not([type="checkbox"]):hover {
   border-color: var(--viz-eje);
 }
 
-.campo input:focus-visible {
+.campo input:not([type="checkbox"]):focus-visible {
   border-color: var(--acento);
   outline-offset: 0;
 }

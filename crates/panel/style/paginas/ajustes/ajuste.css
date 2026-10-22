@@ -219,14 +219,6 @@
   min-height: 32px;
 }
 
-/* El interruptor dentro de `.campo`: sin la altura ni el relleno de los
-   campos de texto. */
-.campo-ajuste input.interruptor {
-  min-height: 0;
-  padding: 0;
-  border: 0;
-}
-
 .campo-ajuste .campo-interruptor label {
   font-weight: 500;
   cursor: pointer;

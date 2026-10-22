@@ -20,23 +20,47 @@ fn iniciales(nombre: &str) -> String {
         .collect()
 }
 
-/// El pie de la tarjeta de `e`: los dispositivos conectados (con sus
-/// iniciales), desde cuándo está apagada, la nota de una radio (con la Biblioteca, donde se ven todas
-/// sus redes) y «Abrir».
+/// Lo que dice el pie de los dispositivos conectados: cuántos y sus
+/// nombres («2 dispositivos conectados: Móvil de Ana, 1 sin nombre»).
+/// `None` si no hay ninguno.
+fn texto_dispositivos(dispositivos: &[Option<String>]) -> Option<String> {
+    if dispositivos.is_empty() {
+        return None;
+    }
+    let n = dispositivos.len();
+    let mut nombres: Vec<String> = dispositivos.iter().flatten().cloned().collect();
+    if nombres.is_empty() {
+        return Some(t!("ajustes-pie-dispositivos", n = n));
+    }
+    let sin_nombre = n - nombres.len();
+    if sin_nombre > 0 {
+        nombres.push(t!("ajustes-pie-sin-nombre", n = sin_nombre));
+    }
+    Some(t!(
+        "ajustes-pie-dispositivos-nombres",
+        n = n,
+        nombres = nombres.join(", ")
+    ))
+}
+
+/// El pie de la tarjeta de `e`: los dispositivos conectados (cuántos, con
+/// las iniciales y el nombre de los que lo tienen), desde cuándo está
+/// apagada, la nota de una radio (con la Biblioteca, donde se ven todas sus
+/// redes) y «Abrir».
 pub(super) fn pie(e: &ElementoVista, nombre: &str, abrir: Callback<()>) -> impl IntoView + use<> {
-    let dispositivos = (!e.pie.dispositivos.is_empty()).then(|| {
+    let dispositivos = texto_dispositivos(&e.pie.dispositivos).map(|texto| {
         let avatares = e
             .pie
             .dispositivos
             .iter()
+            .flatten()
             .take(3)
             .map(|d| view! { <span class="tarjeta-av" aria-hidden="true">{iniciales(d)}</span> })
             .collect_view();
-        let nombres = e.pie.dispositivos.join(", ");
         view! {
             <div class="tarjeta-disp">
                 <span class="tarjeta-avs">{avatares}</span>
-                <span>{nombres}</span>
+                <span>{texto}</span>
             </div>
         }
     });
@@ -73,7 +97,7 @@ pub(super) fn pie(e: &ElementoVista, nombre: &str, abrir: Callback<()>) -> impl 
 
 #[cfg(test)]
 mod tests {
-    use super::iniciales;
+    use super::{iniciales, texto_dispositivos};
 
     #[test]
     fn iniciales_de_un_nombre() {
@@ -81,5 +105,42 @@ mod tests {
         assert_eq!(iniciales("portátil"), "P");
         assert_eq!(iniciales("TV"), "T");
         assert_eq!(iniciales(""), "");
+    }
+
+    /// El pie dice cuántos dispositivos hay conectados y el nombre de los
+    /// que lo tienen; sin ninguno, nada.
+    #[test]
+    fn texto_de_los_dispositivos() {
+        let ana = Some("Móvil de Ana".to_owned());
+        assert_eq!(texto_dispositivos(&[]), None);
+        assert_eq!(
+            texto_dispositivos(std::slice::from_ref(&ana)).as_deref(),
+            Some("1 dispositivo conectado: Móvil de Ana")
+        );
+        assert_eq!(
+            texto_dispositivos(&[ana, None, None]).as_deref(),
+            Some("3 dispositivos conectados: Móvil de Ana, 2 sin nombre")
+        );
+        assert_eq!(
+            texto_dispositivos(&[None, None]).as_deref(),
+            Some("2 dispositivos conectados")
+        );
+    }
+
+    /// «Apagada desde» dice que es desde el panel: no ve lo que se hizo
+    /// con el botón del router o en su web (en los dos idiomas).
+    #[test]
+    fn apagada_desde_el_panel() {
+        let mut args = ::i18n::FluentArgs::new();
+        args.set("fecha", "22/10 10:00");
+        let texto = |idioma| ::i18n::tr(idioma, "ajustes-apagada-desde", Some(&args));
+        assert_eq!(
+            texto(::i18n::Idioma::Es),
+            "Apagada desde el panel el 22/10 10:00"
+        );
+        assert_eq!(
+            texto(::i18n::Idioma::En),
+            "Turned off from the panel on 22/10 10:00"
+        );
     }
 }

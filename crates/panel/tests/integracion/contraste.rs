@@ -223,3 +223,80 @@ fn sobre_acento_solo_sobre_el_acento() {
         "--sobre-acento sin fondo --acento: {malas:#?}"
     );
 }
+
+/// Declaraciones de la regla (de cualquier `.css` de `style/`) que incluye
+/// exactamente el selector `selector` en su lista.
+fn regla(reglas: &[(String, String, String)], selector: &str) -> Option<String> {
+    reglas
+        .iter()
+        .find(|(_, s, _)| s.split(',').any(|x| x.trim() == selector))
+        .map(|(_, _, d)| d.clone())
+}
+
+/// Valor de la propiedad `nombre` en unas declaraciones.
+fn propiedad(declaraciones: &str, nombre: &str) -> Option<String> {
+    declaraciones.split(';').find_map(|d| {
+        let (n, v) = d.split_once(':')?;
+        (n.trim() == nombre).then(|| v.trim().to_owned())
+    })
+}
+
+#[test]
+fn interruptor_apagado_se_distingue() {
+    // WCAG 1.4.11: el carril de un interruptor apagado (el de la tarjeta,
+    // `.int`, y el del detalle, `.interruptor`) se distingue de la
+    // superficie en la que está, de 3:1 en adelante, en los dos temas.
+    let reglas = reglas_css();
+    let mut fallos = Vec::new();
+    for selector in [".int", ".interruptor"] {
+        let Some(fondo) = regla(&reglas, selector).and_then(|d| propiedad(&d, "background")) else {
+            fallos.push(format!("{selector}: sin regla con «background»"));
+            continue;
+        };
+        let Some(token) = fondo
+            .strip_prefix("var(--")
+            .and_then(|t| t.strip_suffix(')'))
+        else {
+            fallos.push(format!("{selector}: «{fondo}» no es un token"));
+            continue;
+        };
+        for (tema, bloque) in [("oscuro", OSCURO), ("claro", CLARO)] {
+            let c = colores(bloque);
+            for sup in ["sup", "sup2"] {
+                let r = relacion_wcag(&c[token], &c[sup]);
+                if r < 3.0 {
+                    fallos.push(format!(
+                        "{tema}: {selector} (--{token}) sobre --{sup} da {r:.2}:1"
+                    ));
+                }
+            }
+        }
+    }
+    assert!(fallos.is_empty(), "{fallos:#?}");
+}
+
+#[test]
+fn interruptor_del_detalle_como_el_de_la_tarjeta() {
+    // En solo lectura, el interruptor del detalle (`disabled`) se ve
+    // desactivado como el de la tarjeta, y en el móvil tiene la misma zona
+    // táctil de 40 px.
+    let reglas = reglas_css();
+    for (selector, propiedades) in [
+        (".interruptor:disabled", &["opacity", "cursor"][..]),
+        (".interruptor::before", &["inset"][..]),
+    ] {
+        let d = regla(&reglas, selector).unwrap_or_else(|| panic!("falta {selector}"));
+        for p in propiedades {
+            assert!(propiedad(&d, p).is_some(), "{selector} sin {p}: {d}");
+        }
+    }
+    assert_eq!(
+        regla(&reglas, ".interruptor:disabled").and_then(|d| propiedad(&d, "cursor")),
+        Some("not-allowed".to_owned())
+    );
+    // Y el estilo de los campos de texto no le pisa el carril.
+    for selector in [".campo input", ".campo-ajuste input"] {
+        let fondo = regla(&reglas, selector).and_then(|d| propiedad(&d, "background"));
+        assert_eq!(fondo, None, "{selector} pinta también el interruptor");
+    }
+}

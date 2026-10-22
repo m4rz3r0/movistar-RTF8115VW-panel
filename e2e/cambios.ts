@@ -60,3 +60,30 @@ export async function esperarFinal(page: Page, id: number) {
     .poll(() => estadoCambio(page, id), { timeout: PLAZO_CAMBIO, intervals: [1_000] })
     .toBe("Aplicado");
 }
+
+/**
+ * Abre el puerto `puerto` (TCP) hacia host-2 con una regla nueva llamada
+ * `nombre`, sin pasar por la interfaz. Devuelve el id del cambio.
+ */
+export async function crearRegla(page: Page, nombre: string, puerto: number): Promise<number> {
+  const p = String(puerto);
+  const grupo = await api(page, "preparar_ajuste", {
+    p: {
+      ajuste: "puertos.reglas",
+      instancia: null,
+      borrar: false,
+      valores: {
+        nombre,
+        protocolo: "tcp",
+        externo_desde: p,
+        externo_hasta: p,
+        destino: "192.168.1.62",
+        interno_desde: p,
+        interno_hasta: p,
+        activa: "true",
+      },
+      esperados: {},
+    },
+  });
+  return api(page, "confirmar_ajuste", { token: grupo.token, desmarcados: [] });
+}

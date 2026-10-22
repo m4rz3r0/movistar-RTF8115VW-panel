@@ -230,7 +230,16 @@ ajustes-leido-hace = { $s ->
    *[other] Read { $s } s ago
 }
 ajustes-leido-hace-min = Read { $min } min ago
-ajustes-apagada-desde = Off since { $fecha }
+ajustes-pie-dispositivos = { $n ->
+    [one] 1 device connected
+   *[other] { $n } devices connected
+}
+ajustes-pie-dispositivos-nombres = { $n ->
+    [one] 1 device connected: { $nombres }
+   *[other] { $n } devices connected: { $nombres }
+}
+ajustes-pie-sin-nombre = { $n } without a name
+ajustes-apagada-desde = Turned off from the panel on { $fecha }
 ajustes-elemento-no-existe = There is nothing called “{ $id }” in this tab. Pick one of its cards.
 
 ## Grid of elements: mark, bar, card, details and change notice
@@ -274,6 +283,10 @@ ajustes-aviso-conectados = { $n ->
 ## WiFi summary strip
 ajustes-resumen-de = { $n } of { $total }
 ajustes-resumen-sin-dato = —
+ajustes-resumen-sin-leer = { $n ->
+    [one] 1 couldn't be read and doesn't count.
+   *[other] { $n } couldn't be read and don't count.
+}
 ajustes-resumen-wifi-redes = Networks on
 ajustes-resumen-wifi-redes-detalle = The ones broadcasting right now.
 ajustes-resumen-wifi-radios = Radios on

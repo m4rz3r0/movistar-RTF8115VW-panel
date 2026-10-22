@@ -172,6 +172,11 @@ pub(crate) fn ContenidoRejilla(
     // Sin señales: el efecto de la dirección puede correr justo cuando la
     // página se está desmontando (al ir a otro tema).
     let ids: std::sync::Arc<[String]> = nombres.iter().map(|(id, _)| id.clone()).collect();
+    // Tras un borrado, ya pintada la página sin lo borrado, el foco a la
+    // fila vecina (o a «Abrir…/Añadir»).
+    if let Some(f) = s.tomar_foco(&ids) {
+        request_animation_frame(move || super::tras_borrar::enfocar_tras_borrar(&f));
+    }
     let existe = move |id: &Option<String>| id.as_ref().filter(|i| ids.contains(i)).cloned();
     // Un elemento en la dirección que el tema no tiene: se dice.
     let desconocido = {

@@ -1,5 +1,6 @@
 //! Pruebas de la insignia de cada red y la nota de su radio.
 
+use super::historial::{PasoDeRed, ultimo_apagado};
 use super::*;
 use ajustes::CatalogoAjustes;
 
@@ -364,4 +365,17 @@ fn apagada_desde_el_ultimo_paso() {
     assert_eq!(m.get("0"), Some(&10), "el nombre no cuenta");
     assert_eq!(m.get("1"), None, "se volvió a encender");
     assert_eq!(m.get("2"), Some(&60));
+}
+
+/// La página de la WiFi lee también la lista de dispositivos de Red local
+/// (para el nombre de los conectados de cada red), en la misma tanda.
+#[test]
+fn la_wifi_lee_los_nombres_de_red_local() {
+    let cat = CatalogoAjustes::load().unwrap();
+    let del_tema: Vec<&Ajuste> = cat.por_tema(Tema::from_slug("wifi").unwrap()).collect();
+    assert!(
+        claves_extra(&del_tema)
+            .iter()
+            .any(|c| *c == Clave::new::<&str, &str>("cbGetLanHostList", &[])),
+    );
 }

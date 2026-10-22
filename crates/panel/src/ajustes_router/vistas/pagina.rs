@@ -144,10 +144,9 @@ pub struct RecomendacionVista {
 /// El pie de la tarjeta: información viva.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PieVista {
-    /// Nombres de los dispositivos conectados.
-    pub dispositivos: Vec<String>,
-    /// Tráfico reciente (bytes por intervalo).
-    pub trafico: Vec<u64>,
+    /// Los dispositivos conectados (a una red WiFi), cada uno con su
+    /// nombre en Red local si lo tiene.
+    pub dispositivos: Vec<Option<String>>,
     /// Una nota ya traducida (lo que no se ve en sus redes).
     pub nota: Option<String>,
     /// Desde cuándo está apagada (segundos Unix), si se apagó desde el
