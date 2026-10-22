@@ -6,13 +6,19 @@
 #   ruta <glob> <regla> — <motivo>
 #   binario <ruta> <sha256> — <motivo>
 
-# DNS públicos de ejemplo en las pruebas.
-valor 9.9.9.9 — DNS público (Quad9) de ejemplo en las pruebas
-valor 149.112.112.112 — DNS público (Quad9) de ejemplo en las pruebas
+# DNS públicos: los de los proveedores del lote Privacidad máxima y algunos de ejemplo en las pruebas.
+valor 9.9.9.9 — DNS público (Quad9): proveedor del lote Privacidad máxima
+valor 149.112.112.112 — DNS público (Quad9): proveedor del lote Privacidad máxima
 valor 2620:fe::fe — DNS público IPv6 (Quad9) de ejemplo en las pruebas
 valor 194.242.2.2 — DNS público (Mullvad) de ejemplo en las pruebas
-valor 1.1.1.1 — DNS público (Cloudflare) de ejemplo en las pruebas
-valor 1.0.0.1 — DNS público (Cloudflare) de ejemplo en las pruebas
+valor 1.1.1.1 — DNS público (Cloudflare): proveedor del lote Privacidad máxima
+valor 1.0.0.1 — DNS público (Cloudflare): proveedor del lote Privacidad máxima
+valor 9.9.9.10 — DNS público (Quad9 sin filtro): proveedor del lote Privacidad máxima
+valor 149.112.112.10 — DNS público (Quad9 sin filtro): proveedor del lote Privacidad máxima
+valor 86.54.11.100 — DNS público (DNS4EU): proveedor del lote Privacidad máxima
+valor 86.54.11.200 — DNS público (DNS4EU): proveedor del lote Privacidad máxima
+valor 94.140.14.14 — DNS público (AdGuard): proveedor del lote Privacidad máxima
+valor 94.140.15.15 — DNS público (AdGuard): proveedor del lote Privacidad máxima
 
 # Valores de fábrica del operador, iguales en todas las líneas.
 valor 192.168.144.1 — puerta de enlace WAN de fábrica del operador
@@ -92,3 +98,4 @@ binario docs/capturas/estado-movil.png 8982bbb85f1cccd30561e00693dd611b88eb21b6c
 binario docs/capturas/configuracion-escritorio.png 1583344aa01e9f6b461d285794db15030121fee07ea67de665e1418d13248b42 — captura del README (configuracion-escritorio), del simulador con datos inventados
 binario docs/capturas/ajustes-wifi-escritorio.png 2619e06cd6c5f683967317f90dffbdb0a1ae6ef36be5f4ff78637cc349d0b013 — captura del README (ajustes-wifi-escritorio), del simulador con datos inventados
 binario docs/capturas/ajustes-puertos-claro.png b362522e3409434944c36476e2d3d38e8d7e5cab30b95f363804bd1986d603b8 — captura del README (ajustes-puertos-claro), del simulador con datos inventados
+binario docs/capturas/mejoras-escritorio.png afcaeb2fe63abd80026383afdc8cc3de296ed8a73ac7ee22946588443259bd89 — captura del README (mejoras-escritorio), del simulador con datos inventados

@@ -1,4 +1,4 @@
-# Settings in the Local network section: devices, fixed IPs, address handout and IPv6.
+# Settings in the Local network section: devices, fixed IPs, address handout, DNS for the home network and IPv6.
 
 ## Connected devices
 ajuste-red_local-dispositivos-titulo = Connected devices
@@ -76,6 +76,16 @@ ajuste-red_local-dhcp-concesion-dia-desc = Devices keep their address all day; t
 ajuste-red_local-dhcp-concesion-semana = 1 week
 ajuste-red_local-dhcp-concesion-semana-desc = Addresses hardly change, but those of devices that no longer come take a while to be freed.
 ajuste-red_local-dhcp-concesion-recomendado = Recommended if mostly the same devices connect at home, plus the odd visitor. Pros: each device keeps its address, and those of devices that stop coming are freed within half a day. Cons: if many different devices come and go, one hour frees addresses sooner.
+
+## DNS for the home network
+ajuste-red_local-dns_casa-titulo = DNS for the home network
+ajuste-red_local-dns_casa-desc = The servers your devices use to turn each website's name into its address. The router hands them out along with each device's IP address.
+ajuste-red_local-dns_casa-ayuda = Usually the router hands out its own address and then asks the operator's servers itself. With a neutral DNS service, the router hands out those servers and each device asks them directly: your lookups are no longer answered by the operator, but they travel unencrypted and the operator can still see them on the way, and hiding them takes encrypted DNS on each device or a VPN. It only changes what devices at home receive: it does not touch the internet connection, TV or voice. Each device notices when it renews its address.
+ajuste-red_local-dns_casa-principal = Primary DNS
+ajuste-red_local-dns_casa-principal-desc = The IP address of the first name server your devices receive, for example 192.168.1.1 if the router itself answers.
+ajuste-red_local-dns_casa-principal-recomendado = Recommended if you prefer that your website name lookups are not answered by the operator and you accept that they still travel unencrypted. Pros: Quad9 is based in Switzerland, does not keep your IP address and blocks malicious domains; other neutral services, such as DNS4EU, Cloudflare or AdGuard, are fine too. Cons: the operator still sees them on the way, you start trusting another company, and you may lose some operator feature that depends on its DNS.
+ajuste-red_local-dns_casa-secundario = Secondary DNS
+ajuste-red_local-dns_casa-secundario-desc = Used if the primary one does not answer. You can leave it empty.
 
 ## IPv6 at home
 ajuste-red_local-ipv6-titulo = IPv6 at home

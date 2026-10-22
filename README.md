@@ -16,6 +16,9 @@ habla con la web del router:
   qué está encendido, qué pide atención y qué recomienda el panel; se
   enciende o se apaga con un interruptor y se puede actuar sobre varios
   elementos a la vez, con un solo deshacer.
+- **Mejoras**: dos lotes de ajustes, «Seguridad recomendada» y «Privacidad
+  máxima», que se revisan y se aplican de una vez, con un solo deshacer; la
+  barra lateral cuenta lo que falta.
 - **Biblioteca**: todas las funciones de la API del router, con su
   descripción. Los cambios se **vigilan**: si el router deja de responder o
   se pierde internet, se deshacen solos.
@@ -32,9 +35,9 @@ lee el [aviso legal](AVISO-LEGAL.md) antes de usarlo.
 |---|---|---|
 | ![Estado del router en el escritorio](docs/capturas/estado-escritorio.png) | ![Estado del router en el móvil](docs/capturas/estado-movil.png) | ![Configuración de la conexión con el router](docs/capturas/configuracion-escritorio.png) |
 
-| Ajustes: WiFi | Ajustes: Puertos, en el tema claro |
-|---|---|
-| ![Ajustes de la WiFi en tarjetas](docs/capturas/ajustes-wifi-escritorio.png) | ![Reglas de puertos en una lista con columnas](docs/capturas/ajustes-puertos-claro.png) |
+| Ajustes: WiFi | Ajustes: Puertos, en el tema claro | Mejoras |
+|---|---|---|
+| ![Ajustes de la WiFi en tarjetas](docs/capturas/ajustes-wifi-escritorio.png) | ![Reglas de puertos en una lista con columnas](docs/capturas/ajustes-puertos-claro.png) | ![Los lotes Seguridad recomendada y Privacidad máxima, con sus pasos](docs/capturas/mejoras-escritorio.png) |
 
 Hechas con el router simulado y datos inventados. Se regeneran con
 `npx playwright test capturas-readme` (en `e2e/`, ver
@@ -98,6 +101,40 @@ resumen o desde el Historial. «Cómo estaba al instalar» compara el router con
 la foto que tomó el asistente y deja volver a cualquier ajuste. Las
 contraseñas van censuradas, con un ojo para verlas; lo demás, en claro. Lo
 que no está en Ajustes se cambia desde la Biblioteca, también con vigilancia.
+
+### Mejoras
+
+«Mejoras» (`/mejoras`) junta en dos lotes los ajustes que conviene cambiar
+y dice, en cada uno, para quién es, qué se gana y qué se pierde:
+
+- **Seguridad recomendada**: apaga la gestión remota del operador (TR-069)
+  y su aviso periódico, el WPS de cada red WiFi, la apertura automática de
+  puertos (UPnP), el espejo del tráfico y el envío del registro del sistema
+  a otro equipo; deja cada red WiFi en WPA2-AES y aísla la red de invitados
+  si está encendida. Lleva además unos consejos sin botón, para lo que el
+  router no deja cambiar desde su web.
+- **Privacidad máxima**: apaga la gestión remota, su aviso, el espejo y el
+  envío del registro; reparte a la red de casa unos DNS neutros, con el
+  proveedor a elegir (Quad9, Quad9 sin filtro, DNS4EU, Cloudflare o
+  AdGuard), y, si lo marcas, toma la hora de un servidor neutro.
+
+Cada tarjeta dice qué pasos están hechos, cuáles faltan y cuáles no se
+pudieron leer, y la barra lateral cuenta los pendientes. «Revisar y
+aplicar» abre la revisión con los pasos por pestaña, cada uno con su «antes
+→ después» y su casilla; se aplica como un solo cambio, vigilado y con un
+solo deshacer. En Ajustes, una recomendación que forma parte de un lote lo
+dice y enlaza a Mejoras.
+
+Los DNS neutros solo cambian quién responde: el router los reparte y cada
+dispositivo les pregunta directamente, pero sin cifrar, así que el operador
+sigue viendo las consultas por el camino.
+Para ocultarlas hace falta DNS cifrado (DoH o DoT) en cada dispositivo o
+una VPN.
+
+Los lotes se han probado contra el router simulado (`router-sim`); la
+comprobación en el router real va aparte (la televisión y el teléfono con
+TR-069 apagado, qué pool DHCP usa el descodificador, el registro…). Hasta
+entonces, mejor aplicarlos sabiendo que el «Deshacer» los devuelve.
 
 ## Instalación
 

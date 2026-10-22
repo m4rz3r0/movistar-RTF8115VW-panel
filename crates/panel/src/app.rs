@@ -11,6 +11,7 @@ use crate::ui::{
     instalar::PaginaInstalar,
     layout::Layout,
     login::PaginaLogin,
+    mejoras::PaginaMejoras,
     panel_ajustes::PaginaPanel,
     recomendaciones::RecomendacionesAlEstado,
     router::{InicioRouter, PaginaConexion, SeccionRouter},
@@ -114,6 +115,7 @@ pub fn App() -> impl IntoView {
                             <Route path=ParamSegment("elemento") view=SinVista />
                         </ParentRoute>
                     </ParentRoute>
+                    <Route path=StaticSegment("mejoras") view=PaginaMejoras />
                     <Route path=StaticSegment("historial") view=PaginaHistorial />
                     <Route path=StaticSegment("panel") view=PaginaPanel />
                     // Vuelve en la fase 4 con sus tarjetas.

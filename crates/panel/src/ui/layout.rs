@@ -1,9 +1,10 @@
-//! Marco de las páginas con sesión: barra lateral (Estado, Ajustes,
-//! Historial, Biblioteca y Configuración del router; debajo, el selector de
-//! idioma y la zona de sesión: el nombre de usuario, que abre «Ajustes del
-//! panel», y «Salir») que en pantallas estrechas pasa a ser una barra
-//! superior con el menú plegable.
+//! Marco de las páginas con sesión: barra lateral (Estado, Ajustes, Mejoras
+//! con su contador, Historial, Biblioteca y Configuración del router; debajo,
+//! el selector de idioma y la zona de sesión: el nombre de usuario, que abre
+//! «Ajustes del panel», y «Salir») que en pantallas estrechas pasa a ser una
+//! barra superior con el menú plegable.
 
+use crate::ajustes_router::{CADUCIDAD_LECTURAS, contar_mejoras};
 use crate::auth::{Logout, quien_soy};
 use crate::t;
 use crate::ui::i18n::SelectorIdioma;
@@ -68,6 +69,8 @@ const ICONO_AJUSTES: &str = "M3 6h9M16 6h1M3 14h1M8 14h9M14 4v4M6 12v4";
 /// Rejilla de bloques (Biblioteca).
 const ICONO_BIBLIOTECA: &str =
     "M3 3h5.5v5.5H3zM11.5 3H17v5.5h-5.5zM3 11.5h5.5V17H3zM11.5 11.5H17V17h-5.5z";
+/// Flecha hacia arriba en un círculo (Mejoras).
+const ICONO_MEJORAS: &str = "M10 2.75a7.25 7.25 0 1 1 0 14.5 7.25 7.25 0 0 1 0-14.5zM10 13.75v-7.5M6.75 9.5 10 6.25l3.25 3.25";
 /// Reloj (Historial).
 const ICONO_HISTORIAL: &str =
     "M10 2.75a7.25 7.25 0 1 1 0 14.5 7.25 7.25 0 0 1 0-14.5zM10 6v4l2.75 1.75";
@@ -82,6 +85,106 @@ const ICONO_USUARIO: &str =
     "M10 3a3.25 3.25 0 1 1 0 6.5A3.25 3.25 0 0 1 10 3zM3.75 17c.6-3.1 3.1-5 6.25-5s5.65 1.9 6.25 5";
 /// Tres rayas (menú).
 const ICONO_MENU: &str = "M3 5.5h14M3 10h14M3 14.5h14";
+
+/// Pide al marco que vuelva a contar lo que muestra la barra lateral (el
+/// contador de Mejoras): el seguimiento de los cambios (Ajustes y Mejoras)
+/// incrementa la señal al terminar uno, aplicado o deshecho.
+#[derive(Clone, Copy)]
+pub struct RecargaMarco(pub RwSignal<u32>);
+
+/// La cuenta de pasos pendientes que enseña el marco, ya en el navegador:
+/// `None` mientras nadie la ha dado; `Some(None)` si no se pudo leer nada.
+/// La escriben el contador, con su consulta, y la página Mejoras, con el
+/// total de su lectura.
+#[derive(Clone, Copy)]
+pub struct CuentaMejoras(pub RwSignal<Option<Option<u32>>>);
+
+/// ¿`ruta` es la página Mejoras, que da la cuenta con su propia lectura?
+fn en_mejoras(ruta: &str) -> bool {
+    seccion_activa("/mejoras", ruta)
+}
+
+/// La píldora del contador: nada sin pasos pendientes o sin lectura.
+fn pildora(n: Option<u32>) -> Option<impl IntoView + use<>> {
+    n.filter(|n| *n > 0).map(|n| {
+        view! {
+            <span class="cuenta" role="img" aria-label=t!("comun-nav-mejoras-pendientes", n = n)>
+                {n}
+            </span>
+        }
+    })
+}
+
+/// El contador de pasos pendientes de Mejoras, en su entrada del menú. Una
+/// consulta propia, que no bloquea ni espera al nombre de usuario, al
+/// cargar el marco (salvo en `/mejoras`, donde la página da el total) y con
+/// [`RecargaMarco`]. Al cambiar de página solo se repite si la cuenta tiene
+/// más de [`CADUCIDAD_LECTURAS`] (la caché de lecturas del servidor): así no
+/// multiplica las lecturas del router. Sin nada pendiente, o si no se pudo
+/// leer nada, no sale.
+#[component]
+fn ContadorMejoras() -> impl IntoView {
+    let ruta = use_location().pathname;
+    let recarga = expect_context::<RecargaMarco>().0;
+    let valor = expect_context::<CuentaMejoras>().0;
+    // La cuenta caducada se vuelve a pedir en el siguiente cambio de página.
+    let caducada = StoredValue::new(false);
+    let generacion = StoredValue::new(0u32);
+    let vuelta = RwSignal::new(0u32);
+    Effect::new(move |anterior: Option<String>| {
+        let r = ruta.get();
+        if anterior.is_some_and(|a| a != r) && !en_mejoras(&r) && caducada.get_value() {
+            caducada.set_value(false);
+            vuelta.update(|n| *n += 1);
+        }
+        r
+    });
+    let cuenta = Resource::new(
+        move || (recarga.get(), vuelta.get()),
+        move |_| {
+            let pedir = !en_mejoras(&ruta.get_untracked());
+            async move {
+                if pedir {
+                    Some(contar_mejoras().await.ok().flatten())
+                } else {
+                    None
+                }
+            }
+        },
+    );
+    Effect::new(move |_| {
+        if let Some(Some(n)) = cuenta.get() {
+            valor.set(Some(n));
+        }
+    });
+    // Cada cuenta nueva (de la consulta o de la página) vale lo que la caché.
+    Effect::new(move |_| {
+        if valor.get().is_none() {
+            return;
+        }
+        caducada.set_value(false);
+        let g = generacion.get_value().wrapping_add(1);
+        generacion.set_value(g);
+        set_timeout(
+            move || {
+                if generacion.try_get_value() == Some(g) {
+                    caducada.try_set_value(true);
+                }
+            },
+            CADUCIDAD_LECTURAS,
+        );
+    });
+    view! {
+        <Transition fallback=|| ()>
+            {move || Suspend::new(async move {
+                // En el servidor y al hidratar, la de la consulta; después,
+                // la última que se dio.
+                let inicial = cuenta.await.flatten();
+                move || pildora(valor.get().unwrap_or(inicial))
+            })}
+        </Transition>
+    }
+}
 
 /// Marco común: navegación y contenido de la ruta hija.
 #[component]
@@ -98,6 +201,8 @@ pub fn Layout() -> impl IntoView {
         }
     });
     let cerrar = move |_| set_abierto.set(false);
+    provide_context(RecargaMarco(RwSignal::new(0)));
+    provide_context(CuentaMejoras(RwSignal::new(None)));
 
     view! {
         <a class="saltar" href="#contenido">
@@ -147,6 +252,11 @@ pub fn Layout() -> impl IntoView {
                         <EnlaceSeccion href=crate::ui::ajustes_router::RUTA_AJUSTES prefijo="/ajustes">
                             {icono(ICONO_AJUSTES)}
                             <span>{t!("comun-nav-ajustes")}</span>
+                        </EnlaceSeccion>
+                        <EnlaceSeccion href="/mejoras" prefijo="/mejoras">
+                            {icono(ICONO_MEJORAS)}
+                            <span>{t!("comun-nav-mejoras")}</span>
+                            <ContadorMejoras />
                         </EnlaceSeccion>
                         <EnlaceSeccion href="/historial" prefijo="/historial">
                             {icono(ICONO_HISTORIAL)}

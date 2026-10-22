@@ -1,4 +1,4 @@
-//! Carga de `ajustes/*.toml` y `excluidas.toml`.
+//! Carga de `ajustes/*.toml`, `ajustes/lotes.toml` y `excluidas.toml`.
 //!
 //! Los ficheros se compilan dentro del binario. Cargar solo comprueba el
 //! formato; las reglas contra el catálogo de funciones están en
@@ -7,6 +7,7 @@
 use serde::Deserialize;
 use thiserror::Error;
 
+use crate::lotes::{Eleccion, Lote, PasoLote};
 use crate::modelo::{Accion, Ajuste, Elemento, Excluida, Tema};
 
 /// Registra los ficheros de `ajustes/`: un tema nuevo se añade solo aquí.
@@ -31,6 +32,9 @@ ficheros!(
 /// Texto de `excluidas.toml`.
 const EXCLUIDAS: &str = include_str!("../excluidas.toml");
 
+/// Texto de `ajustes/lotes.toml`.
+const LOTES: &str = include_str!("../ajustes/lotes.toml");
+
 /// Errores al cargar los ficheros del catálogo de ajustes.
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum ErrorAjustes {
@@ -52,6 +56,17 @@ struct FicheroAjustes {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+struct FicheroLotes {
+    #[serde(default)]
+    lote: Vec<Lote>,
+    #[serde(default)]
+    paso: Vec<PasoLote>,
+    #[serde(default)]
+    eleccion: Vec<Eleccion>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct FicheroExcluidas {
     #[serde(default)]
     excluida: Vec<Excluida>,
@@ -65,16 +80,19 @@ pub struct CatalogoAjustes {
     elementos: Vec<Elemento>,
     acciones: Vec<Accion>,
     excluidas: Vec<Excluida>,
+    lotes: Vec<Lote>,
+    pasos: Vec<PasoLote>,
+    elecciones: Vec<Eleccion>,
 }
 
 impl CatalogoAjustes {
-    /// Carga los ficheros compilados en el binario.
+    /// Carga los ficheros compilados en el binario, lotes incluidos.
     pub fn load() -> Result<CatalogoAjustes, ErrorAjustes> {
-        Self::from_toml(FICHEROS, EXCLUIDAS)
+        Self::from_toml(FICHEROS, EXCLUIDAS)?.con_lotes(LOTES)
     }
 
     /// Carga desde texto: `(nombre, texto)` de cada fichero de ajustes y el
-    /// texto de `excluidas.toml`.
+    /// texto de `excluidas.toml`. Queda sin lotes (ver [`Self::con_lotes`]).
     pub fn from_toml(
         ficheros: &[(&str, &str)],
         excluidas: &str,
@@ -96,7 +114,23 @@ impl CatalogoAjustes {
             elementos,
             acciones,
             excluidas: ex.excluida,
+            lotes: Vec::new(),
+            pasos: Vec::new(),
+            elecciones: Vec::new(),
         })
+    }
+
+    /// El catálogo con los lotes, pasos y elecciones del texto de
+    /// `lotes.toml` (en lugar de los que tuviera).
+    pub fn con_lotes(mut self, texto: &str) -> Result<CatalogoAjustes, ErrorAjustes> {
+        let f: FicheroLotes = toml::from_str(texto).map_err(|e| ErrorAjustes::Toml {
+            fichero: "lotes".to_owned(),
+            mensaje: e.to_string(),
+        })?;
+        self.lotes = f.lote;
+        self.pasos = f.paso;
+        self.elecciones = f.eleccion;
+        Ok(self)
     }
 
     /// Todos los ajustes, en el orden de los ficheros.
@@ -137,5 +171,35 @@ impl CatalogoAjustes {
     /// Funciones de escritura que ningún ajuste cubre, con su motivo.
     pub fn excluidas(&self) -> &[Excluida] {
         &self.excluidas
+    }
+
+    /// Lotes, en el orden del fichero.
+    pub fn lotes(&self) -> &[Lote] {
+        &self.lotes
+    }
+
+    /// Lote por id.
+    pub fn lote(&self, id: &str) -> Option<&Lote> {
+        self.lotes.iter().find(|l| l.id == id)
+    }
+
+    /// Pasos de los lotes, en el orden del fichero.
+    pub fn pasos(&self) -> &[PasoLote] {
+        &self.pasos
+    }
+
+    /// Paso de un lote por id.
+    pub fn paso(&self, id: &str) -> Option<&PasoLote> {
+        self.pasos.iter().find(|p| p.id == id)
+    }
+
+    /// Elecciones de los pasos, en el orden del fichero.
+    pub fn elecciones(&self) -> &[Eleccion] {
+        &self.elecciones
+    }
+
+    /// Elección por id.
+    pub fn eleccion(&self, id: &str) -> Option<&Eleccion> {
+        self.elecciones.iter().find(|e| e.id == id)
     }
 }

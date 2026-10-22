@@ -187,6 +187,9 @@ pub(super) fn paso_vista(
             .collect(),
         titulo: None,
         nota: None,
+        pestana: None,
+        desmarcado: false,
+        clave: None,
     }
 }
 
@@ -213,6 +216,7 @@ pub(super) fn vista_grupo(
         detalle: None,
         aviso: None,
         borra: false,
+        proveedor_dns: None,
     }
 }
 
@@ -426,6 +430,11 @@ pub(in crate::ajustes_router) async fn confirmar_ajuste(
 ) -> Result<i64, ServerFnError> {
     let (state, user) = preparar().await?;
     let g = gestor(&state)?;
+    // Todo lo que cambia, desmarcado: no se escribe nada ni queda nada en
+    // el Historial, y el token sigue valiendo para volver a marcar.
+    if g.nada_que_aplicar(&token, &desmarcados) {
+        return Err(error_ajuste(CambioError::SinCambios));
+    }
     g.confirmar_grupo(&token, &desmarcados, &user.username)
         .await
         .map_err(error_ajuste)

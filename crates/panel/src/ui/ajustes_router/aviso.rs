@@ -17,12 +17,25 @@ use crate::ui::comun::EstadoVisual;
 use crate::ui::explorador::{CambioVista, EstadoDeCambio, estado_cambio, texto_error};
 use crate::ui::grupo::{DialogoGrupo, texto_valor};
 use crate::ui::i18n::traducir;
+use crate::ui::layout::RecargaMarco;
 use leptos::{prelude::*, task::spawn_local};
 use std::time::Duration;
 
 mod vista;
 
 pub(crate) use vista::AvisoCambio;
+
+/// Lo que añade a su diálogo una revisión con opciones (el proveedor de DNS
+/// de un lote de Mejoras), para [`Seguimiento::revisar_con`].
+#[derive(Clone)]
+pub(crate) struct ExtraRevision {
+    /// Se pinta encima de los pasos (el selector).
+    pub antes_de_pasos: ViewFn,
+    /// El grupo preparado de nuevo con otra opción: sustituye al revisado.
+    pub nuevo_grupo: Signal<Option<GrupoVista>>,
+    /// Se está preparando el grupo nuevo: el diálogo no se cierra ni aplica.
+    pub ocupado: Signal<bool>,
+}
 
 /// Cada cuánto se pregunta por el estado del cambio.
 const SONDEO: Duration = Duration::from_secs(2);
@@ -65,6 +78,8 @@ struct Revision {
     deshacer: bool,
     /// Al aplicarse, sus elementos se cierran (una instancia nueva, ya creada).
     cerrar: bool,
+    /// Las opciones de la revisión, si las tiene.
+    extra: Option<ExtraRevision>,
 }
 
 /// El cambio en curso de la página y el diálogo de revisión abierto. Vive
@@ -76,6 +91,9 @@ pub(crate) struct Seguimiento {
     /// Grupo preparado a la espera de que se revise en el diálogo.
     dialogo: RwSignal<Option<Revision>>,
     recargar: Callback<()>,
+    /// El marco (el contador de Mejoras de la barra lateral), que vuelve a
+    /// contar cuando termina un cambio.
+    marco: Option<RecargaMarco>,
     /// Lo editado en cada detalle: el de lo que se aplica se olvida.
     borradores: Borradores,
     /// Elementos que se acaban de cerrar así: la página deja su dirección.
@@ -102,6 +120,7 @@ impl Seguimiento {
             error: RwSignal::new(None),
             dialogo: RwSignal::new(None),
             recargar,
+            marco: use_context::<RecargaMarco>(),
             borradores,
             cerrados: RwSignal::new(Vec::new()),
         };
@@ -169,6 +188,11 @@ impl Seguimiento {
                 }
             }
             self.recargar.run(());
+            // Aplicado o deshecho, lo pendiente de Mejoras cambia: el
+            // contador de la barra lateral vuelve a contar al momento.
+            if let Some(RecargaMarco(r)) = self.marco {
+                r.try_update(|n| *n += 1);
+            }
         }
     }
 
@@ -257,22 +281,35 @@ impl Seguimiento {
 
     /// Abre el diálogo de revisión del grupo `g`, que cambia `elementos`.
     pub(crate) fn revisar(self, g: GrupoVista, elementos: Vec<String>) {
-        self.revisar_con(g, elementos, false);
+        self.abrir(g, elementos, false, None);
     }
 
     /// Como [`Seguimiento::revisar`], pero al aplicarse se cierran sus
     /// elementos (el detalle de una instancia nueva, ya creada).
     pub(crate) fn revisar_y_cerrar(self, g: GrupoVista, elementos: Vec<String>) {
-        self.revisar_con(g, elementos, true);
+        self.abrir(g, elementos, true, None);
     }
 
-    fn revisar_con(self, g: GrupoVista, elementos: Vec<String>, cerrar: bool) {
+    /// Abre el diálogo de revisión del grupo `g` con sus opciones (`extra`):
+    /// un lote de Mejoras, que no cambia ningún elemento de la página.
+    pub(crate) fn revisar_con(self, g: GrupoVista, extra: ExtraRevision) {
+        self.abrir(g, Vec::new(), false, Some(extra));
+    }
+
+    fn abrir(
+        self,
+        g: GrupoVista,
+        elementos: Vec<String>,
+        cerrar: bool,
+        extra: Option<ExtraRevision>,
+    ) {
         self.error.set(None);
         self.dialogo.set(Some(Revision {
             grupo: g,
             elementos,
             deshacer: false,
             cerrar,
+            extra,
         }));
     }
 

@@ -167,7 +167,8 @@ async fn tras_caducar_vuelve_a_leer() {
     assert_eq!(lecturas_desde(&p, antes), vec![]);
     tokio::time::sleep(Duration::from_millis(400)).await;
     leer(&p, &cookie, "sistema").await;
-    assert_eq!(lecturas_desde(&p, antes).len(), 2);
+    // La hora, el espejo y el registro del sistema.
+    assert_eq!(lecturas_desde(&p, antes).len(), 3);
 }
 
 /// `preparar_ajuste` lee el router aunque la página se pintase de la caché:

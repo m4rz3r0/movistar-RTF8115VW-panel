@@ -16,6 +16,9 @@ container) and talks to the router's web interface:
   you see what is on, what needs your attention and what the panel
   recommends; things are switched on or off with a toggle, and you can act
   on several items at once, with a single undo.
+- **Improvements**: two batches of settings, "Recommended security" and
+  "Maximum privacy", reviewed and applied in one go, with a single undo; the
+  sidebar counts what is left.
 - **Library**: every function of the router's API, with its description.
   Changes are **watched**: if the router stops answering or internet goes
   down, they are undone on their own.
@@ -32,9 +35,9 @@ read the [legal notice](AVISO-LEGAL.md#legal-notice) before using it.
 |---|---|---|
 | ![Router status on a desktop](docs/capturas/estado-escritorio.png) | ![Router status on a phone](docs/capturas/estado-movil.png) | ![Router connection settings](docs/capturas/configuracion-escritorio.png) |
 
-| Settings: WiFi | Settings: Ports, light theme |
-|---|---|
-| ![WiFi settings as cards](docs/capturas/ajustes-wifi-escritorio.png) | ![Port rules in a list with columns](docs/capturas/ajustes-puertos-claro.png) |
+| Settings: WiFi | Settings: Ports, light theme | Improvements |
+|---|---|---|
+| ![WiFi settings as cards](docs/capturas/ajustes-wifi-escritorio.png) | ![Port rules in a list with columns](docs/capturas/ajustes-puertos-claro.png) | ![The Recommended security and Maximum privacy batches, with their steps](docs/capturas/mejoras-escritorio.png) |
 
 Taken with the simulated router and made-up data, and in Spanish, the
 panel's default language (the language selector switches it to English).
@@ -100,6 +103,40 @@ the snapshot the wizard took and lets you go back to any setting. Passwords
 are masked, with an eye to reveal them; everything else is shown in clear.
 Whatever is not in Settings is changed from the Library, also with
 watching.
+
+### Improvements
+
+"Improvements" (`/mejoras`) gathers in two batches the settings worth
+changing and says, for each, who it is for, what you gain and what you
+lose:
+
+- **Recommended security**: turns off the operator's remote management
+  (TR-069) and its regular check-in, WPS on each WiFi network, automatic
+  port opening (UPnP), the traffic mirror and sending the system log to
+  another machine; leaves each WiFi network on WPA2-AES and isolates the
+  guest network if it is on. It also carries some tips without a button,
+  for what the router does not let you change from its web interface.
+- **Maximum privacy**: turns off remote management, its check-in, the mirror
+  and sending the log; hands out neutral DNS servers to the home network,
+  with a choice of provider (Quad9, Quad9 unfiltered, DNS4EU, Cloudflare or
+  AdGuard), and, if you tick it, takes the time from a neutral server.
+
+Each card says which steps are done, which are left and which could not be
+read, and the sidebar counts the pending ones. "Review and apply" opens the
+review with the steps by tab, each with its "before → after" and its
+checkbox; it is applied as a single change, watched and with a single
+undo. In Settings, a recommendation that is part of a batch says so and
+links to Improvements.
+
+Neutral DNS servers only change who answers: the router hands them out
+and each device asks them directly, but unencrypted, so the operator can
+still see the queries on the way. To
+hide them you need encrypted DNS (DoH or DoT) on each device or a VPN.
+
+The batches have been tested against the simulated router (`router-sim`);
+checking them on the real router is a separate step (TV and phone with
+TR-069 off, which DHCP pool the set-top box uses, the system log…). Until
+then, apply them knowing that "Undo" brings everything back.
 
 ## Installation
 

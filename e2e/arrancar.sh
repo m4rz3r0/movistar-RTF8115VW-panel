@@ -6,7 +6,8 @@
 #   instalado  (por defecto) con el usuario «e2e», las credenciales del router
 #              en RP_ROUTER_* (el panel las importa, como al actualizar un
 #              servidor), la foto de partida y un grupo de dos pasos ya
-#              aplicado (e2e_grupo);
+#              aplicado (e2e_grupo); con E2E_SOLO_FOTO=1, solo la foto de
+#              partida (el router, con las fixtures tal cual);
 #   nuevo      recién instalado: sin usuarios ni router (el asistente).
 # Necesita antes, en la raíz del repositorio: `cargo build -p router-sim`,
 # `cargo build -p panel --features ssr --example e2e_grupo` y, lo último,
@@ -88,7 +89,11 @@ if [ "$MODO" = instalado ]; then
 	export RP_ROUTER_URL="http://127.0.0.1:$SIM_PORT" RP_ROUTER_USER=sim \
 		RP_ROUTER_SECRET="$DIR/router.secret"
 	printf 'e2e-contrasena\n' | target/debug/panel user add e2e
-	target/debug/examples/e2e_grupo
+	if [ "${E2E_SOLO_FOTO:-0}" = 1 ]; then
+		target/debug/examples/e2e_grupo foto
+	else
+		target/debug/examples/e2e_grupo
+	fi
 fi
 RP_LISTEN="127.0.0.1:$PORT" \
 	LEPTOS_OUTPUT_NAME=panel \

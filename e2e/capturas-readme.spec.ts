@@ -55,6 +55,14 @@ const capturas = [
     escala: 1,
     tema: "light" as const,
   },
+  {
+    // Mejoras: los dos lotes, con sus pasos y lo que falta de cada uno.
+    fichero: "mejoras-escritorio.png",
+    ruta: "/mejoras",
+    listo: "article.tarjeta-lote",
+    viewport: { width: 1440, height: 900 },
+    escala: 1,
+  },
 ];
 
 /** Bloques de PNG que se conservan: la imagen y su espacio de color. */

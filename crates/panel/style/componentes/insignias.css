@@ -76,3 +76,15 @@
   background: var(--sup3);
   color: var(--suave);
 }
+
+/* Contador (resultados de la Biblioteca, pasos pendientes de Mejoras en el
+   menú): una cifra en una píldora neutra. */
+.cuenta {
+  min-width: 26px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--sup2);
+  color: var(--suave);
+  font-size: 12.5px;
+  text-align: center;
+}

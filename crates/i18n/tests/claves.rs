@@ -259,18 +259,24 @@ fn sin_texto_literal_en_vistas() {
     );
 }
 
-/// Sin sugerencias de DNS públicos: los proveedores se elegirán en la fase
-/// 3/4 con fuentes citadas y comprobando que admiten DNS normal (algunos solo
-/// funcionan cifrados, y el router reparte DNS normal por DHCP).
+/// Los proveedores de DNS públicos solo se nombran en los textos del lote
+/// «Privacidad máxima» y de los DNS de la red de casa, que los eligieron con
+/// fuentes citadas y comprobando que admiten DNS normal (el router reparte
+/// DNS normal por DHCP). Mullvad, que solo funciona cifrado, en ninguno. Las
+/// vistas no los nombran: salen de los textos.
 #[test]
 fn sin_proveedores_de_dns_en_textos_ni_vistas() {
-    let proveedores = Regex::new(r"(?i)quad9|mullvad|cloudflare").unwrap();
+    let proveedores = Regex::new(r"(?i)quad9|mullvad|cloudflare|adguard|dns4eu").unwrap();
+    let solo_cifrado = Regex::new(r"(?i)mullvad").unwrap();
     let mut hallados = Vec::new();
     for idioma in ["es", "en"] {
         for f in i18n::FICHEROS {
             let ruta = raiz().join("locales").join(idioma).join(format!("{f}.ftl"));
             for (n, l) in fs::read_to_string(&ruta).unwrap().lines().enumerate() {
-                if proveedores.is_match(l) {
+                let permitido = l.starts_with("mejoras-")
+                    || l.starts_with("ajuste-red_local-dns_casa-")
+                    || l.starts_with('#');
+                if solo_cifrado.is_match(l) || (proveedores.is_match(l) && !permitido) {
                     hallados.push(format!("{}:{}", ruta.display(), n + 1));
                 }
             }

@@ -452,3 +452,101 @@ fn aceptados_en_un_texto_con_recomendado() {
     assert!(!ajustes::valor_aceptado(&a, "malpool.example"));
     assert!(!ajustes::valor_aceptado(&a, "hora.operador.example"));
 }
+
+/// Un ajuste con un campo IP (`puerta`) que lleva `extra`.
+fn con_ip(extra: &str) -> String {
+    format!(
+        "{WIFI}
+[[ajuste]]
+id = \"wifi.puerta\"
+tema = \"wifi\"
+nivel = \"avanzado\"
+leer = {{ funcion = \"cbGetX\" }}
+
+[[ajuste.campo]]
+id = \"puerta\"
+escribe = {{ funcion = \"cbSetX\", parametro = \"puerta\" }}
+lee = \"puerta\"
+tipo = \"ip\"
+{extra}
+"
+    )
+}
+
+/// `aceptados` vale también en un campo IP (los DNS de casa: otros
+/// proveedores neutros valen como el recomendado), y cada uno es una IP.
+#[test]
+fn aceptados_en_un_campo_ip() {
+    let f = fallos(
+        &con_ip("recomendado = \"192.0.2.1\"\naceptados = [\"192.0.2.2\", \"192.0.2.3\"]"),
+        "",
+    );
+    assert!(f.is_empty(), "{f:#?}");
+    falla_con(
+        &fallos(&con_ip("aceptados = [\"192.0.2.2\"]"), ""),
+        "wifi.puerta.puerta",
+        "aceptados",
+    );
+    falla_con(
+        &fallos(
+            &con_ip("recomendado = \"192.0.2.1\"\naceptados = [\"*.example\"]"),
+            "",
+        ),
+        "wifi.puerta.puerta",
+        "aceptados",
+    );
+}
+
+/// En un número, `aceptados` sigue siendo un error.
+#[test]
+fn aceptados_en_un_numero_es_error() {
+    let numero = WIFI.replace(
+        "tipo = \"numero\"\nvalidar = { min = 1, max = 64 }",
+        "tipo = \"numero\"\nvalidar = { min = 1, max = 64 }\nrecomendado = \"8\"\naceptados = [\"9\"]",
+    );
+    assert_ne!(numero, WIFI, "el reemplazo tiene que casar");
+    falla_con(&fallos(&numero, ""), "wifi.avanzado.maximo", "aceptados");
+}
+
+/// Un booleano sobre un `enum` de más de dos valores (el destino del
+/// registro: local, remoto o los dos) vale si dice cuáles son sí y no; sin
+/// decirlo, no.
+#[test]
+fn booleano_sobre_un_enum_de_tres_valores() {
+    let sobre_seguridad = |extra: &str| {
+        format!(
+            "{WIFI}
+[[ajuste]]
+id = \"wifi.modo\"
+tema = \"wifi\"
+nivel = \"avanzado\"
+leer = {{ funcion = \"cbGetX\" }}
+
+[[ajuste.campo]]
+id = \"moderno\"
+escribe = {{ funcion = \"cbSetX\", parametro = \"seguridad\" }}
+lee = \"seguridad\"
+tipo = \"booleano\"
+{extra}
+"
+        )
+    };
+    let f = fallos(
+        &sobre_seguridad("booleano = { si = \"11\", no = \"0\" }"),
+        "",
+    );
+    assert!(f.is_empty(), "{f:#?}");
+    falla_con(
+        &fallos(&sobre_seguridad(""), ""),
+        "wifi.modo.moderno",
+        "incompatible con el parámetro seguridad",
+    );
+    falla_con(
+        &fallos(
+            &sobre_seguridad("booleano = { si = \"11\", no = \"7\" }"),
+            "",
+        ),
+        "wifi.modo.moderno",
+        "seguridad",
+    );
+}

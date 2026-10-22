@@ -101,7 +101,7 @@ pub fn prefijo_de_ajuste(id: &str) -> String {
     format!("ajuste-{}", id.replace('.', "-"))
 }
 
-/// ¿`valor` es uno de los `aceptados` de un campo de texto? Cada uno vale
+/// ¿`valor` es uno de los `aceptados` de un campo de texto o IP? Cada uno vale
 /// tal cual o, si empieza por `*.`, por cualquier nombre de ese dominio
 /// (`*.pool.ntp.org` acepta `es.pool.ntp.org`). Sin distinguir mayúsculas.
 pub fn valor_aceptado(aceptados: &[String], valor: &str) -> bool {
@@ -283,8 +283,9 @@ mod catalogo_toml {
         /// invitados): en la tarjeta va antes que las demás y como riesgo.
         #[serde(default)]
         pub seguridad: bool,
-        /// En un campo de texto con `recomendado`, otros valores que valen
-        /// igual que lo recomendado (otro servidor de hora neutro); ver
+        /// En un campo de texto o IP con `recomendado`, otros valores que
+        /// valen igual que lo recomendado (otro servidor de hora o de DNS
+        /// neutro); ver
         /// [`valor_aceptado`](super::valor_aceptado).
         #[serde(default)]
         pub aceptados: Vec<String>,

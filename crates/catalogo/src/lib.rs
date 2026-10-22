@@ -295,9 +295,19 @@ riesgo = "bajo"
             (r.tipo, r.riesgo, r.bloqueada.as_deref()),
             (Tipo::Accion, Riesgo::Alto, None)
         );
-        for n in ["cbSaveConfig", "cbSetSyslog"] {
-            assert_eq!(c.funcion(n).unwrap().tipo, Tipo::Accion, "{n}");
-        }
+        assert_eq!(c.funcion("cbSaveConfig").unwrap().tipo, Tipo::Accion);
+    }
+
+    /// El registro del sistema se configura como un ajuste más: su escritura
+    /// se lee con su lectura pareada y nunca lleva `export`, que exporta el
+    /// registro (spec de mejoras, §5.2).
+    #[test]
+    fn set_syslog_es_escritura_sin_export() {
+        let c = cat();
+        let f = c.funcion("cbSetSyslog").unwrap();
+        assert_eq!(f.tipo, Tipo::Escritura);
+        assert!(f.parametro("export").is_none());
+        assert_eq!(f.lectura_pareada.as_ref().unwrap().funcion, "cbGetSyslog");
     }
 
     #[test]

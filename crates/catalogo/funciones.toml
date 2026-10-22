@@ -4206,15 +4206,11 @@ riesgo = "bajo"
 name = "cbSetSyslog"
 area = "sistema"
 origen = "avanzada"
-tipo = "accion"
+tipo = "escritura"
 pagina = "syslog.asp"
-descripcion = "Configura el registro del sistema; con `export=EXPORT` exporta el registro (lo que syslog.asp hace al cargarse). Acción explícita."
+descripcion = "Configura el registro del sistema (destino local o remoto, servidor y severidad). El router también exporta el registro si recibe `export=EXPORT` (lo que syslog.asp hace al cargarse): el panel nunca lo envía, porque solo manda los parámetros de este catálogo."
 riesgo = "bajo"
-
-[[funcion.parametro]]
-nombre = "export"
-etiqueta = "Exportar (siempre «EXPORT»)"
-tipo = "text"
+lectura_pareada = { funcion = "cbGetSyslog", params = [] }
 
 [[funcion.parametro]]
 nombre = "syslog_enable"

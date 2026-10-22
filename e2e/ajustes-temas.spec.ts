@@ -86,7 +86,7 @@ const casos: Caso[] = [
   {
     tema: "sistema",
     nombre: "Sistema",
-    tarjetas: 2,
+    tarjetas: 3,
     elemento: "Hora del router",
     id: "hora",
     editar: async (detalle, sufijo) => {

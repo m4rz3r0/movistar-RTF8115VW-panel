@@ -8,7 +8,7 @@ import {
   violacionesGraves,
 } from "./util";
 
-// Aspecto de Estado, Historial, Biblioteca, Configuración del router y
+// Aspecto de Estado, Mejoras, Historial, Biblioteca, Configuración del router y
 // Ajustes del panel con el sistema visual nuevo (spec del rediseño, §3), en
 // español a 360 y 1440 px y en los dos temas, contra router-sim: axe sin
 // violaciones serias (entre ellas, el contraste), sin desbordamiento
@@ -28,6 +28,7 @@ interface Pagina {
 
 const paginas: Pagina[] = [
   { nombre: "estado", ruta: "/", contenido: "main .rejilla-indicadores" },
+  { nombre: "mejoras", ruta: "/mejoras", contenido: "main .tarjeta-lote" },
   { nombre: "historial", ruta: "/historial", contenido: "main .hist-lista" },
   { nombre: "biblioteca", ruta: "/explorador", contenido: "main .tarjeta-enlace" },
   { nombre: "biblioteca-area", ruta: "/explorador/wifi", contenido: "main .funcion-item" },

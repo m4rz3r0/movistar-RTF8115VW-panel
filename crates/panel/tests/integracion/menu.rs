@@ -67,6 +67,7 @@ async fn menu_en_orden() {
         [
             "/",
             "/ajustes/internet",
+            "/mejoras",
             "/historial",
             "/explorador",
             "/router/conexion"
@@ -99,6 +100,7 @@ async fn seccion_marcada_en_subrutas() {
     for (ruta, href) in [
         ("/", "/"),
         ("/ajustes/wifi", "/ajustes/internet"),
+        ("/mejoras", "/mejoras"),
         ("/historial", "/historial"),
         ("/explorador/lan_dhcp", "/explorador"),
         ("/router/conexion", "/router/conexion"),

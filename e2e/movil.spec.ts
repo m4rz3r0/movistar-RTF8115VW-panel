@@ -53,11 +53,15 @@ for (const ancho of anchos) {
       const errores = recogerErrores(page);
       await entrar(page);
       await page.goto("/historial");
-      // El grupo de dos pasos que aplicó e2e_grupo al arrancar.
-      const grupo = page.locator("li.hist-cambio", {
+      // El grupo de dos pasos que aplicó e2e_grupo al arrancar: el más
+      // antiguo, el último. Otros ficheros que pasen antes por el mismo
+      // panel (según cómo se repartan entre los workers) pueden haber
+      // añadido otros grupos encima.
+      const grupos = page.locator("li.hist-cambio", {
         has: page.locator("ol.hist-pasos"),
       });
-      await expect(grupo).toHaveCount(1);
+      await expect(grupos.first()).toBeVisible();
+      const grupo = grupos.last();
       await asentar(page);
       await grupo.locator("summary.hist-cabeza").click();
       const pasos = grupo.locator("li.hist-paso");

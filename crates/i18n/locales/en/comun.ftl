@@ -8,6 +8,12 @@ comun-menu = Menu
 comun-nav-principal = Main
 comun-nav-estado = Status
 comun-nav-ajustes = Settings
+comun-nav-mejoras = Improvements
+# Screen readers only: the counter of the “Improvements” entry.
+comun-nav-mejoras-pendientes = { $n ->
+    [one] 1 pending step
+   *[other] { $n } pending steps
+}
 comun-nav-historial = History
 comun-nav-biblioteca = Library
 comun-nav-router = Router settings

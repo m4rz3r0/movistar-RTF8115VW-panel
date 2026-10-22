@@ -135,6 +135,21 @@
   background: var(--acento);
 }
 
+/* El contador de una entrada (pasos pendientes de Mejoras), a la derecha.
+   Sobre el fondo de la entrada marcada, con el ratón encima o con el foco,
+   un tono más y el texto fuerte (más de 4,5:1 en los dos temas). */
+.nav .cuenta {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.nav a:hover .cuenta,
+.nav a:focus-visible .cuenta,
+.nav a[aria-current="page"] .cuenta {
+  background: var(--sup3);
+  color: var(--texto);
+}
+
 .sesion {
   display: flex;
   flex-direction: column;

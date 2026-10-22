@@ -94,7 +94,7 @@ async fn pagina_sistema_hora() {
     let cookie = sesion(&p).await;
     // Las fixtures traen el servidor de hora del operador.
     let pagina = leer(&p, &cookie, "sistema").await;
-    assert_eq!(ids(&pagina), ["hora", "diagnostico"]);
+    assert_eq!(ids(&pagina), ["hora", "diagnostico", "registro"]);
     let hora = elemento(&pagina, "hora");
     assert_eq!(hora["estado"], "emite", "{hora}");
     let r = &hora["recomendacion"];

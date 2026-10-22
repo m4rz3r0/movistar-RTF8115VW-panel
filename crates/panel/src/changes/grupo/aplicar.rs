@@ -85,6 +85,19 @@ impl ChangeManager {
         })
     }
 
+    /// ¿Se quedaría sin escribir nada el grupo preparado con `token` sin los
+    /// pasos de `desmarcados`? Es decir, todos los pasos con cambios llegan
+    /// desmarcados. No consume el token; con uno que no vale, `false` (lo
+    /// dice [`ChangeManager::confirmar_grupo`]).
+    pub fn nada_que_aplicar(&self, token: &str, desmarcados: &[usize]) -> bool {
+        lock(&self.pendientes).get(token).is_some_and(|v| {
+            v.sin_cambios
+                .iter()
+                .enumerate()
+                .all(|(i, sin)| *sin || desmarcados.contains(&i))
+        })
+    }
+
     /// Aplica el grupo preparado con `token` sin los pasos de `desmarcados`
     /// (índices): escribe y verifica cada paso en orden y deja la vigilancia
     /// en marcha. Devuelve el id del cambio (en `vigilando`). Si un paso

@@ -9,7 +9,8 @@
 //!
 //! Sin features, la crate solo trae los tipos que usan las vistas del panel,
 //! que también se compilan para el navegador. La feature `catalogo` (servidor)
-//! añade la carga de `ajustes/*.toml` y `excluidas.toml`, su comprobación
+//! añade la carga de `ajustes/*.toml` (con los lotes de mejoras de
+//! `ajustes/lotes.toml`) y `excluidas.toml`, su comprobación
 //! contra `funciones.toml`/`secretos.toml` y la traducción de valores entre el
 //! formato del router y el legible.
 
@@ -21,9 +22,11 @@ pub use modelo::{
 };
 
 /// Glifos que puede llevar la tarjeta de un elemento (`icono` en el
-/// catálogo); el panel los dibuja en `ui::comun::Glifo`.
+/// catálogo) o de un lote de mejoras; el panel los dibuja en
+/// `ui::comun::Glifo`.
 pub const ICONOS: &[&str] = &[
     "globo", "escudo", "llave", "personas", "telefono", "fax", "reloj", "lupa", "puerta", "casa",
+    "ojo", "registro",
 ];
 
 /// Columnas que puede declarar la lista de los dispositivos (no es una
@@ -35,6 +38,8 @@ mod carga;
 #[cfg(feature = "catalogo")]
 mod elementos;
 #[cfg(feature = "catalogo")]
+mod lotes;
+#[cfg(feature = "catalogo")]
 mod validar;
 #[cfg(feature = "catalogo")]
 mod valores;
@@ -45,6 +50,12 @@ pub use carga::{CatalogoAjustes, ErrorAjustes};
 pub use elementos::{
     DERIVADOS_DATO, DERIVADOS_ESTADO, MAX_DATOS, PREFIJO_DERIVADO, clave_accion, clave_papel,
     claves_de_elementos, partir_referencia, titulo_accion,
+};
+#[cfg(feature = "catalogo")]
+pub use lotes::{
+    Condicion, Destino, ELECCION_DNS, Eleccion, Lote, OpcionEleccion, ParaCada, PasoExpandido,
+    PasoLote, clave_lote, clave_paso, clave_proveedor_dns, claves_de_lotes, expandir,
+    lotes_del_campo, pasos_del_lote, titulo_lote,
 };
 #[cfg(feature = "catalogo")]
 pub use modelo::{

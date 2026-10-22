@@ -47,7 +47,7 @@ Las funciones del propio panel (`/api/…`) están en
 | [VoIP](#voip) | 7 | 4 | 3 | 0 | 0 |
 | [TR-069](#tr-069) | 2 | 1 | 1 | 0 | 0 |
 | [Usuarios](#usuarios) | 11 | 2 | 2 | 7 | 7 |
-| [Sistema](#sistema) | 30 | 10 | 4 | 16 | 10 |
+| [Sistema](#sistema) | 30 | 10 | 5 | 15 | 10 |
 | [Ocultas](#ocultas) | 8 | 8 | 0 | 0 | 0 |
 
 ## WAN
@@ -1980,13 +1980,14 @@ Elementos de la respuesta: `bind_interface`, `remote_ip`, `remote_port`, `remote
 
 ### `cbSetSyslog`
 
-*acción* · UI avanzada · riesgo bajo · página `syslog.asp`
+*escritura* · UI avanzada · riesgo bajo · página `syslog.asp`
 
-Configura el registro del sistema; con `export=EXPORT` exporta el registro (lo que syslog.asp hace al cargarse). Acción explícita.
+Configura el registro del sistema (destino local o remoto, servidor y severidad). El router también exporta el registro si recibe `export=EXPORT` (lo que syslog.asp hace al cargarse): el panel nunca lo envía, porque solo manda los parámetros de este catálogo.
+
+Lectura pareada: `cbGetSyslog`
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
-| `export` | Exportar (siempre «EXPORT») | text |  |
 | `syslog_enable` | Registro activado | enum | `1` Activado, `0` Desactivado |
 | `syslog_mode` | Destino del registro | enum | `2` Local y remoto, `1` Remoto, `0` Local |
 | `remote_severity` | Severidad mínima remota | enum | `0` Emergencia, `1` Alerta, `2` Crítico, `3` Error, `4` Aviso, `5` Nota, `6` Información, `7` Depuración |

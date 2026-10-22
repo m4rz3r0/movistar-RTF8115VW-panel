@@ -1,4 +1,4 @@
-# Ajustes del tema Red local: dispositivos, IP fijas, reparto de direcciones e IPv6.
+# Ajustes del tema Red local: dispositivos, IP fijas, reparto de direcciones, DNS para la red de casa e IPv6.
 
 ## Dispositivos conectados
 ajuste-red_local-dispositivos-titulo = Dispositivos conectados
@@ -76,6 +76,16 @@ ajuste-red_local-dhcp-concesion-dia-desc = Los dispositivos conservan su direcci
 ajuste-red_local-dhcp-concesion-semana = 1 semana
 ajuste-red_local-dhcp-concesion-semana-desc = Las direcciones casi no cambian, pero las de dispositivos que ya no vienen tardan en liberarse.
 ajuste-red_local-dhcp-concesion-recomendado = Recomendado si en tu casa se conectan casi siempre los mismos dispositivos y alguna visita. A favor: cada dispositivo conserva su dirección y las de los que ya no vienen se liberan en medio día. En contra: si pasan muchos dispositivos distintos, una hora libera antes las direcciones.
+
+## DNS para la red de casa
+ajuste-red_local-dns_casa-titulo = DNS para la red de casa
+ajuste-red_local-dns_casa-desc = Los servidores que tus dispositivos usan para convertir el nombre de cada web en su dirección. El router los reparte junto con la dirección IP de cada dispositivo.
+ajuste-red_local-dns_casa-ayuda = Lo habitual es que el router reparta su propia dirección y pregunte él a los servidores del operador. Con un proveedor neutro, el router reparte esos servidores y cada dispositivo les pregunta directamente: tus consultas dejan de resolverse en el operador, pero viajan sin cifrar y el operador puede seguir viéndolas por el camino, y para ocultarlas hace falta DNS cifrado en cada dispositivo o una VPN. Solo cambia lo que reciben los dispositivos de casa: no toca la conexión a internet, la televisión ni la voz. Cada dispositivo lo nota cuando renueva su dirección.
+ajuste-red_local-dns_casa-principal = DNS principal
+ajuste-red_local-dns_casa-principal-desc = La dirección IP del primer servidor de nombres que reciben tus dispositivos, por ejemplo 192.168.1.1 si responde el propio router.
+ajuste-red_local-dns_casa-principal-recomendado = Recomendado si prefieres que tus consultas de nombres de webs no se resuelvan en el operador y aceptas que siguen viajando en claro. A favor: Quad9 está en Suiza, no guarda tu dirección IP y bloquea dominios maliciosos; otros proveedores neutros, como DNS4EU, Cloudflare o AdGuard, también valen. En contra: el operador las sigue viendo por el camino, pasas a confiar en otro proveedor y puedes perder alguna función del operador que dependa de su DNS.
+ajuste-red_local-dns_casa-secundario = DNS secundario
+ajuste-red_local-dns_casa-secundario-desc = Se usa si el principal no contesta. Puedes dejarlo vacío.
 
 ## IPv6 en casa
 ajuste-red_local-ipv6-titulo = IPv6 en casa
