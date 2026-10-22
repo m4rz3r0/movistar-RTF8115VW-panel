@@ -1,39 +1,4 @@
-/* Ajustes del router: tarjeta heredada de un ajuste, sus campos, la recomendación y «Más opciones». */
-/* Tarjeta de un ajuste. */
-.ajuste {
-  gap: var(--esp-3);
-  min-width: 0;
-}
-
-.ajuste-cabecera {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--esp-2) var(--esp-4);
-}
-
-.ajuste-cabecera h2:focus {
-  outline: none;
-}
-
-.ajuste-cabecera h2:focus-visible {
-  outline: 2px solid var(--foco);
-  outline-offset: 2px;
-}
-
-.ajuste-etiquetas {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--esp-2);
-}
-
-/* Si la red WiFi emite: su insignia, como las demás etiquetas. */
-.emision-red {
-  display: inline-flex;
-}
-
+/* Ajustes del router: textos de un ajuste, sus campos, la recomendación y los detalles técnicos. */
 .ajuste-desc {
   color: var(--suave);
   max-width: 72ch;
@@ -164,7 +129,6 @@
   gap: var(--esp-2);
 }
 
-.ajuste-resumen,
 .ajuste-formulario {
   display: flex;
   flex-direction: column;
