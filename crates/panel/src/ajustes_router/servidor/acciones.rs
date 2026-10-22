@@ -171,6 +171,7 @@ pub(super) fn vista_por_pasos(
         detalle: None,
         aviso: None,
         borra: false,
+        proveedor_dns: None,
     }
 }
 

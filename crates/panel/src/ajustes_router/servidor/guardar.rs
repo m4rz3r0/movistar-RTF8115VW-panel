@@ -216,6 +216,7 @@ pub(super) fn vista_grupo(
         detalle: None,
         aviso: None,
         borra: false,
+        proveedor_dns: None,
     }
 }
 

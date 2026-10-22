@@ -4,20 +4,19 @@ use super::super::acciones::{subgrupo, vista_por_pasos};
 use super::*;
 use ajustes::{OpcionEleccion, titulo_lote};
 
-/// Opción del proveedor de DNS `id` (sin él, la de por defecto); 400 si no
-/// existe.
+/// Opción del proveedor de DNS `id`; 400 si no existe. Sin `id`, `None`:
+/// se decide con lo leído (ver [`preparar_lote`]).
 fn proveedor<'a>(
     cat: &'a CatalogoAjustes,
     id: Option<&str>,
 ) -> Result<Option<&'a OpcionEleccion>, ServerFnError> {
-    let el = cat.eleccion(ELECCION_DNS);
-    match id {
-        None => Ok(el.map(|e| e.defecto())),
-        Some(id) => el
-            .and_then(|e| e.opciones.iter().find(|o| o.id == id))
-            .map(Some)
-            .ok_or_else(|| fallo(StatusCode::BAD_REQUEST, t!("mejoras-error-proveedor"))),
-    }
+    let Some(id) = id else {
+        return Ok(None);
+    };
+    cat.eleccion(ELECCION_DNS)
+        .and_then(|e| e.opciones.iter().find(|o| o.id == id))
+        .map(Some)
+        .ok_or_else(|| fallo(StatusCode::BAD_REQUEST, t!("mejoras-error-proveedor")))
 }
 
 /// Valores legibles por id de campo, de cada ajuste que escribe un paso.
@@ -71,14 +70,19 @@ pub(in crate::ajustes_router) async fn preparar_lote(
         .ajustes
         .lote(&id)
         .ok_or_else(|| fallo(StatusCode::NOT_FOUND, t!("mejoras-error-lote")))?;
-    let dns = proveedor(&state.ajustes, opciones.proveedor_dns.as_deref())?;
+    let elegido = proveedor(&state.ajustes, opciones.proveedor_dns.as_deref())?;
     let g = gestor(&state)?;
     libre(&g)?;
+    let lecturas = Lecturas::de(&state, &[lote], true).await;
+    // Sin proveedor elegido, el que ya está puesto (el paso sale sin
+    // cambios) y, si no es ninguno de la lista, el de por defecto.
+    let dns = elegido.or_else(|| {
+        lecturas
+            .proveedor_dns(&state.ajustes)
+            .or_else(|| state.ajustes.eleccion(ELECCION_DNS).map(|e| e.defecto()))
+    });
     // Lo que no aplica o no se pudo leer no se revisa: el aviso lo dice.
-    let pasos = estados(&state, &[lote], true)
-        .await
-        .pop()
-        .unwrap_or_default();
+    let pasos = lecturas.estados(&state.ajustes).pop().unwrap_or_default();
     let sin_leer = pasos
         .iter()
         .filter(|(_, e)| matches!(e, EstadoPaso::SinLeer { .. }))
@@ -144,5 +148,12 @@ pub(in crate::ajustes_router) async fn preparar_lote(
         paso.desmarcado = p.opcional;
     }
     vista.aviso = (sin_leer > 0).then(|| t!("mejoras-revision-sin-leer", n = sin_leer));
+    // El selector de la revisión marca el proveedor con el que se preparó.
+    if origen
+        .iter()
+        .any(|p| p.elegir.as_deref() == Some(ELECCION_DNS))
+    {
+        vista.proveedor_dns = dns.map(|o| o.id.clone());
+    }
     Ok(vista)
 }

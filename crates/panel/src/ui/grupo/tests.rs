@@ -26,6 +26,7 @@ fn grupo(pasos: Vec<PasoVista>) -> GrupoVista {
         detalle: None,
         aviso: None,
         borra: false,
+        proveedor_dns: None,
     }
 }
 

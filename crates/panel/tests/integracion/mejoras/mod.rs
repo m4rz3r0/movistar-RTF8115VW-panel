@@ -1,7 +1,7 @@
 //! Mejoras contra `router-sim`: el estado de cada lote y de sus pasos, el
 //! contador, la preparación de un lote como un solo cambio con su deshacer,
-//! y los casos raros (todo desmarcado, DNS ya puestos). Las lecturas que
-//! fallan, en [`lecturas`].
+//! y los casos raros (todo desmarcado). Las lecturas que fallan, en
+//! [`lecturas`]; el proveedor de DNS, en [`proveedor`].
 
 use crate::comun::{
     Panel, PanelPrueba, aplicar_ajuste, body_text, elemento, get_con_cookie, llamar, ok,
@@ -11,6 +11,7 @@ use serde_json::{Value, json};
 
 mod lecturas;
 mod pagina;
+mod proveedor;
 
 /// `leer_mejoras`, sin caché.
 async fn mejoras(p: &Panel, cookie: &str) -> Value {
@@ -339,65 +340,6 @@ async fn lote_todo_desmarcado_no_escribe() {
     assert_eq!(h["total"], 0, "{h}");
     // El token sigue valiendo: con algo marcado, se aplica.
     confirmar_sin(&p, &cookie, &g, &["hora_neutra"]).await;
-}
-
-/// Vigilancia 4: los DNS que ya son de un proveedor cuentan como hechos.
-#[tokio::test]
-async fn dns_ya_del_proveedor() {
-    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
-    dns_del_pool(&p, "9.9.9.9", "149.112.112.112").await;
-    let m = mejoras(&p, &cookie).await;
-    assert_eq!(paso(&m, "privacidad", "dns_casa")["estado"], "Hecho", "{m}");
-    let g = grupo(
-        &p,
-        &cookie,
-        "privacidad",
-        json!({ "proveedor_dns": "quad9" }),
-    )
-    .await;
-    assert_eq!(del_grupo(&g, "dns_casa")["sin_cambios"], true, "{g}");
-
-    let g = grupo(
-        &p,
-        &cookie,
-        "privacidad",
-        json!({ "proveedor_dns": "cloudflare" }),
-    )
-    .await;
-    let dns = del_grupo(&g, "dns_casa");
-    assert_eq!(dns["sin_cambios"], false, "{g}");
-    let despues: Vec<&Value> = dns["campos"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|c| &c["despues"])
-        .collect();
-    assert_eq!(despues, [&json!("1.1.1.1"), &json!("1.0.0.1")], "{dns}");
-
-    // Con lo demás también hecho, el lote entero ya está.
-    escribir(
-        &p,
-        "cwmp.asp",
-        "cbSetTr69Config",
-        &[("enableCWMP", "0"), ("periodicInformEnable", "0")],
-    )
-    .await;
-    escribir(
-        &p,
-        "ntp.asp",
-        "cbSetTimeNtp",
-        &[("ntp_svr_1", "hora.roa.es")],
-    )
-    .await;
-    let (status, body) = preparar(
-        &p,
-        &cookie,
-        "privacidad",
-        json!({ "proveedor_dns": "quad9" }),
-    )
-    .await;
-    assert_eq!(status, 409, "{body}");
-    assert!(body.contains("ya está aplicado"), "{body}");
 }
 
 /// `syslog_mode = 1` (solo envío remoto) no es «sin envío»: pendiente.

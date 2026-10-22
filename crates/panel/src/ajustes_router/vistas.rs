@@ -249,6 +249,10 @@ pub struct GrupoVista {
     /// botón de peligro.
     #[serde(default)]
     pub borra: bool,
+    /// En un lote con el paso de los DNS, el proveedor con el que se
+    /// preparó (`cloudflare`): el selector de la revisión lo marca.
+    #[serde(default)]
+    pub proveedor_dns: Option<String>,
 }
 
 /// Un paso del grupo: los campos de una misma escritura del router.

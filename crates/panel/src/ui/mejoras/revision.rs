@@ -11,6 +11,19 @@ use leptos::{prelude::*, task::spawn_local};
 /// revisión lo lleva, lleva también el selector de proveedor.
 const PASO_DNS: &str = "dns_casa";
 
+/// El proveedor que se marca al abrir la revisión del grupo `g`: con el
+/// que se preparó, si está entre `proveedores`; si no, el de por defecto.
+fn marcado(g: &GrupoVista, proveedores: &[ProveedorVista]) -> Option<String> {
+    let preparado = g
+        .proveedor_dns
+        .as_deref()
+        .and_then(|id| proveedores.iter().find(|p| p.id == id));
+    preparado
+        .or_else(|| proveedores.iter().find(|p| p.defecto))
+        .or(proveedores.first())
+        .map(|p| p.id.clone())
+}
+
 /// El selector de proveedor de DNS de la revisión abierta. Vive en la
 /// página y empieza de nuevo con cada revisión.
 #[derive(Clone, Copy)]
@@ -43,8 +56,10 @@ impl SelectorDns {
     }
 
     /// Las opciones de la revisión del grupo `g` del lote `lote`: el
-    /// selector con `proveedores` si el grupo lleva el paso de los DNS (el
-    /// servidor lo preparó con el de por defecto). `None` si no lo lleva.
+    /// selector con `proveedores` si el grupo lleva el paso de los DNS,
+    /// marcado en el proveedor con el que lo preparó el servidor (el que ya
+    /// estaba puesto o, si no era ninguno, el de por defecto). `None` si no
+    /// lo lleva.
     pub(super) fn extra(
         self,
         lote: String,
@@ -54,15 +69,10 @@ impl SelectorDns {
         if !g.pasos.iter().any(|p| p.clave.as_deref() == Some(PASO_DNS)) {
             return None;
         }
-        let defecto = proveedores
-            .iter()
-            .find(|p| p.defecto)
-            .or(proveedores.first())?
-            .id
-            .clone();
+        let marcado = marcado(g, &proveedores)?;
         self.siguiente_vuelta();
-        self.elegido.set(defecto.clone());
-        self.mostrado.set_value(defecto);
+        self.elegido.set(marcado.clone());
+        self.mostrado.set_value(marcado);
         self.nuevo.set(None);
         self.ocupado.set(false);
         self.error.set(None);
