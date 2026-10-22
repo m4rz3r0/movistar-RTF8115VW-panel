@@ -39,6 +39,9 @@ fn trazos(nombre: &str) -> &'static [&'static str] {
             "M10.5 10.5m-6.5 0a6.5 6.5 0 1 0 13 0a6.5 6.5 0 1 0-13 0",
             "M15.5 15.5L21 21",
         ],
+        // Una puerta entreabierta con una flecha que entra: puertos abiertos.
+        "puerta" => &["M14 4h5v16h-5", "M3 12h10", "M9 8l4 4l-4 4"],
+        "casa" => &["M4 11l8-7l8 7", "M6 9.5V20h12V9.5", "M10 20v-5h4v5"],
         _ => &["M12 4a8 8 0 1 0 0 16a8 8 0 1 0 0-16z"],
     }
 }

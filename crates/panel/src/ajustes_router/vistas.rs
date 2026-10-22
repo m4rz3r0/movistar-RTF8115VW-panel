@@ -59,6 +59,10 @@ pub struct AjusteVista {
     /// una nota); `None` si no hay nada que avisar o no se sabe.
     #[serde(default)]
     pub nota_radio: Option<NotaRadio>,
+    /// Columnas de su lista en la página, en orden (ver
+    /// `ajustes::Ajuste::columnas`); vacío si no es una lista.
+    #[serde(default)]
+    pub columnas: Vec<String>,
 }
 
 /// Nota de la tarjeta de una radio WiFi encendida.
@@ -258,6 +262,10 @@ pub struct GrupoVista {
     /// el router no deja leer se queda como se escribió).
     #[serde(default)]
     pub aviso: Option<String>,
+    /// Borra algo (una regla, una IP fija): el diálogo lo confirma con el
+    /// botón de peligro.
+    #[serde(default)]
+    pub borra: bool,
 }
 
 /// Un paso del grupo: los campos de una misma escritura del router.

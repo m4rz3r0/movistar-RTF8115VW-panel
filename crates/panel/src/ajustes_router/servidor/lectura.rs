@@ -65,6 +65,7 @@ pub(super) fn vista(f: &Catalogo, a: &Ajuste, nodo: Option<&XmlNode>) -> AjusteV
         clave: prefijo,
         red_wifi: None,
         nota_radio: None,
+        columnas: a.columnas.clone(),
     }
 }
 

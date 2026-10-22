@@ -29,6 +29,7 @@ mod idioma;
 mod instalar;
 mod instancia;
 mod lecturas;
+mod lista;
 mod menu;
 mod pagina_tema;
 mod pagina_temas;

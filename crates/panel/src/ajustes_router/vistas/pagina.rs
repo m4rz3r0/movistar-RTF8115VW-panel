@@ -1,9 +1,10 @@
 //! La página de un tema tal como la pinta el navegador: resumen y elementos.
 
-use super::{AjusteVista, EstadoLectura};
+use super::{AjusteVista, DispositivoVista, EstadoLectura};
 use crate::ui::comun::EstadoVisual;
 use ajustes::ValorLegible;
 use serde::{Deserialize, Serialize};
+use std::net::Ipv4Addr;
 
 /// Todo lo que pinta la página de un tema, de una sola lectura: la franja
 /// de resumen, los elementos (cada uno con el detalle completo de sus
@@ -27,6 +28,24 @@ pub struct PaginaTema {
     /// que salió de la caché corta), en segundos.
     #[serde(default)]
     pub leido_hace_s: u64,
+    /// La red de casa, en las páginas con listas (Puertos y Red local): da
+    /// nombre al destino de cada regla, dice qué dispositivos hay y deja
+    /// validar una regla o una IP fija antes de enviarla.
+    #[serde(default)]
+    pub red: Option<RedCasa>,
+}
+
+/// La red de casa leída con la página. Cada parte, `None` si su lectura
+/// falló (la lista se ve igual, con menos datos).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RedCasa {
+    /// Los dispositivos que conoce el router, los conectados primero.
+    pub dispositivos: Option<Vec<DispositivoVista>>,
+    /// IP y máscara del router en la red de casa.
+    pub lan: Option<(Ipv4Addr, Ipv4Addr)>,
+    /// Las IP de las IP fijas (para saber si el destino de una regla sigue
+    /// en la red).
+    pub ips_fijas: Option<Vec<String>>,
 }
 
 /// Un dato de la franja de resumen.

@@ -582,6 +582,7 @@ mod tests {
             vigilancia_s: 120,
             detalle: None,
             aviso: None,
+            borra: false,
         }
     }
 

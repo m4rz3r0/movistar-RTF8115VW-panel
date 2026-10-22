@@ -50,6 +50,8 @@ pub(in crate::ajustes_router) async fn leer_tema(
         apagadas: &apagadas,
     };
     let (resumen, elementos, acciones) = montar(&state.catalogo, &state.ajustes, tema, &ctx);
+    let red =
+        matches!(tema, Tema::Puertos | Tema::RedLocal).then(|| super::red_local::red_de(&leidas));
     Ok(PaginaTema {
         tema: tema.slug().to_owned(),
         solo_lectura: instancia::solo_lectura(&state.db).await,
@@ -58,6 +60,7 @@ pub(in crate::ajustes_router) async fn leer_tema(
         elementos,
         acciones,
         leido_hace_s,
+        red,
     })
 }
 
@@ -194,15 +197,7 @@ fn elemento(
         .flatten();
     let aplicables = acciones
         .iter()
-        .filter(|a| {
-            leido
-                && a.campo.as_ref().is_some_and(|id| {
-                    ajustes
-                        .iter()
-                        .flat_map(|v| v.campos.iter())
-                        .any(|c| c.id == *id && c.solo_lectura.is_none())
-                })
-        })
+        .filter(|a| leido && se_aplica(a, &ajustes))
         .map(|a| a.id.clone())
         .collect();
     ElementoVista {
@@ -226,6 +221,29 @@ fn elemento(
         ajustes,
         lectura,
         acciones: aplicables,
+    }
+}
+
+/// ¿Se aplica la acción `a` al elemento con los ajustes `ajustes`? La de una
+/// lista, a las instancias de esa lista (si escribe un campo, que se pueda
+/// escribir); la demás, si alguno de sus ajustes que no es lista tiene el
+/// campo y se puede escribir.
+fn se_aplica(a: &ajustes::Accion, ajustes: &[AjusteVista]) -> bool {
+    let escribible = |v: &AjusteVista, id: &str| {
+        v.campos
+            .iter()
+            .any(|c| c.id == id && c.solo_lectura.is_none())
+    };
+    match &a.lista {
+        Some(l) => ajustes.iter().any(|v| {
+            v.id == *l && (a.borrar || a.campo.as_deref().is_some_and(|c| escribible(v, c)))
+        }),
+        None => a.campo.as_deref().is_some_and(|c| {
+            ajustes
+                .iter()
+                .filter(|v| !v.lista)
+                .any(|v| escribible(v, c))
+        }),
     }
 }
 

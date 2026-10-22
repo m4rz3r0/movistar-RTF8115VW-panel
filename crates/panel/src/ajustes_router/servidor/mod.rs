@@ -2,6 +2,7 @@
 //! comunes.
 
 mod acciones;
+mod acciones_lista;
 mod derivados;
 mod foto;
 mod guardar;

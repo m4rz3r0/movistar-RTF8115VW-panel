@@ -211,6 +211,7 @@ pub(super) fn vista_grupo(
         vigilancia_s: g.tiempos().vigilancia(r).as_secs(),
         detalle: None,
         aviso: None,
+        borra: false,
     }
 }
 
@@ -309,7 +310,11 @@ pub(in crate::ajustes_router) async fn preparar_ajuste(
         buscar(&pedidos[i], param).map(str::to_owned)
     });
     titular_partes(&mut vista.pasos, &titulos, &prefijo_i18n(a));
-    Ok(GrupoVista { detalle, ..vista })
+    Ok(GrupoVista {
+        detalle,
+        borra: p.borrar,
+        ..vista
+    })
 }
 
 /// Prepara el guardado del detalle de un elemento: varios ajustes suyos

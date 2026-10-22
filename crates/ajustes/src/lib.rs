@@ -23,8 +23,12 @@ pub use modelo::{
 /// Glifos que puede llevar la tarjeta de un elemento (`icono` en el
 /// catálogo); el panel los dibuja en `ui::comun::Glifo`.
 pub const ICONOS: &[&str] = &[
-    "globo", "escudo", "llave", "personas", "telefono", "fax", "reloj", "lupa",
+    "globo", "escudo", "llave", "personas", "telefono", "fax", "reloj", "lupa", "puerta", "casa",
 ];
+
+/// Columnas que puede declarar la lista de los dispositivos (no es una
+/// lista del router: sus datos salen de la lectura de la red de casa).
+pub const COLUMNAS_DISPOSITIVOS: &[&str] = &["ip", "mac", "conexion", "ip_fija"];
 
 #[cfg(feature = "catalogo")]
 mod carga;

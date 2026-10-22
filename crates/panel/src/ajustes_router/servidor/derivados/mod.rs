@@ -68,6 +68,7 @@ pub(super) fn claves_extra(tema: Tema, del_tema: &[&Ajuste]) -> Vec<Clave> {
     match tema {
         Tema::Wifi => wifi::claves_extra(del_tema),
         Tema::Internet => internet::claves_extra(),
+        Tema::Puertos | Tema::RedLocal => super::red_local::claves_red(),
         _ => Vec::new(),
     }
 }

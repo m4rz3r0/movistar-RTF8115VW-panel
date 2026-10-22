@@ -79,16 +79,51 @@ fn leida(
     }
 }
 
+/// Lecturas de la red de casa que traen las páginas con listas (Puertos y
+/// Red local), en la misma tanda que sus ajustes.
+pub(super) fn claves_red() -> Vec<Clave> {
+    let mut claves = claves_dispositivos();
+    claves.push(clave_red_casa());
+    claves
+}
+
+/// La red de casa con las lecturas de [`claves_red`]: cada parte, `None` si
+/// su lectura falló.
+pub(super) fn red_de(leidas: &HashMap<Clave, Result<XmlNode, hgu::Error>>) -> RedCasa {
+    let nodo = |c: &Clave| leidas.get(c).and_then(|r| r.as_ref().ok());
+    RedCasa {
+        dispositivos: dispositivos_de(leidas),
+        lan: nodo(&clave_red_casa()).and_then(hgu::read::lan_ipv4_de),
+        ips_fijas: nodo(&clave_reservas()).map(|n| {
+            hgu::models::StaticLease::parse_all(n)
+                .into_iter()
+                .map(|r| r.ip)
+                .collect()
+        }),
+    }
+}
+
 pub(in crate::ajustes_router) async fn leer_dispositivos()
 -> Result<Vec<DispositivoVista>, ServerFnError> {
     let (state, _) = preparar().await?;
-    let mut leidas = state
+    let leidas = state
         .lecturas
         .leer(&state.hgu, &claves_dispositivos())
         .await;
-    let wifi = asociados(&leidas);
-    let hosts = hgu::models::LanHost::parse_all(&leida(&mut leidas, &clave_hosts())?);
-    let reservas = hgu::models::StaticLease::parse_all(&leida(&mut leidas, &clave_reservas())?);
+    dispositivos_de(&leidas)
+        .ok_or_else(|| fallo(StatusCode::BAD_GATEWAY, t!("ajustes-error-lectura")))
+}
+
+/// Los dispositivos con las lecturas de [`claves_dispositivos`], los
+/// conectados primero y por IP; `None` si no se pudo leer la lista o las
+/// reservas (el fallo ya lo registró la caché de lecturas).
+fn dispositivos_de(
+    leidas: &HashMap<Clave, Result<XmlNode, hgu::Error>>,
+) -> Option<Vec<DispositivoVista>> {
+    let nodo = |c: &Clave| leidas.get(c).and_then(|r| r.as_ref().ok());
+    let wifi = asociados(leidas);
+    let hosts = hgu::models::LanHost::parse_all(nodo(&clave_hosts())?);
+    let reservas = hgu::models::StaticLease::parse_all(nodo(&clave_reservas())?);
     let mut lista: Vec<DispositivoVista> = hosts
         .into_iter()
         .map(|h| {
@@ -116,7 +151,7 @@ pub(in crate::ajustes_router) async fn leer_dispositivos()
         })
         .collect();
     lista.sort_by_key(orden);
-    Ok(lista)
+    Some(lista)
 }
 
 pub(in crate::ajustes_router) async fn leer_red_casa()

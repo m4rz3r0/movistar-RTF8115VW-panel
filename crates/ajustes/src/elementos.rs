@@ -3,7 +3,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::carga::CatalogoAjustes;
-use crate::modelo::{Accion, Ajuste, Campo, Elemento, TipoCampo};
+use crate::modelo::{Accion, Ajuste, Campo, Componente, Elemento, TipoCampo};
 use crate::valores::traducir;
 
 /// Datos calculados que puede pedir un elemento (`derivado:<nombre>` en
@@ -98,6 +98,45 @@ pub(crate) fn comprobar_elementos(c: &CatalogoAjustes, fallos: &mut Vec<String>)
             fallos.push(format!("acción {}: id repetido", a.id));
         }
         comprobar_accion(c, a, fallos);
+    }
+    for a in c.todos() {
+        comprobar_columnas(a, fallos);
+    }
+}
+
+/// ¿Existe la columna `col` en la lista `a`? Un campo suyo o un rango
+/// (`<col>_desde` y `<col>_hasta`).
+fn existe_columna(a: &Ajuste, col: &str) -> bool {
+    a.campo(col).is_some()
+        || (a.campo(&format!("{col}_desde")).is_some()
+            && a.campo(&format!("{col}_hasta")).is_some())
+}
+
+/// Las columnas de un ajuste: solo en una lista (o en los dispositivos, con
+/// las suyas), sin repetir y que existan.
+fn comprobar_columnas(a: &Ajuste, fallos: &mut Vec<String>) {
+    if a.columnas.is_empty() {
+        return;
+    }
+    let mut mal = |msg: String| fallos.push(format!("{}: {msg}", a.id));
+    let dispositivos = a.componente == Some(Componente::Dispositivos);
+    if !a.lista && !dispositivos {
+        mal("solo una lista lleva `columnas`".into());
+        return;
+    }
+    let mut vistas = HashSet::new();
+    for col in &a.columnas {
+        if !vistas.insert(col.as_str()) {
+            mal(format!("columna {col} repetida"));
+        }
+        let existe = if dispositivos {
+            crate::COLUMNAS_DISPOSITIVOS.contains(&col.as_str())
+        } else {
+            existe_columna(a, col)
+        };
+        if !existe {
+            mal(format!("la columna {col} no existe"));
+        }
     }
 }
 
@@ -203,11 +242,36 @@ fn comprobar_accion(c: &CatalogoAjustes, a: &Accion, fallos: &mut Vec<String>) {
     if !es_nombre(&a.id) {
         mal("el id solo admite minúsculas, cifras y _".into());
     }
+    if a.borrar {
+        if a.lista.is_none() {
+            mal("borrar necesita `lista`".into());
+        }
+        if a.campo.is_some() || a.valor.is_some() {
+            mal("borrar va sin `campo` ni `valor`".into());
+        }
+        if !a.peligro {
+            mal("borrar lleva el botón de peligro (`peligro = true`)".into());
+        }
+    }
+    let lista = match a.lista.as_deref().map(|id| (id, c.ajuste(id))) {
+        None => None,
+        Some((id, None)) => return mal(format!("la lista {id} no existe")),
+        Some((id, Some(l))) if !l.lista || l.tema != a.tema => {
+            return mal(format!("{id} no es una lista de su tema"));
+        }
+        Some((_, Some(l))) => Some(l),
+    };
+    if a.borrar {
+        return;
+    }
     let (Some(campo), Some(valor)) = (&a.campo, &a.valor) else {
         mal("necesita `campo` y `valor`".into());
         return;
     };
-    let campos = campos_de_la_accion(c, a, campo);
+    let campos = match lista {
+        Some(l) => l.campo(campo).map(|x| (l, x)).into_iter().collect(),
+        None => campos_de_la_accion(c, a, campo),
+    };
     if !campos.iter().any(|(_, x)| x.escribible().is_some()) {
         mal(format!(
             "ningún elemento de su tema tiene el campo {campo} y se puede escribir"

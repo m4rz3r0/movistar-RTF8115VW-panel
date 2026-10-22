@@ -181,6 +181,12 @@ mod catalogo_toml {
         /// Componente propio de la interfaz, en vez de la tarjeta genérica.
         #[serde(default)]
         pub componente: Option<Componente>,
+        /// Columnas de la lista en la página, en orden (spec §5.1): ids de
+        /// sus campos o un rango (`externo`: `externo_desde` y
+        /// `externo_hasta`); en los dispositivos, los datos de
+        /// [`COLUMNAS_DISPOSITIVOS`](crate::COLUMNAS_DISPOSITIVOS).
+        #[serde(default)]
+        pub columnas: Vec<String>,
         #[serde(default, rename = "campo")]
         pub campos: Vec<Campo>,
     }
@@ -487,9 +493,8 @@ mod catalogo_toml {
 
     /// Una acción que se aplica a varios elementos de una pestaña a la vez
     /// (`quitar_wps`): pone el campo `campo` de cada uno a `valor` (legible).
-    /// `campo` y `valor` son opcionales en el formato para que una acción
-    /// sin ellos (borrar en una lista) quepa más adelante; hoy la
-    /// validación los exige.
+    /// En una lista (`lista`), cada instancia es un elemento: pone su campo
+    /// o, con `borrar`, la borra (sin `campo` ni `valor`, y con `peligro`).
     #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
     #[serde(deny_unknown_fields)]
     pub struct Accion {
@@ -505,6 +510,12 @@ mod catalogo_toml {
         /// Lleva el botón de peligro y confirmación.
         #[serde(default)]
         pub peligro: bool,
+        /// Id del ajuste de tipo lista cuyas instancias son sus elementos.
+        #[serde(default)]
+        pub lista: Option<String>,
+        /// Borra las instancias marcadas de `lista`.
+        #[serde(default)]
+        pub borrar: bool,
     }
 
     /// Función de escritura que ningún ajuste cubre, y por qué.

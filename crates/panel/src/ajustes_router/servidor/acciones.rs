@@ -46,13 +46,17 @@ pub(in crate::ajustes_router) async fn preparar_accion(
         .acciones_de(tema)
         .find(|a| a.id == accion)
         .ok_or_else(no_aplica)?;
-    let (Some(campo), Some(valor)) = (&a.campo, &a.valor) else {
-        return Err(no_aplica());
-    };
     let ids = sin_repetir(elementos);
     if ids.is_empty() {
         return Err(no_aplica());
     }
+    // En una lista, cada instancia es un elemento.
+    if a.lista.is_some() {
+        return super::acciones_lista::preparar_en_lista(&state, a, &ids).await;
+    }
+    let (Some(campo), Some(valor)) = (&a.campo, &a.valor) else {
+        return Err(no_aplica());
+    };
     let mut destinos: Vec<&Ajuste> = Vec::with_capacity(ids.len());
     for id in &ids {
         let e = state
@@ -152,6 +156,7 @@ pub(super) fn vista_por_pasos(
         vigilancia_s: g.tiempos().vigilancia(r).as_secs(),
         detalle: None,
         aviso: None,
+        borra: false,
     }
 }
 

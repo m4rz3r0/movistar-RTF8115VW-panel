@@ -20,7 +20,8 @@ pub fn prefijo_i18n(a: &Ajuste) -> String {
 /// - por campo, `<p>-<campo>`, `<p>-<campo>-desc` y la de `solo_lectura`;
 /// - por opción, `<p>-<campo>-<clave>`, su `-desc` y `aviso-<aviso>`;
 /// - `<p>-<campo>-true` y `-false` en un booleano con `textos_valor`;
-/// - `<p>-<campo>-recomendado` si el campo tiene recomendación (el motivo).
+/// - `<p>-<campo>-recomendado` si el campo tiene recomendación (el motivo);
+/// - `<p>-col-<columna>`, la cabecera de cada columna de una lista.
 pub fn claves_requeridas(a: &Ajuste) -> Vec<String> {
     let p = prefijo_i18n(a);
     let mut claves = vec![
@@ -54,6 +55,7 @@ pub fn claves_requeridas(a: &Ajuste) -> Vec<String> {
             claves.push(format!("{pc}-recomendado"));
         }
     }
+    claves.extend(a.columnas.iter().map(|c| format!("{p}-col-{c}")));
     let mut vistas = HashSet::new();
     claves.retain(|k| vistas.insert(k.clone()));
     claves
