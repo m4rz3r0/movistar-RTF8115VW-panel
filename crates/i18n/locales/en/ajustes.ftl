@@ -10,8 +10,6 @@ ajustes-detalles-tecnicos-desc = For anyone who wants to know which router funct
 ajustes-detalles-lectura = Read
 ajustes-detalles-escrituras = Writes
 ajustes-detalles-parametros = Parameters
-ajustes-recomendado = Recommended
-ajustes-recomendado-desc = The option we suggest for most homes.
 ajustes-solo-lectura = Settings can only be viewed for now: the router firmware has not been tested with the panel. You can confirm it in Router configuration.
 ajustes-valor-desconocido = Unrecognised value ({ $valor })
 ajustes-valor-desconocido-desc = The router has a value the panel does not know. It is kept as it is until you choose another one.
@@ -23,7 +21,6 @@ ajustes-volver = Go to the Internet settings
 ajustes-solo-lectura-aviso = Settings can only be viewed for now: the router firmware has not been tested with the panel yet.
 ajustes-solo-lectura-enlace = Confirm it in Router settings
 ajustes-que-hace = What does this do?
-ajustes-editar = Edit
 ajustes-guardar = Save
 ajustes-cancelar = Cancel
 ajustes-recomendado-valor = Recommended: { $valor }
@@ -57,10 +54,7 @@ ajustes-tema-sistema = System
 ajustes-tema-sistema-desc = The router clock and the traffic copy for diagnosis.
 
 ## Levels
-ajustes-nivel-basico = Essentials
-ajustes-nivel-basico-desc = Always in view.
 ajustes-nivel-avanzado = Advanced
-ajustes-nivel-avanzado-desc = Under "More options": for those who know what they are looking for.
 ajustes-nivel-oculto = Hidden
 ajustes-nivel-oculto-desc = Not shown in the operator's web interface.
 

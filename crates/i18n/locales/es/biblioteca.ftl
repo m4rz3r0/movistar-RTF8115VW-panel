@@ -172,4 +172,3 @@ biblioteca-error-param-desconocido = { $funcion }: parámetro desconocido { $par
 biblioteca-error-lectura-router = El router no ha respondido a la lectura: { $error }
 biblioteca-error-no-identifica = { $param } no identifica instancias de { $funcion }
 biblioteca-error-lectura-sin-formulario = { $nombre } es una lectura: no tiene formulario
-biblioteca-error-campo-desaparecido = La lectura ya no muestra el campo { $campo }; vuelve a leer.
