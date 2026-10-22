@@ -34,17 +34,6 @@
   display: inline-flex;
 }
 
-.chip-nivel {
-  color: var(--texto);
-}
-
-.nota-oculto {
-  max-width: 880px;
-  margin-bottom: var(--esp-3);
-  color: var(--suave);
-  font-size: 13px;
-}
-
 .ajuste-desc {
   color: var(--suave);
   max-width: 72ch;
@@ -305,73 +294,4 @@
 .detalles-lista dd {
   margin: 0;
   overflow-wrap: anywhere;
-}
-
-/* «Más opciones»: una barra que se despliega. */
-.mas-opciones {
-  max-width: 880px;
-}
-
-.mas-opciones > summary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--esp-1) var(--esp-3);
-  padding: var(--esp-3) var(--esp-4);
-  border: 1px solid var(--borde);
-  border-radius: var(--radio);
-  background: var(--sup);
-  cursor: pointer;
-}
-
-.mas-opciones > summary::before {
-  content: "";
-  align-self: center;
-  width: 7px;
-  height: 7px;
-  border-right: 2px solid var(--suave);
-  border-bottom: 2px solid var(--suave);
-  transform: rotate(-45deg);
-  transition: transform 120ms ease;
-}
-
-.mas-opciones[open] > summary::before {
-  transform: rotate(45deg);
-}
-
-.mas-opciones > summary::-webkit-details-marker {
-  display: none;
-}
-
-.mas-opciones > summary {
-  list-style: none;
-}
-
-.mas-opciones > summary:hover {
-  border-color: color-mix(in srgb, var(--acento) 45%, var(--borde));
-}
-
-.mas-opciones-titulo {
-  font-family: var(--fuente-titulos);
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.mas-opciones-desc {
-  color: var(--suave);
-}
-
-.mas-opciones[open] > summary {
-  margin-bottom: var(--esp-4);
-}
-
-/* «Oculto» enlaza con la nota que lo explica: se ve como las demás
-   etiquetas, con el subrayado solo al pasar por encima. */
-a.chip-oculto {
-  color: var(--texto);
-  text-decoration: none;
-}
-
-a.chip-oculto:hover {
-  text-decoration: underline;
 }

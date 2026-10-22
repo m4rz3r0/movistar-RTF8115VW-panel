@@ -1,17 +1,13 @@
-//! Piezas comunes de un ajuste: cabecera, ayuda, detalles técnicos y valores.
+//! Piezas comunes de un ajuste: ayuda, detalles técnicos y valores.
 //!
-//! Las usan el detalle de un elemento ([`super::detalle`]), las tarjetas de
-//! los temas que aún no van en rejilla ([`super::heredada`]) y los
-//! componentes de Red local y Puertos. Los detalles técnicos plegados son
+//! Las usan el detalle de un elemento ([`super::detalle`]) y las listas de
+//! Red local y Puertos ([`super::lista`]). Los detalles técnicos plegados son
 //! lo único que nombra la API.
 
 use super::campo::{es_recomendado, etiqueta, texto_legible, valor_resumido};
 use crate::ajustes_router::{AjusteVista, CampoVista, DetallesTecnicos};
 use crate::t;
-use crate::ui::comun::Insignia;
-use crate::ui::explorador::RiesgoCambio;
 use crate::ui::i18n::traducir;
-use ajustes::Nivel;
 use leptos::prelude::*;
 
 /// Prefijo de los ids de la tarjeta en la página (`ajuste-wifi-red_24`).
@@ -27,62 +23,6 @@ pub(crate) fn enfocar(id: &str) {
         .and_then(|e| e.dyn_into::<leptos::web_sys::HtmlElement>().ok())
     {
         let _ = e.focus();
-    }
-}
-
-/// Etiqueta de nivel: nada en lo esencial; «Avanzado» u «Oculto» (con lo
-/// que significa) en lo demás.
-pub(crate) fn nivel(n: Nivel) -> Option<AnyView> {
-    match n {
-        Nivel::Basico => None,
-        Nivel::Avanzado => Some(
-            view! { <span class="chip chip-nivel">{t!("ajustes-nivel-avanzado")}</span> }
-                .into_any(),
-        ),
-        // Lo que significa va una sola vez en la página (`NOTA_OCULTO`). Un
-        // enlace a esa nota: un lector de pantalla anuncia su descripción
-        // (en un `<span>` sin rol, no siempre) y lleva a ella.
-        Nivel::Oculto => Some(
-            view! {
-                <a
-                    class="chip chip-nivel chip-oculto"
-                    href=format!("#{}", super::NOTA_OCULTO)
-                    aria-describedby=super::NOTA_OCULTO
-                >
-                    {t!("ajustes-nivel-oculto")}
-                </a>
-            }
-            .into_any(),
-        ),
-    }
-}
-
-pub(crate) fn riesgo(r: RiesgoCambio) -> AnyView {
-    let (texto, desc) = match r {
-        RiesgoCambio::Bajo => (t!("ajustes-riesgo-bajo"), t!("ajustes-riesgo-bajo-desc")),
-        RiesgoCambio::Medio => (t!("ajustes-riesgo-medio"), t!("ajustes-riesgo-medio-desc")),
-        RiesgoCambio::Alto => (t!("ajustes-riesgo-alto"), t!("ajustes-riesgo-alto-desc")),
-    };
-    view! {
-        <Insignia estado=r.estado() texto=texto />
-        <span class="solo-lector">{desc}</span>
-    }
-    .into_any()
-}
-
-/// Cabecera común: título (enfocable, para volver a él tras guardar),
-/// nivel, riesgo si se puede cambiar y la descripción corta.
-pub(crate) fn cabecera(a: &AjusteVista, editable: bool) -> impl IntoView + use<> {
-    let titulo_id = format!("{}-titulo", dom(a));
-    view! {
-        <header class="ajuste-cabecera">
-            <h2 id=titulo_id tabindex="-1">{traducir(&format!("{}-titulo", a.clave), None)}</h2>
-            <div class="ajuste-etiquetas">
-                {nivel(a.nivel)}
-                {editable.then(|| riesgo(a.riesgo))}
-            </div>
-        </header>
-        <p class="ajuste-desc">{traducir(&format!("{}-desc", a.clave), None)}</p>
     }
 }
 

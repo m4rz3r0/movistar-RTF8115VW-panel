@@ -147,7 +147,7 @@ fn columna(
 pub(crate) struct Borradores(RwSignal<HashMap<String, Borrador>>);
 
 /// Lo editado en un elemento: (ajuste, campo) → valor en edición.
-type Borrador = BTreeMap<(String, String), String>;
+pub(crate) type Borrador = BTreeMap<(String, String), String>;
 
 impl Borradores {
     pub(crate) fn nuevos() -> Borradores {
@@ -185,7 +185,7 @@ impl Borradores {
     }
 
     /// Guarda lo editado en `id` (sin nada, lo olvida).
-    fn guardar(self, id: &str, cambios: Borrador) {
+    pub(crate) fn guardar(self, id: &str, cambios: Borrador) {
         self.0.update(|b| {
             if cambios.is_empty() {
                 b.remove(id);
@@ -196,23 +196,22 @@ impl Borradores {
     }
 
     /// Lo editado en `id`.
-    fn de(self, id: &str) -> Borrador {
+    pub(crate) fn de(self, id: &str) -> Borrador {
         self.0
             .with_untracked(|b| b.get(id).cloned().unwrap_or_default())
     }
 }
 
-/// Lo que se edita en el detalle abierto: el id de su elemento y la edición
-/// de cada columna. La rejilla lo mira (al cambiar de elemento, cerrar o
-/// usar «Atrás») para no perder cambios sin guardar.
-pub(crate) type Registro = RwSignal<Option<(String, Vec<Edicion>)>>;
+/// Lo que se edita en el detalle abierto: el id de su elemento (o de su
+/// fila) y si tiene cambios sin guardar. La rejilla lo mira (al cambiar de
+/// elemento, cerrar o usar «Atrás») para no perder cambios sin guardar.
+pub(crate) type Registro = RwSignal<Option<(String, Signal<bool>)>>;
 
 /// ¿Hay cambios sin guardar en el detalle de `abierto`?
 pub(crate) fn sin_guardar(registro: Registro, abierto: Option<&str>) -> bool {
     registro.with_untracked(|r| {
-        r.as_ref().is_some_and(|(id, eds)| {
-            Some(id.as_str()) == abierto && eds.iter().any(|e| e.cambiada())
-        })
+        r.as_ref()
+            .is_some_and(|(id, sucio)| Some(id.as_str()) == abierto && sucio.get_untracked())
     })
 }
 
@@ -249,9 +248,10 @@ pub(crate) fn Detalle(e: ElementoVista, registro: Registro) -> impl IntoView {
             None => columna_de_consulta(a, unica).into_any(),
         })
         .collect_view();
+    let eds: Vec<Edicion> = ediciones.iter().map(|(_, _, ed)| *ed).collect();
     registro.set(Some((
         e.id.clone(),
-        ediciones.iter().map(|(_, _, ed)| *ed).collect(),
+        Signal::derive(move || eds.iter().any(|ed| ed.cambiada())),
     )));
     // Lo editado antes de que la página volviera a leer el tema, de vuelta;
     // y, desde ahora, guardado mientras se edita.

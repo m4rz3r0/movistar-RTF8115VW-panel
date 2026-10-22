@@ -5,8 +5,6 @@
 ## Página
 ajustes-titulo = Ajustes del router
 ajustes-desc = Cambia lo que quieras del router en lenguaje claro. Cada cambio se vigila y, si el router deja de responder, se deshace solo.
-ajustes-mas-opciones = Más opciones
-ajustes-mas-opciones-desc = Ajustes que casi nunca hace falta tocar.
 ajustes-detalles-tecnicos = Detalles técnicos
 ajustes-detalles-tecnicos-desc = Para quien quiera saber qué funciones del router se usan por debajo.
 ajustes-detalles-lectura = Lectura
@@ -35,6 +33,11 @@ ajustes-secreto-tapado-pedir = El router no deja leer esta clave: escríbela par
 ajustes-secreto-sin-leer-desc = El router no deja leer el valor que tiene; si escribes uno, se guarda el nuevo.
 ajustes-hueco = Este ajuste tendrá aquí su propia pantalla; todavía no está lista.
 ajustes-lista-vacia = No hay ninguno configurado.
+ajustes-lista-filtrar = Filtrar la lista
+ajustes-lista-ninguna = Nada coincide con «{ $texto }».
+ajustes-lista-nombre = Nombre
+ajustes-lista-estado = Estado
+ajustes-lista-borrar = Borrar
 ajustes-lista-sin-editar = Por ahora esta lista solo se puede consultar.
 
 ## Temas
@@ -114,6 +117,7 @@ ajustes-grupo-vacio = (vacío)
 ajustes-grupo-vigilancia = Tras aplicarlo, el panel vigila el router durante { $plazo } y lo deshace solo si deja de responder o se cae internet.
 ajustes-grupo-ninguno = Marca al menos un paso para aplicar el cambio.
 ajustes-grupo-aplicar = Aplicar
+ajustes-grupo-borrar = Borrar
 ajustes-grupo-aplicando = Aplicando…
 ajustes-grupo-cancelar = Cancelar
 ajustes-grupo-cerrar = Cerrar

@@ -238,23 +238,29 @@ async fn pagina_sin_nombres_de_la_api() {
     }
 }
 
-/// Las pestañas sin elementos declarados: cada ajuste es un elemento.
+/// Un ajuste que no está en ningún elemento declarado (la lista de reglas
+/// de Puertos) es un elemento por sí solo, con las acciones de su lista.
 #[tokio::test]
 async fn ajustes_sueltos_son_elementos() {
     let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     let pagina = leer(&p, &cookie, "puertos").await;
-    let upnp = elemento(&pagina, "upnp");
-    let ids: Vec<&str> = upnp["ajustes"]
+    let reglas = elemento(&pagina, "reglas");
+    let ids: Vec<&str> = reglas["ajustes"]
         .as_array()
         .unwrap()
         .iter()
         .map(|a| a["id"].as_str().unwrap())
         .collect();
-    assert_eq!(ids, ["puertos.upnp"]);
-    assert_eq!(upnp["clave"], "ajuste-puertos-upnp");
+    assert_eq!(ids, ["puertos.reglas"]);
+    assert_eq!(reglas["clave"], "ajuste-puertos-reglas");
+    assert_eq!(
+        reglas["acciones"],
+        json!(["activar_regla", "desactivar_regla", "borrar_regla"])
+    );
     assert_eq!(pagina["resumen"], json!([]));
-    assert_eq!(pagina["acciones"], json!([]));
+    // Las tarjetas de encima no tienen acciones de la lista.
+    assert_eq!(elemento(&pagina, "upnp")["acciones"], json!([]));
 }
 
 /// «Volver a leer» (`fresca`) no sale de la caché corta; sin ella, sí. La

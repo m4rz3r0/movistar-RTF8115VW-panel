@@ -20,6 +20,7 @@ ajuste-red_local-dispositivos-fijar-de = Fix this IP: { $ip } ({ $equipo })
 ajuste-red_local-dispositivos-ya-fija = Already has a fixed IP: { $ip }
 ajuste-red_local-dispositivos-no-fijable = This IP can't be fixed
 ajuste-red_local-dispositivos-fijar-desconectado = Connect it to fix its IP
+ajuste-red_local-dispositivos-sin-ip-fija = No fixed IP
 ajuste-red_local-dispositivos-vacia = The router doesn't know any device on your network yet.
 
 ## Fixed IPs
@@ -33,16 +34,15 @@ ajuste-red_local-reservas-ip-desc = The address the device will always have, ins
 ajuste-red_local-reservas-activa = Active
 ajuste-red_local-reservas-activa-desc = If you turn it off, the reservation is kept but the device goes back to getting any address.
 ajuste-red_local-reservas-activa-recomendado = Recommended if you want the device to have its fixed IP now. Pros: it gets it the next time it connects. Cons: nothing important; turn it off only to keep it for later without using it.
-ajuste-red_local-reservas-col-equipo = Device
-ajuste-red_local-reservas-col-acciones = Actions
 ajuste-red_local-reservas-col-mac = Physical address (MAC)
 ajuste-red_local-reservas-col-ip = IP address
 ajuste-red_local-reservas-col-activa = Active
+ajuste-red_local-reservas-activa-de = Fixed IP of { $equipo } active
+ajuste-red_local-reservas-estado-conectado = Connected
+ajuste-red_local-reservas-estado-desactivada = Turned off
 ajuste-red_local-reservas-anadir = Add fixed IP
 ajuste-red_local-reservas-nueva = New fixed IP
 ajuste-red_local-reservas-cambiar = Change the fixed IP
-ajuste-red_local-reservas-editar-de = Edit the fixed IP of { $equipo }
-ajuste-red_local-reservas-borrar = Delete
 ajuste-red_local-reservas-borrar-de = Delete the fixed IP of { $equipo }
 ajuste-red_local-reservas-vacia = There are no fixed IPs yet. Add one here or with "Fix this IP" in the device list.
 ajuste-red_local-reservas-error-fuera = That IP isn't on your network. It has to be on the same network as the router ({ $router }).

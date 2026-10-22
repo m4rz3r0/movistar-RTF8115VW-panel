@@ -94,11 +94,16 @@ const textos = {
 
 type Textos = (typeof textos)["es" | "en"];
 
-/** La tarjeta cuyo título es exactamente `titulo`. */
-function tarjeta(page: Page, titulo: string): Locator {
-  return page.locator("article.ajuste").filter({
+/** La lista cuyo título es exactamente `titulo`. */
+function lista(page: Page, titulo: string): Locator {
+  return page.locator("section.lista-seccion").filter({
     has: page.getByRole("heading", { level: 2, name: titulo, exact: true }),
   });
+}
+
+/** La fila de la lista `titulo` que contiene `texto`. */
+function fila(page: Page, titulo: string, texto: string): Locator {
+  return lista(page, titulo).locator("tbody tr.lista-fila").filter({ hasText: texto });
 }
 
 /**
@@ -112,23 +117,6 @@ async function sinApiALaVista(page: Page, donde: string) {
   expect(texto, `${donde}: una página de la web básica a la vista`).not.toMatch(
     /\bte_\w+\.(asp|cmd|cgi|wl)\b/,
   );
-}
-
-/**
- * El diálogo del resumen: sin la API a la vista; aplica, espera «hecho» y
- * lo cierra. La página relee entonces el tema y lleva el foco al título de
- * `tarjeta`: hasta entonces, la tarjeta puede pintarse de nuevo.
- */
-async function aplicar(page: Page, t: Textos, donde: string, tarjeta: Locator) {
-  const dialogo = page.locator("dialog[open]");
-  await expect(dialogo.locator("#grupo-titulo")).toHaveText(t.revisar);
-  await sinApiALaVista(page, `${donde}: resumen`);
-  await sinDesbordamiento(page, `${donde}: resumen`);
-  await dialogo.getByRole("button", { name: t.aplicar }).click();
-  await expect(dialogo.getByText(t.hecho)).toBeVisible({ timeout: PLAZO_CAMBIO });
-  await dialogo.getByRole("button", { name: t.cerrar }).click();
-  await expect(page.locator("dialog[open]")).toHaveCount(0);
-  await expect(tarjeta.getByRole("heading", { level: 2 })).toBeFocused();
 }
 
 /**
@@ -146,6 +134,18 @@ async function aplicarEnRejilla(page: Page, t: Textos, donde: string) {
   const aviso = page.locator(".avisos-cambio [role=status] .aviso-cambio");
   await expect(aviso).not.toContainText(t.hecho);
   await expect(aviso).toContainText(t.hecho, { timeout: PLAZO_CAMBIO });
+}
+
+/**
+ * Cierra el detalle abierto con «✕» (o, en el móvil, con «‹ Tema»). Tras un
+ * cambio, la página vuelve a leer el tema y, mientras tanto, está inerte: se
+ * reintenta hasta que la pulsación llega.
+ */
+async function cerrarDetalle(page: Page) {
+  await expect(async () => {
+    await page.locator(".detalle :is(.detalle-cerrar, .detalle-volver):visible").click();
+    await expect(page.locator(".detalle")).toHaveCount(0, { timeout: 1_000 });
+  }).toPass();
 }
 
 /** Va a un tema con las pestañas o, en móvil, con el selector de temas. */
@@ -224,30 +224,31 @@ for (const { idioma, locale, ancho } of pasadas) {
       await page.goBack();
       await expect(detalle).toHaveCount(0);
 
-      // 3. La IP de un dispositivo conectado, fija.
+      // 3. La IP de un dispositivo conectado, fija, desde su detalle en la
+      // lista de dispositivos.
       await irA(page, ancho, "red_local", t.redLocal);
-      const dispositivos = tarjeta(page, t.dispositivos);
-      await dispositivos.getByRole("button", { name: t.fijarHost2, exact: true }).click();
+      await fila(page, t.dispositivos, "host-2").locator(".lista-nombre").click();
+      const lateral = page.locator(".detalle-lateral");
+      await lateral.getByRole("button", { name: t.fijarHost2, exact: true }).click();
       await expect(dialogo).toContainText(`${t.fijas}: host-2`);
-      await aplicar(page, t, "IP fija", dispositivos);
-      await expect(dispositivos.locator(".chip-ya-fija").filter({ hasText: t.yaFija })).toBeVisible();
-      await expect(
-        tarjeta(page, t.fijas).locator("tbody tr").filter({ hasText: "192.168.1.62" }),
-      ).toHaveCount(1);
+      await aplicarEnRejilla(page, t, "IP fija");
+      await expect(lateral.locator(".chip-ya-fija").filter({ hasText: t.yaFija })).toBeVisible();
+      await expect(fila(page, t.fijas, "192.168.1.62")).toHaveCount(1);
+      await cerrarDetalle(page);
 
       // 4. Un puerto abierto hacia ese dispositivo.
       await irA(page, ancho, "puertos", t.puertos);
-      const reglas = tarjeta(page, t.reglas);
-      await reglas.getByRole("button", { name: t.abrir }).click();
-      const form = reglas.locator("form.regla-formulario");
+      await lista(page, t.reglas).getByRole("button", { name: t.abrir }).click();
+      const form = lateral.locator("form.regla-formulario");
       await form.getByLabel(t.nombre, { exact: true }).fill(t.nombreRegla);
       await form.getByLabel(t.protocolo, { exact: true }).selectOption("tcp");
       await form.getByLabel(t.puerto, { exact: true }).fill("8443");
       await form.getByLabel(t.dispositivo, { exact: true }).selectOption("192.168.1.62");
       await form.getByRole("button", { name: t.guardar }).click();
       await expect(dialogo).toContainText(`${t.reglas}: ${t.nombreRegla}`);
-      await aplicar(page, t, "puerto", reglas);
-      const regla = reglas.locator("li.regla").filter({ hasText: t.nombreRegla });
+      await aplicarEnRejilla(page, t, "puerto");
+      await cerrarDetalle(page);
+      const regla = fila(page, t.reglas, t.nombreRegla);
       await expect(regla).toContainText("8443");
       await expect(regla).toContainText("host-2");
 

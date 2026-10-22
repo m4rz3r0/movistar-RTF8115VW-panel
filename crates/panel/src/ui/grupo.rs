@@ -490,7 +490,9 @@ pub fn DialogoGrupo(
             }
             .into_any()
         }
-        f => view! {
+        f => {
+            let borra = grupo.with(|g| g.borra);
+            view! {
             <button
                 class="b-sec"
                 type="button"
@@ -499,17 +501,25 @@ pub fn DialogoGrupo(
             >
                 {t!("ajustes-grupo-cancelar")}
             </button>
-            <button class="b-pri" type="submit" disabled=f == Fase::Confirmando>
+            // Lo que borra se confirma con el botón de peligro.
+            <button
+                class=if borra { "b-pel" } else { "b-pri" }
+                type="submit"
+                disabled=f == Fase::Confirmando
+            >
                 {if f == Fase::Confirmando {
                     t!("ajustes-grupo-aplicando")
                 } else if deshace.get().is_some() {
                     t!("ajustes-grupo-deshacer")
+                } else if borra {
+                    t!("ajustes-grupo-borrar")
                 } else {
                     t!("ajustes-grupo-aplicar")
                 }}
             </button>
+            }
+            .into_any()
         }
-        .into_any(),
     };
 
     view! {

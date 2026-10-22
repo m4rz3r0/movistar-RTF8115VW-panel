@@ -20,6 +20,7 @@ ajuste-red_local-dispositivos-fijar-de = Fijar esta IP: { $ip } ({ $equipo })
 ajuste-red_local-dispositivos-ya-fija = Ya tiene IP fija: { $ip }
 ajuste-red_local-dispositivos-no-fijable = Esta IP no se puede fijar
 ajuste-red_local-dispositivos-fijar-desconectado = Conéctalo para fijar su IP
+ajuste-red_local-dispositivos-sin-ip-fija = Sin IP fija
 ajuste-red_local-dispositivos-vacia = El router todavía no conoce ningún dispositivo en tu red.
 
 ## IP fijas
@@ -33,16 +34,15 @@ ajuste-red_local-reservas-ip-desc = La dirección que tendrá siempre el disposi
 ajuste-red_local-reservas-activa = Activa
 ajuste-red_local-reservas-activa-desc = Si la desactivas, la reserva se guarda pero el dispositivo vuelve a recibir una dirección cualquiera.
 ajuste-red_local-reservas-activa-recomendado = Recomendado si quieres que el dispositivo tenga ya su IP fija. A favor: la recibe la próxima vez que se conecte. En contra: ninguno importante; desactívala solo si quieres guardarla para más adelante sin usarla.
-ajuste-red_local-reservas-col-equipo = Dispositivo
-ajuste-red_local-reservas-col-acciones = Qué hacer
 ajuste-red_local-reservas-col-mac = Dirección física (MAC)
 ajuste-red_local-reservas-col-ip = Dirección IP
 ajuste-red_local-reservas-col-activa = Activa
+ajuste-red_local-reservas-activa-de = IP fija de { $equipo } activa
+ajuste-red_local-reservas-estado-conectado = Conectado
+ajuste-red_local-reservas-estado-desactivada = Desactivada
 ajuste-red_local-reservas-anadir = Añadir IP fija
 ajuste-red_local-reservas-nueva = Nueva IP fija
 ajuste-red_local-reservas-cambiar = Cambiar la IP fija
-ajuste-red_local-reservas-editar-de = Editar la IP fija de { $equipo }
-ajuste-red_local-reservas-borrar = Borrar
 ajuste-red_local-reservas-borrar-de = Borrar la IP fija de { $equipo }
 ajuste-red_local-reservas-vacia = Todavía no hay ninguna IP fija. Añádela aquí o con «Fijar esta IP» en la lista de dispositivos.
 ajuste-red_local-reservas-error-fuera = Esa IP no es de tu red. Tiene que ser de la misma red que el router ({ $router }).

@@ -60,52 +60,37 @@ async fn volver_a_un_tema_no_lee_el_router() {
     }
 }
 
-/// Red local pinta primero sus tarjetas (su tanda, solo con sus lecturas);
-/// después, `leer_dispositivos` reusa de la caché la lista y las reservas y
-/// solo lee lo suyo, y `leer_red_casa` lo suyo. La segunda vez, nada.
+/// La página de Red local lee en su misma tanda los dispositivos (con las
+/// estaciones de cada radio) y la red de casa: una sola server fn por
+/// página. Después, `leer_dispositivos` y `leer_red_casa` salen enteras de
+/// la caché.
 #[tokio::test]
 async fn dispositivos_y_red_de_casa_tambien_de_la_cache() {
     let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     let antes = p.sim.control.reads().len();
-    leer(&p, &cookie, "red_local").await;
+    let pagina = leer(&p, &cookie, "red_local").await;
     let del_tema: Vec<String> = lecturas_desde(&p, antes)
         .into_iter()
         .map(|(n, _)| n)
         .collect();
-    assert!(
-        !del_tema
-            .iter()
-            .any(|n| n == "cbListWifiAccPtAssociation" || n == "cbGetLanIPv4Addr"),
-        "la tanda de Red local lee lo de los dispositivos: {del_tema:?}"
-    );
+    for n in [
+        "cbListWifiAccPtAssociation",
+        "cbGetLanIPv4Addr",
+        "cbGetLanHostList",
+    ] {
+        assert!(
+            del_tema.iter().any(|x| x == n),
+            "la tanda de Red local no lee {n}: {del_tema:?}"
+        );
+    }
+    assert!(pagina["red"]["dispositivos"].is_array(), "{pagina}");
     let antes = p.sim.control.reads().len();
     let dispositivos = ok(&p, "leer_dispositivos", json!({}), &cookie).await;
     let red = ok(&p, "leer_red_casa", json!({}), &cookie).await;
-    let nombres: Vec<String> = lecturas_desde(&p, antes)
-        .into_iter()
-        .map(|(n, _)| n)
-        .collect();
-    assert_eq!(
-        nombres,
-        [
-            "cbListWifiAccPtAssociation",
-            "cbListWifiAccPtAssociation",
-            "cbGetLanIPv4Addr"
-        ]
-    );
-    assert!(
-        !dispositivos.as_array().unwrap().is_empty(),
-        "{dispositivos}"
-    );
-    assert!(red.is_array(), "{red}");
-    let antes = p.sim.control.reads().len();
-    assert_eq!(
-        ok(&p, "leer_dispositivos", json!({}), &cookie).await,
-        dispositivos
-    );
-    assert_eq!(ok(&p, "leer_red_casa", json!({}), &cookie).await, red);
     assert_eq!(lecturas_desde(&p, antes), vec![]);
+    assert_eq!(pagina["red"]["dispositivos"], dispositivos);
+    assert_eq!(pagina["red"]["lan"], red);
 }
 
 /// Sin pasar por Red local, `leer_dispositivos` y `leer_red_casa` también

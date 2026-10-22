@@ -8,23 +8,6 @@ use ajustes::{Nivel, Requiere, TipoCampo, ValorLegible};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-/// Los ajustes de un tema, leídos del router. Ya no viaja: la interfaz de
-/// tarjetas sueltas la monta con [`PaginaTema`] hasta que pase a la
-/// rejilla de elementos.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TemaVista {
-    /// Identificador corto del tema (`wifi`).
-    pub tema: String,
-    /// El panel está en modo solo lectura (firmware sin confirmar): los
-    /// ajustes se ven pero no se cambian.
-    pub solo_lectura: bool,
-    /// Hay foto de partida: la cabecera enlaza a su comparación.
-    #[serde(default)]
-    pub foto_de_partida: bool,
-    /// En el orden del catálogo.
-    pub ajustes: Vec<AjusteVista>,
-}
-
 /// Un ajuste con su valor actual.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AjusteVista {

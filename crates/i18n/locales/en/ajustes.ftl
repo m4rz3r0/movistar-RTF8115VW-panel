@@ -5,8 +5,6 @@
 ## Page
 ajustes-titulo = Settings
 ajustes-desc = Change what you need on the router in plain language. Every change is watched and, if the router stops responding, it is undone on its own.
-ajustes-mas-opciones = More options
-ajustes-mas-opciones-desc = Settings you will hardly ever need to touch.
 ajustes-detalles-tecnicos = Technical details
 ajustes-detalles-tecnicos-desc = For anyone who wants to know which router functions are used underneath.
 ajustes-detalles-lectura = Read
@@ -35,6 +33,11 @@ ajustes-secreto-tapado-pedir = The router won't let this password be read: type 
 ajustes-secreto-sin-leer-desc = The router won't let its current value be read; if you type one, the new one is saved.
 ajustes-hueco = This setting will have its own screen here; it is not ready yet.
 ajustes-lista-vacia = None set up.
+ajustes-lista-filtrar = Filter the list
+ajustes-lista-ninguna = Nothing matches “{ $texto }”.
+ajustes-lista-nombre = Name
+ajustes-lista-estado = Status
+ajustes-lista-borrar = Delete
 ajustes-lista-sin-editar = For now this list can only be viewed.
 
 ## Sections
@@ -114,6 +117,7 @@ ajustes-grupo-vacio = (empty)
 ajustes-grupo-vigilancia = After applying it, the panel watches the router for { $plazo } and undoes it on its own if the router stops responding or the internet goes down.
 ajustes-grupo-ninguno = Tick at least one step to apply the change.
 ajustes-grupo-aplicar = Apply
+ajustes-grupo-borrar = Delete
 ajustes-grupo-aplicando = Applying…
 ajustes-grupo-cancelar = Cancel
 ajustes-grupo-cerrar = Close

@@ -7,10 +7,11 @@
 //! marcado, una tarjeta por elemento ([`tarjeta`]) y el detalle del que se
 //! abre ([`detalle`], `/ajustes/<tema>/<elemento>`), con los cambios
 //! seguidos en la propia tarjeta y un aviso con «Deshacer» ([`aviso`]). Lo
-//! mismo Internet, Seguridad, Teléfono y Sistema. Puertos y Red local, hasta
-//! que pasen a la rejilla, con sus tarjetas de siempre ([`heredada`]); los dispositivos y las IP fijas de Red local tienen su
-//! propio componente ([`dispositivos`], [`reservas`]), y las reglas de
-//! apertura de puertos el suyo ([`puertos`]). Un tema que no existe es
+//! mismo Internet, Seguridad, Teléfono y Sistema. En Puertos y Red local, lo
+//! que puede crecer a decenas (las reglas, las IP fijas y los dispositivos)
+//! va en una lista con columnas ([`lista`]) bajo las tarjetas, con el
+//! detalle de cada fila en [`puertos`], [`reservas`] y [`dispositivos`]. Un
+//! tema que no existe es
 //! «página no encontrada». Si hay foto de partida, cada tema enlaza a
 //! «Cómo estaba al instalar» ([`foto`], `/ajustes/foto-de-partida`).
 
@@ -21,7 +22,7 @@ mod detalle;
 mod dispositivos;
 mod edicion;
 mod foto;
-mod heredada;
+mod lista;
 mod piezas;
 mod puertos;
 mod rejilla;
@@ -30,9 +31,7 @@ mod resumen;
 mod seleccion;
 mod tarjeta;
 
-use crate::ajustes_router::{
-    CADUCIDAD_LECTURAS, leer_dispositivos, leer_red_casa, leer_reservas, leer_tema,
-};
+use crate::ajustes_router::{CADUCIDAD_LECTURAS, leer_tema};
 use crate::t;
 use crate::ui::explorador::texto_error;
 use crate::ui::i18n::traducir;
@@ -40,7 +39,6 @@ use crate::ui::{Estado, IconoEstado};
 use ajustes::Tema;
 use aviso::{AvisoCambio, Seguimiento};
 use detalle::Borradores;
-use heredada::{ContenidoTema, tarjetas_sueltas};
 use leptos::prelude::*;
 use leptos_router::{
     NavigateOptions,
@@ -65,22 +63,9 @@ const MINIMO_ACTUALIZANDO: Duration = Duration::from_millis(300);
 /// pasar por encima de camino a otra no lee nada.
 const RETARDO_PRECARGA: Duration = Duration::from_millis(150);
 
-/// Id de la nota que dice qué significa «Oculto» (una por página; la
-/// describen todos sus chips).
-pub(crate) const NOTA_OCULTO: &str = "ajustes-nota-oculto";
-
 /// Id del aviso de solo lectura: lo que no se puede usar lo cita como su
 /// porqué (`aria-describedby`).
 pub(crate) const ID_SOLO_LECTURA: &str = "ajustes-solo-lectura";
-
-/// Temas que ya van en rejilla (los demás, con sus tarjetas de siempre).
-const EN_REJILLA: [Tema; 5] = [
-    Tema::Internet,
-    Tema::Wifi,
-    Tema::Seguridad,
-    Tema::Telefono,
-    Tema::Sistema,
-];
 
 /// Vista que no pinta nada: la de las rutas hijas de un tema, que solo
 /// eligen el elemento abierto (lo pinta la página del tema).
@@ -196,9 +181,8 @@ impl Precargados {
 
 /// Precarga de los temas: al dejar el ratón o el foco en una pestaña, lee
 /// su tema en segundo plano para que el servidor lo tenga en su caché
-/// corta cuando se pulse (en Red local y en Puertos, también los
-/// dispositivos y la red de casa, y en Puertos las IP fijas, que piden
-/// después sus tarjetas). Una sola a la vez (el servidor las lee en serie)
+/// corta cuando se pulse (en Red local y en Puertos, con la red de casa).
+/// Una sola a la vez (el servidor las lee en serie)
 /// y cada tema una vez por caducidad de la caché. Al desmontarse la
 /// página, lo programado se cancela; lo que ya corre no lee señales (solo
 /// `try_*` y valores guardados).
@@ -238,18 +222,7 @@ impl Precarga {
             };
             self.en_curso.set_value(true);
             leptos::task::spawn_local(async move {
-                let mut bien = leer_tema(slug.clone(), false).await.is_ok();
-                // Las tarjetas de Red local piden esto en cuanto se pintan.
-                if bien && t == Tema::RedLocal {
-                    bien = leer_dispositivos().await.is_ok() && leer_red_casa().await.is_ok();
-                }
-                // Las de Puertos, también las IP fijas (el aviso de destino).
-                if bien && t == Tema::Puertos {
-                    bien = leer_dispositivos().await.is_ok()
-                        && leer_reservas().await.is_ok()
-                        && leer_red_casa().await.is_ok();
-                }
-                if bien {
+                if leer_tema(slug.clone(), false).await.is_ok() {
                     self.hechas.update_value(|h| h.hecha(&slug, generacion));
                     set_timeout(
                         move || self.hechas.update_value(|h| h.caducada(&slug, generacion)),
@@ -351,8 +324,6 @@ pub fn PaginaTema() -> impl IntoView {
     let params = use_params_map();
     let slug = Memo::new(move |_| params.with(|p| p.get("tema").unwrap_or_default()));
     let existe = Memo::new(move |_| Tema::from_slug(&slug.get()).is_some());
-    let en_rejilla =
-        Memo::new(move |_| Tema::from_slug(&slug.get()).is_some_and(|t| EN_REJILLA.contains(&t)));
     let ubicacion = use_location();
     let elemento = Memo::new(move |_| elemento_de(&ubicacion.pathname.get()));
     // «Volver a leer»: la próxima lectura no sale de la caché del servidor.
@@ -369,10 +340,6 @@ pub fn PaginaTema() -> impl IntoView {
             }
         },
     );
-    // Un elemento en la dirección solo existe en los temas en rejilla. Un
-    // `Memo`: abrir o cerrar un detalle no vuelve a pintar la página.
-    let fuera_de_la_rejilla =
-        Memo::new(move |_| elemento.with(Option::is_some) && !en_rejilla.get());
     let foco = Foco(RwSignal::new(None));
     provide_context(foco);
     let precarga = Precarga::nueva();
@@ -416,7 +383,7 @@ pub fn PaginaTema() -> impl IntoView {
         }
     });
     move || {
-        if !existe.get() || fuera_de_la_rejilla.get() {
+        if !existe.get() {
             return no_encontrada().into_any();
         }
         view! {
@@ -439,28 +406,16 @@ pub fn PaginaTema() -> impl IntoView {
                     aria-busy=move || actualizando.ocupado.get().then_some("true")
                     inert=move || actualizando.ocupado.get()
                 >
-                <Transition
-                    fallback=move || {
-                        if en_rejilla.get_untracked() {
-                            esqueleto().into_any()
-                        } else {
-                            view! { <p class="estado-espera">{t!("comun-cargando")}</p> }.into_any()
-                        }
-                    }
-                    set_pending=pendiente
-                >
+                <Transition fallback=esqueleto set_pending=pendiente>
                 {move || Suspend::new(async move {
                     match datos.await {
-                        Ok(Some(p)) if en_rejilla.get_untracked() => {
+                        Ok(Some(p)) => {
                             let intro = introduccion(&p.tema, p.foto_de_partida, p.solo_lectura);
                             view! {
                                 {intro}
                                 <ContenidoRejilla p volver_a_leer elemento />
                             }
                                 .into_any()
-                        }
-                        Ok(Some(p)) => {
-                            view! { <ContenidoTema t=tarjetas_sueltas(p) recargar /> }.into_any()
                         }
                         Ok(None) => ().into_any(),
                         Err(e) => {

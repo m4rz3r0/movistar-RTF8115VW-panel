@@ -40,12 +40,6 @@ impl Edicion {
         self.errores.with_value(|e| e[i])
     }
 
-    /// Primer campo que se puede cambiar (al que va el foco).
-    pub(crate) fn primero(self) -> Option<usize> {
-        self.campos
-            .with_value(|cs| cs.iter().position(|c| c.solo_lectura.is_none()))
-    }
-
     /// Lo deja todo como se leyó, sin errores.
     pub(crate) fn reiniciar(self) {
         self.campos.with_value(|cs| {

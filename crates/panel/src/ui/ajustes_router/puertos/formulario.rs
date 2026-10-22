@@ -1,11 +1,14 @@
 //! Formulario de una regla de puertos, nueva o existente.
 
+use super::super::detalle::Registro;
+use super::super::lista::seguir_lo_editado;
 use super::*;
 
 /// Formulario de una regla, nueva o existente (`editando`: la regla y sus
 /// valores tal como los leyó la página). Llama a `preparado` con el resumen
 /// del cambio y a `cancelar` al dejarlo. Su error general va a `error`, la
-/// única región de alerta de la tarjeta.
+/// única región de alerta del detalle. Lo editado se apunta en `registro`
+/// con el id de su fila (`fila`) y sobrevive a que la página vuelva a leer.
 #[component]
 pub(super) fn FormRegla(
     plantilla: Vec<CampoVista>,
@@ -16,6 +19,8 @@ pub(super) fn FormRegla(
     dom: String,
     preparado: Callback<GrupoVista>,
     cancelar: Callback<()>,
+    registro: Registro,
+    fila: String,
 ) -> impl IntoView {
     let regla = editando.as_ref().and_then(regla_de);
     let instancia = editando.as_ref().map(|i| i.id.clone());
@@ -78,6 +83,18 @@ pub(super) fn FormRegla(
         ini.destino.clone()
     });
     let interno_v = RwSignal::new(ini.interno.clone());
+    let olvidar = seguir_lo_editado(
+        fila,
+        vec![
+            ("nombre".into(), nombre_v, ini.nombre.clone()),
+            ("protocolo".into(), protocolo_v, ini.protocolo.clone()),
+            ("puerto".into(), puerto_v, ini.puerto.clone()),
+            ("dispositivo".into(), eleccion, eleccion_inicial.clone()),
+            ("otra_ip".into(), otra_ip_v, otra_ip_v.get_untracked()),
+            ("interno".into(), interno_v, ini.interno.clone()),
+        ],
+        registro,
+    );
     let [
         e_nombre,
         e_protocolo,
@@ -95,11 +112,6 @@ pub(super) fn FormRegla(
         let id = id.clone();
         move |campo: &str| format!("{}-control", id(campo))
     };
-    // El foco, al primer campo al abrirse.
-    {
-        let primero = control("nombre");
-        request_animation_frame(move || enfocar(&primero));
-    }
     let titulo = if nueva {
         t!("ajuste-puertos-reglas-nueva")
     } else {
@@ -275,7 +287,10 @@ pub(super) fn FormRegla(
             };
             spawn_local(async move {
                 match preparar_ajuste(p).await {
-                    Ok(g) => preparado.run(g),
+                    Ok(g) => {
+                        olvidar.run(());
+                        preparado.run(g);
+                    }
                     Err(e) => error.set(Some(texto_error(&e))),
                 }
                 preparando.set(false);

@@ -204,9 +204,9 @@ async fn espejo_apagado_es_ninguna() {
     assert!(!html.contains("Valor no reconocido (0)"), "{html}");
 }
 
-/// Los temas en rejilla no esconden nada bajo «Más opciones»: cada
-/// elemento tiene su tarjeta (también Sistema, sin ajustes básicos, y lo
-/// oculto de Teléfono). Puertos, que aún no va en rejilla, sí lo pliega.
+/// Ningún tema esconde nada bajo «Más opciones»: cada elemento tiene su
+/// tarjeta (también Sistema, sin ajustes básicos, y lo oculto de Teléfono y
+/// de Puertos), y las listas de Puertos y Red local van con sus columnas.
 #[tokio::test]
 async fn rejilla_sin_mas_opciones() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
@@ -216,6 +216,8 @@ async fn rejilla_sin_mas_opciones() {
         ("/ajustes/seguridad", "Gestión remota del operador"),
         ("/ajustes/telefono", "Servidores de teléfono del operador"),
         ("/ajustes/sistema", "Hora del router"),
+        ("/ajustes/puertos", "Apertura automática de puertos (UPnP)"),
+        ("/ajustes/red_local", "Reparto de direcciones (DHCP)"),
     ] {
         let (_, _, html) = pagina(&p, &cookie, ruta).await;
         assert!(html.contains("rejilla-elementos"), "{ruta}: {html}");
@@ -225,13 +227,20 @@ async fn rejilla_sin_mas_opciones() {
             "{ruta}: {html}"
         );
     }
-    let (_, _, html) = pagina(&p, &cookie, "/ajustes/puertos").await;
-    assert!(html.contains(r#"<details class="mas-opciones""#), "{html}");
+    // Lo que puede crecer a decenas, en lista con columnas bajo las tarjetas.
+    for (ruta, listas) in [("/ajustes/puertos", 1), ("/ajustes/red_local", 2)] {
+        let (_, _, html) = pagina(&p, &cookie, ruta).await;
+        let (visible, _) = partir(&html, "<script", "</script>");
+        assert_eq!(
+            visible.matches(r#"class="lista-seccion""#).count(),
+            listas,
+            "{ruta}: {visible}"
+        );
+    }
 }
 
-/// La nota de «Oculto» va una sola vez por página en los temas que no van
-/// en rejilla (Puertos); en el detalle de uno en rejilla, bajo el título de
-/// la columna de lo oculto.
+/// La nota de «Oculto» va una sola vez en el detalle, bajo el título de la
+/// columna de lo oculto.
 #[tokio::test]
 async fn nota_de_oculto_una_vez() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
@@ -246,19 +255,14 @@ async fn nota_de_oculto_una_vez() {
         visible.contains(r#"class="detalle-nota-oculto""#),
         "{visible}"
     );
-    let (_, _, html) = pagina(&p, &cookie, "/ajustes/puertos").await;
+    // Un elemento que es solo lo oculto (los ayudantes de protocolos de
+    // Puertos), igual.
+    let (_, _, html) = pagina(&p, &cookie, "/ajustes/puertos/alg").await;
     let (visible, _) = partir(&html, "<script", "</script>");
-    assert!(visible.matches("chip-oculto").count() >= 1, "{visible}");
-    // Cada etiqueta «Oculto» es un enlace a la nota, que la describe (un
-    // lector de pantalla no siempre anuncia la descripción de un `<span>`).
-    let chip = "<a href=\"#ajustes-nota-oculto\" aria-describedby=\"ajustes-nota-oculto\" \
-                class=\"chip chip-nivel chip-oculto\"";
-    assert_eq!(
-        visible.matches(chip).count(),
-        visible.matches("chip-oculto").count(),
+    assert!(
+        visible.contains(r#"class="detalle-nota-oculto""#),
         "{visible}"
     );
-    assert!(visible.contains("id=\"ajustes-nota-oculto\""), "{visible}");
     assert_eq!(
         visible.matches("No aparece en la web del operador").count(),
         1,
@@ -404,9 +408,8 @@ async fn red_oculta_encendida_se_avisa() {
     }
 }
 
-/// Un elemento que no existe en la dirección: en un tema en rejilla, se
-/// dice; en uno que no va en rejilla (no tiene elementos en la dirección),
-/// «página no encontrada».
+/// Un elemento que no existe en la dirección (tampoco como fila de una
+/// lista): se dice; en un tema que no existe, «página no encontrada».
 #[tokio::test]
 async fn elemento_desconocido_en_la_direccion() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
@@ -417,7 +420,16 @@ async fn elemento_desconocido_en_la_direccion() {
         "{html}"
     );
     assert!(!html.contains(r#"class="detalle""#), "{html}");
+    // En una lista, igual: ni la fila ni el detalle existen.
     let (status, _, html) = pagina(&p, &cookie, "/ajustes/puertos/x").await;
+    assert_eq!(status, 200, "{html}");
+    assert!(
+        html.contains("No hay nada que se llame «x» en esta pestaña."),
+        "{html}"
+    );
+    assert!(!html.contains("detalle-lateral"), "{html}");
+    // Un tema que no existe, aunque lleve elemento: página no encontrada.
+    let (status, _, html) = pagina(&p, &cookie, "/ajustes/nada/x").await;
     assert_eq!(status, 404, "{html}");
     assert!(html.contains("Página no encontrada"), "{html}");
 }

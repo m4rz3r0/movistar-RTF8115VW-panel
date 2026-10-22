@@ -7,14 +7,19 @@
 //! espacio marca o desmarca, Intro abre y Esc cierra; al abrir, el foco va
 //! al título del detalle y, al cerrar, vuelve a la tarjeta. Con cambios sin
 //! guardar, cambiar de elemento, cerrar o «Atrás» pregunta antes.
+//!
+//! En Puertos y Red local, lo que no es una lista va en tarjetas y, debajo,
+//! cada lista con sus columnas ([`super::lista`]): sus filas se abren,
+//! marcan y recorren igual, con su propia dirección.
 
 use super::aviso::Seguimiento;
 use super::detalle::{Borradores, Detalle, sin_guardar};
+use super::lista::{Lista, es_lista, filas_de_la_pagina};
 use super::piezas::enfocar;
 use super::resumen::{LecturaDelTema, ResumenTema};
 use super::seleccion::{BarraSeleccion, Seleccion, nombre};
 use super::tarjeta::{Tarjeta, id_tarjeta};
-use crate::ajustes_router::{PaginaTema, preparar_accion};
+use crate::ajustes_router::{ElementoVista, PaginaTema, preparar_accion};
 use crate::t;
 use crate::ui::explorador::texto_error;
 use crate::ui::{Estado, IconoEstado};
@@ -130,9 +135,25 @@ pub(crate) fn ContenidoRejilla(
     let s = expect_context::<Seguimiento>();
     let navegar = use_navigate();
     let tema = StoredValue::new(p.tema.clone());
+    // Las filas de las listas son elementos como las tarjetas: se abren,
+    // se marcan y entran en la barra.
+    let filas = filas_de_la_pagina(&p);
+    let tarjetas_y_filas: Vec<ElementoVista> = p
+        .elementos
+        .iter()
+        .filter(|e| !es_lista(e))
+        .cloned()
+        .chain(filas.iter().map(|(e, _)| e.clone()))
+        .collect();
+    let nombres: Vec<(String, String)> = p
+        .elementos
+        .iter()
+        .map(|e| (e.id.clone(), nombre(e)))
+        .chain(filas.iter().map(|(e, n)| (e.id.clone(), n.clone())))
+        .collect();
     // Sin señales: el efecto de la dirección puede correr justo cuando la
     // página se está desmontando (al ir a otro tema).
-    let ids: std::sync::Arc<[String]> = p.elementos.iter().map(|e| e.id.clone()).collect();
+    let ids: std::sync::Arc<[String]> = nombres.iter().map(|(id, _)| id.clone()).collect();
     let existe = move |id: &Option<String>| id.as_ref().filter(|i| ids.contains(i)).cloned();
     // Un elemento en la dirección que el tema no tiene: se dice.
     let desconocido = {
@@ -215,7 +236,10 @@ pub(crate) fn ContenidoRejilla(
     let pagina = Pagina {
         tema,
         solo_lectura: p.solo_lectura,
-        marcar: !p.acciones.is_empty(),
+        marcar: p
+            .elementos
+            .iter()
+            .any(|e| !es_lista(e) && !e.acciones.is_empty()),
         abierto,
         abrir: Callback::new({
             let ir_a = ir_a.clone();
@@ -230,8 +254,21 @@ pub(crate) fn ContenidoRejilla(
     };
     provide_context(pagina);
 
+    let peligrosas: Vec<String> = p
+        .acciones
+        .iter()
+        .filter(|a| a.peligro)
+        .map(|a| a.id.clone())
+        .collect();
     let accion = Callback::new(move |(accion, ids): (String, Vec<String>)| {
         let tema = tema.get_value();
+        // Lo que se va a borrar no puede quedar abierto: su dirección ya no
+        // existiría.
+        if peligrosas.contains(&accion)
+            && abierto.with_untracked(|a| a.as_ref().is_some_and(|a| ids.contains(a)))
+        {
+            pagina.cerrar.run(());
+        }
         spawn_local(async move {
             match preparar_accion(tema, accion, ids.clone()).await {
                 Ok(g) => s.revisar(g, ids),
@@ -242,6 +279,7 @@ pub(crate) fn ContenidoRejilla(
     let tarjetas = p
         .elementos
         .iter()
+        .filter(|e| !es_lista(e))
         .map(|e| {
             let id = e.id.clone();
             let del_detalle = StoredValue::new(e.clone());
@@ -255,14 +293,38 @@ pub(crate) fn ContenidoRejilla(
             }
         })
         .collect_view();
-    let nombre_abierto = {
-        let elementos = p.elementos.clone();
-        move || {
-            abierto
-                .get()
-                .and_then(|id| elementos.iter().find(|e| e.id == id).map(nombre))
-                .unwrap_or_default()
-        }
+    let red = p.red.clone().unwrap_or_default();
+    let existentes = p
+        .ajustes()
+        .find(|a| a.componente.as_deref() == Some(super::RESERVAS))
+        .map(|a| super::reservas::existentes(&a.instancias))
+        .unwrap_or_default();
+    let listas = p
+        .elementos
+        .iter()
+        .filter(|e| es_lista(e))
+        .map(|e| {
+            view! {
+                <Lista
+                    e=e.clone()
+                    red=red.clone()
+                    acciones=p.acciones.clone()
+                    existentes=existentes.clone()
+                    registro
+                />
+            }
+        })
+        .collect_view();
+    let nombre_abierto = move || {
+        abierto
+            .get()
+            .and_then(|id| {
+                nombres
+                    .iter()
+                    .find(|(i, _)| *i == id)
+                    .map(|(_, n)| n.clone())
+            })
+            .unwrap_or_default()
     };
     let seguir = {
         let ir = ir.clone();
@@ -296,11 +358,12 @@ pub(crate) fn ContenidoRejilla(
         <ResumenTema datos=p.resumen.clone() />
         <BarraSeleccion
             acciones=p.acciones.clone()
-            elementos=p.elementos.clone()
+            elementos=tarjetas_y_filas
             solo_lectura=p.solo_lectura
             al_pulsar=accion
         />
         <div class="rejilla-elementos" class:hay-marcadas=move || { sel.cuantas() > 0 }>{tarjetas}</div>
+        {listas}
         {move || salida.with(Option::is_some).then(|| {
             let seguir = seguir.clone();
             let descartar = descartar.clone();

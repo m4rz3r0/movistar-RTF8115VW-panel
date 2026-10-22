@@ -6,6 +6,10 @@
 }
 
 /* Los botones de una fila, más estrechos: caben a 360 px. */
+.tabla .acciones-fila {
+  text-align: right;
+}
+
 .tabla .acciones-fila :is(.b-sec, .b-pel) {
   padding: 0 var(--esp-2);
   font-size: 12.5px;

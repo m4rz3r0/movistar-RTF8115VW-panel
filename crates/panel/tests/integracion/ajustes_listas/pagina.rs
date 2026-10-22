@@ -1,61 +1,68 @@
-//! Página de la red local: dispositivos, IP fijas y avisos de cada tarjeta.
+//! Páginas de Red local y Puertos: sus listas (dispositivos, IP fijas,
+//! reglas) y el detalle de cada fila.
 
 use super::*;
 
-/// La página de Red local pinta los dos componentes (sin el hueco de
-/// «todavía no está lista»).
-#[tokio::test]
-async fn pagina_red_local_con_dispositivos_y_reservas() {
-    let p = PanelPrueba::nuevo().arrancar().await;
-    let cookie = sesion(&p).await;
-    let resp = crate::comun::get_con_cookie(&p.app, "/ajustes/red_local", &cookie).await;
-    assert_eq!(resp.status(), 200);
-    let html = crate::comun::body_text(resp).await;
-    assert!(html.contains("Fijar esta IP"), "{html}");
-    assert!(html.contains("Añadir IP fija"), "{html}");
-    assert!(html.contains("192.168.1.62"), "{html}");
-    assert!(!html.contains("todavía no está lista"), "{html}");
+/// Ids de las filas de la lista cuyo título es `titulo` (`id="fila-…"`).
+fn filas(html: &str, titulo: &str) -> Vec<String> {
+    let desde = html
+        .find(&format!(">{titulo}</h2>"))
+        .unwrap_or_else(|| panic!("sin la lista {titulo}"));
+    let lista = &html[desde..];
+    let lista = lista.split("</section>").next().unwrap();
+    lista
+        .split(r#"id="fila-"#)
+        .skip(1)
+        .map(|f| f.split('"').next().unwrap().to_owned())
+        .collect()
 }
 
-// ------------------------------------------- ronda de corrección 1
-
-/// El `<article>` de la página cuyo título es `titulo` (sin lo que llega
-/// después por streaming).
-fn tarjeta<'a>(html: &'a str, titulo: &str) -> &'a str {
-    html.split("<article")
-        .find(|a| a.contains(&format!(">{titulo}</h2>")))
-        .unwrap_or_else(|| panic!("sin la tarjeta {titulo}"))
-        .split("</article>")
+/// El detalle abierto en la página (lo que hay dentro de su `<section>`).
+fn detalle(html: &str) -> &str {
+    html.split(r#"class="detalle detalle-lateral""#)
+        .nth(1)
+        .unwrap_or_else(|| panic!("sin detalle: {html}"))
+        .split("</section>")
         .next()
         .unwrap()
 }
 
-/// El fragmento que el servidor envía aparte (streaming fuera de orden, un
-/// `<template>`) con `marca`: lo que pinta una tarjeta tras leer la red.
-fn fragmento<'a>(html: &'a str, marca: &str) -> &'a str {
-    html.split("<template")
-        .map(|t| t.split("</template>").next().unwrap())
-        .find(|t| t.contains(marca) && !t.contains("<article"))
-        .unwrap_or_else(|| panic!("sin el fragmento con {marca}"))
+/// Los detalles de todos los dispositivos de Red local, uno por fila.
+async fn detalles_de_dispositivos(p: &Panel, cookie: &str) -> Vec<String> {
+    let html = pagina(p, cookie, "/ajustes/red_local").await;
+    let mut out = Vec::new();
+    for id in filas(&html, "Dispositivos conectados") {
+        let html = pagina(p, cookie, &format!("/ajustes/red_local/{id}")).await;
+        out.push(detalle(&html).to_owned());
+    }
+    out
 }
 
-/// Lo que se ve de los dispositivos y de las IP fijas, ya leídos.
-fn lista_de_dispositivos(html: &str) -> &str {
-    fragmento(html, r#"class="dispositivos""#)
+/// La página de Red local pinta las dos listas (sin el hueco de «todavía no
+/// está lista») y, abierto un dispositivo, «Fijar esta IP».
+#[tokio::test]
+async fn pagina_red_local_con_dispositivos_y_reservas() {
+    let p = PanelPrueba::nuevo().arrancar().await;
+    let cookie = sesion(&p).await;
+    let html = pagina(&p, &cookie, "/ajustes/red_local").await;
+    assert!(html.contains("Añadir IP fija"), "{html}");
+    assert!(html.contains("192.168.1.62"), "{html}");
+    assert!(!html.contains("todavía no está lista"), "{html}");
+    assert_eq!(filas(&html, "IP fijas"), ["0", "1"]);
+    let html = pagina(&p, &cookie, "/ajustes/red_local/02-00-00-00-00-03").await;
+    assert!(detalle(&html).contains("Fijar esta IP"), "{html}");
 }
 
-fn ip_fijas(html: &str) -> &str {
-    fragmento(html, "tabla-apilada")
-}
+// ------------------------------------------- ronda de corrección 1
 
 /// El nombre accesible de «Fijar esta IP» empieza por lo que se ve
 /// (WCAG 2.5.3): quien lo pide por voz lo encuentra.
 #[tokio::test]
 async fn fijar_esta_ip_se_nombra_como_se_ve() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
-    let html = pagina(&p, &cookie, "/ajustes/red_local").await;
+    let html = pagina(&p, &cookie, "/ajustes/red_local/02-00-00-00-00-03").await;
     assert!(
-        html.contains(r#"aria-label="Fijar esta IP: 192.168.1.62 (host-2)""#),
+        detalle(&html).contains(r#"aria-label="Fijar esta IP: 192.168.1.62 (host-2)""#),
         "{html}"
     );
 }
@@ -68,12 +75,14 @@ async fn ya_tiene_ip_fija_dice_la_reservada() {
     assert_eq!(por_mac(&d, "02:00:00:00:00:01")["ip"], "192.168.1.60");
     assert_eq!(por_mac(&d, "02:00:00:00:00:01")["ip_fija"], "192.168.1.69");
     assert_eq!(por_mac(&d, "02:00:00:00:00:03")["ip_fija"], Value::Null);
-    let html = pagina(&p, &cookie, "/ajustes/red_local").await;
+    let html = pagina(&p, &cookie, "/ajustes/red_local/02-00-00-00-00-01").await;
     // Un dato, no una acción: una etiqueta, no un botón desactivado.
+    let d = detalle(&html);
     assert!(
-        html.contains("<span class=\"chip chip-ya-fija\">Ya tiene IP fija: 192.168.1.69</span>"),
-        "{html}"
+        d.contains("<span class=\"chip chip-ya-fija\">Ya tiene IP fija: 192.168.1.69</span>"),
+        "{d}"
     );
+    assert!(!d.contains("Fijar esta IP"), "{d}");
 }
 
 /// Sin «Fijar esta IP» donde el servidor la rechazaría siempre (una IP de
@@ -101,20 +110,16 @@ async fn sin_fijar_si_no_se_puede() {
         )
         .await
         .unwrap();
-    let html = pagina(&p, &cookie, "/ajustes/red_local").await;
-    let dispositivos = lista_de_dispositivos(&html);
+    let detalles = detalles_de_dispositivos(&p, &cookie).await.join("\n");
     for ip in ["198.51.100.76", "192.168.1.61", "192.168.1.62"] {
         assert!(
-            !dispositivos.contains(&format!("Fijar esta IP: {ip} ")),
-            "{ip}: {dispositivos}"
+            !detalles.contains(&format!("Fijar esta IP: {ip} ")),
+            "{ip}: {detalles}"
         );
     }
-    assert!(dispositivos.contains("Fijar esta IP: 192.168.1.64 (host-4)"));
-    assert_eq!(dispositivos.matches("Esta IP no se puede fijar").count(), 2);
-    assert_eq!(
-        dispositivos.matches("Conéctalo para fijar su IP").count(),
-        1
-    );
+    assert!(detalles.contains("Fijar esta IP: 192.168.1.64 (host-4)"));
+    assert_eq!(detalles.matches("Esta IP no se puede fijar").count(), 2);
+    assert_eq!(detalles.matches("Conéctalo para fijar su IP").count(), 1);
 }
 
 /// El nombre del dispositivo de una reserva se busca con las MAC normalizadas.
@@ -125,7 +130,7 @@ async fn nombre_de_la_reserva_con_mac_normalizada() {
         .arrancar_con_gestor()
         .await;
     let html = pagina(&p, &cookie, "/ajustes/red_local").await;
-    let fijas = ip_fijas(&html);
+    let fijas = html.split(">IP fijas</h2>").nth(1).unwrap();
     let fila = fijas
         .split("<tr")
         .find(|f| f.contains("02:00:00:00:00:04"))
@@ -133,17 +138,14 @@ async fn nombre_de_la_reserva_con_mac_normalizada() {
     assert!(fila.contains("host-3"), "{fila}");
 }
 
-/// Una sola región de alerta por tarjeta, no una por dispositivo.
+/// Una sola región de alerta en el detalle de un dispositivo, no una por
+/// dato ni por acción.
 #[tokio::test]
-async fn una_alerta_por_tarjeta() {
+async fn una_alerta_por_detalle() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
-    let html = pagina(&p, &cookie, "/ajustes/red_local").await;
-    let alertas = |t: &str| t.matches(r#"role="alert""#).count();
-    let n =
-        alertas(tarjeta(&html, "Dispositivos conectados")) + alertas(lista_de_dispositivos(&html));
-    assert_eq!(n, 1, "dispositivos");
-    let n = alertas(tarjeta(&html, "IP fijas")) + alertas(ip_fijas(&html));
-    assert_eq!(n, 1, "IP fijas");
+    for d in detalles_de_dispositivos(&p, &cookie).await {
+        assert_eq!(d.matches(r#"role="alert""#).count(), 1, "{d}");
+    }
 }
 
 fn dispositivo(ip: &str, activo: bool) -> DispositivoVista {
@@ -182,15 +184,25 @@ fn destino_de_un_dispositivo_o_de_una_ip_fija_existe() {
 async fn aviso_destino_inexistente_en_la_pagina() {
     let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
-    let resp = crate::comun::get_con_cookie(&p.app, "/ajustes/puertos", &cookie).await;
-    assert_eq!(resp.status(), 200);
-    let html = crate::comun::body_text(resp).await;
-    assert!(
-        html.contains("El dispositivo de destino ya no está en la red"),
-        "{html}"
-    );
+    let html = pagina(&p, &cookie, "/ajustes/puertos").await;
     assert!(!html.contains("todavía no está lista"), "{html}");
     assert!(html.contains("Abrir un puerto"), "{html}");
+    let ids = filas(&html, "Puertos abiertos");
+    assert_eq!(ids.len(), 1, "{html}");
+    let fila = html
+        .split(&format!(r#"id="fila-{}""#, ids[0]))
+        .nth(1)
+        .unwrap()
+        .split("</tr>")
+        .next()
+        .unwrap();
+    assert!(fila.contains("Sin dispositivo"), "{fila}");
+    // Su detalle dice qué hacer.
+    let html = pagina(&p, &cookie, &format!("/ajustes/puertos/{}", ids[0])).await;
+    assert!(
+        detalle(&html).contains("El router no conoce ningún dispositivo"),
+        "{html}"
+    );
 }
 
 /// Un protocolo que el panel no conoce se ve como en el resto de ajustes

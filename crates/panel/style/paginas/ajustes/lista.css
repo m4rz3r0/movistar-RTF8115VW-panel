@@ -1,0 +1,372 @@
+/* Lista con columnas (Puertos, reservas y dispositivos): tabla a todo el ancho, detalle a la derecha. */
+/* ---------------------------------------------------------------- Lista */
+
+.lista-seccion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-3);
+  min-width: 0;
+  margin-top: var(--esp-6);
+}
+
+.lista-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--esp-3);
+}
+
+.lista-cabecera h2 {
+  margin: 0;
+  font-family: var(--fuente-titulos);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.lista-desc {
+  max-width: 75ch;
+  margin: var(--esp-1) 0 0;
+  color: var(--suave);
+  font-size: 13px;
+}
+
+.lista-filtro {
+  max-width: 320px;
+  margin: 0;
+}
+
+/* Cerrada, la tabla a todo el ancho; abierta, unos 360 px y el detalle al
+   lado, que entra desde la derecha. */
+.lista-cuerpo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: var(--esp-4);
+  transition: grid-template-columns 300ms ease;
+}
+
+.lista-abierta {
+  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+}
+
+.lista-tabla {
+  min-width: 0;
+  overflow-x: auto;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-tarjeta);
+  background: var(--sup);
+}
+
+table.lista {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.lista th,
+.lista td {
+  padding: 10px var(--esp-3);
+  border-bottom: 1px solid var(--borde);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.lista thead :is(th, td) {
+  background: var(--sup2);
+  color: var(--suave);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.lista tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.lista-ordenar {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--esp-1);
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.lista-ordenar:hover,
+.lista th[aria-sort] .lista-ordenar {
+  color: var(--texto);
+}
+
+.lista-ordenar:focus-visible {
+  outline: 2px solid var(--foco);
+  outline-offset: 2px;
+}
+
+.lista th[aria-sort="ascending"] .lista-flecha::after {
+  content: "↑";
+}
+
+.lista th[aria-sort="descending"] .lista-flecha::after {
+  content: "↓";
+}
+
+/* ----------------------------------------------------------------- Filas */
+
+.lista-fila {
+  cursor: pointer;
+  transition: background 200ms ease;
+}
+
+.lista-fila:hover {
+  background: var(--sup2);
+}
+
+.lista-fila:focus-visible {
+  outline: 2px solid var(--foco);
+  outline-offset: -2px;
+}
+
+.lista-fila.marcada,
+.lista-fila.abierta {
+  background: var(--sup2);
+  box-shadow: inset 3px 0 0 var(--acento);
+}
+
+/* La marca, al inicio de la fila: al pasar el ratón o con el foco en la
+   fila (no solo en su celda). */
+.lista-fila:hover .marcar,
+.lista-fila:focus-within .marcar,
+.lista-fila:focus .marcar {
+  opacity: 1;
+}
+
+.lista-marca {
+  width: 22px;
+  padding-right: 0;
+}
+
+.lista tbody th.lista-nombre {
+  color: var(--texto);
+  font-weight: 500;
+}
+
+.lista-nombre-texto {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.lista-sub,
+.lista-nota {
+  display: block;
+  color: var(--tenue);
+  font-size: 12.5px;
+  font-weight: 400;
+}
+
+.lista-valor {
+  overflow-wrap: anywhere;
+}
+
+.lista-estado,
+.lista-int,
+.lista-abrir {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.lista-abrir {
+  text-align: right;
+}
+
+.lista-ninguna,
+.lista-vacia {
+  margin: 0;
+  padding: var(--esp-4) var(--esp-3);
+  color: var(--suave);
+}
+
+/* Abierta: solo el nombre (con lo esencial debajo), el estado y el
+   interruptor. Cerrada, lo de debajo del nombre ya está en sus columnas. */
+.lista-abierta :is(.lista-dato, .lista-abrir) {
+  display: none;
+}
+
+.lista-cuerpo:not(.lista-abierta) .lista-sub {
+  display: none;
+}
+
+/* ---------------------------------------------------------- Su detalle */
+
+/* En el móvil (hasta 900 px) ocupa la pantalla, como el de una tarjeta
+   (detalle.css). */
+@media (min-width: 901px) {
+  .detalle-lateral {
+    grid-column: auto;
+    position: sticky;
+    top: var(--esp-4);
+    animation: detalle-entra 300ms ease-out;
+  }
+}
+
+.detalle-borrar {
+  display: flex;
+  padding-top: var(--esp-3);
+  border-top: 1px solid var(--borde);
+}
+
+.regla-perdida {
+  max-width: 70ch;
+  margin: 0;
+  padding: var(--esp-2) var(--esp-3);
+  border-radius: var(--radio);
+  background: var(--aviso-velo);
+  color: var(--texto);
+  font-size: 13px;
+}
+
+.regla-formulario h3,
+.reserva-formulario h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.regla-interno > summary {
+  color: var(--suave);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.regla-interno[open] > summary {
+  margin-bottom: var(--esp-2);
+}
+
+.nota-fijar {
+  margin: 0;
+  color: var(--suave);
+  font-size: 13px;
+}
+
+/* «Ya tiene IP fija: …»: un dato, no un botón. */
+.chip-ya-fija {
+  white-space: normal;
+}
+
+/* Hasta 900 px el detalle ocupa la pantalla (detalle.css): la lista no se
+   estrecha. */
+@media (max-width: 900px) {
+  .lista-abierta {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lista-abierta :is(.lista-dato, .lista-abrir) {
+    display: revert;
+  }
+
+  .lista-abierta .lista-sub {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------- Móvil: filas apiladas */
+
+@media (max-width: 640px) {
+  .lista-tabla {
+    overflow-x: visible;
+  }
+
+  table.lista,
+  .lista :is(thead, tbody, tr, th, td) {
+    display: block;
+  }
+
+  /* La cabecera queda como una fila de botones para ordenar. */
+  .lista thead tr {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--esp-1) var(--esp-3);
+    padding: var(--esp-2) var(--esp-3);
+    background: var(--sup2);
+  }
+
+  .lista thead :is(th, td) {
+    width: auto;
+    padding: 0;
+    border: 0;
+    white-space: normal;
+  }
+
+  .lista thead td {
+    display: none;
+  }
+
+  .lista .lista-fila {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--esp-2) var(--esp-3);
+    padding: var(--esp-3);
+    border-bottom: 1px solid var(--borde);
+  }
+
+  .lista tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .lista-fila > :is(th, td) {
+    width: auto;
+    padding: 0;
+    border: 0;
+  }
+
+  .lista-fila .lista-nombre {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .lista-fila .lista-int {
+    order: 2;
+  }
+
+  .lista-fila .lista-estado {
+    order: 3;
+    flex-basis: 100%;
+  }
+
+  .lista-fila .lista-dato {
+    order: 4;
+    display: flex;
+    flex-basis: 100%;
+    gap: var(--esp-2);
+  }
+
+  .lista-fila .lista-dato::before {
+    content: attr(data-etiqueta);
+    flex: 0 0 42%;
+    color: var(--tenue);
+    font-size: 12.5px;
+  }
+
+  .lista-fila .lista-abrir {
+    order: 5;
+    margin-left: auto;
+  }
+
+  .lista-filtro {
+    max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lista-cuerpo,
+  .lista-fila {
+    transition: none;
+  }
+
+  .detalle-lateral {
+    animation: none;
+  }
+}
