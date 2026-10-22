@@ -1,7 +1,7 @@
 /* Página Mejoras: las tarjetas de los lotes, sus pasos, avisos y consejos. */
-/* -------------------------------------------------------------- Mejoras */
 
-/* Dos columnas en pantallas anchas; una por debajo de unos 1000 px. */
+/* Tantas columnas como quepan con tarjetas de 480 px como mínimo (una sola
+   si no caben dos). */
 .rejilla-lotes {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(480px, 100%), 1fr));
@@ -49,10 +49,12 @@
   line-height: 1.55;
 }
 
+/* El motivo del lote, si no se leyó, y «Volver a leer» a la derecha. */
 .lote-sin-leer {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--esp-3);
 }
 

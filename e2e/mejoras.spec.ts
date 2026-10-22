@@ -108,3 +108,112 @@ for (const ancho of [360, 1440]) {
     });
   }
 }
+
+// Lecturas que fallan (la respuesta de leer_mejoras se cambia en el
+// navegador, como en ajustes-wifi.spec.ts): Privacidad «sin leer» del todo
+// y Seguridad con pendientes y dos pasos sin leer. Las dos ofrecen «Volver a
+// leer», que pide una lectura fresca.
+const MOTIVO = "No se pudo leer la pestaña Sistema.";
+const SIN_LEER = ["gestion_remota", "aviso_operador"];
+
+interface Paso {
+  clave: string;
+  estado: unknown;
+}
+interface Lote {
+  id: string;
+  estado: unknown;
+  pasos: Paso[];
+}
+
+for (const tema of ["oscuro", "claro"] as const) {
+  test.describe(`Mejoras con lecturas que fallan en tema ${tema}`, () => {
+    test.use({
+      locale: "es-ES",
+      baseURL: mejoras.url,
+      viewport: { width: 1440, height: 900 },
+      colorScheme: tema === "oscuro" ? "dark" : "light",
+    });
+
+    test("lote sin leer y pasos sin leer con «Volver a leer»", async ({ page }) => {
+      test.setTimeout(90_000);
+      const errores = recogerErrores(page);
+      await entrarEnSuPanel(page);
+      await page.route("**/api/leer_mejoras", async (r) => {
+        const respuesta = await r.fetch();
+        const m = await respuesta.json();
+        for (const l of m.lotes as Lote[]) {
+          for (const p of l.pasos) {
+            if (SIN_LEER.includes(p.clave)) {
+              p.estado = { SinLeer: { motivo: MOTIVO } };
+            } else if (l.id === "privacidad") {
+              p.estado = "Hecho";
+            }
+          }
+          l.estado =
+            l.id === "privacidad"
+              ? { SinLeer: { motivo: "2 pasos no se pudieron leer; lo demás ya está." } }
+              : { Pendientes: { pendientes: 3, total: 9 } };
+        }
+        await r.fulfill({ response: respuesta, json: m });
+      });
+      // Navegación en el navegador: la lectura pasa por la ruta cambiada.
+      await asentar(page);
+      await page.locator('nav a[href="/mejoras"]').click();
+      await page.waitForURL((u) => u.pathname === "/mejoras");
+      const seguridad = tarjeta(page, "Seguridad recomendada");
+      const privacidad = tarjeta(page, "Privacidad máxima");
+      await expect(privacidad.locator(".ins-off")).toHaveText("Sin leer");
+      await expect(privacidad).toContainText("2 pasos no se pudieron leer; lo demás ya está.");
+      await expect(privacidad.getByRole("button", { name: "Revisar y aplicar" })).toBeDisabled();
+      await expect(seguridad.locator(".ins-aviso")).toHaveText("3 de 9 pendientes");
+      await expect(seguridad.locator("li.paso-sin-leer")).toHaveCount(2);
+      for (const t of [seguridad, privacidad]) {
+        await expect(t.getByRole("button", { name: "Volver a leer" })).toBeVisible();
+      }
+      await sinDesbordamiento(page, `sin leer ${tema}`);
+      expect.soft(await violacionesGraves(page), `sin leer ${tema}`).toEqual([]);
+      await quieta(page);
+      await page.screenshot({
+        path: `${CAPTURAS}/mejoras-sin-leer-1440-${tema}.png`,
+        fullPage: true,
+        animations: "disabled",
+      });
+      const fresca = page.waitForRequest(
+        (r) => r.url().endsWith("/api/leer_mejoras") && /"fresca":\s*true/.test(r.postData() ?? ""),
+      );
+      await seguridad.getByRole("button", { name: "Volver a leer" }).click();
+      await fresca;
+      await page.unrouteAll({ behavior: "wait" });
+      expect(errores, "errores o avisos en la consola").toEqual([]);
+    });
+  });
+}
+
+// El contador no relanza su consulta en cada cambio de página: se pide al
+// cargar el marco (en el servidor) y no vuelve a pedirse mientras la cuenta
+// valga (30 s, como la caché de lecturas). En /mejoras sale del total de la
+// propia página.
+test.describe("contador sin consultas de más", () => {
+  test.use({ locale: "es-ES", baseURL: mejoras.url, viewport: { width: 1440, height: 900 } });
+
+  test("navegar no vuelve a contar", async ({ page }) => {
+    const errores = recogerErrores(page);
+    await entrarEnSuPanel(page);
+    await asentar(page);
+    const cuenta = page.locator("nav .cuenta");
+    await expect(cuenta).toHaveText("6");
+    const consultas: string[] = [];
+    page.on("request", (r) => {
+      if (r.url().endsWith("/api/contar_mejoras")) consultas.push(r.url());
+    });
+    for (const ruta of ["/historial", "/explorador", "/mejoras", "/"]) {
+      await page.locator(`nav a[href="${ruta}"]`).click();
+      await page.waitForURL((u) => u.pathname === ruta);
+      await asentar(page);
+      await expect(cuenta).toHaveText("6");
+    }
+    expect(consultas, "consultas del contador al navegar").toEqual([]);
+    expect(errores, "errores o avisos en la consola").toEqual([]);
+  });
+});

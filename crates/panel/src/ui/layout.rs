@@ -4,7 +4,7 @@
 //! «Ajustes del panel», y «Salir») que en pantallas estrechas pasa a ser una
 //! barra superior con el menú plegable.
 
-use crate::ajustes_router::contar_mejoras;
+use crate::ajustes_router::{CADUCIDAD_LECTURAS, contar_mejoras};
 use crate::auth::{Logout, quien_soy};
 use crate::t;
 use crate::ui::i18n::SelectorIdioma;
@@ -87,37 +87,100 @@ const ICONO_USUARIO: &str =
 const ICONO_MENU: &str = "M3 5.5h14M3 10h14M3 14.5h14";
 
 /// Pide al marco que vuelva a contar lo que muestra la barra lateral (el
-/// contador de Mejoras): quien lo sabe (una página que acaba de leer o de
-/// aplicar algo) incrementa la señal.
+/// contador de Mejoras): quien cambia algo del router fuera de Mejoras
+/// incrementa la señal.
 #[derive(Clone, Copy)]
 pub struct RecargaMarco(pub RwSignal<u32>);
 
+/// La cuenta de pasos pendientes que enseña el marco, ya en el navegador:
+/// `None` mientras nadie la ha dado; `Some(None)` si no se pudo leer nada.
+/// La escriben el contador, con su consulta, y la página Mejoras, con el
+/// total de su lectura.
+#[derive(Clone, Copy)]
+pub struct CuentaMejoras(pub RwSignal<Option<Option<u32>>>);
+
+/// ¿`ruta` es la página Mejoras, que da la cuenta con su propia lectura?
+fn en_mejoras(ruta: &str) -> bool {
+    seccion_activa("/mejoras", ruta)
+}
+
+/// La píldora del contador: nada sin pasos pendientes o sin lectura.
+fn pildora(n: Option<u32>) -> Option<impl IntoView + use<>> {
+    n.filter(|n| *n > 0).map(|n| {
+        view! {
+            <span class="cuenta" role="img" aria-label=t!("comun-nav-mejoras-pendientes", n = n)>
+                {n}
+            </span>
+        }
+    })
+}
+
 /// El contador de pasos pendientes de Mejoras, en su entrada del menú. Una
-/// consulta propia, que no bloquea ni espera al nombre de usuario; se repite
-/// al cambiar de página o con [`RecargaMarco`]. Sin nada pendiente, o si no
-/// se pudo leer nada, no sale.
+/// consulta propia, que no bloquea ni espera al nombre de usuario, al
+/// cargar el marco (salvo en `/mejoras`, donde la página da el total) y con
+/// [`RecargaMarco`]. Al cambiar de página solo se repite si la cuenta tiene
+/// más de [`CADUCIDAD_LECTURAS`] (la caché de lecturas del servidor): así no
+/// multiplica las lecturas del router. Sin nada pendiente, o si no se pudo
+/// leer nada, no sale.
 #[component]
 fn ContadorMejoras() -> impl IntoView {
     let ruta = use_location().pathname;
-    let recarga = use_context::<RecargaMarco>().map(|r| r.0);
+    let recarga = expect_context::<RecargaMarco>().0;
+    let valor = expect_context::<CuentaMejoras>().0;
+    // La cuenta caducada se vuelve a pedir en el siguiente cambio de página.
+    let caducada = StoredValue::new(false);
+    let generacion = StoredValue::new(0u32);
+    let vuelta = RwSignal::new(0u32);
+    Effect::new(move |anterior: Option<String>| {
+        let r = ruta.get();
+        if anterior.is_some_and(|a| a != r) && !en_mejoras(&r) && caducada.get_value() {
+            caducada.set_value(false);
+            vuelta.update(|n| *n += 1);
+        }
+        r
+    });
     let cuenta = Resource::new(
-        move || (ruta.get(), recarga.map(|r| r.get())),
-        |_| contar_mejoras(),
+        move || (recarga.get(), vuelta.get()),
+        move |_| {
+            let pedir = !en_mejoras(&ruta.get_untracked());
+            async move {
+                if pedir {
+                    Some(contar_mejoras().await.ok().flatten())
+                } else {
+                    None
+                }
+            }
+        },
     );
+    Effect::new(move |_| {
+        if let Some(Some(n)) = cuenta.get() {
+            valor.set(Some(n));
+        }
+    });
+    // Cada cuenta nueva (de la consulta o de la página) vale lo que la caché.
+    Effect::new(move |_| {
+        if valor.get().is_none() {
+            return;
+        }
+        caducada.set_value(false);
+        let g = generacion.get_value().wrapping_add(1);
+        generacion.set_value(g);
+        set_timeout(
+            move || {
+                if generacion.try_get_value() == Some(g) {
+                    caducada.try_set_value(true);
+                }
+            },
+            CADUCIDAD_LECTURAS,
+        );
+    });
     view! {
         <Transition fallback=|| ()>
             {move || Suspend::new(async move {
-                cuenta.await.ok().flatten().filter(|n| *n > 0).map(|n| {
-                    view! {
-                        <span
-                            class="cuenta"
-                            role="img"
-                            aria-label=t!("comun-nav-mejoras-pendientes", n = n)
-                        >
-                            {n}
-                        </span>
-                    }
-                })
+                // En el servidor y al hidratar, la de la consulta; después,
+                // la última que se dio.
+                let inicial = cuenta.await.flatten();
+                move || pildora(valor.get().unwrap_or(inicial))
             })}
         </Transition>
     }
@@ -139,6 +202,7 @@ pub fn Layout() -> impl IntoView {
     });
     let cerrar = move |_| set_abierto.set(false);
     provide_context(RecargaMarco(RwSignal::new(0)));
+    provide_context(CuentaMejoras(RwSignal::new(None)));
 
     view! {
         <a class="saltar" href="#contenido">

@@ -85,20 +85,31 @@ pub(super) fn TarjetaLote(
     let desc = traducir(&format!("mejoras-lote-{}-desc", lote.id), None);
     let (para_quien, pros) = partir_motivo(&desc, &t!("ajustes-recomendado-marca"));
     let (estado, texto) = insignia(&lote.estado);
-    let sin_leer = match &lote.estado {
-        EstadoLote::SinLeer { motivo } => Some(view! {
+    // «Volver a leer» si algo no se pudo leer: el lote entero (con el
+    // motivo arriba) o solo algún paso (el motivo va en el paso).
+    let algun_paso_sin_leer = lote
+        .pasos
+        .iter()
+        .any(|p| matches!(p.estado, EstadoPaso::SinLeer { .. }));
+    let motivo = match &lote.estado {
+        EstadoLote::SinLeer { motivo } => Some(motivo.clone()),
+        _ => None,
+    };
+    let sin_leer = (motivo.is_some() || algun_paso_sin_leer).then(|| {
+        view! {
             <div class="lote-sin-leer">
-                <p class="aviso estado-neutro">
-                    <IconoEstado estado=Estado::Neutro />
-                    <span>{motivo.clone()}</span>
-                </p>
+                {motivo.map(|m| view! {
+                    <p class="aviso estado-neutro">
+                        <IconoEstado estado=Estado::Neutro />
+                        <span>{m}</span>
+                    </p>
+                })}
                 <button type="button" class="b-sec" on:click=move |_| volver_a_leer.run(())>
                     {t!("mejoras-volver-a-leer")}
                 </button>
             </div>
-        }),
-        _ => None,
-    };
+        }
+    });
     let hay_pendientes = lote.pasos.iter().any(|p| p.estado == EstadoPaso::Pendiente);
     let pasos = lote.pasos.into_iter().map(paso).collect_view();
     let avisos = lote

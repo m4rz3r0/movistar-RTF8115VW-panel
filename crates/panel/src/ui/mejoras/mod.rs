@@ -2,15 +2,15 @@
 //!
 //! Una sola lectura ([`leer_mejoras`]) da los lotes con el estado de cada
 //! paso. Mientras lee, los esqueletos de las tarjetas; «Volver a leer» pide
-//! una lectura que no sale de la caché del servidor y avisa al marco para
-//! que el contador de la barra lateral se ponga al día.
+//! una lectura que no sale de la caché del servidor. El contador de la barra
+//! lateral toma el total de cada lectura ([`CuentaMejoras`]).
 
 mod tarjeta;
 
 use crate::ajustes_router::leer_mejoras;
 use crate::t;
 use crate::ui::explorador::texto_error;
-use crate::ui::layout::RecargaMarco;
+use crate::ui::layout::CuentaMejoras;
 use crate::ui::{Estado, IconoEstado};
 use leptos::prelude::*;
 use tarjeta::TarjetaLote;
@@ -39,21 +39,20 @@ fn esqueleto() -> impl IntoView {
 pub fn PaginaMejoras() -> impl IntoView {
     // «Volver a leer»: la próxima lectura no sale de la caché del servidor.
     let fresca = StoredValue::new(false);
-    let recarga = use_context::<RecargaMarco>();
+    let cuenta = use_context::<CuentaMejoras>();
     let datos = Resource::new(
         || (),
         move |()| {
             let fresca = fresca.try_update_value(std::mem::take).unwrap_or(false);
-            async move {
-                let r = leer_mejoras(fresca).await;
-                // Lo recién leído puede cambiar el contador de la barra.
-                if fresca && let Some(RecargaMarco(n)) = recarga {
-                    n.try_update(|n| *n = n.wrapping_add(1));
-                }
-                r
-            }
+            leer_mejoras(fresca)
         },
     );
+    // El contador de la barra toma el total de esta lectura: no hace la suya.
+    Effect::new(move |_| {
+        if let (Some(Ok(m)), Some(CuentaMejoras(c))) = (datos.get(), cuenta) {
+            c.set(Some(m.pendientes));
+        }
+    });
     let volver_a_leer = Callback::new(move |()| {
         fresca.set_value(true);
         datos.refetch();
