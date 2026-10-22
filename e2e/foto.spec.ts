@@ -6,7 +6,8 @@ import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 // panel instalado del e2e tiene foto de partida y, después, UPnP y la clave
 // de la red de 5 GHz cambiados (e2e_grupo). Se entra desde la cabecera de
 // Puertos, se vuelve UPnP a su valor de la foto con el diálogo de siempre
-// (Esc no lo cierra mientras confirma) y se deja como estaba; a 360 px, la
+// (Esc no lo cierra mientras confirma ni mientras prepara el deshacer) y se
+// deja como estaba; a 360 px, la
 // clave que cambió se ve con el ojo; en
 // Teléfono, volver a un valor pide la clave de la línea (el router no la
 // deja leer).
@@ -94,7 +95,22 @@ test("volver UPnP a como estaba al instalar", async ({ page }) => {
   await expect(dialogo.getByText("Hecho: el router tiene ya el cambio.")).toBeVisible({
     timeout: PLAZO_CAMBIO,
   });
-  await dialogo.getByRole("button", { name: "Cerrar", exact: true }).click();
+  // «Deshacer» prepara el cambio inverso: mientras lo prepara, Esc tampoco
+  // cierra. Se cancela (sin aplicarlo), así que no escribe nada más.
+  await page.route(
+    "**/api/deshacer_ajuste",
+    async (r) => {
+      await new Promise((ok) => setTimeout(ok, 1_500));
+      await r.continue();
+    },
+    { times: 1 },
+  );
+  await dialogo.getByRole("button", { name: "Deshacer", exact: true }).click();
+  await expect(dialogo.getByRole("button", { name: "Preparando…" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialogo).toBeVisible();
+  await expect(dialogo.locator("#grupo-titulo")).toHaveText("Volver a como estaba");
+  await dialogo.getByRole("button", { name: "Cancelar", exact: true }).click();
   await expect(dialogo).toBeHidden();
   // Ya no sale (la página vuelve a leer) y el foco va al título.
   await expect(tarjeta).toHaveCount(0);

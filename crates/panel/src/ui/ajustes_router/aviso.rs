@@ -47,21 +47,29 @@ impl CambioActivo {
     }
 }
 
+/// Un grupo preparado a la espera de que se revise en el diálogo de la página.
+#[derive(Clone)]
+struct Revision {
+    grupo: GrupoVista,
+    /// Los elementos que cambia (su insignia, y los que se cierran).
+    elementos: Vec<String>,
+    /// Deshace otro cambio (título y botón de deshacer).
+    deshacer: bool,
+    /// Al aplicarse, sus elementos se cierran (una instancia nueva, ya creada).
+    cerrar: bool,
+}
+
 /// El cambio en curso de la página y el diálogo de revisión abierto. Vive
 /// fuera de la lectura del tema (sobrevive a la relectura al terminar).
 #[derive(Clone, Copy)]
 pub(crate) struct Seguimiento {
     activo: RwSignal<Option<CambioActivo>>,
     error: RwSignal<Option<String>>,
-    /// Grupo preparado a la espera de que se revise, con los elementos que
-    /// cambia y si deshace otro cambio.
-    dialogo: RwSignal<Option<(GrupoVista, Vec<String>, bool)>>,
+    /// Grupo preparado a la espera de que se revise en el diálogo.
+    dialogo: RwSignal<Option<Revision>>,
     recargar: Callback<()>,
     /// Lo editado en cada detalle: el de lo que se aplica se olvida.
     borradores: Borradores,
-    /// El grupo en revisión cierra sus elementos al aplicarse (ver
-    /// [`CambioActivo::cerrar`]).
-    cerrar_al_aplicar: RwSignal<bool>,
     /// Elementos que se acaban de cerrar así: la página deja su dirección.
     cerrados: RwSignal<Vec<String>>,
 }
@@ -77,7 +85,6 @@ impl Seguimiento {
             dialogo: RwSignal::new(None),
             recargar,
             borradores,
-            cerrar_al_aplicar: RwSignal::new(false),
             cerrados: RwSignal::new(Vec::new()),
         };
         let vigilado = Memo::new(move |_| {
@@ -175,14 +182,23 @@ impl Seguimiento {
 
     /// Confirma el grupo preparado (`token`, sin los pasos `desmarcados`)
     /// que cambia `elementos`, y lo sigue.
-    pub(crate) fn aplicar(self, g: &GrupoVista, desmarcados: Vec<usize>, elementos: Vec<String>) {
+    /// `cerrar`: al aplicarse, sus elementos se cierran (los que borra `g`
+    /// siempre; `cerrar` lo añade para una instancia nueva). No es estado
+    /// compartido: un interruptor de fila lo pasa `false`.
+    pub(crate) fn aplicar(
+        self,
+        g: &GrupoVista,
+        desmarcados: Vec<usize>,
+        elementos: Vec<String>,
+        cerrar: bool,
+    ) {
         let interruptor = self.activo.with_untracked(|a| {
             a.as_ref()
                 .filter(|a| a.id.is_none())
                 .and_then(|a| a.interruptor.clone())
         });
         self.error.set(None);
-        let cerrar = g.borra || self.cerrar_al_aplicar.get_untracked();
+        let cerrar = g.borra || cerrar;
         self.activo.set(Some(CambioActivo {
             cerrar,
             id: None,
@@ -214,16 +230,23 @@ impl Seguimiento {
 
     /// Abre el diálogo de revisión del grupo `g`, que cambia `elementos`.
     pub(crate) fn revisar(self, g: GrupoVista, elementos: Vec<String>) {
-        self.error.set(None);
-        self.cerrar_al_aplicar.set(false);
-        self.dialogo.set(Some((g, elementos, false)));
+        self.revisar_con(g, elementos, false);
     }
 
     /// Como [`Seguimiento::revisar`], pero al aplicarse se cierran sus
     /// elementos (el detalle de una instancia nueva, ya creada).
     pub(crate) fn revisar_y_cerrar(self, g: GrupoVista, elementos: Vec<String>) {
-        self.revisar(g, elementos);
-        self.cerrar_al_aplicar.set(true);
+        self.revisar_con(g, elementos, true);
+    }
+
+    fn revisar_con(self, g: GrupoVista, elementos: Vec<String>, cerrar: bool) {
+        self.error.set(None);
+        self.dialogo.set(Some(Revision {
+            grupo: g,
+            elementos,
+            deshacer: false,
+            cerrar,
+        }));
     }
 
     /// ¿Se acaba de cerrar `id` (borrado, o creado desde su detalle)? Reactivo.
@@ -290,15 +313,21 @@ pub(crate) fn resumen(g: &GrupoVista) -> String {
 pub(crate) fn DialogoDeLaPagina() -> impl IntoView {
     let s = expect_context::<Seguimiento>();
     move || {
-        s.dialogo.get().map(|(g, elementos, deshacer)| {
-            let grupo = g.clone();
+        s.dialogo.get().map(|r| {
+            let Revision {
+                grupo,
+                elementos,
+                deshacer,
+                cerrar,
+            } = r;
+            let g = grupo.clone();
             view! {
                 <DialogoGrupo
                     grupo=g
                     deshacer
                     on_cerrar=move |_| s.dialogo.set(None)
                     al_aplicar=move |(_, desmarcados): (String, Vec<usize>)| {
-                        s.aplicar(&grupo, desmarcados, elementos.clone())
+                        s.aplicar(&grupo, desmarcados, elementos.clone(), cerrar)
                     }
                 />
             }
@@ -341,8 +370,12 @@ pub(crate) fn AvisoCambio() -> impl IntoView {
             match deshacer_ajuste(id).await {
                 Ok(g) => {
                     s.error.set(None);
-                    s.cerrar_al_aplicar.set(false);
-                    s.dialogo.set(Some((g, elementos, true)));
+                    s.dialogo.set(Some(Revision {
+                        grupo: g,
+                        elementos,
+                        deshacer: true,
+                        cerrar: false,
+                    }));
                 }
                 Err(e) => s.error.set(Some(texto_error(&e))),
             }

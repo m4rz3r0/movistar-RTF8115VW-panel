@@ -72,7 +72,7 @@ fn interruptor(e: &ElementoVista, i: InterruptorVista, nombre: &str) -> impl Int
                     }
                     s.revisar(g, vec![id]);
                 }
-                Ok(g) => s.aplicar(&g, Vec::new(), vec![id]),
+                Ok(g) => s.aplicar(&g, Vec::new(), vec![id], false),
                 Err(e) => s.falla(texto_error(&e)),
             }
         });

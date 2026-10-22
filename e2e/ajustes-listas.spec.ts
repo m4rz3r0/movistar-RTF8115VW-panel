@@ -370,3 +370,73 @@ test.describe("listas: interruptor con otro cambio en curso", () => {
     ).toEqual([]);
   });
 });
+
+// Tras abrir el formulario de una regla nueva (que, al aplicarse, cerraría
+// su detalle), pulsar el interruptor de una fila con su propio detalle
+// abierto NO debe cerrarlo ni perder lo editado: el cierre no es estado
+// compartido. Una sola combinación, con un cambio de verdad (y su vuelta).
+test.describe("listas: el interruptor de una fila no cierra su detalle", () => {
+  test.use({ locale: "es-ES", viewport: { width: 1440, height: 900 } });
+  test("el detalle y lo editado siguen", async ({ page }) => {
+    test.setTimeout(plazoDeTest(2));
+    const errores = recogerErrores(page);
+    await entrar(page);
+    await page.goto("/ajustes/puertos");
+    await asentar(page);
+    const reglas = page.locator("section.lista-seccion").filter({
+      has: page.getByRole("heading", { level: 2, name: "Puertos abiertos", exact: true }),
+    });
+
+    // 1. Abrir «Abrir un puerto», rellenar una regla válida y pulsar Guardar:
+    // su revisión se prepara para cerrar el detalle al aplicarse. Se cancela
+    // (sin escribir nada) y se cierra el formulario, descartando lo escrito.
+    await reglas.getByRole("button", { name: "Abrir un puerto" }).click();
+    await page.waitForURL((u) => u.pathname === "/ajustes/puertos/reglas");
+    const form = page.locator(".detalle-lateral form.regla-formulario");
+    await form.getByLabel("Nombre", { exact: true }).fill("Temporal");
+    await form.getByLabel("Protocolo", { exact: true }).selectOption("tcp");
+    await form.getByLabel("Puerto de internet", { exact: true }).fill("8443");
+    await form.getByLabel("Dispositivo", { exact: true }).selectOption("192.168.1.62");
+    await form.getByRole("button", { name: "Guardar" }).click();
+    const dialogo = page.locator("dialog[open]");
+    await expect(dialogo.locator("#grupo-titulo")).toHaveText("Revisa el cambio");
+    await dialogo.getByRole("button", { name: "Cancelar" }).click();
+    await expect(page.locator("dialog[open]")).toHaveCount(0);
+    await page.getByRole("button", { name: "Cerrar el detalle" }).click();
+    await page.locator("dialog[open]").getByRole("button", { name: "Descartar los cambios" }).click();
+    await page.waitForURL((u) => u.pathname === "/ajustes/puertos");
+
+    // 2. Abrir desc-1, editar su nombre (sin guardar) y pulsar su propio
+    // interruptor.
+    const desc1 = filas(page).filter({ hasText: "desc-1" });
+    const id = (await desc1.getAttribute("id"))?.replace(/^fila-/, "") ?? "";
+    await desc1.locator(".lista-nombre").click();
+    await page.waitForURL((u) => u.pathname === `/ajustes/puertos/${id}`);
+    const detalle = page.locator(".detalle-lateral");
+    const nombre = detalle.getByLabel("Nombre", { exact: true });
+    await nombre.fill("desc-1 editada");
+    const activa = desc1.getByRole("switch", { name: "Regla desc-1 activa" });
+    await expect(activa).toHaveAttribute("aria-checked", "true");
+    await activa.click();
+    const aviso = page.locator(".avisos-cambio [role=status] .aviso-cambio");
+    await expect(aviso).toContainText("Hecho: el router tiene ya el cambio.", {
+      timeout: plazoDeTest(1),
+    });
+
+    // 3. Su detalle sigue abierto y lo editado no se ha perdido.
+    expect(new URL(page.url()).pathname).toBe(`/ajustes/puertos/${id}`);
+    await expect(detalle).toBeVisible();
+    await expect(detalle.getByLabel("Nombre", { exact: true })).toHaveValue("desc-1 editada");
+    await expect(activa).toHaveAttribute("aria-checked", "false");
+
+    // 4. Dejar el router como estaba: volver a encender y descartar lo editado.
+    await activa.click();
+    await expect(aviso).toContainText("Hecho: el router tiene ya el cambio.", {
+      timeout: plazoDeTest(1),
+    });
+    await page.getByRole("button", { name: "Cerrar el detalle" }).click();
+    await page.locator("dialog[open]").getByRole("button", { name: "Descartar los cambios" }).click();
+    await page.waitForURL((u) => u.pathname === "/ajustes/puertos");
+    expect(errores, "errores o avisos en la consola").toEqual([]);
+  });
+});

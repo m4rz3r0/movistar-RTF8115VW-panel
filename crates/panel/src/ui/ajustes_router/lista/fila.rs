@@ -143,7 +143,7 @@ pub(crate) fn FilaLista(f: Fila, d: DatosLista) -> impl IntoView {
             };
             spawn_local(async move {
                 match preparar_ajuste(p).await {
-                    Ok(g) => s.aplicar(&g, Vec::new(), vec![i.id]),
+                    Ok(g) => s.aplicar(&g, Vec::new(), vec![i.id], false),
                     Err(e) => s.falla(texto_error(&e)),
                 }
             });
