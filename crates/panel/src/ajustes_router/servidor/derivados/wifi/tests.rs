@@ -1,5 +1,6 @@
 //! Pruebas de la insignia de cada red y la nota de su radio.
 
+use super::historial::{PasoDeRed, ultimo_apagado};
 use super::*;
 use ajustes::CatalogoAjustes;
 
