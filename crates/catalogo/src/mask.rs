@@ -1,4 +1,12 @@
-//! Enmascarado de secretos según `secretos.toml`.
+//! Enmascarado de secretos y datos sensibles según `secretos.toml`.
+//!
+//! Dos niveles ([`Nivel`]): los secretos (contraseñas, claves, PIN) van
+//! censurados con el ojo en pantalla; los datos sensibles (usuarios,
+//! números, serie, servidores) se ven en claro en pantalla. Los dos se
+//! enmascaran en los registros, los errores y lo que se guarda sin cifrar:
+//! para eso, [`Mascara::es_protegido`], [`Mascara::oculta`] y
+//! [`Mascara::enmascarar`]; para la pantalla, [`Mascara::es_secreto`] y
+//! [`Mascara::oculta_en_pantalla`].
 
 use hgu::xml::XmlNode;
 use serde::Deserialize;
@@ -11,13 +19,39 @@ pub const MASCARA: &str = "••••••";
 /// Texto de `secretos.toml`.
 pub const SECRETOS_TOML: &str = include_str!("../secretos.toml");
 
-/// Reglas para reconocer nombres de elementos o parámetros secretos.
+/// Nivel de protección de un valor.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Nivel {
+    /// Dato personal o identificador: en claro en pantalla, enmascarado en
+    /// los registros.
+    Sensible,
+    /// Contraseña, clave, PIN o token: censurado con el ojo en pantalla y
+    /// enmascarado en los registros.
+    Secreto,
+}
+
+/// Reglas de un nivel.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Reglas {
+    fragmentos: Vec<String>,
+    exactos: Vec<String>,
+}
+
+/// Reglas para reconocer nombres de elementos o parámetros secretos o
+/// sensibles.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Mascara {
-    fragmentos: Vec<String>,
-    exactos: Vec<String>,
     sufijos_numericos: Vec<String>,
+    secreto: Reglas,
+    sensible: Reglas,
+}
+
+impl Reglas {
+    fn contiene_fragmento(&self, n: &str) -> bool {
+        self.fragmentos.iter().any(|f| n.contains(f.as_str()))
+    }
 }
 
 impl Mascara {
@@ -30,7 +64,13 @@ impl Mascara {
     pub fn from_toml(text: &str) -> Result<Mascara, CatalogoError> {
         let mut m: Mascara =
             toml::from_str(text).map_err(|e| CatalogoError::Toml(format!("secretos.toml: {e}")))?;
-        for v in [&mut m.fragmentos, &mut m.exactos, &mut m.sufijos_numericos] {
+        for v in [
+            &mut m.secreto.fragmentos,
+            &mut m.secreto.exactos,
+            &mut m.sensible.fragmentos,
+            &mut m.sensible.exactos,
+            &mut m.sufijos_numericos,
+        ] {
             for s in v.iter_mut() {
                 *s = s.to_ascii_lowercase();
             }
@@ -43,36 +83,73 @@ impl Mascara {
         Ok(m)
     }
 
-    fn contiene_fragmento(&self, n: &str) -> bool {
-        self.fragmentos.iter().any(|f| n.contains(f.as_str()))
-    }
-
     fn sufijo_numerico(&self, n: &str) -> bool {
         self.sufijos_numericos
             .iter()
             .any(|s| n.ends_with(s.as_str()))
     }
 
-    /// `true` si el valor del elemento o parámetro `nombre` es secreto.
-    /// Los identificadores e indicadores (`*_id`, `*_type`…) no lo son.
+    fn reglas(&self) -> [(Nivel, &Reglas); 2] {
+        [
+            (Nivel::Secreto, &self.secreto),
+            (Nivel::Sensible, &self.sensible),
+        ]
+    }
+
+    /// Nivel del elemento o parámetro `nombre`, o `None` si se ve tal cual.
+    /// Los identificadores e indicadores (`*_id`, `*_type`…) no tienen.
+    pub fn nivel(&self, nombre: &str) -> Option<Nivel> {
+        let n = nombre.to_ascii_lowercase();
+        let numerico = self.sufijo_numerico(&n);
+        self.reglas()
+            .into_iter()
+            .find(|(_, r)| r.exactos.contains(&n) || (!numerico && r.contiene_fragmento(&n)))
+            .map(|(nivel, _)| nivel)
+    }
+
+    /// Nivel del elemento `nombre` con valor `valor`: [`Mascara::nivel`] o,
+    /// con un nombre de un nivel terminado en un sufijo numérico, ese nivel
+    /// si el valor no es un entero.
+    pub fn nivel_de(&self, nombre: &str, valor: &str) -> Option<Nivel> {
+        self.nivel(nombre).or_else(|| {
+            if es_entero(valor) {
+                return None;
+            }
+            let n = nombre.to_ascii_lowercase();
+            self.reglas()
+                .into_iter()
+                .find(|(_, r)| r.contiene_fragmento(&n))
+                .map(|(nivel, _)| nivel)
+        })
+    }
+
+    /// `true` si `nombre` es un secreto de verdad (contraseña, clave, PIN o
+    /// token): en pantalla, censurado con el ojo.
     pub fn es_secreto(&self, nombre: &str) -> bool {
-        let n = nombre.to_ascii_lowercase();
-        self.exactos.contains(&n) || (self.contiene_fragmento(&n) && !self.sufijo_numerico(&n))
+        self.nivel(nombre) == Some(Nivel::Secreto)
     }
 
-    /// `true` si el elemento `nombre` con valor `valor` debe enmascararse:
-    /// [`Mascara::es_secreto`], o un nombre sensible con sufijo numérico cuyo
-    /// valor no es un entero.
+    /// `true` si `nombre` es secreto o sensible: su valor no sale en los
+    /// registros, los errores ni lo que se guarda sin cifrar.
+    pub fn es_protegido(&self, nombre: &str) -> bool {
+        self.nivel(nombre).is_some()
+    }
+
+    /// `true` si el elemento `nombre` con valor `valor` se enmascara en los
+    /// registros, los errores y lo guardado sin cifrar (los dos niveles).
     pub fn oculta(&self, nombre: &str, valor: &str) -> bool {
-        if self.es_secreto(nombre) {
-            return true;
-        }
-        let n = nombre.to_ascii_lowercase();
-        self.contiene_fragmento(&n) && !es_entero(valor)
+        self.nivel_de(nombre, valor).is_some()
     }
 
-    /// Copia del árbol con el texto de los elementos secretos sustituido por
-    /// [`MASCARA`] (también si está vacío, para no revelar que no hay clave).
+    /// `true` si el elemento `nombre` con valor `valor` va censurado en
+    /// pantalla (solo los secretos: los sensibles se ven en claro).
+    pub fn oculta_en_pantalla(&self, nombre: &str, valor: &str) -> bool {
+        self.nivel_de(nombre, valor) == Some(Nivel::Secreto)
+    }
+
+    /// Copia del árbol con el texto de los elementos secretos y sensibles
+    /// sustituido por [`MASCARA`] (también si está vacío, para no revelar
+    /// que no hay clave). Para registros y capturas.
     pub fn enmascarar(&self, node: &XmlNode) -> XmlNode {
         XmlNode {
             tag: node.tag.clone(),
@@ -85,7 +162,7 @@ impl Mascara {
         }
     }
 
-    /// Valor para mostrar o registrar un parámetro.
+    /// Valor para registrar un parámetro (los dos niveles, enmascarados).
     pub fn valor_visible<'a>(&self, nombre: &str, valor: &'a str) -> &'a str {
         if self.oculta(nombre, valor) {
             MASCARA
@@ -123,20 +200,31 @@ mod tests {
             "password",
             "Password",
             "auth_password",
+            "loginPassword",
+            "rqPasswd",
+            "acs_password",
+            "connectionRequestPassword",
+            "gpon_password",
+            "wps_device_pin",
+            "pri_svr_secret",
+            "radius_secret",
+            "api_token",
+            "admin_pwd",
+            "wanppp",
+        ] {
+            assert_eq!(m.nivel(n), Some(Nivel::Secreto), "{n} debería ser secreto");
+            assert!(m.es_secreto(n) && m.es_protegido(n), "{n}");
+        }
+        for n in [
             "auth_username",
             "username",
             "UserName",
-            "loginPassword",
-            "rqPasswd",
             "rqUser",
             "acs_URL",
             "acs_username",
-            "acs_password",
             "connectionRequestURL",
             "connectionRequestUsername",
-            "connectionRequestPassword",
             "GponSerialNumber",
-            "gpon_password",
             "AcsSerialNumber",
             "directory_number",
             "call_forward_unconditional_number",
@@ -144,15 +232,16 @@ mod tests {
             "conference_call_domain_uri",
             "proxy_server_cfg",
             "outbound_proxy_cfg",
-            "wps_device_pin",
-            "pri_svr_secret",
-            "radius_secret",
-            "api_token",
-            "admin_pwd",
             "user_agent_domain",
             "rqDelList",
+            "account",
         ] {
-            assert!(m.es_secreto(n), "{n} debería ser secreto");
+            assert_eq!(
+                m.nivel(n),
+                Some(Nivel::Sensible),
+                "{n} debería ser sensible"
+            );
+            assert!(!m.es_secreto(n) && m.es_protegido(n), "{n}");
         }
         for n in [
             "dpm_cfg_wifi_ssid_id",
@@ -175,8 +264,35 @@ mod tests {
             "mapping",
             "description",
         ] {
-            assert!(!m.es_secreto(n), "{n} no debería ser secreto");
+            assert_eq!(m.nivel(n), None, "{n} no debería estar protegido");
+            assert!(!m.es_protegido(n), "{n}");
         }
+    }
+
+    /// En pantalla solo se censuran los secretos; en los registros, los dos
+    /// niveles.
+    #[test]
+    fn pantalla_solo_secretos_registros_los_dos() {
+        let m = m();
+        assert!(m.oculta_en_pantalla("acs_password", "x"));
+        assert!(m.oculta("acs_password", "x"));
+        assert!(!m.oculta_en_pantalla("acs_username", "usuario"));
+        assert!(m.oculta("acs_username", "usuario"));
+        assert_eq!(m.valor_visible("acs_URL", "https://acs.example"), MASCARA);
+        // Un sufijo numérico con texto: su nivel.
+        assert_eq!(m.nivel_de("wep_key1_type", "abc"), Some(Nivel::Secreto));
+        assert_eq!(m.nivel_de("serial_type", "abc"), Some(Nivel::Sensible));
+        assert_eq!(m.nivel_de("serial_type", "2"), None);
+        assert!(!m.oculta_en_pantalla("serial_type", "abc"));
+        let n = parse_response(
+            "cbX",
+            "<Response><cbX><Result>0</Result><acs_URL>https://acs.example</acs_URL>\
+             <acs_password>p</acs_password></cbX></Response>",
+        )
+        .unwrap();
+        let e = m.enmascarar(&n);
+        assert_eq!(e.text_of("acs_URL"), Some(MASCARA));
+        assert_eq!(e.text_of("acs_password"), Some(MASCARA));
     }
 
     #[test]
@@ -252,7 +368,7 @@ mod tests {
             hojas(&e, &mut b);
             assert_eq!(a.len(), b.len());
             for (o, n) in a.iter().zip(&b) {
-                if m.es_secreto(&o.tag) {
+                if m.es_protegido(&o.tag) {
                     assert_eq!(n.text, MASCARA, "{f}: <{}> visible", o.tag);
                     vistos.insert(o.tag.to_ascii_lowercase());
                 } else if !m.oculta(&o.tag, &o.text) {

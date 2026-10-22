@@ -44,7 +44,10 @@ impl ChangeManager {
             let (diff, sin_cambios) = match self.planificar(&p.req, explicito).await {
                 Ok(plan) => {
                     riesgo = riesgo.max(Some(plan.funcion.riesgo));
-                    (visible(&plan.campos), false)
+                    (
+                        para_mostrar(&plan.funcion, &self.state.mascara, &plan.campos),
+                        false,
+                    )
                 }
                 Err(CambioError::SinCambios) => (Diff::default(), true),
                 Err(e) => return Err(e),

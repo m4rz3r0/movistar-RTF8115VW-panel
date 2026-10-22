@@ -94,9 +94,16 @@ const CAMPOS_RESERVADOS: [&str; 3] = ["titulo", "desc", "ayuda"];
 /// Claves de opción que darían las del propio campo (`<p>-<campo>-desc`…).
 const OPCIONES_RESERVADAS: [&str; 2] = ["desc", "recomendado"];
 
-/// El parámetro es secreto por su tipo o por la máscara.
+/// El parámetro es una credencial (va en un campo `secreto`, censurado con
+/// el ojo) por su tipo o por la máscara.
 fn es_secreto(p: &Parametro, m: &Mascara) -> bool {
     p.tipo == TipoParam::Secret || m.es_secreto(&p.nombre)
+}
+
+/// El parámetro es secreto o un dato sensible (un usuario, una URL): el
+/// gestor lo cifra y lo enmascara al guardar y lo bloquea en la web básica.
+fn es_protegido(p: &Parametro, m: &Mascara) -> bool {
+    es_secreto(p, m) || m.es_protegido(&p.nombre)
 }
 
 fn comprobar_ajuste(a: &Ajuste, f: &Catalogo, m: &Mascara, fallos: &mut Vec<String>) {
@@ -136,7 +143,7 @@ fn comprobar_ajuste(a: &Ajuste, f: &Catalogo, m: &Mascara, fallos: &mut Vec<Stri
                         "{id}: la lectura {} no tiene el parámetro {k}",
                         l.name
                     )),
-                    Some(p) if es_secreto(p, m) => {
+                    Some(p) if es_protegido(p, m) => {
                         fallos.push(format!("{id}: el parámetro de lectura {k} es secreto"));
                     }
                     Some(_) => {}
@@ -245,7 +252,7 @@ fn comprobar_fijos(a: &Ajuste, f: &Catalogo, m: &Mascara, fallos: &mut Vec<Strin
         fallos.push(format!("{id}: fijos en un ajuste que no escribe"));
     }
     for k in a.fijos.keys() {
-        if m.es_secreto(k) {
+        if m.es_protegido(k) {
             fallos.push(format!("{id}: el fijo {k} es secreto"));
         }
         if a.campos
@@ -259,7 +266,7 @@ fn comprobar_fijos(a: &Ajuste, f: &Catalogo, m: &Mascara, fallos: &mut Vec<Strin
         for func in funciones.iter().filter_map(|n| f.funcion(n)) {
             match func.parametro(k) {
                 None => fallos.push(format!("{id}: {} no tiene el fijo {k}", func.name)),
-                Some(p) if p.tipo == TipoParam::Secret && !m.es_secreto(k) => {
+                Some(p) if p.tipo == TipoParam::Secret && !m.es_protegido(k) => {
                     fallos.push(format!("{id}: el fijo {k} es secreto"));
                 }
                 Some(_) => {}
@@ -271,7 +278,7 @@ fn comprobar_fijos(a: &Ajuste, f: &Catalogo, m: &Mascara, fallos: &mut Vec<Strin
 /// El parámetro de instancia de una lista (el id que identifica cada
 /// instancia en la interfaz) no es secreto.
 fn comprobar_id_de_lista(a: &Ajuste, func: &Funcion, m: &Mascara, fallos: &mut Vec<String>) {
-    if let Some(l) = func.lista.as_ref().filter(|l| m.es_secreto(&l.id_param)) {
+    if let Some(l) = func.lista.as_ref().filter(|l| m.es_protegido(&l.id_param)) {
         let fallo = format!(
             "{}: el parámetro de instancia {} de {} es secreto",
             a.id, l.id_param, func.name
@@ -329,13 +336,19 @@ fn comprobar_campo(a: &Ajuste, c: &Campo, f: &Catalogo, m: &Mascara, fallos: &mu
     if a.lista && func.lista.is_none() {
         mal(format!("lista = true, pero {nombre_f} no es una lista"));
     }
-    // 8. Secretos de la web básica: se quedan en solo lectura. Es el único
-    // caso en que un campo de solo lectura conserva su `escribe`.
+    // 8. Secretos (y datos sensibles, que el gestor también bloquea) de la
+    // web básica: se quedan en solo lectura. Es el único caso en que un
+    // campo de solo lectura conserva su `escribe`.
     let basica = func.origen == Origen::Basica || !nombre_f.starts_with("cb");
-    let secreto_basico = campo_secreto && basica;
+    let protegido = campo_secreto
+        || func
+            .parametro(&e.parametro)
+            .is_some_and(|p| es_protegido(p, m));
+    let secreto_basico = protegido && basica;
     if secreto_basico && c.solo_lectura.is_none() {
         mal(format!(
-            "secreto que solo escribe la web básica ({nombre_f}): necesita solo_lectura"
+            "secreto o dato sensible que solo escribe la web básica ({nombre_f}): \
+             necesita solo_lectura"
         ));
     } else if !secreto_basico && c.solo_lectura.is_some() {
         mal(
@@ -390,11 +403,11 @@ fn comprobar_campo(a: &Ajuste, c: &Campo, f: &Catalogo, m: &Mascara, fallos: &mu
             mal(format!("{nombre_f} no tiene el parámetro {}", ad.parametro));
             continue;
         };
-        if es_secreto(pa, m) {
+        if es_protegido(pa, m) {
             mal(format!("el parámetro {} es secreto", pa.nombre));
             continue;
         }
-        if m.es_secreto(&ad.lee) {
+        if m.es_protegido(&ad.lee) {
             mal(format!("el elemento leído {} es secreto", ad.lee));
         }
         if !compatibles(TipoCampo::Opcion, pa) {

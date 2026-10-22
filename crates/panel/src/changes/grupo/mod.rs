@@ -38,8 +38,9 @@ pub struct GrupoRequest {
     pub titulo: Option<String>,
 }
 
-/// Un paso preparado: su diff (secretos enmascarados) o `sin_cambios` si el
-/// router ya está así (se omitirá al confirmar).
+/// Un paso preparado: su diff para la pantalla (las credenciales
+/// enmascaradas y los datos sensibles en claro, `plan::para_mostrar`) o
+/// `sin_cambios` si el router ya está así (se omitirá al confirmar).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PasoPreparado {
     /// Posición en el grupo (desde 0); es la que se desmarca al confirmar.

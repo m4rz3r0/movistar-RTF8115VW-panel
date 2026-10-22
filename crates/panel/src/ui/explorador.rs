@@ -590,19 +590,42 @@ fn vista_valores(v: Vista) -> impl IntoView + use<> {
             }
         })
         .collect_view();
-    let crudo = v.crudo.map(|x| {
-        view! {
-            <details class="crudo">
-                <summary>{t!("biblioteca-xml")}</summary>
-                <pre class="mono">{x}</pre>
-            </details>
-        }
-    });
+    let crudo = v.crudo.map(|x| xml_respuesta(x, v.crudo_con_claves));
     view! {
         {vacia.then(|| view! { <p class="estado-espera">{t!("biblioteca-sin-datos")}</p> })}
         {pares}
         {grupos}
         {crudo}
+    }
+}
+
+/// El XML de la respuesta, plegado: los secretos enmascarados y, si hay
+/// alguno, un botón que los muestra u oculta al instante, como el ojo de un
+/// campo (`con_claves` ya viaja con la página, que va con `no-store`).
+fn xml_respuesta(crudo: String, con_claves: Option<String>) -> impl IntoView + use<> {
+    let visibles = RwSignal::new(false);
+    let boton = con_claves.is_some().then(|| {
+        view! {
+            <button
+                class="boton-sutil boton-claves-xml"
+                type="button"
+                aria-pressed=move || visibles.get().to_string()
+                on:click=move |_| visibles.update(|v| *v = !*v)
+            >
+                {move || if visibles.get() { t!("biblioteca-xml-ocultar-claves") } else { t!("biblioteca-xml-mostrar-claves") }}
+            </button>
+        }
+    });
+    let texto = move || match (&con_claves, visibles.get()) {
+        (Some(c), true) => c.clone(),
+        _ => crudo.clone(),
+    };
+    view! {
+        <details class="crudo">
+            <summary>{t!("biblioteca-xml")}</summary>
+            {boton}
+            <pre class="mono">{texto}</pre>
+        </details>
     }
 }
 

@@ -142,6 +142,7 @@ fn resumen_legible_de_una_opcion_con_ademas() {
             antes: "99".into(),
             despues: "3".into(),
             secreto: false,
+            sensible: false,
         }],
     };
     let pedido = mapa(&[("authentication", "3"), ("encryption", "4")]);

@@ -47,7 +47,7 @@ fijos = { interwork_id = "0" }
 id = "usuario"
 escribe = { funcion = "cbSetVoiceLine", parametro = "auth_username" }
 lee = "auth_username"
-tipo = "secreto"
+tipo = "texto"
 validar = { min = 1 }
 
 [[ajuste.campo]]
@@ -60,7 +60,7 @@ tipo = "booleano"
 id = "numero_directo"
 escribe = { funcion = "cbSetVoiceLine", parametro = "warmline_hotline_number" }
 lee = "warmline_hotline_number"
-tipo = "secreto"
+tipo = "texto"
 validar = { min = 1 }
 
 [[ajuste.campo]]
@@ -110,14 +110,14 @@ recomendado = "true"
 id = "dominio"
 escribe = { funcion = "cbSetVoiceSip", parametro = "user_agent_domain" }
 lee = "user_agent_domain"
-tipo = "secreto"
+tipo = "texto"
 validar = { min = 1, max = 253, ascii = true }
 
 [[ajuste.campo]]
 id = "servidor"
 escribe = { funcion = "cbSetVoiceSip", parametro = "proxy_server_cfg" }
 lee = "proxy_server_cfg"
-tipo = "secreto"
+tipo = "texto"
 validar = { min = 1, max = 253, ascii = true }
 
 [[ajuste.campo]]
@@ -131,7 +131,7 @@ validar = { min = 1, max = 65535 }
 id = "registro"
 escribe = { funcion = "cbSetVoiceSip", parametro = "registrar_server_cfg" }
 lee = "registrar_server_cfg"
-tipo = "secreto"
+tipo = "texto"
 validar = { min = 1, max = 253, ascii = true }
 
 [[ajuste.campo]]
@@ -145,7 +145,7 @@ validar = { min = 1, max = 65535 }
 id = "salida"
 escribe = { funcion = "cbSetVoiceSip", parametro = "outbound_proxy_cfg" }
 lee = "outbound_proxy_cfg"
-tipo = "secreto"
+tipo = "texto"
 validar = { min = 1, max = 253, ascii = true }
 
 [[ajuste.campo]]

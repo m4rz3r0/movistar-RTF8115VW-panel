@@ -94,12 +94,17 @@ pub struct CampoDiff {
     pub antes: String,
     pub despues: String,
     pub secreto: bool,
+    /// Dato sensible en claro (un usuario, una URL): solo en el diff para la
+    /// pantalla de un cambio preparado, nunca en el guardado (ahí va como
+    /// `secreto`). Su `Debug` también lo tapa.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub sensible: bool,
 }
 
 impl std::fmt::Debug for CampoDiff {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let valor = |v: &str| {
-            if self.secreto {
+            if self.secreto || self.sensible {
                 "***".to_owned()
             } else {
                 v.to_owned()
@@ -355,6 +360,7 @@ mod tests {
             antes: "clave-de-antes".into(),
             despues: "clave-en-claro".into(),
             secreto: true,
+            sensible: false,
         };
         let d = format!("{c:?}");
         assert!(
@@ -368,6 +374,30 @@ mod tests {
         assert!(
             format!("{c:?}").contains("clave-en-claro"),
             "lo que no es secreto, sí"
+        );
+        // Un dato sensible en claro (el diff para la pantalla) tampoco sale
+        // en un registro.
+        let c = CampoDiff {
+            nombre: "acs_username".into(),
+            antes: "usuario-de-antes".into(),
+            despues: "usuario-nuevo".into(),
+            secreto: false,
+            sensible: true,
+        };
+        let d = format!("{c:?}");
+        assert!(
+            !d.contains("usuario-nuevo") && !d.contains("usuario-de-antes"),
+            "{d}"
+        );
+        // Y no se guarda marcado: el diff guardado no cambia de forma.
+        let guardado = CampoDiff {
+            sensible: false,
+            ..c
+        };
+        assert!(
+            !serde_json::to_string(&guardado)
+                .unwrap()
+                .contains("sensible")
         );
     }
 }

@@ -41,6 +41,10 @@
   cursor: pointer;
 }
 
+.crudo .boton-claves-xml {
+  margin-top: var(--esp-2);
+}
+
 .crudo pre {
   max-height: 420px;
   margin: var(--esp-2) 0 0;

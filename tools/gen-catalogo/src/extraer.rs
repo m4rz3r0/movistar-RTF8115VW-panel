@@ -1179,6 +1179,7 @@ function delX(id) { var obj = { "x_id": id }; obj["del"] = "DEL";
 <input name="mac-0"><input name="mac-1"><input name="mac-2"><input name="mac-3"><input name="mac-4"><input name="mac-5">
 <select name="mode"><option value="a">A</option><option value="b">B</option></select>
 <input type="checkbox" name="wmm">WMM <input type="text" name="key_phrase"> <input type="hidden" name="x_id">
+<input type="text" name="acs_username"><input type="text" name="acs_URL">
 <input type="submit" value="Apply"></form>"#,
             ),
         };
@@ -1193,6 +1194,10 @@ function delX(id) { var obj = { "x_id": id }; obj["del"] = "DEL";
         assert_eq!(por("mode").opciones[1], ("b".into(), "B".into()));
         assert_eq!(por("wmm").tipo, TipoParam::Bool);
         assert_eq!(por("key_phrase").tipo, TipoParam::Secret);
+        // Un usuario o una URL es texto, que se ve en claro; solo las
+        // credenciales son secretas.
+        assert_eq!(por("acs_username").tipo, TipoParam::Text);
+        assert_eq!(por("acs_URL").tipo, TipoParam::Text);
         assert_eq!(por("x_id").tipo, TipoParam::Int);
         assert!(c.iter().all(|c| !c.nombre.contains('-')));
     }

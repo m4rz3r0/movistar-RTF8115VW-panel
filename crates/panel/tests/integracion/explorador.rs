@@ -190,8 +190,10 @@ async fn formulario_static_lease_rellena_valores() {
     assert_eq!(status, 400);
 }
 
-/// Review Focus #1: el formulario enviado sin tocar el secreto (que llega
-/// como MASCARA) nunca escribe MASCARA y conserva el valor actual.
+/// Review Focus #1: el formulario trae el valor del secreto para el campo
+/// censurado con el ojo (con `no-store`); enviado sin tocar (el navegador lo
+/// devuelve como MASCARA, o con su mismo valor), nunca escribe MASCARA y
+/// conserva el valor actual.
 #[tokio::test]
 async fn preparar_con_secreto_sin_tocar_no_cambia_secreto() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
@@ -213,8 +215,11 @@ async fn preparar_con_secreto_sin_tocar_no_cambia_secreto() {
     )
     .await;
     assert_eq!(f["operacion"], "Editar");
-    assert_eq!(campo(&f, "key_phrase").unwrap()["valor"], MASCARA);
-    assert!(!f.to_string().contains(&clave_actual));
+    assert_eq!(
+        campo(&f, "key_phrase").unwrap()["valor"],
+        clave_actual.as_str()
+    );
+    assert_eq!(campo(&f, "key_phrase").unwrap()["sin_leer"], false);
     // Lo que la lectura no muestra no se ofrece (el gestor lo rechazaría).
     assert!(campo(&f, "validation_only").is_none());
     assert!(
@@ -236,6 +241,18 @@ async fn preparar_con_secreto_sin_tocar_no_cambia_secreto() {
     .await;
     assert_eq!(status, 400, "{body}");
     assert!(body.contains("No hay nada que cambiar"), "{body}");
+    // Ni devolviendo la clave tal cual llegó.
+    let mut valores = valores_de(&f);
+    fijar(&mut valores, "key_phrase", &clave_actual);
+    let (status, body) = llamar(
+        &p,
+        "preparar_cambio",
+        json!({ "peticion": { "funcion": "cbSetWifiAccPt", "instancia": null,
+                              "valores": valores, "borrar": false } }),
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(status, 400, "{body}");
 
     // Cambiando solo el SSID: el diff no incluye el secreto.
     let mut valores = valores_de(&f);

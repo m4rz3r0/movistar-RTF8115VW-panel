@@ -4,7 +4,7 @@ use super::{Panel, ok};
 use serde_json::{Value, json};
 
 /// Valores de un formulario tal como llegan (más sus claves), para enviarlos
-/// sin tocar.
+/// sin tocar, como lo haría el navegador (los secretos, como MASCARA).
 pub fn valores_de(form: &Value) -> Vec<(String, String)> {
     let mut v: Vec<(String, String)> = form["claves"]
         .as_array()
@@ -12,11 +12,15 @@ pub fn valores_de(form: &Value) -> Vec<(String, String)> {
         .iter()
         .map(|c| (c[0].as_str().unwrap().into(), c[1].as_str().unwrap().into()))
         .collect();
+    let editar = form["operacion"] == "Editar";
     for c in form["campos"].as_array().unwrap() {
-        v.push((
-            c["param"]["nombre"].as_str().unwrap().into(),
-            c["valor"].as_str().unwrap().into(),
-        ));
+        // Como el navegador: un secreto sin tocar va como MASCARA.
+        let valor = if editar && c["param"]["tipo"] == "Secret" {
+            "••••••"
+        } else {
+            c["valor"].as_str().unwrap()
+        };
+        v.push((c["param"]["nombre"].as_str().unwrap().into(), valor.into()));
     }
     v
 }

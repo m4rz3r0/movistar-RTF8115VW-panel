@@ -291,7 +291,8 @@ fn secretos_catalogo(catalogo: &catalogo::Catalogo) -> HashSet<String> {
         .collect()
 }
 
-/// Reglas de enmascarado: `secretos.toml` más los secretos del catálogo.
+/// Qué se censura en pantalla: los secretos de `secretos.toml` más los del
+/// catálogo. Los datos sensibles (usuarios, URL, números) se ven en claro.
 pub(crate) struct Ocultar {
     mascara: Arc<catalogo::mask::Mascara>,
     catalogo: HashSet<String>,
@@ -309,8 +310,11 @@ impl Ocultar {
         }
     }
 
-    fn oculto(&self, nombre: &str, valor: &str) -> bool {
-        self.mascara.oculta(nombre, valor) || self.catalogo.contains(&nombre.to_ascii_lowercase())
+    /// ¿Va censurado en pantalla? Solo un secreto (por la máscara o el
+    /// catálogo).
+    pub(crate) fn oculto(&self, nombre: &str, valor: &str) -> bool {
+        self.mascara.oculta_en_pantalla(nombre, valor)
+            || self.catalogo.contains(&nombre.to_ascii_lowercase())
     }
 
     /// Valor de una lectura: un secreto va con su valor, para el campo
@@ -385,7 +389,9 @@ fn aplanar<'a>(n: &'a XmlNode, prefijo: &str, out: &mut Campos<'a>) {
     }
 }
 
-fn xml_enmascarado(o: &Ocultar, n: &XmlNode, nivel: usize, out: &mut String) {
+/// El XML de `n`, sangrado, para leerlo en pantalla: con los secretos
+/// enmascarados o, con `o = None`, tal cual (para «Mostrar claves»).
+fn xml_legible(o: Option<&Ocultar>, n: &XmlNode, nivel: usize, out: &mut String) {
     let sangria = "  ".repeat(nivel);
     let escapar = |s: &str| {
         s.replace('&', "&amp;")
@@ -393,7 +399,7 @@ fn xml_enmascarado(o: &Ocultar, n: &XmlNode, nivel: usize, out: &mut String) {
             .replace('>', "&gt;")
     };
     if n.children.is_empty() {
-        let texto = if o.oculto(&n.tag, &n.text) {
+        let texto = if o.is_some_and(|o| o.oculto(&n.tag, &n.text)) {
             MASCARA.to_owned()
         } else {
             escapar(&n.text)
@@ -402,7 +408,7 @@ fn xml_enmascarado(o: &Ocultar, n: &XmlNode, nivel: usize, out: &mut String) {
     } else {
         out.push_str(&format!("{sangria}<{}>\n", n.tag));
         for c in &n.children {
-            xml_enmascarado(o, c, nivel + 1, out);
+            xml_legible(o, c, nivel + 1, out);
         }
         out.push_str(&format!("{sangria}</{}>\n", n.tag));
     }
@@ -477,10 +483,14 @@ fn vista_xml(o: &Ocultar, f: &Funcion, n: &XmlNode) -> Vista {
         })
         .collect();
     let mut crudo = String::new();
-    xml_enmascarado(o, n, 0, &mut crudo);
+    xml_legible(Some(o), n, 0, &mut crudo);
+    let mut con_claves = String::new();
+    xml_legible(None, n, 0, &mut con_claves);
     Vista {
         pares,
         grupos,
+        // Solo si hay algo censurado: es lo que muestra «Mostrar claves».
+        crudo_con_claves: (con_claves != crudo).then_some(con_claves),
         crudo: Some(crudo),
     }
 }
@@ -558,6 +568,7 @@ pub async fn leer(
                 .collect(),
             grupos: Vec::new(),
             crudo: None,
+            crudo_con_claves: None,
         },
     })
 }
@@ -649,17 +660,25 @@ pub async fn formulario(
                 String::new()
             }
         };
+        let mut sin_leer = false;
         let valor = match (operacion, cur) {
             (Operacion::Accion, _) => nuevo(),
             (Operacion::Crear, Some(_)) => nuevo(),
             (Operacion::Crear, None) if actual.is_empty() => nuevo(),
-            (Operacion::Editar, Some(v)) => {
-                if p.tipo == TipoParam::Secret || o.oculto(&p.nombre, v) {
-                    MASCARA.to_owned()
+            // Un secreto, con su valor para el campo censurado con el ojo
+            // (la respuesta va con `no-store`); el navegador lo devuelve
+            // como MASCARA si no se toca. Si el router no deja leerlo, vacío.
+            (Operacion::Editar, Some(v)) if p.tipo == TipoParam::Secret => {
+                sin_leer =
+                    crate::changes::plan::enmascarado(v) || (p.tapado && v.trim().is_empty());
+                if sin_leer {
+                    String::new()
                 } else {
                     v.to_owned()
                 }
             }
+            (Operacion::Editar, Some(v)) if o.oculto(&p.nombre, v) => MASCARA.to_owned(),
+            (Operacion::Editar, Some(v)) => v.to_owned(),
             (_, None) => {
                 omitidos.push(p.nombre.clone());
                 continue;
@@ -668,6 +687,7 @@ pub async fn formulario(
         campos.push(CampoForm {
             param: param_vista(f, p),
             valor,
+            sin_leer,
         });
     }
     Ok(FormVista {
@@ -952,6 +972,7 @@ mod tests {
             antes: antes.into(),
             despues: despues.into(),
             secreto: false,
+            sensible: false,
         }
     }
 

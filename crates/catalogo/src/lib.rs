@@ -366,4 +366,21 @@ riesgo = "bajo"
         let wl = c.funcion("te_wifi.wl").unwrap();
         assert_eq!(wl.parametro("wlWpaPsk").unwrap().tipo, TipoParam::Secret);
     }
+
+    /// Solo las credenciales son `secret` (censuradas con el ojo): un
+    /// usuario, una URL o un número es texto, que se ve en claro.
+    #[test]
+    fn solo_las_credenciales_son_secret() {
+        let c = cat();
+        let m = mask::Mascara::load().unwrap();
+        let mut mal = Vec::new();
+        for f in c.todas() {
+            for p in f.parametros.iter().filter(|p| p.tipo == TipoParam::Secret) {
+                if !m.es_secreto(&p.nombre) {
+                    mal.push(format!("{}.{}", f.name, p.nombre));
+                }
+            }
+        }
+        assert!(mal.is_empty(), "secret sin ser credencial: {mal:?}");
+    }
 }
