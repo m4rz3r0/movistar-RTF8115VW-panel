@@ -1,6 +1,6 @@
 [package]
 name = "panel"
-version = "0.3.0"
+version = "0.3.1"
 description = "Panel web (Leptos + Axum) para gestionar el router Askey RTF8115VW"
 edition.workspace = true
 rust-version.workspace = true
