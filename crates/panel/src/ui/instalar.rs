@@ -2,7 +2,8 @@
 //! lectura inicial y, para terminar, enlace a los parámetros opcionales de la
 //! instancia.
 
-use super::{Estado, Insignia, mensaje_del_servidor};
+use super::comun::{EstadoVisual, Insignia};
+use super::mensaje_del_servidor;
 use crate::instalar::{
     EstadoInstalacion, InfoRouter, ResumenFoto, crear_admin, fase_instalacion, guardar_router,
     lectura_inicial, probar_router, url_sugerida,
@@ -188,7 +189,7 @@ fn PasoAdmin(paso: RwSignal<Paso>, token: RwSignal<String>) -> impl IntoView {
                 None,
             )}
             {error_de(error)}
-            <button class="boton" type="submit" disabled=move || pendiente.get()>
+            <button class="b-pri" type="submit" disabled=move || pendiente.get()>
                 {t!("instalar-crear-admin")}
             </button>
         </form>
@@ -198,9 +199,9 @@ fn PasoAdmin(paso: RwSignal<Paso>, token: RwSignal<String>) -> impl IntoView {
 /// Modelo, firmware y si está probado.
 fn detectado(i: &InfoRouter) -> impl IntoView + use<> {
     let (estado, nota) = if i.probado {
-        (Estado::Ok, t!("instalar-firmware-probado"))
+        (EstadoVisual::Emite, t!("instalar-firmware-probado"))
     } else {
-        (Estado::Aviso, t!("instalar-firmware-no-probado"))
+        (EstadoVisual::Atencion, t!("instalar-firmware-no-probado"))
     };
     view! {
         <div class="instalar-detectado" role="status">
@@ -316,14 +317,14 @@ fn PasoRouter(
             {error_de(error)}
             <div class="instalar-botones">
                 <button
-                    class="boton-sutil"
+                    class="b-sec"
                     type="button"
                     disabled=move || pendiente.get()
                     on:click=move |_| llamar(false)
                 >
                     {t!("instalar-probar")}
                 </button>
-                <button class="boton" type="submit" disabled=move || pendiente.get()>
+                <button class="b-pri" type="submit" disabled=move || pendiente.get()>
                     {t!("instalar-guardar")}
                 </button>
             </div>
@@ -360,7 +361,7 @@ fn PasoLectura(
         {move || info.get().map(|i| detectado(&i))}
         <p class="pagina-sub">{t!("instalar-lectura-texto")}</p>
         {error_de(error)}
-        <button class="boton" type="button" disabled=move || pendiente.get() on:click=leer>
+        <button class="b-pri" type="button" disabled=move || pendiente.get() on:click=leer>
             {move || if pendiente.get() { t!("instalar-leyendo") } else { t!("instalar-leer") }}
         </button>
     }
@@ -373,7 +374,7 @@ fn PasoFin(resumen: RwSignal<Option<ResumenFoto>>) -> impl IntoView {
             let fallidas = (!r.fallidas.is_empty()).then(|| {
                 view! {
                     <Insignia
-                        estado=Estado::Aviso
+                        estado=EstadoVisual::Atencion
                         texto=t!("instalar-fallidas", n = r.fallidas.len())
                     />
                 }
@@ -399,7 +400,7 @@ fn PasoFin(resumen: RwSignal<Option<ResumenFoto>>) -> impl IntoView {
             {detalle}
         </div>
         <div class="instalar-botones">
-            <a class="boton" href="/" rel="external">{t!("instalar-ir-estado")}</a>
+            <a class="b-pri" href="/" rel="external">{t!("instalar-ir-estado")}</a>
         </div>
     }
 }

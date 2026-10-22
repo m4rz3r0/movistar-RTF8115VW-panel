@@ -33,7 +33,7 @@
   padding: var(--esp-1) var(--esp-3);
   border: 1px solid var(--borde);
   border-radius: var(--radio);
-  background: var(--superficie-2);
-  color: var(--texto-1);
+  background: var(--sup2);
+  color: var(--texto);
   font-size: 0.875rem;
 }

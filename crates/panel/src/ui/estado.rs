@@ -26,11 +26,12 @@ use tablas::Tablas;
 
 use crate::t;
 use crate::ui::{
-    Estado, IconoEstado, IconosOcultos, Insignia,
+    Estado, IconoEstado, IconosOcultos,
     charts::{
         Corte, FranjaDisponibilidad, Indicador, Serie, SerieTemporal, Tono, Unidad, formato_bps,
         formato_decimal, formato_duracion, formato_fecha_hora, formato_hora,
     },
+    comun::{EstadoVisual, Insignia},
     table::{Celda, Columna, Tabla},
     vista::{SelectorVista, use_vista},
 };

@@ -24,8 +24,9 @@ pub(crate) use dialogo::abrir_modal;
 pub use dialogo::{DialogoCambio, TablaDiff};
 
 use crate::t;
+use crate::ui::comun::{EstadoVisual, Insignia};
 use crate::ui::secreto::SecretoLeido;
-use crate::ui::{Estado, IconoEstado, Insignia};
+use crate::ui::{Estado, IconoEstado};
 use formulario::Escritura;
 use leptos::prelude::*;
 use leptos_router::{
@@ -69,7 +70,7 @@ fn Etiquetas(f: FuncionResumen) -> impl IntoView {
             <span class=origen_clase title=f.origen.ayuda()>
                 {f.origen.etiqueta()}
             </span>
-            {f.bloqueada.is_some().then(|| view! { <Insignia estado=Estado::Error texto=t!("biblioteca-bloqueada") /> })}
+            {f.bloqueada.is_some().then(|| view! { <Insignia estado=EstadoVisual::Peligro texto=t!("biblioteca-bloqueada") /> })}
         </span>
     }
 }
@@ -607,7 +608,7 @@ fn xml_respuesta(crudo: String, con_claves: Option<String>) -> impl IntoView + u
     let boton = con_claves.is_some().then(|| {
         view! {
             <button
-                class="boton-sutil boton-claves-xml"
+                class="b-sec boton-claves-xml"
                 type="button"
                 aria-pressed=move || visibles.get().to_string()
                 on:click=move |_| visibles.update(|v| *v = !*v)
@@ -755,7 +756,7 @@ fn VistaLectura(detalle: FuncionDetalle) -> impl IntoView {
             <form class="formulario formulario-lectura" on:submit=leer_de_nuevo>
                 {hay_params.then(|| view! { <div class="rejilla-campos">{entradas}</div> })}
                 <div class="formulario-pie">
-                    <button class="boton-sutil" type="submit" disabled=move || leyendo.get()>
+                    <button class="b-sec" type="submit" disabled=move || leyendo.get()>
                         {move || if leyendo.get() { t!("biblioteca-leyendo") } else { t!("biblioteca-leer-de-nuevo") }}
                     </button>
                 </div>

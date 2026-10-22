@@ -7,7 +7,7 @@
   min-height: 100vh;
   padding: var(--esp-4);
   background:
-    radial-gradient(60rem 30rem at 50% -10%, rgb(255 176 0 / 0.07), transparent 70%),
+    radial-gradient(60rem 30rem at 50% -10%, color-mix(in srgb, var(--acento) 7%, transparent), transparent 70%),
     var(--fondo);
 }
 
@@ -17,10 +17,10 @@
   gap: var(--esp-4);
   width: min(100%, 380px);
   padding: var(--esp-6);
-  background: var(--superficie-1);
+  background: var(--sup);
   border: 1px solid var(--borde);
   border-radius: var(--radio);
-  box-shadow: 0 24px 48px rgb(0 0 0 / 0.35);
+  box-shadow: var(--sombra-flotante);
 }
 
 .acceso-cabeza {
@@ -47,7 +47,7 @@
   padding: 0;
   list-style: none;
   counter-reset: paso;
-  color: var(--texto-2);
+  color: var(--suave);
   font-size: 12px;
 }
 
@@ -60,7 +60,7 @@
 }
 
 .instalar-pasos li[aria-current] {
-  color: var(--acento);
+  color: var(--acento-texto);
   font-weight: 600;
 }
 
@@ -79,12 +79,12 @@
 
 .acceso .nota {
   margin: 0;
-  color: var(--texto-2);
+  color: var(--suave);
   font-size: 12px;
 }
 
 .acceso-marca {
-  color: var(--acento);
+  color: var(--acento-texto);
   font-family: var(--fuente-titulos);
   font-weight: 600;
   font-size: 13px;
@@ -104,7 +104,7 @@
 }
 
 .campo label {
-  color: var(--texto-2);
+  color: var(--suave);
   font-size: 12px;
   font-weight: 500;
 }
@@ -119,7 +119,7 @@ input {
   border: 1px solid var(--borde);
   border-radius: var(--radio);
   background: var(--fondo);
-  color: var(--texto-1);
+  color: var(--texto);
 }
 
 .campo input:hover {
@@ -133,7 +133,7 @@ input {
 
 .acceso .error {
   min-height: 1.5em;
-  color: var(--error);
+  color: var(--peligro);
   font-size: 13px;
 }
 

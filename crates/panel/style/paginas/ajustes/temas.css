@@ -32,19 +32,19 @@
   padding: 0 var(--esp-3);
   margin-bottom: -1px;
   border-bottom: 2px solid transparent;
-  color: var(--texto-2);
+  color: var(--suave);
   font-weight: 500;
   text-decoration: none;
   transition: color 120ms ease, border-color 120ms ease;
 }
 
 .temas a:hover {
-  color: var(--texto-1);
+  color: var(--texto);
 }
 
 .temas a[aria-current="page"] {
   border-bottom-color: var(--acento);
-  color: var(--texto-1);
+  color: var(--texto);
 }
 
 .temas-selector {
@@ -63,7 +63,7 @@
 
 .tema-desc {
   max-width: 880px;
-  color: var(--texto-2);
+  color: var(--suave);
 }
 
 .ajustes-lista + .mas-opciones,

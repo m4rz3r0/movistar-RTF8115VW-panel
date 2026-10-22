@@ -12,9 +12,9 @@ use leptos::prelude::*;
 pub use server::{
     AuthUser, LoginError, MAX_PASSWORD_BYTES, MIN_PASSWORD_CHARS, REAUTH_SECS, SESSION_COOKIE,
     User, UserError, abrir_ventana_de_reautenticacion, attempt_login, change_own_password,
-    client_ip, create_user, delay_secs, delete_user, guardar_modo_vista, hash_password,
-    poner_cookie_de_sesion, reautenticar_sesion, reauthenticate, require_page_session,
-    require_reauth, require_user, set_password, verify, warm_up,
+    client_ip, create_user, delay_secs, delete_user, guardar_modo_vista, guardar_tema,
+    hash_password, poner_cookie_de_sesion, reautenticar_sesion, reauthenticate,
+    require_page_session, require_reauth, require_user, set_password, verify, warm_up,
 };
 
 /// Mensaje de error de las server functions sin sesión vigente (con estado

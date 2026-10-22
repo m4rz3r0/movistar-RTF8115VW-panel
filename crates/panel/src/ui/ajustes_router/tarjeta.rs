@@ -25,10 +25,11 @@ use crate::ajustes_router::{
     preparar_ajuste,
 };
 use crate::t;
+use crate::ui::comun::Insignia;
 use crate::ui::explorador::{RiesgoCambio, texto_error};
 use crate::ui::grupo::DialogoGrupo;
 use crate::ui::i18n::traducir;
-use crate::ui::{Estado, IconoEstado, Insignia};
+use crate::ui::{Estado, IconoEstado};
 use ajustes::Nivel;
 use leptos::{ev::SubmitEvent, html, prelude::*, task::spawn_local};
 use leptos_router::components::A;
@@ -239,7 +240,7 @@ fn enlace_contrasena(a: &AjusteVista) -> impl IntoView + use<> {
         {ayuda(a)}
         <p class="ayuda">{t!("contrasena-router-enlace-texto")}</p>
         <p>
-            <A href=href attr:class="boton-sutil">
+            <A href=href attr:class="b-sec">
                 {t!("contrasena-router-enlace")}
             </A>
         </p>
@@ -550,14 +551,14 @@ fn TarjetaAjuste(a: AjusteVista, solo_lectura: bool, recargar: Callback<()>) -> 
                 {efecto}
                 <p class="error-formulario" role="alert">{move || error.get()}</p>
                 <div class="ajuste-acciones">
-                    <button class="boton-sutil" type="button" disabled=move || preparando.get() on:click=cancelar>
+                    <button class="b-sec" type="button" disabled=move || preparando.get() on:click=cancelar>
                         {t!("ajustes-cancelar")}
                     </button>
                     // Sin `disabled`: el botón conserva el foco y el diálogo
                     // se lo devuelve al cerrarse (el envío ya se ignora
                     // mientras prepara).
                     <button
-                        class="boton"
+                        class="b-pri"
                         type="submit"
                         aria-disabled=move || preparando.get().then_some("true")
                     >
@@ -577,7 +578,7 @@ fn TarjetaAjuste(a: AjusteVista, solo_lectura: bool, recargar: Callback<()>) -> 
                 {resumen}
                 {editable.then(|| view! {
                     <div class="ajuste-acciones">
-                        <button class="boton-sutil" type="button" node_ref=boton_editar on:click=abrir>
+                        <button class="b-sec" type="button" node_ref=boton_editar on:click=abrir>
                             {t!("ajustes-editar")}
                         </button>
                     </div>

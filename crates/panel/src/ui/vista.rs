@@ -203,7 +203,7 @@ pub fn SeccionVista() -> impl IntoView {
                 </fieldset>
                 {mensajes(error, aviso)}
                 <div class="botones">
-                    <button class="boton" type="submit" disabled=move || pendiente.get()>
+                    <button class="b-pri" type="submit" disabled=move || pendiente.get()>
                         {t!("panel-guardar")}
                     </button>
                 </div>

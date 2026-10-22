@@ -1,0 +1,66 @@
+/* Marca redonda de selección: nunca una casilla cuadrada. */
+/* ----------------------------------------------------------------- Marca */
+
+/* Va en la esquina de la tarjeta (o al inicio de la fila). Solo se ve al
+   pasar el ratón, con el foco o cuando ya hay alguna marcada
+   (.hay-marcadas en el contenedor). Marcada: rellena de ámbar con ✓. */
+.marcar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1.5px solid var(--borde-fuerte);
+  border-radius: 50%;
+  background: var(--sup);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 200ms ease, background 200ms ease, border-color 200ms ease;
+}
+
+.marcar svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: var(--sobre-acento);
+  stroke-width: 2;
+  opacity: 0;
+}
+
+:hover > .marcar,
+:focus-within > .marcar,
+.hay-marcadas .marcar,
+.marcar:focus-visible {
+  opacity: 1;
+}
+
+.marcar[aria-pressed="true"],
+.marcar[aria-checked="true"] {
+  border-color: var(--acento);
+  background: var(--acento);
+  opacity: 1;
+}
+
+.marcar[aria-pressed="true"] svg,
+.marcar[aria-checked="true"] svg {
+  opacity: 1;
+}
+
+.marcar:focus-visible {
+  outline: 2px solid var(--foco);
+  outline-offset: 2px;
+}
+
+/* Sin ratón, la marca siempre a la vista. */
+@media (hover: none) {
+  .marcar {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marcar {
+    transition: none;
+  }
+}

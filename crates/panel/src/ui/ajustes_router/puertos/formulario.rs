@@ -352,7 +352,7 @@ pub(super) fn FormRegla(
             </div>
             <div class="ajuste-acciones">
                 <button
-                    class="boton-sutil"
+                    class="b-sec"
                     type="button"
                     disabled=move || preparando.get()
                     on:click=move |_| cancelar.run(())
@@ -360,7 +360,7 @@ pub(super) fn FormRegla(
                     {t!("ajustes-cancelar")}
                 </button>
                 <button
-                    class="boton"
+                    class="b-pri"
                     type="submit"
                     aria-disabled=move || preparando.get().then_some("true")
                 >

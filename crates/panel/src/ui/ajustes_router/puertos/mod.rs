@@ -27,10 +27,10 @@ use crate::ajustes_router::{
     valor_de,
 };
 use crate::t;
+use crate::ui::comun::{EstadoVisual, Insignia};
 use crate::ui::explorador::texto_error;
 use crate::ui::grupo::DialogoGrupo;
 use crate::ui::i18n::traducir;
-use crate::ui::{Estado, Insignia};
 use ajustes::{TipoCampo, ValorLegible};
 use leptos::{ev::SubmitEvent, prelude::*, task::spawn_local};
 use std::collections::BTreeMap;

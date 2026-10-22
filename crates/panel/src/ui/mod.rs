@@ -1,12 +1,14 @@
 //! Interfaz: páginas, marco común y componentes.
 //!
 //! Aquí viven también las piezas mínimas que comparten tablas, indicadores y
-//! páginas: el [`Estado`] (ok, aviso, error, neutro) con su icono e
-//! [`Insignia`]. Los colores de estado se reservan para estados y van siempre
-//! con icono y texto, nunca solos.
+//! páginas: el [`Estado`] (ok, aviso, error, neutro) con su icono. Los
+//! componentes del sistema visual (insignia, interruptor, icono de emisión)
+//! están en [`comun`]. Los colores de estado se reservan para estados y van
+//! siempre con texto, nunca solos.
 
 pub mod ajustes_router;
 pub mod charts;
+pub mod comun;
 pub mod estado;
 pub mod explorador;
 pub mod grupo;
@@ -20,6 +22,7 @@ pub mod recomendaciones;
 pub mod router;
 pub mod secreto;
 pub mod table;
+pub mod tema;
 pub mod vista;
 
 use crate::t;
@@ -66,6 +69,19 @@ impl Estado {
             Estado::Aviso => "estado-aviso",
             Estado::Error => "estado-error",
             Estado::Neutro => "estado-neutro",
+        }
+    }
+}
+
+impl From<Estado> for comun::EstadoVisual {
+    /// Color de la insignia de un estado de tabla o indicador: lo neutro
+    /// (desconectado, apagado) va en gris, como lo apagado.
+    fn from(e: Estado) -> Self {
+        match e {
+            Estado::Ok => comun::EstadoVisual::Emite,
+            Estado::Aviso => comun::EstadoVisual::Atencion,
+            Estado::Error => comun::EstadoVisual::Peligro,
+            Estado::Neutro => comun::EstadoVisual::Apagada,
         }
     }
 }
@@ -130,17 +146,6 @@ fn dibujo_estado(estado: Estado) -> impl IntoView {
         >
             {trazos}
         </svg>
-    }
-}
-
-/// Insignia de estado: icono y texto.
-#[component]
-pub fn Insignia(estado: Estado, #[prop(into)] texto: String) -> impl IntoView {
-    view! {
-        <span class=format!("insignia {}", estado.clase())>
-            <IconoEstado estado />
-            {texto}
-        </span>
     }
 }
 

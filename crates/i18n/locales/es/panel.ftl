@@ -34,6 +34,17 @@ panel-vista-grafica-ayuda = Las gráficas del histórico primero y a todo el anc
 panel-vista-mixto = Mixto
 panel-vista-mixto-ayuda = Indicadores con su minigráfica de la última hora y, debajo, las gráficas del histórico. Es el de por defecto.
 
+## Tema
+panel-tema = Tema
+panel-tema-ayuda = Los colores del panel. Es tuyo: cada usuario del panel elige el suyo. Se aplica al momento.
+panel-tema-elegir = Tema de los colores
+panel-tema-automatico = Automático
+panel-tema-automatico-ayuda = Claro u oscuro, el mismo que use tu sistema. Es el de por defecto.
+panel-tema-oscuro = Oscuro
+panel-tema-oscuro-ayuda = Fondo oscuro y texto claro. Cansa menos la vista con poca luz.
+panel-tema-claro = Claro
+panel-tema-claro-ayuda = Fondo claro y texto oscuro. Se lee mejor con mucha luz.
+
 ## Usuarios
 panel-usuarios = Usuarios del panel
 panel-usuarios-texto = Pueden entrar en el panel con todos los permisos. También se gestionan con la orden panel user.

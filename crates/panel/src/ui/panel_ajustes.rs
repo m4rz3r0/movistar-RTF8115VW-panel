@@ -1,6 +1,6 @@
 //! «Ajustes del panel» (`/panel`): solo lo del panel. Panel (idioma por
 //! defecto y zona horaria), visualización (el modo de cada usuario,
-//! [`super::vista::SeccionVista`]) y usuarios del panel. No está en el menú: se abre
+//! [`super::vista::SeccionVista`]), tema ([`super::tema::SeccionTema`]) y usuarios del panel. No está en el menú: se abre
 //! con el nombre de usuario. Lo del router está en «Configuración del
 //! router» ([`super::router`]). Los demás parámetros de la instancia (DNS
 //! preferidos, dispositivos de confianza…) los pedirán en contexto las
@@ -20,6 +20,7 @@ use crate::panel_ajustes::{
 use crate::t;
 use crate::ui::charts::Zona;
 use crate::ui::i18n::nombre_idioma;
+use crate::ui::tema::SeccionTema;
 use crate::ui::vista::SeccionVista;
 use ::i18n::Idioma;
 use leptos::{ev::SubmitEvent, html, prelude::*, task::spawn_local};
@@ -117,6 +118,7 @@ fn Ajustes(a: AjustesPanel) -> impl IntoView {
         <div class="ajustes-panel">
             <SeccionPanel instancia />
             <SeccionVista />
+            <SeccionTema />
             <SeccionUsuarios usuarios=a.usuarios.clone() yo=a.yo.clone() />
         </div>
     }
@@ -425,7 +427,7 @@ fn SeccionPanel(instancia: Instancia) -> impl IntoView {
                 {desfases}
                 {mensajes(error, aviso)}
                 <div class="botones">
-                    <button class="boton" type="submit" disabled=move || pendiente.get()>
+                    <button class="b-pri" type="submit" disabled=move || pendiente.get()>
                         {t!("panel-guardar")}
                     </button>
                 </div>
@@ -534,13 +536,13 @@ fn SeccionUsuarios(usuarios: Vec<String>, yo: String) -> impl IntoView {
                         )}
                         <div class="botones">
                             <button
-                                class="boton-sutil"
+                                class="b-sec"
                                 type="button"
                                 on:click=move |_| editando.set(None)
                             >
                                 {t!("panel-cancelar")}
                             </button>
-                            <button class="boton" type="submit" disabled=move || pendiente.get()>
+                            <button class="b-pri" type="submit" disabled=move || pendiente.get()>
                                 {t!("panel-usuario-cambiar")}
                             </button>
                         </div>
@@ -552,11 +554,11 @@ fn SeccionUsuarios(usuarios: Vec<String>, yo: String) -> impl IntoView {
             if borrar_este() {
                 let u = u3.clone();
                 view! {
-                    <button class="boton-sutil" type="button" on:click=move |_| borrando.set(None)>
+                    <button class="b-sec" type="button" on:click=move |_| borrando.set(None)>
                         {t!("panel-cancelar")}
                     </button>
                     <button
-                        class="boton boton-borrar"
+                        class="b-pel"
                         type="button"
                         disabled=move || pendiente.get()
                         on:click=move |_| borrar.run(())
@@ -569,7 +571,7 @@ fn SeccionUsuarios(usuarios: Vec<String>, yo: String) -> impl IntoView {
                 let (ue, ub) = (u4.clone(), u4.clone());
                 view! {
                     <button
-                        class="boton-sutil"
+                        class="b-sec"
                         type="button"
                         aria-label=t!("panel-usuario-contrasena-de", usuario = ue.clone())
                         on:click=move |_| {
@@ -581,7 +583,7 @@ fn SeccionUsuarios(usuarios: Vec<String>, yo: String) -> impl IntoView {
                         {t!("panel-usuario-contrasena")}
                     </button>
                     <button
-                        class="boton-sutil"
+                        class="b-sec"
                         type="button"
                         aria-label=t!("panel-usuario-borrar-de", usuario = ub.clone())
                         disabled=move || es_yo || usuarios.with(|l| l.len() <= 1)
@@ -636,7 +638,7 @@ fn SeccionUsuarios(usuarios: Vec<String>, yo: String) -> impl IntoView {
                     None,
                 )}
                 <div class="botones">
-                    <button class="boton" type="submit" disabled=move || pendiente.get()>
+                    <button class="b-pri" type="submit" disabled=move || pendiente.get()>
                         {t!("panel-usuario-crear")}
                     </button>
                 </div>
@@ -721,10 +723,10 @@ pub(crate) fn DialogoReautenticar() -> impl IntoView {
                 </p>
                 <p class="error-formulario" role="alert">{move || error.get()}</p>
                 <div class="dialogo-pie">
-                    <button class="boton-sutil" type="button" on:click=cerrar>
+                    <button class="b-sec" type="button" on:click=cerrar>
                         {t!("panel-cancelar")}
                     </button>
-                    <button class="boton" type="submit" disabled=move || pidiendo.get()>
+                    <button class="b-pri" type="submit" disabled=move || pidiendo.get()>
                         {t!("panel-reautenticar-seguir")}
                     </button>
                 </div>

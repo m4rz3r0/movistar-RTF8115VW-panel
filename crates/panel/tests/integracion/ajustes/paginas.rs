@@ -304,11 +304,18 @@ async fn cada_red_dice_si_esta_encendida() {
         let cookie = format!("{cookie}; rp_lang={idioma}");
         let (status, _, html) = pagina(&p, &cookie, "/ajustes/wifi").await;
         assert_eq!(status, 200, "{html}");
-        let insignia = |texto: &str| format!("</svg>{texto}</span>");
+        // Gris si está apagada; verde si emite.
+        let insignia = |clase: &str, texto: &str| format!(r#"class="ins {clase}">{texto}</span>"#);
         let red_24 = tarjeta(&html, "wifi.red_24");
-        assert!(red_24.contains(&insignia(apagada)), "{idioma}: {red_24}");
+        assert!(
+            red_24.contains(&insignia("ins-off", apagada)),
+            "{idioma}: {red_24}"
+        );
         let red_5 = tarjeta(&html, "wifi.red_5");
-        assert!(red_5.contains(&insignia(encendida)), "{idioma}: {red_5}");
+        assert!(
+            red_5.contains(&insignia("ins-ok", encendida)),
+            "{idioma}: {red_5}"
+        );
         assert!(tarjeta(&html, "wifi.radio_24").contains(nota), "{idioma}");
         assert!(!tarjeta(&html, "wifi.radio_5").contains(nota), "{idioma}");
         assert!(!tarjeta(&html, "wifi.red_24").contains(nota), "{idioma}");

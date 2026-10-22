@@ -18,7 +18,7 @@
 }
 
 .ajuste-cabecera h2:focus-visible {
-  outline: 2px solid var(--acento);
+  outline: 2px solid var(--foco);
   outline-offset: 2px;
 }
 
@@ -35,18 +35,18 @@
 }
 
 .chip-nivel {
-  color: var(--texto-1);
+  color: var(--texto);
 }
 
 .nota-oculto {
   max-width: 880px;
   margin-bottom: var(--esp-3);
-  color: var(--texto-2);
+  color: var(--suave);
   font-size: 13px;
 }
 
 .ajuste-desc {
-  color: var(--texto-2);
+  color: var(--suave);
   max-width: 72ch;
 }
 
@@ -54,14 +54,14 @@
 .detalles-tecnicos summary,
 .recomendacion-pros summary {
   width: fit-content;
-  color: var(--texto-2);
+  color: var(--suave);
   cursor: pointer;
 }
 
 .ajuste-ayuda summary:hover,
 .detalles-tecnicos summary:hover,
 .recomendacion-pros summary:hover {
-  color: var(--texto-1);
+  color: var(--texto);
 }
 
 .ajuste-ayuda p {
@@ -89,7 +89,7 @@
 }
 
 .ajuste-fila dt {
-  color: var(--texto-2);
+  color: var(--suave);
 }
 
 .ajuste-fila dd {
@@ -103,7 +103,7 @@
 }
 
 .ajuste-vacio {
-  color: var(--texto-2);
+  color: var(--suave);
 }
 
 @media (max-width: 480px) {
@@ -114,8 +114,8 @@
 
 .chip-recomendado {
   border-color: color-mix(in srgb, var(--acento) 55%, var(--borde));
-  background: var(--acento-suave);
-  color: var(--texto-1);
+  background: var(--acento-velo);
+  color: var(--texto);
   white-space: normal;
 }
 
@@ -149,14 +149,14 @@
 .recomendacion-resumen > p {
   max-width: 60ch;
   margin-top: var(--esp-2);
-  color: var(--texto-2);
+  color: var(--suave);
   font-size: 13px;
 }
 
 .chip-sugerencia {
   border-style: dashed;
   border-color: color-mix(in srgb, var(--acento) 55%, var(--borde));
-  color: var(--texto-1);
+  color: var(--texto);
   white-space: normal;
 }
 
@@ -164,7 +164,7 @@
 .nota-hueco,
 .ajuste-efecto {
   max-width: 72ch;
-  color: var(--texto-2);
+  color: var(--suave);
   font-size: 13px;
 }
 
@@ -197,7 +197,7 @@
 }
 
 .campo-ajuste label {
-  color: var(--texto-1);
+  color: var(--texto);
   font-size: 14px;
   font-weight: 500;
 }
@@ -210,7 +210,7 @@
   border: 1px solid var(--borde);
   border-radius: var(--radio);
   background: var(--fondo);
-  color: var(--texto-1);
+  color: var(--texto);
   font: inherit;
 }
 
@@ -222,7 +222,7 @@
 
 .campo-ajuste input[aria-invalid="true"],
 .campo-ajuste select[aria-invalid="true"] {
-  border-color: var(--error);
+  border-color: var(--peligro);
 }
 
 .campo-ajuste .campo-interruptor {
@@ -238,11 +238,11 @@
   min-height: 0;
   padding: 0;
   border-radius: 999px;
-  background: var(--superficie-2);
+  background: var(--sup2);
 }
 
 .campo-ajuste input.interruptor:checked {
-  background: var(--acento-suave);
+  background: var(--acento-velo);
 }
 
 .campo-ajuste .campo-interruptor label {
@@ -251,7 +251,7 @@
 }
 
 .opcion-elegida {
-  color: var(--texto-1);
+  color: var(--texto);
 }
 
 /* Recomendación: el valor que aconsejamos y para quién; a favor y en
@@ -262,7 +262,7 @@
   gap: var(--esp-1);
   padding: var(--esp-2) var(--esp-3);
   border-left: 2px solid color-mix(in srgb, var(--acento) 55%, var(--borde));
-  color: var(--texto-2);
+  color: var(--suave);
   font-size: 13px;
 }
 
@@ -299,7 +299,7 @@
 }
 
 .detalles-lista dt {
-  color: var(--texto-2);
+  color: var(--suave);
 }
 
 .detalles-lista dd {
@@ -320,7 +320,7 @@
   padding: var(--esp-3) var(--esp-4);
   border: 1px solid var(--borde);
   border-radius: var(--radio);
-  background: var(--superficie-1);
+  background: var(--sup);
   cursor: pointer;
 }
 
@@ -329,8 +329,8 @@
   align-self: center;
   width: 7px;
   height: 7px;
-  border-right: 2px solid var(--texto-2);
-  border-bottom: 2px solid var(--texto-2);
+  border-right: 2px solid var(--suave);
+  border-bottom: 2px solid var(--suave);
   transform: rotate(-45deg);
   transition: transform 120ms ease;
 }
@@ -358,7 +358,7 @@
 }
 
 .mas-opciones-desc {
-  color: var(--texto-2);
+  color: var(--suave);
 }
 
 .mas-opciones[open] > summary {
@@ -368,7 +368,7 @@
 /* «Oculto» enlaza con la nota que lo explica: se ve como las demás
    etiquetas, con el subrayado solo al pasar por encima. */
 a.chip-oculto {
-  color: var(--texto-1);
+  color: var(--texto);
   text-decoration: none;
 }
 

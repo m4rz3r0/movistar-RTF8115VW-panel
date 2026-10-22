@@ -257,6 +257,23 @@ pub async fn guardar_modo_vista(modo: ModoVista) -> Result<(), ServerFnError> {
     }
 }
 
+/// Guarda el tema de la interfaz del usuario de la sesión (sin sesión, 401).
+/// El de por defecto se guarda como `NULL`.
+pub async fn guardar_tema(tema: TemaUi) -> Result<(), ServerFnError> {
+    let state = app_state()?;
+    let user = require_user().await?;
+    let valor = (tema != TemaUi::default()).then_some(tema.codigo());
+    let res = sqlx::query("UPDATE users SET tema = ? WHERE id = ?")
+        .bind(valor)
+        .bind(user.id)
+        .execute(&state.db)
+        .await;
+    match res {
+        Ok(_) => Ok(()),
+        Err(e) => internal(e),
+    }
+}
+
 /// Vuelve a pedir la contraseña al usuario de la sesión (con el freno
 /// del login, por la IP del cliente) y, si es buena, abre la ventana de
 /// reautenticación de esta sesión durante [`REAUTH_SECS`].

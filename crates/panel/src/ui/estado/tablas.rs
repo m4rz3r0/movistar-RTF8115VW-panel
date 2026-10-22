@@ -140,7 +140,7 @@ pub(super) fn Tablas(vista: Memo<Option<EstadoVista>>) -> impl IntoView {
         vista.with(|v| {
             v.as_ref()
                 .is_some_and(|v| v.wifi.iter().any(|r| r.wps && r.activa))
-                .then(|| view! { <Insignia estado=Estado::Aviso texto=t!("estado-wps-activo-insignia") /> })
+                .then(|| view! { <Insignia estado=EstadoVisual::Atencion texto=t!("estado-wps-activo-insignia") /> })
         })
     };
 

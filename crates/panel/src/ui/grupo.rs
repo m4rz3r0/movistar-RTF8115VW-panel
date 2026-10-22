@@ -12,11 +12,12 @@ use crate::ajustes_router::{
     CambioLegible, GrupoVista, PasoVista, confirmar_ajuste, deshacer_ajuste,
 };
 use crate::t;
+use crate::ui::comun::{EstadoVisual, Insignia};
 use crate::ui::explorador::{
     CambioVista, EstadoDeCambio, MASCARA, RiesgoCambio, duracion, estado_cambio, texto_error,
 };
 use crate::ui::i18n::{idioma_actual, traducir};
-use crate::ui::{Estado, IconoEstado, Insignia};
+use crate::ui::{Estado, IconoEstado};
 use ajustes::TipoCampo;
 use leptos::{ev::SubmitEvent, html, prelude::*, task::spawn_local};
 use std::time::Duration;
@@ -415,18 +416,22 @@ pub fn DialogoGrupo(
         };
         let (estado, texto) = match c.estado {
             EstadoDeCambio::Vigilando => (
-                Estado::Neutro,
+                EstadoVisual::Proceso,
                 t!(
                     "ajustes-grupo-estado-vigilando",
                     resto = duracion(c.restante_s.unwrap_or(0).max(0) as u64)
                 ),
             ),
-            EstadoDeCambio::Aplicado => (Estado::Ok, t!("ajustes-grupo-estado-aplicado")),
-            EstadoDeCambio::Revertido => (Estado::Aviso, t!("ajustes-grupo-estado-revertido")),
-            EstadoDeCambio::Fallido => (Estado::Error, t!("ajustes-grupo-estado-fallido")),
-            EstadoDeCambio::RevertidoParcial => (Estado::Error, t!("ajustes-grupo-estado-parcial")),
+            EstadoDeCambio::Aplicado => (EstadoVisual::Emite, t!("ajustes-grupo-estado-aplicado")),
+            EstadoDeCambio::Revertido => {
+                (EstadoVisual::Atencion, t!("ajustes-grupo-estado-revertido"))
+            }
+            EstadoDeCambio::Fallido => (EstadoVisual::Peligro, t!("ajustes-grupo-estado-fallido")),
+            EstadoDeCambio::RevertidoParcial => {
+                (EstadoVisual::Peligro, t!("ajustes-grupo-estado-parcial"))
+            }
             EstadoDeCambio::Preparado | EstadoDeCambio::Aplicando => {
-                (Estado::Neutro, t!("ajustes-grupo-estado-aplicando"))
+                (EstadoVisual::Proceso, t!("ajustes-grupo-estado-aplicando"))
             }
         };
         Some(view! { <div class="estado-cambio"><Insignia estado texto /></div> }.into_any())
@@ -442,7 +447,7 @@ pub fn DialogoGrupo(
             view! {
                 {puede_deshacer.then(|| view! {
                     <button
-                        class="boton-sutil"
+                        class="b-sec"
                         type="button"
                         disabled=preparando
                         on:click=deshacer
@@ -450,7 +455,7 @@ pub fn DialogoGrupo(
                         {if preparando { t!("ajustes-grupo-preparando") } else { t!("ajustes-grupo-deshacer") }}
                     </button>
                 })}
-                <button class="boton" type="button" disabled=preparando on:click=move |_| cerrar()>
+                <button class="b-pri" type="button" disabled=preparando on:click=move |_| cerrar()>
                     {t!("ajustes-grupo-cerrar")}
                 </button>
             }
@@ -458,14 +463,14 @@ pub fn DialogoGrupo(
         }
         f => view! {
             <button
-                class="boton-sutil"
+                class="b-sec"
                 type="button"
                 disabled=f == Fase::Confirmando
                 on:click=move |_| cerrar()
             >
                 {t!("ajustes-grupo-cancelar")}
             </button>
-            <button class="boton" type="submit" disabled=f == Fase::Confirmando>
+            <button class="b-pri" type="submit" disabled=f == Fase::Confirmando>
                 {if f == Fase::Confirmando {
                     t!("ajustes-grupo-aplicando")
                 } else if deshace.get().is_some() {

@@ -304,7 +304,7 @@ pub(crate) fn Dispositivos(
                     // Sin `disabled` al preparar: el botón conserva el foco y
                     // el diálogo se lo devuelve al cerrarse.
                     <button
-                        class="boton-sutil"
+                        class="b-sec"
                         type="button"
                         aria-label=etiqueta
                         aria-disabled=move || ocupado.get().then_some("true")

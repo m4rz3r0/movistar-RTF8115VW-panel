@@ -1,6 +1,7 @@
 /*
- * Sistema visual del panel: tema oscuro sobrio, acento ámbar, tipografía
- * técnica servida desde el propio binario. Sin estilos en línea (CSP
+ * Sistema visual del panel: temas oscuro y claro (el servidor elige con
+ * <html data-tema>), acento ámbar, tipografía técnica servida desde el
+ * propio binario. Sin estilos en línea (CSP
  * `style-src 'self'`): todo color y tamaño sale de aquí.
  *
  * Fuentes (SIL OFL 1.1, subconjunto latino, licencias en /fonts):
@@ -19,6 +20,11 @@
 @import "paginas/estado.css";
 @import "paginas/estado-modos.css";
 @import "componentes/insignias.css";
+@import "componentes/interruptor.css";
+@import "componentes/emision.css";
+@import "componentes/marca.css";
+@import "componentes/barra.css";
+@import "componentes/resumen.css";
 @import "componentes/indicadores.css";
 @import "componentes/graficas.css";
 @import "componentes/tablas.css";

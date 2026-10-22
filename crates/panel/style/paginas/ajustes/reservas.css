@@ -18,7 +18,7 @@
   border: 1px solid var(--borde);
   border-left: 2px solid var(--acento);
   border-radius: var(--radio);
-  background: var(--superficie-2);
+  background: var(--sup2);
 }
 
 .reserva-formulario h3 {
@@ -76,7 +76,7 @@
   .tabla-apilada td::before,
   .tabla-apilada th[scope="row"]::before {
     content: attr(data-etiqueta);
-    color: var(--texto-2);
+    color: var(--suave);
     font-family: var(--fuente-ui);
     font-size: 12px;
     font-weight: 400;
@@ -93,7 +93,7 @@
     content: none;
   }
 
-  .tabla .acciones-fila .boton-mini + .boton-mini {
+  .tabla .acciones-fila button + button {
     margin-left: 0;
   }
 }

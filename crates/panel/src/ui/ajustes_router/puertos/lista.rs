@@ -161,7 +161,7 @@ pub(crate) fn Puertos(a: AjusteVista, solo_lectura: bool, recargar: Callback<()>
             view! {
                 <div class="ajuste-acciones reglas-acciones" class:oculto=move || modo.get() == Some(Modo::Nueva)>
                     <button
-                        class="boton-sutil"
+                        class="b-sec"
                         type="button"
                         id=abrir_id
                         on:click=move |_| {
@@ -249,7 +249,7 @@ fn fila(
     let perdido = red.destino_perdido(&destino);
     let activa = v("activa") == "true";
     let aviso = perdido.then(|| {
-        view! { <Insignia estado=Estado::Aviso texto=t!("ajuste-puertos-reglas-destino-perdido") /> }
+        view! { <Insignia estado=EstadoVisual::Atencion texto=t!("ajuste-puertos-reglas-destino-perdido") /> }
     });
     // Qué hacer, a lo ancho de la fila.
     let que_hacer = perdido.then(|| {
@@ -296,7 +296,7 @@ fn fila(
             <div class="regla-acciones">
                 {se_edita.then(|| view! {
                     <button
-                        class="boton-mini"
+                        class="b-sec"
                         type="button"
                         id=editar_id
                         aria-label=t!("ajuste-puertos-reglas-editar-de", nombre = nombre_regla.clone())
@@ -309,7 +309,7 @@ fn fila(
                     </button>
                 })}
                 <button
-                    class="boton-mini boton-peligro"
+                    class="b-pel"
                     type="button"
                     aria-label=t!("ajuste-puertos-reglas-borrar-de", nombre = nombre_regla.clone())
                     aria-disabled=move || ocupado().then_some("true")

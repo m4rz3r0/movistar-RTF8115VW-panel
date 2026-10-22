@@ -1,0 +1,54 @@
+/* Franja de resumen: cuatro datos del tema con cifra grande. */
+/* --------------------------------------------------------------- Resumen */
+
+.resumen {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--esp-3);
+  margin-bottom: 20px;
+}
+
+.resumen-dato {
+  padding: 14px var(--esp-4);
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  background: var(--sup);
+  box-shadow: var(--sombra);
+}
+
+.resumen-dato p {
+  margin: 0;
+  color: var(--suave);
+  font-size: 13px;
+}
+
+.resumen-dato strong {
+  display: block;
+  margin: 2px 0;
+  font-family: var(--fuente-titulos);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.resumen-dato span {
+  color: var(--tenue);
+  font-size: 12.5px;
+}
+
+/* «Recomendaciones pendientes», en ámbar si hay alguna. */
+.resumen-dato.pendiente {
+  border-color: var(--acento-borde);
+  background: var(--acento-velo);
+}
+
+.resumen-dato.pendiente strong,
+.resumen-dato.pendiente span {
+  color: var(--sobre-acento);
+}
+
+@media (max-width: 900px) {
+  .resumen {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

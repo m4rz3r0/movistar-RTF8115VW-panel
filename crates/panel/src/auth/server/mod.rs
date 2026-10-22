@@ -1,7 +1,7 @@
 //! Servidor de la autenticación (feature `ssr`): constantes, usuario y reloj; el
 //! resto, por partes en los submódulos.
 
-use crate::{redes::RedIp, state::AppState, vista::ModoVista};
+use crate::{redes::RedIp, state::AppState, tema::TemaUi, vista::ModoVista};
 use argon2::{
     Argon2,
     password_hash::{PasswordHasher, PasswordVerifier, phc::PasswordHash},
@@ -55,6 +55,8 @@ pub struct User {
     pub username: String,
     /// Su modo de visualización (sin elegir, el de por defecto).
     pub modo_vista: ModoVista,
+    /// Su tema de la interfaz (sin elegir, automático).
+    pub tema: TemaUi,
 }
 
 fn now_ms() -> i64 {

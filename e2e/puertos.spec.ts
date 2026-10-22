@@ -146,7 +146,7 @@ for (const idioma of ["es", "en"] as const) {
         // El nombre y el aviso tienen sitio: nada se parte letra a letra.
         const quien = await desc1.locator(".regla-quien").boundingBox();
         expect(quien?.width ?? 0, `nombre y aviso a ${ancho} px`).toBeGreaterThan(150);
-        const aviso = await desc1.locator(".insignia").boundingBox();
+        const aviso = await desc1.locator(".ins").boundingBox();
         expect(aviso?.height ?? 0, `aviso a ${ancho} px`).toBeLessThan(80);
         await sinDesbordamiento(page, `puertos ${idioma} ${ancho}`);
         sinApi(await reglas.innerText());

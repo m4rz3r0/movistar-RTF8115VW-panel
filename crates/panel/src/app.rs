@@ -14,6 +14,7 @@ use crate::ui::{
     panel_ajustes::PaginaPanel,
     recomendaciones::RecomendacionesAlEstado,
     router::{InicioRouter, PaginaConexion, SeccionRouter},
+    tema::{provide_tema, tema_inicial},
     vista::{provide_vista, vista_inicial},
 };
 use leptos::prelude::*;
@@ -27,9 +28,10 @@ use leptos_router::{
 ///
 /// En el servidor fija la CSP de la página con el nonce que Leptos pone en sus
 /// scripts en línea (carga de la hidratación y datos serializados), el
-/// idioma de `<html lang>`, la zona horaria de `<html data-zona>` y el modo
-/// de visualización del usuario de `<html data-vista>`, que el navegador lee
-/// al hidratar.
+/// idioma de `<html lang>`, la zona horaria de `<html data-zona>`, el modo
+/// de visualización del usuario de `<html data-vista>` y su tema de
+/// `<html data-tema>`, que el navegador lee al hidratar. Con el tema en el
+/// HTML, la página se pinta ya con sus colores, sin destello.
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     #[cfg(feature = "ssr")]
     csp_con_nonce();
@@ -38,12 +40,19 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
     let zona = zona_inicial();
     provide_zona(zona);
     let vista = vista_inicial();
+    let tema = tema_inicial();
     view! {
         <!DOCTYPE html>
-        <html lang=idioma.codigo() data-zona=zona.codigo() data-vista=vista.codigo()>
+        <html
+            lang=idioma.codigo()
+            data-zona=zona.codigo()
+            data-vista=vista.codigo()
+            data-tema=tema.codigo()
+        >
             <head>
                 <meta charset="utf-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
+                <meta name="color-scheme" content="dark light" />
                 <AutoReload options=options.clone() />
                 <HashedStylesheet options=options.clone() id="leptos" />
                 <HydrationScripts options />
@@ -77,6 +86,7 @@ pub fn App() -> impl IntoView {
     provide_idioma(idioma_inicial());
     provide_zona(zona_inicial());
     provide_vista(vista_inicial());
+    provide_tema(tema_inicial());
     // `<Redirect>` en el servidor: 302 con `Location` (`/router`,
     // `/ajustes`, `/recomendaciones/*`).
     #[cfg(feature = "ssr")]

@@ -87,7 +87,7 @@
   border-left-width: 3px;
   border-left-color: var(--estado);
   border-radius: var(--radio);
-  background: var(--estado-suave);
+  background: var(--estado-velo);
   overflow-wrap: anywhere;
 }
 
@@ -104,7 +104,7 @@
   padding: 3px;
   border: 1px solid var(--borde);
   border-radius: var(--radio);
-  background: var(--superficie-1);
+  background: var(--sup);
 }
 
 .selector-boton {
@@ -114,7 +114,7 @@
   border: 0;
   border-radius: 5px;
   background: transparent;
-  color: var(--texto-2);
+  color: var(--suave);
   font-variant-numeric: tabular-nums;
   font-weight: 500;
   cursor: pointer;
@@ -122,12 +122,12 @@
 }
 
 .selector-boton:hover {
-  color: var(--texto-1);
+  color: var(--texto);
 }
 
 .selector-boton[aria-pressed="true"] {
-  background: var(--acento-suave);
-  color: var(--acento);
+  background: var(--acento-velo);
+  color: var(--acento-texto);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--acento) 45%, transparent);
 }
 
@@ -141,7 +141,7 @@
 }
 
 .estado-espera {
-  color: var(--texto-2);
+  color: var(--suave);
 }
 
 /* Biblioteca sin JavaScript o con el wasm caído: el catálogo, la ficha, la
@@ -167,7 +167,7 @@ body[data-hidratado] .aviso-sin-hidratar {
 }
 
 .tarjeta.estado-espera {
-  color: var(--texto-1);
+  color: var(--texto);
   gap: var(--esp-2);
 }
 
@@ -178,11 +178,11 @@ body[data-hidratado] .aviso-sin-hidratar {
 }
 
 .tarjeta.estado-error {
-  border-color: color-mix(in srgb, var(--error) 45%, var(--borde));
+  border-color: color-mix(in srgb, var(--peligro) 45%, var(--borde));
 }
 
 .estado-espera-detalle {
-  color: var(--texto-2);
+  color: var(--suave);
   overflow-wrap: anywhere;
 }
 

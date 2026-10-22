@@ -5,7 +5,8 @@
 //! y se pinta como `<span class="secreto">••••••</span>`.
 
 use crate::t;
-use crate::ui::{Estado, Insignia};
+use crate::ui::Estado;
+use crate::ui::comun::Insignia;
 use leptos::prelude::*;
 
 /// Lo que se muestra en lugar de un valor secreto.
@@ -61,7 +62,9 @@ fn celda(c: Celda) -> AnyView {
             <span class="solo-lector">{t!("comun-valor-oculto")}</span>
         }
         .into_any(),
-        Celda::Estado(estado, texto) => view! { <Insignia estado texto /> }.into_any(),
+        Celda::Estado(estado, texto) => {
+            view! { <Insignia estado=estado.into() texto /> }.into_any()
+        }
         Celda::Vacia => view! {
             <span class="vacia" aria-hidden="true">"—"</span>
             <span class="solo-lector">{t!("comun-sin-valor")}</span>

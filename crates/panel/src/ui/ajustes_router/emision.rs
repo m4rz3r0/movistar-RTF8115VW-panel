@@ -4,7 +4,8 @@
 
 use crate::ajustes_router::{AjusteVista, EmisionRed, NotaRadio};
 use crate::t;
-use crate::ui::{Estado, IconoEstado, Insignia};
+use crate::ui::comun::{EstadoVisual, Insignia};
+use crate::ui::{Estado, IconoEstado};
 use leptos::prelude::*;
 use leptos_router::components::A;
 
@@ -15,10 +16,10 @@ const BIBLIOTECA_WIFI: &str = "/explorador/wifi";
 /// está apagada», en la cabecera de la tarjeta de una red.
 pub(super) fn insignia(a: &AjusteVista) -> Option<impl IntoView + use<>> {
     let (estado, texto) = match a.red_wifi? {
-        EmisionRed::Encendida => (Estado::Ok, t!("ajustes-wifi-red-encendida")),
-        EmisionRed::Apagada => (Estado::Neutro, t!("ajustes-wifi-red-apagada")),
-        EmisionRed::SinRadio => (Estado::Aviso, t!("ajustes-wifi-red-sin-radio")),
-        EmisionRed::NoEmite => (Estado::Aviso, t!("ajustes-wifi-red-no-emite")),
+        EmisionRed::Encendida => (EstadoVisual::Emite, t!("ajustes-wifi-red-encendida")),
+        EmisionRed::Apagada => (EstadoVisual::Apagada, t!("ajustes-wifi-red-apagada")),
+        EmisionRed::SinRadio => (EstadoVisual::Atencion, t!("ajustes-wifi-red-sin-radio")),
+        EmisionRed::NoEmite => (EstadoVisual::Atencion, t!("ajustes-wifi-red-no-emite")),
     };
     Some(view! { <span class="emision-red"><Insignia estado texto /></span> })
 }

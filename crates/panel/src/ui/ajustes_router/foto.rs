@@ -348,7 +348,7 @@ fn BotonVolver(
             // Sin `disabled`: el botón conserva el foco y el diálogo se lo
             // devuelve al cerrarse.
             <button
-                class="boton-sutil"
+                class="b-sec"
                 type="button"
                 // El campo al que vuelve: hay un botón por fila.
                 aria-describedby=descrito

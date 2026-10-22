@@ -67,19 +67,23 @@ pub(super) async fn create_session(db: &SqlitePool, user_id: i64) -> Result<Stri
     Ok(id)
 }
 
+/// Fila de una sesión con su usuario: id, nombre, modo de visualización,
+/// tema, creada y vista por última vez.
+type FilaSesion = (i64, String, Option<String>, Option<String>, i64, i64);
+
 /// Usuario de la sesión `id` si sigue vigente. Una sesión caducada se
 /// borra; una vigente renueva `last_seen` (como mucho una vez por minuto).
 pub(super) async fn session_user(db: &SqlitePool, id: &str) -> Result<Option<User>, sqlx::Error> {
     let key = session_key(id);
-    let row: Option<(i64, String, Option<String>, i64, i64)> = sqlx::query_as(
-        "SELECT u.id, u.username, u.modo_vista, s.created, s.last_seen
+    let row: Option<FilaSesion> = sqlx::query_as(
+        "SELECT u.id, u.username, u.modo_vista, u.tema, s.created, s.last_seen
          FROM sessions s JOIN users u ON u.id = s.user_id
          WHERE s.id = ?",
     )
     .bind(&key)
     .fetch_optional(db)
     .await?;
-    let Some((user_id, username, modo_vista, created, last_seen)) = row else {
+    let Some((user_id, username, modo_vista, tema, created, last_seen)) = row else {
         return Ok(None);
     };
     let now = now_secs();
@@ -103,6 +107,10 @@ pub(super) async fn session_user(db: &SqlitePool, id: &str) -> Result<Option<Use
         modo_vista: modo_vista
             .as_deref()
             .and_then(ModoVista::desde_codigo)
+            .unwrap_or_default(),
+        tema: tema
+            .as_deref()
+            .and_then(TemaUi::desde_codigo)
             .unwrap_or_default(),
     }))
 }

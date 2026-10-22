@@ -195,7 +195,7 @@ fn FormReserva(
             <div class="ajuste-campos">{filas}</div>
             <div class="ajuste-acciones">
                 <button
-                    class="boton-sutil"
+                    class="b-sec"
                     type="button"
                     disabled=move || preparando.get()
                     on:click=move |_| cancelar.run(())
@@ -203,7 +203,7 @@ fn FormReserva(
                     {t!("ajustes-cancelar")}
                 </button>
                 <button
-                    class="boton"
+                    class="b-pri"
                     type="submit"
                     aria-disabled=move || preparando.get().then_some("true")
                 >
@@ -353,7 +353,7 @@ pub(crate) fn Reservas(
                     view! {
                         <td class="acciones-fila" data-etiqueta=t!("ajuste-red_local-reservas-col-acciones")>
                             <button
-                                class="boton-mini"
+                                class="b-sec"
                                 type="button"
                                 id=editar_id(&id)
                                 aria-label=t!("ajuste-red_local-reservas-editar-de", equipo = quien.clone())
@@ -365,7 +365,7 @@ pub(crate) fn Reservas(
                                 {t!("ajustes-editar")}
                             </button>
                             <button
-                                class="boton-mini boton-peligro"
+                                class="b-pel"
                                 type="button"
                                 aria-label=t!("ajuste-red_local-reservas-borrar-de", equipo = quien.clone())
                                 aria-disabled=move || ocupado().then_some("true")
@@ -433,7 +433,7 @@ pub(crate) fn Reservas(
             view! {
                 <div class="ajuste-acciones reservas-acciones" class:oculto=move || modo.get() == Some(Modo::Nueva)>
                     <button
-                        class="boton-sutil"
+                        class="b-sec"
                         type="button"
                         id=anadir_id
                         on:click=move |_| {

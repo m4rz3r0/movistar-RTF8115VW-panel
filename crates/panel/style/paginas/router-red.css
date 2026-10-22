@@ -16,5 +16,5 @@
 .red-resumen li:not(:last-child)::after {
   content: "·";
   margin-left: var(--esp-3);
-  color: var(--texto-2);
+  color: var(--suave);
 }
