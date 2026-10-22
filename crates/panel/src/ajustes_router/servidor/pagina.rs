@@ -200,7 +200,7 @@ fn elemento(
         pie: PieVista {
             nota: derivados::nota(ctx, e),
             apagada_desde: derivados::apagada_desde(ctx, e),
-            ..PieVista::default()
+            dispositivos: derivados::dispositivos(ctx, e),
         },
         ajustes,
         lectura,

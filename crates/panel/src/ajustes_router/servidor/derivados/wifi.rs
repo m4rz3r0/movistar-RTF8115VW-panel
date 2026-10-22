@@ -12,7 +12,12 @@
 use super::super::lectura::{hojas, instancias};
 use super::*;
 
+mod conectados;
 mod historial;
+
+#[cfg(test)]
+use conectados::dispositivos_del_punto;
+pub(super) use conectados::{conectados, dispositivos};
 
 pub(super) use historial::apagada_desde;
 pub(in crate::ajustes_router) use historial::apagadas_desde;
@@ -173,7 +178,8 @@ fn ocultas_que_emiten(lista: &XmlNode, vistos: &[&String]) -> u32 {
 const ASOCIADOS: &str = "cbListWifiAccPtAssociation";
 
 /// Lecturas extra del tema WiFi: la lista de puntos de acceso y la de
-/// estaciones asociadas de cada radio. Vacío fuera del tema.
+/// estaciones asociadas de cada radio, y la de dispositivos de Red local.
+/// Vacío fuera del tema.
 pub(super) fn claves_extra(del_tema: &[&Ajuste]) -> Vec<Clave> {
     let listas = claves_de_listas(del_tema);
     let asociados: Vec<Clave> = listas
@@ -181,10 +187,14 @@ pub(super) fn claves_extra(del_tema: &[&Ajuste]) -> Vec<Clave> {
         .filter_map(|(radio, _)| id_de_radio(del_tema, radio))
         .map(|id| Clave::new(ASOCIADOS, &[(ID_RADIO, id)]))
         .collect();
+    // Los nombres de los conectados, de la lista de Red local (la misma
+    // lectura: comparten la caché).
+    let hosts = (!asociados.is_empty()).then(super::super::red_local::clave_hosts);
     listas
         .into_iter()
         .map(|(_, c)| c)
         .chain(asociados)
+        .chain(hosts)
         .collect()
 }
 
@@ -318,20 +328,6 @@ pub(super) fn canal_y_ancho(ctx: &Contexto, e: &Elemento) -> Option<ValorLegible
         None => canal,
     };
     Some(ValorLegible::Texto(texto))
-}
-
-/// `derivado:conectados`: estaciones asociadas al punto de acceso de una
-/// red, de la lista de su radio. `None` si no se pudo leer.
-pub(super) fn conectados(ctx: &Contexto, e: &Elemento) -> Option<u32> {
-    let (red, radio) = red_de(e)?;
-    let punto = ctx.ajuste(red)?.fijos.get(ID_PUNTO)?;
-    let id_radio = id_de_radio(ctx.del_tema, radio)?;
-    let lista = ctx.leida(&Clave::new(ASOCIADOS, &[(ID_RADIO, id_radio)]))?;
-    let n = hgu::models::WifiAssoc::parse_all(lista)
-        .into_iter()
-        .filter(|st| st.ap_id == *punto)
-        .count();
-    Some(u32::try_from(n).unwrap_or(u32::MAX))
 }
 
 /// Nota del pie de una radio, ya traducida: no emite ninguna red o emite

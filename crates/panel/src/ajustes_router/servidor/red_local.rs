@@ -16,7 +16,7 @@ fn clave_estaciones(radio: &str) -> Clave {
 }
 
 /// Lista de dispositivos del router.
-fn clave_hosts() -> Clave {
+pub(super) fn clave_hosts() -> Clave {
     Clave::new::<&str, &str>("cbGetLanHostList", &[])
 }
 

@@ -215,6 +215,12 @@ pub(super) fn apagada_desde(ctx: &Contexto, e: &Elemento) -> Option<i64> {
     wifi::apagada_desde(ctx, e)
 }
 
+/// Dispositivos conectados al elemento (si es una red WiFi), con su nombre
+/// si lo tiene.
+pub(super) fn dispositivos(ctx: &Contexto, e: &Elemento) -> Vec<Option<String>> {
+    wifi::dispositivos(ctx, e)
+}
+
 /// Nota del pie de un elemento, ya traducida.
 pub(super) fn nota(ctx: &Contexto, e: &Elemento) -> Option<String> {
     wifi::nota(ctx, e)
