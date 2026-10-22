@@ -4,8 +4,10 @@
 //! Los tipos de aquí no dependen de `catalogo` ni de `hgu` (que solo existen
 //! en el servidor). En una lectura, un secreto viaja con su valor
 //! ([`Valor::Clave`], decisión del usuario del 2026-10-18), para el campo
-//! censurado con el ojo; en el diff va como [`Valor::Secreto`] y en los
-//! formularios como [`MASCARA`] (que el gestor entiende como "sin tocar").
+//! censurado con el ojo, también en los formularios (que lo envían como
+//! [`MASCARA`], "sin tocar" para el gestor, si no se cambia); en el diff va
+//! como [`Valor::Secreto`]. Los datos sensibles (usuarios, URL, números) se
+//! ven en claro.
 //!
 //! Toda escritura pasa por el gestor de cambios del servidor
 //! (`AppState::cambios`): `preparar_cambio` y `confirmar_cambio` son sus
@@ -249,13 +251,17 @@ pub struct Grupo {
     pub total: usize,
 }
 
-/// Resultado de una lectura, enmascarado.
+/// Resultado de una lectura: los secretos con su valor para el ojo; los
+/// datos sensibles, en claro.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Vista {
     pub pares: Vec<Par>,
     pub grupos: Vec<Grupo>,
-    /// XML de la respuesta, enmascarado.
+    /// XML de la respuesta con los secretos enmascarados.
     pub crudo: Option<String>,
+    /// El mismo XML con los secretos a la vista, para «Mostrar claves en el
+    /// XML» (como el ojo). `None` si no hay ningún secreto.
+    pub crudo_con_claves: Option<String>,
 }
 
 /// Qué hace un formulario.
@@ -270,9 +276,12 @@ pub enum Operacion {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CampoForm {
     pub param: ParamVista,
-    /// Valor actual; [`MASCARA`] en los secretos (enviarlo tal cual = sin
-    /// tocar).
+    /// Valor actual. En un secreto, su valor, para el campo censurado con el
+    /// ojo: si no se toca, el formulario envía [`MASCARA`] (sin tocar).
     pub valor: String,
+    /// Secreto que el router no deja leer (`valor` vacío).
+    #[serde(default)]
+    pub sin_leer: bool,
 }
 
 /// Formulario generado del catálogo y rellenado con la lectura pareada.
@@ -518,6 +527,8 @@ pub async fn instancias(
 /// Paso 1 del gestor de cambios: diff y token.
 #[server(endpoint = "preparar_cambio", input = Json)]
 pub async fn preparar_cambio(peticion: Peticion) -> Result<PreparadoVista, ServerFnError> {
+    // Lleva los datos sensibles del diff en claro.
+    super::servidor::sin_guardar();
     crate::auth::require_user().await?;
     let state = super::servidor::app_state()?;
     super::servidor::preparar(&state, peticion).await

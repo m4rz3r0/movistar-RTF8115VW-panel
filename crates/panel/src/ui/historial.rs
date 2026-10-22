@@ -256,6 +256,8 @@ pub fn fecha_hora(ts: i64, con_segundos: bool) -> String {
 /// reciente al más antiguo.
 #[server(endpoint = "historial", input = Json)]
 pub async fn historial(pagina: u32) -> Result<PaginaHistorial, ServerFnError> {
+    // Lleva los datos sensibles de los cambios en claro.
+    crate::ui::explorador::servidor::sin_guardar();
     crate::auth::require_user().await?;
     let state = crate::ui::explorador::servidor::app_state()?;
     servidor::pagina(&state, pagina).await
@@ -265,6 +267,8 @@ pub async fn historial(pagina: u32) -> Result<PaginaHistorial, ServerFnError> {
 /// haya deshecho). Se confirma con `confirmar_cambio`, como cualquier otro.
 #[server(endpoint = "deshacer", input = Json)]
 pub async fn deshacer(change_id: i64) -> Result<PreparadoVista, ServerFnError> {
+    // Lleva los datos sensibles de los cambios en claro.
+    crate::ui::explorador::servidor::sin_guardar();
     crate::auth::require_user().await?;
     let state = crate::ui::explorador::servidor::app_state()?;
     servidor::deshacer(&state, change_id).await

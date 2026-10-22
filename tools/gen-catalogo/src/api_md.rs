@@ -1,6 +1,9 @@
 //! `docs/api.md`: el catálogo revisado en formato legible.
 
-use catalogo::{Area, Catalogo, Funcion, Origen, Riesgo, Tipo, TipoParam, mask::Mascara};
+use catalogo::{
+    Area, Catalogo, Funcion, Origen, Riesgo, Tipo, TipoParam,
+    mask::{Mascara, Nivel},
+};
 use regex::Regex;
 use std::{collections::BTreeSet, fmt::Write as _, path::Path};
 
@@ -143,12 +146,10 @@ fn funcion(md: &mut String, f: &Funcion, m: &Mascara, fixtures: &Path) {
         if !els.is_empty() {
             let els: Vec<String> = els
                 .iter()
-                .map(|e| {
-                    if m.es_secreto(e) {
-                        format!("`{e}` 🔒")
-                    } else {
-                        format!("`{e}`")
-                    }
+                .map(|e| match m.nivel(e) {
+                    Some(Nivel::Secreto) => format!("`{e}` 🔒"),
+                    Some(Nivel::Sensible) => format!("`{e}` (sensible)"),
+                    None => format!("`{e}`"),
                 })
                 .collect();
             let _ = writeln!(md, "Elementos de la respuesta: {}\n", els.join(", "));
@@ -184,8 +185,10 @@ pub fn generar(cat: &Catalogo, fixtures: &Path) -> Result<String, String> {
            (alto). Las lecturas no tienen riesgo. Las funciones **bloqueadas** no se\n  \
            invocan nunca desde el panel.\n\
          - En la lectura pareada, `{param}` es el valor de ese parámetro en la\n  \
-           escritura. Elementos marcados con 🔒 se enmascaran siempre\n  \
-           (`crates/catalogo/secretos.toml`).\n\n",
+           escritura. Los elementos marcados con 🔒 son secretos (en pantalla,\n  \
+           censurados con el ojo) y los marcados «(sensible)», datos personales\n  \
+           que en pantalla se ven en claro; los dos se enmascaran siempre en los\n  \
+           registros (`crates/catalogo/secretos.toml`).\n\n",
     );
     let _ = writeln!(
         md,

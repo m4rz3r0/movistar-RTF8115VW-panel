@@ -107,9 +107,15 @@ tipo = "text"
 "#;
 
 pub(crate) const SECRETOS: &str = r#"
+sufijos_numericos = ["_id", "_type"]
+
+[secreto]
 fragmentos = ["key", "psk", "passphrase"]
 exactos = []
-sufijos_numericos = ["_id", "_type"]
+
+[sensible]
+fragmentos = ["username"]
+exactos = []
 "#;
 
 /// Ajustes válidos contra [`FUNCIONES`].

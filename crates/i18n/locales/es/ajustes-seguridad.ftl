@@ -31,7 +31,7 @@ ajuste-seguridad-gestion_remota_avanzado-intervalo-semana-desc = Un aviso a la s
 ## Gestión remota: servidor y claves
 ajuste-seguridad-gestion_remota_oculto-titulo = Servidor y claves de la gestión remota
 ajuste-seguridad-gestion_remota_oculto-desc = La dirección del servidor del operador y las claves con las que el router y el operador se reconocen.
-ajuste-seguridad-gestion_remota_oculto-ayuda = Estos datos los pone el operador y no se muestran nunca. Si escribes uno mal, el operador deja de poder gestionar el router hasta que deshagas el cambio. Cámbialos solo si el operador te lo pide.
+ajuste-seguridad-gestion_remota_oculto-ayuda = Estos datos los pone el operador; las contraseñas salen censuradas, con un ojo para verlas. Si escribes uno mal, el operador deja de poder gestionar el router hasta que deshagas el cambio. Cámbialos solo si el operador te lo pide.
 ajuste-seguridad-gestion_remota_oculto-servidor = Dirección del servidor del operador
 ajuste-seguridad-gestion_remota_oculto-servidor-desc = La dirección web con la que el router se pone en contacto, por ejemplo https://gestion.example. Sin espacios, tildes ni ñ.
 ajuste-seguridad-gestion_remota_oculto-usuario = Usuario ante el operador

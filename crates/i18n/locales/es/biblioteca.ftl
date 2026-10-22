@@ -1,7 +1,7 @@
 # Biblioteca de funciones del router (ruta /explorador): la interfaz. Lo que viene
 # del catálogo (áreas, descripciones, etiquetas) no se traduce.
 biblioteca-titulo = Biblioteca
-biblioteca-inicio-texto = Las lecturas se ejecutan al abrirlas, con los secretos enmascarados. Las escrituras pasan por el gestor de cambios: ves el antes y el después, el panel vigila el router tras aplicarlas y revierte si deja de responder.
+biblioteca-inicio-texto = Las lecturas se ejecutan al abrirlas; las contraseñas y claves salen censuradas, con un ojo para verlas. Las escrituras pasan por el gestor de cambios: ves el antes y el después, el panel vigila el router tras aplicarlas y revierte si deja de responder.
 biblioteca-inicio-total = { $n } funciones del router, de la web básica, la avanzada y las que no enlaza ningún menú.
 biblioteca-buscar = Buscar función
 biblioteca-buscar-placeholder = Nombre o descripción
@@ -82,7 +82,9 @@ biblioteca-leer-de-nuevo = Leer de nuevo
 biblioteca-sin-js = Tu navegador tiene JavaScript desactivado.
 biblioteca-sin-hidratar = La Biblioteca lee del router desde el navegador y necesita JavaScript. Si lo tienes activado y este aviso no se va, recarga la página.
 biblioteca-sin-datos = La respuesta no trae datos.
-biblioteca-xml = XML de la respuesta (enmascarado)
+biblioteca-xml = XML de la respuesta
+biblioteca-xml-mostrar-claves = Mostrar claves en el XML
+biblioteca-xml-ocultar-claves = Ocultar claves en el XML
 biblioteca-vacio-par = (vacío)
 biblioteca-vacio = vacío
 biblioteca-valor-desconocido = (valor desconocido: { $valor })

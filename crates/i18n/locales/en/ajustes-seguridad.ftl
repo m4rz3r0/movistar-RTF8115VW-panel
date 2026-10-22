@@ -31,7 +31,7 @@ ajuste-seguridad-gestion_remota_avanzado-intervalo-semana-desc = One check-in a 
 ## Remote management: server and keys
 ajuste-seguridad-gestion_remota_oculto-titulo = Remote management server and keys
 ajuste-seguridad-gestion_remota_oculto-desc = The address of the operator's server and the keys the router and the operator use to recognise each other.
-ajuste-seguridad-gestion_remota_oculto-ayuda = The operator sets these and they are never shown. If you type one wrong, the operator can no longer manage the router until you undo the change. Only change them if the operator asks you to.
+ajuste-seguridad-gestion_remota_oculto-ayuda = The operator sets these; the passwords are hidden, with an eye button to show them. If you type one wrong, the operator can no longer manage the router until you undo the change. Only change them if the operator asks you to.
 ajuste-seguridad-gestion_remota_oculto-servidor = Operator's server address
 ajuste-seguridad-gestion_remota_oculto-servidor-desc = The web address the router contacts, for example https://gestion.example. No spaces or accented letters.
 ajuste-seguridad-gestion_remota_oculto-usuario = User name with the operator

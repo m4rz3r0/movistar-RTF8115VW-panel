@@ -31,4 +31,5 @@ mod menu;
 mod panel_ajustes;
 mod poller;
 mod red;
+mod sensibles;
 mod vista;

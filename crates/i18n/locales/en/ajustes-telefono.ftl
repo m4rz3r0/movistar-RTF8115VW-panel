@@ -17,7 +17,7 @@ ajuste-telefono-linea-contrasena-desc = The password the line uses to sign in to
 ## Phone line: account and direct line
 ajuste-telefono-linea_oculto-titulo = Line account and direct line
 ajuste-telefono-linea_oculto-desc = The details the line uses to identify itself to the operator, and the automatic call when you pick up.
-ajuste-telefono-linea_oculto-ayuda = The operator sets these and they are hidden. If you type one wrong, the landline stops working until you undo the change. To save any of them you have to type the line password, which the router won't let be read. Only change them if the operator asks you to.
+ajuste-telefono-linea_oculto-ayuda = The operator sets these. If you type one wrong, the landline stops working until you undo the change. To save any of them you have to type the line password, which the router won't let be read. Only change them if the operator asks you to.
 ajuste-telefono-linea_oculto-usuario = Line user name
 ajuste-telefono-linea_oculto-usuario-desc = The name the line uses to identify itself to the operator.
 ajuste-telefono-linea_oculto-linea_directa = Direct line
@@ -46,7 +46,7 @@ ajuste-telefono-sip-fax-desc = Sends faxes in a way designed for the internet, w
 ## Calls: operator's servers
 ajuste-telefono-sip_oculto-titulo = Operator's phone servers
 ajuste-telefono-sip_oculto-desc = The addresses the router connects to in order to make and receive calls.
-ajuste-telefono-sip_oculto-ayuda = The operator sets these and the addresses are never shown. If you type one wrong, the landline stops working until you undo the change. Only change them if the operator asks you to.
+ajuste-telefono-sip_oculto-ayuda = The operator sets these. If you type one wrong, the landline stops working until you undo the change. Only change them if the operator asks you to.
 ajuste-telefono-sip_oculto-activo = Internet phone on
 ajuste-telefono-sip_oculto-activo-desc = If you turn it off, the router stops connecting to the operator for calls and the landline does not work.
 ajuste-telefono-sip_oculto-activo-recomendado = Recommended if you use the landline. Pros: the router connects to the operator and the landline can make and receive calls. Cons: none significant for most people.

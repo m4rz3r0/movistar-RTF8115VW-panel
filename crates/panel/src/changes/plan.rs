@@ -156,7 +156,19 @@ pub(super) fn iguales(p: Option<&Parametro>, a: &str, b: &str) -> bool {
     }
 }
 
+/// ¿El gestor trata `nombre` como secreto? Lo es por el catálogo o por la
+/// máscara en cualquiera de sus dos niveles: un dato sensible (un usuario,
+/// una URL) también va cifrado, enmascarado en el diff guardado y en los
+/// registros, y bloqueado en la web básica, aunque en pantalla se vea en
+/// claro ([`para_mostrar`]).
 pub(super) fn es_secreto_param(f: &Funcion, m: &Mascara, nombre: &str) -> bool {
+    es_credencial(f, m, nombre) || m.es_protegido(nombre)
+}
+
+/// ¿Es `nombre` una credencial (contraseña, clave, PIN), por el catálogo o
+/// por la máscara? Solo esas van censuradas en pantalla y, vacías en una
+/// petición, quieren decir «sin tocar»: un dato sensible vacío se borra.
+pub(super) fn es_credencial(f: &Funcion, m: &Mascara, nombre: &str) -> bool {
     f.parametro(nombre)
         .is_some_and(|p| p.tipo == TipoParam::Secret)
         || m.es_secreto(nombre)
@@ -322,7 +334,7 @@ pub(super) fn componer(
     let mut de_la_lectura = BTreeSet::new();
     for (k, v) in valores {
         let p = f.parametro(k);
-        let vacio = !explicito && es_secreto_param(f, m, k) && v.trim().is_empty();
+        let vacio = !explicito && es_credencial(f, m, k) && v.trim().is_empty();
         if v == MASCARA || vacio {
             if let Some(cur) = buscar(actual, k) {
                 efectivos.insert(k.clone(), cur.to_owned());
@@ -567,9 +579,31 @@ pub(super) fn visible(campos: &[Campo]) -> Diff {
                 antes: ver(c, &c.antes),
                 despues: ver(c, &c.despues),
                 secreto: c.secreto,
+                sensible: false,
             })
             .collect(),
     }
+}
+
+/// Diff para la pantalla (la confirmación de un cambio): solo las
+/// credenciales enmascaradas ([`es_credencial`], o un valor que la máscara
+/// censura en pantalla); los datos sensibles, en claro y marcados
+/// `sensible` (su `Debug` los sigue tapando). No se guarda: lo guardado es
+/// [`visible`].
+pub(super) fn para_mostrar(f: &Funcion, m: &Mascara, campos: &[Campo]) -> Diff {
+    let mut d = visible(campos);
+    for (cd, c) in d.campos.iter_mut().zip(campos) {
+        let credencial = es_credencial(f, m, &c.nombre)
+            || m.oculta_en_pantalla(&c.nombre, &c.antes)
+            || m.oculta_en_pantalla(&c.nombre, &c.despues);
+        if c.secreto && !credencial {
+            cd.antes = c.antes.clone();
+            cd.despues = c.despues.clone();
+            cd.secreto = false;
+            cd.sensible = true;
+        }
+    }
+    d
 }
 
 /// Resumen del diff para los registros (secretos enmascarados).
@@ -584,3 +618,5 @@ pub(super) fn resumen(campos: &[Campo]) -> String {
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_sensibles;

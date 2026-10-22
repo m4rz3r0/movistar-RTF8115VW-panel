@@ -87,7 +87,7 @@ async fn secretos_solo_en_su_campo() {
 }
 
 #[tokio::test]
-async fn usuarios_del_router_por_pares_y_secretos() {
+async fn usuarios_del_router_por_pares_y_en_claro() {
     let p = PanelPrueba::nuevo().arrancar().await;
     let cookie = sesion(&p).await;
     let tema = leer(&p, &cookie, "seguridad").await;
@@ -107,13 +107,18 @@ async fn usuarios_del_router_por_pares_y_secretos() {
         ]
     );
     for i in instancias {
-        assert_eq!(campo(i, "nombre")["valor"], "Secreto", "{i}");
+        // El nombre de usuario es un dato sensible, no un secreto: en claro,
+        // sin ojo.
+        assert_eq!(
+            campo(i, "nombre")["valor"],
+            json!({ "Texto": "X-REDACTED-X" }),
+            "{i}"
+        );
         assert_eq!(
             campo(i, "nombre")["solo_lectura"],
             "ajuste-seguridad-usuarios_router-motivo"
         );
-        // El nombre (secreto) va solo en su campo aparte, para el ojo.
-        assert_eq!(campo(i, "nombre")["valor_secreto"], "X-REDACTED-X", "{i}");
+        assert!(campo(i, "nombre")["valor_secreto"].is_null(), "{i}");
     }
     // TR-069 es una opción, con la apagada recomendada.
     let remota = ajuste(&tema, "seguridad.gestion_remota");

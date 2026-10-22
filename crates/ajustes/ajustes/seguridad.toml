@@ -56,14 +56,14 @@ leer = { funcion = "cbGetTr69Config" }
 id = "servidor"
 escribe = { funcion = "cbSetTr69Config", parametro = "acs_URL" }
 lee = "acs_URL"
-tipo = "secreto"
+tipo = "texto"
 validar = { min = 1, max = 256, ascii = true }
 
 [[ajuste.campo]]
 id = "usuario"
 escribe = { funcion = "cbSetTr69Config", parametro = "acs_username" }
 lee = "acs_username"
-tipo = "secreto"
+tipo = "texto"
 validar = { min = 1, max = 256 }
 
 [[ajuste.campo]]
@@ -77,7 +77,7 @@ validar = { min = 1, max = 256 }
 id = "usuario_entrada"
 escribe = { funcion = "cbSetTr69Config", parametro = "connectionRequestUsername" }
 lee = "connectionRequestUsername"
-tipo = "secreto"
+tipo = "texto"
 validar = { min = 1, max = 256 }
 
 [[ajuste.campo]]
@@ -110,7 +110,7 @@ leer = { funcion = "cbGetUserList" }
 [[ajuste.campo]]
 id = "nombre"
 lee = "UserName"
-tipo = "secreto"
+tipo = "texto"
 solo_lectura = "ajuste-seguridad-usuarios_router-motivo"
 
 [[ajuste.campo]]

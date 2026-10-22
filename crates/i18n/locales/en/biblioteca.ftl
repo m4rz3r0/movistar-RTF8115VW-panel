@@ -1,7 +1,7 @@
 # Library of router functions (route /explorador): the interface. What comes from the
 # catalogue (areas, descriptions, labels) is not translated.
 biblioteca-titulo = Library
-biblioteca-inicio-texto = Reads run when you open them, with secrets masked. Writes go through the change manager: you see the before and after, and the panel watches the router after applying them and reverts if it stops responding.
+biblioteca-inicio-texto = Reads run when you open them; passwords and keys are hidden, with an eye button to show them. Writes go through the change manager: you see the before and after, and the panel watches the router after applying them and reverts if it stops responding.
 biblioteca-inicio-total = { $n } router functions, from the basic web interface, the advanced web interface and those no menu links to.
 biblioteca-buscar = Find a function
 biblioteca-buscar-placeholder = Name or description
@@ -82,7 +82,9 @@ biblioteca-leer-de-nuevo = Read again
 biblioteca-sin-js = JavaScript is turned off in your browser.
 biblioteca-sin-hidratar = The Library reads from the router in the browser and needs JavaScript. If it is on and this notice does not go away, reload the page.
 biblioteca-sin-datos = The response has no data.
-biblioteca-xml = Response XML (masked)
+biblioteca-xml = Response XML
+biblioteca-xml-mostrar-claves = Show keys in the XML
+biblioteca-xml-ocultar-claves = Hide keys in the XML
 biblioteca-vacio-par = (empty)
 biblioteca-vacio = empty
 biblioteca-valor-desconocido = (unknown value: { $valor })

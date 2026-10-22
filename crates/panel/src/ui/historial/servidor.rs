@@ -51,13 +51,67 @@ async fn vinculo(state: &AppState, id: i64) -> Result<Option<Vinculo>, ServerFnE
     }))
 }
 
+/// Valores en claro de lo que el gestor guardó como secreto en un cambio:
+/// `(orden, parámetro, antes, después, tapado)`.
+type Claros = [(i64, String, Option<String>, Option<String>, bool)];
+
+/// ¿Puede ser un dato sensible el campo del diff guardado `d`? Lo guardado
+/// como secreto que, por su nombre, no se censura en pantalla.
+fn puede_ser_sensible(o: &Ocultar, d: &crate::changes::CampoDiff) -> bool {
+    d.secreto && !o.oculto(&d.nombre, "")
+}
+
+/// Pone en claro, en el diff del paso `orden`, los datos sensibles que el
+/// gestor guardó enmascarados (sus valores van cifrados): en pantalla solo
+/// se censuran los secretos de verdad. Un campo cuyo valor la pantalla
+/// censuraría se queda como estaba.
+fn revelar_sensibles(o: &Ocultar, diff: &mut crate::changes::Diff, orden: i64, claros: &Claros) {
+    for d in diff.campos.iter_mut().filter(|d| puede_ser_sensible(o, d)) {
+        let Some((_, _, antes, despues, _)) = claros
+            .iter()
+            .find(|(n, nombre, ..)| *n == orden && *nombre == d.nombre)
+        else {
+            continue;
+        };
+        let (antes, despues) = (
+            antes.clone().unwrap_or_default(),
+            despues.clone().unwrap_or_default(),
+        );
+        if o.oculto(&d.nombre, &antes) || o.oculto(&d.nombre, &despues) {
+            continue;
+        }
+        d.antes = antes;
+        d.despues = despues;
+        d.secreto = false;
+        d.sensible = true;
+    }
+}
+
 async fn fila_cambio(
     state: &AppState,
     o: &Ocultar,
     de_ajustes: &Etiquetas,
-    c: Cambio,
+    mut c: Cambio,
 ) -> Result<CambioFila, ServerFnError> {
     let g = gestor(state)?;
+    // Los datos sensibles, en claro (se descifra este cambio solo si tiene
+    // alguno).
+    let con_sensibles = c
+        .pasos
+        .iter()
+        .flat_map(|p| &p.diff.campos)
+        .chain(&c.diff.campos)
+        .any(|d| puede_ser_sensible(o, d));
+    if con_sensibles {
+        let claros = g.secretos_en_claro(c.id).await;
+        for p in &mut c.pasos {
+            revelar_sensibles(o, &mut p.diff, p.orden, &claros);
+        }
+        if let [p] = c.pasos.as_slice() {
+            let orden = p.orden;
+            revelar_sensibles(o, &mut c.diff, orden, &claros);
+        }
+    }
     let (por, deshace) = g.enlaces_deshacer(c.id).await;
     // Un deshacer guardado sin título (antes de que lo llevaran) toma el del
     // cambio que deshace: así no se queda con el nombre de la función.
@@ -197,9 +251,14 @@ pub async fn secretos_del_cambio(
     cambio: i64,
 ) -> Result<Vec<SecretoDelCambio>, ServerFnError> {
     let g = gestor(state)?;
+    let o = Ocultar::new(state);
+    // Solo los secretos de verdad: los datos sensibles ya van en claro en la
+    // fila.
+    let secreto = |nombre: &str, v: &Option<String>| o.oculto(nombre, v.as_deref().unwrap_or(""));
     Ok(g.secretos_en_claro(cambio)
         .await
         .into_iter()
+        .filter(|(_, nombre, antes, despues, _)| secreto(nombre, antes) || secreto(nombre, despues))
         .map(|(orden, nombre, antes, despues, tapado)| SecretoDelCambio {
             orden,
             nombre,

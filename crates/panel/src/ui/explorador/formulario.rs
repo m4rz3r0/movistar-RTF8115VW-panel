@@ -8,7 +8,7 @@ use super::{
     en_el_navegador, formulario, instancias, preparar_cambio, texto_error, validar_campo,
 };
 use crate::t;
-use crate::ui::{Estado, IconoEstado};
+use crate::ui::{Estado, IconoEstado, secreto::Secreto};
 use leptos::{ev::SubmitEvent, prelude::*, task::spawn_local};
 
 /// Qué formulario se muestra.
@@ -447,6 +447,20 @@ fn control(i: usize, c: &CampoForm, s: RwSignal<String>, op: Operacion) -> impl 
             }
             .into_any()
         }
+        // Al editar, el secreto con su valor, censurado, y el ojo: el mismo
+        // campo de Ajustes.
+        TipoCampo::Secret if op == Operacion::Editar => {
+            let nombre = p.etiqueta.clone();
+            let invalido = Signal::derive(move || error.with(Option::is_some));
+            if c.sin_leer {
+                let vacio = t!("secreto-sin-leer");
+                view! { <Secreto valor=s nombre editable=true id=id.clone() vacio descrito=describe.clone() invalido /> }
+                    .into_any()
+            } else {
+                view! { <Secreto valor=s nombre editable=true id=id.clone() descrito=describe.clone() invalido /> }
+                    .into_any()
+            }
+        }
         TipoCampo::Secret => view! {
             <input
                 id=id
@@ -484,6 +498,7 @@ fn control(i: usize, c: &CampoForm, s: RwSignal<String>, op: Operacion) -> impl 
         }
     };
     let es_secreto = p.tipo == TipoCampo::Secret && op == Operacion::Editar;
+    let original = c.valor.clone();
     view! {
         <div class="campo">
             {etiqueta}
@@ -494,7 +509,7 @@ fn control(i: usize, c: &CampoForm, s: RwSignal<String>, op: Operacion) -> impl 
                     {es_secreto.then(|| view! {
                         " "
                         <span class="sin-cambios">
-                            {move || if s.with(|v| v == MASCARA) { t!("biblioteca-sin-cambios") } else { t!("biblioteca-se-cambiara") }}
+                            {move || if s.with(|v| *v == original) { t!("biblioteca-sin-cambios") } else { t!("biblioteca-se-cambiara") }}
                         </span>
                     })}
                 </p>
@@ -560,10 +575,15 @@ fn Formulario(
             form.with_value(|f| (f.funcion.clone(), f.instancia.clone(), f.claves.clone()));
         campos.with_value(|c| {
             for (c, s) in c {
-                let v = s.get_untracked();
+                let mut v = s.get_untracked();
                 // Al crear o ejecutar, lo que se deja vacío no se envía.
                 if op != Operacion::Editar && v.trim().is_empty() {
                     continue;
+                }
+                // Un secreto sin tocar va como MASCARA: el gestor reenvía el
+                // valor que lee (y se niega si no sirve para reenviarlo).
+                if op == Operacion::Editar && c.param.tipo == TipoCampo::Secret && v == c.valor {
+                    v = MASCARA.to_owned();
                 }
                 valores.push((c.param.nombre.clone(), v));
             }

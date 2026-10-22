@@ -26,8 +26,10 @@ Las funciones del propio panel (`/api/…`) están en
   (alto). Las lecturas no tienen riesgo. Las funciones **bloqueadas** no se
   invocan nunca desde el panel.
 - En la lectura pareada, `{param}` es el valor de ese parámetro en la
-  escritura. Elementos marcados con 🔒 se enmascaran siempre
-  (`crates/catalogo/secretos.toml`).
+  escritura. Los elementos marcados con 🔒 son secretos (en pantalla,
+  censurados con el ojo) y los marcados «(sensible)», datos personales
+  que en pantalla se ven en claro; los dos se enmascaran siempre en los
+  registros (`crates/catalogo/secretos.toml`).
 
 ## Resumen
 
@@ -56,7 +58,7 @@ Las funciones del propio panel (`/api/…`) están en
 
 Estado de la fibra (GPON): estado de la ONT, serie y contraseña GPON (enmascaradas).
 
-Elementos de la respuesta: `AcsSerialNumber` 🔒, `GponSerialNumber` 🔒, `Opstatus`, `Password` 🔒
+Elementos de la respuesta: `AcsSerialNumber` (sensible), `GponSerialNumber` (sensible), `Opstatus`, `Password` 🔒
 
 ### `cbGetIpIntf`
 
@@ -187,7 +189,7 @@ Lista: instancia por `ip_intf_0i`
 |---|---|---|---|
 | `ip_intf_0i` | Conexión WAN (índice) | int |  |
 
-Elementos de la respuesta: `ac_name`, `adm_state`, `dhcpv4_req_opt60_value`, `dhcpv4_req_opt61_value`, `dhcpv4_req_opt77_value`, `dis_ipv4_addr`, `dis_ipv4_gw`, `dis_ipv6_addr`, `dns_override`, `dnsv4_svr0`, `dnsv4_svr1`, `idle_dis_time`, `ip_intf_0i`, `ip_intf_id`, `ipcpv4_req_local_addr`, `ipv4_adm_state`, `ipv4_opr_status`, `ipv6_addr_type`, `ipv6_adm_state`, `ipv6_opr_status`, `ipv6_type`, `ipv6_unnumbered`, `mll_wanconn_data`, `mtu`, `name`, `opr_app_mask`, `opr_status`, `password` 🔒, `ppp_passthru`, `service_name`, `static_ipv4_addr`, `static_ipv4_gw`, `static_ipv4_mask`, `trigger`, `untagged`, `username` 🔒, `vlan8021p`, `vlanid`, `wan_type`
+Elementos de la respuesta: `ac_name`, `adm_state`, `dhcpv4_req_opt60_value`, `dhcpv4_req_opt61_value`, `dhcpv4_req_opt77_value`, `dis_ipv4_addr`, `dis_ipv4_gw`, `dis_ipv6_addr`, `dns_override`, `dnsv4_svr0`, `dnsv4_svr1`, `idle_dis_time`, `ip_intf_0i`, `ip_intf_id`, `ipcpv4_req_local_addr`, `ipv4_adm_state`, `ipv4_opr_status`, `ipv6_addr_type`, `ipv6_adm_state`, `ipv6_opr_status`, `ipv6_type`, `ipv6_unnumbered`, `mll_wanconn_data`, `mtu`, `name`, `opr_app_mask`, `opr_status`, `password` 🔒, `ppp_passthru`, `service_name`, `static_ipv4_addr`, `static_ipv4_gw`, `static_ipv4_mask`, `trigger`, `untagged`, `username` (sensible), `vlan8021p`, `vlanid`, `wan_type`
 
 ### `cbSetWanIPIntf`
 
@@ -206,7 +208,7 @@ Lista: instancia por `ip_intf_id`; `del=DEL` borra
 | `vlanid` | VLAN | int |  |
 | `vlan8021p` | Prioridad 802.1p | enum | `0` 0, `1` 1, `2` 2, `3` 3, `4` 4, `5` 5, `6` 6, `7` 7 |
 | `wan_type` | Tipo de conexión | enum | `0` PPPoE, `1` DHCP, `2` IP estática |
-| `username` | Usuario PPP | secret |  |
+| `username` | Usuario PPP | text |  |
 | `password` | Contraseña | secret |  |
 | `service_name` | Nombre de servicio PPPoE | text |  |
 | `ac_name` | Concentrador PPPoE (AC) | text |  |
@@ -237,7 +239,7 @@ Lectura pareada: `te_multipuesto_monopuesto.asp`
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
 | `userselection` | Modo (multipuesto/monopuesto) | text |  |
-| `PPPoEUsername` | Usuario PPPoE | secret |  |
+| `PPPoEUsername` | Usuario PPPoE | text |  |
 | `PPPoEPassword` | Contraseña PPPoE | secret |  |
 | `curWebPage` | Página de retorno | text |  |
 
@@ -252,7 +254,7 @@ Lectura pareada: `te_mapa_red_local.asp`
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
 | `userselection` | Modo (multipuesto/monopuesto) | text |  |
-| `PPPoEUsername` | Usuario PPPoE | secret |  |
+| `PPPoEUsername` | Usuario PPPoE | text |  |
 | `PPPoEPassword` | Contraseña PPPoE | secret |  |
 | `curWebPage` | Página de retorno | text |  |
 
@@ -1265,7 +1267,7 @@ Lista: instancia por `rtm_ddns_id`; `del=DEL` borra
 | `provider` | Proveedor | enum | `0` No-IP, `1` Now-IP, `2` DynDNS, `3` Now-DNS |
 | `hostname` | Nombre de host | text |  |
 | `ip_intf_id` | Interfaz IP | int |  |
-| `account` | Cuenta | secret |  |
+| `account` | Cuenta | text |  |
 | `password` | Contraseña | secret |  |
 | `rtm_ddns_id` | Entrada DDNS (id; -1 = nueva) | int |  |
 
@@ -1646,7 +1648,7 @@ Líneas de voz: número, usuario y contraseña SIP (enmascarados), servicios.
 |---|---|---|---|
 | `interwork_id` | Línea (id) | int |  |
 
-Elementos de la respuesta: `adm_state`, `auth_password` 🔒, `auth_username` 🔒, `call_forward_on_busy`, `call_forward_on_busy_number` 🔒, `call_forward_on_no_answer`, `call_forward_on_no_answer_number` 🔒, `call_forward_unconditional`, `call_forward_unconditional_number` 🔒, `call_status`, `call_transfer`, `call_waiting`, `clt_status`, `codec_0_adm_state`, `codec_0_id`, `codec_0_order`, `codec_0_ptime`, `codec_0_type`, `codec_1_adm_state`, `codec_1_id`, `codec_1_order`, `codec_1_ptime`, `codec_1_type`, `codec_2_adm_state`, `codec_2_id`, `codec_2_order`, `codec_2_ptime`, `codec_2_type`, `codec_3_adm_state`, `codec_3_id`, `codec_3_order`, `codec_3_ptime`, `codec_3_type`, `directory_number` 🔒, `do_not_disturb`, `fxs_intf`, `interwork_id`, `mwi`, `polarity_reverse`, `register_uri` 🔒, `rx_anonymous_call_rejection`, `tr104_issue1_vp_line`, `tx_not_adm_state`, `vad_state`, `warmline_hotline`, `warmline_hotline_number` 🔒, `warmline_hotline_timeout`
+Elementos de la respuesta: `adm_state`, `auth_password` 🔒, `auth_username` (sensible), `call_forward_on_busy`, `call_forward_on_busy_number` (sensible), `call_forward_on_no_answer`, `call_forward_on_no_answer_number` (sensible), `call_forward_unconditional`, `call_forward_unconditional_number` (sensible), `call_status`, `call_transfer`, `call_waiting`, `clt_status`, `codec_0_adm_state`, `codec_0_id`, `codec_0_order`, `codec_0_ptime`, `codec_0_type`, `codec_1_adm_state`, `codec_1_id`, `codec_1_order`, `codec_1_ptime`, `codec_1_type`, `codec_2_adm_state`, `codec_2_id`, `codec_2_order`, `codec_2_ptime`, `codec_2_type`, `codec_3_adm_state`, `codec_3_id`, `codec_3_order`, `codec_3_ptime`, `codec_3_type`, `directory_number` (sensible), `do_not_disturb`, `fxs_intf`, `interwork_id`, `mwi`, `polarity_reverse`, `register_uri` (sensible), `rx_anonymous_call_rejection`, `tr104_issue1_vp_line`, `tx_not_adm_state`, `vad_state`, `warmline_hotline`, `warmline_hotline_number` (sensible), `warmline_hotline_timeout`
 
 ### `cbSetVoiceLine`
 
@@ -1661,11 +1663,11 @@ Lectura pareada: `cbGetVoiceLine` con `interwork_id={interwork_id}`
 | `adm_state` | Activado | enum | `1` Activado, `0` Desactivado |
 | `warmline_hotline_flag` | Modo línea directa | int |  |
 | `warmline_hotline` | Línea directa (hotline/warmline) | bool |  |
-| `warmline_hotline_number` | Número de la línea directa | secret |  |
+| `warmline_hotline_number` | Número de la línea directa | text |  |
 | `warmline_hotline_timeout` | Espera de la warmline (s) | int |  |
 | `interwork_id` | Línea (id) | int |  |
 | `web` | Origen del formulario (BASIC/ADVANCED) | text |  |
-| `auth_username` | Usuario SIP | secret |  |
+| `auth_username` | Usuario SIP | text |  |
 | `auth_password` | Contraseña SIP | secret |  |
 | `vad_state` | Detección de silencio (VAD) | enum | `1` Activado, `0` Desactivado |
 
@@ -1699,7 +1701,7 @@ Lectura pareada: `cbGetVoicePhysical`
 
 Configuración SIP: servidores proxy y de registro, dominio, tiempos y DTMF.
 
-Elementos de la respuesta: `adm_state`, `alt_outbound_proxy_cfg` 🔒, `alt_outbound_proxy_port`, `alt_proxy_server_cfg` 🔒, `alt_proxy_server_port`, `alt_proxy_server_transport`, `alt_registrar_server_cfg` 🔒, `alt_registrar_server_port`, `alt_registrar_server_transport`, `conference_call_domain_uri` 🔒, `conference_call_remote_mixer_enable`, `digit_map_str`, `dtmf_method`, `hook_flash_method`, `invite_expires`, `ip_intf_id`, `map_id`, `min_session_expires`, `net_status`, `opr_outbound_proxy`, `outbound_proxy_cfg` 🔒, `outbound_proxy_port`, `proxy_server_cfg` 🔒, `proxy_server_port`, `proxy_server_transport`, `region`, `register_expires`, `register_min_expires`, `register_retry_interval`, `registrar_server_cfg` 🔒, `registrar_server_port`, `registrar_server_transport`, `registration_period`, `reinvite_expires`, `rtp_dscp_mark`, `session_expires`, `sip_clt_id`, `sip_dscp_mark`, `t38_enable`, `tr104_issue1_vp_sip`, `user_agent_domain` 🔒, `user_agent_port`, `user_agent_transport`
+Elementos de la respuesta: `adm_state`, `alt_outbound_proxy_cfg` (sensible), `alt_outbound_proxy_port`, `alt_proxy_server_cfg` (sensible), `alt_proxy_server_port`, `alt_proxy_server_transport`, `alt_registrar_server_cfg` (sensible), `alt_registrar_server_port`, `alt_registrar_server_transport`, `conference_call_domain_uri` (sensible), `conference_call_remote_mixer_enable`, `digit_map_str`, `dtmf_method`, `hook_flash_method`, `invite_expires`, `ip_intf_id`, `map_id`, `min_session_expires`, `net_status`, `opr_outbound_proxy`, `outbound_proxy_cfg` (sensible), `outbound_proxy_port`, `proxy_server_cfg` (sensible), `proxy_server_port`, `proxy_server_transport`, `region`, `register_expires`, `register_min_expires`, `register_retry_interval`, `registrar_server_cfg` (sensible), `registrar_server_port`, `registrar_server_transport`, `registration_period`, `reinvite_expires`, `rtp_dscp_mark`, `session_expires`, `sip_clt_id`, `sip_dscp_mark`, `t38_enable`, `tr104_issue1_vp_sip`, `user_agent_domain` (sensible), `user_agent_port`, `user_agent_transport`
 
 ### `cbSetVoiceSip`
 
@@ -1722,15 +1724,15 @@ Lectura pareada: `cbGetVoiceSip`
 | `rtp_dscp_mark` | DSCP de RTP | int |  |
 | `web` | Origen del formulario (BASIC/ADVANCED) | text |  |
 | `ip_intf_id` | Interfaz IP | int |  |
-| `user_agent_domain` | Dominio SIP | secret |  |
+| `user_agent_domain` | Dominio SIP | text |  |
 | `user_agent_port` | Puerto local SIP | int |  |
 | `user_agent_transport` | Transporte local | enum | `1` UDP |
-| `outbound_proxy_cfg` | Proxy de salida | secret |  |
+| `outbound_proxy_cfg` | Proxy de salida | text |  |
 | `outbound_proxy_port` | Puerto del proxy de salida | int |  |
-| `proxy_server_cfg` | Servidor proxy | secret |  |
+| `proxy_server_cfg` | Servidor proxy | text |  |
 | `proxy_server_port` | Puerto del proxy | int |  |
 | `proxy_server_transport` | Transporte del proxy | enum | `1` UDP |
-| `registrar_server_cfg` | Servidor de registro | secret |  |
+| `registrar_server_cfg` | Servidor de registro | text |  |
 | `registrar_server_port` | Puerto de registro | int |  |
 | `registrar_server_transport` | Transporte de registro | enum | `1` UDP |
 | `digit_map_str` | Plan de marcación | text |  |
@@ -1746,7 +1748,7 @@ Lectura pareada: `cbGetVoiceSip`
 
 TR-069: activación, URL y credenciales del ACS, Inform periódico y credenciales de connection request (enmascaradas). Solo la usa cwmp.asp, que ningún menú enlaza.
 
-Elementos de la respuesta: `acs_URL` 🔒, `acs_password` 🔒, `acs_username` 🔒, `connectionRequestPassword` 🔒, `connectionRequestURL` 🔒, `connectionRequestUsername` 🔒, `cwmp_data`, `enableCWMP`, `periodicInformEnable`, `periodicInformInterval`
+Elementos de la respuesta: `acs_URL` (sensible), `acs_password` 🔒, `acs_username` (sensible), `connectionRequestPassword` 🔒, `connectionRequestURL` (sensible), `connectionRequestUsername` (sensible), `cwmp_data`, `enableCWMP`, `periodicInformEnable`, `periodicInformInterval`
 
 ### `cbSetTr69Config`
 
@@ -1759,12 +1761,12 @@ Lectura pareada: `cbGetTr69Config`
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
 | `enableCWMP` | TR-069 activado | enum | `1` Activado, `0` Desactivado |
-| `acs_URL` | URL del ACS | secret |  |
-| `acs_username` | Usuario del ACS | secret |  |
+| `acs_URL` | URL del ACS | text |  |
+| `acs_username` | Usuario del ACS | text |  |
 | `acs_password` | Contraseña del ACS | secret |  |
 | `periodicInformEnable` | Inform periódico | enum | `1` Activado, `0` Desactivado |
 | `periodicInformInterval` | Intervalo de Inform (s) | int |  |
-| `connectionRequestUsername` | Usuario de connection request | secret |  |
+| `connectionRequestUsername` | Usuario de connection request | text |  |
 | `connectionRequestPassword` | Contraseña de connection request | secret |  |
 
 ## Usuarios
@@ -1779,7 +1781,7 @@ Lectura pareada: `cbGetUserList`
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
-| `rqUser` | Usuario | secret |  |
+| `rqUser` | Usuario | text |  |
 | `rqPwd` | Contraseña | secret |  |
 | `rqGroup` | Grupo (user/admin/system) | text |  |
 
@@ -1793,7 +1795,7 @@ Inicio de sesión en la UI avanzada: devuelve SessionID. Usuario y contraseña v
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
-| `rqUsername` | Usuario (XOR 0x1f) | secret |  |
+| `rqUsername` | Usuario (XOR 0x1f) | text |  |
 | `rqPasswd` | Contraseña (XOR 0x1f) | secret |  |
 | `rqTimeout` | Caducidad de la sesión (s) | int |  |
 
@@ -1821,7 +1823,7 @@ Lectura pareada: `cbGetUserList`
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
-| `rqDelList` | Usuarios a borrar | secret |  |
+| `rqDelList` | Usuarios a borrar | text |  |
 
 ### `cbGetUserList`
 
@@ -1829,7 +1831,7 @@ Lectura pareada: `cbGetUserList`
 
 Lista los usuarios de la interfaz web con su rol. Incluye un usuario oculto del operador, con rol system, que la interfaz no deja tocar (su nombre se enmascara).
 
-Elementos de la respuesta: `UserName` 🔒, `UserRole`
+Elementos de la respuesta: `UserName` (sensible), `UserRole`
 
 ### `cbModifyPwd`
 
@@ -1841,7 +1843,7 @@ Cambia la contraseña del usuario con sesión iniciada (contraseña actual y nue
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
-| `rqUser` | Usuario | secret |  |
+| `rqUser` | Usuario | text |  |
 | `rqOPwd` | Contraseña actual | secret |  |
 | `rqNPwd` | Contraseña nueva | secret |  |
 
@@ -1855,7 +1857,7 @@ Cambia la contraseña y el grupo de otro usuario (ventana user_profile_modifyOth
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
-| `rqUser` | Usuario | secret |  |
+| `rqUser` | Usuario | text |  |
 | `rqNPwd` | Contraseña nueva | secret |  |
 | `rqGroup` | Grupo (user/admin/system) | text |  |
 
@@ -1870,7 +1872,7 @@ Inicio de sesión en la UI básica (formulario de te_acceso_router.asp): fija la
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
 | `curWebPage` | Página de retorno | text |  |
-| `loginUsername` | Usuario (XOR 0x1f) | secret |  |
+| `loginUsername` | Usuario (XOR 0x1f) | text |  |
 | `loginPassword` | Contraseña (XOR 0x1f) | secret |  |
 
 ### `te_cambio_contrasena.cgi`
