@@ -5,8 +5,8 @@
 //! y se pinta como `<span class="secreto">••••••</span>`.
 
 use crate::t;
-use crate::ui::Estado;
-use crate::ui::comun::Insignia;
+use crate::ui::comun::{EstadoVisual, IconoEmision, Insignia};
+use crate::ui::{Estado, IconosOcultos};
 use leptos::prelude::*;
 
 /// Lo que se muestra en lugar de un valor secreto.
@@ -48,6 +48,9 @@ pub enum Celda {
     Secreto,
     /// Estado con icono y texto.
     Estado(Estado, String),
+    /// Red WiFi: el icono de emisión del color de su estado y el SSID en
+    /// monoespaciada. Bajo [`IconosOcultos`] (modo «texto»), sin icono.
+    Red(EstadoVisual, String),
     /// Sin valor («—»).
     Vacia,
 }
@@ -64,6 +67,19 @@ fn celda(c: Celda) -> AnyView {
         .into_any(),
         Celda::Estado(estado, texto) => {
             view! { <Insignia estado=estado.into() texto /> }.into_any()
+        }
+        Celda::Red(estado, ssid) => {
+            let ocultos = use_context::<IconosOcultos>().map(|o| o.0);
+            let icono = move || {
+                (!ocultos.is_some_and(|o| o.get())).then(|| view! { <IconoEmision estado /> })
+            };
+            view! {
+                <span class="celda-red">
+                    {icono}
+                    <span class="mono">{ssid}</span>
+                </span>
+            }
+            .into_any()
         }
         Celda::Vacia => view! {
             <span class="vacia" aria-hidden="true">"—"</span>
@@ -137,7 +153,9 @@ pub fn Tabla(
             .into_any()
     };
     view! {
-        <div class="tabla-scroll">
+        // Enfocable: si la tabla no cabe a lo ancho, se desplaza con el
+        // teclado (axe, scrollable-region-focusable).
+        <div class="tabla-scroll" tabindex="0">
             <table class="tabla">
                 {move || titulo.get().map(|t| view! { <caption>{t}</caption> })}
                 <thead>
@@ -213,5 +231,33 @@ mod tests {
         // Sin pedirlo, todas son celdas normales.
         let h = html(columnas, filas);
         assert!(!h.contains("scope=\"row\""), "{h}");
+    }
+
+    #[test]
+    fn red_con_su_icono_de_emision_y_desplazable_con_el_teclado() {
+        let h = html(
+            vec![Columna::new("SSID")],
+            vec![vec![Celda::Red(EstadoVisual::Emite, "RED-1".into())]],
+        );
+        assert!(h.contains("emision emision-ok"), "{h}");
+        assert!(h.contains("<span class=\"mono\">RED-1</span>"), "{h}");
+        // La tabla puede desplazarse a lo ancho: se alcanza con el teclado.
+        assert!(
+            h.contains(r#"<div tabindex="0" class="tabla-scroll">"#),
+            "{h}"
+        );
+        // En el modo «texto» (iconos ocultos), solo el SSID.
+        let h = Owner::new().with(|| {
+            provide_context(IconosOcultos(Signal::stored(true)));
+            view! {
+                <Tabla
+                    columnas=vec![Columna::new("SSID")]
+                    filas=vec![vec![Celda::Red(EstadoVisual::Apagada, "RED-1".into())]]
+                />
+            }
+            .to_html()
+        });
+        assert!(!h.contains("<svg"), "{h}");
+        assert!(h.contains("RED-1"), "{h}");
     }
 }

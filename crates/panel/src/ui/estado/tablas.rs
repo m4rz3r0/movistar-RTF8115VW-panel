@@ -88,8 +88,15 @@ fn filas_wifi(v: &EstadoVista) -> Vec<Vec<Celda>> {
             } else {
                 t!("estado-canal", canal = r.canal.as_str())
             };
+            // El icono de emisión dice el estado antes que el texto: verde
+            // si emite, gris si está apagada.
+            let emision = if r.activa {
+                EstadoVisual::Emite
+            } else {
+                EstadoVisual::Apagada
+            };
             vec![
-                Celda::Texto(r.ssid.clone()),
+                Celda::Red(emision, r.ssid.clone()),
                 Celda::Texto(format!("{} · {canal}", r.banda)),
                 estado,
                 Celda::Texto(r.seguridad.clone()),

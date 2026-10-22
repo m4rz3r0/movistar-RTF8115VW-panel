@@ -40,7 +40,7 @@
   border: 1px solid var(--borde);
   border-radius: var(--radio);
   background: var(--sup);
-  font-size: 12px;
+  font-size: 12.5px;
 }
 
 .resultado-lectura {

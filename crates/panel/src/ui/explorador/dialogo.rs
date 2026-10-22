@@ -89,7 +89,7 @@ pub fn TablaDiff(campos: Vec<CampoCambio>, #[prop(optional)] sin_nombres: bool) 
         })
         .collect_view();
     view! {
-        <div class="tabla-scroll">
+        <div class="tabla-scroll" tabindex="0">
             <table class="tabla">
                 <thead>
                     <tr>

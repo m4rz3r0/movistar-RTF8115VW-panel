@@ -335,7 +335,7 @@ fn tabla_instancias(
         t!("biblioteca-instancias", n = i.total)
     };
     view! {
-        <div class="tabla-scroll">
+        <div class="tabla-scroll" tabindex="0">
             <table class="tabla">
                 <caption>{titulo}</caption>
                 <thead>
