@@ -29,6 +29,7 @@ mod rejilla;
 mod reservas;
 mod resumen;
 mod seleccion;
+mod sin_guardar;
 mod tarjeta;
 
 use crate::ajustes_router::{CADUCIDAD_LECTURAS, leer_tema};

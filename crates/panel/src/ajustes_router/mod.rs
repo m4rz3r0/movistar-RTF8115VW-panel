@@ -20,7 +20,6 @@ pub use vistas::*;
 
 use leptos::prelude::*;
 use leptos::server_fn::codec::Json;
-use std::net::Ipv4Addr;
 
 /// Cuánto vale una lectura del router para mostrar: la caché del servidor
 /// (`crate::lecturas`) y la precarga de temas de la página.
@@ -101,32 +100,6 @@ pub async fn leer_tema(
     #[server(default)] fresca: bool,
 ) -> Result<PaginaTema, ServerFnError> {
     servidor::leer_tema(tema, fresca).await
-}
-
-/// Los dispositivos que el router conoce en la red de casa, los conectados
-/// primero y por IP, con su conexión y su reserva (lecturas para mostrar,
-/// como [`leer_tema`]). Exige sesión; la respuesta va con `no-store`.
-#[server(endpoint = "leer_dispositivos", input = Json)]
-pub async fn leer_dispositivos() -> Result<Vec<DispositivoVista>, ServerFnError> {
-    servidor::leer_dispositivos().await
-}
-
-/// IP y máscara del router en la red de casa (`None` si no da ninguna
-/// legible): la página valida con ellas una reserva antes de enviarla (el
-/// servidor la vuelve a validar leyendo el router). Lectura para mostrar,
-/// como [`leer_tema`].
-#[server(endpoint = "leer_red_casa", input = Json)]
-pub async fn leer_red_casa() -> Result<Option<(Ipv4Addr, Ipv4Addr)>, ServerFnError> {
-    servidor::leer_red_casa().await
-}
-
-/// Las IP de las IP fijas del router (solo eso: es lo que usa la página):
-/// Puertos las usa para saber si el dispositivo de destino de una regla
-/// sigue en la red ([`destino_inexistente`]). Lectura para mostrar, como
-/// [`leer_tema`].
-#[server(endpoint = "leer_reservas", input = Json)]
-pub async fn leer_reservas() -> Result<Vec<String>, ServerFnError> {
-    servidor::leer_reservas().await
 }
 
 /// Lo que ha cambiado desde la foto de partida (la lectura del asistente

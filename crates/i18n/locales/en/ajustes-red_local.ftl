@@ -20,6 +20,7 @@ ajuste-red_local-dispositivos-fijar-de = Fix this IP: { $ip } ({ $equipo })
 ajuste-red_local-dispositivos-ya-fija = Already has a fixed IP: { $ip }
 ajuste-red_local-dispositivos-no-fijable = This IP can't be fixed
 ajuste-red_local-dispositivos-fijar-desconectado = Connect it to fix its IP
+ajuste-red_local-dispositivos-conexion-ninguna = —
 ajuste-red_local-dispositivos-sin-ip-fija = No fixed IP
 ajuste-red_local-dispositivos-vacia = The router doesn't know any device on your network yet.
 
@@ -39,6 +40,7 @@ ajuste-red_local-reservas-col-ip = IP address
 ajuste-red_local-reservas-col-activa = Active
 ajuste-red_local-reservas-activa-de = Fixed IP of { $equipo } active
 ajuste-red_local-reservas-estado-conectado = Connected
+ajuste-red_local-reservas-estado-activa = Active
 ajuste-red_local-reservas-estado-desactivada = Turned off
 ajuste-red_local-reservas-anadir = Add fixed IP
 ajuste-red_local-reservas-nueva = New fixed IP

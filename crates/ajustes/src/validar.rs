@@ -167,6 +167,7 @@ fn comprobar_ajuste(a: &Ajuste, f: &Catalogo, m: &Mascara, fallos: &mut Vec<Stri
         }
         comprobar_campo(a, campo, f, m, fallos);
         comprobar_requiere(a, campo, fallos);
+        comprobar_recomendado_si(a, campo, fallos);
         let escritura = campo.escribe.as_ref().and_then(|e| f.funcion(&e.funcion));
         if let Some(func) = escritura.filter(|_| a.lista) {
             comprobar_id_de_lista(a, func, m, fallos);
@@ -238,6 +239,32 @@ fn comprobar_requiere(a: &Ajuste, c: &Campo, fallos: &mut Vec<String>) {
             "{donde}: requiere con «{}», que no es un valor válido del campo",
             r.cuando
         ));
+    }
+}
+
+/// `recomendado_si`: el campo tiene recomendación, y la condición es otro
+/// campo del mismo ajuste con un valor válido suyo.
+fn comprobar_recomendado_si(a: &Ajuste, c: &Campo, fallos: &mut Vec<String>) {
+    let Some(r) = &c.recomendado_si else {
+        return;
+    };
+    let donde = format!("{}.{}", a.id, c.id);
+    if c.recomendado.is_none() && !c.opciones.iter().any(|o| o.recomendada) {
+        fallos.push(format!("{donde}: recomendado_si sin recomendación"));
+    }
+    match a.campo(&r.campo) {
+        Some(e) if e.id != c.id => {
+            if traducir(e, &r.cuando).is_err() {
+                fallos.push(format!(
+                    "{donde}: recomendado_si con «{}», que no es un valor válido de {}",
+                    r.cuando, e.id
+                ));
+            }
+        }
+        _ => fallos.push(format!(
+            "{donde}: recomendado_si {}, que no es otro campo del ajuste",
+            r.campo
+        )),
     }
 }
 

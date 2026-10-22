@@ -329,3 +329,44 @@ async fn apagada_desde_segun_el_historial() {
     );
     assert!(elemento(&pagina, "red-5")["pie"]["apagada_desde"].is_null());
 }
+
+/// Con IPv6 apagado en casa, los anuncios no se recomiendan: la tarjeta de
+/// IPv6 no pide nada (su recomendación solo vale con IPv6 encendido).
+#[tokio::test]
+async fn ipv6_apagado_sin_recomendacion_de_anuncios() {
+    let p = PanelPrueba::nuevo().arrancar().await;
+    let cookie = sesion(&p).await;
+    let pagina = leer(&p, &cookie, "red_local").await;
+    let ipv6 = elemento(&pagina, "ipv6");
+    assert_eq!(ipv6["interruptor"]["encendido"], false, "{ipv6}");
+    assert!(ipv6["recomendacion"].is_null(), "{ipv6}");
+    assert_eq!(ipv6["texto_estado"], "Como se recomienda", "{ipv6}");
+    let anuncios = ipv6["ajustes"][0]["campos"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["id"] == "anuncios")
+        .unwrap();
+    assert!(anuncios["recomendado"].is_null(), "{anuncios}");
+}
+
+/// «Ahora: …» de un sí/no sin textos propios se lee natural, con su nombre
+/// y sin «, Sí» (en los dos idiomas).
+#[tokio::test]
+async fn ahora_de_un_si_no_se_lee_natural() {
+    let p = PanelPrueba::nuevo().arrancar().await;
+    let cookie = sesion(&p).await;
+    // UPnP encendido (no es lo recomendado).
+    p.state
+        .hgu
+        .write("upnp.asp", "cbSetUpnpCfg", &[("adm_state", "1")])
+        .await
+        .unwrap();
+    let pagina = leer(&p, &cookie, "puertos").await;
+    let reco = &elemento(&pagina, "upnp")["recomendacion"];
+    assert_eq!(reco["problema"], "Ahora: UPnP activado.", "{reco}");
+    let en = format!("{cookie}; rp_lang=en");
+    let pagina = leer(&p, &en, "puertos").await;
+    let reco = &elemento(&pagina, "upnp")["recomendacion"];
+    assert_eq!(reco["problema"], "Currently on: UPnP on.", "{reco}");
+}

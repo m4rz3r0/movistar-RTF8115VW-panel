@@ -11,10 +11,8 @@ código, junto a cada `#[server(endpoint = "…")]`.
 
 | Función | Qué hace |
 |---|---|
-| `leer_tema` | Los ajustes de un tema (`wifi`, `puertos`…) con su valor actual del router. Cada lectura se hace una vez; si una falla, solo sus ajustes quedan sin leer. 404 si el tema no existe. `no-store`. |
-| `leer_dispositivos` | Los dispositivos que el router conoce en la red de casa, con su conexión y su IP fija. `no-store`. |
-| `leer_red_casa` | La IP y la máscara del router en la red de casa, para validar una IP fija antes de enviarla. |
-| `leer_reservas` | Las direcciones reservadas como IP fijas, para avisar de una regla de puertos cuyo dispositivo ya no está. |
+| `leer_tema` | La página de un tema (`wifi`, `puertos`…): sus elementos con el valor actual del router y, en Puertos y Red local, la red de casa (los dispositivos, la IP y la máscara del router y las IP fijas). Cada lectura se hace una vez; si una falla, solo lo que la usa queda sin leer. 404 si el tema no existe. `no-store`. |
+| `preparar_accion` | Prepara una acción sobre varios elementos de un tema (quitar el WPS de dos redes, borrar tres reglas de puertos): un solo cambio con un paso por elemento y un solo deshacer. Al borrar varias instancias de una lista, de mayor a menor id y comprobando, antes de cada paso, que la instancia sigue siendo la misma. |
 | `preparar_ajuste` | Prepara el guardado de un ajuste: lee el router, calcula lo que cambia en cada paso y devuelve el resumen con su token. 409 si ya está así o hay otro cambio en curso; 403 en solo lectura; 400 si un valor no vale. |
 | `confirmar_ajuste` | Aplica el ajuste preparado (sin los pasos desmarcados) y devuelve el id del cambio, que se sigue con `estado_cambio`. |
 | `deshacer_ajuste` | Prepara el cambio que deshace uno aplicado desde Ajustes; se confirma con `confirmar_ajuste`. |

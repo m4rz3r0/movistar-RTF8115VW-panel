@@ -475,6 +475,7 @@ pub(super) fn inversa(plan: &Plan) -> Option<ChangeRequest> {
         instancia,
         valores,
         borrar,
+        identidad: Default::default(),
     })
 }
 

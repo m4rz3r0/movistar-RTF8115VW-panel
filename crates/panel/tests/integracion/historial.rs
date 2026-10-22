@@ -331,6 +331,7 @@ async fn grupo_es_una_fila_con_sus_pasos() {
                 .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
                 .collect(),
             borrar: false,
+            identidad: Default::default(),
         },
         etiqueta: e.map(str::to_owned),
     };

@@ -204,6 +204,8 @@ for (const idioma of ["es", "en"] as const) {
           await form.getByRole("button", { name: t.cancelar }).click();
           await page.locator("dialog[open]").getByRole("button", { name: t.descartar }).click();
           await page.waitForURL((u) => u.pathname === "/ajustes/puertos");
+          // El foco vuelve al botón que lo abrió.
+          await expect(reglas(page, t).getByRole("button", { name: t.abrir })).toBeFocused();
           // desc-1 pasa al 8081 (deja libre el 8080).
           await puertoDeDesc1(page, t, "8081");
           // Ahora sí: 8080 TCP a host-2.
@@ -218,11 +220,12 @@ for (const idioma of ["es", "en"] as const) {
           await expect(dialogo.getByText("192.168.1.62")).toBeVisible();
           sinApi(await dialogo.innerText());
           await aplicar(page, t);
-          // La regla nueva, en la lista (ya releída), hacia host-2 y sin aviso.
+          // La regla nueva, en la lista (ya releída), hacia host-2 y sin
+          // aviso; su detalle (el de una nueva) se ha cerrado solo.
           const nueva = fila(page, t, t.nombreNuevo);
           await expect(nueva).toHaveCount(1);
-          await page.getByRole("button", { name: t.cerrar }).click();
           await expect(page.locator(".detalle-lateral")).toHaveCount(0);
+          await page.waitForURL((u) => u.pathname === "/ajustes/puertos");
           await expect(nueva).toContainText("8080");
           await expect(nueva).toContainText("host-2");
           await expect(nueva.locator(".lista-estado")).not.toContainText(t.sinDestino);
@@ -247,6 +250,9 @@ for (const idioma of ["es", "en"] as const) {
           ).toHaveClass(/b-pel/);
           await aplicar(page, t, t.borrar);
           await expect(fila(page, t, t.nombreNuevo)).toHaveCount(0);
+          // Borrada, su detalle se cierra.
+          await expect(page.locator(".detalle-lateral")).toHaveCount(0);
+          await page.waitForURL((u) => u.pathname === "/ajustes/puertos");
           await puertoDeDesc1(page, t, "8080");
         } else {
           // Un puerto del dispositivo que no existe, con su plegable

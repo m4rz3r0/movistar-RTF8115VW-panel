@@ -5,8 +5,9 @@ import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 // «Cómo estaba al instalar» (/ajustes/foto-de-partida) contra router-sim: el
 // panel instalado del e2e tiene foto de partida y, después, UPnP y la clave
 // de la red de 5 GHz cambiados (e2e_grupo). Se entra desde la cabecera de
-// Puertos, se vuelve UPnP a su valor de la foto con el diálogo de siempre y
-// se deja como estaba; a 360 px, la clave que cambió se ve con el ojo; en
+// Puertos, se vuelve UPnP a su valor de la foto con el diálogo de siempre
+// (Esc no lo cierra mientras confirma) y se deja como estaba; a 360 px, la
+// clave que cambió se ve con el ojo; en
 // Teléfono, volver a un valor pide la clave de la línea (el router no la
 // deja leer).
 //
@@ -77,7 +78,19 @@ test("volver UPnP a como estaba al instalar", async ({ page }) => {
   const dialogo = page.locator("dialog[open]");
   await expect(dialogo.locator("#grupo-titulo")).toHaveText("Revisa el cambio");
   sinApi(await dialogo.innerText());
+  // Mientras confirma, Esc no cierra el diálogo.
+  await page.route(
+    "**/api/confirmar_ajuste",
+    async (r) => {
+      await new Promise((ok) => setTimeout(ok, 1_500));
+      await r.continue();
+    },
+    { times: 1 },
+  );
   await dialogo.getByRole("button", { name: "Aplicar", exact: true }).click();
+  await expect(dialogo.getByRole("button", { name: "Aplicando…" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialogo).toBeVisible();
   await expect(dialogo.getByText("Hecho: el router tiene ya el cambio.")).toBeVisible({
     timeout: PLAZO_CAMBIO,
   });

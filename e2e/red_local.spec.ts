@@ -154,6 +154,8 @@ for (const idioma of ["es", "en"] as const) {
         await form.getByRole("button", { name: t.cancelar }).click();
         await page.locator("dialog[open]").getByRole("button", { name: t.descartar }).click();
         await expect(form).toHaveCount(0);
+        // El foco vuelve al botón que lo abrió.
+        await expect(fijas.getByRole("button", { name: t.anadir })).toBeFocused();
 
         // «Fijar esta IP»: el resumen con la MAC y la IP actuales.
         // El nombre accesible empieza por lo que se ve (WCAG 2.5.3).
@@ -190,6 +192,7 @@ for (const idioma of ["es", "en"] as const) {
           await expect(page.locator("dialog[open]")).toBeVisible();
           await aplicar(page, t, t.borrar);
           await expect(fila(page, t.fijas, "192.168.1.62")).toHaveCount(0);
+          await expect(page.locator(".detalle-lateral")).toHaveCount(0);
           const otraVez = await abrir(page, t.dispositivos, "host-2");
           await expect(otraVez.getByRole("button", { name: t.fijarHost2 })).toBeVisible();
         } else {

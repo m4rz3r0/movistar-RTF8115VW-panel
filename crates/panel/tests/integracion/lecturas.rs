@@ -1,5 +1,5 @@
-//! Lecturas para mostrar (`leer_tema`, `leer_dispositivos`,
-//! `leer_red_casa`): caché corta que se invalida al escribir y tanda sin
+//! Lecturas para mostrar (`leer_tema`, con la red de casa en Puertos y Red
+//! local): caché corta que se invalida al escribir y tanda sin
 //! lecturas de otros intercaladas. Lo que prepara un cambio sigue leyendo el
 //! router.
 
@@ -62,8 +62,7 @@ async fn volver_a_un_tema_no_lee_el_router() {
 
 /// La página de Red local lee en su misma tanda los dispositivos (con las
 /// estaciones de cada radio) y la red de casa: una sola server fn por
-/// página. Después, `leer_dispositivos` y `leer_red_casa` salen enteras de
-/// la caché.
+/// página. La segunda vez, todo de la caché.
 #[tokio::test]
 async fn dispositivos_y_red_de_casa_tambien_de_la_cache() {
     let p = PanelPrueba::nuevo().arrancar().await;
@@ -86,27 +85,7 @@ async fn dispositivos_y_red_de_casa_tambien_de_la_cache() {
     }
     assert!(pagina["red"]["dispositivos"].is_array(), "{pagina}");
     let antes = p.sim.control.reads().len();
-    let dispositivos = ok(&p, "leer_dispositivos", json!({}), &cookie).await;
-    let red = ok(&p, "leer_red_casa", json!({}), &cookie).await;
-    assert_eq!(lecturas_desde(&p, antes), vec![]);
-    assert_eq!(pagina["red"]["dispositivos"], dispositivos);
-    assert_eq!(pagina["red"]["lan"], red);
-}
-
-/// Sin pasar por Red local, `leer_dispositivos` y `leer_red_casa` también
-/// guardan lo leído.
-#[tokio::test]
-async fn dispositivos_y_red_de_casa_se_guardan() {
-    let p = PanelPrueba::nuevo().arrancar().await;
-    let cookie = sesion(&p).await;
-    let primera = ok(&p, "leer_dispositivos", json!({}), &cookie).await;
-    let red = ok(&p, "leer_red_casa", json!({}), &cookie).await;
-    let antes = p.sim.control.reads().len();
-    assert_eq!(
-        ok(&p, "leer_dispositivos", json!({}), &cookie).await,
-        primera
-    );
-    assert_eq!(ok(&p, "leer_red_casa", json!({}), &cookie).await, red);
+    assert_eq!(leer(&p, &cookie, "red_local").await["red"], pagina["red"]);
     assert_eq!(lecturas_desde(&p, antes), vec![]);
 }
 
@@ -346,8 +325,9 @@ async fn un_error_de_la_funcion_no_corta_la_tanda() {
     assert!(r[&k[1]].is_ok(), "{:?}", r[&k[1]]);
 }
 
-/// Una lectura que falla deja una sola línea en el registro, también en
-/// `leer_dispositivos` y `leer_red_casa` (que responden 502).
+/// Cada lectura que falla deja una sola línea en el registro (la de la caché
+/// de lecturas), también las de la red de casa de una página, que responde
+/// igual (sin ellas).
 #[tokio::test]
 async fn una_linea_por_lectura_fallida() {
     let mut p = PanelPrueba::nuevo().arrancar().await;
@@ -363,13 +343,26 @@ async fn una_linea_por_lectura_fallida() {
             .finish(),
     );
     p.sim.control.set_unresponsive(true);
-    let (estado, _) = crate::comun::llamar(&p, "leer_red_casa", json!({}), Some(&cookie)).await;
+    let (estado, _) = crate::comun::llamar(
+        &p,
+        "leer_tema",
+        json!({ "tema": "red_local", "fresca": true }),
+        Some(&cookie),
+    )
+    .await;
     p.sim.control.set_unresponsive(false);
-    assert_eq!(estado, 502);
+    assert_eq!(estado, 200);
     let texto = registro.texto();
     let lineas: Vec<&str> = texto.lines().filter(|l| l.contains("WARN")).collect();
-    assert_eq!(lineas.len(), 1, "{texto}");
-    assert!(lineas[0].contains("cbGetLanIPv4Addr"), "{texto}");
+    assert!(
+        lineas.iter().any(|l| l.contains("cbGetLanIPv4Addr")),
+        "{texto}"
+    );
+    // Una por lectura, la de la caché de lecturas: la página no añade otra.
+    assert!(
+        lineas.iter().all(|l| l.contains("panel::lecturas:")),
+        "{texto}"
+    );
 }
 
 /// Una escritura que llega mientras la tanda espera su turno: lo que lee la
@@ -424,6 +417,7 @@ fn reserva(id: &str, ip: &str) -> ChangeRequest {
             .map(|(k, v)| (k.to_owned(), v.to_owned()))
             .collect(),
         borrar: false,
+        identidad: Default::default(),
     }
 }
 

@@ -59,6 +59,7 @@ pub(crate) fn grupo_de(a: &Ajuste, p: &PeticionAjuste) -> Result<GrupoRequest, E
                     instancia: p.instancia.clone().filter(|_| a.lista),
                     valores,
                     borrar: p.borrar && a.lista,
+                    identidad: Default::default(),
                 },
                 etiqueta: Some(titulo.clone()),
             })

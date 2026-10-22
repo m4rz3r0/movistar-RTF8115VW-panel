@@ -39,6 +39,15 @@ impl Tipo {
         }
     }
 
+    /// El componente de la lista (como `ajustes::Componente::slug`).
+    pub(crate) fn componente(self) -> Option<&'static str> {
+        Some(match self {
+            Tipo::Reglas => PUERTOS,
+            Tipo::Reservas => RESERVAS,
+            Tipo::Dispositivos => DISPOSITIVOS,
+        })
+    }
+
     /// Se crean instancias nuevas desde la página (la fila «nueva»).
     pub(crate) fn admite_nuevas(self) -> bool {
         self != Tipo::Dispositivos
@@ -68,7 +77,7 @@ pub(crate) struct Celda {
 }
 
 impl Celda {
-    fn texto(texto: String) -> Celda {
+    pub(super) fn texto(texto: String) -> Celda {
         let orden = Orden::Texto(texto.to_lowercase());
         Celda {
             texto,
@@ -80,7 +89,7 @@ impl Celda {
         }
     }
 
-    fn mono(texto: String, orden: Orden) -> Celda {
+    pub(super) fn mono(texto: String, orden: Orden) -> Celda {
         Celda {
             mono: true,
             orden,
@@ -164,9 +173,12 @@ fn celda_de_campo(i: &InstanciaVista, col: &str) -> Celda {
 
 /// Las filas de la lista `a` (de tipo `tipo`) con la red de casa `red`.
 pub(crate) fn filas(tipo: Tipo, a: &AjusteVista, red: &RedCasa) -> Vec<Fila> {
-    let dispositivos: &[DispositivoVista] = red.dispositivos.as_deref().unwrap_or_default();
+    // Sin la lista de dispositivos (no se pudo leer) no se inventa nada: ni
+    // filas de dispositivos ni si el de una IP fija está conectado.
+    let dispositivos = red.dispositivos.as_deref();
     match tipo {
         Tipo::Dispositivos => dispositivos
+            .unwrap_or_default()
             .iter()
             .map(|d| fila_de_dispositivo(a, d))
             .collect(),
@@ -256,32 +268,57 @@ fn fila_de_regla(a: &AjusteVista, i: &InstanciaVista, red: &RedCasa) -> Fila {
     }
 }
 
-/// Una IP fija: el dispositivo (por su MAC) y su IP debajo, y si está
-/// desactivada o si el dispositivo está conectado ahora.
-fn fila_de_reserva(a: &AjusteVista, i: &InstanciaVista, dispositivos: &[DispositivoVista]) -> Fila {
-    let mac = valor_de(&i.campos, "mac");
-    let d = dispositivos
-        .iter()
-        .find(|d| mac_comparable(&d.mac) == mac_comparable(&mac));
-    let celdas = celdas(a, i);
-    let encendida = activa(&celdas);
-    let (estado, clave) = match (encendida, d.is_some_and(|d| d.activo)) {
+/// Estado de una IP fija activa o no (`encendida`) cuyo dispositivo está
+/// conectado o no (`conectado`; `None` si no se pudieron leer los
+/// dispositivos: entonces no se dice).
+fn estado_de_reserva(
+    encendida: Option<bool>,
+    conectado: Option<bool>,
+) -> (EstadoVisual, &'static str) {
+    match (encendida, conectado) {
         (Some(false), _) => (
             EstadoVisual::Apagada,
             "ajuste-red_local-reservas-estado-desactivada",
         ),
-        (_, true) => (
+        (_, None) => (
+            EstadoVisual::Emite,
+            "ajuste-red_local-reservas-estado-activa",
+        ),
+        (_, Some(true)) => (
             EstadoVisual::Emite,
             "ajuste-red_local-reservas-estado-conectado",
         ),
-        (_, false) => (
+        (_, Some(false)) => (
             EstadoVisual::Apagada,
             "ajuste-red_local-dispositivos-desconectado",
         ),
+    }
+}
+
+/// Una IP fija: el dispositivo (por su MAC) y su IP debajo, y si está
+/// desactivada o si el dispositivo está conectado ahora.
+fn fila_de_reserva(
+    a: &AjusteVista,
+    i: &InstanciaVista,
+    dispositivos: Option<&[DispositivoVista]>,
+) -> Fila {
+    let mac = valor_de(&i.campos, "mac");
+    let d = dispositivos.map(|ds| {
+        ds.iter()
+            .find(|d| mac_comparable(&d.mac) == mac_comparable(&mac))
+    });
+    let celdas = celdas(a, i);
+    let encendida = activa(&celdas);
+    let conectado = d.map(|d| d.is_some_and(|d| d.activo));
+    let (estado, clave) = estado_de_reserva(encendida, conectado);
+    // Sin los dispositivos, tampoco su nombre: la MAC.
+    let nombre = match d {
+        None => mac.clone(),
+        Some(d) => nombre(d.map_or("", |d| d.nombre.as_str())),
     };
     Fila {
         id: i.id.clone(),
-        nombre: nombre(d.map_or("", |d| d.nombre.as_str())),
+        nombre,
         sub: Some(valor_de(&i.campos, "ip")).filter(|ip| !ip.is_empty()),
         sub_mono: true,
         activa: encendida,
@@ -301,9 +338,11 @@ fn fila_de_dispositivo(a: &AjusteVista, d: &DispositivoVista) -> Fila {
         .map(|col| match col.as_str() {
             "ip" => Celda::mono(d.ip.clone(), orden_ip(&d.ip)),
             "mac" => Celda::mono(d.mac.clone(), Orden::Texto(mac_comparable(&d.mac))),
-            "conexion" if !d.activo => {
-                Celda::texto(t!("ajuste-red_local-dispositivos-desconectado"))
-            }
+            // Desconectado, la conexión no se sabe (el estado ya lo dice).
+            "conexion" if !d.activo => Celda {
+                orden: Orden::Numero(u64::MAX),
+                ..Celda::texto(t!("ajuste-red_local-dispositivos-conexion-ninguna"))
+            },
             "conexion" => Celda::texto(conexion(&d.conexion)),
             "ip_fija" => match &d.ip_fija {
                 Some(ip) => Celda {
@@ -341,92 +380,35 @@ fn fila_de_dispositivo(a: &AjusteVista, d: &DispositivoVista) -> Fila {
     }
 }
 
-/// Por qué se ordena la lista: el nombre o una columna (su posición), y en
-/// qué sentido.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct Criterio {
-    /// `None`: el nombre.
-    pub columna: Option<usize>,
-    pub ascendente: bool,
-}
-
-impl Criterio {
-    /// Pulsar la cabecera `columna`: la primera vez, de menor a mayor; otra
-    /// vez la misma, al revés.
-    pub(crate) fn al_pulsar(self, columna: Option<usize>) -> Criterio {
-        Criterio {
-            columna,
-            ascendente: self.columna != columna || !self.ascendente,
-        }
-    }
-}
-
-/// Ordena `filas` según `c` (sin criterio, como las da el router).
-pub(crate) fn ordenar(filas: &mut [Fila], c: Option<Criterio>) {
-    let Some(c) = c else {
-        return;
-    };
-    let clave = |f: &Fila| match c.columna {
-        None => Orden::Texto(f.nombre.to_lowercase()),
-        Some(i) => f
-            .celdas
-            .get(i)
-            .map_or(Orden::Numero(u64::MAX), |x| x.orden.clone()),
-    };
-    filas.sort_by(|a, b| {
-        let o = clave(a).cmp(&clave(b));
-        if c.ascendente { o } else { o.reverse() }
-    });
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn fila(nombre: &str, puerto: u64) -> Fila {
-        Fila {
-            id: nombre.into(),
-            nombre: nombre.into(),
-            sub: None,
-            sub_mono: false,
-            celdas: vec![Celda::mono(puerto.to_string(), Orden::Numero(puerto))],
-            estado: EstadoVisual::Emite,
-            texto_estado: String::new(),
-            activa: None,
-        }
-    }
-
-    fn nombres(f: &[Fila]) -> Vec<&str> {
-        f.iter().map(|f| f.nombre.as_str()).collect()
-    }
-
-    /// Por número (el 9000 después del 800), por nombre, y al revés al
-    /// pulsar otra vez la misma cabecera.
-    #[test]
-    fn ordenar_por_columna() {
-        let mut f = vec![fila("b", 9000), fila("c", 800), fila("a", 27015)];
-        ordenar(&mut f, None);
-        assert_eq!(nombres(&f), ["b", "c", "a"], "sin criterio, como vienen");
-        let c = Criterio {
-            columna: None,
-            ascendente: true,
-        }
-        .al_pulsar(Some(0));
-        assert!(c.ascendente);
-        ordenar(&mut f, Some(c));
-        assert_eq!(nombres(&f), ["c", "b", "a"]);
-        let c = c.al_pulsar(Some(0));
-        assert!(!c.ascendente);
-        ordenar(&mut f, Some(c));
-        assert_eq!(nombres(&f), ["a", "b", "c"]);
-        let c = c.al_pulsar(None);
-        assert!(c.ascendente);
-        ordenar(&mut f, Some(c));
-        assert_eq!(nombres(&f), ["a", "b", "c"]);
-    }
-
     #[test]
     fn id_de_un_dispositivo() {
         assert_eq!(id_de_mac("02:00:00:00:00:0A"), "02-00-00-00-00-0a");
+    }
+
+    /// Sin los dispositivos leídos, una IP fija solo dice si está activa:
+    /// nunca «No conectado ahora».
+    #[test]
+    fn ip_fija_sin_dispositivos_no_inventa() {
+        let clave = |e, c| estado_de_reserva(e, c).1;
+        assert_eq!(
+            clave(Some(true), None),
+            "ajuste-red_local-reservas-estado-activa"
+        );
+        assert_eq!(
+            clave(Some(false), None),
+            "ajuste-red_local-reservas-estado-desactivada"
+        );
+        assert_eq!(
+            clave(Some(true), Some(true)),
+            "ajuste-red_local-reservas-estado-conectado"
+        );
+        assert_eq!(
+            clave(Some(true), Some(false)),
+            "ajuste-red_local-dispositivos-desconectado"
+        );
     }
 }

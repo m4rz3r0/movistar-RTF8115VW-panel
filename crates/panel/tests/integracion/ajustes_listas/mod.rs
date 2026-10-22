@@ -1,4 +1,4 @@
-//! Red local: los dispositivos conectados (`leer_dispositivos`) y las IP fijas
+//! Red local: los dispositivos conectados (la red de casa de `leer_tema`) y las IP fijas
 //! (reservas DHCP) creadas, borradas y deshechas como grupos de cambios,
 //! con la validación de una reserva (`validar_reserva`) igual en el
 //! servidor y en la página.
@@ -45,8 +45,13 @@ fn ip(s: &str) -> Ipv4Addr {
 // ------------------------------------------------------- en el simulador
 
 async fn dispositivos(p: &Panel, cookie: &str) -> Vec<Value> {
-    ok(p, "leer_dispositivos", json!({}), cookie)
-        .await
+    ok(
+        p,
+        "leer_tema",
+        json!({ "tema": "red_local", "fresca": true }),
+        cookie,
+    )
+    .await["red"]["dispositivos"]
         .as_array()
         .unwrap()
         .clone()

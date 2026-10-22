@@ -2,7 +2,7 @@
 //! pintarlas y las acciones sobre varias instancias marcadas (un grupo, un
 //! paso por instancia, un solo deshacer).
 
-use crate::comun::{Panel, PanelPrueba, aplicar_ajuste, llamar, ok};
+use crate::comun::{Panel, PanelPrueba, aplicar_ajuste, esperar_libre, llamar, ok};
 use serde_json::{Value, json};
 
 /// La página del tema `tema`, leída del router (sin la caché corta).
@@ -235,4 +235,51 @@ async fn pagina_de_una_lista() {
     // En los temas sin listas, nada de la red.
     let pag = pagina(&p, &cookie, "wifi").await;
     assert!(pag["red"].is_null(), "{}", pag["red"]);
+}
+
+/// Un borrado en lote va de mayor a menor id y, justo antes de cada paso,
+/// comprueba que la instancia sigue siendo la misma: si el router ha puesto
+/// otra regla en ese id (como si renumerase su lista), ese paso no se
+/// escribe, el cambio no se aplica (409, con el motivo) y no se borra nada.
+#[tokio::test]
+async fn borrar_en_lote_no_toca_una_instancia_renumerada() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    abrir_regla(&p, &cookie, "Consola", "9090").await;
+    let antes = reglas(&p, &cookie).await;
+    let ids: Vec<&str> = antes.iter().map(|(id, _, _)| id.as_str()).collect();
+    let (status, body) = accion(&p, &cookie, "puertos", "borrar_regla", &ids).await;
+    assert_eq!(status, 200, "{body}");
+    let g: Value = serde_json::from_str(&body).unwrap();
+    // El primer paso es el de mayor id.
+    let mayor = ids
+        .iter()
+        .max_by_key(|id| id.parse::<i64>().unwrap())
+        .unwrap()
+        .to_string();
+    // Entre preparar y confirmar, en ese id hay otra regla (otro puerto).
+    p.state
+        .hgu
+        .write(
+            "natportmap.asp",
+            "cbSetNatPortMapping",
+            &[
+                ("nat_port_mapping_id", mayor.as_str()),
+                ("ext_l4_port_min_value", "7070"),
+                ("ext_l4_port_max_value", "7070"),
+            ],
+        )
+        .await
+        .unwrap();
+    let (status, body) = llamar(
+        &p,
+        "confirmar_ajuste",
+        json!({ "token": g["token"], "desmarcados": [] }),
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(status, 409, "{body}");
+    assert!(body.contains("no se ha tocado nada"), "{body}");
+    esperar_libre(&p).await;
+    // No se ha borrado ninguna.
+    assert_eq!(reglas(&p, &cookie).await.len(), 2);
 }

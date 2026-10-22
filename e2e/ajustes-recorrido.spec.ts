@@ -247,7 +247,8 @@ for (const { idioma, locale, ancho } of pasadas) {
       await form.getByRole("button", { name: t.guardar }).click();
       await expect(dialogo).toContainText(`${t.reglas}: ${t.nombreRegla}`);
       await aplicarEnRejilla(page, t, "puerto");
-      await cerrarDetalle(page);
+      // El detalle de la regla nueva se cierra solo al aplicarse.
+      await expect(lateral).toHaveCount(0);
       const regla = fila(page, t.reglas, t.nombreRegla);
       await expect(regla).toContainText("8443");
       await expect(regla).toContainText("host-2");

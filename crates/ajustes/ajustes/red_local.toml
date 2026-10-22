@@ -98,6 +98,8 @@ escribe = { funcion = "cbSetLanIPv6Config", parametro = "radv_adm_state" }
 lee = "radv_adm_state"
 tipo = "booleano"
 recomendado = "true"
+# Sin IPv6 en casa, los anuncios no hacen nada: no se recomiendan.
+recomendado_si = { campo = "ipv6", cuando = "true" }
 
 # Encima de las listas, una tarjeta por ajuste que no es lista (spec §4.2).
 [[elemento]]

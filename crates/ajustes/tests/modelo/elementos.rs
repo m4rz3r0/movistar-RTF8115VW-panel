@@ -337,3 +337,38 @@ fn acciones_de_una_lista() {
         "campo nombre",
     );
 }
+
+/// `recomendado_si`: en un campo con recomendación y sobre otro campo del
+/// ajuste, con un valor suyo.
+#[test]
+fn recomendado_si_de_un_campo() {
+    let con = |cond: &str| {
+        WIFI.replace(
+            "invertido = true\nrecomendado = \"true\"",
+            &format!("invertido = true\nrecomendado = \"true\"\nrecomendado_si = {cond}"),
+        )
+    };
+    assert_eq!(
+        fallos(&con("{ campo = \"seguridad\", cuando = \"wpa2\" }"), ""),
+        Vec::<String>::new()
+    );
+    falla_con(
+        &fallos(&con("{ campo = \"nada\", cuando = \"wpa2\" }"), ""),
+        "wifi.red.visible",
+        "no es otro campo",
+    );
+    falla_con(
+        &fallos(&con("{ campo = \"seguridad\", cuando = \"quizá\" }"), ""),
+        "wifi.red.visible",
+        "no es un valor válido",
+    );
+    let sin_reco = WIFI.replace(
+        "lee = \"nombre\"\ntipo = \"texto\"",
+        "lee = \"nombre\"\ntipo = \"texto\"\nrecomendado_si = { campo = \"visible\", cuando = \"true\" }",
+    );
+    falla_con(
+        &fallos(&sin_reco, ""),
+        "wifi.red.nombre",
+        "sin recomendación",
+    );
+}

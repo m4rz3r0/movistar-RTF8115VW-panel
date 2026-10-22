@@ -223,10 +223,11 @@ pub(crate) fn DetalleDispositivo(
             .into_any()
         }
     };
+    // Desconectado, por dónde no se sabe (lo dice ya su insignia).
     let estado = if d.activo {
         conexion(&d.conexion)
     } else {
-        t!("ajuste-red_local-dispositivos-desconectado")
+        t!("ajuste-red_local-dispositivos-conexion-ninguna")
     };
     let con_fija = d.ip_fija.is_some();
     let fija = d

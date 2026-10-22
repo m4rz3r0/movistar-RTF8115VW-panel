@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
+import { cambiarUpnp, esperarFinal, plazoDeTest } from "./cambios";
 import {
   asentar,
   entrar,
@@ -233,11 +234,12 @@ for (const ancho of [360, 1440]) {
         await dialogo.getByRole("button", { name: t.cancelar }).click();
         await expect(page.locator("dialog[open]")).toHaveCount(0);
         await expect(filas(page).filter({ hasText: "desc-1" })).toHaveCount(1);
+        // Cancelar lo deja como estaba: el detalle sigue abierto.
+        await expect(detalle).toBeVisible();
+        expect(new URL(page.url()).pathname).toBe(`/ajustes/puertos/${id}`);
 
-        // Otra vez abierta, «✕» (o, en el móvil, «‹ Puertos») la cierra y la
-        // lista recupera su ancho.
-        await filas(page).filter({ hasText: "desc-1" }).locator(".lista-nombre").click();
-        await page.waitForURL((u) => u.pathname === `/ajustes/puertos/${id}`);
+        // «✕» (o, en el móvil, «‹ Puertos») lo cierra y la lista recupera su
+        // ancho.
         if (movil) {
           await page.getByRole("button", { name: "‹ Puertos" }).click();
         } else {
@@ -246,11 +248,53 @@ for (const ancho of [360, 1440]) {
         await page.waitForURL((u) => u.pathname === "/ajustes/puertos");
         await expect(page.locator(".detalle-lateral")).toHaveCount(0);
         expect(await anchoDeLaTabla(page)).toBeCloseTo(ancho0, 0);
+        // El foco vuelve a la fila.
+        await expect(filas(page).filter({ hasText: "desc-1" })).toBeFocused();
         // Y Esc también.
-        await filas(page).first().focus();
         await page.keyboard.press("Enter");
         await page.waitForURL((u) => u.pathname === `/ajustes/puertos/${id}`);
         await page.keyboard.press("Escape");
+        await page.waitForURL((u) => u.pathname === "/ajustes/puertos");
+        await expect(filas(page).filter({ hasText: "desc-1" })).toBeFocused();
+        // La regla nueva: al cerrar su detalle, el foco vuelve a «Abrir un
+        // puerto».
+        const abrir = page.getByRole("button", { name: "Abrir un puerto" });
+        await abrir.click();
+        await page.waitForURL((u) => u.pathname === "/ajustes/puertos/reglas");
+        await page.keyboard.press("Escape");
+        await page.waitForURL((u) => u.pathname === "/ajustes/puertos");
+        await expect(abrir).toBeFocused();
+        expect(errores, "errores o avisos en la consola").toEqual([]);
+      });
+
+      test("puertos: «Borrar» con cambios sin guardar, un solo diálogo", async ({ page }) => {
+        const errores = recogerErrores(page);
+        await entrar(page);
+        await page.goto("/ajustes/puertos");
+        await asentar(page);
+        const fila = filas(page).filter({ hasText: "desc-1" });
+        const id = (await fila.getAttribute("id"))?.replace(/^fila-/, "") ?? "";
+        await fila.locator(".lista-nombre").click();
+        await page.waitForURL((u) => u.pathname === `/ajustes/puertos/${id}`);
+        const detalle = page.locator(".detalle-lateral");
+        const nombre = detalle.getByLabel("Nombre", { exact: true });
+        await nombre.fill("desc-1 cambiada");
+        await detalle.getByRole("button", { name: "Borrar la regla desc-1" }).click();
+        // Solo la revisión del borrado, no la pregunta de los cambios.
+        const dialogo = page.locator("dialog[open]");
+        await expect(dialogo.locator("#grupo-titulo")).toHaveText(t.revisar);
+        await expect(dialogo).toHaveCount(1);
+        await dialogo.getByRole("button", { name: t.cancelar }).click();
+        await expect(page.locator("dialog[open]")).toHaveCount(0);
+        // Todo como estaba: el detalle abierto, con lo editado.
+        expect(new URL(page.url()).pathname).toBe(`/ajustes/puertos/${id}`);
+        await expect(nombre).toHaveValue("desc-1 cambiada");
+        // Al cerrarlo, la pregunta de siempre; se descarta.
+        await page.keyboard.press("Escape");
+        await page
+          .locator("dialog[open]")
+          .getByRole("button", { name: "Descartar los cambios" })
+          .click();
         await page.waitForURL((u) => u.pathname === "/ajustes/puertos");
         expect(errores, "errores o avisos en la consola").toEqual([]);
       });
@@ -295,3 +339,34 @@ for (const ancho of [360, 1440]) {
     });
   }
 }
+
+// Con otro cambio en curso, el interruptor de una fila no se aplica: el
+// aviso lo dice (409) y la fila vuelve a como estaba. Una sola combinación:
+// cambia UPnP de verdad (y lo deja como estaba).
+test.describe("listas: interruptor con otro cambio en curso", () => {
+  test.use({ locale: "es-ES", viewport: { width: 1440, height: 900 } });
+  test("la fila vuelve a su estado", async ({ page }) => {
+    test.setTimeout(plazoDeTest(2));
+    const errores = recogerErrores(page);
+    await entrar(page);
+    await page.goto("/ajustes/puertos");
+    await asentar(page);
+    const fila = filas(page).filter({ hasText: "desc-1" });
+    const activa = fila.getByRole("switch", { name: "Regla desc-1 activa" });
+    await expect(activa).toHaveAttribute("aria-checked", "true");
+    const cambio = await cambiarUpnp(page);
+    await activa.click();
+    const error = page.locator(".avisos-cambio [role=alert] .aviso-cambio");
+    await expect(error).toContainText("Hay otro cambio en curso");
+    await expect(activa).toHaveAttribute("aria-checked", "true");
+    await expect(fila.locator(".lista-estado")).toContainText("Sin dispositivo");
+    await esperarFinal(page, cambio);
+    // UPnP como estaba.
+    await esperarFinal(page, await cambiarUpnp(page));
+    // El 409 de la petición rechazada sale en la consola: es lo esperado.
+    expect(
+      errores.filter((e) => !e.includes("409")),
+      "errores o avisos en la consola",
+    ).toEqual([]);
+  });
+});

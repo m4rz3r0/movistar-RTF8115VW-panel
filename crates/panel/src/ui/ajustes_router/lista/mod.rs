@@ -14,14 +14,18 @@
 //! Lo marcado entra en la barra de la página como cualquier elemento
 //! ([`filas_de_la_pagina`]): activar, desactivar y borrar varias a la vez.
 
+mod borrador;
 mod columnas;
 mod detalle;
 mod fila;
 mod filtro;
+mod orden;
 
+pub(crate) use borrador::seguir_lo_editado;
 pub(crate) use columnas::Tipo;
+pub(crate) use fila::id_fila;
 
-use super::detalle::{Borrador, Borradores, Registro};
+use super::detalle::Registro;
 use super::piezas::{ayuda, detalles_tecnicos};
 use super::rejilla::Pagina;
 use super::seleccion::Seleccion;
@@ -33,17 +37,35 @@ use crate::t;
 use crate::ui::i18n::traducir;
 use crate::ui::{Estado, IconoEstado};
 use ajustes::TipoCampo;
-use columnas::{Criterio, Fila, cabecera, ordenar};
+use columnas::{Fila, cabecera};
 use detalle::DetalleFila;
 use fila::FilaLista;
 use filtro::{Filtro, coincide, hay_filtro};
 use leptos::prelude::*;
+use orden::{Criterio, ordenar};
 
 /// La lista del elemento `e`, si lo es (su ajuste es una lista con
 /// componente propio).
 fn lista_de(e: &ElementoVista) -> Option<(Tipo, &AjusteVista)> {
     let a = e.ajustes.first()?;
     Some((Tipo::de(a)?, a))
+}
+
+/// Id en la página del botón que crea una instancia nueva de la lista `id`
+/// («Abrir un puerto»): al cerrar su detalle, el foco vuelve a él.
+pub(crate) fn id_nueva(id: &str) -> String {
+    format!("lista-{id}-nueva")
+}
+
+/// Cómo se leyó la lista de tipo `tipo` (su ajuste, `lectura`): la de los
+/// dispositivos sale de la red de casa, y sin ella está sin leer (no vacía).
+fn lectura_de(tipo: Tipo, lectura: &EstadoLectura, red: &RedCasa) -> EstadoLectura {
+    match tipo {
+        Tipo::Dispositivos if red.dispositivos.is_none() => {
+            EstadoLectura::SinLeer(t!("ajustes-error-lectura"))
+        }
+        _ => lectura.clone(),
+    }
 }
 
 /// ¿Se pinta `e` como una lista (y no como una tarjeta)?
@@ -84,48 +106,6 @@ fn como_elemento(e: &ElementoVista, f: &Fila) -> ElementoVista {
         lectura: e.lectura.clone(),
         acciones: e.acciones.clone(),
     }
-}
-
-/// Namespace de lo editado en el formulario de una fila (en [`Borradores`]).
-const BORRADOR: &str = "fila";
-
-/// Sigue lo editado en el formulario de la fila `fila`: `campos` son el
-/// nombre de cada campo, su valor en edición y el leído. Lo que se editó
-/// antes de que la página volviera a leer vuelve a su sitio; desde ahora,
-/// se guarda mientras se edita, y `registro` dice si hay cambios sin
-/// guardar. Devuelve con qué olvidarlo (al preparar el cambio).
-pub(crate) fn seguir_lo_editado(
-    fila: String,
-    campos: Vec<(String, RwSignal<String>, String)>,
-    registro: Registro,
-) -> Callback<()> {
-    let borradores = expect_context::<Borradores>();
-    for ((ns, campo), v) in borradores.de(&fila) {
-        if let Some((_, s, _)) = campos
-            .iter()
-            .find(|(k, _, _)| ns == BORRADOR && *k == campo)
-        {
-            s.set(v);
-        }
-    }
-    let campos = StoredValue::new(campos);
-    let sucio = Signal::derive(move || {
-        campos.with_value(|cs| cs.iter().any(|(_, s, leido)| s.get() != *leido))
-    });
-    registro.set(Some((fila.clone(), sucio)));
-    let id = fila.clone();
-    Effect::new(move |_| {
-        let cambios: Borrador = campos.with_value(|cs| {
-            cs.iter()
-                .filter_map(|(k, s, leido)| {
-                    let v = s.get();
-                    (v != *leido).then(|| ((BORRADOR.to_owned(), k.clone()), v))
-                })
-                .collect()
-        });
-        borradores.guardar(&id, cambios);
-    });
-    Callback::new(move |()| borradores.olvidar(&fila))
 }
 
 /// Lo que comparten las filas de una lista.
@@ -214,7 +194,8 @@ pub(crate) fn Lista(
     let Some((tipo, a)) = lista_de(&e).map(|(t, a)| (t, a.clone())) else {
         return ().into_any();
     };
-    let leida = e.lectura == EstadoLectura::Leido;
+    let lectura = lectura_de(tipo, &e.lectura, &red);
+    let leida = lectura == EstadoLectura::Leido;
     let filas: Vec<Fila> = columnas::filas(tipo, &a, &red);
     let ids: Vec<String> = filas.iter().map(|f| f.id.clone()).collect();
     let interruptor = campo_interruptor(&a);
@@ -288,7 +269,12 @@ pub(crate) fn Lista(
             _ => t!("ajuste-red_local-reservas-anadir"),
         };
         view! {
-            <button type="button" class="b-sec lista-nueva" on:click=move |_| pagina.abrir.run(id.clone())>
+            <button
+                type="button"
+                class="b-sec lista-nueva"
+                id=id_nueva(&id)
+                on:click=move |_| pagina.abrir.run(id.clone())
+            >
                 {texto}
             </button>
         }
@@ -297,7 +283,7 @@ pub(crate) fn Lista(
         let clave = format!("{}-vacia", a.clave);
         view! { <p class="ayuda lista-vacia">{traducir(&clave, None)}</p> }
     });
-    let sin_leer = match &e.lectura {
+    let sin_leer = match &lectura {
         EstadoLectura::SinLeer(m) => Some(view! {
             <div class="tarjeta-sin-leer">
                 <p class="aviso estado-error">
@@ -382,4 +368,27 @@ pub(crate) fn Lista(
         </section>
     }
     .into_any()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Sin la red de casa, los dispositivos dicen «Sin leer», no que no hay
+    /// ninguno; las demás listas, como su ajuste.
+    #[test]
+    fn dispositivos_sin_leer() {
+        let sin = RedCasa::default();
+        let con = RedCasa {
+            dispositivos: Some(Vec::new()),
+            ..RedCasa::default()
+        };
+        let leido = EstadoLectura::Leido;
+        assert!(matches!(
+            lectura_de(Tipo::Dispositivos, &leido, &sin),
+            EstadoLectura::SinLeer(_)
+        ));
+        assert_eq!(lectura_de(Tipo::Dispositivos, &leido, &con), leido);
+        assert_eq!(lectura_de(Tipo::Reservas, &leido, &sin), leido);
+    }
 }

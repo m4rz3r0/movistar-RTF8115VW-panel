@@ -115,6 +115,10 @@ pub(crate) fn error_cambio(e: CambioError) -> ServerFnError {
             StatusCode::BAD_REQUEST,
             crate::t!("biblioteca-error-invalida", detalle = m),
         ),
+        E::InstanciaCambiada(m) => (
+            StatusCode::CONFLICT,
+            crate::t!("biblioteca-error-router", detalle = m),
+        ),
     };
     con_estado(status, msg)
 }
@@ -827,6 +831,7 @@ pub async fn preparar(state: &AppState, p: Peticion) -> Result<PreparadoVista, S
         instancia: p.instancia.clone(),
         valores: mapa(p.valores),
         borrar: p.borrar,
+        identidad: Default::default(),
     };
     let prep = g.preparar(req).await.map_err(error_cambio)?;
     Ok(vista_preparado(state, &g, prep))

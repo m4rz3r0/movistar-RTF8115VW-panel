@@ -34,6 +34,7 @@ fn paso(funcion: &str, instancia: Option<&str>, valores: &[(&str, &str)]) -> Pas
                 .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
                 .collect::<BTreeMap<_, _>>(),
             borrar: false,
+            identidad: Default::default(),
         },
         etiqueta: None,
     }

@@ -18,12 +18,13 @@ use super::lista::{Lista, es_lista, filas_de_la_pagina};
 use super::piezas::enfocar;
 use super::resumen::{LecturaDelTema, ResumenTema};
 use super::seleccion::{BarraSeleccion, Seleccion, nombre};
+use super::sin_guardar::SinGuardar;
 use super::tarjeta::{Tarjeta, id_tarjeta};
 use crate::ajustes_router::{ElementoVista, PaginaTema, preparar_accion};
 use crate::t;
 use crate::ui::explorador::texto_error;
 use crate::ui::{Estado, IconoEstado};
-use leptos::{ev, html, prelude::*, task::spawn_local};
+use leptos::{ev, prelude::*, task::spawn_local};
 use leptos_router::{NavigateOptions, hooks::use_navigate};
 
 /// Lo que comparten las tarjetas y el detalle de la rejilla.
@@ -105,6 +106,23 @@ pub(crate) fn teclas_de_tarjeta(ev: &ev::KeyboardEvent, id: &str, p: Pagina, sel
     }
 }
 
+/// Al cerrar el detalle de `id`, el foco vuelve a lo que lo abrió: su fila,
+/// su tarjeta o, en el de una instancia nueva (la dirección de su lista), el
+/// botón que la crea.
+fn enfocar_al_cerrar(id: &str) {
+    let candidatos = [
+        super::lista::id_fila(id),
+        id_tarjeta(id),
+        super::lista::id_nueva(id),
+    ];
+    if let Some(c) = candidatos
+        .iter()
+        .find(|c| document().get_element_by_id(c).is_some())
+    {
+        enfocar(c);
+    }
+}
+
 /// Esqueletos con la forma de las tarjetas, mientras se lee el tema.
 pub(crate) fn esqueleto() -> impl IntoView {
     let tarjeta = || {
@@ -161,7 +179,9 @@ pub(crate) fn ContenidoRejilla(
         move || {
             elemento
                 .get()
-                .filter(|e| existe(&Some(e.clone())).is_none())
+                // Lo recién borrado (o creado desde su detalle) deja su
+                // dirección: no es un error.
+                .filter(|e| existe(&Some(e.clone())).is_none() && !s.cerrado(e))
                 .map(|id| {
                     view! {
                         <p class="aviso estado-error" role="alert">
@@ -203,7 +223,7 @@ pub(crate) fn ContenidoRejilla(
         // (`enfocar_detalle`); al cerrar, vuelve a la tarjeta.
         match (destino, antes) {
             (Some(_), _) => enfocar_detalle.set(true),
-            (None, Some(a)) => request_animation_frame(move || enfocar(&id_tarjeta(&a))),
+            (None, Some(a)) => request_animation_frame(move || enfocar_al_cerrar(&a)),
             (None, None) => {}
         }
     };
@@ -254,21 +274,21 @@ pub(crate) fn ContenidoRejilla(
     };
     provide_context(pagina);
 
-    let peligrosas: Vec<String> = p
-        .acciones
-        .iter()
-        .filter(|a| a.peligro)
-        .map(|a| a.id.clone())
-        .collect();
+    // Lo borrado (o creado desde su detalle) se cierra al aplicarse: la
+    // dirección deja de nombrarlo, sin preguntar por lo editado en él.
+    {
+        let ir = ir.clone();
+        Effect::new(move |_| {
+            let en_la_direccion = elemento.get_untracked();
+            if en_la_direccion.as_deref().is_some_and(|e| s.cerrado(e)) {
+                registro.set(None);
+                s.olvidar_cerrados();
+                ir(None, true);
+            }
+        });
+    }
     let accion = Callback::new(move |(accion, ids): (String, Vec<String>)| {
         let tema = tema.get_value();
-        // Lo que se va a borrar no puede quedar abierto: su dirección ya no
-        // existiría.
-        if peligrosas.contains(&accion)
-            && abierto.with_untracked(|a| a.as_ref().is_some_and(|a| ids.contains(a)))
-        {
-            pagina.cerrar.run(());
-        }
         spawn_local(async move {
             match preparar_accion(tema, accion, ids.clone()).await {
                 Ok(g) => s.revisar(g, ids),
@@ -375,45 +395,6 @@ pub(crate) fn ContenidoRejilla(
                 />
             }
         })}
-    }
-}
-
-/// La pregunta de los cambios sin guardar: seguir editando o descartarlos.
-/// Esc sigue editando.
-#[component]
-fn SinGuardar(nombre: String, seguir: Callback<()>, descartar: Callback<()>) -> impl IntoView {
-    let dlg = NodeRef::<html::Dialog>::new();
-    Effect::new(move |_| {
-        if let Some(d) = dlg.get()
-            && !d.open()
-        {
-            let _ = d.show_modal();
-        }
-    });
-    view! {
-        <dialog
-            class="dialogo dialogo-sin-guardar"
-            node_ref=dlg
-            aria-labelledby="sin-guardar-titulo"
-            aria-modal="true"
-            on:cancel=move |ev: leptos::ev::Event| {
-                ev.prevent_default();
-                seguir.run(());
-            }
-        >
-            <div class="dialogo-cuerpo">
-                <h2 id="sin-guardar-titulo">{t!("ajustes-sin-guardar-titulo")}</h2>
-                <p>{t!("ajustes-sin-guardar-texto", nombre = nombre)}</p>
-                <div class="dialogo-pie">
-                    <button type="button" class="b-pel" on:click=move |_| descartar.run(())>
-                        {t!("ajustes-sin-guardar-descartar")}
-                    </button>
-                    <button type="button" class="b-pri" autofocus on:click=move |_| seguir.run(())>
-                        {t!("ajustes-sin-guardar-seguir")}
-                    </button>
-                </div>
-            </div>
-        </dialog>
     }
 }
 

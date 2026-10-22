@@ -20,7 +20,6 @@ pub(super) use guardar::{confirmar_ajuste, preparar_ajuste, preparar_elemento};
 pub(super) use historial::deshacer_ajuste;
 pub(crate) use historial::etiquetas_de_campos;
 pub(super) use pagina::leer_tema;
-pub(super) use red_local::{leer_dispositivos, leer_red_casa, leer_reservas};
 
 use super::*;
 use crate::{
@@ -78,6 +77,10 @@ fn error_ajuste(e: CambioError) -> ServerFnError {
         E::Router(_) | E::Verificacion(_) => {
             tracing::warn!("ajustes: el router no hizo el cambio: {e}");
             fallo(StatusCode::BAD_GATEWAY, t!("ajustes-error-router"))
+        }
+        E::InstanciaCambiada(_) => {
+            tracing::warn!("ajustes: no se escribe: {e}");
+            fallo(StatusCode::CONFLICT, t!("ajustes-error-instancia-cambiada"))
         }
         E::Invalida(_) => {
             tracing::warn!("ajustes: petición no válida: {e}");

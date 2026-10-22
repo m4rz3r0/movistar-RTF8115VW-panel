@@ -256,6 +256,7 @@ mod catalogo_toml {
                     "no-fijable",
                     "fijar-desconectado",
                     "sin-ip-fija",
+                    "conexion-ninguna",
                     "vacia",
                 ],
                 Componente::Reservas => &[
@@ -264,6 +265,7 @@ mod catalogo_toml {
                     "cambiar",
                     "borrar-de",
                     "activa-de",
+                    "estado-activa",
                     "estado-conectado",
                     "estado-desactivada",
                     "vacia",
@@ -367,6 +369,11 @@ mod catalogo_toml {
         /// (`requiere = { campo = "puerto", cuando = "true" }`).
         #[serde(default)]
         pub requiere: Option<Requiere>,
+        /// Su recomendación solo vale cuando otro campo del ajuste tiene un
+        /// valor (`recomendado_si = { campo = "ipv6", cuando = "true" }`: los
+        /// anuncios, solo con IPv6 encendido); si no, no se recomienda nada.
+        #[serde(default)]
+        pub recomendado_si: Option<Requiere>,
         /// Su recomendación es de seguridad (el WPS, el aislamiento de los
         /// invitados): en la tarjeta va antes que las demás y como riesgo.
         #[serde(default)]

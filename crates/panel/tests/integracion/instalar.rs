@@ -284,6 +284,7 @@ fn escritura() -> ChangeRequest {
         instancia: None,
         valores: BTreeMap::from([("adm_state".to_owned(), "1".to_owned())]),
         borrar: false,
+        identidad: Default::default(),
     }
 }
 

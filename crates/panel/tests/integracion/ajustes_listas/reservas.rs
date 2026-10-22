@@ -151,7 +151,7 @@ async fn reserva_invalida_da_400() {
 /// Cada dispositivo con su nombre, su conexión (la banda por el punto de acceso
 /// al que está asociado; si no, el cable) y su reserva.
 #[tokio::test]
-async fn leer_dispositivos_con_banda() {
+async fn dispositivos_con_banda() {
     let (p, cookie) = PanelPrueba::nuevo()
         .capa(&variante("dispositivos-wifi"))
         .arrancar_con_gestor()
@@ -175,13 +175,6 @@ async fn leer_dispositivos_con_banda() {
     // Los conectados primero, por IP.
     assert_eq!(d[0]["mac"], "02:00:00:00:00:01");
     assert_eq!(d.last().unwrap()["activo"], false);
-}
-
-#[tokio::test]
-async fn leer_dispositivos_exige_sesion() {
-    let (p, _) = PanelPrueba::nuevo().arrancar_con_gestor().await;
-    let (status, body) = llamar(&p, "leer_dispositivos", json!({}), None).await;
-    assert_eq!(status, 401, "{body}");
 }
 
 /// Desactivar una reserva que ya no valdría (comparte IP con otra) no exige
@@ -412,12 +405,14 @@ async fn editar_o_borrar_sin_mac_esperada_da_400() {
     assert!(p.sim.control.writes().is_empty());
 }
 
+/// La página trae las IP de las IP fijas (Puertos las usa para saber si el
+/// destino de una regla sigue en la red).
 #[tokio::test]
-async fn leer_reservas_de_la_cache() {
+async fn ips_fijas_en_la_pagina() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
-    let r = ok(&p, "leer_reservas", json!({}), &cookie).await;
-    // Solo las IP: es lo único que usa la página.
-    assert_eq!(r, json!(["192.168.1.68", "192.168.1.69"]));
-    let (status, _) = llamar(&p, "leer_reservas", json!({}), None).await;
-    assert_eq!(status, 401);
+    let r = ok(&p, "leer_tema", json!({ "tema": "puertos" }), &cookie).await;
+    assert_eq!(
+        r["red"]["ips_fijas"],
+        json!(["192.168.1.68", "192.168.1.69"])
+    );
 }

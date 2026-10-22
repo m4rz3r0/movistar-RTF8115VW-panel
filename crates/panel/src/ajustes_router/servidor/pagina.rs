@@ -341,11 +341,25 @@ fn problema(ajuste: &str, c: &CampoVista) -> String {
             args.set("valor", actual);
             traducir(&k, Some(&args))
         }
-        None => t!(
-            "ajustes-recomendacion-ahora",
-            campo = traducir(&c.clave, None),
-            valor = actual
-        ),
+        None => ahora(c, actual),
+    }
+}
+
+/// «Ahora: …» genérico. Un sí/no sin textos propios se dice con su nombre
+/// («Ahora: UPnP activado.», «Ahora no: Anuncios del router.»), no con
+/// «, Sí»; lo demás, con su valor.
+fn ahora(c: &CampoVista, actual: String) -> String {
+    let idioma = crate::ui::i18n::idioma_actual();
+    let campo = traducir(&c.clave, None);
+    match c.valor {
+        ValorLegible::Booleano(b) if !i18n::existe(idioma, &format!("{}-{b}", c.clave)) => {
+            if b {
+                t!("ajustes-recomendacion-ahora-si", campo = campo)
+            } else {
+                t!("ajustes-recomendacion-ahora-no", campo = campo)
+            }
+        }
+        _ => t!("ajustes-recomendacion-ahora", campo = campo, valor = actual),
     }
 }
 

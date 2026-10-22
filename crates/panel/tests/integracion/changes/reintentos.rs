@@ -50,6 +50,7 @@ async fn reintento_de_revertir_un_borrado_no_duplica() {
     let (p, m) = preparado().await;
     let borrar = ChangeRequest {
         borrar: true,
+        identidad: Default::default(),
         ..req(LEASES, Some("1"), &[(POOL, "0")])
     };
     let prep = m.preparar(borrar).await.unwrap();

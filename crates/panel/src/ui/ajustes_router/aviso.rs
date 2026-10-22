@@ -36,6 +36,9 @@ struct CambioActivo {
     /// Claves de los campos que escribe (`ajuste-wifi-red_24-nombre`).
     campos: Vec<String>,
     estado: Option<CambioVista>,
+    /// Al aplicarse, sus elementos se cierran (lo borrado ya no existe; lo
+    /// creado desde el detalle de una nueva, ya está en su lista).
+    cerrar: bool,
 }
 
 impl CambioActivo {
@@ -56,6 +59,11 @@ pub(crate) struct Seguimiento {
     recargar: Callback<()>,
     /// Lo editado en cada detalle: el de lo que se aplica se olvida.
     borradores: Borradores,
+    /// El grupo en revisión cierra sus elementos al aplicarse (ver
+    /// [`CambioActivo::cerrar`]).
+    cerrar_al_aplicar: RwSignal<bool>,
+    /// Elementos que se acaban de cerrar así: la página deja su dirección.
+    cerrados: RwSignal<Vec<String>>,
 }
 
 impl Seguimiento {
@@ -69,6 +77,8 @@ impl Seguimiento {
             dialogo: RwSignal::new(None),
             recargar,
             borradores,
+            cerrar_al_aplicar: RwSignal::new(false),
+            cerrados: RwSignal::new(Vec::new()),
         };
         let vigilado = Memo::new(move |_| {
             s.activo
@@ -110,15 +120,21 @@ impl Seguimiento {
         let mismo = self.activo.try_update(|a| match a {
             Some(a) if a.id == Some(id) => {
                 a.estado = Some(c);
-                Some(a.campos.clone())
+                Some((a.campos.clone(), a.cerrar.then(|| a.elementos.clone())))
             }
             _ => None,
         });
-        if let Some(Some(campos)) = mismo
+        if let Some(Some((campos, cerrar))) = mismo
             && terminado
         {
             if aplicado {
                 self.borradores.olvidar_campos(&campos);
+                if let Some(elementos) = cerrar {
+                    for e in &elementos {
+                        self.borradores.olvidar(e);
+                    }
+                    self.cerrados.try_set(elementos);
+                }
             }
             self.recargar.run(());
         }
@@ -135,6 +151,7 @@ impl Seguimiento {
             interruptor: interruptor.map(|v| (elemento.to_owned(), v)),
             campos: Vec::new(),
             estado: None,
+            cerrar: false,
         }));
     }
 
@@ -165,7 +182,9 @@ impl Seguimiento {
                 .and_then(|a| a.interruptor.clone())
         });
         self.error.set(None);
+        let cerrar = g.borra || self.cerrar_al_aplicar.get_untracked();
         self.activo.set(Some(CambioActivo {
+            cerrar,
             id: None,
             elementos,
             texto: resumen(g),
@@ -196,7 +215,25 @@ impl Seguimiento {
     /// Abre el diálogo de revisión del grupo `g`, que cambia `elementos`.
     pub(crate) fn revisar(self, g: GrupoVista, elementos: Vec<String>) {
         self.error.set(None);
+        self.cerrar_al_aplicar.set(false);
         self.dialogo.set(Some((g, elementos, false)));
+    }
+
+    /// Como [`Seguimiento::revisar`], pero al aplicarse se cierran sus
+    /// elementos (el detalle de una instancia nueva, ya creada).
+    pub(crate) fn revisar_y_cerrar(self, g: GrupoVista, elementos: Vec<String>) {
+        self.revisar(g, elementos);
+        self.cerrar_al_aplicar.set(true);
+    }
+
+    /// ¿Se acaba de cerrar `id` (borrado, o creado desde su detalle)? Reactivo.
+    pub(crate) fn cerrado(self, id: &str) -> bool {
+        self.cerrados.with(|c| c.iter().any(|x| x == id))
+    }
+
+    /// Los elementos cerrados, ya atendidos.
+    pub(crate) fn olvidar_cerrados(self) {
+        self.cerrados.set(Vec::new());
     }
 
     /// Insignia de `elemento` mientras cambia. Reactivo.
@@ -304,6 +341,7 @@ pub(crate) fn AvisoCambio() -> impl IntoView {
             match deshacer_ajuste(id).await {
                 Ok(g) => {
                     s.error.set(None);
+                    s.cerrar_al_aplicar.set(false);
                     s.dialogo.set(Some((g, elementos, true)));
                 }
                 Err(e) => s.error.set(Some(texto_error(&e))),

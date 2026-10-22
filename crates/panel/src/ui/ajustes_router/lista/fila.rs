@@ -12,9 +12,7 @@ use super::super::rejilla::Pagina;
 use super::super::seleccion::{Marca, Seleccion};
 use super::DatosLista;
 use super::columnas::{Fila, Tipo};
-use crate::ajustes_router::{
-    IDENTIFICAN_REGLA, InstanciaVista, PeticionAjuste, preparar_ajuste, valor_de,
-};
+use crate::ajustes_router::{PeticionAjuste, identidad_de, preparar_ajuste};
 use crate::t;
 use crate::ui::comun::{Insignia, Interruptor};
 use crate::ui::explorador::texto_error;
@@ -49,20 +47,6 @@ fn mover(id: &str, abajo: bool) {
     if let Some(o) = otra.and_then(|o| o.dyn_into::<leptos::web_sys::HtmlElement>().ok()) {
         let _ = o.focus();
     }
-}
-
-/// Lo que identifica la instancia al escribirla (lo que pide el servidor
-/// para saber que sigue siendo la misma).
-fn esperados(tipo: Tipo, i: &InstanciaVista) -> BTreeMap<String, String> {
-    let campos: &[&str] = match tipo {
-        Tipo::Reglas => &IDENTIFICAN_REGLA,
-        Tipo::Reservas => &["mac"],
-        Tipo::Dispositivos => &[],
-    };
-    campos
-        .iter()
-        .map(|k| ((*k).to_owned(), valor_de(&i.campos, k)))
-        .collect()
 }
 
 /// Nombre accesible del interruptor de la fila `nombre`.
@@ -155,7 +139,7 @@ pub(crate) fn FilaLista(f: Fila, d: DatosLista) -> impl IntoView {
                 instancia: Some(i.id.clone()),
                 borrar: false,
                 valores: BTreeMap::from([(d.campo_interruptor.get_value(), nuevo.to_string())]),
-                esperados: esperados(d.tipo, &i),
+                esperados: identidad_de(d.tipo.componente(), &i.campos),
             };
             spawn_local(async move {
                 match preparar_ajuste(p).await {

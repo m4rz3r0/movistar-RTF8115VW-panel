@@ -2,6 +2,36 @@
 
 use super::*;
 
+/// Quita la recomendación de los campos con `recomendado_si` cuya condición
+/// no se cumple ahora (los anuncios de IPv6 con IPv6 apagado): no hay nada
+/// que recomendar.
+fn sin_recomendacion_que_no_vale(a: &Ajuste, campos: &mut [CampoVista]) {
+    let legible = |v: &ValorLegible| match v {
+        ValorLegible::Booleano(b) => Some(b.to_string()),
+        ValorLegible::Opcion(t) | ValorLegible::Texto(t) => Some(t.clone()),
+        ValorLegible::Desconocido(_) | ValorLegible::Secreto => None,
+    };
+    let valores: Vec<(String, Option<String>)> = campos
+        .iter()
+        .map(|c| (c.id.clone(), legible(&c.valor)))
+        .collect();
+    for c in campos.iter_mut() {
+        let Some(r) = a.campo(&c.id).and_then(|x| x.recomendado_si.as_ref()) else {
+            continue;
+        };
+        let vale = valores
+            .iter()
+            .any(|(id, v)| *id == r.campo && v.as_deref() == Some(r.cuando.as_str()));
+        if !vale {
+            c.recomendado = None;
+            c.motivo_recomendado = None;
+            for o in &mut c.opciones {
+                o.recomendada = false;
+            }
+        }
+    }
+}
+
 /// Vista de un ajuste con la respuesta de su lectura (`None` si falló).
 pub(super) fn vista(f: &Catalogo, a: &Ajuste, nodo: Option<&XmlNode>) -> AjusteVista {
     let prefijo = prefijo_i18n(a);
@@ -35,7 +65,7 @@ pub(super) fn vista(f: &Catalogo, a: &Ajuste, nodo: Option<&XmlNode>) -> AjusteV
         Some(n) => {
             let mut leidos = Leidos::new();
             hojas(n, &mut leidos);
-            let campos = a
+            let mut campos: Vec<CampoVista> = a
                 .campos
                 .iter()
                 .map(|c| {
@@ -48,6 +78,7 @@ pub(super) fn vista(f: &Catalogo, a: &Ajuste, nodo: Option<&XmlNode>) -> AjusteV
                     )
                 })
                 .collect();
+            sin_recomendacion_que_no_vale(a, &mut campos);
             (EstadoLectura::Leido, campos, Vec::new())
         }
     };

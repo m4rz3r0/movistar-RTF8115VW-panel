@@ -73,6 +73,13 @@ pub struct ChangeRequest {
     pub instancia: Option<String>,
     pub valores: BTreeMap<String, String>,
     pub borrar: bool,
+    /// Al editar o borrar una instancia de una lista: lo que la identifica
+    /// (elemento leído → valor del router), tal como era al preparar. Justo
+    /// antes de escribir el paso, la instancia con ese id tiene que seguir
+    /// teniéndolo; si no (el router renumeró sus instancias, otra sesión la
+    /// cambió), el paso no se escribe. Vacío: sin comprobación.
+    #[serde(default)]
+    pub identidad: BTreeMap<String, String>,
 }
 
 impl std::fmt::Debug for ChangeRequest {
@@ -82,6 +89,7 @@ impl std::fmt::Debug for ChangeRequest {
             .field("instancia", &self.instancia)
             .field("valores", &self.valores.keys().collect::<Vec<_>>())
             .field("borrar", &self.borrar)
+            .field("identidad", &self.identidad.keys().collect::<Vec<_>>())
             .finish()
     }
 }
@@ -165,6 +173,9 @@ pub enum CambioError {
     TokenInvalido,
     /// Petición no válida (función, parámetro o valor).
     Invalida(String),
+    /// La instancia que iba a editarse o borrarse ya no es la misma que al
+    /// preparar (`ChangeRequest::identidad`): el motivo.
+    InstanciaCambiada(String),
 }
 
 impl std::fmt::Display for CambioError {
@@ -182,6 +193,7 @@ impl std::fmt::Display for CambioError {
                 f.write_str("el cambio preparado ha caducado o ya se usó; revísalo de nuevo")
             }
             CambioError::Invalida(e) => write!(f, "petición no válida: {e}"),
+            CambioError::InstanciaCambiada(e) => write!(f, "{e}"),
         }
     }
 }
@@ -349,6 +361,7 @@ mod tests {
             instancia: None,
             valores: [("key_phrase".to_owned(), "clave-en-claro".to_owned())].into(),
             borrar: false,
+            identidad: Default::default(),
         };
         let d = format!("{r:?}");
         assert!(

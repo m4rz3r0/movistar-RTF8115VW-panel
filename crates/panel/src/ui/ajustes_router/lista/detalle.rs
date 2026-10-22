@@ -3,8 +3,9 @@
 //! Lleva la misma cabecera que el de una tarjeta (título, insignia, ✕ y, en
 //! el móvil, «‹ Puertos»); Esc o ✕ lo cierran y la lista recupera su ancho.
 //! El de la fila «nueva» (la dirección de la propia lista) es el formulario
-//! vacío. Los detalles técnicos van una vez, al pie de la lista. «Borrar» prepara la misma acción que la barra con esa fila sola:
-//! el diálogo lo confirma con el botón de peligro.
+//! vacío, que se cierra al aplicarse. Los detalles técnicos van una vez, al
+//! pie de la lista. «Borrar» prepara la misma acción que la barra con esa
+//! fila sola: el diálogo lo confirma con el botón de peligro.
 
 use super::super::aviso::Seguimiento;
 use super::super::detalle::{ID_TITULO_DETALLE, Registro};
@@ -57,9 +58,14 @@ pub(crate) fn DetalleFila(
     let error = RwSignal::new(None::<String>);
     let editable = !pagina.solo_lectura;
     let id_fila = fila.as_ref().map(|f| f.id.clone());
+    // Una instancia nueva, al aplicarse, ya está en su lista: su detalle
+    // (vacío) se cierra.
     let preparado = {
-        let id_fila = id_fila.clone();
-        Callback::new(move |g: GrupoVista| s.revisar(g, id_fila.clone().into_iter().collect()))
+        let (id_fila, abierto) = (id_fila.clone(), abierto.clone());
+        Callback::new(move |g: GrupoVista| match &id_fila {
+            Some(id) => s.revisar(g, vec![id.clone()]),
+            None => s.revisar_y_cerrar(g, vec![abierto.clone()]),
+        })
     };
     let cancelar = Callback::new(move |()| pagina.cerrar.run(()));
     let instancia = id_fila
@@ -130,12 +136,10 @@ pub(crate) fn DetalleFila(
                 error.set(None);
                 let (tema, accion, id) = (pagina.tema.get_value(), accion.clone(), id.clone());
                 spawn_local(async move {
+                    // El detalle sigue abierto mientras se revisa (cancelar lo
+                    // deja todo como estaba); al aplicarse, se cierra.
                     match preparar_accion(tema, accion, vec![id.clone()]).await {
-                        // Borrada, su dirección ya no existiría: se cierra antes.
-                        Ok(g) => {
-                            pagina.cerrar.run(());
-                            s.revisar(g, vec![id]);
-                        }
+                        Ok(g) => s.revisar(g, vec![id]),
                         Err(e) => {
                             error.try_set(Some(texto_error(&e)));
                         }

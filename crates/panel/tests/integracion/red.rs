@@ -158,6 +158,7 @@ fn lease0(ip: &str) -> ChangeRequest {
             .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
             .collect::<BTreeMap<_, _>>(),
         borrar: false,
+        identidad: Default::default(),
     }
 }
 
