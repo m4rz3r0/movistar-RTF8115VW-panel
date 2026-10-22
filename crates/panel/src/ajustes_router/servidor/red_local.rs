@@ -1,6 +1,7 @@
 //! Red local: dispositivos, red de casa y reservas de IP fija.
 
 use super::*;
+use std::net::Ipv4Addr;
 
 /// Lectura del router que falla al leer los dispositivos o la red: 502 con
 /// el mensaje de siempre (el detalle va al registro).
@@ -15,7 +16,7 @@ fn clave_estaciones(radio: &str) -> Clave {
 }
 
 /// Lista de dispositivos del router.
-fn clave_hosts() -> Clave {
+pub(super) fn clave_hosts() -> Clave {
     Clave::new::<&str, &str>("cbGetLanHostList", &[])
 }
 
@@ -29,7 +30,7 @@ fn clave_red_casa() -> Clave {
     Clave::new::<&str, &str>("cbGetLanIPv4Addr", &[])
 }
 
-/// Lecturas de [`leer_dispositivos`]: la lista, las reservas y las
+/// Lecturas de los dispositivos: la lista, las reservas y las
 /// estaciones de cada radio.
 fn claves_dispositivos() -> Vec<Clave> {
     let mut claves = vec![clave_hosts(), clave_reservas()];
@@ -67,28 +68,40 @@ fn orden(d: &DispositivoVista) -> (bool, u32, String) {
     (!d.activo, ip, d.ip.clone())
 }
 
-/// Respuesta de la lectura `clave` de `leidas`; si falló, 502 con el
-/// mensaje de siempre (el fallo ya lo registró la caché de lecturas).
-fn leida(
-    leidas: &mut HashMap<Clave, Result<XmlNode, hgu::Error>>,
-    clave: &Clave,
-) -> Result<XmlNode, ServerFnError> {
-    match leidas.remove(clave) {
-        Some(Ok(n)) => Ok(n),
-        _ => Err(fallo(StatusCode::BAD_GATEWAY, t!("ajustes-error-lectura"))),
+/// Lecturas de la red de casa que traen las páginas con listas (Puertos y
+/// Red local), en la misma tanda que sus ajustes.
+pub(super) fn claves_red() -> Vec<Clave> {
+    let mut claves = claves_dispositivos();
+    claves.push(clave_red_casa());
+    claves
+}
+
+/// La red de casa con las lecturas de [`claves_red`]: cada parte, `None` si
+/// su lectura falló.
+pub(super) fn red_de(leidas: &HashMap<Clave, Result<XmlNode, hgu::Error>>) -> RedCasa {
+    let nodo = |c: &Clave| leidas.get(c).and_then(|r| r.as_ref().ok());
+    RedCasa {
+        dispositivos: dispositivos_de(leidas),
+        lan: nodo(&clave_red_casa()).and_then(hgu::read::lan_ipv4_de),
+        ips_fijas: nodo(&clave_reservas()).map(|n| {
+            hgu::models::StaticLease::parse_all(n)
+                .into_iter()
+                .map(|r| r.ip)
+                .collect()
+        }),
     }
 }
 
-pub(in crate::ajustes_router) async fn leer_dispositivos()
--> Result<Vec<DispositivoVista>, ServerFnError> {
-    let (state, _) = preparar().await?;
-    let mut leidas = state
-        .lecturas
-        .leer(&state.hgu, &claves_dispositivos())
-        .await;
-    let wifi = asociados(&leidas);
-    let hosts = hgu::models::LanHost::parse_all(&leida(&mut leidas, &clave_hosts())?);
-    let reservas = hgu::models::StaticLease::parse_all(&leida(&mut leidas, &clave_reservas())?);
+/// Los dispositivos con las lecturas de [`claves_dispositivos`], los
+/// conectados primero y por IP; `None` si no se pudo leer la lista o las
+/// reservas (el fallo ya lo registró la caché de lecturas).
+fn dispositivos_de(
+    leidas: &HashMap<Clave, Result<XmlNode, hgu::Error>>,
+) -> Option<Vec<DispositivoVista>> {
+    let nodo = |c: &Clave| leidas.get(c).and_then(|r| r.as_ref().ok());
+    let wifi = asociados(leidas);
+    let hosts = hgu::models::LanHost::parse_all(nodo(&clave_hosts())?);
+    let reservas = hgu::models::StaticLease::parse_all(nodo(&clave_reservas())?);
     let mut lista: Vec<DispositivoVista> = hosts
         .into_iter()
         .map(|h| {
@@ -116,33 +129,7 @@ pub(in crate::ajustes_router) async fn leer_dispositivos()
         })
         .collect();
     lista.sort_by_key(orden);
-    Ok(lista)
-}
-
-pub(in crate::ajustes_router) async fn leer_red_casa()
--> Result<Option<(Ipv4Addr, Ipv4Addr)>, ServerFnError> {
-    let (state, _) = preparar().await?;
-    let clave = clave_red_casa();
-    let mut leidas = state
-        .lecturas
-        .leer(&state.hgu, std::slice::from_ref(&clave))
-        .await;
-    let n = leida(&mut leidas, &clave)?;
-    Ok(hgu::read::lan_ipv4_de(&n))
-}
-
-pub(in crate::ajustes_router) async fn leer_reservas() -> Result<Vec<String>, ServerFnError> {
-    let (state, _) = preparar().await?;
-    let clave = clave_reservas();
-    let mut leidas = state
-        .lecturas
-        .leer(&state.hgu, std::slice::from_ref(&clave))
-        .await;
-    let n = leida(&mut leidas, &clave)?;
-    Ok(hgu::models::StaticLease::parse_all(&n)
-        .into_iter()
-        .map(|r| r.ip)
-        .collect())
+    Some(lista)
 }
 
 /// Nombre del dispositivo con la MAC `mac` en la lista del router, si lo

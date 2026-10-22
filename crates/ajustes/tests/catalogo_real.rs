@@ -3,7 +3,8 @@
 //! usan las páginas por tema.
 
 use ajustes::{
-    Ajuste, Campo, CatalogoAjustes, Componente, Nivel, claves_requeridas, comprobar, prefijo_i18n,
+    Ajuste, Campo, CatalogoAjustes, Componente, Nivel, claves_de_elementos, claves_requeridas,
+    comprobar, prefijo_i18n,
 };
 use catalogo::{Catalogo, Tipo, mask::Mascara};
 use i18n::Idioma;
@@ -79,6 +80,50 @@ fn claves_i18n_completas_en_los_dos_sentidos() {
                 .collect();
             assert!(sobran.is_empty(), "{}: sobran {sobran:#?}", ruta.display());
         }
+    }
+}
+
+/// Encender o apagar una red o una radio dice «Encendida» y «Apagada», no
+/// «Sí» y «No»: sus textos de valor los pide el catálogo.
+#[test]
+fn encendida_y_apagada_con_sus_textos() {
+    let c = cargar();
+    for (ajuste, campo) in [
+        ("wifi.red_24", "activa"),
+        ("wifi.red_5", "activa"),
+        ("wifi.invitados", "activa"),
+        ("wifi.radio_24", "encendida"),
+        ("wifi.radio_5", "encendida"),
+    ] {
+        let a = c.ajuste(ajuste).unwrap();
+        assert!(a.campo(campo).unwrap().textos_valor, "{ajuste}.{campo}");
+        let claves = claves_requeridas(a);
+        let p = prefijo_i18n(a);
+        for v in ["true", "false"] {
+            assert!(
+                claves.contains(&format!("{p}-{campo}-{v}")),
+                "{ajuste}: {claves:?}"
+            );
+        }
+    }
+}
+
+/// Los papeles de los elementos y los botones de las acciones tienen su
+/// texto en los dos idiomas.
+#[test]
+fn claves_de_elementos_en_los_dos_idiomas() {
+    let claves = claves_de_elementos(&cargar());
+    assert!(
+        claves.contains(&"ajustes-accion-quitar_wps".to_owned()),
+        "{claves:?}"
+    );
+    assert!(
+        claves.contains(&"ajuste-accion-quitar_wps-titulo".to_owned()),
+        "{claves:?}"
+    );
+    for idioma in Idioma::TODOS {
+        let faltan: Vec<&String> = claves.iter().filter(|k| !i18n::existe(idioma, k)).collect();
+        assert!(faltan.is_empty(), "faltan en {idioma:?}: {faltan:#?}");
     }
 }
 
@@ -550,7 +595,8 @@ fn forma(
 
 /// Las tres redes WiFi tienen los mismos campos, parámetros, validaciones y
 /// opciones; solo difieren la recomendación del aislamiento (sí en
-/// invitados) y la de encender la red (apagada en invitados). Las dos radios, igual, salvo canales, anchos y modos (propios
+/// invitados, donde además es de seguridad) y la de encender la red
+/// (apagada en invitados). Las dos radios, igual, salvo canales, anchos y modos (propios
 /// de cada banda) y la señal dirigida, que solo está en 5 GHz.
 #[test]
 fn redes_y_radios_wifi_iguales_salvo_lo_previsto() {
@@ -561,9 +607,9 @@ fn redes_y_radios_wifi_iguales_salvo_lo_previsto() {
             let a = c.ajuste(&format!("wifi.{otra}{sufijo}")).unwrap();
             assert_eq!(forma(a), forma(base), "{}", a.id);
             let quita = |x: &Campo| {
-                let mut x = sin(x, x.id == "aislamiento", false);
-                if x.id == "activa" {
-                    x.opciones.iter_mut().for_each(|o| o.recomendada = false);
+                let mut x = sin(x, matches!(x.id.as_str(), "aislamiento" | "activa"), false);
+                if x.id == "aislamiento" {
+                    x.seguridad = false;
                 }
                 x
             };

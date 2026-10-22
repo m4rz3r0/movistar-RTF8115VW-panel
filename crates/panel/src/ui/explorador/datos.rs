@@ -100,11 +100,13 @@ impl RiesgoCambio {
         }
     }
 
-    pub fn estado(self) -> crate::ui::Estado {
+    /// Color de la insignia del riesgo.
+    pub fn estado(self) -> crate::ui::comun::EstadoVisual {
+        use crate::ui::comun::EstadoVisual;
         match self {
-            RiesgoCambio::Bajo => crate::ui::Estado::Ok,
-            RiesgoCambio::Medio => crate::ui::Estado::Aviso,
-            RiesgoCambio::Alto => crate::ui::Estado::Error,
+            RiesgoCambio::Bajo => EstadoVisual::Emite,
+            RiesgoCambio::Medio => EstadoVisual::Atencion,
+            RiesgoCambio::Alto => EstadoVisual::Peligro,
         }
     }
 }
@@ -426,12 +428,14 @@ impl EstadoDeCambio {
         )
     }
 
-    pub fn estado(self) -> crate::ui::Estado {
+    /// Color de la insignia del estado (lo que sigue en curso, neutro).
+    pub fn estado(self) -> crate::ui::comun::EstadoVisual {
+        use crate::ui::comun::EstadoVisual;
         match self {
-            EstadoDeCambio::Aplicado => crate::ui::Estado::Ok,
-            EstadoDeCambio::Revertido => crate::ui::Estado::Aviso,
-            EstadoDeCambio::Fallido | EstadoDeCambio::RevertidoParcial => crate::ui::Estado::Error,
-            _ => crate::ui::Estado::Neutro,
+            EstadoDeCambio::Aplicado => EstadoVisual::Emite,
+            EstadoDeCambio::Revertido => EstadoVisual::Atencion,
+            EstadoDeCambio::Fallido | EstadoDeCambio::RevertidoParcial => EstadoVisual::Peligro,
+            _ => EstadoVisual::Proceso,
         }
     }
 }

@@ -3,14 +3,16 @@
 ## Time
 ajuste-sistema-hora-titulo = Router clock
 ajuste-sistema-hora-desc = The router sets its clock by asking time servers on the internet.
-ajuste-sistema-hora-ayuda = With the wrong time, the router's logs and any schedules that depend on it are off, and some secure connections may fail. The operator leaves a working server in place: only change it if you know another one suits you better.
+ajuste-sistema-hora-ayuda = With the wrong time, the router's logs and any schedules that depend on it are off, and some secure connections may fail. The operator leaves one of its own servers in place, which works; the panel recommends a public, neutral one, such as hora.roa.es (Spain's official time) or those of the NTP Pool project, so the time does not depend on the operator. Both set the clock correctly.
 ajuste-sistema-hora-activa = Set the time over the internet
 ajuste-sistema-hora-activa-desc = If you turn it off, the router does not correct its clock and it drifts.
 ajuste-sistema-hora-activa-recomendado = Recommended if you want the router to always have the right time, as is usual. Pros: the clock corrects itself, also after a power cut, because home routers do not usually have a clock battery. Cons: the router checks an internet time server every so often.
 ajuste-sistema-hora-servidor_1 = Time server
 ajuste-sistema-hora-servidor_1-desc = The name of the server asked for the time, for example hora.example. No spaces or accented letters.
+ajuste-sistema-hora-servidor_1-recomendado = Recommended if you would rather the router's time did not depend on your operator. Pros: hora.roa.es is the server of the Spanish Navy's Royal Institute and Observatory, which keeps Spain's official time, and no company runs it. Cons: if it ever does not answer, the router takes longer to set its time; add a backup server.
 ajuste-sistema-hora-servidor_2 = Backup time server
 ajuste-sistema-hora-servidor_2-desc = Used if the first one does not answer. You can leave it empty.
+ajuste-sistema-hora-servidor_2-recomendado = Recommended if you want a backup server that does not depend on the operator either. Pros: es.pool.ntp.org is a public group of time servers in Spain, run by volunteers with no company behind it; if the first one does not answer, the router keeps the right time. Cons: none significant; you can also leave it empty.
 
 ## Diagnostics
 ajuste-sistema-diagnostico-titulo = Traffic copy for diagnostics

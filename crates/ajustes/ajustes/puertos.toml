@@ -7,6 +7,8 @@ nivel = "basico"
 lista = true
 componente = "puertos"
 leer = { funcion = "cbGetNatPortMapping" }
+# Columnas de su lista en la página (el nombre va siempre delante).
+columnas = ["protocolo", "externo", "destino", "activa"]
 
 [[ajuste.campo]]
 id = "nombre"
@@ -112,3 +114,42 @@ id = "h323"
 lee = "h323_enable"
 tipo = "booleano"
 solo_lectura = "ajuste-puertos-alg-motivo"
+
+# Encima de la lista de reglas, una tarjeta por ajuste que no es lista
+# (spec §4.2); las reglas son los elementos de la lista.
+[[elemento]]
+id = "upnp"
+tema = "puertos"
+ajustes = ["puertos.upnp"]
+icono = "puerta"
+interruptor = "puertos.upnp.activo"
+estado = "derivado:segun_lo_recomendado"
+
+[[elemento]]
+id = "alg"
+tema = "puertos"
+ajustes = ["puertos.alg"]
+icono = "puerta"
+datos = ["puertos.alg.ftp", "puertos.alg.sip", "puertos.alg.pptp", "puertos.alg.h323"]
+
+# Acciones sobre las reglas marcadas (spec §5.5).
+[[accion]]
+id = "activar_regla"
+tema = "puertos"
+lista = "puertos.reglas"
+campo = "activa"
+valor = "true"
+
+[[accion]]
+id = "desactivar_regla"
+tema = "puertos"
+lista = "puertos.reglas"
+campo = "activa"
+valor = "false"
+
+[[accion]]
+id = "borrar_regla"
+tema = "puertos"
+lista = "puertos.reglas"
+borrar = true
+peligro = true

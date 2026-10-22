@@ -23,6 +23,16 @@ async function api(page: Page, nombre: string, cuerpo: unknown) {
   return r.json();
 }
 
+/** Un ajuste de la página de un tema (`leer_tema`), esté en el elemento que esté. */
+type AjusteLeido = { id: string; campos: { id: string; valor: Record<string, unknown> }[] };
+
+/** El ajuste `id` de la página de un tema leída con `leer_tema`. */
+export function ajusteDe(pagina: { elementos: { ajustes: AjusteLeido[] }[] }, id: string): AjusteLeido {
+  const a = pagina.elementos.flatMap((e) => e.ajustes).find((x) => x.id === id);
+  if (!a) throw new Error(`falta el ajuste ${id}`);
+  return a;
+}
+
 /**
  * Cambia la apertura automática de puertos (UPnP) al valor contrario: un
  * cambio de riesgo bajo, que se vigila RP_E2E_VIGILANCIA_S. Devuelve su id.
@@ -30,8 +40,8 @@ async function api(page: Page, nombre: string, cuerpo: unknown) {
  */
 export async function cambiarUpnp(page: Page): Promise<number> {
   const tema = await api(page, "leer_tema", { tema: "puertos" });
-  const upnp = tema.ajustes.find((a: { id: string }) => a.id === "puertos.upnp");
-  const activo = upnp.campos.find((c: { id: string }) => c.id === "activo").valor.Booleano;
+  const upnp = ajusteDe(tema, "puertos.upnp");
+  const activo = upnp.campos.find((c) => c.id === "activo")?.valor.Booleano;
   const grupo = await api(page, "preparar_ajuste", {
     p: { ajuste: "puertos.upnp", instancia: null, borrar: false, valores: { activo: String(!activo) } },
   });
@@ -49,4 +59,31 @@ export async function esperarFinal(page: Page, id: number) {
   await expect
     .poll(() => estadoCambio(page, id), { timeout: PLAZO_CAMBIO, intervals: [1_000] })
     .toBe("Aplicado");
+}
+
+/**
+ * Abre el puerto `puerto` (TCP) hacia host-2 con una regla nueva llamada
+ * `nombre`, sin pasar por la interfaz. Devuelve el id del cambio.
+ */
+export async function crearRegla(page: Page, nombre: string, puerto: number): Promise<number> {
+  const p = String(puerto);
+  const grupo = await api(page, "preparar_ajuste", {
+    p: {
+      ajuste: "puertos.reglas",
+      instancia: null,
+      borrar: false,
+      valores: {
+        nombre,
+        protocolo: "tcp",
+        externo_desde: p,
+        externo_hasta: p,
+        destino: "192.168.1.62",
+        interno_desde: p,
+        interno_hasta: p,
+        activa: "true",
+      },
+      esperados: {},
+    },
+  });
+  return api(page, "confirmar_ajuste", { token: grupo.token, desmarcados: [] });
 }

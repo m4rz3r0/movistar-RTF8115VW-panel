@@ -3,9 +3,10 @@ import { PLAZO_CAMBIO, plazoDeTest } from "./cambios";
 import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 
 // Red local (/ajustes/red_local) a 360 y 1440 px, en español y en inglés,
-// contra router-sim: los dispositivos conectados con «Fijar esta IP» y las IP
-// fijas con su tabla (apilada en móvil) y el formulario de añadir, que dice
-// junto al campo por qué no vale una IP (la del router).
+// contra router-sim: los dispositivos conectados y las IP fijas, cada uno en
+// su lista con columnas. El detalle de un dispositivo ofrece «Fijar esta IP»
+// (o dice que ya la tiene); «Añadir IP fija» abre el formulario vacío, que
+// dice junto al campo por qué no vale una IP (la del router).
 //
 // «Fijar esta IP» → aplicado → aparece en IP fijas se hace en una sola
 // combinación (inglés, 1440 px, la última): cada aplicación se vigila (30 s
@@ -26,7 +27,8 @@ const textos = {
     guardar: "Guardar",
     cancelar: "Cancelar",
     aplicar: "Aplicar",
-    cerrar: "Cerrar",
+    borrar: "Borrar",
+    descartar: "Descartar los cambios",
     borrarHost2: "Borrar la IP fija de host-2",
     revisar: "Revisa el cambio",
     hecho: "Hecho: el router tiene ya el cambio.",
@@ -44,7 +46,8 @@ const textos = {
     guardar: "Save",
     cancelar: "Cancel",
     aplicar: "Apply",
-    cerrar: "Close",
+    borrar: "Delete",
+    descartar: "Discard the changes",
     borrarHost2: "Delete the fixed IP of host-2",
     revisar: "Review the change",
     hecho: "Done: the router now has the change.",
@@ -52,11 +55,18 @@ const textos = {
   },
 } as const;
 
-/** La tarjeta cuyo título es exactamente `titulo`. */
-function tarjeta(page: Page, titulo: string): Locator {
-  return page.locator("article.ajuste").filter({
+type Textos = (typeof textos)["es" | "en"];
+
+/** La lista cuyo título es exactamente `titulo`. */
+function lista(page: Page, titulo: string): Locator {
+  return page.locator("section.lista-seccion").filter({
     has: page.getByRole("heading", { level: 2, name: titulo, exact: true }),
   });
+}
+
+/** La fila de `titulo` que contiene `texto`. */
+function fila(page: Page, titulo: string, texto: string): Locator {
+  return lista(page, titulo).locator("tbody tr.lista-fila").filter({ hasText: texto });
 }
 
 /** Sin funciones ni parámetros de la API en un texto visible. */
@@ -65,13 +75,20 @@ function sinApi(texto: string) {
   expect(texto).not.toMatch(/mac_addr|ipv4_addr|adm_state|static_id/);
 }
 
-/** Aplica el diálogo abierto, espera «hecho» y lo cierra. */
-async function aplicar(page: Page, t: (typeof textos)["es" | "en"]) {
-  const dialogo = page.locator("dialog[open]");
-  await dialogo.getByRole("button", { name: t.aplicar }).click();
-  await expect(dialogo.getByText(t.hecho)).toBeVisible({ timeout: PLAZO_CAMBIO });
-  await dialogo.getByRole("button", { name: t.cerrar }).click();
+/** Aplica el diálogo abierto con `boton` y espera a que el cambio termine. */
+async function aplicar(page: Page, t: Textos, boton: string = t.aplicar) {
+  await page.locator("dialog[open]").getByRole("button", { name: boton, exact: true }).click();
   await expect(page.locator("dialog[open]")).toHaveCount(0);
+  const aviso = page.locator(".avisos-cambio [role=status] .aviso-cambio");
+  await expect(aviso).toContainText(t.hecho, { timeout: PLAZO_CAMBIO });
+}
+
+/** Abre el detalle de la fila de `titulo` que contiene `texto`. */
+async function abrir(page: Page, titulo: string, texto: string): Promise<Locator> {
+  await fila(page, titulo, texto).locator(".lista-nombre").click();
+  const detalle = page.locator(".detalle-lateral");
+  await expect(detalle).toBeVisible();
+  return detalle;
 }
 
 // Cada test entra con su sesión y deja el simulador como estaba: se
@@ -96,28 +113,30 @@ for (const idioma of ["es", "en"] as const) {
         await entrar(page);
         await page.goto("/ajustes/red_local");
         await asentar(page);
-        const dispositivos = tarjeta(page, t.dispositivos);
-        const fijas = tarjeta(page, t.fijas);
+        const dispositivos = lista(page, t.dispositivos);
+        const fijas = lista(page, t.fijas);
         await expect(dispositivos).toBeVisible();
         await expect(fijas).toBeVisible();
         await sinDesbordamiento(page, `red local ${idioma} ${ancho}`);
-        // Un dispositivo con reserva no se puede fijar otra vez: lo dice una
-        // etiqueta, sin botón.
-        await expect(dispositivos.locator(".chip-ya-fija").first()).toContainText(t.yaFija);
-        await expect(dispositivos.getByRole("button", { name: new RegExp(`^${t.yaFija}`) })).toHaveCount(0);
         sinApi(await dispositivos.innerText());
         sinApi(await fijas.innerText());
         await page.screenshot({
           path: `capturas/red_local-${idioma}-${ancho}.png`,
           fullPage: true,
         });
+        // Un dispositivo con reserva no se puede fijar otra vez: lo dice una
+        // etiqueta en su detalle, sin botón.
+        const conFija = await abrir(page, t.dispositivos, "192.168.1.69");
+        await expect(conFija.locator(".chip-ya-fija")).toContainText(t.yaFija);
+        await expect(conFija.getByRole("button", { name: new RegExp(`^${t.fijar}`) })).toHaveCount(0);
+        await page.keyboard.press("Escape");
+        await expect(page.locator(".detalle-lateral")).toHaveCount(0);
 
         // Añadir con la IP del router: el error, junto a la IP, sin enviar.
-        const anadir = fijas.getByRole("button", { name: t.anadir });
-        await anadir.click();
-        const form = fijas.locator("form.reserva-formulario");
+        await fijas.getByRole("button", { name: t.anadir }).click();
+        const form = page.locator(".detalle-lateral form.reserva-formulario");
+        await expect(form).toBeVisible();
         const mac = form.getByLabel(t.mac, { exact: true });
-        await expect(mac).toBeFocused();
         await mac.fill("02:00:00:00:00:0b");
         const ip = form.getByLabel(t.ip, { exact: true });
         await ip.fill("192.168.1.1");
@@ -131,13 +150,17 @@ for (const idioma of ["es", "en"] as const) {
         await expect(ip).toHaveAttribute("aria-invalid", "true");
         expect(preparado).toBe(false);
         await sinDesbordamiento(page, `formulario ${idioma} ${ancho}`);
+        // Cancelar con cambios sin guardar pregunta antes; se descartan.
         await form.getByRole("button", { name: t.cancelar }).click();
+        await page.locator("dialog[open]").getByRole("button", { name: t.descartar }).click();
         await expect(form).toHaveCount(0);
-        await expect(anadir).toBeFocused();
+        // El foco vuelve al botón que lo abrió.
+        await expect(fijas.getByRole("button", { name: t.anadir })).toBeFocused();
 
         // «Fijar esta IP»: el resumen con la MAC y la IP actuales.
         // El nombre accesible empieza por lo que se ve (WCAG 2.5.3).
-        const fijar = dispositivos.getByRole("button", { name: t.fijarHost2, exact: true });
+        const host2 = await abrir(page, t.dispositivos, "host-2");
+        const fijar = host2.getByRole("button", { name: t.fijarHost2, exact: true });
         await expect(fijar).toHaveText(t.fijar);
         await fijar.click();
         const dialogo = page.locator("dialog[open]");
@@ -154,21 +177,24 @@ for (const idioma of ["es", "en"] as const) {
         if (aplicaDeVerdad) {
           await aplicar(page, t);
           // La reserva nueva, en IP fijas; el dispositivo ya no se puede fijar.
-          const fila = fijas.locator("tbody tr").filter({ hasText: "192.168.1.62" });
-          await expect(fila).toHaveCount(1);
-          await expect(fila).toContainText("host-2");
-          await expect(fila).toContainText("02:00:00:00:00:03");
-          await expect(dispositivos.getByRole("button", { name: t.fijarHost2 })).toHaveCount(0);
-          await expect(
-            dispositivos.locator(".chip-ya-fija").filter({ hasText: `${t.yaFija}: 192.168.1.62` }),
-          ).toBeVisible();
-          await expect(dispositivos.getByRole("heading", { level: 2 })).toBeFocused();
+          const nueva = fila(page, t.fijas, "192.168.1.62");
+          await expect(nueva).toHaveCount(1);
+          await expect(nueva).toContainText("host-2");
+          await expect(nueva).toContainText("02:00:00:00:00:03");
+          const detalle = page.locator(".detalle-lateral");
+          await expect(detalle.getByRole("button", { name: t.fijarHost2 })).toHaveCount(0);
+          await expect(detalle.locator(".chip-ya-fija")).toContainText(
+            `${t.yaFija}: 192.168.1.62`,
+          );
           // Borrarla deja el simulador como estaba.
-          await fijas.getByRole("button", { name: t.borrarHost2 }).click();
+          const reserva = await abrir(page, t.fijas, "192.168.1.62");
+          await reserva.getByRole("button", { name: t.borrarHost2 }).click();
           await expect(page.locator("dialog[open]")).toBeVisible();
-          await aplicar(page, t);
-          await expect(fijas.locator("tbody tr").filter({ hasText: "192.168.1.62" })).toHaveCount(0);
-          await expect(dispositivos.getByRole("button", { name: t.fijarHost2 })).toBeVisible();
+          await aplicar(page, t, t.borrar);
+          await expect(fila(page, t.fijas, "192.168.1.62")).toHaveCount(0);
+          await expect(page.locator(".detalle-lateral")).toHaveCount(0);
+          const otraVez = await abrir(page, t.dispositivos, "host-2");
+          await expect(otraVez.getByRole("button", { name: t.fijarHost2 })).toBeVisible();
         } else {
           await dialogo.getByRole("button", { name: t.cancelar }).click();
           await expect(page.locator("dialog[open]")).toHaveCount(0);

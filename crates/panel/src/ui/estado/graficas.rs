@@ -13,7 +13,7 @@ pub(super) fn selector_rango(
             view! {
                 <button
                     type="button"
-                    class="selector-boton"
+                    class="b-sec"
                     aria-pressed=move || (rango.get() == r).to_string()
                     on:click=move |_| set_rango.set(r)
                 >

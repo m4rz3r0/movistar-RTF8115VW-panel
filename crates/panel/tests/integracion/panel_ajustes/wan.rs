@@ -183,6 +183,7 @@ async fn red_bloqueada_mientras_se_retoman_cambios() {
         instancia: None,
         valores: [("adm_state".to_owned(), "1".to_owned())].into(),
         borrar: false,
+        identidad: Default::default(),
     };
     let prep = a.preparar(peticion).await.unwrap();
     a.confirmar(&prep.token, None, "admin").await.unwrap();

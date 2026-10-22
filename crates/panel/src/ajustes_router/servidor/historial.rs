@@ -53,9 +53,20 @@ pub(in crate::ajustes_router) async fn deshacer_ajuste(
 ) -> Result<GrupoVista, ServerFnError> {
     let (state, _) = preparar().await?;
     let g = gestor(&state)?;
-    let (a, instancia) = ajuste_del_cambio(&state, &g, cambio)
-        .await
-        .ok_or_else(|| fallo(StatusCode::NOT_FOUND, t!("ajustes-error-cambio")))?;
+    // De un ajuste o de una acción sobre varios elementos (un paso por
+    // elemento, cada uno con el título de su ajuste).
+    let de_ajuste = ajuste_del_cambio(&state, &g, cambio).await;
+    let de_accion = match de_ajuste {
+        Some(_) => None,
+        None => g
+            .cambio(cambio)
+            .await
+            .and_then(|c| c.titulo)
+            .filter(|t| super::acciones::es_de_accion(t)),
+    };
+    if de_ajuste.is_none() && de_accion.is_none() {
+        return Err(fallo(StatusCode::NOT_FOUND, t!("ajustes-error-cambio")));
+    }
     // Antes que «otro cambio en curso»: un cambio que aún se vigila (el
     // activo) o que ya se deshizo no se puede deshacer.
     let (solo_tapados, tapados) = g.tapados_del_cambio(cambio).await;
@@ -81,14 +92,29 @@ pub(in crate::ajustes_router) async fn deshacer_ajuste(
     }
     libre(&g)?;
     let prep = g.deshacer(cambio).await.map_err(error_ajuste)?;
-    // Lo que no cambia en cada paso, como lo muestra ahora el router
-    // (una lectura por paso con cambios).
+    // Lo que el router no deja leer se queda como se escribió.
+    let aviso =
+        (!tapados.is_empty()).then(|| t!("cambio-aviso-tapado", campos = nombres_tapados()));
+    let Some((a, instancia)) = de_ajuste else {
+        let titulo = de_accion.unwrap_or_default();
+        let vista = super::acciones::vista_deshacer(&state, &g, titulo, &prep)
+            .await
+            .ok_or_else(|| fallo(StatusCode::NOT_FOUND, t!("ajustes-error-cambio")))?;
+        return Ok(GrupoVista { aviso, ..vista });
+    };
+    // El ajuste de cada paso (el detalle de un elemento guarda varios en un
+    // cambio: cada paso lleva el título del suyo) y lo que no cambia en
+    // él, como lo muestra ahora el router (una lectura por paso con
+    // cambios).
+    let mut de_cada_paso: Vec<&Ajuste> = Vec::new();
     let mut actuales: Vec<BTreeMap<String, String>> = Vec::new();
     for paso in &prep.pasos {
+        let del_paso =
+            super::acciones::ajuste_de_etiqueta(&state, paso.etiqueta.as_deref()).unwrap_or(a);
         let leidos = if paso.sin_cambios {
             None
         } else {
-            g.valores_actuales(&paso.funcion, instancia.as_deref(), &a.fijos)
+            g.valores_actuales(&paso.funcion, instancia.as_deref(), &del_paso.fijos)
                 .await
                 .inspect_err(|e| {
                     tracing::warn!("ajustes: {}: no se puede leer para el resumen: {e}", a.id);
@@ -96,13 +122,22 @@ pub(in crate::ajustes_router) async fn deshacer_ajuste(
                 .ok()
                 .flatten()
         };
+        de_cada_paso.push(del_paso);
         actuales.push(leidos.unwrap_or_default());
     }
-    let vista = vista_grupo(&g, a, prep.token, &prep.pasos, prep.riesgo, &|i, param| {
-        buscar(&actuales[i], param).map(str::to_owned)
-    });
-    // Lo que el router no deja leer se queda como se escribió.
-    let aviso =
-        (!tapados.is_empty()).then(|| t!("cambio-aviso-tapado", campos = nombres_tapados()));
+    let completar = |i: usize, param: &str| buscar(&actuales[i], param).map(str::to_owned);
+    let vista = if de_cada_paso.iter().all(|x| x.id == a.id) {
+        vista_grupo(&g, a, prep.token, &prep.pasos, prep.riesgo, &completar)
+    } else {
+        super::acciones::vista_por_pasos(
+            &g,
+            format!("{}-titulo", prefijo_i18n(a)),
+            &de_cada_paso,
+            prep.token,
+            &prep.pasos,
+            prep.riesgo,
+            &completar,
+        )
+    };
     Ok(GrupoVista { aviso, ..vista })
 }

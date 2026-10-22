@@ -3,39 +3,33 @@ import { PLAZO_CAMBIO, plazoDeTest } from "./cambios";
 import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 
 // Ajustes → WiFi dice si cada red está encendida o apagada: la insignia de
-// la cabecera de cada red y, en la radio encendida sin ninguna red
-// encendida, una nota. En las fixtures, como en el router real, todas las
-// redes están apagadas y las radios, encendidas.
+// la tarjeta de cada red y, en la radio encendida sin ninguna red
+// encendida, una nota en su pie. En las fixtures, como en el router real,
+// todas las redes están apagadas y las radios, encendidas.
 //
-// En español a 1440 px se enciende la red de 2,4 GHz desde su tarjeta
-// básica y se vuelve a apagar (dos cambios de verdad contra router-sim, que
-// dejan el panel como estaba); en las demás combinaciones solo se mira.
+// En español a 1440 px se enciende la red de 2,4 GHz con el interruptor de
+// su tarjeta (sin preguntar: encender no corta nada) y se vuelve a apagar
+// (apagar sí corta: lo pregunta antes); dos cambios de verdad contra
+// router-sim, que dejan el panel como estaba. En las demás combinaciones
+// solo se mira.
 
 const textos = {
   es: {
     red24: "Red WiFi 2,4 GHz",
     radio24: "Radio de 2,4 GHz",
-    red: "Red",
     encendida: "Encendida",
     apagada: "Apagada",
     nota: "La radio está encendida, pero ninguna de sus redes emite: en esta banda no hay WiFi.",
-    editar: "Editar",
-    guardar: "Guardar",
     aplicar: "Aplicar",
-    cerrar: "Cerrar",
     hecho: "Hecho: el router tiene ya el cambio.",
   },
   en: {
     red24: "2.4 GHz WiFi network",
     radio24: "2.4 GHz radio",
-    red: "Network",
     encendida: "On",
     apagada: "Off",
     nota: "The radio is on, but none of its networks is broadcasting: there is no WiFi on this band.",
-    editar: "Edit",
-    guardar: "Save",
     aplicar: "Apply",
-    cerrar: "Close",
     hecho: "Done: the router now has the change.",
   },
 } as const;
@@ -44,30 +38,31 @@ type Textos = (typeof textos)["es" | "en"];
 
 /** La tarjeta cuyo título es exactamente `titulo`. */
 function tarjeta(page: Page, titulo: string): Locator {
-  return page.locator("article.ajuste").filter({
+  return page.locator("article.tarjeta-el").filter({
     has: page.getByRole("heading", { level: 2, name: titulo, exact: true }),
   });
 }
 
-/** Desde la tarjeta básica, la red pasa a `opcion` (`encendida`/`apagada`). */
-async function ponerRed(page: Page, t: Textos, red: Locator, opcion: string, de: string, a: string) {
-  await red.getByRole("button", { name: t.editar }).click();
-  const control = red.getByLabel(t.red, { exact: true });
-  await expect(control).toBeFocused();
-  await control.selectOption(opcion);
-  await red.getByRole("button", { name: t.guardar }).click();
+/**
+ * Enciende (`encender`) o apaga la red con el interruptor de su tarjeta:
+ * apagarla pregunta antes; encenderla, no. Espera a que el router lo tenga.
+ */
+async function ponerRed(page: Page, t: Textos, red: Locator, encender: boolean) {
+  await red.getByRole("switch").click();
   const dialogo = page.locator("dialog[open]");
-  const fila = dialogo.locator("tbody tr");
-  await expect(fila).toHaveCount(1);
-  await expect(fila.locator("th")).toHaveText(t.red);
-  await expect(fila.locator("td").nth(0)).toHaveText(de);
-  await expect(fila.locator("td").nth(1)).toHaveText(a);
-  await dialogo.getByRole("button", { name: t.aplicar }).click();
-  await expect(dialogo.getByText(t.hecho)).toBeVisible({ timeout: PLAZO_CAMBIO });
-  await dialogo.getByRole("button", { name: t.cerrar }).click();
-  await expect(page.locator("dialog[open]")).toHaveCount(0);
-  // La página relee el tema y lleva el foco al título de la tarjeta.
-  await expect(red.getByRole("heading", { level: 2 })).toBeFocused();
+  if (encender) {
+    await expect(dialogo).toHaveCount(0);
+  } else {
+    const fila = dialogo.locator("tbody tr");
+    await expect(fila.locator("td").nth(0)).toHaveText(t.encendida);
+    await expect(fila.locator("td").nth(1)).toHaveText(t.apagada);
+    await dialogo.getByRole("button", { name: t.aplicar }).click();
+  }
+  // El aviso es el de este cambio (el anterior ya decía «hecho»): lo sigue
+  // y lo dice al terminar (tras la vigilancia).
+  const aviso = page.locator(".avisos-cambio [role=status] .aviso-cambio");
+  await expect(aviso).not.toContainText(t.hecho);
+  await expect(aviso).toContainText(t.hecho, { timeout: PLAZO_CAMBIO });
 }
 
 test.describe.configure({ mode: "parallel" });
@@ -90,15 +85,11 @@ for (const idioma of ["es", "en"] as const) {
         await asentar(page);
 
         const red24 = tarjeta(page, t.red24);
-        const insignia = red24.locator(".ajuste-cabecera .emision-red");
+        const insignia = red24.locator(".tarjeta-insignia .ins");
         const radio24 = tarjeta(page, t.radio24);
         const nota = radio24.getByText(t.nota, { exact: true });
         await expect(insignia).toHaveText(t.apagada);
         await expect(nota).toBeVisible();
-        // Encender o apagar la red es la primera fila de la tarjeta.
-        await expect(red24.locator(".ajuste-resumen .ajuste-fila").first().locator("dt")).toHaveText(
-          t.red,
-        );
         await sinDesbordamiento(page, `wifi ${idioma} ${ancho}`);
         if (idioma === "es") {
           await red24.screenshot({ path: `capturas/w1-red-apagada-${idioma}-${ancho}.png` });
@@ -106,10 +97,10 @@ for (const idioma of ["es", "en"] as const) {
         }
 
         if (cambia) {
-          await ponerRed(page, t, red24, "encendida", t.apagada, t.encendida);
+          await ponerRed(page, t, red24, true);
           await expect(insignia).toHaveText(t.encendida);
           await expect(nota).toHaveCount(0);
-          await ponerRed(page, t, red24, "apagada", t.encendida, t.apagada);
+          await ponerRed(page, t, red24, false);
           await expect(insignia).toHaveText(t.apagada);
           await expect(nota).toBeVisible();
         }

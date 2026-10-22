@@ -7,7 +7,7 @@
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::modelo::{Ajuste, Excluida, Tema};
+use crate::modelo::{Accion, Ajuste, Elemento, Excluida, Tema};
 
 /// Registra los ficheros de `ajustes/`: un tema nuevo se añade solo aquí.
 macro_rules! ficheros {
@@ -44,6 +44,10 @@ pub enum ErrorAjustes {
 struct FicheroAjustes {
     #[serde(default)]
     ajuste: Vec<Ajuste>,
+    #[serde(default)]
+    elemento: Vec<Elemento>,
+    #[serde(default)]
+    accion: Vec<Accion>,
 }
 
 #[derive(Deserialize)]
@@ -58,6 +62,8 @@ struct FicheroExcluidas {
 #[derive(Debug, Clone)]
 pub struct CatalogoAjustes {
     ajustes: Vec<Ajuste>,
+    elementos: Vec<Elemento>,
+    acciones: Vec<Accion>,
     excluidas: Vec<Excluida>,
 }
 
@@ -77,14 +83,18 @@ impl CatalogoAjustes {
             fichero: fichero.to_owned(),
             mensaje: e.to_string(),
         };
-        let mut ajustes = Vec::new();
+        let (mut ajustes, mut elementos, mut acciones) = (Vec::new(), Vec::new(), Vec::new());
         for (nombre, texto) in ficheros {
             let f: FicheroAjustes = toml::from_str(texto).map_err(|e| error(nombre, e))?;
             ajustes.extend(f.ajuste);
+            elementos.extend(f.elemento);
+            acciones.extend(f.accion);
         }
         let ex: FicheroExcluidas = toml::from_str(excluidas).map_err(|e| error("excluidas", e))?;
         Ok(CatalogoAjustes {
             ajustes,
+            elementos,
+            acciones,
             excluidas: ex.excluida,
         })
     }
@@ -102,6 +112,26 @@ impl CatalogoAjustes {
     /// Ajuste por id.
     pub fn ajuste(&self, id: &str) -> Option<&Ajuste> {
         self.ajustes.iter().find(|a| a.id == id)
+    }
+
+    /// Todos los elementos, en el orden de los ficheros.
+    pub fn elementos(&self) -> &[Elemento] {
+        &self.elementos
+    }
+
+    /// Elementos de un tema, en el orden de los ficheros.
+    pub fn elementos_de(&self, tema: Tema) -> impl Iterator<Item = &Elemento> {
+        self.elementos.iter().filter(move |e| e.tema == tema)
+    }
+
+    /// Todas las acciones, en el orden de los ficheros.
+    pub fn acciones(&self) -> &[Accion] {
+        &self.acciones
+    }
+
+    /// Acciones de un tema, en el orden de los ficheros.
+    pub fn acciones_de(&self, tema: Tema) -> impl Iterator<Item = &Accion> {
+        self.acciones.iter().filter(move |a| a.tema == tema)
     }
 
     /// Funciones de escritura que ningún ajuste cubre, con su motivo.

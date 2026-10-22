@@ -190,6 +190,16 @@ fn forma_de_booleanos_enteros_opcionales_y_claves() {
         "wifi.red.nombre",
         "`booleano` solo vale en un campo `booleano`",
     );
+    // `textos_valor` en un campo que no es booleano.
+    let textos_en_texto = WIFI.replace(
+        "lee = \"nombre\"\ntipo = \"texto\"",
+        "lee = \"nombre\"\ntipo = \"texto\"\ntextos_valor = true",
+    );
+    falla_con(
+        &fallos(&textos_en_texto, ""),
+        "wifi.red.nombre",
+        "`textos_valor` solo vale en un campo `booleano`",
+    );
     // `opcional` no vale en opciones ni booleanos; en texto, sí.
     let opcional_opcion = WIFI.replace(
         "lee = \"seguridad\"\ntipo = \"opcion\"",
@@ -405,4 +415,40 @@ fn secreto_tapado_necesita_su_campo() {
     assert_ne!(sin, WIFI, "el reemplazo tiene que casar");
     let fallos = comprobar(&cargar(&[("wifi", &sin)], ""), &f, &mascara());
     falla_con(&fallos, "wifi.red:", "tapado");
+}
+
+/// `aceptados`: otros valores que valen como lo recomendado, solo en un
+/// texto con `recomendado`; `*.dominio` acepta cualquier nombre de él.
+#[test]
+fn aceptados_en_un_texto_con_recomendado() {
+    let con = |extra: &str| {
+        WIFI.replacen(
+            "tipo = \"texto\"\nvalidar = { min = 1, max = 32 }",
+            &format!("tipo = \"texto\"\nvalidar = {{ min = 1, max = 32 }}\n{extra}"),
+            1,
+        )
+    };
+    let bien =
+        con("recomendado = \"hora.example\"\naceptados = [\"*.pool.example\", \"otra.example\"]");
+    let f = fallos(&bien, "");
+    assert!(f.is_empty(), "{f:#?}");
+    falla_con(
+        &fallos(&con("aceptados = [\"otra.example\"]"), ""),
+        "wifi.red.nombre",
+        "aceptados",
+    );
+    falla_con(
+        &fallos(
+            &con("recomendado = \"a.example\"\naceptados = [\"*.\"]"),
+            "",
+        ),
+        "wifi.red.nombre",
+        "aceptados",
+    );
+    let a = ["*.pool.example".to_owned(), "otra.example".to_owned()];
+    assert!(ajustes::valor_aceptado(&a, "es.pool.example"));
+    assert!(ajustes::valor_aceptado(&a, " OTRA.example "));
+    assert!(!ajustes::valor_aceptado(&a, "pool.example"));
+    assert!(!ajustes::valor_aceptado(&a, "malpool.example"));
+    assert!(!ajustes::valor_aceptado(&a, "hora.operador.example"));
 }

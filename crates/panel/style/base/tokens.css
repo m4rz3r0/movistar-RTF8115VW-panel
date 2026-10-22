@@ -1,33 +1,13 @@
-/* Tokens: colores, espacios, radios y tipografías del tema oscuro. */
+/* Tokens: colores de los temas oscuro y claro, espacios, radios y tipografías. */
 /* ---------------------------------------------------------------- Tokens */
 
+/* El servidor pone el tema del usuario en <html data-tema>: «oscuro»,
+   «claro» o «automatico». En automático decide la preferencia del sistema
+   (sin JavaScript): oscuro, el de referencia, salvo que pida claro. Los dos
+   temas tienen los mismos nombres; cada texto cumple 4,5:1 sobre su fondo
+   (lo comprueba tests/integracion/contraste.rs). */
+
 :root {
-  color-scheme: dark;
-
-  --fondo: #0e0f11;
-  --superficie-1: #16181c;
-  --superficie-2: #1e2126;
-  --borde: #2a2e35;
-  --texto-1: #e8eaed;
-  --texto-2: #9aa0a8;
-  --acento: #ffb000;
-  --acento-texto: #0e0f11;
-  --acento-suave: rgb(255 176 0 / 0.1);
-
-  --ok: #3dd68c;
-  --aviso: #f5a524;
-  --error: #f0524f;
-  --ok-suave: rgb(61 214 140 / 0.12);
-  --aviso-suave: rgb(245 165 36 / 0.12);
-  --error-suave: rgb(240 82 79 / 0.12);
-
-  /* Datos (validados contra la superficie #16181C): nunca el acento. */
-  --viz-1: #3399e0;
-  --viz-2: #c27f00;
-  --viz-rejilla: #23262c;
-  --viz-eje: #3a3f47;
-  --viz-cruceta: #6b717a;
-
   --esp-1: 4px;
   --esp-2: 8px;
   --esp-3: 12px;
@@ -35,10 +15,131 @@
   --esp-5: 24px;
   --esp-6: 32px;
   --radio: 8px;
+  --radio-tarjeta: 14px;
 
   --fuente-ui: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --fuente-titulos: "Chakra Petch", var(--fuente-ui);
   --fuente-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 
   --barra-ancho: 232px;
+}
+
+:root,
+:root[data-tema="oscuro"] {
+  color-scheme: dark;
+
+  --fondo: #0f1215;
+  --sup: #171b20;
+  --sup2: #1e2329;
+  --sup3: #252b32;
+  --borde: #2b3139;
+  --borde-fuerte: #3a424c;
+  --texto: #e7eaee;
+  --suave: #a3abb5;
+  --tenue: #828b96;
+  --acento: #f0a63a;
+  --acento-texto: #f3b456;
+  --sobre-acento: #1b1204;
+  --acento-velo: #2a2112;
+  --acento-borde: #6b5121;
+  --foco: #f3b456;
+  --ok: #57d18f;
+  --ok-velo: #13301f;
+  --apag: #c3c9d1;
+  --apag-velo: #262b31;
+  --aviso: #f3b456;
+  --aviso-velo: #33270f;
+  --peligro: #f08080;
+  --peligro-velo: #3a1c1c;
+
+  /* Datos (validados contra --sup): nunca el acento. */
+  --viz-1: #3399e0;
+  --viz-2: #c27f00;
+  --viz-rejilla: #23282e;
+  --viz-eje: #3a424c;
+  --viz-cruceta: #6b737d;
+
+  --sombra: 0 1px 0 rgb(255 255 255 / 0.03) inset;
+  --sombra-flotante: 0 24px 48px rgb(0 0 0 / 0.45);
+  --velo-dialogo: rgb(0 0 0 / 0.6);
+}
+
+:root[data-tema="claro"] {
+  color-scheme: light;
+
+  --fondo: #f3f4f6;
+  --sup: #ffffff;
+  --sup2: #f6f7f9;
+  --sup3: #eceef2;
+  --borde: #dde1e6;
+  --borde-fuerte: #c4cad2;
+  --texto: #151a20;
+  --suave: #4c5561;
+  --tenue: #626b77;
+  --acento: #f0a63a;
+  --acento-texto: #8a5200;
+  --sobre-acento: #1b1204;
+  --acento-velo: #fff3df;
+  --acento-borde: #e8b766;
+  --foco: #8a5200;
+  --ok: #137a43;
+  --ok-velo: #e3f5ea;
+  --apag: #4c5561;
+  --apag-velo: #eceef2;
+  --aviso: #8a5200;
+  --aviso-velo: #fff1d9;
+  --peligro: #b42323;
+  --peligro-velo: #fde8e8;
+
+  --viz-1: #1f6fb2;
+  --viz-2: #9a6100;
+  --viz-rejilla: #e6e9ed;
+  --viz-eje: #c4cad2;
+  --viz-cruceta: #828b96;
+
+  --sombra: 0 1px 2px rgb(20 26 32 / 0.06);
+  --sombra-flotante: 0 24px 48px rgb(20 26 32 / 0.18);
+  --velo-dialogo: rgb(20 26 32 / 0.45);
+}
+
+/* Automático con el sistema en claro: los mismos valores que el tema claro
+   (repetidos: sin preprocesador ni JavaScript; el test lo comprueba). */
+@media (prefers-color-scheme: light) {
+  :root[data-tema="automatico"] {
+    color-scheme: light;
+
+    --fondo: #f3f4f6;
+    --sup: #ffffff;
+    --sup2: #f6f7f9;
+    --sup3: #eceef2;
+    --borde: #dde1e6;
+    --borde-fuerte: #c4cad2;
+    --texto: #151a20;
+    --suave: #4c5561;
+    --tenue: #626b77;
+    --acento: #f0a63a;
+    --acento-texto: #8a5200;
+    --sobre-acento: #1b1204;
+    --acento-velo: #fff3df;
+    --acento-borde: #e8b766;
+    --foco: #8a5200;
+    --ok: #137a43;
+    --ok-velo: #e3f5ea;
+    --apag: #4c5561;
+    --apag-velo: #eceef2;
+    --aviso: #8a5200;
+    --aviso-velo: #fff1d9;
+    --peligro: #b42323;
+    --peligro-velo: #fde8e8;
+
+    --viz-1: #1f6fb2;
+    --viz-2: #9a6100;
+    --viz-rejilla: #e6e9ed;
+    --viz-eje: #c4cad2;
+    --viz-cruceta: #828b96;
+
+    --sombra: 0 1px 2px rgb(20 26 32 / 0.06);
+    --sombra-flotante: 0 24px 48px rgb(20 26 32 / 0.18);
+    --velo-dialogo: rgb(20 26 32 / 0.45);
+  }
 }

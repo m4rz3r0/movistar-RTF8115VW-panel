@@ -1,0 +1,80 @@
+/* Interruptor de encendido (role="switch"): verde cuando está encendido. */
+/* ----------------------------------------------------------- Interruptor */
+
+/* Dos formas con el mismo dibujo: el botón `.int` de las tarjetas y las
+   filas (`aria-checked`, `aria-disabled`) y la casilla `.interruptor` de los
+   campos del detalle (`<input type="checkbox" role="switch">`: `:checked`,
+   `:disabled`). Apagado, el carril es `--tenue`: se distingue de la
+   superficie de 3:1 en adelante en los dos temas (WCAG 1.4.11; lo comprueba
+   tests/integracion/contraste.rs). */
+
+.int,
+.interruptor {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 40px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 11px;
+  background: var(--tenue);
+  cursor: pointer;
+  transition: background 200ms ease;
+}
+
+.int::after,
+.interruptor::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--sup);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.35);
+  transition: left 200ms ease;
+}
+
+.int[aria-checked="true"],
+.interruptor:checked {
+  background: var(--ok);
+}
+
+.int[aria-checked="true"]::after,
+.interruptor:checked::after {
+  left: 21px;
+}
+
+.int:focus-visible,
+.interruptor:focus-visible {
+  outline: 2px solid var(--foco);
+  outline-offset: 2px;
+}
+
+.int[aria-disabled="true"],
+.interruptor:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* En el móvil, zona táctil de 40 px sin agrandar el dibujo. */
+@media (pointer: coarse), (max-width: 860px) {
+  .int::before,
+  .interruptor::before {
+    content: "";
+    position: absolute;
+    inset: -9px 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .int,
+  .int::after,
+  .interruptor,
+  .interruptor::after {
+    transition: none;
+  }
+}

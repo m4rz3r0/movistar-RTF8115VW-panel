@@ -22,6 +22,9 @@ opciones = [
   { valor = "1", clave = "encendida" },
   { valor = "0", clave = "apagada", recomendada = true },
 ]
+# Es una puerta de entrada desde internet: su recomendación va antes que
+# las demás, como riesgo.
+seguridad = true
 
 [[ajuste]]
 id = "seguridad.gestion_remota_avanzado"
@@ -123,3 +126,35 @@ opciones = [
   { valor = "admin", clave = "administrador" },
   { valor = "user", clave = "usuario" },
 ]
+
+# Elementos de la pestaña (spec §5.1): la gestión remota junta sus tres
+# ajustes (lo esencial, el aviso y el servidor).
+[[elemento]]
+id = "gestion-remota"
+tema = "seguridad"
+ajustes = ["seguridad.gestion_remota", "seguridad.gestion_remota_avanzado",
+           "seguridad.gestion_remota_oculto"]
+icono = "escudo"
+datos = ["seguridad.gestion_remota.activa", "seguridad.gestion_remota_avanzado.aviso",
+         "seguridad.gestion_remota_avanzado.intervalo", "seguridad.gestion_remota_oculto.servidor"]
+estado = "derivado:estado_gestion_remota"
+
+[[elemento]]
+id = "contrasena-router"
+tema = "seguridad"
+ajustes = ["seguridad.contrasena_router"]
+icono = "llave"
+
+[[elemento]]
+id = "usuarios"
+tema = "seguridad"
+ajustes = ["seguridad.usuarios_router"]
+icono = "personas"
+datos = ["derivado:cuentas"]
+
+# Acciones (spec §5.5).
+[[accion]]
+id = "apagar_gestion_remota"
+tema = "seguridad"
+campo = "activa"
+valor = "apagada"

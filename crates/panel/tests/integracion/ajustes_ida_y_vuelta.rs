@@ -23,10 +23,8 @@ static FUNCIONES: LazyLock<catalogo::Catalogo> =
 /// `leer_tema` (`{"Texto": …}`, `{"Opcion": …}`…).
 async fn legible(p: &Panel, cookie: &str, a: &Ajuste, campo: &str) -> Value {
     let tema = ok(p, "leer_tema", json!({ "tema": a.tema.slug() }), cookie).await;
-    let ajuste = tema["ajustes"]
-        .as_array()
-        .unwrap()
-        .iter()
+    let ajuste = crate::comun::ajustes_de(&tema)
+        .into_iter()
         .find(|x| x["id"] == a.id.as_str())
         .unwrap_or_else(|| panic!("{}: falta en leer_tema", a.id));
     assert_eq!(ajuste["estado"], "Leido", "{}: {ajuste}", a.id);

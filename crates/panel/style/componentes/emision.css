@@ -1,0 +1,42 @@
+/* Icono de emisión: tres arcos y un punto con el color del estado. */
+/* --------------------------------------------------------------- Emisión */
+
+.emision {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  --emision: var(--borde-fuerte);
+}
+
+.emision path {
+  fill: none;
+  stroke: var(--emision);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+
+.emision circle {
+  fill: var(--emision);
+}
+
+.emision-ok {
+  --emision: var(--ok);
+}
+
+/* Una radio sin redes: los arcos exteriores y el punto en ámbar; el
+   interior, gris (como en la maqueta). */
+.emision-aviso path:nth-child(-n + 2) {
+  stroke: var(--aviso);
+}
+
+.emision-aviso circle {
+  fill: var(--aviso);
+}
+
+.emision-peligro {
+  --emision: var(--peligro);
+}
+
+.emision-proceso {
+  --emision: var(--suave);
+}

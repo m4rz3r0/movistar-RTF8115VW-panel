@@ -1,24 +1,12 @@
 //! Tipos de Ajustes que comparten el servidor y el navegador.
 
+mod pagina;
+pub use pagina::*;
+
 use crate::ui::explorador::RiesgoCambio;
 use ajustes::{Nivel, Requiere, TipoCampo, ValorLegible};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-
-/// Los ajustes de un tema, leídos del router.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TemaVista {
-    /// Identificador corto del tema (`wifi`).
-    pub tema: String,
-    /// El panel está en modo solo lectura (firmware sin confirmar): los
-    /// ajustes se ven pero no se cambian.
-    pub solo_lectura: bool,
-    /// Hay foto de partida: la cabecera enlaza a su comparación.
-    #[serde(default)]
-    pub foto_de_partida: bool,
-    /// En el orden del catálogo.
-    pub ajustes: Vec<AjusteVista>,
-}
 
 /// Un ajuste con su valor actual.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -54,6 +42,10 @@ pub struct AjusteVista {
     /// una nota); `None` si no hay nada que avisar o no se sabe.
     #[serde(default)]
     pub nota_radio: Option<NotaRadio>,
+    /// Columnas de su lista en la página, en orden (ver
+    /// `ajustes::Ajuste::columnas`); vacío si no es una lista.
+    #[serde(default)]
+    pub columnas: Vec<String>,
 }
 
 /// Nota de la tarjeta de una radio WiFi encendida.
@@ -63,6 +55,9 @@ pub enum NotaRadio {
     SinRedes,
     /// Emite tantas redes que el panel no muestra (se ven en la Biblioteca).
     Ocultas(u32),
+    /// Alguna de sus redes no se pudo leer y ninguna de las otras emite: no
+    /// se sabe si emite alguna.
+    RedesSinLeer,
 }
 
 /// Si una red WiFi emite, para la insignia de su tarjeta.
@@ -122,6 +117,10 @@ pub struct CampoVista {
     /// Clave de traducción del porqué de la recomendación (para quién es, a
     /// favor y en contra): `<clave>-recomendado`. Solo si hay recomendación.
     pub motivo_recomendado: Option<String>,
+    /// Otros valores que valen como lo recomendado (otro servidor de hora
+    /// neutro); ver [`ajustes::valor_aceptado`].
+    #[serde(default)]
+    pub aceptados: Vec<String>,
     /// Otro campo del ajuste que hace falta cuando este toma un valor (la
     /// toma del espejo al encenderlo): la página lo pide junto a ese campo.
     pub requiere: Option<Requiere>,
@@ -246,6 +245,10 @@ pub struct GrupoVista {
     /// el router no deja leer se queda como se escribió).
     #[serde(default)]
     pub aviso: Option<String>,
+    /// Borra algo (una regla, una IP fija): el diálogo lo confirma con el
+    /// botón de peligro.
+    #[serde(default)]
+    pub borra: bool,
 }
 
 /// Un paso del grupo: los campos de una misma escritura del router.

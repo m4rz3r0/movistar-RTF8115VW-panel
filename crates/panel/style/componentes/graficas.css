@@ -12,7 +12,7 @@
 
 .grafica {
   padding: var(--esp-4) var(--esp-4) var(--esp-3);
-  background: var(--superficie-1);
+  background: var(--sup);
   border: 1px solid var(--borde);
   border-radius: var(--radio);
 }
@@ -27,7 +27,7 @@
 
 .grafica-titulo {
   font-family: var(--fuente-titulos);
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   letter-spacing: 0.01em;
 }
@@ -35,8 +35,8 @@
 .grafica-nota {
   flex-basis: 100%;
   margin: 0;
-  color: var(--texto-2);
-  font-size: 12px;
+  color: var(--suave);
+  font-size: 12.5px;
   line-height: 1.4;
 }
 
@@ -47,8 +47,8 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  color: var(--texto-2);
-  font-size: 12px;
+  color: var(--suave);
+  font-size: 12.5px;
 }
 
 .leyenda li {
@@ -104,7 +104,7 @@
 
 .grafica-lienzo svg:focus-visible,
 .franja-lienzo svg:focus-visible {
-  outline: 2px solid var(--acento);
+  outline: 2px solid var(--foco);
   outline-offset: 4px;
 }
 
@@ -116,11 +116,11 @@
 }
 
 .eje-texto {
-  fill: var(--texto-2);
+  fill: var(--suave);
 }
 
 .eje-unidad {
-  fill: var(--texto-2);
+  fill: var(--suave);
   font-weight: 500;
 }
 
@@ -170,21 +170,21 @@
 
 /* El anillo del color de la superficie separa el punto de las líneas. */
 .marcador {
-  stroke: var(--superficie-1);
+  stroke: var(--sup);
   stroke-width: 2px;
 }
 
 .grafica svg .etiqueta-directa {
-  fill: var(--texto-1);
+  fill: var(--texto);
   font-weight: 600;
   paint-order: stroke;
-  stroke: var(--superficie-1);
+  stroke: var(--sup);
   stroke-width: 4px;
   stroke-linejoin: round;
 }
 
 .grafica-vacia {
-  fill: var(--texto-2);
+  fill: var(--suave);
 }
 
 .cruceta {
@@ -199,7 +199,7 @@
 }
 
 .lectura-fondo {
-  fill: var(--superficie-2);
+  fill: var(--sup2);
   stroke: var(--borde);
   stroke-width: 1px;
   filter: drop-shadow(0 4px 12px rgb(0 0 0 / 0.45));
@@ -212,17 +212,17 @@
 
 .grafica svg .lectura .lectura-cabecera,
 .franja svg .lectura .lectura-cabecera {
-  fill: var(--texto-2);
+  fill: var(--suave);
   font-size: 11px;
 }
 
 .lectura-valor {
-  fill: var(--texto-1);
+  fill: var(--texto);
   font-weight: 600;
 }
 
 .lectura-nombre {
-  fill: var(--texto-2);
+  fill: var(--suave);
 }
 
 .clave {
@@ -239,7 +239,7 @@
 }
 
 .grafica-datos {
-  color: var(--texto-2);
+  color: var(--suave);
   font-size: 12px;
 }
 
@@ -251,7 +251,7 @@
 }
 
 .grafica-datos summary:hover {
-  color: var(--texto-1);
+  color: var(--texto);
 }
 
 .grafica-datos[open] summary {
@@ -273,21 +273,21 @@
 }
 
 .franja-detalle {
-  color: var(--texto-2);
+  color: var(--suave);
   font-variant-numeric: tabular-nums;
 }
 
 .franja-ok {
-  fill: color-mix(in srgb, var(--ok) 28%, var(--superficie-1));
+  fill: color-mix(in srgb, var(--ok) 28%, var(--sup));
 }
 
 .franja-corte {
-  fill: var(--error);
+  fill: var(--peligro);
 }
 
 .franja-resalte {
   fill: none;
-  stroke: var(--texto-1);
+  stroke: var(--texto);
   stroke-width: 1.5px;
   pointer-events: none;
 }
@@ -299,17 +299,17 @@
 }
 
 .clave-bloque.franja-clave-ok {
-  background: color-mix(in srgb, var(--ok) 28%, var(--superficie-1));
+  background: color-mix(in srgb, var(--ok) 28%, var(--sup));
 }
 
 .clave-bloque.franja-clave-corte {
-  background: var(--error);
+  background: var(--peligro);
 }
 
 .clave.franja-clave-ok {
-  stroke: color-mix(in srgb, var(--ok) 60%, var(--superficie-1));
+  stroke: color-mix(in srgb, var(--ok) 60%, var(--sup));
 }
 
 .clave.franja-clave-corte {
-  stroke: var(--error);
+  stroke: var(--peligro);
 }

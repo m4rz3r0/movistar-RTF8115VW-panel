@@ -1,5 +1,6 @@
 //! Pruebas de la insignia de cada red y la nota de su radio.
 
+use super::historial::{PasoDeRed, ultimo_apagado};
 use super::*;
 use ajustes::CatalogoAjustes;
 
@@ -187,10 +188,10 @@ fn sin_si_emite_vale_lo_encendida() {
     ]);
     assert_eq!(de(&v, "wifi.red_5").red_wifi, Some(EmisionRed::Encendida));
     assert_eq!(de(&v, "wifi.red_24").red_wifi, Some(EmisionRed::Apagada));
+    // La de invitados no se ha podido leer: no se sabe si la radio emite.
     assert_eq!(
         de(&v, "wifi.radio_24").nota_radio,
-        None,
-        "la de invitados no se ha podido leer"
+        Some(NotaRadio::RedesSinLeer)
     );
 }
 
@@ -206,6 +207,30 @@ fn red_encendida_con_la_radio_apagada_no_emite() {
         None,
         "la radio está apagada"
     );
+}
+
+/// Una red de la radio no se pudo leer y ninguna de las otras emite: la
+/// radio no dice que emite (ni con su lista ni sin ella), sino que sus
+/// redes no se han podido leer.
+#[test]
+fn radio_con_una_red_sin_leer_no_dice_que_emite() {
+    let sin_red_24: Vec<_> = todo_apagado()
+        .into_iter()
+        .filter(|(id, _)| *id != "wifi.red_24")
+        .collect();
+    for listas in [listas_apagadas(), Vec::new()] {
+        let v = marcar_con(&sin_red_24, &listas);
+        let nota = de(&v, "wifi.radio_24").nota_radio;
+        assert_eq!(nota, Some(NotaRadio::RedesSinLeer), "{}", listas.len());
+        let (estado, clave) = estado_red(None, Some(true), nota);
+        assert_ne!(estado, EstadoVisual::Emite);
+        assert_eq!(clave, "ajustes-wifi-radio-redes-sin-leer-corto");
+    }
+    // Si otra de sus redes emite, sí se sabe que emite.
+    let mut con_invitados = sin_red_24.clone();
+    con_invitados[0] = ("wifi.invitados", nodo("", "1", Some("1")));
+    let v = marcar_con(&con_invitados, &listas_apagadas());
+    assert_eq!(de(&v, "wifi.radio_24").nota_radio, None);
 }
 
 #[test]
@@ -243,4 +268,114 @@ fn cada_red_del_catalogo_tiene_su_radio() {
             assert!(cat.ajuste(radio).is_some(), "{radio}");
         }
     }
+}
+
+/// La tabla de estados de la tarjeta: la insignia de la red manda; en una
+/// radio, si emite y lo que no se ve en sus redes.
+#[test]
+fn estado_red_de_redes_y_radios() {
+    use EstadoVisual as E;
+    let casos = [
+        (
+            (Some(EmisionRed::Encendida), None, None),
+            (E::Emite, "ajustes-wifi-red-encendida"),
+        ),
+        (
+            (Some(EmisionRed::Apagada), Some(true), None),
+            (E::Apagada, "ajustes-wifi-red-apagada"),
+        ),
+        (
+            (Some(EmisionRed::SinRadio), None, None),
+            (E::Atencion, "ajustes-wifi-red-sin-radio"),
+        ),
+        (
+            (Some(EmisionRed::NoEmite), None, None),
+            (E::Atencion, "ajustes-wifi-red-no-emite"),
+        ),
+        (
+            (None, Some(false), None),
+            (E::Apagada, "ajustes-wifi-radio-apagada"),
+        ),
+        (
+            (None, Some(true), Some(NotaRadio::SinRedes)),
+            (E::Atencion, "ajustes-wifi-radio-sin-redes-corto"),
+        ),
+        (
+            (None, Some(true), Some(NotaRadio::Ocultas(2))),
+            (E::Emite, "ajustes-wifi-red-encendida"),
+        ),
+        (
+            (None, Some(true), None),
+            (E::Emite, "ajustes-wifi-red-encendida"),
+        ),
+        (
+            (None, Some(true), Some(NotaRadio::RedesSinLeer)),
+            (E::Atencion, "ajustes-wifi-radio-redes-sin-leer-corto"),
+        ),
+        (
+            (None, None, None),
+            (E::Atencion, "ajustes-estado-desconocido"),
+        ),
+    ];
+    for ((ap, radio, ocultos), (estado, clave)) in casos {
+        assert_eq!(
+            estado_red(ap, radio, ocultos),
+            (estado, clave.to_owned()),
+            "{ap:?} {radio:?} {ocultos:?}"
+        );
+        for idioma in i18n::Idioma::TODOS {
+            assert!(i18n::existe(idioma, clave), "{clave}");
+        }
+    }
+    let es = |k: &str| i18n::tr(i18n::Idioma::Es, k, None);
+    assert_eq!(
+        es("ajustes-wifi-radio-sin-redes-corto"),
+        "Encendida, sin redes"
+    );
+}
+
+/// Ancho de banda de cada código del router.
+#[test]
+fn ancho_en_mhz() {
+    assert_eq!(mhz("1"), Some("20"));
+    assert_eq!(mhz("3"), Some("80"));
+    assert_eq!(mhz("9"), None);
+}
+
+/// «Apagada desde»: manda el último paso que tocó el `adm_state` de cada
+/// punto de acceso; encenderla lo borra, y otro punto no cuenta.
+#[test]
+fn apagada_desde_el_ultimo_paso() {
+    let paso = |punto: &str, campo: &str, despues: &str, cuando: i64| PasoDeRed {
+        valores: [(ID_PUNTO.to_owned(), punto.to_owned())].into(),
+        diff: format!(
+            r#"[{{"nombre":"{campo}","antes":"x","despues":"{despues}","secreto":false}}]"#
+        ),
+        cuando,
+    };
+    let pasos = [
+        paso("0", "adm_state", "0", 10),
+        paso("1", "adm_state", "0", 20),
+        paso("1", "adm_state", "1", 30),
+        paso("0", "ssid", "RED-9", 40),
+        paso("2", "adm_state", "0", 50),
+        paso("2", "adm_state", "0", 60),
+    ];
+    let m = ultimo_apagado(&pasos);
+    assert_eq!(m.get("0"), Some(&10), "el nombre no cuenta");
+    assert_eq!(m.get("1"), None, "se volvió a encender");
+    assert_eq!(m.get("2"), Some(&60));
+}
+
+/// La página de la WiFi lee también la lista de dispositivos de Red local
+/// (para el nombre de los conectados de cada red), en la misma tanda.
+#[test]
+fn la_wifi_lee_los_nombres_de_red_local() {
+    let cat = CatalogoAjustes::load().unwrap();
+    let del_tema: Vec<&Ajuste> = cat.por_tema(Tema::from_slug("wifi").unwrap()).collect();
+    assert!(
+        claves_extra(&del_tema)
+            .iter()
+            .any(|c| *c == Clave::new::<&str, &str>("cbGetLanHostList", &[])),
+    );
 }

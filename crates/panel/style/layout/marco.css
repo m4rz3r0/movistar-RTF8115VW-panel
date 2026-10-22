@@ -17,7 +17,7 @@
   /* En pantallas bajas se desplaza la barra: «Salir» nunca queda cortado. */
   overflow-y: auto;
   padding: var(--esp-5) var(--esp-3) var(--esp-4);
-  background: linear-gradient(180deg, var(--superficie-1), #121417);
+  background: var(--sup);
   border-right: 1px solid var(--borde);
 }
 
@@ -33,13 +33,13 @@
   align-items: center;
   gap: var(--esp-3);
   padding: 0 var(--esp-2);
-  color: var(--texto-1);
+  color: var(--texto);
   text-decoration: none;
 }
 
 .marca-logo {
   flex: none;
-  color: var(--acento);
+  color: var(--acento-texto);
 }
 
 .marca-texto {
@@ -57,7 +57,7 @@
 }
 
 .marca-sub {
-  color: var(--texto-2);
+  color: var(--suave);
   font-size: 12px;
 }
 
@@ -70,7 +70,7 @@
   border: 1px solid var(--borde);
   border-radius: var(--radio);
   background: transparent;
-  color: var(--texto-1);
+  color: var(--texto);
   cursor: pointer;
 }
 
@@ -100,7 +100,7 @@
   min-height: 40px;
   padding: 0 var(--esp-3);
   border-radius: var(--radio);
-  color: var(--texto-2);
+  color: var(--suave);
   font-weight: 500;
   text-decoration: none;
   transition: color 120ms ease, background 120ms ease;
@@ -108,19 +108,19 @@
 
 .nav a:hover,
 .sesion-usuario:hover {
-  color: var(--texto-1);
-  background: var(--superficie-2);
+  color: var(--texto);
+  background: var(--sup2);
 }
 
 .nav a[aria-current="page"],
 .sesion-usuario[aria-current="page"] {
-  color: var(--texto-1);
-  background: var(--acento-suave);
+  color: var(--texto);
+  background: var(--acento-velo);
 }
 
 .nav a[aria-current="page"] .icono,
 .sesion-usuario[aria-current="page"] .icono {
-  color: var(--acento);
+  color: var(--acento-texto);
 }
 
 .nav a[aria-current="page"]::before,
@@ -166,7 +166,7 @@
 }
 
 .idioma-error {
-  color: var(--error);
+  color: var(--peligro);
   font-size: 12px;
 }
 
@@ -181,19 +181,19 @@
   border: 1px solid var(--borde);
   border-radius: var(--radio);
   background: transparent;
-  color: var(--texto-2);
+  color: var(--suave);
   font: inherit;
   cursor: pointer;
 }
 
 .idioma-selector:hover {
-  color: var(--texto-1);
-  border-color: var(--texto-2);
+  color: var(--texto);
+  border-color: var(--suave);
 }
 
 .idioma-selector option {
   background: var(--fondo);
-  color: var(--texto-1);
+  color: var(--texto);
 }
 
 .contenido {
@@ -225,7 +225,7 @@
     padding: var(--esp-2) var(--esp-4);
     border-right: 0;
     border-bottom: 1px solid var(--borde);
-    background: var(--superficie-1);
+    background: var(--sup);
   }
 
   .marca {

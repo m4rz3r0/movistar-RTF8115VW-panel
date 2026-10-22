@@ -10,7 +10,7 @@
 //! campos censurados con el ojo (de solo lectura).
 
 use super::campo::{CampoSecreto, etiqueta, validar, valor_resumido};
-use super::tarjeta::enfocar;
+use super::piezas::enfocar;
 use super::{RUTA_AJUSTES, nombre, ruta};
 use crate::ajustes_router::{
     CampoVista, ComparacionVista, Diferencia, DiferenciaVista, GrupoVista, comparar_con_partida,
@@ -348,7 +348,7 @@ fn BotonVolver(
             // Sin `disabled`: el botón conserva el foco y el diálogo se lo
             // devuelve al cerrarse.
             <button
-                class="boton-sutil"
+                class="b-sec"
                 type="button"
                 // El campo al que vuelve: hay un botón por fila.
                 aria-describedby=descrito

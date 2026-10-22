@@ -62,3 +62,36 @@ escribe = { funcion = "cbSetDdns", parametro = "password" }
 lee = "password"
 tipo = "secreto"
 validar = { min = 1 }
+
+# Elementos de la pestaña (spec §5.1). La conexión a internet no es un
+# elemento: no hay ajuste que la cambie (ver arriba); su estado va en la
+# franja de resumen.
+[[elemento]]
+id = "dns"
+tema = "internet"
+ajustes = ["internet.dns"]
+icono = "globo"
+interruptor = "internet.dns.rele"
+datos = ["internet.dns.rele"]
+estado = "derivado:estado_dns"
+
+[[elemento]]
+id = "ddns"
+tema = "internet"
+ajustes = ["internet.ddns"]
+icono = "globo"
+datos = ["derivado:nombres_ddns"]
+estado = "derivado:estado_ddns"
+
+# Acciones (spec §5.5): el relé, de un clic para lo marcado.
+[[accion]]
+id = "activar_rele"
+tema = "internet"
+campo = "rele"
+valor = "true"
+
+[[accion]]
+id = "desactivar_rele"
+tema = "internet"
+campo = "rele"
+valor = "false"

@@ -82,8 +82,7 @@ fn texto_opcion(c: &CampoVista, clave: &str) -> String {
 pub(crate) fn texto_legible(c: &CampoVista, v: &str) -> String {
     match c.tipo {
         TipoCampo::Opcion => texto_opcion(c, v),
-        TipoCampo::Booleano if v == "true" => t!("comun-si"),
-        TipoCampo::Booleano => t!("comun-no"),
+        TipoCampo::Booleano => crate::ui::grupo::texto_booleano(&c.clave, v == "true"),
         _ => v.to_owned(),
     }
 }
@@ -461,6 +460,7 @@ mod tests {
             valor_secreto: None,
             recomendado: Some("wpa2".into()),
             motivo_recomendado: None,
+            aceptados: Vec::new(),
             requiere: None,
             sin_eleccion: false,
         }

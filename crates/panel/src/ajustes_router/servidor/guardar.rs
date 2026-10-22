@@ -59,6 +59,7 @@ pub(crate) fn grupo_de(a: &Ajuste, p: &PeticionAjuste) -> Result<GrupoRequest, E
                     instancia: p.instancia.clone().filter(|_| a.lista),
                     valores,
                     borrar: p.borrar && a.lista,
+                    identidad: Default::default(),
                 },
                 etiqueta: Some(titulo.clone()),
             })
@@ -163,6 +164,32 @@ pub(super) fn cambio_legible(
     })
 }
 
+/// Lo que cambia en el paso preparado `paso`, que escribe en el ajuste
+/// `a`. `completar(parámetro)` da el valor de un parámetro que no cambia.
+pub(super) fn paso_vista(
+    a: &Ajuste,
+    paso: &PasoPreparado,
+    completar: &dyn Fn(&str) -> Option<String>,
+) -> PasoVista {
+    let prefijo = prefijo_i18n(a);
+    PasoVista {
+        indice: paso.indice,
+        sin_cambios: paso.sin_cambios,
+        campos: a
+            .campos
+            .iter()
+            .filter(|c| {
+                c.escribe
+                    .as_ref()
+                    .is_some_and(|e| e.funcion == paso.funcion)
+            })
+            .filter_map(|c| cambio_legible(&prefijo, c, &paso.diff, completar))
+            .collect(),
+        titulo: None,
+        nota: None,
+    }
+}
+
 /// Resumen de un grupo preparado del ajuste `a`. `completar(paso,
 /// parámetro)` da el valor de un parámetro que no cambia en ese paso.
 pub(super) fn vista_grupo(
@@ -173,58 +200,35 @@ pub(super) fn vista_grupo(
     r: Riesgo,
     completar: &dyn Fn(usize, &str) -> Option<String>,
 ) -> GrupoVista {
-    let prefijo = prefijo_i18n(a);
     GrupoVista {
         token,
-        titulo: format!("{prefijo}-titulo"),
+        titulo: format!("{}-titulo", prefijo_i18n(a)),
         pasos: pasos
             .iter()
-            .map(|paso| PasoVista {
-                indice: paso.indice,
-                sin_cambios: paso.sin_cambios,
-                campos: a
-                    .campos
-                    .iter()
-                    .filter(|c| {
-                        c.escribe
-                            .as_ref()
-                            .is_some_and(|e| e.funcion == paso.funcion)
-                    })
-                    .filter_map(|c| {
-                        cambio_legible(&prefijo, c, &paso.diff, &|param| {
-                            completar(paso.indice, param)
-                        })
-                    })
-                    .collect(),
-                titulo: None,
-                nota: None,
-            })
+            .map(|paso| paso_vista(a, paso, &|param| completar(paso.indice, param)))
             .collect(),
         riesgo: riesgo(r),
         efecto: a.efecto.as_ref().map(|e| format!("efecto-{e}")),
         vigilancia_s: g.tiempos().vigilancia(r).as_secs(),
         detalle: None,
         aviso: None,
+        borra: false,
     }
 }
 
-pub(in crate::ajustes_router) async fn preparar_ajuste(
-    p: PeticionAjuste,
-) -> Result<GrupoVista, ServerFnError> {
-    // `preparar()` ya pone `no-store` (el resumen lleva los datos sensibles
-    // en claro).
-    let (state, _) = preparar().await?;
-    let a = ajuste_por_id(&state, &p.ajuste)?;
+/// Valida lo que pide `p` en el ajuste `a` antes de leer el router: el
+/// ajuste admite borrar, los campos existen, lo exigido viene y cada valor
+/// vale (400 con su mensaje).
+fn validar(a: &Ajuste, p: &PeticionAjuste) -> Result<(), ServerFnError> {
     if p.borrar && !a.lista {
         return Err(fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-invalida")));
     }
     let prefijo = prefijo_i18n(a);
-    let partes = partes(a, &p);
-    let campos = partes
-        .iter()
-        .flat_map(|q| &q.valores)
+    let campos = partes(a, p)
+        .into_iter()
+        .flat_map(|q| q.valores)
         .map(|(id, v)| {
-            a.campo(id)
+            a.campo(&id)
                 .map(|c| (c, v))
                 .ok_or_else(|| fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-campo")))
         })
@@ -237,21 +241,25 @@ pub(in crate::ajustes_router) async fn preparar_ajuste(
         return Err(error_requiere(&prefijo, pide, falta));
     }
     for (c, v) in campos {
-        pares(c, v).map_err(|e| error_valor(&prefijo, c, &e))?;
+        pares(c, &v).map_err(|e| error_valor(&prefijo, c, &e))?;
     }
-    let g = gestor(&state)?;
-    libre(&g)?;
-    let detalle = match a.componente {
-        Some(Componente::Reservas) => comprobar_reserva(&state, a, &p).await?,
-        Some(Componente::Puertos) => comprobar_regla(&state, a, &p).await?,
-        _ => None,
-    };
+    Ok(())
+}
+
+/// El grupo que guarda `p` en el ajuste `a` (ya validado), con el título
+/// de cada paso: con varias partes («TCP y UDP»), su protocolo. Exige la
+/// clave que el router no deja leer donde se reenvía (400).
+fn armar(
+    state: &AppState,
+    a: &Ajuste,
+    p: &PeticionAjuste,
+) -> Result<(GrupoRequest, Vec<Option<String>>), ServerFnError> {
+    let prefijo = prefijo_i18n(a);
+    let partes = partes(a, p);
     let mut grupo = GrupoRequest {
         pasos: Vec::new(),
         titulo: None,
     };
-    // Con varias partes («TCP y UDP»), cada paso se titula con su
-    // protocolo.
     let mut titulos: Vec<Option<String>> = Vec::new();
     for q in &partes {
         let g = grupo_de(a, q).map_err(|e| {
@@ -273,24 +281,99 @@ pub(in crate::ajustes_router) async fn preparar_ajuste(
         );
         fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-invalida"))
     })?;
+    exigir_tapados(&state.catalogo, a, &partes, &grupo)?;
+    Ok((grupo, titulos))
+}
+
+pub(in crate::ajustes_router) async fn preparar_ajuste(
+    p: PeticionAjuste,
+) -> Result<GrupoVista, ServerFnError> {
+    // `preparar()` ya pone `no-store` (el resumen lleva los datos sensibles
+    // en claro).
+    let (state, _) = preparar().await?;
+    let a = ajuste_por_id(&state, &p.ajuste)?;
+    validar(a, &p)?;
+    let g = gestor(&state)?;
+    libre(&g)?;
+    let detalle = match a.componente {
+        Some(Componente::Reservas) => comprobar_reserva(&state, a, &p).await?,
+        Some(Componente::Puertos) => comprobar_regla(&state, a, &p).await?,
+        _ => None,
+    };
+    let (grupo, titulos) = armar(&state, a, &p)?;
     if grupo.pasos.is_empty() {
         return Err(error_ajuste(CambioError::SinCambios));
     }
-    exigir_tapados(&state.catalogo, a, &partes, &grupo)?;
     let pedidos: Vec<BTreeMap<String, String>> =
         grupo.pasos.iter().map(|p| p.req.valores.clone()).collect();
     let prep = g.preparar_grupo(grupo).await.map_err(error_ajuste)?;
     let mut vista = vista_grupo(&g, a, prep.token, &prep.pasos, prep.riesgo, &|i, param| {
         buscar(&pedidos[i], param).map(str::to_owned)
     });
-    titular_partes(&mut vista.pasos, &titulos, &prefijo);
-    Ok(GrupoVista { detalle, ..vista })
+    titular_partes(&mut vista.pasos, &titulos, &prefijo_i18n(a));
+    Ok(GrupoVista {
+        detalle,
+        borra: p.borrar,
+        ..vista
+    })
+}
+
+/// Prepara el guardado del detalle de un elemento: varios ajustes suyos
+/// (lo esencial y lo avanzado de una red) en un solo grupo, con un paso por
+/// escritura titulado con su ajuste. Solo ajustes que no son listas ni
+/// tienen componente propio (400). Con uno solo, es [`preparar_ajuste`].
+pub(in crate::ajustes_router) async fn preparar_elemento(
+    peticiones: Vec<PeticionAjuste>,
+) -> Result<GrupoVista, ServerFnError> {
+    let invalida = || fallo(StatusCode::BAD_REQUEST, t!("ajustes-error-invalida"));
+    if peticiones.len() <= 1 {
+        let p = peticiones.into_iter().next().ok_or_else(invalida)?;
+        return preparar_ajuste(p).await;
+    }
+    let (state, _) = preparar().await?;
+    let mut ajustes: Vec<&Ajuste> = Vec::with_capacity(peticiones.len());
+    for p in &peticiones {
+        let a = ajuste_por_id(&state, &p.ajuste)?;
+        if a.lista || a.componente.is_some() || ajustes.iter().any(|x| x.id == a.id) {
+            return Err(invalida());
+        }
+        validar(a, p)?;
+        ajustes.push(a);
+    }
+    let g = gestor(&state)?;
+    libre(&g)?;
+    let mut grupo = GrupoRequest {
+        pasos: Vec::new(),
+        titulo: Some(format!("{}-titulo", prefijo_i18n(ajustes[0]))),
+    };
+    let mut de_cada_paso: Vec<&Ajuste> = Vec::new();
+    for (a, p) in ajustes.iter().zip(&peticiones) {
+        let (sub, _) = armar(&state, a, p)?;
+        de_cada_paso.extend(std::iter::repeat_n(*a, sub.pasos.len()));
+        grupo.pasos.extend(sub.pasos);
+    }
+    if grupo.pasos.is_empty() {
+        return Err(error_ajuste(CambioError::SinCambios));
+    }
+    let titulo = grupo.titulo.clone().unwrap_or_default();
+    let pedidos: Vec<BTreeMap<String, String>> =
+        grupo.pasos.iter().map(|p| p.req.valores.clone()).collect();
+    let prep = g.preparar_grupo(grupo).await.map_err(error_ajuste)?;
+    Ok(super::acciones::vista_por_pasos(
+        &g,
+        titulo,
+        &de_cada_paso,
+        prep.token,
+        &prep.pasos,
+        prep.riesgo,
+        &|i, param| buscar(&pedidos[i], param).map(str::to_owned),
+    ))
 }
 
 /// Cada paso que escribe una función con un secreto tapado al leer lo
 /// reenvía: tiene que venir escrito en la petición (si no, 400 junto al
 /// campo, con el motivo). Al borrar no se reenvía.
-fn exigir_tapados(
+pub(super) fn exigir_tapados(
     f: &Catalogo,
     a: &Ajuste,
     partes: &[PeticionAjuste],

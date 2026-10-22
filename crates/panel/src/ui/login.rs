@@ -65,7 +65,7 @@ pub fn PaginaLogin() -> impl IntoView {
                     <p class="error" role="alert" aria-live="assertive">
                         {error}
                     </p>
-                    <button class="boton" type="submit" disabled=move || action.pending().get()>
+                    <button class="b-pri" type="submit" disabled=move || action.pending().get()>
                         {t!("login-entrar")}
                     </button>
                 </ActionForm>

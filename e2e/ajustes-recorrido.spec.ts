@@ -22,6 +22,9 @@ const textos = {
     puertos: "Puertos",
     seguridad: "Seguridad",
     red24: "Red WiFi 2,4 GHz",
+    abrirRed24: "Abrir Red WiFi 2,4 GHz",
+    guardarCambios: "Guardar cambios",
+    quitarWps: "Quitar WPS",
     contrasena: "Contraseña",
     wps: "WPS",
     no: "No",
@@ -43,6 +46,7 @@ const textos = {
     dispositivo: "Dispositivo",
     nombreRegla: "Servidor web",
     gestion: "Gestión remota del operador",
+    abrirGestion: "Abrir Gestión remota del operador",
     gestionCampo: "Gestión remota",
     apagada: "Apagada",
     recomendada: /^Recomendado: Apagada Recomendado si [^.]+\.$/,
@@ -55,6 +59,9 @@ const textos = {
     puertos: "Ports",
     seguridad: "Security",
     red24: "2.4 GHz WiFi network",
+    abrirRed24: "Open 2.4 GHz WiFi network",
+    guardarCambios: "Save changes",
+    quitarWps: "Turn off WPS",
     contrasena: "Password",
     wps: "WPS",
     no: "No",
@@ -76,6 +83,7 @@ const textos = {
     dispositivo: "Device",
     nombreRegla: "Web server",
     gestion: "Operator's remote management",
+    abrirGestion: "Open Operator's remote management",
     gestionCampo: "Remote management",
     apagada: "Off",
     recomendada: /^Recommended: Off Recommended if [^.]+\.$/,
@@ -86,11 +94,16 @@ const textos = {
 
 type Textos = (typeof textos)["es" | "en"];
 
-/** La tarjeta cuyo título es exactamente `titulo`. */
-function tarjeta(page: Page, titulo: string): Locator {
-  return page.locator("article.ajuste").filter({
+/** La lista cuyo título es exactamente `titulo`. */
+function lista(page: Page, titulo: string): Locator {
+  return page.locator("section.lista-seccion").filter({
     has: page.getByRole("heading", { level: 2, name: titulo, exact: true }),
   });
+}
+
+/** La fila de la lista `titulo` que contiene `texto`. */
+function fila(page: Page, titulo: string, texto: string): Locator {
+  return lista(page, titulo).locator("tbody tr.lista-fila").filter({ hasText: texto });
 }
 
 /**
@@ -107,20 +120,32 @@ async function sinApiALaVista(page: Page, donde: string) {
 }
 
 /**
- * El diálogo del resumen: sin la API a la vista; aplica, espera «hecho» y
- * lo cierra. La página relee entonces el tema y lleva el foco al título de
- * `tarjeta`: hasta entonces, la tarjeta puede pintarse de nuevo.
+ * El diálogo del resumen en la rejilla (WiFi): sin la API a la vista;
+ * aplica (el diálogo se cierra) y espera a que el aviso del cambio diga
+ * «hecho».
  */
-async function aplicar(page: Page, t: Textos, donde: string, tarjeta: Locator) {
+async function aplicarEnRejilla(page: Page, t: Textos, donde: string) {
   const dialogo = page.locator("dialog[open]");
   await expect(dialogo.locator("#grupo-titulo")).toHaveText(t.revisar);
   await sinApiALaVista(page, `${donde}: resumen`);
   await sinDesbordamiento(page, `${donde}: resumen`);
   await dialogo.getByRole("button", { name: t.aplicar }).click();
-  await expect(dialogo.getByText(t.hecho)).toBeVisible({ timeout: PLAZO_CAMBIO });
-  await dialogo.getByRole("button", { name: t.cerrar }).click();
   await expect(page.locator("dialog[open]")).toHaveCount(0);
-  await expect(tarjeta.getByRole("heading", { level: 2 })).toBeFocused();
+  const aviso = page.locator(".avisos-cambio [role=status] .aviso-cambio");
+  await expect(aviso).not.toContainText(t.hecho);
+  await expect(aviso).toContainText(t.hecho, { timeout: PLAZO_CAMBIO });
+}
+
+/**
+ * Cierra el detalle abierto con «✕» (o, en el móvil, con «‹ Tema»). Tras un
+ * cambio, la página vuelve a leer el tema y, mientras tanto, está inerte: se
+ * reintenta hasta que la pulsación llega.
+ */
+async function cerrarDetalle(page: Page) {
+  await expect(async () => {
+    await page.locator(".detalle :is(.detalle-cerrar, .detalle-volver):visible").click();
+    await expect(page.locator(".detalle")).toHaveCount(0, { timeout: 1_000 });
+  }).toPass();
 }
 
 /** Va a un tema con las pestañas o, en móvil, con el selector de temas. */
@@ -171,74 +196,81 @@ for (const { idioma, locale, ancho } of pasadas) {
       await asentar(page);
       await sinApiALaVista(page, "wifi");
 
-      // 1. La contraseña de la red WiFi de 2,4 GHz.
-      const red24 = tarjeta(page, t.red24);
-      await red24.getByRole("button", { name: t.editar }).click();
-      const edicion = red24.locator(".ajuste-edicion");
-      await edicion.getByLabel(t.contrasena, { exact: true }).fill("una-frase-larga-de-prueba");
-      await edicion.getByRole("button", { name: t.guardar }).click();
+      // 1. La contraseña de la red WiFi de 2,4 GHz, en su detalle.
+      const red24 = page.locator("article.tarjeta-el").filter({
+        has: page.getByRole("heading", { level: 2, name: t.red24, exact: true }),
+      });
+      await red24.getByRole("button", { name: t.abrirRed24, exact: true }).click();
+      const detalle = page.locator(".detalle");
+      await detalle.getByLabel(t.contrasena, { exact: true }).fill("una-frase-larga-de-prueba");
+      await detalle.getByRole("button", { name: t.guardarCambios }).click();
       const dialogo = page.locator("dialog[open]");
       await expect(dialogo.locator("tbody tr")).toHaveCount(1);
       await expect(dialogo.locator("tbody th")).toHaveText(t.contrasena);
       // El secreto no sale en claro en el resumen.
       expect(await dialogo.innerText()).not.toContain("una-frase-larga-de-prueba");
-      await aplicar(page, t, "contraseña WiFi", red24);
+      await aplicarEnRejilla(page, t, "contraseña WiFi");
 
-      // 2. El WPS de esa red, apagado (el recomendado).
-      await red24.getByRole("button", { name: t.editar }).click();
-      const wps = edicion.getByRole("switch", { name: t.wps, exact: true });
-      await expect(wps).toBeChecked();
-      await wps.click();
-      await edicion.getByRole("button", { name: t.guardar }).click();
+      // 2. El WPS de esa red, apagado (el recomendado): el botón de la
+      // recomendación de su tarjeta, con el detalle cerrado («Atrás»).
+      await page.goBack();
+      await expect(detalle).toHaveCount(0);
+      await red24.getByRole("button", { name: t.quitarWps, exact: true }).click();
       await expect(dialogo.locator("tbody th")).toHaveText(t.wps);
-      await aplicar(page, t, "WPS", red24);
-      const filaWps = red24.locator(".ajuste-resumen .ajuste-fila").filter({ hasText: t.wps });
-      await expect(filaWps.locator("dd")).toHaveText(t.no);
+      await aplicarEnRejilla(page, t, "WPS");
+      await red24.getByRole("button", { name: t.abrirRed24, exact: true }).click();
+      const wps = detalle.getByRole("switch", { name: t.wps, exact: true });
+      await expect(wps).not.toBeChecked();
+      await page.goBack();
+      await expect(detalle).toHaveCount(0);
 
-      // 3. La IP de un dispositivo conectado, fija.
+      // 3. La IP de un dispositivo conectado, fija, desde su detalle en la
+      // lista de dispositivos.
       await irA(page, ancho, "red_local", t.redLocal);
-      const dispositivos = tarjeta(page, t.dispositivos);
-      await dispositivos.getByRole("button", { name: t.fijarHost2, exact: true }).click();
+      await fila(page, t.dispositivos, "host-2").locator(".lista-nombre").click();
+      const lateral = page.locator(".detalle-lateral");
+      await lateral.getByRole("button", { name: t.fijarHost2, exact: true }).click();
       await expect(dialogo).toContainText(`${t.fijas}: host-2`);
-      await aplicar(page, t, "IP fija", dispositivos);
-      await expect(dispositivos.locator(".chip-ya-fija").filter({ hasText: t.yaFija })).toBeVisible();
-      await expect(
-        tarjeta(page, t.fijas).locator("tbody tr").filter({ hasText: "192.168.1.62" }),
-      ).toHaveCount(1);
+      await aplicarEnRejilla(page, t, "IP fija");
+      await expect(lateral.locator(".chip-ya-fija").filter({ hasText: t.yaFija })).toBeVisible();
+      await expect(fila(page, t.fijas, "192.168.1.62")).toHaveCount(1);
+      await cerrarDetalle(page);
 
       // 4. Un puerto abierto hacia ese dispositivo.
       await irA(page, ancho, "puertos", t.puertos);
-      const reglas = tarjeta(page, t.reglas);
-      await reglas.getByRole("button", { name: t.abrir }).click();
-      const form = reglas.locator("form.regla-formulario");
+      await lista(page, t.reglas).getByRole("button", { name: t.abrir }).click();
+      const form = lateral.locator("form.regla-formulario");
       await form.getByLabel(t.nombre, { exact: true }).fill(t.nombreRegla);
       await form.getByLabel(t.protocolo, { exact: true }).selectOption("tcp");
       await form.getByLabel(t.puerto, { exact: true }).fill("8443");
       await form.getByLabel(t.dispositivo, { exact: true }).selectOption("192.168.1.62");
       await form.getByRole("button", { name: t.guardar }).click();
       await expect(dialogo).toContainText(`${t.reglas}: ${t.nombreRegla}`);
-      await aplicar(page, t, "puerto", reglas);
-      const regla = reglas.locator("li.regla").filter({ hasText: t.nombreRegla });
+      await aplicarEnRejilla(page, t, "puerto");
+      // El detalle de la regla nueva se cierra solo al aplicarse.
+      await expect(lateral).toHaveCount(0);
+      const regla = fila(page, t.reglas, t.nombreRegla);
       await expect(regla).toContainText("8443");
       await expect(regla).toContainText("host-2");
 
-      // 5. La gestión remota del operador (TR-069), apagada.
+      // 5. La gestión remota del operador (TR-069), apagada, en su detalle
+      // (Seguridad va en rejilla).
       await irA(page, ancho, "seguridad", t.seguridad);
-      const gestion = tarjeta(page, t.gestion);
-      await gestion.getByRole("button", { name: t.editar }).click();
-      await gestion.getByLabel(t.gestionCampo, { exact: true }).selectOption("apagada");
+      const gestion = page.locator("article.tarjeta-el").filter({
+        has: page.getByRole("heading", { level: 2, name: t.gestion, exact: true }),
+      });
+      await gestion.getByRole("button", { name: t.abrirGestion, exact: true }).click();
+      await detalle.getByLabel(t.gestionCampo, { exact: true }).selectOption("apagada");
       // La recomendación: para quién es y, plegado, a favor y en contra.
-      const reco = gestion.locator(".recomendacion");
+      const reco = detalle.locator(".recomendacion").first();
       await expect(reco.locator(":scope > p")).toHaveText(t.recomendada);
       await reco.locator("details.recomendacion-pros > summary").click();
       await expect(reco.locator("details.recomendacion-pros > p")).toHaveText(t.pros);
       await sinDesbordamiento(page, "gestión remota");
-      await gestion.getByRole("button", { name: t.guardar }).click();
+      await detalle.getByRole("button", { name: t.guardarCambios }).click();
       await expect(dialogo.locator("tbody td").nth(1)).toHaveText(t.apagada);
-      await aplicar(page, t, "gestión remota", gestion);
-      await expect(gestion.locator(".ajuste-resumen .ajuste-fila dd").first()).toContainText(
-        t.apagada,
-      );
+      await aplicarEnRejilla(page, t, "gestión remota");
+      await expect(gestion.locator(".tarjeta-datos dd").first()).toContainText(t.apagada);
       await page.screenshot({ path: `capturas/recorrido-${idioma}-${ancho}.png`, fullPage: true });
 
       // El Historial: los cinco cambios, sin la API a la vista.

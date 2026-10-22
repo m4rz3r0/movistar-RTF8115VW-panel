@@ -14,8 +14,8 @@
 
 .ajustes-panel .nota {
   margin: 0;
-  color: var(--texto-2);
-  font-size: 12px;
+  color: var(--suave);
+  font-size: 12.5px;
 }
 
 .ajustes-estado {
@@ -73,11 +73,6 @@
 .ajustes-usuario-nombre {
   min-width: 0;
   overflow-wrap: anywhere;
-}
-
-.boton.boton-borrar {
-  border-color: var(--error);
-  background: var(--error);
 }
 
 .aviso-formulario {

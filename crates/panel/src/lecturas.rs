@@ -95,6 +95,26 @@ impl CacheLecturas {
         self.mapa().clear();
     }
 
+    /// Olvida lo guardado de `claves` (volver a leer una página).
+    pub fn olvidar(&self, claves: &[Clave]) {
+        let mut mapa = self.mapa();
+        for c in claves {
+            mapa.remove(c);
+        }
+    }
+
+    /// Lo que tiene la más antigua de `claves` de las guardadas (cero si
+    /// ninguna lo está): cuánto hace que se leyó lo que se enseña.
+    pub fn edad(&self, claves: &[Clave]) -> Duration {
+        let mapa = self.mapa();
+        claves
+            .iter()
+            .filter_map(|c| mapa.get(c))
+            .map(|e| e.leida.elapsed())
+            .max()
+            .unwrap_or_default()
+    }
+
     fn generacion(&self, hgu: &hgu::Client) -> Generacion {
         Generacion {
             propia: self.propia.load(Ordering::SeqCst),

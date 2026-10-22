@@ -38,6 +38,23 @@ const capturas = [
     viewport: { width: 1440, height: 900 },
     escala: 1,
   },
+  {
+    // Ajustes en rejilla: las tarjetas de la WiFi con su estado.
+    fichero: "ajustes-wifi-escritorio.png",
+    ruta: "/ajustes/wifi",
+    listo: "article.tarjeta-el",
+    viewport: { width: 1440, height: 900 },
+    escala: 1,
+  },
+  {
+    // Ajustes en lista con columnas, en el tema claro.
+    fichero: "ajustes-puertos-claro.png",
+    ruta: "/ajustes/puertos",
+    listo: "tr.lista-fila",
+    viewport: { width: 1440, height: 900 },
+    escala: 1,
+    tema: "light" as const,
+  },
 ];
 
 /** Bloques de PNG que se conservan: la imagen y su espacio de color. */
@@ -61,7 +78,11 @@ function sinMetadatos(png: Buffer): Buffer {
 
 for (const c of capturas) {
   test.describe(c.fichero, () => {
-    test.use({ viewport: c.viewport, deviceScaleFactor: c.escala });
+    test.use({
+      viewport: c.viewport,
+      deviceScaleFactor: c.escala,
+      colorScheme: "tema" in c ? c.tema : "dark",
+    });
 
     test(`captura ${c.fichero}`, async ({ page }) => {
       await entrar(page);

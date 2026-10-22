@@ -112,10 +112,8 @@ async fn de_la_voz(p: &Panel, nombre: &str) -> String {
 
 /// Campo `campo` del ajuste `ajuste` en la respuesta de `leer_tema`.
 fn campo_de(tema: &Value, ajuste: &str, campo: &str) -> Value {
-    tema["ajustes"]
-        .as_array()
-        .unwrap()
-        .iter()
+    crate::comun::ajustes_de(tema)
+        .into_iter()
         .find(|a| a["id"] == ajuste)
         .unwrap_or_else(|| panic!("falta {ajuste}"))["campos"]
         .as_array()

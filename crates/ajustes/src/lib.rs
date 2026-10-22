@@ -16,10 +16,24 @@
 mod legible;
 mod modelo;
 pub use legible::{ErrorValor, Limites, mac as normalizar_mac, validar_legible};
-pub use modelo::{Nivel, Requiere, SIN_ELECCION, Tema, TipoCampo, ValorLegible};
+pub use modelo::{
+    Nivel, Requiere, SIN_ELECCION, Tema, TipoCampo, ValorLegible, prefijo_de_ajuste, valor_aceptado,
+};
+
+/// Glifos que puede llevar la tarjeta de un elemento (`icono` en el
+/// catálogo); el panel los dibuja en `ui::comun::Glifo`.
+pub const ICONOS: &[&str] = &[
+    "globo", "escudo", "llave", "personas", "telefono", "fax", "reloj", "lupa", "puerta", "casa",
+];
+
+/// Columnas que puede declarar la lista de los dispositivos (no es una
+/// lista del router: sus datos salen de la lectura de la red de casa).
+pub const COLUMNAS_DISPOSITIVOS: &[&str] = &["ip", "mac", "conexion", "ip_fija"];
 
 #[cfg(feature = "catalogo")]
 mod carga;
+#[cfg(feature = "catalogo")]
+mod elementos;
 #[cfg(feature = "catalogo")]
 mod validar;
 #[cfg(feature = "catalogo")]
@@ -28,8 +42,14 @@ mod valores;
 #[cfg(feature = "catalogo")]
 pub use carga::{CatalogoAjustes, ErrorAjustes};
 #[cfg(feature = "catalogo")]
+pub use elementos::{
+    DERIVADOS_DATO, DERIVADOS_ESTADO, MAX_DATOS, PREFIJO_DERIVADO, clave_accion, clave_papel,
+    claves_de_elementos, partir_referencia, titulo_accion,
+};
+#[cfg(feature = "catalogo")]
 pub use modelo::{
-    Adicional, Ajuste, Booleano, Campo, Componente, Escritura, Excluida, Lectura, Opcion, Validar,
+    Accion, Adicional, Ajuste, Booleano, Campo, Componente, Elemento, Escritura, Excluida, Lectura,
+    Opcion, Validar,
 };
 #[cfg(feature = "catalogo")]
 pub use validar::{claves_requeridas, comprobar, prefijo_i18n, riesgo};

@@ -10,7 +10,8 @@ use super::{
     duracion, estado_cambio, texto_error,
 };
 use crate::t;
-use crate::ui::{Estado, IconoEstado, Insignia};
+use crate::ui::comun::{EstadoVisual, Insignia};
+use crate::ui::{Estado, IconoEstado};
 use leptos::{ev::SubmitEvent, html, prelude::*, task::spawn_local};
 use std::time::Duration;
 
@@ -88,7 +89,7 @@ pub fn TablaDiff(campos: Vec<CampoCambio>, #[prop(optional)] sin_nombres: bool) 
         })
         .collect_view();
     view! {
-        <div class="tabla-scroll">
+        <div class="tabla-scroll" tabindex="0">
             <table class="tabla">
                 <thead>
                     <tr>
@@ -283,7 +284,7 @@ pub fn DialogoCambio(
                     _ => None,
                 };
                 let estado = match c.estado {
-                    EstadoDeCambio::Vigilando | EstadoDeCambio::Aplicando => Estado::Neutro,
+                    EstadoDeCambio::Vigilando | EstadoDeCambio::Aplicando => EstadoVisual::Proceso,
                     e => e.estado(),
                 };
                 view! {
@@ -300,21 +301,21 @@ pub fn DialogoCambio(
 
     let pie = move || match fase.get() {
         Fase::Seguimiento(_) => view! {
-            <button class="boton" type="button" on:click=move |_| cerrar()>
+            <button class="b-pri" type="button" on:click=move |_| cerrar()>
                 {t!("biblioteca-cerrar")}
             </button>
         }
         .into_any(),
         f => view! {
             <button
-                class="boton-sutil"
+                class="b-sec"
                 type="button"
                 disabled=f == Fase::Confirmando
                 on:click=move |_| cerrar()
             >
                 {t!("biblioteca-cancelar")}
             </button>
-            <button class="boton" type="submit" disabled=f == Fase::Confirmando>
+            <button class="b-pri" type="submit" disabled=f == Fase::Confirmando>
                 {if f == Fase::Confirmando {
                     t!("biblioteca-aplicando")
                 } else if deshace.is_some() {

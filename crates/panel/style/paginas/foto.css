@@ -14,7 +14,7 @@
 }
 
 .foto-fecha {
-  color: var(--texto-2);
+  color: var(--suave);
 }
 
 .foto-tema {
@@ -65,7 +65,7 @@
 }
 
 .foto-valores dt {
-  color: var(--texto-2);
+  color: var(--suave);
   font-size: 13px;
 }
 
@@ -87,7 +87,7 @@
 }
 
 .foto-nota {
-  color: var(--texto-2);
+  color: var(--suave);
   font-size: 13px;
 }
 
@@ -98,18 +98,18 @@
 
 .foto-sin-dato summary {
   width: fit-content;
-  color: var(--texto-2);
+  color: var(--suave);
   cursor: pointer;
 }
 
 .foto-sin-dato summary:hover {
-  color: var(--texto-1);
+  color: var(--texto);
 }
 
 .foto-sin-dato > p {
   max-width: 72ch;
   margin-top: var(--esp-2);
-  color: var(--texto-2);
+  color: var(--suave);
 }
 
 #foto-titulo:focus {
@@ -151,6 +151,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--esp-1) var(--esp-3);
-  color: var(--texto-2);
+  color: var(--suave);
   font-size: 13px;
 }

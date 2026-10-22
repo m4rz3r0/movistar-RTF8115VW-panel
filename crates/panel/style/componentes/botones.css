@@ -1,4 +1,4 @@
-/* Botones. */
+/* Botones: una escala, siempre con el mismo significado (spec §3.3). */
 /* --------------------------------------------------------------- Botones */
 
 button {
@@ -6,53 +6,117 @@ button {
   color: inherit;
 }
 
-.boton {
+/* Principal (ámbar relleno): la acción final; como mucho uno por tarjeta,
+   detalle o diálogo. Secundario (borde neutro): abrir, encender, acciones
+   de la barra. Recomendación (borde ámbar): la acción de una
+   recomendación. De texto: desmarcar, ver, el ojo, copiar. Peligro (borde
+   rojo): borrar. */
+.b-pri,
+.b-sec,
+.b-rec,
+.b-txt,
+.b-pel {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--esp-2);
-  min-height: 40px;
-  padding: 0 var(--esp-4);
-  border: 1px solid var(--acento);
-  border-radius: var(--radio);
-  background: var(--acento);
-  color: var(--acento-texto);
-  font-weight: 600;
-  cursor: pointer;
-  transition: filter 120ms ease;
-}
-
-.boton:hover {
-  filter: brightness(1.08);
-}
-
-.boton:disabled,
-.boton[aria-disabled="true"] {
-  opacity: 0.6;
-  cursor: progress;
-}
-
-.boton-sutil {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--esp-2);
-  min-height: 36px;
+  gap: 6px;
+  min-height: 32px;
   padding: 0 var(--esp-3);
-  border: 1px solid var(--borde);
-  border-radius: var(--radio);
-  background: transparent;
-  color: var(--texto-2);
+  border: 1px solid transparent;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-decoration: none;
   cursor: pointer;
-  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    filter 150ms ease;
 }
 
-.boton-sutil:hover {
-  color: var(--texto-1);
-  border-color: var(--texto-2);
-  background: var(--superficie-2);
+.b-pri {
+  background: var(--acento);
+  border-color: var(--acento);
+  color: var(--sobre-acento);
+  font-weight: 600;
 }
 
-.boton-sutil:disabled {
+.b-pri:hover {
+  filter: brightness(1.07);
+}
+
+.b-sec {
+  background: var(--sup2);
+  border-color: var(--borde-fuerte);
+  color: var(--texto);
+}
+
+.b-sec:hover {
+  background: var(--sup3);
+}
+
+.b-sec[aria-pressed="true"] {
+  border-color: var(--acento-borde);
+  background: var(--acento-velo);
+  color: var(--acento-texto);
+}
+
+.b-rec {
+  background: transparent;
+  border-color: var(--acento-borde);
+  color: var(--acento-texto);
+}
+
+.b-rec:hover {
+  background: var(--acento-velo);
+}
+
+.b-txt {
+  padding: 0 6px;
+  background: none;
+  border: 0;
+  color: var(--suave);
+}
+
+.b-txt:hover {
+  color: var(--texto);
+}
+
+.b-pel {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--peligro) 55%, transparent);
+  color: var(--peligro);
+}
+
+.b-pel:hover {
+  background: var(--peligro-velo);
+}
+
+:is(.b-pri, .b-sec, .b-rec, .b-txt, .b-pel):focus-visible {
+  outline: 2px solid var(--foco);
+  outline-offset: 2px;
+}
+
+:is(.b-pri, .b-sec, .b-rec, .b-txt, .b-pel):disabled,
+:is(.b-pri, .b-sec, .b-rec, .b-txt, .b-pel)[aria-disabled="true"] {
   opacity: 0.6;
+  cursor: not-allowed;
+  filter: none;
+}
+
+:is(.b-pri, .b-sec, .b-rec, .b-txt, .b-pel)[aria-busy="true"] {
   cursor: progress;
+}
+
+/* En el móvil, zona táctil de 40 px. */
+@media (pointer: coarse), (max-width: 860px) {
+  .b-pri,
+  .b-sec,
+  .b-rec,
+  .b-txt,
+  .b-pel {
+    min-height: 40px;
+  }
 }

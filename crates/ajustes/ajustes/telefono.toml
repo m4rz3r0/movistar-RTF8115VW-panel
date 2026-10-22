@@ -97,6 +97,9 @@ tipo = "booleano"
 id = "telefono.sip_oculto"
 tema = "telefono"
 nivel = "oculto"
+# Apagarlo (o un servidor mal escrito) deja el fijo sin servicio: el
+# interruptor de su tarjeta pregunta antes de apagarlo.
+efecto = "telefono_corte"
 leer = { funcion = "cbGetVoiceSip" }
 
 [[ajuste.campo]]
@@ -175,3 +178,57 @@ id = "modem"
 escribe = { funcion = "cbSetVoicePhysical", parametro = "modem_passthrough_adm_state" }
 lee = "modem_passthrough_adm_state"
 tipo = "booleano"
+
+# Elementos de la pestaña (spec §5.1). Sin interruptor ni acciones en la
+# línea: guardarla reenvía su contraseña, que el router no deja leer, y
+# solo el detalle la pide. El teléfono por internet y el paso directo del
+# fax, sí.
+[[elemento]]
+id = "linea"
+tema = "telefono"
+ajustes = ["telefono.linea", "telefono.linea_oculto"]
+icono = "telefono"
+datos = ["telefono.linea.activa", "telefono.linea.silencio", "telefono.linea_oculto.usuario",
+         "telefono.linea_oculto.linea_directa", "telefono.linea_oculto.numero_directo"]
+estado = "derivado:estado_linea"
+
+[[elemento]]
+id = "llamadas"
+tema = "telefono"
+ajustes = ["telefono.sip"]
+icono = "telefono"
+datos = ["telefono.sip.tonos", "telefono.sip.fax"]
+estado = "derivado:segun_lo_recomendado"
+
+[[elemento]]
+id = "servidores"
+tema = "telefono"
+ajustes = ["telefono.sip_oculto"]
+icono = "telefono"
+interruptor = "telefono.sip_oculto.activo"
+datos = ["telefono.sip_oculto.activo", "telefono.sip_oculto.dominio",
+         "telefono.sip_oculto.servidor", "telefono.sip_oculto.registro"]
+estado = "derivado:estado_voz"
+
+[[elemento]]
+id = "fax-y-modem"
+tema = "telefono"
+ajustes = ["telefono.fisico"]
+icono = "fax"
+interruptor = "telefono.fisico.fax"
+datos = ["telefono.fisico.fax", "telefono.fisico.modem"]
+estado = "derivado:estado_paso_directo"
+
+# Acciones (spec §5.5): el teléfono por internet, de un clic para lo
+# marcado (apagarlo avisa de su efecto en la revisión).
+[[accion]]
+id = "encender_voz"
+tema = "telefono"
+campo = "activo"
+valor = "true"
+
+[[accion]]
+id = "apagar_voz"
+tema = "telefono"
+campo = "activo"
+valor = "false"

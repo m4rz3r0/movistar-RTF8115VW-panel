@@ -23,11 +23,11 @@ mod contrasena;
 
 pub use contrasena::ID_TARJETA as ID_CAMBIAR_CONTRASENA;
 
+use super::comun::{EstadoVisual, Insignia};
 use super::panel_ajustes::{
     DialogoReautenticar, Reautenticacion, campo, mensajes, repetible, texto_error,
 };
 use super::secreto::Secreto;
-use super::{Estado, Insignia};
 use crate::instalar::{ResumenRed, TipoRed};
 use crate::panel_ajustes::{
     InfoRouter, confirmar_firmware, guardar_router, guardar_wan, leer_conexion_router,
@@ -229,18 +229,19 @@ fn Conexion(
     let modo = move || {
         if solo_lectura.get() {
             view! {
-                <Insignia estado=Estado::Aviso texto=t!("router-modo-solo-lectura") />
+                <Insignia estado=EstadoVisual::Atencion texto=t!("router-modo-solo-lectura") />
                 <p class="nota">{t!("router-confirmar-texto")}</p>
                 <p class="error-formulario" role="alert">{move || error_firmware.get()}</p>
                 <div class="botones">
-                    <button class="boton" type="button" on:click=move |_| confirmar.run(())>
+                    <button class="b-pri" type="button" on:click=move |_| confirmar.run(())>
                         {t!("router-confirmar")}
                     </button>
                 </div>
             }
             .into_any()
         } else {
-            view! { <Insignia estado=Estado::Ok texto=t!("router-modo-escritura") /> }.into_any()
+            view! { <Insignia estado=EstadoVisual::Emite texto=t!("router-modo-escritura") /> }
+                .into_any()
         }
     };
     let detectado = move || {
@@ -286,14 +287,14 @@ fn Conexion(
                 {mensajes(error, aviso)}
                 <div class="botones">
                     <button
-                        class="boton-sutil"
+                        class="b-sec"
                         type="button"
                         disabled=move || pendiente.get()
                         on:click=probar
                     >
                         {t!("router-probar")}
                     </button>
-                    <button class="boton" type="submit" disabled=move || pendiente.get()>
+                    <button class="b-pri" type="submit" disabled=move || pendiente.get()>
                         {t!("router-guardar")}
                     </button>
                 </div>
@@ -435,7 +436,7 @@ fn RedDelRouter(
             .map(|m| {
                 view! {
                     <Insignia
-                        estado=Estado::Aviso
+                        estado=EstadoVisual::Atencion
                         texto=t!("router-red-manual-no-existe", conexion = m)
                     />
                 }
@@ -496,14 +497,14 @@ fn RedDelRouter(
                 {mensajes(error, aviso)}
                 <div class="botones">
                     <button
-                        class="boton-sutil"
+                        class="b-sec"
                         type="button"
                         disabled=move || pendiente.get()
                         on:click=move |_| volver_a_detectar.run(())
                     >
                         {t!("router-red-redetectar")}
                     </button>
-                    <button class="boton" type="submit" disabled=move || pendiente.get()>
+                    <button class="b-pri" type="submit" disabled=move || pendiente.get()>
                         {t!("router-red-guardar")}
                     </button>
                 </div>

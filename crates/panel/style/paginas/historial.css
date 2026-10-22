@@ -13,7 +13,7 @@
 .hist-entrada {
   position: relative;
   min-width: 0;
-  background: var(--superficie-1);
+  background: var(--sup);
   border: 1px solid var(--borde);
   border-radius: var(--radio);
 }
@@ -49,8 +49,8 @@ summary.hist-cabeza::before {
   top: 21px;
   width: 7px;
   height: 7px;
-  border-right: 1.6px solid var(--texto-2);
-  border-bottom: 1.6px solid var(--texto-2);
+  border-right: 1.6px solid var(--suave);
+  border-bottom: 1.6px solid var(--suave);
   transform: rotate(-45deg);
   transition: transform 120ms ease;
 }
@@ -61,20 +61,20 @@ details[open] > summary.hist-cabeza::before {
 }
 
 summary.hist-cabeza:hover {
-  background: var(--superficie-2);
+  background: var(--sup2);
   border-radius: var(--radio);
 }
 
 .hist-hora,
 .hist-quien,
 .hist-diff {
-  color: var(--texto-2);
+  color: var(--suave);
   font-size: 13px;
   overflow-wrap: anywhere;
 }
 
 .hist-quien {
-  color: var(--texto-1);
+  color: var(--texto);
 }
 
 .hist-que {
@@ -87,12 +87,12 @@ summary.hist-cabeza:hover {
 }
 
 .hist-id {
-  color: var(--texto-2);
-  font-size: 12px;
+  color: var(--suave);
+  font-size: 12.5px;
 }
 
 .hist-instancia {
-  color: var(--texto-2);
+  color: var(--suave);
 }
 
 .hist-insignias {
@@ -111,7 +111,7 @@ summary.hist-cabeza:hover {
 .hist-revelado .icono-ojo {
   flex: none;
   margin-top: 2px;
-  color: var(--acento);
+  color: var(--acento-texto);
 }
 
 .hist-revelado .hist-cabeza {
@@ -130,13 +130,13 @@ summary.hist-cabeza:hover {
 .hist-nota {
   margin: 0;
   padding: 0 var(--esp-4) var(--esp-3) calc(var(--esp-4) + 18px);
-  color: var(--texto-2);
+  color: var(--suave);
   font-size: 13px;
   overflow-wrap: anywhere;
 }
 
 .hist-error {
-  color: var(--error);
+  color: var(--peligro);
 }
 
 .hist-acciones {
@@ -165,7 +165,7 @@ summary.hist-cabeza:hover {
 }
 
 .hist-tiempos dt {
-  color: var(--texto-2);
+  color: var(--suave);
 }
 
 .hist-tiempos dd {
@@ -210,8 +210,8 @@ summary.hist-cabeza:hover {
 }
 
 .hist-paso-n {
-  color: var(--texto-2);
-  font-size: 12px;
+  color: var(--suave);
+  font-size: 12.5px;
 }
 
 .hist-paso-estado {

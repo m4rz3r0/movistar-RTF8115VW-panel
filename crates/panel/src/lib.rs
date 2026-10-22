@@ -15,6 +15,7 @@ pub mod contrasena_router;
 pub mod instalar;
 pub mod panel_ajustes;
 pub mod preferencias;
+pub mod tema;
 pub mod ui;
 pub mod vista;
 

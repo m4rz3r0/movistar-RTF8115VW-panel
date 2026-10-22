@@ -20,7 +20,6 @@ pub use vistas::*;
 
 use leptos::prelude::*;
 use leptos::server_fn::codec::Json;
-use std::net::Ipv4Addr;
 
 /// Cuánto vale una lectura del router para mostrar: la caché del servidor
 /// (`crate::lecturas`) y la precarga de temas de la página.
@@ -34,6 +33,38 @@ pub const CADUCIDAD_LECTURAS: std::time::Duration = std::time::Duration::from_se
 pub async fn preparar_ajuste(p: PeticionAjuste) -> Result<GrupoVista, ServerFnError> {
     servidor::preparar_ajuste(p).await
 }
+
+/// Prepara una acción sobre varios elementos del tema (`quitar_wps` en dos
+/// redes): un único grupo del gestor con un paso por elemento, que se
+/// confirma con [`confirmar_ajuste`] y se deshace entero con
+/// [`deshacer_ajuste`]. Un elemento que ya tiene el valor sale como paso
+/// sin cambios («ya estaba así») y no se escribe. Errores con el mensaje
+/// traducido: 400 con más de [`MAX_ELEMENTOS_ACCION`] elementos o si la
+/// acción no se aplica a alguno; 409 si ninguno cambia o hay otro cambio
+/// en curso; 403 en solo lectura. Exige sesión.
+#[server(endpoint = "preparar_accion", input = Json)]
+pub async fn preparar_accion(
+    tema: String,
+    accion: String,
+    elementos: Vec<String>,
+) -> Result<GrupoVista, ServerFnError> {
+    servidor::preparar_accion(tema, accion, elementos).await
+}
+
+/// Prepara el guardado del detalle de un elemento: los cambios de varios
+/// ajustes suyos (lo esencial y lo avanzado de una red) en un solo grupo,
+/// con un paso por escritura titulado con su ajuste, que se confirma con
+/// [`confirmar_ajuste`] y se deshace entero. Errores como
+/// [`preparar_ajuste`]; 400 con una lista o un componente propio.
+#[server(endpoint = "preparar_elemento", input = Json)]
+pub async fn preparar_elemento(
+    peticiones: Vec<PeticionAjuste>,
+) -> Result<GrupoVista, ServerFnError> {
+    servidor::preparar_elemento(peticiones).await
+}
+
+/// Como mucho, elementos en una acción sobre varios.
+pub const MAX_ELEMENTOS_ACCION: usize = 20;
 
 /// Aplica el ajuste preparado con `token` sin los pasos de `desmarcados`
 /// (índices). Devuelve el id del cambio para seguirlo con
@@ -53,40 +84,22 @@ pub async fn deshacer_ajuste(cambio: i64) -> Result<GrupoVista, ServerFnError> {
     servidor::deshacer_ajuste(cambio).await
 }
 
-/// Los ajustes del tema `tema` (`wifi`, `puertos`…) con su valor actual
-/// del router. Cada lectura distinta se hace una sola vez, de la caché
-/// corta si está ([`crate::lecturas`]) y, las que faltan, seguidas en una
-/// tanda; si una falla, solo sus ajustes quedan [`EstadoLectura::SinLeer`].
-/// 404 si el tema no existe. Exige sesión; la respuesta va con `no-store`.
+/// La página del tema `tema` (`wifi`, `puertos`…) entera: el resumen, los
+/// elementos con su estado, sus datos, su recomendación principal y el
+/// detalle de sus ajustes con el valor actual del router, y las acciones
+/// sobre varios elementos. Cada lectura distinta se hace una sola vez, de
+/// la caché corta si está ([`crate::lecturas`]) y, las que faltan, seguidas
+/// en una tanda; si una falla, solo los elementos que la usan quedan
+/// [`EstadoLectura::SinLeer`]. 404 si el tema no existe. Exige sesión; la
+/// respuesta va con `no-store`.
+///
+/// Con `fresca` («Volver a leer»), lo de este tema no sale de la caché.
 #[server(endpoint = "leer_tema", input = Json)]
-pub async fn leer_tema(tema: String) -> Result<TemaVista, ServerFnError> {
-    servidor::leer_tema(tema).await
-}
-
-/// Los dispositivos que el router conoce en la red de casa, los conectados
-/// primero y por IP, con su conexión y su reserva (lecturas para mostrar,
-/// como [`leer_tema`]). Exige sesión; la respuesta va con `no-store`.
-#[server(endpoint = "leer_dispositivos", input = Json)]
-pub async fn leer_dispositivos() -> Result<Vec<DispositivoVista>, ServerFnError> {
-    servidor::leer_dispositivos().await
-}
-
-/// IP y máscara del router en la red de casa (`None` si no da ninguna
-/// legible): la página valida con ellas una reserva antes de enviarla (el
-/// servidor la vuelve a validar leyendo el router). Lectura para mostrar,
-/// como [`leer_tema`].
-#[server(endpoint = "leer_red_casa", input = Json)]
-pub async fn leer_red_casa() -> Result<Option<(Ipv4Addr, Ipv4Addr)>, ServerFnError> {
-    servidor::leer_red_casa().await
-}
-
-/// Las IP de las IP fijas del router (solo eso: es lo que usa la página):
-/// Puertos las usa para saber si el dispositivo de destino de una regla
-/// sigue en la red ([`destino_inexistente`]). Lectura para mostrar, como
-/// [`leer_tema`].
-#[server(endpoint = "leer_reservas", input = Json)]
-pub async fn leer_reservas() -> Result<Vec<String>, ServerFnError> {
-    servidor::leer_reservas().await
+pub async fn leer_tema(
+    tema: String,
+    #[server(default)] fresca: bool,
+) -> Result<PaginaTema, ServerFnError> {
+    servidor::leer_tema(tema, fresca).await
 }
 
 /// Lo que ha cambiado desde la foto de partida (la lectura del asistente
@@ -140,6 +153,7 @@ mod tests {
             valor_secreto: Some("clave-de-prueba-9".into()),
             recomendado: None,
             motivo_recomendado: None,
+            aceptados: Vec::new(),
             requiere: None,
             sin_eleccion: false,
         };

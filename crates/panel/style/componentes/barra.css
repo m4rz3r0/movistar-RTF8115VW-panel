@@ -1,0 +1,78 @@
+/* Barra contextual: aparece al marcar algo, con las acciones aplicables. */
+/* ----------------------------------------------------------------- Barra */
+
+/* En escritorio, fija arriba al desplazarse; en el móvil, fija abajo y con
+   desplazamiento horizontal. (.barra es el menú lateral: esta es
+   .barra-acciones.) */
+.barra-acciones {
+  position: sticky;
+  top: var(--esp-3);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: var(--esp-2);
+  margin-bottom: 14px;
+  padding: var(--esp-2) 10px var(--esp-2) 14px;
+  border: 1px solid var(--acento-borde);
+  border-radius: 12px;
+  background: var(--sup);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
+  animation: barra-acciones-baja 220ms ease-out;
+}
+
+.barra-acciones[hidden] {
+  display: none;
+}
+
+.barra-acciones-n {
+  margin-right: 6px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.barra-acciones-hueco {
+  flex: 1;
+}
+
+/* Lo que no entra en la acción (no se ha podido leer) o que ninguna vale. */
+.barra-acciones-nota {
+  color: var(--suave);
+  font-size: 12.5px;
+}
+
+/* En el móvil, todo en una línea que se desplaza. */
+@media (max-width: 900px) {
+  .barra-acciones > * {
+    flex: none;
+    white-space: nowrap;
+  }
+}
+
+/* En escritorio, si no cabe en una línea, en dos. */
+@media (min-width: 901px) {
+  .barra-acciones {
+    flex-wrap: wrap;
+  }
+}
+
+@keyframes barra-acciones-baja {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+@media (max-width: 900px) {
+  .barra-acciones {
+    position: fixed;
+    inset: auto var(--esp-3) var(--esp-3);
+    margin: 0;
+    overflow-x: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .barra-acciones {
+    animation: none;
+  }
+}

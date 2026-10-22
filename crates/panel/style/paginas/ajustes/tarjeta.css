@@ -1,377 +1,243 @@
-/* Ajustes del router: tarjeta de un ajuste, edición, recomendación y «Más opciones». */
-/* Tarjeta de un ajuste. */
-.ajuste {
-  gap: var(--esp-3);
-  min-width: 0;
-}
+/* Tarjeta de un elemento de la rejilla: cabecera, datos, recomendación y pie. */
+/* -------------------------------------------------------------- Tarjeta */
 
-.ajuste-cabecera {
+.tarjeta-el {
+  position: relative;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--esp-2) var(--esp-4);
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: var(--esp-4) 18px 14px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-tarjeta);
+  background: var(--sup);
+  box-shadow: var(--sombra);
+  cursor: pointer;
+  transition:
+    border-color 200ms ease,
+    box-shadow 200ms ease;
 }
 
-.ajuste-cabecera h2:focus {
-  outline: none;
+.tarjeta-el:hover {
+  border-color: var(--borde-fuerte);
 }
 
-.ajuste-cabecera h2:focus-visible {
-  outline: 2px solid var(--acento);
+.tarjeta-el:focus-visible {
+  outline: 2px solid var(--foco);
   outline-offset: 2px;
 }
 
-.ajuste-etiquetas {
+/* Marcada o abierta: el borde de acento. */
+.tarjeta-el.marcada,
+.tarjeta-el.abierta {
+  border-color: var(--acento);
+  box-shadow: 0 0 0 1px var(--acento) inset;
+}
+
+/* La marca redonda, en la esquina (estilos en componentes/marca.css). */
+.tarjeta-el > .marcar {
+  position: absolute;
+  top: -9px;
+  left: -9px;
+}
+
+.tarjeta-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-2) var(--esp-3);
+  min-width: 0;
+}
+
+.tarjeta-nombre {
+  flex: 1 1 150px;
+  min-width: 0;
+}
+
+.tarjeta-nombre h2 {
+  margin: 0;
+  font-family: var(--fuente-ui);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.tarjeta-papel {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--esp-2);
-}
-
-/* Si la red WiFi emite: su insignia, como las demás etiquetas. */
-.emision-red {
-  display: inline-flex;
-}
-
-.chip-nivel {
-  color: var(--texto-1);
-}
-
-.nota-oculto {
-  max-width: 880px;
-  margin-bottom: var(--esp-3);
-  color: var(--texto-2);
+  margin: 2px 0 0;
+  color: var(--suave);
   font-size: 13px;
 }
 
-.ajuste-desc {
-  color: var(--texto-2);
-  max-width: 72ch;
-}
-
-.ajuste-ayuda summary,
-.detalles-tecnicos summary,
-.recomendacion-pros summary {
-  width: fit-content;
-  color: var(--texto-2);
-  cursor: pointer;
-}
-
-.ajuste-ayuda summary:hover,
-.detalles-tecnicos summary:hover,
-.recomendacion-pros summary:hover {
-  color: var(--texto-1);
-}
-
-.ajuste-ayuda p {
-  max-width: 72ch;
-  margin-top: var(--esp-2);
-  padding-left: var(--esp-3);
-  border-left: 2px solid var(--borde);
-}
-
-/* Valor actual: etiqueta a la izquierda, valor a la derecha; en móvil, uno
-   bajo otro. */
-.ajuste-valores {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-  border-top: 1px solid var(--borde);
-}
-
-.ajuste-fila {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
-  gap: var(--esp-1) var(--esp-4);
-  padding: var(--esp-2) 0;
-  border-bottom: 1px solid var(--borde);
-}
-
-.ajuste-fila dt {
-  color: var(--texto-2);
-}
-
-.ajuste-fila dd {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--esp-2);
-  margin: 0;
-  min-width: 0;
+.tarjeta-ssid {
+  padding: 0 6px;
+  border-radius: 5px;
+  background: var(--sup3);
+  color: var(--texto);
+  font-family: var(--fuente-mono);
+  font-size: 12px;
   overflow-wrap: anywhere;
 }
 
-.ajuste-vacio {
-  color: var(--texto-2);
-}
-
-@media (max-width: 480px) {
-  .ajuste-fila {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.chip-recomendado {
-  border-color: color-mix(in srgb, var(--acento) 55%, var(--borde));
-  background: var(--acento-suave);
-  color: var(--texto-1);
-  white-space: normal;
-}
-
-.recomendacion-resumen {
+.tarjeta-insignia {
+  display: inline-flex;
   min-width: 0;
 }
 
-.recomendacion-resumen > summary {
-  cursor: pointer;
-  list-style: none;
+/* Datos: hasta seis, en tres columnas (dos en el móvil). */
+/* Una tarjeta sin datos (la contraseña del router) dice qué es. */
+.tarjeta-desc {
+  margin: 0;
+  color: var(--suave);
+  font-size: 14px;
 }
 
-.recomendacion-resumen > summary::-webkit-details-marker {
-  display: none;
+.tarjeta-datos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--esp-3) 18px;
+  margin: 0;
 }
 
-.recomendacion-resumen > summary::after {
-  content: "";
-  width: 5px;
-  height: 5px;
-  margin-left: var(--esp-2);
-  border-right: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
-  transform: rotate(45deg) translateY(-2px);
+.tarjeta-datos > div {
+  min-width: 0;
 }
 
-.recomendacion-resumen[open] > summary::after {
-  transform: rotate(-135deg) translateY(-1px);
+.tarjeta-datos dt {
+  color: var(--tenue);
+  font-size: 12.5px;
 }
 
-.recomendacion-resumen > p {
-  max-width: 60ch;
-  margin-top: var(--esp-2);
-  color: var(--texto-2);
-  font-size: 13px;
+.tarjeta-datos dd {
+  margin: 1px 0 0;
+  font-weight: 500;
+  overflow-wrap: anywhere;
 }
 
-.chip-sugerencia {
-  border-style: dashed;
-  border-color: color-mix(in srgb, var(--acento) 55%, var(--borde));
-  color: var(--texto-1);
-  white-space: normal;
+.tarjeta-datos dd.atencion {
+  color: var(--aviso);
 }
 
-.nota-solo-lectura,
-.nota-hueco,
-.ajuste-efecto {
-  max-width: 72ch;
-  color: var(--texto-2);
-  font-size: 13px;
+.tarjeta-datos .secreto-campo {
+  max-width: 100%;
 }
 
-.ajuste-acciones {
+/* La recomendación: ámbar si es un riesgo de seguridad; neutra, si no. */
+.tarjeta-rec {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--esp-2);
+  align-items: center;
+  gap: var(--esp-2) var(--esp-3);
+  padding: 10px var(--esp-3);
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  background: var(--sup2);
 }
 
-.ajuste-resumen,
-.ajuste-formulario {
+.tarjeta-rec::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tenue);
+}
+
+.tarjeta-rec.riesgo {
+  border-color: var(--acento-borde);
+  background: var(--acento-velo);
+}
+
+.tarjeta-rec.riesgo::before {
+  background: var(--acento);
+}
+
+.tarjeta-rec p {
+  flex: 1 1 200px;
+  min-width: 0;
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.tarjeta-rec-quien {
+  color: var(--suave);
+}
+
+.tarjeta-sin-leer {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  align-items: center;
   gap: var(--esp-3);
 }
 
-/* Edición: un campo bajo otro, con su ayuda debajo. */
-.ajuste-campos {
-  display: flex;
-  flex-direction: column;
-  gap: var(--esp-4);
-}
-
-.campo-ajuste {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-width: 560px;
-}
-
-.campo-ajuste label {
-  color: var(--texto-1);
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.campo-ajuste input:not([type="checkbox"]),
-.campo-ajuste select {
-  width: 100%;
-  min-height: 40px;
-  padding: 0 var(--esp-3);
-  border: 1px solid var(--borde);
-  border-radius: var(--radio);
-  background: var(--fondo);
-  color: var(--texto-1);
-  font: inherit;
-}
-
-.campo-ajuste input:focus-visible,
-.campo-ajuste select:focus-visible {
-  border-color: var(--acento);
-  outline-offset: 0;
-}
-
-.campo-ajuste input[aria-invalid="true"],
-.campo-ajuste select[aria-invalid="true"] {
-  border-color: var(--error);
-}
-
-.campo-ajuste .campo-interruptor {
-  display: flex;
-  min-height: 32px;
-}
-
-/* El interruptor dentro de `.campo`: sin la altura ni el relleno de los
-   campos de texto. */
-.campo-ajuste input.interruptor {
-  width: 36px;
-  height: 20px;
-  min-height: 0;
-  padding: 0;
-  border-radius: 999px;
-  background: var(--superficie-2);
-}
-
-.campo-ajuste input.interruptor:checked {
-  background: var(--acento-suave);
-}
-
-.campo-ajuste .campo-interruptor label {
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.opcion-elegida {
-  color: var(--texto-1);
-}
-
-/* Recomendación: el valor que aconsejamos y para quién; a favor y en
-   contra, plegado. */
-.recomendacion {
-  display: flex;
-  flex-direction: column;
-  gap: var(--esp-1);
-  padding: var(--esp-2) var(--esp-3);
-  border-left: 2px solid color-mix(in srgb, var(--acento) 55%, var(--borde));
-  color: var(--texto-2);
-  font-size: 13px;
-}
-
-.recomendacion .chip {
-  margin-right: var(--esp-1);
-}
-
-.recomendacion-pros p {
-  margin-top: var(--esp-1);
-}
-
-/* Detalles técnicos: lo único con nombres de la API, apagado. */
-.detalles-tecnicos {
-  padding-top: var(--esp-2);
-  border-top: 1px dashed var(--borde);
-  font-size: 13px;
-}
-
-.detalles-tecnicos[open] > * + * {
-  margin-top: var(--esp-2);
-}
-
-.detalles-lista {
-  display: flex;
-  flex-direction: column;
-  gap: var(--esp-1);
+.tarjeta-sin-leer .aviso {
+  flex: 1 1 200px;
   margin: 0;
 }
 
-.detalles-lista div {
+/* Pie: información viva y «Abrir». */
+.tarjeta-pie {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-2) var(--esp-3);
+  margin-top: auto;
+  padding-top: var(--esp-3);
+  border-top: 1px solid var(--borde);
+  color: var(--suave);
+  font-size: 13px;
+}
+
+.tarjeta-hueco {
+  flex: 1;
+}
+
+.tarjeta-disp {
+  display: flex;
+  align-items: center;
   gap: var(--esp-2);
+  min-width: 0;
 }
 
-.detalles-lista dt {
-  color: var(--texto-2);
-}
-
-.detalles-lista dd {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
-/* «Más opciones»: una barra que se despliega. */
-.mas-opciones {
-  max-width: 880px;
-}
-
-.mas-opciones > summary {
+.tarjeta-avs {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--esp-1) var(--esp-3);
-  padding: var(--esp-3) var(--esp-4);
-  border: 1px solid var(--borde);
-  border-radius: var(--radio);
-  background: var(--superficie-1);
-  cursor: pointer;
 }
 
-.mas-opciones > summary::before {
-  content: "";
-  align-self: center;
-  width: 7px;
-  height: 7px;
-  border-right: 2px solid var(--texto-2);
-  border-bottom: 2px solid var(--texto-2);
-  transform: rotate(-45deg);
-  transition: transform 120ms ease;
-}
-
-.mas-opciones[open] > summary::before {
-  transform: rotate(45deg);
-}
-
-.mas-opciones > summary::-webkit-details-marker {
-  display: none;
-}
-
-.mas-opciones > summary {
-  list-style: none;
-}
-
-.mas-opciones > summary:hover {
-  border-color: color-mix(in srgb, var(--acento) 45%, var(--borde));
-}
-
-.mas-opciones-titulo {
-  font-family: var(--fuente-titulos);
-  font-size: 15px;
+.tarjeta-av {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin-left: -7px;
+  border: 2px solid var(--sup);
+  border-radius: 50%;
+  background: var(--sup3);
+  color: var(--suave);
+  font-size: 9.5px;
   font-weight: 600;
 }
 
-.mas-opciones-desc {
-  color: var(--texto-2);
+.tarjeta-av:first-child {
+  margin-left: 0;
 }
 
-.mas-opciones[open] > summary {
-  margin-bottom: var(--esp-4);
+.tarjeta-nota {
+  flex: 1 1 200px;
+  min-width: 0;
 }
 
-/* «Oculto» enlaza con la nota que lo explica: se ve como las demás
-   etiquetas, con el subrayado solo al pasar por encima. */
-a.chip-oculto {
-  color: var(--texto-1);
-  text-decoration: none;
+@media (max-width: 600px) {
+  .tarjeta-datos {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
-a.chip-oculto:hover {
-  text-decoration: underline;
+@media (prefers-reduced-motion: reduce) {
+  .tarjeta-el {
+    transition: none;
+  }
 }

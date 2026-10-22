@@ -2,39 +2,54 @@
 //! por temas en lenguaje claro. `/ajustes` lleva a Internet.
 //!
 //! Cada página tiene las pestañas de los siete temas (por debajo de 640 px,
-//! un selector), el aviso de solo lectura si el panel aún no escribe, las
-//! tarjetas de lo esencial arriba y el resto bajo «Más opciones». Las
-//! tarjetas ([`tarjeta::Tarjeta`]) se editan en el sitio y guardan con el
-//! diálogo de grupo; los dispositivos y las IP fijas de Red local tienen su
-//! propio componente ([`dispositivos`], [`reservas`]), y las reglas de
-//! apertura de puertos el suyo ([`puertos`]). Un tema que no
-//! existe es «página no encontrada». Si hay foto de partida, cada tema
-//! enlaza a «Cómo estaba al instalar» ([`foto`], `/ajustes/foto-de-partida`).
+//! un selector) y el aviso de solo lectura si el panel aún no escribe. La
+//! WiFi va en rejilla ([`rejilla`]): la franja de resumen, la barra de lo
+//! marcado, una tarjeta por elemento ([`tarjeta`]) y el detalle del que se
+//! abre ([`detalle`], `/ajustes/<tema>/<elemento>`), con los cambios
+//! seguidos en la propia tarjeta y un aviso con «Deshacer» ([`aviso`]). Lo
+//! mismo Internet, Seguridad, Teléfono y Sistema. En Puertos y Red local, lo
+//! que puede crecer a decenas (las reglas, las IP fijas y los dispositivos)
+//! va en una lista con columnas ([`lista`]) bajo las tarjetas, con el
+//! detalle de cada fila en [`puertos`], [`reservas`] y [`dispositivos`]. Un
+//! tema que no existe es
+//! «página no encontrada». Si hay foto de partida, cada tema enlaza a
+//! «Cómo estaba al instalar» ([`foto`], `/ajustes/foto-de-partida`).
 
+mod aviso;
 mod campo;
+mod consulta;
+mod detalle;
 mod dispositivos;
-mod emision;
+mod edicion;
 mod foto;
+mod lista;
+mod piezas;
 mod puertos;
+mod rejilla;
 mod reservas;
+mod resumen;
+mod seleccion;
+mod sin_guardar;
 mod tarjeta;
+mod tras_borrar;
 
-use crate::ajustes_router::{
-    CADUCIDAD_LECTURAS, TemaVista, leer_dispositivos, leer_red_casa, leer_reservas, leer_tema,
-};
+use crate::ajustes_router::{CADUCIDAD_LECTURAS, leer_tema};
 use crate::t;
 use crate::ui::explorador::texto_error;
 use crate::ui::i18n::traducir;
 use crate::ui::{Estado, IconoEstado};
-use ajustes::{Nivel, Tema};
+use ajustes::Tema;
+use aviso::{AvisoCambio, Seguimiento};
+use detalle::Borradores;
 use leptos::prelude::*;
 use leptos_router::{
     NavigateOptions,
     components::{Outlet, Redirect},
-    hooks::{use_navigate, use_params_map},
+    hooks::{use_location, use_navigate, use_params_map},
 };
+use rejilla::{ContenidoRejilla, esqueleto};
+use seleccion::Seleccion;
 use std::{collections::HashSet, time::Duration};
-use tarjeta::Tarjeta;
 
 pub use foto::{PaginaFoto, RUTA_FOTO};
 
@@ -50,9 +65,43 @@ const MINIMO_ACTUALIZANDO: Duration = Duration::from_millis(300);
 /// pasar por encima de camino a otra no lee nada.
 const RETARDO_PRECARGA: Duration = Duration::from_millis(150);
 
-/// Id de la nota que dice qué significa «Oculto» (una por página; la
-/// describen todos sus chips).
-pub(crate) const NOTA_OCULTO: &str = "ajustes-nota-oculto";
+/// Id del aviso de solo lectura: lo que no se puede usar lo cita como su
+/// porqué (`aria-describedby`).
+pub(crate) const ID_SOLO_LECTURA: &str = "ajustes-solo-lectura";
+
+/// Vista que no pinta nada: la de las rutas hijas de un tema, que solo
+/// eligen el elemento abierto (lo pinta la página del tema).
+#[component]
+pub fn SinVista() -> impl IntoView {}
+
+/// Descripción del tema, enlace a la foto de partida (si la hay) y aviso de
+/// solo lectura (si el panel aún no escribe).
+pub(crate) fn introduccion(tema: &str, foto: bool, solo_lectura: bool) -> impl IntoView + use<> {
+    let desc = traducir(&format!("ajustes-tema-{tema}-desc"), None);
+    let foto = foto.then(|| {
+        view! {
+            <p class="tema-foto">
+                <a href=RUTA_FOTO>{t!("ajustes-foto-enlace")}</a>
+            </p>
+        }
+    });
+    let aviso = solo_lectura.then(|| {
+        view! {
+            <p class="aviso estado-aviso" role="status" id=ID_SOLO_LECTURA>
+                <IconoEstado estado=Estado::Aviso />
+                <span>
+                    {t!("ajustes-solo-lectura-aviso")} " "
+                    <a href=crate::ui::router::RUTA_CONEXION>{t!("ajustes-solo-lectura-enlace")}</a>
+                </span>
+            </p>
+        }
+    });
+    view! {
+        <p class="tema-desc">{desc}</p>
+        {foto}
+        {aviso}
+    }
+}
 
 /// Componentes de Red local (los nombres de `ajustes::Componente::slug`,
 /// que en el navegador no está).
@@ -134,9 +183,8 @@ impl Precargados {
 
 /// Precarga de los temas: al dejar el ratón o el foco en una pestaña, lee
 /// su tema en segundo plano para que el servidor lo tenga en su caché
-/// corta cuando se pulse (en Red local y en Puertos, también los
-/// dispositivos y la red de casa, y en Puertos las IP fijas, que piden
-/// después sus tarjetas). Una sola a la vez (el servidor las lee en serie)
+/// corta cuando se pulse (en Red local y en Puertos, con la red de casa).
+/// Una sola a la vez (el servidor las lee en serie)
 /// y cada tema una vez por caducidad de la caché. Al desmontarse la
 /// página, lo programado se cancela; lo que ya corre no lee señales (solo
 /// `try_*` y valores guardados).
@@ -176,18 +224,7 @@ impl Precarga {
             };
             self.en_curso.set_value(true);
             leptos::task::spawn_local(async move {
-                let mut bien = leer_tema(slug.clone()).await.is_ok();
-                // Las tarjetas de Red local piden esto en cuanto se pintan.
-                if bien && t == Tema::RedLocal {
-                    bien = leer_dispositivos().await.is_ok() && leer_red_casa().await.is_ok();
-                }
-                // Las de Puertos, también las IP fijas (el aviso de destino).
-                if bien && t == Tema::Puertos {
-                    bien = leer_dispositivos().await.is_ok()
-                        && leer_reservas().await.is_ok()
-                        && leer_red_casa().await.is_ok();
-                }
-                if bien {
+                if leer_tema(slug.clone(), false).await.is_ok() {
                     self.hechas.update_value(|h| h.hecha(&slug, generacion));
                     set_timeout(
                         move || self.hechas.update_value(|h| h.caducada(&slug, generacion)),
@@ -277,18 +314,31 @@ fn no_encontrada() -> impl IntoView {
     }
 }
 
-/// `/ajustes/<tema>`.
+/// Elemento de la dirección (`/ajustes/<tema>/<elemento>`), si la hay.
+fn elemento_de(ruta: &str) -> Option<String> {
+    let mut partes = ruta.trim_end_matches('/').split('/').skip(3);
+    partes.next().filter(|e| !e.is_empty()).map(str::to_owned)
+}
+
+/// `/ajustes/<tema>` y `/ajustes/<tema>/<elemento>`.
 #[component]
 pub fn PaginaTema() -> impl IntoView {
     let params = use_params_map();
     let slug = Memo::new(move |_| params.with(|p| p.get("tema").unwrap_or_default()));
     let existe = Memo::new(move |_| Tema::from_slug(&slug.get()).is_some());
+    let ubicacion = use_location();
+    let elemento = Memo::new(move |_| elemento_de(&ubicacion.pathname.get()));
+    // «Volver a leer»: la próxima lectura no sale de la caché del servidor.
+    let fresca = StoredValue::new(false);
     let datos = Resource::new(
         move || slug.get(),
-        |s| async move {
-            match Tema::from_slug(&s) {
-                Some(_) => leer_tema(s).await.map(Some),
-                None => Ok(None),
+        move |s| {
+            let fresca = fresca.try_update_value(std::mem::take).unwrap_or(false);
+            async move {
+                match Tema::from_slug(&s) {
+                    Some(_) => leer_tema(s, fresca).await.map(Some),
+                    None => Ok(None),
+                }
             }
         },
     );
@@ -298,6 +348,25 @@ pub fn PaginaTema() -> impl IntoView {
     let recargar = Callback::new(move |()| {
         precarga.olvidar();
         datos.refetch();
+    });
+    let volver_a_leer = Callback::new(move |()| {
+        fresca.set_value(true);
+        recargar.run(());
+    });
+    // Lo marcado y el cambio en curso viven fuera de la lectura: sobreviven
+    // a la relectura tras un cambio. Al cambiar de tema, nada marcado.
+    let seleccion = Seleccion::nueva();
+    provide_context(seleccion);
+    let borradores = Borradores::nuevos();
+    provide_context(borradores);
+    provide_context(Seguimiento::nuevo(recargar, borradores, seleccion));
+    Effect::new(move |anterior: Option<String>| {
+        let ahora = slug.get();
+        if anterior.is_some_and(|a| a != ahora) {
+            seleccion.vaciar();
+            borradores.vaciar();
+        }
+        ahora
     });
     // Mientras se lee otro tema (o el mismo tras un cambio), lo anterior se
     // ve atenuado (e inerte) y con «Actualizando…», si tarda más que el
@@ -310,7 +379,7 @@ pub fn PaginaTema() -> impl IntoView {
             && let Some(id) = foco.0.get_untracked()
         {
             request_animation_frame(move || {
-                tarjeta::enfocar(&id);
+                piezas::enfocar(&id);
                 foco.0.set(None);
             });
         }
@@ -339,13 +408,17 @@ pub fn PaginaTema() -> impl IntoView {
                     aria-busy=move || actualizando.ocupado.get().then_some("true")
                     inert=move || actualizando.ocupado.get()
                 >
-                <Transition
-                    fallback=|| view! { <p class="estado-espera">{t!("comun-cargando")}</p> }
-                    set_pending=pendiente
-                >
+                <Transition fallback=esqueleto set_pending=pendiente>
                 {move || Suspend::new(async move {
                     match datos.await {
-                        Ok(Some(t)) => view! { <ContenidoTema t recargar /> }.into_any(),
+                        Ok(Some(p)) => {
+                            let intro = introduccion(&p.tema, p.foto_de_partida, p.solo_lectura);
+                            view! {
+                                {intro}
+                                <ContenidoRejilla p volver_a_leer elemento />
+                            }
+                                .into_any()
+                        }
                         Ok(None) => ().into_any(),
                         Err(e) => {
                             view! {
@@ -361,6 +434,8 @@ pub fn PaginaTema() -> impl IntoView {
                 </Transition>
                 </div>
             </div>
+            <AvisoCambio />
+            <Outlet />
         }
         .into_any()
     }
@@ -437,109 +512,20 @@ fn aviso_actualizando(pendiente: RwSignal<bool>) -> Actualizando {
     Actualizando { ocupado, aviso }
 }
 
-/// Las tarjetas de un tema: lo esencial arriba; lo avanzado y lo oculto,
-/// bajo «Más opciones».
-#[component]
-fn ContenidoTema(t: TemaVista, recargar: Callback<()>) -> impl IntoView {
-    let solo_lectura = t.solo_lectura;
-    // Los dispositivos y las IP fijas leen la red de casa una vez para los dos.
-    let de_red = |c: &Option<String>| matches!(c.as_deref(), Some(DISPOSITIVOS | RESERVAS));
-    if t.ajustes.iter().any(|a| de_red(&a.componente)) {
-        let existentes = t
-            .ajustes
-            .iter()
-            .find(|a| a.componente.as_deref() == Some(RESERVAS))
-            .map(|a| reservas::existentes(&a.instancias))
-            .unwrap_or_default();
-        provide_context(dispositivos::DatosRed::nuevo(existentes));
-    }
-    if t.ajustes
-        .iter()
-        .any(|a| a.componente.as_deref() == Some(PUERTOS))
-    {
-        provide_context(puertos::DatosPuertos::nuevo());
-    }
-    let (basicos, otros): (Vec<_>, Vec<_>) = t
-        .ajustes
-        .into_iter()
-        .partition(|a| a.nivel == Nivel::Basico);
-    let tarjetas = move |lista: Vec<_>| {
-        lista
-            .into_iter()
-            .map(|a| view! { <Tarjeta a solo_lectura recargar /> })
-            .collect_view()
-    };
-    let aviso = solo_lectura.then(|| {
-        view! {
-            <p class="aviso estado-aviso" role="status">
-                <IconoEstado estado=Estado::Aviso />
-                <span>
-                    {t!("ajustes-solo-lectura-aviso")} " "
-                    <a href=crate::ui::router::RUTA_CONEXION>{t!("ajustes-solo-lectura-enlace")}</a>
-                </span>
-            </p>
-        }
-    });
-    let tema = format!("ajustes-tema-{}-desc", t.tema);
-    // Solo si hay con qué comparar.
-    let foto = t.foto_de_partida.then(|| {
-        view! {
-            <p class="tema-foto">
-                <a href=RUTA_FOTO>{t!("ajustes-foto-enlace")}</a>
-            </p>
-        }
-    });
-    // Qué significa «Oculto», una sola vez, delante de las tarjetas ocultas.
-    let nota_oculto = |hay: bool| {
-        hay.then(|| {
-            view! {
-                <p class="nota-oculto" id=NOTA_OCULTO>
-                    <span class="chip chip-nivel">{t!("ajustes-nivel-oculto")}</span>
-                    " "
-                    {t!("ajustes-nivel-oculto-desc")}
-                </p>
-            }
-        })
-    };
-    let hay_oculto = otros.iter().any(|a| a.nivel == Nivel::Oculto);
-    // Sin nada esencial (Sistema), plegarlo todo dejaría la página vacía:
-    // sus tarjetas se ven directamente, cada una con su etiqueta de nivel.
-    let cuerpo = if basicos.is_empty() {
-        view! {
-            {nota_oculto(hay_oculto)}
-            <div class="ajustes-lista">{tarjetas(otros)}</div>
-        }
-        .into_any()
-    } else {
-        let mas = (!otros.is_empty()).then(|| {
-            view! {
-                <details class="mas-opciones">
-                    <summary>
-                        <span class="mas-opciones-titulo">{t!("ajustes-mas-opciones")}</span>
-                        <span class="mas-opciones-desc">{t!("ajustes-mas-opciones-desc")}</span>
-                    </summary>
-                    {nota_oculto(hay_oculto)}
-                    <div class="ajustes-lista">{tarjetas(otros)}</div>
-                </details>
-            }
-        });
-        view! {
-            <div class="ajustes-lista">{tarjetas(basicos)}</div>
-            {mas}
-        }
-        .into_any()
-    };
-    view! {
-        <p class="tema-desc">{traducir(&tema, None)}</p>
-        {foto}
-        {aviso}
-        {cuerpo}
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::Precargados;
+    use super::{Precargados, elemento_de};
+
+    #[test]
+    fn el_elemento_sale_de_la_direccion() {
+        assert_eq!(elemento_de("/ajustes/wifi"), None);
+        assert_eq!(elemento_de("/ajustes/wifi/"), None);
+        assert_eq!(elemento_de("/ajustes/wifi/red-5").as_deref(), Some("red-5"));
+        assert_eq!(
+            elemento_de("/ajustes/wifi/red-5/").as_deref(),
+            Some("red-5")
+        );
+    }
 
     /// Tras un cambio, todo vuelve a precargarse, y una precarga que empezó
     /// antes no cuenta (leyó antes de que el servidor invalidara).

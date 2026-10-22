@@ -99,7 +99,7 @@ pub(super) fn Escritura(detalle: FuncionDetalle) -> impl IntoView {
                 <p class="pagina-sub">{t!("biblioteca-instancia-trabajar")}</p>
                 <div class="rejilla-campos">{entradas}</div>
                 <div class="formulario-pie">
-                    <button class="boton-sutil" type="submit">{t!("biblioteca-cargar")}</button>
+                    <button class="b-sec" type="submit">{t!("biblioteca-cargar")}</button>
                 </div>
             </form>
         }
@@ -141,7 +141,7 @@ pub(super) fn Escritura(detalle: FuncionDetalle) -> impl IntoView {
                 <div class="seccion-cabecera">
                     <h2 id="titulo-instancias" class="titulo-seccion">{t!("biblioteca-instancias-titulo")}</h2>
                     <button
-                        class="boton-sutil"
+                        class="b-sec"
                         type="button"
                         on:click=move |_| {
                             error.set(None);
@@ -194,7 +194,7 @@ pub(super) fn Escritura(detalle: FuncionDetalle) -> impl IntoView {
                             <h2 id="titulo-formulario" class="titulo-seccion">{titulo}</h2>
                             {es_lista.then(|| view! {
                                 <button
-                                    class="boton-sutil"
+                                    class="b-sec"
                                     type="button"
                                     on:click=move |_| modo.set(Modo::Ninguno)
                                 >
@@ -301,7 +301,7 @@ fn tabla_instancias(
                     <td class="acciones-fila">
                         {con_id.then(|| view! {
                             <button
-                                class="boton-mini"
+                                class="b-sec"
                                 type="button"
                                 on:click=move |_| modo.set(Modo::Form(Some(id_editar.clone())))
                             >
@@ -311,7 +311,7 @@ fn tabla_instancias(
                         })}
                         {(con_id && se_borra).then(|| view! {
                             <button
-                                class="boton-mini boton-peligro"
+                                class="b-pel"
                                 type="button"
                                 on:click=move |_| borrar(id_borrar.clone())
                             >
@@ -335,7 +335,7 @@ fn tabla_instancias(
         t!("biblioteca-instancias", n = i.total)
     };
     view! {
-        <div class="tabla-scroll">
+        <div class="tabla-scroll" tabindex="0">
             <table class="tabla">
                 <caption>{titulo}</caption>
                 <thead>
@@ -618,7 +618,7 @@ fn Formulario(
                 {move || error.get()}
             </p>
             <div class="formulario-pie">
-                <button class="boton" type="submit" disabled=move || enviando.get() || sin_campos>
+                <button class="b-pri" type="submit" disabled=move || enviando.get() || sin_campos>
                     {move || if enviando.get() { t!("biblioteca-revisando") } else { t!("biblioteca-revisar-cambios") }}
                 </button>
             </div>

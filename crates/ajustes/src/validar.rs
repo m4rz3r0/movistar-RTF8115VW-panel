@@ -12,14 +12,16 @@ use crate::valores::traducir;
 /// Prefijo de las claves de traducción de un ajuste: `ajuste-` más el id con
 /// `.` → `-` (`wifi.red_5` → `ajuste-wifi-red_5`).
 pub fn prefijo_i18n(a: &Ajuste) -> String {
-    format!("ajuste-{}", a.id.replace('.', "-"))
+    crate::prefijo_de_ajuste(&a.id)
 }
 
 /// Claves de traducción que necesita un ajuste, sin repetir:
 /// - `<p>-titulo`, `<p>-desc`, `<p>-ayuda` y `efecto-<efecto>`;
 /// - por campo, `<p>-<campo>`, `<p>-<campo>-desc` y la de `solo_lectura`;
 /// - por opción, `<p>-<campo>-<clave>`, su `-desc` y `aviso-<aviso>`;
-/// - `<p>-<campo>-recomendado` si el campo tiene recomendación (el motivo).
+/// - `<p>-<campo>-true` y `-false` en un booleano con `textos_valor`;
+/// - `<p>-<campo>-recomendado` si el campo tiene recomendación (el motivo);
+/// - `<p>-col-<columna>`, la cabecera de cada columna de una lista.
 pub fn claves_requeridas(a: &Ajuste) -> Vec<String> {
     let p = prefijo_i18n(a);
     let mut claves = vec![
@@ -45,10 +47,15 @@ pub fn claves_requeridas(a: &Ajuste) -> Vec<String> {
             claves.push(format!("{pc}-{SIN_ELECCION}"));
             claves.push(format!("{pc}-{SIN_ELECCION}-desc"));
         }
+        if c.textos_valor {
+            claves.push(format!("{pc}-true"));
+            claves.push(format!("{pc}-false"));
+        }
         if c.recomendado.is_some() || c.opciones.iter().any(|o| o.recomendada) {
             claves.push(format!("{pc}-recomendado"));
         }
     }
+    claves.extend(a.columnas.iter().map(|c| format!("{p}-col-{c}")));
     let mut vistas = HashSet::new();
     claves.retain(|k| vistas.insert(k.clone()));
     claves
@@ -79,6 +86,7 @@ pub fn comprobar(c: &CatalogoAjustes, f: &Catalogo, m: &Mascara) -> Vec<String> 
         comprobar_ajuste(a, f, m, &mut fallos);
     }
     comprobar_excluidas(c, f, &mut fallos);
+    crate::elementos::comprobar_elementos(c, &mut fallos);
     fallos
 }
 
@@ -159,6 +167,7 @@ fn comprobar_ajuste(a: &Ajuste, f: &Catalogo, m: &Mascara, fallos: &mut Vec<Stri
         }
         comprobar_campo(a, campo, f, m, fallos);
         comprobar_requiere(a, campo, fallos);
+        comprobar_recomendado_si(a, campo, fallos);
         let escritura = campo.escribe.as_ref().and_then(|e| f.funcion(&e.funcion));
         if let Some(func) = escritura.filter(|_| a.lista) {
             comprobar_id_de_lista(a, func, m, fallos);
@@ -230,6 +239,32 @@ fn comprobar_requiere(a: &Ajuste, c: &Campo, fallos: &mut Vec<String>) {
             "{donde}: requiere con «{}», que no es un valor válido del campo",
             r.cuando
         ));
+    }
+}
+
+/// `recomendado_si`: el campo tiene recomendación, y la condición es otro
+/// campo del mismo ajuste con un valor válido suyo.
+fn comprobar_recomendado_si(a: &Ajuste, c: &Campo, fallos: &mut Vec<String>) {
+    let Some(r) = &c.recomendado_si else {
+        return;
+    };
+    let donde = format!("{}.{}", a.id, c.id);
+    if c.recomendado.is_none() && !c.opciones.iter().any(|o| o.recomendada) {
+        fallos.push(format!("{donde}: recomendado_si sin recomendación"));
+    }
+    match a.campo(&r.campo) {
+        Some(e) if e.id != c.id => {
+            if traducir(e, &r.cuando).is_err() {
+                fallos.push(format!(
+                    "{donde}: recomendado_si con «{}», que no es un valor válido de {}",
+                    r.cuando, e.id
+                ));
+            }
+        }
+        _ => fallos.push(format!(
+            "{donde}: recomendado_si {}, que no es otro campo del ajuste",
+            r.campo
+        )),
     }
 }
 
@@ -535,8 +570,22 @@ fn comprobar_forma(c: &Campo, mal: &mut impl FnMut(String)) {
             _ => {}
         }
     }
+    if !c.aceptados.is_empty() && (c.tipo != TipoCampo::Texto || c.recomendado.is_none()) {
+        mal("`aceptados` solo vale en un campo `texto` con `recomendado`".into());
+    }
+    for a in c.aceptados.iter().filter_map(|a| a.strip_prefix("*.")) {
+        if a.is_empty() || a.contains('*') {
+            mal(format!("`aceptados`: «*.{a}» no es un dominio"));
+        }
+    }
+    if c.seguridad && c.recomendado.is_none() && !c.opciones.iter().any(|o| o.recomendada) {
+        mal("`seguridad` sin recomendación".into());
+    }
     if c.invertido && c.tipo != TipoCampo::Booleano {
         mal("`invertido` solo vale en un campo `booleano`".into());
+    }
+    if c.textos_valor && c.tipo != TipoCampo::Booleano {
+        mal("`textos_valor` solo vale en un campo `booleano`".into());
     }
     if let Some(b) = &c.booleano {
         if c.tipo != TipoCampo::Booleano {

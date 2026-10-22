@@ -16,11 +16,12 @@ body {
   margin: 0;
   min-height: 100vh;
   background: var(--fondo);
-  color: var(--texto-1);
+  color: var(--texto);
   font-family: var(--fuente-ui);
   font-size: 14px;
   line-height: 1.5;
   font-feature-settings: "cv11";
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -35,11 +36,11 @@ h3 {
 }
 
 h1 {
-  font-size: 26px;
+  font-size: 28px;
 }
 
 h2 {
-  font-size: 17px;
+  font-size: 16px;
 }
 
 h3 {
@@ -51,7 +52,7 @@ p {
 }
 
 a {
-  color: var(--texto-1);
+  color: var(--texto);
   text-decoration-color: var(--borde);
   text-underline-offset: 3px;
 }
@@ -61,13 +62,13 @@ a:hover {
 }
 
 :focus-visible {
-  outline: 2px solid var(--acento);
+  outline: 2px solid var(--foco);
   outline-offset: 2px;
   border-radius: 4px;
 }
 
 ::selection {
-  background: rgb(255 176 0 / 0.3);
+  background: color-mix(in srgb, var(--acento) 30%, transparent);
 }
 
 .solo-lector {
@@ -89,7 +90,7 @@ a:hover {
   z-index: 100;
   padding: var(--esp-2) var(--esp-3);
   background: var(--acento);
-  color: var(--acento-texto);
+  color: var(--sobre-acento);
   border-radius: var(--radio);
   font-weight: 600;
   text-decoration: none;

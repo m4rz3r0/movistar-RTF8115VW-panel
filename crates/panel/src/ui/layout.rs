@@ -180,7 +180,7 @@ pub fn Layout() -> impl IntoView {
                             <span class="solo-lector">{t!("comun-usuario-ajustes")}</span>
                         </EnlaceSeccion>
                         <button
-                            class="boton-sutil salir"
+                            class="b-sec salir"
                             type="button"
                             disabled=move || salir.pending().get()
                             on:click=move |_| {

@@ -145,7 +145,7 @@ pub fn CambiarContrasena(
                 }}
                 {mensajes(error, aviso)}
                 <div class="botones">
-                    <button class="boton" type="submit" disabled=move || bloqueada.get()>
+                    <button class="b-pri" type="submit" disabled=move || bloqueada.get()>
                         {t!("contrasena-router-cambiar")}
                     </button>
                 </div>
@@ -211,14 +211,14 @@ fn DialogoConfirmar(
                 <p class="nota">{t!("contrasena-router-confirmar-nota")}</p>
                 <div class="dialogo-pie">
                     <button
-                        class="boton-sutil"
+                        class="b-sec"
                         type="button"
                         disabled=move || pendiente.get()
                         on:click=cancelar
                     >
                         {t!("panel-cancelar")}
                     </button>
-                    <button class="boton" type="submit" autofocus disabled=move || pendiente.get()>
+                    <button class="b-pri" type="submit" autofocus disabled=move || pendiente.get()>
                         {move || {
                             if pendiente.get() {
                                 t!("contrasena-router-cambiando")

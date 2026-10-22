@@ -1,6 +1,6 @@
 [package]
 name = "panel"
-version = "0.3.1"
+version = "0.4.0"
 description = "Panel web (Leptos + Axum) para gestionar el router Askey RTF8115VW"
 edition.workspace = true
 rust-version.workspace = true
@@ -28,7 +28,7 @@ i18n = { path = "../i18n" }
 ajustes = { path = "../ajustes" }
 # Posición del puntero en los gráficos (`getBoundingClientRect`); ya la trae
 # Leptos, aquí solo se activa `DomRect`.
-web-sys = { workspace = true, features = ["DomRect", "HtmlDetailsElement"] }
+web-sys = { workspace = true, features = ["DomRect", "HtmlDetailsElement", "NodeList"] }
 # Servidor (feature `ssr`).
 leptos_axum = { workspace = true, optional = true }
 axum = { workspace = true, optional = true }

@@ -34,6 +34,17 @@ panel-vista-grafica-ayuda = History charts first and full width; indicators more
 panel-vista-mixto = Mixed
 panel-vista-mixto-ayuda = Indicators with their last-hour sparkline and, below, the history charts. This is the default.
 
+## Theme
+panel-tema = Theme
+panel-tema-ayuda = The panel's colours. It's yours: each panel user chooses their own. It applies straight away.
+panel-tema-elegir = Colour theme
+panel-tema-automatico = Automatic
+panel-tema-automatico-ayuda = Light or dark, the same as your system. This is the default.
+panel-tema-oscuro = Dark
+panel-tema-oscuro-ayuda = Dark background and light text. Easier on the eyes in low light.
+panel-tema-claro = Light
+panel-tema-claro-ayuda = Light background and dark text. Easier to read in bright light.
+
 ## Users
 panel-usuarios = Panel users
 panel-usuarios-texto = They can log in to the panel with full permissions. They can also be managed with the panel user command.

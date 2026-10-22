@@ -6,6 +6,7 @@
 
 mod comun;
 
+mod acciones;
 mod ajustes;
 mod ajustes_catalogo;
 mod ajustes_foto;
@@ -16,6 +17,7 @@ mod auth;
 mod binario_e2e;
 mod changes;
 mod contrasena_router;
+mod contraste;
 mod estado;
 mod estaticos;
 mod explorador;
@@ -27,9 +29,13 @@ mod idioma;
 mod instalar;
 mod instancia;
 mod lecturas;
+mod lista;
 mod menu;
+mod pagina_tema;
+mod pagina_temas;
 mod panel_ajustes;
 mod poller;
 mod red;
 mod sensibles;
+mod tema;
 mod vista;

@@ -188,6 +188,30 @@ pub fn regla_de(i: &InstanciaVista) -> Option<ReglaPuertos> {
 /// router aún los tiene (si no, 409).
 pub const IDENTIFICAN_REGLA: [&str; 3] = ["protocolo", "externo_desde", "destino"];
 
+/// Campos que identifican una instancia de la lista con el componente
+/// `componente` (`puertos`, `reservas`): una regla por lo que abre y hacia
+/// dónde; una IP fija, por su MAC. Ninguno en las demás listas.
+pub fn identifican(componente: Option<&str>) -> &'static [&'static str] {
+    match componente {
+        Some("puertos") => &IDENTIFICAN_REGLA,
+        Some("reservas") => &["mac"],
+        _ => &[],
+    }
+}
+
+/// Lo que identifica una instancia (`campo → valor legible`), tal como la
+/// leyó la página: lo que se envía como `esperados` al editarla o borrarla
+/// (desde la página o desde una acción sobre varias, en el servidor).
+pub fn identidad_de(
+    componente: Option<&str>,
+    campos: &[CampoVista],
+) -> std::collections::BTreeMap<String, String> {
+    identifican(componente)
+        .iter()
+        .map(|k| ((*k).to_owned(), valor_de(campos, k)))
+        .collect()
+}
+
 /// ¿Hay que validar la regla que pide `p` ([`validar_regla`])? Una nueva, o
 /// una que cambia algo más que el nombre o se activa. Desactivarla, cambiarle
 /// el nombre o borrarla, no: así se puede apagar una regla que ya no

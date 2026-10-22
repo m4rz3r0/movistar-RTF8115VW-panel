@@ -96,7 +96,7 @@ pub fn Secreto(
                 }
             />
             <button
-                class="boton-ojo"
+                class="b-txt boton-ojo"
                 type="button"
                 aria-controls=control
                 aria-pressed=move || visible.get().to_string()

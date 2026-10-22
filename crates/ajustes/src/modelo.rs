@@ -95,6 +95,26 @@ pub enum ValorLegible {
 /// `requiere`.
 pub const SIN_ELECCION: &str = "ninguna";
 
+/// Prefijo de las claves de traducción del ajuste `id` (`wifi.red_24` →
+/// `ajuste-wifi-red_24`). Lo usan el catálogo y el navegador.
+pub fn prefijo_de_ajuste(id: &str) -> String {
+    format!("ajuste-{}", id.replace('.', "-"))
+}
+
+/// ¿`valor` es uno de los `aceptados` de un campo de texto? Cada uno vale
+/// tal cual o, si empieza por `*.`, por cualquier nombre de ese dominio
+/// (`*.pool.ntp.org` acepta `es.pool.ntp.org`). Sin distinguir mayúsculas.
+pub fn valor_aceptado(aceptados: &[String], valor: &str) -> bool {
+    let v = valor.trim().to_ascii_lowercase();
+    aceptados.iter().any(|a| {
+        let a = a.trim().to_ascii_lowercase();
+        match a.strip_prefix("*.") {
+            Some(dominio) => v.len() > dominio.len() && v.ends_with(&format!(".{dominio}")),
+            None => v == a,
+        }
+    })
+}
+
 /// Otro campo del mismo ajuste que hace falta cuando este toma un valor: al
 /// encender el espejo de puerto hay que elegir la toma. Lo comprueban el
 /// servidor al guardar y la página junto al campo exigido.
@@ -107,6 +127,11 @@ pub struct Requiere {
     /// de opción…).
     pub cuando: String,
 }
+
+#[cfg(feature = "catalogo")]
+mod componente;
+#[cfg(feature = "catalogo")]
+mod elemento;
 
 #[cfg(feature = "catalogo")]
 pub use catalogo_toml::*;
@@ -134,6 +159,8 @@ pub use catalogo_toml::*;
 /// web básica.
 #[cfg(feature = "catalogo")]
 mod catalogo_toml {
+    pub use super::componente::Componente;
+    pub use super::elemento::{Accion, Elemento};
     use super::{Nivel, Requiere, Tema, TipoCampo};
     use serde::{Deserialize, Deserializer};
     use std::collections::BTreeMap;
@@ -161,6 +188,12 @@ mod catalogo_toml {
         /// Componente propio de la interfaz, en vez de la tarjeta genérica.
         #[serde(default)]
         pub componente: Option<Componente>,
+        /// Columnas de la lista en la página, en orden (spec §5.1): ids de
+        /// sus campos o un rango (`externo`: `externo_desde` y
+        /// `externo_hasta`); en los dispositivos, los datos de
+        /// [`COLUMNAS_DISPOSITIVOS`](crate::COLUMNAS_DISPOSITIVOS).
+        #[serde(default)]
+        pub columnas: Vec<String>,
         #[serde(default, rename = "campo")]
         pub campos: Vec<Campo>,
     }
@@ -186,107 +219,6 @@ mod catalogo_toml {
         Ok(BTreeMap::<String, String>::deserialize(d)?
             .into_iter()
             .collect())
-    }
-
-    /// Componente propio de la interfaz para un ajuste.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
-    #[serde(rename_all = "snake_case")]
-    pub enum Componente {
-        Dispositivos,
-        Reservas,
-        Puertos,
-        ContrasenaRouter,
-    }
-
-    impl Componente {
-        /// Nombre del componente, el mismo que en el TOML.
-        pub fn slug(self) -> &'static str {
-            match self {
-                Componente::Dispositivos => "dispositivos",
-                Componente::Reservas => "reservas",
-                Componente::Puertos => "puertos",
-                Componente::ContrasenaRouter => "contrasena_router",
-            }
-        }
-
-        /// Textos propios del componente: finales de claves de traducción
-        /// que, tras el prefijo del ajuste (`ajuste-red_local-reservas`),
-        /// van en el `.ftl` de su tema.
-        pub fn claves(self) -> &'static [&'static str] {
-            match self {
-                Componente::Dispositivos => &[
-                    "col-ip",
-                    "col-mac",
-                    "sin-nombre",
-                    "cable",
-                    "wifi24",
-                    "wifi5",
-                    "invitados",
-                    "desconocida",
-                    "desconectado",
-                    "fijar",
-                    "fijar-de",
-                    "ya-fija",
-                    "no-fijable",
-                    "fijar-desconectado",
-                    "vacia",
-                ],
-                Componente::Reservas => &[
-                    "col-equipo",
-                    "col-acciones",
-                    "anadir",
-                    "nueva",
-                    "cambiar",
-                    "editar-de",
-                    "borrar",
-                    "borrar-de",
-                    "vacia",
-                    "error-fuera",
-                    "error-router",
-                    "error-ip-repetida",
-                    "error-mac-repetida",
-                    "error-difusion",
-                    "error-cambiada",
-                ],
-                Componente::Puertos => &[
-                    "protocolo-ambos",
-                    "protocolo-ambos-desc",
-                    "paso-igual",
-                    "paso-igual-sin-el-primero",
-                    "abrir",
-                    "nueva",
-                    "cambiar",
-                    "puerto",
-                    "puerto-desc",
-                    "dispositivo",
-                    "dispositivo-desc",
-                    "dispositivo-elegir",
-                    "otra-ip",
-                    "puerto-distinto",
-                    "interno",
-                    "interno-desc",
-                    "col-puerto",
-                    "col-dispositivo",
-                    "a-ip",
-                    "destino-perdido",
-                    "destino-perdido-desc",
-                    "editar-de",
-                    "borrar",
-                    "borrar-de",
-                    "activa-de",
-                    "vacia",
-                    "error-puerto",
-                    "error-dispositivo",
-                    "error-invertido",
-                    "error-distintos",
-                    "error-solapa",
-                    "error-fuera",
-                    "error-cero",
-                    "error-cambiada",
-                ],
-                Componente::ContrasenaRouter => &[],
-            }
-        }
     }
 
     /// Un campo del ajuste: un parámetro de una función de escritura (o un
@@ -342,6 +274,25 @@ mod catalogo_toml {
         /// (`requiere = { campo = "puerto", cuando = "true" }`).
         #[serde(default)]
         pub requiere: Option<Requiere>,
+        /// Su recomendación solo vale cuando otro campo del ajuste tiene un
+        /// valor (`recomendado_si = { campo = "ipv6", cuando = "true" }`: los
+        /// anuncios, solo con IPv6 encendido); si no, no se recomienda nada.
+        #[serde(default)]
+        pub recomendado_si: Option<Requiere>,
+        /// Su recomendación es de seguridad (el WPS, el aislamiento de los
+        /// invitados): en la tarjeta va antes que las demás y como riesgo.
+        #[serde(default)]
+        pub seguridad: bool,
+        /// En un campo de texto con `recomendado`, otros valores que valen
+        /// igual que lo recomendado (otro servidor de hora neutro); ver
+        /// [`valor_aceptado`](super::valor_aceptado).
+        #[serde(default)]
+        pub aceptados: Vec<String>,
+        /// Un `booleano` con sus propios textos para sí y no («Encendida» y
+        /// «Apagada» en vez de «Sí» y «No»): `<p>-<campo>-true` y
+        /// `<p>-<campo>-false`, en el resumen de un cambio y en su valor.
+        #[serde(default)]
+        pub textos_valor: bool,
     }
 
     impl Campo {

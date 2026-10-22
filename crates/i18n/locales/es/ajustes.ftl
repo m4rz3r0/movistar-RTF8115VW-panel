@@ -5,8 +5,6 @@
 ## Página
 ajustes-titulo = Ajustes del router
 ajustes-desc = Cambia lo que quieras del router en lenguaje claro. Cada cambio se vigila y, si el router deja de responder, se deshace solo.
-ajustes-mas-opciones = Más opciones
-ajustes-mas-opciones-desc = Ajustes que casi nunca hace falta tocar.
 ajustes-detalles-tecnicos = Detalles técnicos
 ajustes-detalles-tecnicos-desc = Para quien quiera saber qué funciones del router se usan por debajo.
 ajustes-detalles-lectura = Lectura
@@ -35,6 +33,11 @@ ajustes-secreto-tapado-pedir = El router no deja leer esta clave: escríbela par
 ajustes-secreto-sin-leer-desc = El router no deja leer el valor que tiene; si escribes uno, se guarda el nuevo.
 ajustes-hueco = Este ajuste tendrá aquí su propia pantalla; todavía no está lista.
 ajustes-lista-vacia = No hay ninguno configurado.
+ajustes-lista-filtrar = Filtrar la lista
+ajustes-lista-ninguna = Nada coincide con «{ $texto }».
+ajustes-lista-nombre = Nombre
+ajustes-lista-estado = Estado
+ajustes-lista-borrar = Borrar
 ajustes-lista-sin-editar = Por ahora esta lista solo se puede consultar.
 
 ## Temas
@@ -51,7 +54,7 @@ ajustes-tema-seguridad-desc = Quién puede entrar al router y la gestión remota
 ajustes-tema-telefono = Teléfono
 ajustes-tema-telefono-desc = La línea de teléfono fijo del router.
 ajustes-tema-sistema = Sistema
-ajustes-tema-sistema-desc = Hora, registro y otros ajustes generales del router.
+ajustes-tema-sistema-desc = La hora del router y la copia del tráfico para diagnóstico.
 
 ## Niveles
 ajustes-nivel-basico = Lo esencial
@@ -89,6 +92,7 @@ ajustes-error-sin-cambios = Ya está así: el router tiene esos valores y no hay
 ajustes-error-bloqueada = El panel aún no puede cambiar este ajuste con seguridad.
 ajustes-error-router = El router no ha podido hacer el cambio. Prueba de nuevo en un momento.
 ajustes-error-invalida = El panel no ha podido preparar este cambio. Recarga la página y prueba de nuevo.
+ajustes-error-instancia-cambiada = Algo de lo que ibas a cambiar ya no es igual en el router (quizá su lista ha cambiado de orden): no se ha tocado nada. Vuelve a leer y prueba otra vez.
 ajustes-error-ajuste = Ese ajuste no existe.
 ajustes-error-campo = Ese ajuste no tiene ese dato. Recarga la página y prueba de nuevo.
 cambio-error-secreto-tapado = No se puede guardar: en la misma escritura va una clave que el router no deja leer o da tapada, y reenviarla podría borrarla. Escríbela para guardar los cambios.
@@ -114,6 +118,7 @@ ajustes-grupo-vacio = (vacío)
 ajustes-grupo-vigilancia = Tras aplicarlo, el panel vigila el router durante { $plazo } y lo deshace solo si deja de responder o se cae internet.
 ajustes-grupo-ninguno = Marca al menos un paso para aplicar el cambio.
 ajustes-grupo-aplicar = Aplicar
+ajustes-grupo-borrar = Borrar
 ajustes-grupo-aplicando = Aplicando…
 ajustes-grupo-cancelar = Cancelar
 ajustes-grupo-cerrar = Cerrar
@@ -164,3 +169,222 @@ ajustes-wifi-radio-ocultas = { $n ->
    *[other] La radio emite { $n } redes que el panel no muestra.
 }
 ajustes-wifi-radio-ocultas-enlace = Ver en la Biblioteca
+ajustes-wifi-radio-apagada = Apagada
+ajustes-wifi-radio-sin-redes-corto = Encendida, sin redes
+ajustes-wifi-radio-redes-sin-leer-corto = Encendida, redes sin leer
+ajustes-wifi-radio-redes-sin-leer = La radio está encendida, pero alguna de sus redes no se ha podido leer: no se sabe si emite alguna.
+
+## Elementos de cada pestaña: estado, papel, datos, recomendación y acciones
+ajustes-estado-sin-leer = Sin leer
+ajustes-estado-desconocido = Sin datos
+ajustes-papel-principal = Principal
+ajustes-papel-invitados = Invitados
+ajustes-papel-radio = Radio
+ajustes-dato-canal_y_ancho = Canal y ancho
+ajustes-dato-canal-auto = Canal automático
+ajustes-dato-canal-numero = Canal { $canal }
+ajustes-dato-canal-y-ancho = { $canal } · { $ancho } MHz
+ajustes-dato-conectados = Dispositivos conectados
+ajustes-recomendacion-aplicar = Aplicar lo recomendado
+ajustes-accion-encender = Encender
+ajustes-accion-apagar = Apagar
+ajustes-accion-quitar_wps = Quitar WPS
+ajustes-accion-ocultar_nombre = Ocultar el nombre
+ajustes-accion-mostrar_nombre = Mostrar el nombre
+ajustes-accion-aislar = Aislar los dispositivos
+ajuste-accion-encender-titulo = Redes WiFi, encender
+ajuste-accion-apagar-titulo = Redes WiFi, apagar
+ajuste-accion-quitar_wps-titulo = Redes WiFi, quitar el WPS
+ajuste-accion-ocultar_nombre-titulo = Redes WiFi, ocultar el nombre
+ajuste-accion-mostrar_nombre-titulo = Redes WiFi, mostrar el nombre
+ajuste-accion-aislar-titulo = Redes WiFi, aislar los dispositivos
+ajustes-accion-activar_regla = Activar
+ajustes-accion-desactivar_regla = Desactivar
+ajustes-accion-borrar_regla = Borrar
+ajuste-accion-activar_regla-titulo = Puertos abiertos, activar reglas
+ajuste-accion-desactivar_regla-titulo = Puertos abiertos, desactivar reglas
+ajuste-accion-borrar_regla-titulo = Puertos abiertos, borrar reglas
+ajustes-accion-activar_reserva = Activar
+ajustes-accion-desactivar_reserva = Desactivar
+ajustes-accion-borrar_reserva = Borrar
+ajuste-accion-activar_reserva-titulo = IP fijas, activar
+ajuste-accion-desactivar_reserva-titulo = IP fijas, desactivar
+ajuste-accion-borrar_reserva-titulo = IP fijas, borrar
+ajustes-accion-demasiados = Como mucho { $max } a la vez: desmarca alguno.
+ajustes-accion-no-aplica = Esa acción no se puede aplicar a todo lo marcado.
+ajustes-accion-ya-estaba = Todas las marcadas ya estaban así: no hay nada que cambiar.
+ajustes-accion-tapado = Esta acción no vale para «{ $ajuste }»: guardarlo exige escribir una clave que el router no deja leer. Cámbialo desde su detalle.
+ajustes-recomendacion-ahora = Ahora: { $campo }, { $valor }.
+ajustes-recomendacion-ahora-si = Ahora: { $campo }.
+ajustes-recomendacion-ahora-no = Ahora no: { $campo }.
+ajustes-problema-wifi-wps-true = El WPS está activado: quien llegue al router puede conectarse pulsando su botón, sin la contraseña.
+ajustes-problema-wifi-activa-false = La red está apagada: ningún dispositivo puede conectarse a ella.
+ajustes-problema-wifi-activa-true = La red está encendida: si ahora no tienes visitas, es una red más que se ve desde fuera.
+ajustes-problema-wifi-aislamiento-false = Los dispositivos de esta red pueden verse entre ellos: las visitas verían los tuyos.
+ajustes-problema-wifi-aislamiento-true = Los dispositivos de esta red no se ven entre ellos: no podrás, por ejemplo, enviar contenido a la tele.
+ajustes-problema-wifi-visible-false = El nombre de la red está oculto: hay que escribirlo a mano para conectarse.
+ajustes-problema-wifi-seguridad-abierta = La red está abierta: cualquiera que esté cerca puede conectarse sin contraseña.
+ajustes-leido-hace = { $s ->
+    [0] Leído ahora mismo
+    [one] Leído hace 1 s
+   *[other] Leído hace { $s } s
+}
+ajustes-leido-hace-min = Leído hace { $min } min
+ajustes-pie-dispositivos = { $n ->
+    [one] 1 dispositivo conectado
+   *[other] { $n } dispositivos conectados
+}
+ajustes-pie-dispositivos-nombres = { $n ->
+    [one] 1 dispositivo conectado: { $nombres }
+   *[other] { $n } dispositivos conectados: { $nombres }
+}
+ajustes-pie-sin-nombre = { $n } sin nombre
+ajustes-apagada-desde = Apagada desde el panel el { $fecha }
+ajustes-elemento-no-existe = No hay nada que se llame «{ $id }» en esta pestaña. Elige una de sus tarjetas.
+
+## Rejilla de elementos: marca, barra, tarjeta, detalle y aviso del cambio
+ajustes-resumen = Resumen del tema
+ajustes-marcar = Marcar { $nombre }
+ajustes-barra = Acciones para lo marcado
+ajustes-marcadas = { $n ->
+    [one] 1 marcada
+   *[other] { $n } marcadas
+}
+ajustes-desmarcar-todo = Desmarcar todo
+ajustes-barra-sin-leer = No entra lo que no se ha podido leer: { $nombres }.
+ajustes-barra-ninguna = Ninguna acción vale para todo lo marcado.
+ajustes-insignia-aplicando = Aplicando…
+ajustes-insignia-comprobando = Comprobando…
+ajustes-interruptor-si = { $nombre } encendida
+ajustes-interruptor-no = { $nombre } apagada
+ajustes-abrir = Abrir
+ajustes-abrir-nombre = Abrir { $nombre }
+ajustes-volver-a-leer = Volver a leer
+ajustes-detalle-cerrar = Cerrar el detalle
+ajustes-detalle-volver = ‹ { $tema }
+ajustes-detalle-basico = Lo esencial
+ajustes-descartar = Descartar
+ajustes-guardar-cambios = Guardar cambios
+ajustes-sin-guardar-titulo = Tienes cambios sin guardar
+ajustes-sin-guardar-texto = Si sigues, se pierden los cambios de «{ $nombre }».
+ajustes-sin-guardar-seguir = Seguir editando
+ajustes-sin-guardar-descartar = Descartar los cambios
+ajustes-aviso-cambio = { $titulo }: { $campo }, { $antes } → { $despues }
+ajustes-aviso-varios = { $titulo }: { $n ->
+    [one] un cambio
+   *[other] { $n } cambios
+}
+ajustes-aviso-cerrar = Cerrar el aviso
+ajustes-aviso-conectados = { $n ->
+    [one] El dispositivo conectado se queda sin WiFi.
+   *[other] Los { $n } dispositivos conectados se quedan sin WiFi.
+}
+
+## Franja de resumen de la WiFi
+ajustes-resumen-de = { $n } de { $total }
+ajustes-resumen-sin-dato = —
+ajustes-resumen-sin-leer = { $n ->
+    [one] 1 no se ha podido leer y no cuenta.
+   *[other] { $n } no se han podido leer y no cuentan.
+}
+ajustes-resumen-wifi-redes = Redes encendidas
+ajustes-resumen-wifi-redes-detalle = Las que emiten ahora mismo.
+ajustes-resumen-wifi-radios = Radios encendidas
+ajustes-resumen-wifi-radios-detalle = Las bandas de 2,4 y 5 GHz.
+ajustes-resumen-wifi-conectados = Dispositivos conectados
+ajustes-resumen-wifi-conectados-detalle = En todas las redes del panel.
+ajustes-resumen-recomendaciones = Recomendaciones pendientes
+ajustes-resumen-recomendaciones-detalle = Cada tarjeta enseña la más importante.
+
+## Internet, Seguridad, Teléfono y Sistema en rejilla: estados de las tarjetas
+ajustes-estado-como-se-recomienda = Como se recomienda
+ajustes-estado-con-recomendacion = Con una recomendación
+ajustes-estado-dns-si = Activado
+ajustes-estado-dns-no = Desactivado
+ajustes-estado-ddns-si = Activo
+ajustes-estado-ddns-no = Desactivado
+ajustes-estado-ddns-sin-usar = Sin usar
+ajustes-estado-gestion-remota-si = Encendida
+ajustes-estado-gestion-remota-no = Apagada
+ajustes-estado-linea-si = Activa
+ajustes-estado-linea-no = Apagada
+ajustes-estado-voz-si = Encendido
+ajustes-estado-voz-no = Apagado
+ajustes-estado-paso-directo-si = Activado
+ajustes-estado-paso-directo-no = Desactivado
+ajustes-estado-hora-si = Automática
+ajustes-estado-hora-no = Sin corregir
+ajustes-estado-diagnostico-si = Copiando el tráfico
+ajustes-estado-diagnostico-no = Apagada
+ajustes-dato-nombres_ddns = Nombres
+ajustes-dato-nombres_ddns-ninguno = Ninguno
+ajustes-dato-cuentas = Cuentas
+
+## Acciones de Seguridad y Sistema
+ajustes-accion-apagar_gestion_remota = Apagar la gestión remota
+ajustes-accion-usar_hora_neutra = Usar un servidor de hora neutro
+ajuste-accion-apagar_gestion_remota-titulo = Gestión remota, apagarla
+ajuste-accion-usar_hora_neutra-titulo = Hora del router, usar un servidor neutro
+
+## Qué pasa ahora (la recomendación de la tarjeta)
+ajustes-problema-seguridad-activa-encendida = La gestión remota está encendida: el operador puede entrar en el router desde internet y cambiar cualquier ajuste sin preguntarte.
+ajustes-problema-sistema-activa-false = El router no se pone en hora por internet: su reloj se va desajustando, y tras un corte de luz puede quedarse con una hora muy distinta.
+ajustes-problema-sistema-servidor_1 = El router se pone en hora con { $valor }: depende de quien gestione ese servidor.
+ajustes-problema-sistema-espejo-true = La copia del tráfico está encendida: quien se enchufe a esa toma puede ver todo lo que hace tu casa en internet.
+ajustes-problema-telefono-tonos-en_la_voz = Las teclas que pulsas en una llamada van mezcladas con la voz: si la llamada se oye mal, un menú por teléfono puede no reconocerlas.
+ajustes-problema-telefono-tonos-mensajes = Las teclas que pulsas en una llamada van como mensajes aparte: si el operador no lo admite, los menús por teléfono no las reciben.
+ajustes-problema-telefono-activo-false = El teléfono por internet está apagado: el teléfono fijo no puede llamar ni recibir llamadas.
+
+## Franja de resumen de Internet, Seguridad, Teléfono y Sistema
+ajustes-resumen-internet-conexion = Conexión a internet
+ajustes-resumen-internet-conectada = Conectada
+ajustes-resumen-internet-sin-conexion = Sin conexión
+ajustes-resumen-internet-conexion-sin-leer = No se ha podido leer la conexión.
+ajustes-resumen-internet-tipo-pppoe = Por PPPoE, con usuario y contraseña del operador.
+ajustes-resumen-internet-tipo-dhcp = Con una dirección que da el operador sola (DHCP).
+ajustes-resumen-internet-tipo-fija = Con una dirección fija.
+ajustes-resumen-internet-tipo-otro = De un tipo que el panel no reconoce.
+ajustes-resumen-internet-rele = Relé DNS
+ajustes-resumen-internet-rele-detalle = Si el router reenvía las consultas de nombres.
+ajustes-resumen-internet-ddns = Nombres fijos
+ajustes-resumen-internet-ddns-detalle = Dados de alta en el DNS dinámico.
+ajustes-resumen-seguridad-remota = Gestión remota
+ajustes-resumen-seguridad-remota-detalle = Si el operador puede cambiar el router a distancia.
+ajustes-resumen-seguridad-aviso = Aviso al operador
+ajustes-resumen-seguridad-aviso-detalle = Cada cuánto le escribe el router por su cuenta.
+ajustes-resumen-seguridad-cuentas = Cuentas del router
+ajustes-resumen-seguridad-cuentas-detalle = Las que pueden entrar en su web, también la del operador.
+ajustes-resumen-telefono-linea = Línea
+ajustes-resumen-telefono-linea-detalle = El teléfono fijo enchufado al router.
+ajustes-resumen-telefono-voz = Teléfono por internet
+ajustes-resumen-telefono-voz-detalle = La conexión del router con el operador para las llamadas.
+ajustes-resumen-telefono-fax = Fax por internet
+ajustes-resumen-telefono-fax-detalle = Los faxes van de una forma pensada para internet.
+ajustes-resumen-sistema-hora = Hora por internet
+ajustes-resumen-sistema-hora-detalle = El router corrige su reloj solo.
+ajustes-resumen-sistema-servidores = Servidores de hora
+ajustes-resumen-sistema-servidores-detalle = Los que consulta el router.
+ajustes-resumen-sistema-servidores-primero = El primero: { $servidor }.
+ajustes-resumen-sistema-servidores-ninguno = No hay ninguno puesto.
+ajustes-resumen-sistema-copia = Copia del tráfico
+ajustes-resumen-sistema-copia-detalle = Para diagnóstico; apagada, nadie la recibe.
+
+## Interruptores con su propio nombre, columna única del detalle y acciones de Internet y Teléfono
+ajustes-interruptor-dns-si = Relé DNS activado
+ajustes-interruptor-dns-no = Relé DNS desactivado
+ajustes-interruptor-hora-si = Hora automática activada
+ajustes-interruptor-hora-no = Hora automática desactivada
+ajustes-interruptor-servidores-si = Teléfono por internet encendido
+ajustes-interruptor-servidores-no = Teléfono por internet apagado
+ajustes-interruptor-fax-y-modem-si = Paso directo del fax activado
+ajustes-interruptor-fax-y-modem-no = Paso directo del fax desactivado
+ajustes-detalle-opciones = Opciones
+ajustes-accion-activar_rele = Activar el relé
+ajustes-accion-desactivar_rele = Desactivar el relé
+ajustes-accion-encender_voz = Encender el teléfono por internet
+ajustes-accion-apagar_voz = Apagar el teléfono por internet
+ajuste-accion-activar_rele-titulo = Relé DNS, activarlo
+ajuste-accion-desactivar_rele-titulo = Relé DNS, desactivarlo
+ajuste-accion-encender_voz-titulo = Teléfono por internet, encenderlo
+ajuste-accion-apagar_voz-titulo = Teléfono por internet, apagarlo
+ajustes-problema-sistema-servidor_2 = El servidor de reserva es { $valor }: depende de quien gestione ese servidor.

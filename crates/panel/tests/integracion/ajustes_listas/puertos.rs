@@ -8,10 +8,8 @@ use super::*;
 /// destino)`.
 async fn reglas_del_tema(p: &Panel, cookie: &str) -> Vec<[String; 5]> {
     let tema = ok(p, "leer_tema", json!({ "tema": "puertos" }), cookie).await;
-    let a = tema["ajustes"]
-        .as_array()
-        .unwrap()
-        .iter()
+    let a = crate::comun::ajustes_de(&tema)
+        .into_iter()
         .find(|a| a["id"] == "puertos.reglas")
         .unwrap()
         .clone();

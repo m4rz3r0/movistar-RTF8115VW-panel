@@ -1,8 +1,6 @@
-//! «Puertos abiertos» ([`Puertos`]): las reglas de apertura de puertos en
-//! una lista (apilada en pantallas estrechas) con su nombre, el puerto de
-//! internet y su protocolo, el dispositivo al que van, si está activa,
-//! «Editar» y «Borrar». Una regla cuyo dispositivo de destino ya no está en
-//! la red lleva un aviso ([`destino_inexistente`]).
+//! «Puertos abiertos»: el detalle de una regla de la lista
+//! ([`detalle::DetalleRegla`]), con su formulario y «Borrar». La lista
+//! misma es la genérica ([`super::lista`]).
 //!
 //! «Abrir un puerto» es un formulario corto: nombre, protocolo (también
 //! «TCP y UDP», que son dos reglas en un solo cambio), el puerto o el rango
@@ -11,26 +9,21 @@
 //! comprueba la regla como el servidor ([`validar_regla`]) y dice el error
 //! junto al campo. Todo se guarda con el diálogo de grupo.
 
+mod detalle;
 mod formulario;
-mod lista;
 
-pub(crate) use lista::Puertos;
+pub(crate) use detalle::DetalleRegla;
 
-use super::Foco;
 use super::campo::{Campo, DESCONOCIDO, validar};
-use super::dispositivos::{aviso_error, nombre};
-use super::tarjeta::{ayuda, cabecera, detalles_tecnicos, dom, enfocar};
+use super::dispositivos::nombre;
+use super::piezas::enfocar;
 use crate::ajustes_router::{
-    AMBOS, AjusteVista, CampoVista, DispositivoVista, EstadoLectura, GrupoVista, IDENTIFICAN_REGLA,
-    InstanciaVista, OpcionVista, PeticionAjuste, Protocolo, ReglaPuertos, destino_inexistente,
-    leer_dispositivos, leer_red_casa, leer_reservas, preparar_ajuste, regla_de, validar_regla,
-    valor_de,
+    AMBOS, CampoVista, DispositivoVista, GrupoVista, IDENTIFICAN_REGLA, InstanciaVista,
+    OpcionVista, PeticionAjuste, Protocolo, RedCasa, ReglaPuertos, destino_inexistente,
+    preparar_ajuste, regla_de, validar_regla, valor_de,
 };
 use crate::t;
 use crate::ui::explorador::texto_error;
-use crate::ui::grupo::DialogoGrupo;
-use crate::ui::i18n::traducir;
-use crate::ui::{Estado, Insignia};
 use ajustes::{TipoCampo, ValorLegible};
 use leptos::{ev::SubmitEvent, prelude::*, task::spawn_local};
 use std::collections::BTreeMap;
@@ -45,30 +38,29 @@ const OTRA_IP: &str = "otra";
 /// Las IP de las IP fijas.
 type IpFijas = Vec<String>;
 
-/// Lo que lee de la red de casa la tarjeta de Puertos: los dispositivos
-/// (para elegir el destino y ponerle nombre), las IP fijas (para saber si
-/// el destino sigue en la red) y la red (para validar antes de enviar). Cada
-/// lectura es su propio recurso: ninguna función del servidor va detrás de
-/// otra dentro de un mismo recurso.
-#[derive(Clone, Copy)]
-pub(super) struct DatosPuertos {
-    dispositivos: Resource<Result<Vec<DispositivoVista>, ServerFnError>>,
-    reservas: Resource<Result<IpFijas, ServerFnError>>,
-    red: Resource<Result<Option<(Ipv4Addr, Ipv4Addr)>, ServerFnError>>,
-}
-
-/// Las tres lecturas; `None` en la que falló.
+/// Lo que usa de la red de casa una regla: los dispositivos (para elegir
+/// el destino y ponerle nombre), las IP fijas (para saber si el destino
+/// sigue en la red) y la red (para validar antes de enviar). Llega con la
+/// página; `None` en lo que no se pudo leer.
 #[derive(Clone, Debug, Default)]
-struct RedPuertos {
+pub(crate) struct RedPuertos {
     dispositivos: Option<Vec<DispositivoVista>>,
     reservas: Option<IpFijas>,
     lan: Option<(Ipv4Addr, Ipv4Addr)>,
 }
 
 impl RedPuertos {
+    pub(crate) fn de(red: &RedCasa) -> RedPuertos {
+        RedPuertos {
+            dispositivos: red.dispositivos.clone(),
+            reservas: red.ips_fijas.clone(),
+            lan: red.lan,
+        }
+    }
+
     /// ¿Hay que avisar de que el destino `ip` ya no está en la red? Solo si
     /// se pudieron leer los dispositivos y las IP fijas: sin ellos no se sabe.
-    fn destino_perdido(&self, ip: &str) -> bool {
+    pub(crate) fn destino_perdido(&self, ip: &str) -> bool {
         match (&self.dispositivos, &self.reservas) {
             (Some(d), Some(r)) => {
                 let fijas: Vec<(String, String, String)> = r
@@ -82,35 +74,12 @@ impl RedPuertos {
     }
 
     /// Nombre del dispositivo con la IP `ip`, si se conoce.
-    fn nombre_de(&self, ip: &str) -> Option<String> {
+    pub(crate) fn nombre_de(&self, ip: &str) -> Option<String> {
         self.dispositivos
             .as_ref()?
             .iter()
             .find(|d| d.ip.trim() == ip.trim())
             .map(|d| nombre(&d.nombre))
-    }
-}
-
-impl DatosPuertos {
-    /// Se crea con cada lectura del tema: tras aplicar un cambio se vuelve
-    /// a leer.
-    pub(super) fn nuevo() -> Self {
-        DatosPuertos {
-            dispositivos: Resource::new(|| (), |()| leer_dispositivos()),
-            reservas: Resource::new(|| (), |()| leer_reservas()),
-            red: Resource::new(|| (), |()| leer_red_casa()),
-        }
-    }
-
-    async fn leer(self) -> RedPuertos {
-        let lan = self.red.await.ok().flatten();
-        let reservas = self.reservas.await.ok();
-        let dispositivos = self.dispositivos.await.ok();
-        RedPuertos {
-            dispositivos,
-            reservas,
-            lan,
-        }
     }
 }
 
@@ -127,7 +96,7 @@ fn leer_puertos(texto: &str) -> Option<(u16, u16)> {
 }
 
 /// Puerto o rango para leerlo: `8080` o `27015–27030`.
-fn rango(r: (u16, u16)) -> String {
+pub(crate) fn rango(r: (u16, u16)) -> String {
     if r.0 == r.1 {
         r.0.to_string()
     } else {
@@ -171,16 +140,10 @@ fn campo_propio(id: &str, tipo: TipoCampo, opcional: bool) -> CampoVista {
         valor_secreto: None,
         recomendado: None,
         motivo_recomendado: None,
+        aceptados: Vec::new(),
         requiere: None,
         sin_eleccion: false,
     }
-}
-
-/// Qué se está editando: una regla nueva o la de ese id.
-#[derive(Clone, Debug, PartialEq, Eq)]
-enum Modo {
-    Nueva,
-    Editar(String),
 }
 
 /// Valores con que empieza el formulario.

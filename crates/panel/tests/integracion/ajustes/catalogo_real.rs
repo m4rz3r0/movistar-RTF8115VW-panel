@@ -31,8 +31,8 @@ async fn claves_de_la_vista_existen() {
         "sistema",
     ] {
         let t = leer(&p, &cookie, tema).await;
-        assert!(!t["ajustes"].as_array().unwrap().is_empty(), "{tema}");
-        for a in t["ajustes"].as_array().unwrap() {
+        assert!(!crate::comun::ajustes_de(&t).is_empty(), "{tema}");
+        for a in crate::comun::ajustes_de(&t) {
             assert_eq!(a["estado"], "Leido", "{a}");
             for sufijo in ["titulo", "desc", "ayuda"] {
                 claves.push(format!("{}-{sufijo}", a["clave"].as_str().unwrap()));
@@ -84,7 +84,7 @@ async fn plantilla_de_lista_sin_desconocidos() {
         "sistema",
     ] {
         let t = leer(&p, &cookie, tema).await;
-        for a in t["ajustes"].as_array().unwrap() {
+        for a in crate::comun::ajustes_de(&t) {
             if a["lista"] != true {
                 continue;
             }

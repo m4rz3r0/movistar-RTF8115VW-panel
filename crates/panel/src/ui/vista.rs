@@ -116,7 +116,7 @@ pub fn SelectorVista() -> impl IntoView {
             view! {
                 <button
                     type="button"
-                    class="selector-boton"
+                    class="b-sec"
                     value=m.codigo()
                     title=ayuda(m)
                     aria-pressed=move || (vista.get() == m).to_string()
@@ -203,7 +203,7 @@ pub fn SeccionVista() -> impl IntoView {
                 </fieldset>
                 {mensajes(error, aviso)}
                 <div class="botones">
-                    <button class="boton" type="submit" disabled=move || pendiente.get()>
+                    <button class="b-pri" type="submit" disabled=move || pendiente.get()>
                         {t!("panel-guardar")}
                     </button>
                 </div>

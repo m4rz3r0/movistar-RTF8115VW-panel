@@ -1,12 +1,14 @@
 import { expect, type Page, test } from "@playwright/test";
-import { PLAZO_CAMBIO, cambiarUpnp, esperarFinal, plazoDeTest } from "./cambios";
+import { PLAZO_CAMBIO, ajusteDe, cambiarUpnp, esperarFinal, plazoDeTest } from "./cambios";
 import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 
 // «Cómo estaba al instalar» (/ajustes/foto-de-partida) contra router-sim: el
 // panel instalado del e2e tiene foto de partida y, después, UPnP y la clave
 // de la red de 5 GHz cambiados (e2e_grupo). Se entra desde la cabecera de
-// Puertos, se vuelve UPnP a su valor de la foto con el diálogo de siempre y
-// se deja como estaba; a 360 px, la clave que cambió se ve con el ojo; en
+// Puertos, se vuelve UPnP a su valor de la foto con el diálogo de siempre
+// (Esc no lo cierra mientras confirma ni mientras prepara el deshacer) y se
+// deja como estaba; a 360 px, la
+// clave que cambió se ve con el ojo; en
 // Teléfono, volver a un valor pide la clave de la línea (el router no la
 // deja leer).
 //
@@ -32,8 +34,8 @@ async function upnpCambiado(page: Page): Promise<boolean> {
 /** UPnP encendido ahora. */
 async function upnpActivo(page: Page): Promise<boolean> {
   const tema = await api(page, "leer_tema", { tema: "puertos" });
-  const a = tema.ajustes.find((a: { id: string }) => a.id === "puertos.upnp");
-  return a.campos.find((c: { id: string }) => c.id === "activo").valor.Booleano;
+  const a = ajusteDe(tema, "puertos.upnp");
+  return a.campos.find((c) => c.id === "activo")?.valor.Booleano as boolean;
 }
 
 /** Sin funciones ni parámetros de la API en un texto visible. */
@@ -77,11 +79,38 @@ test("volver UPnP a como estaba al instalar", async ({ page }) => {
   const dialogo = page.locator("dialog[open]");
   await expect(dialogo.locator("#grupo-titulo")).toHaveText("Revisa el cambio");
   sinApi(await dialogo.innerText());
+  // Mientras confirma, Esc no cierra el diálogo.
+  await page.route(
+    "**/api/confirmar_ajuste",
+    async (r) => {
+      await new Promise((ok) => setTimeout(ok, 1_500));
+      await r.continue();
+    },
+    { times: 1 },
+  );
   await dialogo.getByRole("button", { name: "Aplicar", exact: true }).click();
+  await expect(dialogo.getByRole("button", { name: "Aplicando…" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialogo).toBeVisible();
   await expect(dialogo.getByText("Hecho: el router tiene ya el cambio.")).toBeVisible({
     timeout: PLAZO_CAMBIO,
   });
-  await dialogo.getByRole("button", { name: "Cerrar", exact: true }).click();
+  // «Deshacer» prepara el cambio inverso: mientras lo prepara, Esc tampoco
+  // cierra. Se cancela (sin aplicarlo), así que no escribe nada más.
+  await page.route(
+    "**/api/deshacer_ajuste",
+    async (r) => {
+      await new Promise((ok) => setTimeout(ok, 1_500));
+      await r.continue();
+    },
+    { times: 1 },
+  );
+  await dialogo.getByRole("button", { name: "Deshacer", exact: true }).click();
+  await expect(dialogo.getByRole("button", { name: "Preparando…" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialogo).toBeVisible();
+  await expect(dialogo.locator("#grupo-titulo")).toHaveText("Volver a como estaba");
+  await dialogo.getByRole("button", { name: "Cancelar", exact: true }).click();
   await expect(dialogo).toBeHidden();
   // Ya no sale (la página vuelve a leer) y el foco va al título.
   await expect(tarjeta).toHaveCount(0);
@@ -123,8 +152,8 @@ test("Teléfono: volver a un valor pide la clave que el router no deja leer", as
   await entrar(page);
   // Cambia «Ahorro en los silencios» desde Ajustes (con la clave de la línea).
   const tema = await api(page, "leer_tema", { tema: "telefono" });
-  const linea = tema.ajustes.find((a: { id: string }) => a.id === "telefono.linea");
-  const silencio = linea.campos.find((c: { id: string }) => c.id === "silencio").valor.Booleano;
+  const linea = ajusteDe(tema, "telefono.linea");
+  const silencio = linea.campos.find((c) => c.id === "silencio")?.valor.Booleano;
   const grupo = await api(page, "preparar_ajuste", {
     p: {
       ajuste: "telefono.linea",

@@ -111,7 +111,7 @@ solo_lectura = "ajuste-puertos-alg-motivo"
     );
     // Lo que la página necesita: el motivo, y el valor para el ojo.
     let tema = ok(&p, "leer_tema", json!({ "tema": "wifi" }), &cookie).await;
-    let campo = tema["ajustes"][0]["campos"]
+    let campo = crate::comun::ajustes_de(&tema)[0]["campos"]
         .as_array()
         .unwrap()
         .iter()

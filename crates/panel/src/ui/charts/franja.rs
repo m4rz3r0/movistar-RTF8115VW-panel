@@ -8,7 +8,7 @@ use super::{
 };
 use crate::t;
 use crate::ui::{
-    Estado, Insignia,
+    comun::{EstadoVisual, Insignia},
     table::{Celda, Columna, Tabla},
 };
 use leptos::{ev, html, prelude::*, svg};
@@ -158,8 +158,8 @@ pub fn FranjaDisponibilidad(
     let cabecera = move || {
         let r = resumen.get();
         let (estado, texto) = match r.cortes {
-            0 => (Estado::Ok, t!("comun-sin-cortes")),
-            n => (Estado::Error, t!("comun-cortes", n = n)),
+            0 => (EstadoVisual::Emite, t!("comun-sin-cortes")),
+            n => (EstadoVisual::Peligro, t!("comun-cortes", n = n)),
         };
         let detalle = if r.cortes == 0 {
             t!("comun-disponible", disponible = formato_disponibilidad(&r))

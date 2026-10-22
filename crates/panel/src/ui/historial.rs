@@ -18,8 +18,8 @@ pub(crate) mod servidor;
 
 use crate::t;
 use crate::ui::{
-    Estado, Insignia,
     charts::{formato_fecha, hora_local},
+    comun::{EstadoVisual, Insignia},
     explorador::{
         CampoCambio, DialogoCambio, EstadoDeCambio, PreparadoVista, RiesgoCambio, TablaDiff, Valor,
         texto_error,
@@ -109,12 +109,12 @@ impl EstadoPasoVista {
         }
     }
 
-    pub fn estado(self) -> Estado {
+    pub fn estado(self) -> EstadoVisual {
         match self {
-            EstadoPasoVista::Aplicado => Estado::Ok,
-            EstadoPasoVista::Revertido => Estado::Aviso,
-            EstadoPasoVista::Fallido => Estado::Error,
-            _ => Estado::Neutro,
+            EstadoPasoVista::Aplicado => EstadoVisual::Emite,
+            EstadoPasoVista::Revertido => EstadoVisual::Atencion,
+            EstadoPasoVista::Fallido => EstadoVisual::Peligro,
+            _ => EstadoVisual::Proceso,
         }
     }
 }
@@ -495,7 +495,7 @@ fn FilaCambio(
     let id = c.id;
     let estado = match c.estado {
         EstadoDeCambio::Aplicando | EstadoDeCambio::Vigilando | EstadoDeCambio::Preparado => {
-            Estado::Neutro
+            EstadoVisual::Proceso
         }
         e => e.estado(),
     };
@@ -629,7 +629,7 @@ fn FilaCambio(
     let boton = c.puede_deshacer.then(|| {
         view! {
             <button
-                class="boton-sutil hist-deshacer"
+                class="b-sec hist-deshacer"
                 type="button"
                 disabled=move || ocupado.get()
                 on:click=move |_| on_deshacer.run(id)

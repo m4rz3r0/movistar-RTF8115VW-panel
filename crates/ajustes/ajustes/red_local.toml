@@ -7,6 +7,9 @@ tema = "red_local"
 nivel = "basico"
 componente = "dispositivos"
 leer = { funcion = "cbGetLanHostList" }
+# Columnas de su lista (el nombre va siempre delante); sin tráfico por
+# dispositivo: el router no lo da.
+columnas = ["ip", "mac", "conexion", "ip_fija"]
 
 [[ajuste]]
 id = "red_local.reservas"
@@ -16,6 +19,7 @@ lista = true
 componente = "reservas"
 leer = { funcion = "cbDhcpV4SvrPoolGetStatic", params = { rtm_cfg_dhcpv4_svr_pool_id = "0", all = "ALL" } }
 fijos = { rtm_cfg_dhcpv4_svr_pool_id = "0" }
+columnas = ["mac", "ip", "activa"]
 
 [[ajuste.campo]]
 id = "mac"
@@ -94,3 +98,46 @@ escribe = { funcion = "cbSetLanIPv6Config", parametro = "radv_adm_state" }
 lee = "radv_adm_state"
 tipo = "booleano"
 recomendado = "true"
+# Sin IPv6 en casa, los anuncios no hacen nada: no se recomiendan.
+recomendado_si = { campo = "ipv6", cuando = "true" }
+
+# Encima de las listas, una tarjeta por ajuste que no es lista (spec §4.2).
+[[elemento]]
+id = "dhcp"
+tema = "red_local"
+ajustes = ["red_local.dhcp"]
+icono = "casa"
+interruptor = "red_local.dhcp.activo"
+datos = ["red_local.dhcp.inicio", "red_local.dhcp.fin", "red_local.dhcp.concesion"]
+estado = "derivado:segun_lo_recomendado"
+
+[[elemento]]
+id = "ipv6"
+tema = "red_local"
+ajustes = ["red_local.ipv6"]
+icono = "globo"
+interruptor = "red_local.ipv6.ipv6"
+datos = ["red_local.ipv6.anuncios"]
+estado = "derivado:segun_lo_recomendado"
+
+# Acciones sobre las IP fijas marcadas (spec §5.5).
+[[accion]]
+id = "activar_reserva"
+tema = "red_local"
+lista = "red_local.reservas"
+campo = "activa"
+valor = "true"
+
+[[accion]]
+id = "desactivar_reserva"
+tema = "red_local"
+lista = "red_local.reservas"
+campo = "activa"
+valor = "false"
+
+[[accion]]
+id = "borrar_reserva"
+tema = "red_local"
+lista = "red_local.reservas"
+borrar = true
+peligro = true

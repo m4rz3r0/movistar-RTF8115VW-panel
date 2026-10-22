@@ -1,4 +1,4 @@
-//! Red local: los dispositivos conectados (`leer_dispositivos`) y las IP fijas
+//! Red local: los dispositivos conectados (la red de casa de `leer_tema`) y las IP fijas
 //! (reservas DHCP) creadas, borradas y deshechas como grupos de cambios,
 //! con la validación de una reserva (`validar_reserva`) igual en el
 //! servidor y en la página.
@@ -45,8 +45,13 @@ fn ip(s: &str) -> Ipv4Addr {
 // ------------------------------------------------------- en el simulador
 
 async fn dispositivos(p: &Panel, cookie: &str) -> Vec<Value> {
-    ok(p, "leer_dispositivos", json!({}), cookie)
-        .await
+    ok(
+        p,
+        "leer_tema",
+        json!({ "tema": "red_local", "fresca": true }),
+        cookie,
+    )
+    .await["red"]["dispositivos"]
         .as_array()
         .unwrap()
         .clone()
@@ -62,10 +67,8 @@ fn por_mac<'a>(lista: &'a [Value], mac: &str) -> &'a Value {
 /// Reservas de `leer_tema` como triples `(id, mac, ip)`.
 async fn reservas(p: &Panel, cookie: &str) -> Vec<(String, String, String)> {
     let tema = ok(p, "leer_tema", json!({ "tema": "red_local" }), cookie).await;
-    let a = tema["ajustes"]
-        .as_array()
-        .unwrap()
-        .iter()
+    let a = crate::comun::ajustes_de(&tema)
+        .into_iter()
         .find(|a| a["id"] == "red_local.reservas")
         .unwrap()
         .clone();

@@ -1,34 +1,21 @@
-/* Nombres técnicos de un paso del historial, botones mini y lectura de la biblioteca (respuesta cruda, resultado). */
+/* Nombres técnicos de un paso del historial, botones de las filas y lectura de la biblioteca (respuesta cruda, resultado). */
 /* Historial: los nombres técnicos de un paso, plegados. */
 .hist-tecnico {
   margin: 0;
   padding-left: var(--esp-4);
 }
 
-.boton-mini {
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
+/* Los botones de una fila, más estrechos: caben a 360 px. */
+.tabla .acciones-fila {
+  text-align: right;
+}
+
+.tabla .acciones-fila :is(.b-sec, .b-pel) {
   padding: 0 var(--esp-2);
-  border: 1px solid var(--borde);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--texto-2);
-  font-size: 12px;
-  cursor: pointer;
+  font-size: 12.5px;
 }
 
-.boton-mini:hover {
-  color: var(--texto-1);
-  border-color: var(--texto-2);
-}
-
-.boton-peligro:hover {
-  color: var(--error);
-  border-color: var(--error);
-}
-
-.tabla .acciones-fila .boton-mini + .boton-mini {
+.tabla .acciones-fila button + button {
   margin-left: var(--esp-2);
 }
 
@@ -37,7 +24,7 @@
 }
 
 .crudo summary {
-  color: var(--texto-2);
+  color: var(--suave);
   cursor: pointer;
 }
 
@@ -52,8 +39,8 @@
   overflow: auto;
   border: 1px solid var(--borde);
   border-radius: var(--radio);
-  background: var(--superficie-1);
-  font-size: 12px;
+  background: var(--sup);
+  font-size: 12.5px;
 }
 
 .resultado-lectura {
