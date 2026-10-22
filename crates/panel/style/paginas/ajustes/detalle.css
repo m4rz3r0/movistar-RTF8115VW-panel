@@ -1,0 +1,133 @@
+/* Detalle de un elemento: a todo el ancho bajo su fila; en el móvil, a pantalla completa. */
+/* -------------------------------------------------------------- Detalle */
+
+.detalle {
+  display: flex;
+  flex-direction: column;
+  grid-column: 1 / -1;
+  gap: var(--esp-4);
+  min-width: 0;
+  padding: 18px 20px;
+  border: 1px solid var(--acento-borde);
+  border-radius: var(--radio-tarjeta);
+  background: var(--sup);
+  box-shadow: var(--sombra);
+  transform-origin: top;
+  animation: detalle-abre 320ms ease-out;
+}
+
+.detalle-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-2) var(--esp-3);
+}
+
+.detalle-cabecera h2 {
+  margin: 0;
+  font-family: var(--fuente-titulos);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.detalle-cabecera h2:focus {
+  outline: none;
+}
+
+.detalle-cabecera h2:focus-visible {
+  outline: 2px solid var(--foco);
+  outline-offset: 2px;
+}
+
+.detalle-cerrar {
+  margin-left: auto;
+  font-size: 16px;
+}
+
+/* «‹ WiFi»: solo en el móvil. */
+.detalle-volver {
+  display: none;
+}
+
+.detalle-formulario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-3);
+}
+
+.detalle-columnas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+  gap: var(--esp-5);
+}
+
+.detalle-columna {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-3);
+  min-width: 0;
+}
+
+.detalle-columna h3 {
+  margin: 0;
+  color: var(--suave);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.detalle-columna .ajuste-desc {
+  margin: 0;
+}
+
+.detalle-pie {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--esp-2);
+  padding-top: var(--esp-3);
+  border-top: 1px solid var(--borde);
+}
+
+@keyframes detalle-abre {
+  from {
+    opacity: 0;
+    transform: scaleY(0.96);
+  }
+}
+
+@keyframes detalle-entra {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+
+@media (max-width: 900px) {
+  .detalle {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    overflow-y: auto;
+    padding: var(--esp-4);
+    border: 0;
+    border-radius: 0;
+    animation: detalle-entra 300ms ease-out;
+  }
+
+  .detalle-volver {
+    display: inline-flex;
+    flex-basis: 100%;
+    justify-content: flex-start;
+    padding-left: 0;
+  }
+
+  .detalle-cerrar {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .detalle {
+    animation: none;
+  }
+}

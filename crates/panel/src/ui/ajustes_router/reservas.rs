@@ -8,7 +8,7 @@
 use super::Foco;
 use super::campo::{Campo, cambiado, etiqueta, inicial, texto_legible, validar};
 use super::dispositivos::{DatosRed, RedLocal, aviso_error, nombre};
-use super::tarjeta::{ayuda, cabecera, detalles_tecnicos, dom, enfocar};
+use super::piezas::{ayuda, cabecera, detalles_tecnicos, dom, enfocar};
 use crate::ajustes_router::{
     AjusteVista, CampoVista, EstadoLectura, GrupoVista, InstanciaVista, PeticionAjuste,
     mac_comparable, preparar_ajuste, valida_la_reserva, validar_reserva,

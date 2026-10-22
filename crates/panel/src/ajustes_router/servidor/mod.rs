@@ -1,6 +1,7 @@
 //! Lado del servidor de Ajustes: lectura de la página, guardado y errores
 //! comunes.
 
+mod acciones;
 mod derivados;
 mod foto;
 mod guardar;
@@ -12,8 +13,9 @@ mod red_local;
 #[cfg(test)]
 mod tests;
 
+pub(super) use acciones::preparar_accion;
 pub(super) use foto::{comparar_con_partida, preparar_volver_a_partida};
-pub(super) use guardar::{confirmar_ajuste, preparar_ajuste};
+pub(super) use guardar::{confirmar_ajuste, preparar_ajuste, preparar_elemento};
 pub(super) use historial::deshacer_ajuste;
 pub(crate) use historial::etiquetas_de_campos;
 pub(super) use pagina::leer_tema;

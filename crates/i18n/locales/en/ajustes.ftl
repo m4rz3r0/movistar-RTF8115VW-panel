@@ -166,6 +166,8 @@ ajustes-wifi-radio-ocultas = { $n ->
 ajustes-wifi-radio-ocultas-enlace = View in the Library
 ajustes-wifi-radio-apagada = Off
 ajustes-wifi-radio-sin-redes-corto = On, no networks
+ajustes-wifi-radio-redes-sin-leer-corto = On, networks not read
+ajustes-wifi-radio-redes-sin-leer = The radio is on, but some of its networks could not be read: it is not known whether it broadcasts any.
 
 ## Elements of each tab: state, role, data, recommendation and actions
 ajustes-estado-sin-leer = Not read
@@ -186,6 +188,53 @@ ajustes-accion-quitar_wps = Turn off WPS
 ajustes-accion-ocultar_nombre = Hide the name
 ajustes-accion-mostrar_nombre = Show the name
 ajustes-accion-aislar = Isolate the devices
+ajuste-accion-encender-titulo = WiFi networks: turn on
+ajuste-accion-apagar-titulo = WiFi networks: turn off
+ajuste-accion-quitar_wps-titulo = WiFi networks: turn off WPS
+ajuste-accion-ocultar_nombre-titulo = WiFi networks: hide the name
+ajuste-accion-mostrar_nombre-titulo = WiFi networks: show the name
+ajuste-accion-aislar-titulo = WiFi networks: isolate the devices
+ajustes-accion-demasiados = At most { $max } at a time: unmark some.
+ajustes-accion-no-aplica = That action can't be applied to everything marked.
+ajustes-accion-ya-estaba = All the marked ones were already like that: there is nothing to change.
+
+## Grid of elements: mark, bar, card, details and change notice
+ajustes-resumen = Summary of the section
+ajustes-marcar = Mark { $nombre }
+ajustes-barra = Actions for the marked items
+ajustes-marcadas = { $n ->
+    [one] 1 marked
+   *[other] { $n } marked
+}
+ajustes-desmarcar-todo = Unmark all
+ajustes-barra-sin-leer = Left out because they could not be read: { $nombres }.
+ajustes-barra-ninguna = No action works for everything marked.
+ajustes-insignia-aplicando = Applying…
+ajustes-insignia-comprobando = Checking…
+ajustes-interruptor-si = { $nombre } on
+ajustes-interruptor-no = { $nombre } off
+ajustes-abrir = Open
+ajustes-abrir-nombre = Open { $nombre }
+ajustes-volver-a-leer = Read again
+ajustes-detalle-cerrar = Close the details
+ajustes-detalle-volver = ‹ { $tema }
+ajustes-detalle-basico = The essentials
+ajustes-descartar = Discard
+ajustes-guardar-cambios = Save changes
+ajustes-sin-guardar-titulo = You have unsaved changes
+ajustes-sin-guardar-texto = If you go on, the changes to “{ $nombre }” are lost.
+ajustes-sin-guardar-seguir = Keep editing
+ajustes-sin-guardar-descartar = Discard the changes
+ajustes-aviso-cambio = { $titulo }: { $campo }, { $antes } → { $despues }
+ajustes-aviso-varios = { $titulo }: { $n ->
+    [one] one change
+   *[other] { $n } changes
+}
+ajustes-aviso-cerrar = Close the notice
+ajustes-aviso-conectados = { $n ->
+    [one] The connected device loses its WiFi.
+   *[other] The { $n } connected devices lose their WiFi.
+}
 
 ## WiFi summary strip
 ajustes-resumen-de = { $n } of { $total }

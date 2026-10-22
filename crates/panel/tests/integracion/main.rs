@@ -6,6 +6,7 @@
 
 mod comun;
 
+mod acciones;
 mod ajustes;
 mod ajustes_catalogo;
 mod ajustes_foto;

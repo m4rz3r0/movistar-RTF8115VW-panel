@@ -35,6 +35,38 @@ pub async fn preparar_ajuste(p: PeticionAjuste) -> Result<GrupoVista, ServerFnEr
     servidor::preparar_ajuste(p).await
 }
 
+/// Prepara una acción sobre varios elementos del tema (`quitar_wps` en dos
+/// redes): un único grupo del gestor con un paso por elemento, que se
+/// confirma con [`confirmar_ajuste`] y se deshace entero con
+/// [`deshacer_ajuste`]. Un elemento que ya tiene el valor sale como paso
+/// sin cambios («ya estaba así») y no se escribe. Errores con el mensaje
+/// traducido: 400 con más de [`MAX_ELEMENTOS_ACCION`] elementos o si la
+/// acción no se aplica a alguno; 409 si ninguno cambia o hay otro cambio
+/// en curso; 403 en solo lectura. Exige sesión.
+#[server(endpoint = "preparar_accion", input = Json)]
+pub async fn preparar_accion(
+    tema: String,
+    accion: String,
+    elementos: Vec<String>,
+) -> Result<GrupoVista, ServerFnError> {
+    servidor::preparar_accion(tema, accion, elementos).await
+}
+
+/// Prepara el guardado del detalle de un elemento: los cambios de varios
+/// ajustes suyos (lo esencial y lo avanzado de una red) en un solo grupo,
+/// con un paso por escritura titulado con su ajuste, que se confirma con
+/// [`confirmar_ajuste`] y se deshace entero. Errores como
+/// [`preparar_ajuste`]; 400 con una lista o un componente propio.
+#[server(endpoint = "preparar_elemento", input = Json)]
+pub async fn preparar_elemento(
+    peticiones: Vec<PeticionAjuste>,
+) -> Result<GrupoVista, ServerFnError> {
+    servidor::preparar_elemento(peticiones).await
+}
+
+/// Como mucho, elementos en una acción sobre varios.
+pub const MAX_ELEMENTOS_ACCION: usize = 20;
+
 /// Aplica el ajuste preparado con `token` sin los pasos de `desmarcados`
 /// (índices). Devuelve el id del cambio para seguirlo con
 /// [`estado_cambio`](crate::ui::explorador::estado_cambio).

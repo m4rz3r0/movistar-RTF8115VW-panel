@@ -30,14 +30,21 @@ pub fn clave_accion(id: &str) -> String {
     format!("ajustes-accion-{id}")
 }
 
-/// Claves de traducción que piden los elementos y las acciones (papeles y
-/// botones), sin repetir.
+/// Clave de traducción del título del grupo de cambios de una acción (en el
+/// resumen y en el Historial).
+pub fn titulo_accion(id: &str) -> String {
+    format!("ajuste-accion-{id}-titulo")
+}
+
+/// Claves de traducción que piden los elementos y las acciones (papeles,
+/// botones y títulos de sus cambios), sin repetir.
 pub fn claves_de_elementos(c: &CatalogoAjustes) -> Vec<String> {
     let mut claves: Vec<String> = c
         .elementos()
         .iter()
         .filter_map(|e| e.papel.as_deref().map(clave_papel))
         .chain(c.acciones().iter().map(|a| clave_accion(&a.id)))
+        .chain(c.acciones().iter().map(|a| titulo_accion(&a.id)))
         .collect();
     claves.sort();
     claves.dedup();

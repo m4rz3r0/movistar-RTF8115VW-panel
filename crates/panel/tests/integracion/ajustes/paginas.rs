@@ -87,13 +87,18 @@ async fn pagina_tema_sin_nombres_de_api_fuera_de_detalles() {
         .iter()
         .map(|n| regex::Regex::new(&format!(r"(?i)\b{}\b", regex::escape(n))).unwrap())
         .collect();
-    for tema in ["wifi", "puertos", "seguridad", "red_local"] {
+    // La WiFi va en rejilla: los detalles técnicos, en el detalle abierto
+    // de un elemento (y, cerrado, ni eso).
+    for tema in ["wifi", "wifi/red-24", "puertos", "seguridad", "red_local"] {
         let ruta = format!("/ajustes/{tema}");
         let (status, _, html) = pagina(&p, &cookie, &ruta).await;
         assert_eq!(status, 200, "{ruta}: {html}");
         let (sin_detalles, detalles) =
             partir(&html, r#"<details class="detalles-tecnicos""#, "</details>");
-        assert!(!detalles.is_empty(), "{ruta}: sin detalles técnicos");
+        assert!(
+            tema == "wifi" || !detalles.is_empty(),
+            "{ruta}: sin detalles técnicos"
+        );
         // Los datos de la hidratación (`<script>`) no se pintan: llevan los
         // detalles técnicos para hidratar sus bloques plegados.
         let (visible, _) = partir(&sin_detalles, "<script", "</script>");
@@ -116,7 +121,7 @@ async fn pagina_tema_sin_nombres_de_api_fuera_de_detalles() {
                 );
             }
         }
-        if tema == "wifi" {
+        if tema == "wifi/red-24" {
             assert!(
                 detalles.iter().any(|d| d.contains("cbSetWifiAccPt")),
                 "{ruta}: {detalles:#?}"
@@ -195,8 +200,12 @@ async fn tema_sin_basicos_sin_plegar() {
     let (_, _, html) = pagina(&p, &cookie, "/ajustes/sistema").await;
     assert!(html.contains("Hora del router"), "{html}");
     assert!(!html.contains(r#"<details class="mas-opciones""#), "{html}");
-    let (_, _, html) = pagina(&p, &cookie, "/ajustes/wifi").await;
+    let (_, _, html) = pagina(&p, &cookie, "/ajustes/seguridad").await;
     assert!(html.contains(r#"<details class="mas-opciones""#), "{html}");
+    // La WiFi va en rejilla: sin «Más opciones».
+    let (_, _, html) = pagina(&p, &cookie, "/ajustes/wifi").await;
+    assert!(html.contains("rejilla-elementos"), "{html}");
+    assert!(!html.contains(r#"<details class="mas-opciones""#), "{html}");
 }
 
 /// La nota de «Oculto» va una sola vez por página, aunque haya varias
@@ -224,25 +233,26 @@ async fn nota_de_oculto_una_vez() {
     );
 }
 
-/// En la vista resumida, «Recomendado: …» deja ver para quién es sin entrar
-/// en «Editar»; la opción del selector no repite la marca.
+/// La tarjeta deja ver su recomendación principal, para quién es, sin
+/// abrir el detalle; en el detalle, la opción del selector no repite la
+/// marca.
 #[tokio::test]
-async fn recomendacion_visible_en_el_resumen() {
+async fn recomendacion_visible_en_la_tarjeta() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let (_, _, html) = pagina(&p, &cookie, "/ajustes/wifi").await;
     let (visible, _) = partir(&html, "<script", "</script>");
-    let (_, resumenes) = partir(
-        &visible,
-        r#"<details class="recomendacion-resumen""#,
-        "</details>",
-    );
+    let (_, recos) = partir(&visible, r#"<div class="tarjeta-rec"#, "</div>");
     assert!(
-        resumenes
-            .iter()
-            .any(|r| r
-                .contains("Recomendado si conectas tus dispositivos escribiendo la contraseña")),
-        "{resumenes:#?}"
+        recos.iter().any(|r| r
+            .contains("Recomendado si conectas tus dispositivos escribiendo la contraseña.")
+            && r.contains("Quitar WPS")),
+        "{recos:#?}"
     );
+    // Solo para quién es: a favor y en contra, en el detalle.
+    assert!(recos.iter().all(|r| !r.contains("A favor:")), "{recos:#?}");
+    let (_, _, html) = pagina(&p, &cookie, "/ajustes/wifi/red-24").await;
+    let (visible, _) = partir(&html, "<script", "</script>");
+    assert!(visible.contains("A favor:"), "en el detalle");
     assert!(
         !visible.contains("(recomendada)"),
         "marca repetida en el selector"
@@ -254,7 +264,7 @@ async fn recomendacion_visible_en_el_resumen() {
 #[tokio::test]
 async fn descripcion_de_la_opcion_en_el_selector() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
-    let (_, _, html) = pagina(&p, &cookie, "/ajustes/wifi").await;
+    let (_, _, html) = pagina(&p, &cookie, "/ajustes/wifi/red-5").await;
     let (visible, _) = partir(&html, "<script", "</script>");
     let describe = regex::Regex::new(r#"<select[^>]*aria-describedby="([^"]*)""#).unwrap();
     let mut vistos = 0;
@@ -269,14 +279,11 @@ async fn descripcion_de_la_opcion_en_el_selector() {
     assert!(vistos > 0, "sin <select> en WiFi");
 }
 
-/// La tarjeta `ajuste` (`wifi.red_24`) de la página, sin los datos de la
-/// hidratación.
-fn tarjeta<'h>(html: &'h str, ajuste: &str) -> &'h str {
-    let marca = format!(
-        "aria-labelledby=\"ajuste-{}-titulo\"",
-        ajuste.replace('.', "-")
-    );
-    let desde = &html[html.find(&marca).unwrap_or_else(|| panic!("{ajuste}"))..];
+/// La tarjeta del elemento `id` (`red-24`) de la página, sin los datos de
+/// la hidratación.
+fn tarjeta<'h>(html: &'h str, id: &str) -> &'h str {
+    let marca = format!("aria-labelledby=\"elemento-{id}-titulo\"");
+    let desde = &html[html.find(&marca).unwrap_or_else(|| panic!("{id}"))..];
     &desde[..desde.find("</article>").unwrap()]
 }
 
@@ -306,19 +313,19 @@ async fn cada_red_dice_si_esta_encendida() {
         assert_eq!(status, 200, "{html}");
         // Gris si está apagada; verde si emite.
         let insignia = |clase: &str, texto: &str| format!(r#"class="ins {clase}">{texto}</span>"#);
-        let red_24 = tarjeta(&html, "wifi.red_24");
+        let red_24 = tarjeta(&html, "red-24");
         assert!(
             red_24.contains(&insignia("ins-off", apagada)),
             "{idioma}: {red_24}"
         );
-        let red_5 = tarjeta(&html, "wifi.red_5");
+        let red_5 = tarjeta(&html, "red-5");
         assert!(
             red_5.contains(&insignia("ins-ok", encendida)),
             "{idioma}: {red_5}"
         );
-        assert!(tarjeta(&html, "wifi.radio_24").contains(nota), "{idioma}");
-        assert!(!tarjeta(&html, "wifi.radio_5").contains(nota), "{idioma}");
-        assert!(!tarjeta(&html, "wifi.red_24").contains(nota), "{idioma}");
+        assert!(tarjeta(&html, "radio-24").contains(nota), "{idioma}");
+        assert!(!tarjeta(&html, "radio-5").contains(nota), "{idioma}");
+        assert!(!tarjeta(&html, "red-24").contains(nota), "{idioma}");
     }
 }
 
@@ -353,13 +360,13 @@ async fn red_oculta_encendida_se_avisa() {
         let cookie = format!("{cookie}; rp_lang={idioma}");
         let (status, _, html) = pagina(&p, &cookie, "/ajustes/wifi").await;
         assert_eq!(status, 200, "{html}");
-        let radio = tarjeta(&html, "wifi.radio_24");
+        let radio = tarjeta(&html, "radio-24");
         assert!(radio.contains(ocultas), "{idioma}: {radio}");
         assert!(
             radio.contains("href=\"/explorador/wifi\""),
             "{idioma}: {radio}"
         );
         assert!(!radio.contains(ninguna), "{idioma}: {radio}");
-        assert!(tarjeta(&html, "wifi.radio_5").contains(ninguna), "{idioma}");
+        assert!(tarjeta(&html, "radio-5").contains(ninguna), "{idioma}");
     }
 }

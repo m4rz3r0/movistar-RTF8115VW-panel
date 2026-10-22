@@ -1,6 +1,5 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { asentar, entrar, recogerErrores } from "./util";
+import { asentar, entrar, recogerErrores, violacionesGraves } from "./util";
 
 // Tema de la interfaz (automático, oscuro, claro): se elige en «Ajustes del
 // panel → Tema», cambia al momento sin recargar y se guarda por usuario. El
@@ -28,16 +27,6 @@ async function elegirTema(page: Page, tema: string) {
   await seccion.locator(`input[name=tema][value=${tema}]`).check();
   expect((await guardado).status()).toBe(200);
   await expect(page.locator("html")).toHaveAttribute("data-tema", tema);
-}
-
-/** Violaciones serias o críticas de axe en la página actual. */
-async function violacionesGraves(page: Page) {
-  const { violations, passes } = await new AxeBuilder({ page }).analyze();
-  // Que axe ha mirado la página de verdad (entre otras, el contraste).
-  expect(passes.map((p) => p.id)).toContain("color-contrast");
-  return violations
-    .filter((v) => v.impact === "serious" || v.impact === "critical")
-    .map((v) => `${v.id} (${v.impact}): ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`);
 }
 
 test.describe("tema de la interfaz", () => {
@@ -98,7 +87,7 @@ test.describe("tema de la interfaz", () => {
           await asentar(page);
           // Con su contenido: los datos de Estado o las tarjetas de WiFi.
           const contenido =
-            ruta === "/" ? page.locator("main .rejilla-indicadores") : page.locator("main .emision-red");
+            ruta === "/" ? page.locator("main .rejilla-indicadores") : page.locator("main .tarjeta-el");
           await expect(contenido.first()).toBeVisible({ timeout: 20_000 });
           expect(await violacionesGraves(page), `${ruta} en tema ${tema}`).toEqual([]);
         }

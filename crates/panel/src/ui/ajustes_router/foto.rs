@@ -10,7 +10,7 @@
 //! campos censurados con el ojo (de solo lectura).
 
 use super::campo::{CampoSecreto, etiqueta, validar, valor_resumido};
-use super::tarjeta::enfocar;
+use super::piezas::enfocar;
 use super::{RUTA_AJUSTES, nombre, ruta};
 use crate::ajustes_router::{
     CampoVista, ComparacionVista, Diferencia, DiferenciaVista, GrupoVista, comparar_con_partida,

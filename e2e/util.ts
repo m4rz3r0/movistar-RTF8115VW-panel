@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 import { CONTRASENA, USUARIO, instalado, instalados } from "./instancias";
 
@@ -95,4 +96,31 @@ export async function sinDesbordamiento(page: Page, donde: string) {
 export async function asentar(page: Page) {
   await hidratada(page);
   await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {});
+}
+
+/** Violaciones serias o críticas de axe en la página actual. */
+export async function violacionesGraves(page: Page) {
+  // A medio fundido, los colores aún no son los suyos.
+  await quieta(page);
+  const { violations, passes } = await new AxeBuilder({ page }).analyze();
+  // Que axe ha mirado la página de verdad (entre otras, el contraste).
+  expect(passes.map((p) => p.id)).toContain("color-contrast");
+  return violations
+    .filter((v) => v.impact === "serious" || v.impact === "critical")
+    .map((v) => `${v.id} (${v.impact}): ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`);
+}
+
+/**
+ * Espera a que acaben las animaciones y transiciones de la página (las que
+ * no acaban nunca, no): para mirar los colores o hacer una captura.
+ */
+export async function quieta(page: Page) {
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((a) => a.effect?.getComputedTiming().iterations !== Infinity)
+        .map((a) => a.finished.catch(() => undefined)),
+    ),
+  );
 }

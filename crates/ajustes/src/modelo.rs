@@ -346,6 +346,11 @@ mod catalogo_toml {
         /// invitados): en la tarjeta va antes que las demás y como riesgo.
         #[serde(default)]
         pub seguridad: bool,
+        /// Un `booleano` con sus propios textos para sí y no («Encendida» y
+        /// «Apagada» en vez de «Sí» y «No»): `<p>-<campo>-true` y
+        /// `<p>-<campo>-false`, en el resumen de un cambio y en su valor.
+        #[serde(default)]
+        pub textos_valor: bool,
     }
 
     impl Campo {

@@ -68,6 +68,9 @@ pub enum NotaRadio {
     SinRedes,
     /// Emite tantas redes que el panel no muestra (se ven en la Biblioteca).
     Ocultas(u32),
+    /// Alguna de sus redes no se pudo leer y ninguna de las otras emite: no
+    /// se sabe si emite alguna.
+    RedesSinLeer,
 }
 
 /// Si una red WiFi emite, para la insignia de su tarjeta.

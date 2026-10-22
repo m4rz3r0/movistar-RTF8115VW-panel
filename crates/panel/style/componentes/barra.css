@@ -34,6 +34,27 @@
   flex: 1;
 }
 
+/* Lo que no entra en la acción (no se ha podido leer) o que ninguna vale. */
+.barra-acciones-nota {
+  color: var(--suave);
+  font-size: 12.5px;
+}
+
+/* En el móvil, todo en una línea que se desplaza. */
+@media (max-width: 900px) {
+  .barra-acciones > * {
+    flex: none;
+    white-space: nowrap;
+  }
+}
+
+/* En escritorio, si no cabe en una línea, en dos. */
+@media (min-width: 901px) {
+  .barra-acciones {
+    flex-wrap: wrap;
+  }
+}
+
 @keyframes barra-acciones-baja {
   from {
     opacity: 0;

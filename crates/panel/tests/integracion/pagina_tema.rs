@@ -55,6 +55,8 @@ async fn pagina_wifi_con_las_redes_apagadas() {
         assert_eq!(e["lectura"], "Leido", "{e}");
         assert_eq!(e["interruptor"]["encendido"], false, "{e}");
         assert_eq!(e["interruptor"]["campo"], "activa", "{e}");
+        // Encenderla no corta nada: el interruptor no pregunta antes.
+        assert!(e["interruptor"]["efecto"].is_null(), "{e}");
         // Seguridad, contraseña, visible, canal y ancho, aislamiento y
         // conectados (ninguno en las fixtures).
         assert_eq!(e["datos"].as_array().unwrap().len(), 6, "{e}");
@@ -83,6 +85,8 @@ async fn pagina_wifi_con_las_redes_apagadas() {
         assert_eq!(e["estado"], "atencion", "{e}");
         assert_eq!(e["texto_estado"], "Encendida, sin redes", "{e}");
         assert_eq!(e["interruptor"]["encendido"], true, "{e}");
+        // Apagarla corta la WiFi de su banda: pregunta antes.
+        assert_eq!(e["interruptor"]["efecto"], "efecto-wifi_corte", "{e}");
         assert!(e["ssid"].is_null(), "{e}");
         assert!(e["pie"]["nota"].as_str().is_some(), "{e}");
         // Ninguna acción de las redes se aplica a una radio.

@@ -8,7 +8,7 @@
 //! los usan también las IP fijas ([`super::reservas::Reservas`]).
 
 use super::Foco;
-use super::tarjeta::{ayuda, cabecera, detalles_tecnicos, dom};
+use super::piezas::{ayuda, cabecera, detalles_tecnicos, dom};
 use crate::ajustes_router::{
     AjusteVista, Conexion, DispositivoVista, GrupoVista, PeticionAjuste, leer_dispositivos,
     leer_red_casa, preparar_ajuste, validar_reserva,

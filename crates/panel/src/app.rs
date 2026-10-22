@@ -2,7 +2,7 @@
 
 use crate::t;
 use crate::ui::{
-    ajustes_router::{InicioAjustes, PaginaFoto, PaginaTema, SeccionAjustes},
+    ajustes_router::{InicioAjustes, PaginaFoto, PaginaTema, SeccionAjustes, SinVista},
     charts::{provide_zona, zona_inicial},
     estado::PaginaEstado,
     explorador::{Explorador, InicioExplorador, PaginaArea, PaginaFuncion},
@@ -106,7 +106,13 @@ pub fn App() -> impl IntoView {
                         <Route path=StaticSegment("") view=InicioAjustes />
                         // Antes que los temas: no es uno de ellos.
                         <Route path=StaticSegment("foto-de-partida") view=PaginaFoto />
-                        <Route path=ParamSegment("tema") view=PaginaTema />
+                        // El tema y, en la rejilla, el elemento abierto
+                        // (`/ajustes/wifi/red-5`): la misma página, que no se
+                        // vuelve a montar al abrir o cerrar un detalle.
+                        <ParentRoute path=ParamSegment("tema") view=PaginaTema>
+                            <Route path=StaticSegment("") view=SinVista />
+                            <Route path=ParamSegment("elemento") view=SinVista />
+                        </ParentRoute>
                     </ParentRoute>
                     <Route path=StaticSegment("historial") view=PaginaHistorial />
                     <Route path=StaticSegment("panel") view=PaginaPanel />

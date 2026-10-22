@@ -187,10 +187,10 @@ fn sin_si_emite_vale_lo_encendida() {
     ]);
     assert_eq!(de(&v, "wifi.red_5").red_wifi, Some(EmisionRed::Encendida));
     assert_eq!(de(&v, "wifi.red_24").red_wifi, Some(EmisionRed::Apagada));
+    // La de invitados no se ha podido leer: no se sabe si la radio emite.
     assert_eq!(
         de(&v, "wifi.radio_24").nota_radio,
-        None,
-        "la de invitados no se ha podido leer"
+        Some(NotaRadio::RedesSinLeer)
     );
 }
 
@@ -206,6 +206,30 @@ fn red_encendida_con_la_radio_apagada_no_emite() {
         None,
         "la radio está apagada"
     );
+}
+
+/// Una red de la radio no se pudo leer y ninguna de las otras emite: la
+/// radio no dice que emite (ni con su lista ni sin ella), sino que sus
+/// redes no se han podido leer.
+#[test]
+fn radio_con_una_red_sin_leer_no_dice_que_emite() {
+    let sin_red_24: Vec<_> = todo_apagado()
+        .into_iter()
+        .filter(|(id, _)| *id != "wifi.red_24")
+        .collect();
+    for listas in [listas_apagadas(), Vec::new()] {
+        let v = marcar_con(&sin_red_24, &listas);
+        let nota = de(&v, "wifi.radio_24").nota_radio;
+        assert_eq!(nota, Some(NotaRadio::RedesSinLeer), "{}", listas.len());
+        let (estado, clave) = estado_red(None, Some(true), nota);
+        assert_ne!(estado, EstadoVisual::Emite);
+        assert_eq!(clave, "ajustes-wifi-radio-redes-sin-leer-corto");
+    }
+    // Si otra de sus redes emite, sí se sabe que emite.
+    let mut con_invitados = sin_red_24.clone();
+    con_invitados[0] = ("wifi.invitados", nodo("", "1", Some("1")));
+    let v = marcar_con(&con_invitados, &listas_apagadas());
+    assert_eq!(de(&v, "wifi.radio_24").nota_radio, None);
 }
 
 #[test]
@@ -282,6 +306,10 @@ fn estado_red_de_redes_y_radios() {
         (
             (None, Some(true), None),
             (E::Emite, "ajustes-wifi-red-encendida"),
+        ),
+        (
+            (None, Some(true), Some(NotaRadio::RedesSinLeer)),
+            (E::Atencion, "ajustes-wifi-radio-redes-sin-leer-corto"),
         ),
         (
             (None, None, None),

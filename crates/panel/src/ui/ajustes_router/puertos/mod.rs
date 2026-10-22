@@ -19,7 +19,7 @@ pub(crate) use lista::Puertos;
 use super::Foco;
 use super::campo::{Campo, DESCONOCIDO, validar};
 use super::dispositivos::{aviso_error, nombre};
-use super::tarjeta::{ayuda, cabecera, detalles_tecnicos, dom, enfocar};
+use super::piezas::{ayuda, cabecera, detalles_tecnicos, dom, enfocar};
 use crate::ajustes_router::{
     AMBOS, AjusteVista, CampoVista, DispositivoVista, EstadoLectura, GrupoVista, IDENTIFICAN_REGLA,
     InstanciaVista, OpcionVista, PeticionAjuste, Protocolo, ReglaPuertos, destino_inexistente,

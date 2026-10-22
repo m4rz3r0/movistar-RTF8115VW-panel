@@ -32,7 +32,7 @@ pub use carga::{CatalogoAjustes, ErrorAjustes};
 #[cfg(feature = "catalogo")]
 pub use elementos::{
     DERIVADOS_DATO, DERIVADOS_ESTADO, MAX_DATOS, PREFIJO_DERIVADO, clave_accion, clave_papel,
-    claves_de_elementos, partir_referencia,
+    claves_de_elementos, partir_referencia, titulo_accion,
 };
 #[cfg(feature = "catalogo")]
 pub use modelo::{

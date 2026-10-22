@@ -111,12 +111,14 @@ fn legible(v: &ValorLegible) -> Option<String> {
     }
 }
 
-/// El campo tiene recomendación y no el valor recomendado.
+/// El campo tiene recomendación y otro valor que el panel reconoce: uno que
+/// no reconoce no es una recomendación pendiente (no se sabe qué tiene).
 fn pendiente(c: &CampoVista) -> bool {
     c.tipo != TipoCampo::Secreto
-        && c.recomendado
-            .as_ref()
-            .is_some_and(|r| legible(&c.valor).as_ref() != Some(r))
+        && match (&c.recomendado, legible(&c.valor)) {
+            (Some(r), Some(v)) => v != *r,
+            _ => false,
+        }
 }
 
 fn elemento(
@@ -155,11 +157,13 @@ fn elemento(
         .filter(|_| leido)
         .and_then(campo)
         .and_then(|(v, c)| match c.valor {
+            // Apagar corta lo que emite: pregunta antes (con el efecto del
+            // ajuste). Encender no corta nada: se aplica sin preguntar.
             ValorLegible::Booleano(encendido) => Some(InterruptorVista {
                 ajuste: v.id.clone(),
                 campo: c.id.clone(),
                 encendido,
-                efecto: v.efecto.clone(),
+                efecto: v.efecto.clone().filter(|_| encendido),
             }),
             _ => None,
         });
@@ -300,4 +304,54 @@ fn recomendacion(
         campo: c.id.clone(),
         valor,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn campo(tipo: TipoCampo, valor: ValorLegible, recomendado: Option<&str>) -> CampoVista {
+        CampoVista {
+            id: "wps".into(),
+            clave: "ajuste-wifi-red_24-wps".into(),
+            tipo,
+            valor,
+            opciones: Vec::new(),
+            min: None,
+            max: None,
+            ascii: false,
+            opcional: false,
+            solo_lectura: None,
+            tapado: false,
+            valor_secreto: None,
+            recomendado: recomendado.map(str::to_owned),
+            motivo_recomendado: None,
+            requiere: None,
+            sin_eleccion: false,
+        }
+    }
+
+    /// Solo cuenta como pendiente un valor reconocido distinto del
+    /// recomendado: uno que el panel no reconoce no es ni recomendación ni
+    /// riesgo.
+    #[test]
+    fn un_valor_no_reconocido_no_es_pendiente() {
+        let b = TipoCampo::Booleano;
+        assert!(pendiente(&campo(
+            b,
+            ValorLegible::Booleano(true),
+            Some("false")
+        )));
+        assert!(!pendiente(&campo(
+            b,
+            ValorLegible::Booleano(false),
+            Some("false")
+        )));
+        assert!(!pendiente(&campo(b, ValorLegible::Booleano(true), None)));
+        let raro = ValorLegible::Desconocido("7".into());
+        assert!(!pendiente(&campo(b, raro.clone(), Some("false"))));
+        assert!(!pendiente(&campo(TipoCampo::Opcion, raro, Some("wpa2"))));
+        let secreto = campo(TipoCampo::Secreto, ValorLegible::Secreto, Some("x"));
+        assert!(!pendiente(&secreto));
+    }
 }

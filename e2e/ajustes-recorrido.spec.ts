@@ -22,6 +22,9 @@ const textos = {
     puertos: "Puertos",
     seguridad: "Seguridad",
     red24: "Red WiFi 2,4 GHz",
+    abrirRed24: "Abrir Red WiFi 2,4 GHz",
+    guardarCambios: "Guardar cambios",
+    quitarWps: "Quitar WPS",
     contrasena: "Contraseña",
     wps: "WPS",
     no: "No",
@@ -55,6 +58,9 @@ const textos = {
     puertos: "Ports",
     seguridad: "Security",
     red24: "2.4 GHz WiFi network",
+    abrirRed24: "Open 2.4 GHz WiFi network",
+    guardarCambios: "Save changes",
+    quitarWps: "Turn off WPS",
     contrasena: "Password",
     wps: "WPS",
     no: "No",
@@ -123,6 +129,23 @@ async function aplicar(page: Page, t: Textos, donde: string, tarjeta: Locator) {
   await expect(tarjeta.getByRole("heading", { level: 2 })).toBeFocused();
 }
 
+/**
+ * El diálogo del resumen en la rejilla (WiFi): sin la API a la vista;
+ * aplica (el diálogo se cierra) y espera a que el aviso del cambio diga
+ * «hecho».
+ */
+async function aplicarEnRejilla(page: Page, t: Textos, donde: string) {
+  const dialogo = page.locator("dialog[open]");
+  await expect(dialogo.locator("#grupo-titulo")).toHaveText(t.revisar);
+  await sinApiALaVista(page, `${donde}: resumen`);
+  await sinDesbordamiento(page, `${donde}: resumen`);
+  await dialogo.getByRole("button", { name: t.aplicar }).click();
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
+  const aviso = page.locator(".avisos-cambio .aviso-cambio");
+  await expect(aviso).not.toContainText(t.hecho);
+  await expect(aviso).toContainText(t.hecho, { timeout: PLAZO_CAMBIO });
+}
+
 /** Va a un tema con las pestañas o, en móvil, con el selector de temas. */
 async function irA(page: Page, ancho: number, tema: string, nombre: string) {
   if (ancho < 640) {
@@ -171,29 +194,33 @@ for (const { idioma, locale, ancho } of pasadas) {
       await asentar(page);
       await sinApiALaVista(page, "wifi");
 
-      // 1. La contraseña de la red WiFi de 2,4 GHz.
-      const red24 = tarjeta(page, t.red24);
-      await red24.getByRole("button", { name: t.editar }).click();
-      const edicion = red24.locator(".ajuste-edicion");
-      await edicion.getByLabel(t.contrasena, { exact: true }).fill("una-frase-larga-de-prueba");
-      await edicion.getByRole("button", { name: t.guardar }).click();
+      // 1. La contraseña de la red WiFi de 2,4 GHz, en su detalle.
+      const red24 = page.locator("article.tarjeta-el").filter({
+        has: page.getByRole("heading", { level: 2, name: t.red24, exact: true }),
+      });
+      await red24.getByRole("button", { name: t.abrirRed24, exact: true }).click();
+      const detalle = page.locator(".detalle");
+      await detalle.getByLabel(t.contrasena, { exact: true }).fill("una-frase-larga-de-prueba");
+      await detalle.getByRole("button", { name: t.guardarCambios }).click();
       const dialogo = page.locator("dialog[open]");
       await expect(dialogo.locator("tbody tr")).toHaveCount(1);
       await expect(dialogo.locator("tbody th")).toHaveText(t.contrasena);
       // El secreto no sale en claro en el resumen.
       expect(await dialogo.innerText()).not.toContain("una-frase-larga-de-prueba");
-      await aplicar(page, t, "contraseña WiFi", red24);
+      await aplicarEnRejilla(page, t, "contraseña WiFi");
 
-      // 2. El WPS de esa red, apagado (el recomendado).
-      await red24.getByRole("button", { name: t.editar }).click();
-      const wps = edicion.getByRole("switch", { name: t.wps, exact: true });
-      await expect(wps).toBeChecked();
-      await wps.click();
-      await edicion.getByRole("button", { name: t.guardar }).click();
+      // 2. El WPS de esa red, apagado (el recomendado): el botón de la
+      // recomendación de su tarjeta, con el detalle cerrado («Atrás»).
+      await page.goBack();
+      await expect(detalle).toHaveCount(0);
+      await red24.getByRole("button", { name: t.quitarWps, exact: true }).click();
       await expect(dialogo.locator("tbody th")).toHaveText(t.wps);
-      await aplicar(page, t, "WPS", red24);
-      const filaWps = red24.locator(".ajuste-resumen .ajuste-fila").filter({ hasText: t.wps });
-      await expect(filaWps.locator("dd")).toHaveText(t.no);
+      await aplicarEnRejilla(page, t, "WPS");
+      await red24.getByRole("button", { name: t.abrirRed24, exact: true }).click();
+      const wps = detalle.getByRole("switch", { name: t.wps, exact: true });
+      await expect(wps).not.toBeChecked();
+      await page.goBack();
+      await expect(detalle).toHaveCount(0);
 
       // 3. La IP de un dispositivo conectado, fija.
       await irA(page, ancho, "red_local", t.redLocal);

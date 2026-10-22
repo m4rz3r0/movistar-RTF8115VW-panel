@@ -38,7 +38,10 @@
 @import "paginas/ajustes-panel.css";
 @import "paginas/router-red.css";
 @import "paginas/ajustes/temas.css";
+@import "paginas/ajustes/ajuste.css";
+@import "paginas/ajustes/rejilla.css";
 @import "paginas/ajustes/tarjeta.css";
+@import "paginas/ajustes/detalle.css";
 @import "paginas/ajustes/dispositivos.css";
 @import "paginas/ajustes/reservas.css";
 @import "paginas/ajustes/tema-carga.css";

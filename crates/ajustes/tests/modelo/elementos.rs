@@ -41,7 +41,11 @@ fn elementos_y_acciones_validos() {
     );
     assert_eq!(
         claves_de_elementos(&c),
-        ["ajustes-accion-ocultar_nombre", "ajustes-papel-principal"]
+        [
+            "ajuste-accion-ocultar_nombre-titulo",
+            "ajustes-accion-ocultar_nombre",
+            "ajustes-papel-principal"
+        ]
     );
 }
 

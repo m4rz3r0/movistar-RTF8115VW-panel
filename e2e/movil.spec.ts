@@ -12,7 +12,7 @@ const paginas = [
     listo: "main h1",
   },
   { nombre: "historial", ruta: "/historial", listo: "main h1" },
-  { nombre: "ajustes-wifi", ruta: "/ajustes/wifi", listo: "article.ajuste" },
+  { nombre: "ajustes-wifi", ruta: "/ajustes/wifi", listo: "article.tarjeta-el" },
   { nombre: "ajustes-sistema", ruta: "/ajustes/sistema", listo: "article.ajuste" },
   { nombre: "ajustes-seguridad", ruta: "/ajustes/seguridad", listo: "article.ajuste" },
   { nombre: "ajustes-del-panel", ruta: "/panel", listo: "#panel-idioma" },

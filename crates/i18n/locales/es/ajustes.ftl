@@ -166,6 +166,8 @@ ajustes-wifi-radio-ocultas = { $n ->
 ajustes-wifi-radio-ocultas-enlace = Ver en la Biblioteca
 ajustes-wifi-radio-apagada = Apagada
 ajustes-wifi-radio-sin-redes-corto = Encendida, sin redes
+ajustes-wifi-radio-redes-sin-leer-corto = Encendida, redes sin leer
+ajustes-wifi-radio-redes-sin-leer = La radio está encendida, pero alguna de sus redes no se ha podido leer: no se sabe si emite alguna.
 
 ## Elementos de cada pestaña: estado, papel, datos, recomendación y acciones
 ajustes-estado-sin-leer = Sin leer
@@ -186,6 +188,53 @@ ajustes-accion-quitar_wps = Quitar WPS
 ajustes-accion-ocultar_nombre = Ocultar el nombre
 ajustes-accion-mostrar_nombre = Mostrar el nombre
 ajustes-accion-aislar = Aislar los dispositivos
+ajuste-accion-encender-titulo = Redes WiFi: encender
+ajuste-accion-apagar-titulo = Redes WiFi: apagar
+ajuste-accion-quitar_wps-titulo = Redes WiFi: quitar el WPS
+ajuste-accion-ocultar_nombre-titulo = Redes WiFi: ocultar el nombre
+ajuste-accion-mostrar_nombre-titulo = Redes WiFi: mostrar el nombre
+ajuste-accion-aislar-titulo = Redes WiFi: aislar los dispositivos
+ajustes-accion-demasiados = Como mucho { $max } a la vez: desmarca alguno.
+ajustes-accion-no-aplica = Esa acción no se puede aplicar a todo lo marcado.
+ajustes-accion-ya-estaba = Todas las marcadas ya estaban así: no hay nada que cambiar.
+
+## Rejilla de elementos: marca, barra, tarjeta, detalle y aviso del cambio
+ajustes-resumen = Resumen del tema
+ajustes-marcar = Marcar { $nombre }
+ajustes-barra = Acciones para lo marcado
+ajustes-marcadas = { $n ->
+    [one] 1 marcada
+   *[other] { $n } marcadas
+}
+ajustes-desmarcar-todo = Desmarcar todo
+ajustes-barra-sin-leer = No entra lo que no se ha podido leer: { $nombres }.
+ajustes-barra-ninguna = Ninguna acción vale para todo lo marcado.
+ajustes-insignia-aplicando = Aplicando…
+ajustes-insignia-comprobando = Comprobando…
+ajustes-interruptor-si = { $nombre } encendida
+ajustes-interruptor-no = { $nombre } apagada
+ajustes-abrir = Abrir
+ajustes-abrir-nombre = Abrir { $nombre }
+ajustes-volver-a-leer = Volver a leer
+ajustes-detalle-cerrar = Cerrar el detalle
+ajustes-detalle-volver = ‹ { $tema }
+ajustes-detalle-basico = Lo esencial
+ajustes-descartar = Descartar
+ajustes-guardar-cambios = Guardar cambios
+ajustes-sin-guardar-titulo = Tienes cambios sin guardar
+ajustes-sin-guardar-texto = Si sigues, se pierden los cambios de «{ $nombre }».
+ajustes-sin-guardar-seguir = Seguir editando
+ajustes-sin-guardar-descartar = Descartar los cambios
+ajustes-aviso-cambio = { $titulo }: { $campo }, { $antes } → { $despues }
+ajustes-aviso-varios = { $titulo }: { $n ->
+    [one] un cambio
+   *[other] { $n } cambios
+}
+ajustes-aviso-cerrar = Cerrar el aviso
+ajustes-aviso-conectados = { $n ->
+    [one] El dispositivo conectado se queda sin WiFi.
+   *[other] Los { $n } dispositivos conectados se quedan sin WiFi.
+}
 
 ## Franja de resumen de la WiFi
 ajustes-resumen-de = { $n } de { $total }

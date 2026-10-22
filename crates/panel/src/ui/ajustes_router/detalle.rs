@@ -1,0 +1,245 @@
+//! Detalle de un elemento: sus campos por columnas, «Descartar» y «Guardar cambios».
+//!
+//! Se pinta con lo que ya trajo la página (sin otra petición): una columna
+//! por ajuste del elemento (lo esencial y lo avanzado), cada una con su
+//! ayuda, sus campos, su efecto y sus detalles técnicos plegados.
+//! «Guardar cambios» prepara un solo cambio con lo de todas las columnas y
+//! lo abre en el diálogo de revisión. Se cierra con ✕ o con Esc; en el
+//! móvil ocupa la pantalla y vuelve con «‹ WiFi».
+
+use super::aviso::Seguimiento;
+use super::campo::Campo;
+use super::edicion::Edicion;
+use super::piezas::{ayuda, detalles_tecnicos, dom, enfocar, fila, motivos};
+use super::rejilla::Pagina;
+use super::seleccion::nombre;
+use crate::ajustes_router::{
+    AjusteVista, ElementoVista, EstadoLectura, PeticionAjuste, preparar_elemento,
+};
+use crate::t;
+use crate::ui::comun::Insignia;
+use crate::ui::explorador::texto_error;
+use crate::ui::i18n::traducir;
+use crate::ui::{Estado, IconoEstado};
+use ajustes::Nivel;
+use leptos::{ev, prelude::*, task::spawn_local};
+use std::collections::BTreeMap;
+
+/// Id del título del detalle (recibe el foco al abrirlo).
+pub(crate) const ID_TITULO_DETALLE: &str = "detalle-titulo";
+
+/// Título de la columna de un ajuste, por su nivel.
+fn titulo_columna(n: Nivel) -> String {
+    match n {
+        Nivel::Basico => t!("ajustes-detalle-basico"),
+        Nivel::Avanzado => t!("ajustes-nivel-avanzado"),
+        Nivel::Oculto => t!("ajustes-nivel-oculto"),
+    }
+}
+
+/// La columna del ajuste `a`, con sus campos editables (si `editable`) o
+/// de consulta.
+fn columna(
+    a: &AjusteVista,
+    ed: Edicion,
+    editable: bool,
+    bloqueado: Signal<bool>,
+) -> impl IntoView + use<> {
+    let prefijo = dom(a);
+    let col = format!("{prefijo}-columna");
+    let col_titulo = col.clone();
+    let campos = a
+        .campos
+        .iter()
+        .enumerate()
+        .map(|(i, c)| {
+            if !editable || c.solo_lectura.is_some() {
+                view! { <dl class="ajuste-valores">{fila(c)}</dl> }.into_any()
+            } else {
+                view! {
+                    <Campo
+                        c=c.clone()
+                        dom=format!("{prefijo}-c{i}")
+                        valor=ed.valor(i)
+                        error=ed.error(i)
+                        bloqueado
+                    />
+                }
+                .into_any()
+            }
+        })
+        .collect_view();
+    let efecto = a.efecto.clone().filter(|_| editable).map(|e| {
+        view! {
+            <p class="ajuste-efecto">
+                <strong>{t!("ajustes-efecto")}</strong>
+                ": "
+                {traducir(&e, None)}
+            </p>
+        }
+    });
+    view! {
+        <section class="detalle-columna" aria-labelledby=col>
+            <h3 id=col_titulo>{titulo_columna(a.nivel)}</h3>
+            <p class="ajuste-desc">{traducir(&format!("{}-desc", a.clave), None)}</p>
+            {ayuda(a)}
+            <div class="ajuste-campos">{campos}</div>
+            {motivos(&a.campos)}
+            {efecto}
+            {detalles_tecnicos(&a.clave, &a.tecnico)}
+        </section>
+    }
+}
+
+/// Lo que se edita en el detalle abierto: el id de su elemento y la edición
+/// de cada columna. La rejilla lo mira (al cambiar de elemento, cerrar o
+/// usar «Atrás») para no perder cambios sin guardar.
+pub(crate) type Registro = RwSignal<Option<(String, Vec<Edicion>)>>;
+
+/// ¿Hay cambios sin guardar en el detalle de `abierto`?
+pub(crate) fn sin_guardar(registro: Registro, abierto: Option<&str>) -> bool {
+    registro.with_untracked(|r| {
+        r.as_ref().is_some_and(|(id, eds)| {
+            Some(id.as_str()) == abierto && eds.iter().any(|e| e.cambiada())
+        })
+    })
+}
+
+/// El detalle de `e`. Se apunta en `registro` al crearse.
+#[component]
+pub(crate) fn Detalle(e: ElementoVista, registro: Registro) -> impl IntoView {
+    let pagina = expect_context::<Pagina>();
+    let s = expect_context::<Seguimiento>();
+    let leido = e.lectura == EstadoLectura::Leido;
+    let editable = leido && !pagina.solo_lectura;
+    let preparando = RwSignal::new(false);
+    let error = RwSignal::new(None::<String>);
+    let leidos: Vec<&AjusteVista> = e
+        .ajustes
+        .iter()
+        .filter(|a| a.estado == EstadoLectura::Leido)
+        .collect();
+    let ediciones: Vec<(String, String, Edicion)> = leidos
+        .iter()
+        .map(|a| (a.id.clone(), dom(a), Edicion::nueva(&a.campos)))
+        .collect();
+    let columnas = leidos
+        .iter()
+        .zip(&ediciones)
+        .map(|(a, (_, _, ed))| columna(a, *ed, editable, preparando.into()))
+        .collect_view();
+    registro.set(Some((
+        e.id.clone(),
+        ediciones.iter().map(|(_, _, ed)| *ed).collect(),
+    )));
+    let ediciones = StoredValue::new(ediciones);
+    let id = e.id.clone();
+    let guardar = move |ev: ev::SubmitEvent| {
+        ev.prevent_default();
+        if !editable || preparando.get_untracked() {
+            return;
+        }
+        error.set(None);
+        let mut peticiones = Vec::new();
+        for (ajuste, prefijo, ed) in ediciones.get_value() {
+            match ed.pedir() {
+                Err(i) => {
+                    enfocar(&format!("{prefijo}-c{i}-control"));
+                    return;
+                }
+                Ok(valores) if valores.is_empty() => {}
+                Ok(valores) => peticiones.push(PeticionAjuste {
+                    ajuste,
+                    instancia: None,
+                    borrar: false,
+                    valores,
+                    esperados: BTreeMap::new(),
+                }),
+            }
+        }
+        if peticiones.is_empty() {
+            error.set(Some(t!("ajustes-error-sin-cambios")));
+            return;
+        }
+        preparando.set(true);
+        let id = id.clone();
+        spawn_local(async move {
+            match preparar_elemento(peticiones).await {
+                Ok(g) => s.revisar(g, vec![id]),
+                Err(e) => {
+                    error.try_set(Some(texto_error(&e)));
+                }
+            }
+            preparando.try_set(false);
+        });
+    };
+    let descartar = move |_| {
+        ediciones.with_value(|es| es.iter().for_each(|(_, _, ed)| ed.reiniciar()));
+        error.set(None);
+    };
+    let cerrar = move |_| pagina.cerrar.run(());
+    let teclas = move |ev: ev::KeyboardEvent| {
+        if ev.key() == "Escape" && !ev.default_prevented() {
+            ev.prevent_default();
+            pagina.cerrar.run(());
+        }
+    };
+    let id_insignia = e.id.clone();
+    let (estado, texto) = (e.estado, e.texto_estado.clone());
+    let insignia = move || {
+        let (estado, texto) = s.insignia(&id_insignia).unwrap_or((estado, texto.clone()));
+        view! { <Insignia estado texto /> }
+    };
+    let sin_leer = match &e.lectura {
+        EstadoLectura::SinLeer(m) => Some(view! {
+            <p class="aviso estado-error">
+                <IconoEstado estado=Estado::Error />
+                <span>{m.clone()}</span>
+            </p>
+        }),
+        EstadoLectura::Leido => None,
+    };
+    let tema = pagina
+        .tema
+        .with_value(|t| traducir(&format!("ajustes-tema-{t}"), None));
+    view! {
+        <section class="detalle" aria-labelledby=ID_TITULO_DETALLE on:keydown=teclas>
+            <header class="detalle-cabecera">
+                <button type="button" class="b-txt detalle-volver" on:click=cerrar>
+                    {t!("ajustes-detalle-volver", tema = tema)}
+                </button>
+                <h2 id=ID_TITULO_DETALLE tabindex="-1">{nombre(&e)}</h2>
+                <span class="detalle-insignia">{insignia}</span>
+                <button
+                    type="button"
+                    class="b-txt detalle-cerrar"
+                    aria-label=t!("ajustes-detalle-cerrar")
+                    on:click=cerrar
+                >
+                    "✕"
+                </button>
+            </header>
+            {sin_leer}
+            <form class="detalle-formulario" novalidate=true on:submit=guardar>
+                <div class="detalle-columnas">{columnas}</div>
+                <p class="error-formulario" role="alert">{move || error.get()}</p>
+                {editable.then(|| view! {
+                    <div class="detalle-pie">
+                        <button type="button" class="b-sec" on:click=descartar>
+                            {t!("ajustes-descartar")}
+                        </button>
+                        // Sin `disabled`: conserva el foco, y el diálogo se lo
+                        // devuelve al cerrarse.
+                        <button
+                            type="submit"
+                            class="b-pri"
+                            aria-disabled=move || preparando.get().then_some("true")
+                        >
+                            {move || if preparando.get() { t!("ajustes-grupo-preparando") } else { t!("ajustes-guardar-cambios") }}
+                        </button>
+                    </div>
+                })}
+            </form>
+        </section>
+    }
+}

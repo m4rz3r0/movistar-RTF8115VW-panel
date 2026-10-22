@@ -19,6 +19,7 @@ pub fn prefijo_i18n(a: &Ajuste) -> String {
 /// - `<p>-titulo`, `<p>-desc`, `<p>-ayuda` y `efecto-<efecto>`;
 /// - por campo, `<p>-<campo>`, `<p>-<campo>-desc` y la de `solo_lectura`;
 /// - por opción, `<p>-<campo>-<clave>`, su `-desc` y `aviso-<aviso>`;
+/// - `<p>-<campo>-true` y `-false` en un booleano con `textos_valor`;
 /// - `<p>-<campo>-recomendado` si el campo tiene recomendación (el motivo).
 pub fn claves_requeridas(a: &Ajuste) -> Vec<String> {
     let p = prefijo_i18n(a);
@@ -44,6 +45,10 @@ pub fn claves_requeridas(a: &Ajuste) -> Vec<String> {
         if c.sin_eleccion.is_some() {
             claves.push(format!("{pc}-{SIN_ELECCION}"));
             claves.push(format!("{pc}-{SIN_ELECCION}-desc"));
+        }
+        if c.textos_valor {
+            claves.push(format!("{pc}-true"));
+            claves.push(format!("{pc}-false"));
         }
         if c.recomendado.is_some() || c.opciones.iter().any(|o| o.recomendada) {
             claves.push(format!("{pc}-recomendado"));
@@ -541,6 +546,9 @@ fn comprobar_forma(c: &Campo, mal: &mut impl FnMut(String)) {
     }
     if c.invertido && c.tipo != TipoCampo::Booleano {
         mal("`invertido` solo vale en un campo `booleano`".into());
+    }
+    if c.textos_valor && c.tipo != TipoCampo::Booleano {
+        mal("`textos_valor` solo vale en un campo `booleano`".into());
     }
     if let Some(b) = &c.booleano {
         if c.tipo != TipoCampo::Booleano {

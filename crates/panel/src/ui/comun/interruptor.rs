@@ -13,12 +13,14 @@ fn al_pulsar(encendido: bool, desactivado: bool) -> Option<bool> {
 /// `al_cambiar` con el valor nuevo; no cambia por sí solo: lo cambia quien
 /// lo pinta, al aplicar el cambio. Desactivado lleva `aria-disabled` (no
 /// `disabled`), como el resto del panel: sigue recibiendo el foco, para que
-/// se pueda explicar por qué, y el clic no hace nada.
+/// se pueda explicar por qué (`descrito`: el id de esa explicación), y el
+/// clic no hace nada.
 #[component]
 pub fn Interruptor(
     #[prop(into)] encendido: Signal<bool>,
     #[prop(into)] etiqueta: Signal<String>,
     #[prop(into, optional)] desactivado: Signal<bool>,
+    #[prop(into, optional_no_strip)] descrito: Option<String>,
     al_cambiar: Callback<bool>,
 ) -> impl IntoView {
     view! {
@@ -29,6 +31,7 @@ pub fn Interruptor(
             aria-checked=move || encendido.get().to_string()
             aria-label=move || etiqueta.get()
             aria-disabled=move || desactivado.get().then_some("true")
+            aria-describedby=descrito
             on:click=move |_| {
                 if let Some(nuevo) =
                     al_pulsar(encendido.get_untracked(), desactivado.get_untracked())

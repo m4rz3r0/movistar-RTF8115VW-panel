@@ -1,0 +1,109 @@
+/* Rejilla de elementos de Ajustes: tarjetas, esqueletos y el aviso del cambio. */
+/* -------------------------------------------------------------- Rejilla */
+
+/* Dos columnas a 1440 px, tres desde unos 1600 y una por debajo de 900.
+   El detalle va a todo el ancho justo después de su tarjeta en el orden
+   del documento: con «dense», las tarjetas que siguen rellenan antes el
+   hueco de su fila, y el detalle queda debajo de ella. */
+.rejilla-elementos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(440px, 100%), 1fr));
+  grid-auto-flow: row dense;
+  gap: var(--esp-4);
+  margin-top: var(--esp-2);
+}
+
+/* Mientras se lee: la forma de las tarjetas, sin datos. */
+.tarjeta-esqueleto {
+  min-height: 240px;
+  cursor: default;
+}
+
+.esqueleto-linea {
+  display: block;
+  width: 70%;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--sup3);
+}
+
+.esqueleto-titulo {
+  width: 45%;
+  height: 18px;
+}
+
+.esqueleto-corta {
+  width: 30%;
+}
+
+/* ----------------------------------------------------- Aviso del cambio */
+
+/* Abajo a la derecha (en el móvil, sobre la barra de lo marcado). */
+.avisos-cambio {
+  position: fixed;
+  right: var(--esp-5);
+  bottom: var(--esp-5);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-2);
+  width: min(480px, calc(100vw - 2 * var(--esp-4)));
+  pointer-events: none;
+}
+
+.aviso-cambio {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-3);
+  padding: 10px 10px 10px 14px;
+  border: 1px solid var(--borde-fuerte);
+  border-radius: 12px;
+  background: var(--sup);
+  box-shadow: var(--sombra-flotante);
+  pointer-events: auto;
+  animation: aviso-cambio-sube 220ms ease-out;
+}
+
+.aviso-cambio p {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 13.5px;
+  overflow-wrap: anywhere;
+}
+
+.aviso-cambio strong {
+  font-weight: 600;
+}
+
+.aviso-cambio-hecho {
+  border-color: var(--borde);
+}
+
+.aviso-cambio-error {
+  border-color: color-mix(in srgb, var(--peligro) 55%, transparent);
+}
+
+.aviso-cambio-error p {
+  color: var(--peligro);
+}
+
+@keyframes aviso-cambio-sube {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (max-width: 900px) {
+  .avisos-cambio {
+    right: var(--esp-4);
+    bottom: 76px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aviso-cambio {
+    animation: none;
+  }
+}

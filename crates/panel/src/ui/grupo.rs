@@ -40,7 +40,7 @@ enum Fase {
 /// Texto de un valor legible del resumen: una opción por su etiqueta, un
 /// sí/no traducido, un valor que el panel no reconoce como tal y el resto
 /// tal cual.
-fn texto_valor(c: &CambioLegible, v: &str) -> String {
+pub(crate) fn texto_valor(c: &CambioLegible, v: &str) -> String {
     let desconocido = || t!("ajustes-valor-desconocido", valor = v);
     // Sin valor (antes de crear una instancia o tras borrarla): vacío, en
     // cualquier tipo, no «valor no reconocido».
@@ -57,11 +57,24 @@ fn texto_valor(c: &CambioLegible, v: &str) -> String {
             }
         }
         TipoCampo::Booleano => match v {
-            "true" => t!("comun-si"),
-            "false" => t!("comun-no"),
+            "true" => texto_booleano(&c.campo, true),
+            "false" => texto_booleano(&c.campo, false),
             _ => desconocido(),
         },
         _ => v.to_owned(),
+    }
+}
+
+/// Texto de un sí/no del campo `clave`: sus textos de valor si el catálogo
+/// los tiene («Encendida», «Apagada») o, si no, «Sí» y «No».
+pub(crate) fn texto_booleano(clave: &str, v: bool) -> String {
+    let propio = format!("{clave}-{v}");
+    if i18n::existe(idioma_actual(), &propio) {
+        traducir(&propio, None)
+    } else if v {
+        t!("comun-si")
+    } else {
+        t!("comun-no")
     }
 }
 
@@ -148,17 +161,26 @@ fn siguiente_deshace(actual: Option<i64>, id: i64) -> Option<i64> {
 /// `on_cerrar` con el id del último cambio confirmado desde él, haya
 /// acabado aplicado, revertido o fallido (`None` si no se confirmó
 /// ninguno), para que la página vuelva a leer los ajustes.
+///
+/// Con `al_aplicar`, el diálogo solo sirve para revisar: «Aplicar» lo
+/// cierra y le pasa el token y los pasos desmarcados, y la página confirma
+/// y sigue el cambio (la rejilla, con la insignia de cada tarjeta y el
+/// aviso con «Deshacer»). `deshacer`: el grupo deshace otro cambio (título
+/// y botón de deshacer).
 #[component]
 pub fn DialogoGrupo(
     grupo: GrupoVista,
     #[prop(into)] on_cerrar: Callback<Option<i64>>,
+    #[prop(optional, into)] al_aplicar: Option<Callback<(String, Vec<usize>)>>,
+    #[prop(optional)] deshacer: bool,
 ) -> impl IntoView {
     let dlg = NodeRef::<html::Dialog>::new();
     let titulo_ref = NodeRef::<html::H2>::new();
     let marcados = RwSignal::new(marcados_de(&grupo));
     let grupo = RwSignal::new(grupo);
-    // Cambio que se está deshaciendo (cambia el título y el botón).
-    let deshace = RwSignal::new(None::<i64>);
+    // Cambio que se está deshaciendo (cambia el título y el botón). Con
+    // `deshacer`, el grupo ya es el que deshace otro (lo preparó la página).
+    let deshace = RwSignal::new(deshacer.then_some(0));
     let fase = RwSignal::new(Fase::Revisar);
     let error = RwSignal::new(None::<String>);
     let cambio = RwSignal::new(None::<CambioVista>);
@@ -200,8 +222,15 @@ pub fn DialogoGrupo(
             return;
         }
         error.set(None);
-        fase.set(Fase::Confirmando);
         let token = grupo.with_untracked(|g| g.token.clone());
+        if let Some(al_aplicar) = al_aplicar {
+            al_aplicar.run((token, quitar));
+            if let Some(d) = dlg.get_untracked() {
+                d.close();
+            }
+            return;
+        }
+        fase.set(Fase::Confirmando);
         spawn_local(async move {
             match confirmar_ajuste(token, quitar).await {
                 Ok(id) => {
@@ -715,6 +744,28 @@ mod tests {
         );
         let h = html(grupo(vec![paso(0, None, None), paso(1, None, None)]));
         assert!(h.contains(&t!("ajustes-grupo-paso", n = 2)), "{h}");
+    }
+
+    /// Encender o apagar una red dice «Apagada → Encendida», no «No → Sí»:
+    /// los textos de valor del catálogo; un sí/no sin ellos, «Sí» y «No».
+    #[test]
+    fn un_si_no_con_sus_textos_de_valor() {
+        let c = cambio(
+            "ajuste-wifi-red_24-activa",
+            "false",
+            "true",
+            TipoCampo::Booleano,
+        );
+        assert_eq!(texto_valor(&c, "false"), "Apagada");
+        assert_eq!(texto_valor(&c, "true"), "Encendida");
+        let c = cambio(
+            "ajuste-wifi-red_24-wps",
+            "true",
+            "false",
+            TipoCampo::Booleano,
+        );
+        assert_eq!(texto_valor(&c, "true"), t!("comun-si"));
+        assert_eq!(texto_valor(&c, "false"), t!("comun-no"));
     }
 
     #[test]

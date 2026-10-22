@@ -190,6 +190,16 @@ fn forma_de_booleanos_enteros_opcionales_y_claves() {
         "wifi.red.nombre",
         "`booleano` solo vale en un campo `booleano`",
     );
+    // `textos_valor` en un campo que no es booleano.
+    let textos_en_texto = WIFI.replace(
+        "lee = \"nombre\"\ntipo = \"texto\"",
+        "lee = \"nombre\"\ntipo = \"texto\"\ntextos_valor = true",
+    );
+    falla_con(
+        &fallos(&textos_en_texto, ""),
+        "wifi.red.nombre",
+        "`textos_valor` solo vale en un campo `booleano`",
+    );
     // `opcional` no vale en opciones ni booleanos; en texto, sí.
     let opcional_opcion = WIFI.replace(
         "lee = \"seguridad\"\ntipo = \"opcion\"",

@@ -83,6 +83,31 @@ fn claves_i18n_completas_en_los_dos_sentidos() {
     }
 }
 
+/// Encender o apagar una red o una radio dice «Encendida» y «Apagada», no
+/// «Sí» y «No»: sus textos de valor los pide el catálogo.
+#[test]
+fn encendida_y_apagada_con_sus_textos() {
+    let c = cargar();
+    for (ajuste, campo) in [
+        ("wifi.red_24", "activa"),
+        ("wifi.red_5", "activa"),
+        ("wifi.invitados", "activa"),
+        ("wifi.radio_24", "encendida"),
+        ("wifi.radio_5", "encendida"),
+    ] {
+        let a = c.ajuste(ajuste).unwrap();
+        assert!(a.campo(campo).unwrap().textos_valor, "{ajuste}.{campo}");
+        let claves = claves_requeridas(a);
+        let p = prefijo_i18n(a);
+        for v in ["true", "false"] {
+            assert!(
+                claves.contains(&format!("{p}-{campo}-{v}")),
+                "{ajuste}: {claves:?}"
+            );
+        }
+    }
+}
+
 /// Los papeles de los elementos y los botones de las acciones tienen su
 /// texto en los dos idiomas.
 #[test]
@@ -90,6 +115,10 @@ fn claves_de_elementos_en_los_dos_idiomas() {
     let claves = claves_de_elementos(&cargar());
     assert!(
         claves.contains(&"ajustes-accion-quitar_wps".to_owned()),
+        "{claves:?}"
+    );
+    assert!(
+        claves.contains(&"ajuste-accion-quitar_wps-titulo".to_owned()),
         "{claves:?}"
     );
     for idioma in Idioma::TODOS {

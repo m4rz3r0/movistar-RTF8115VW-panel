@@ -126,12 +126,16 @@ pub(super) fn marcar_emision(
         if radio(id_radio) != Some(true) {
             continue;
         }
-        // Sin la lista no se sabe si emite otra red: ninguna nota.
+        // Alguna de sus redes no se pudo leer y ninguna de las otras emite:
+        // no se sabe si emite alguna.
+        let sin_leer = redes.iter().any(Option::is_none) && !redes.contains(&Some(true));
+        // Sin la lista no se sabe si emite otra red: solo esa nota.
         let Some(lista) = listas
             .iter()
             .find(|(r, _)| r == id_radio)
             .and_then(|(_, n)| *n)
         else {
+            vistas[j].nota_radio = sin_leer.then_some(NotaRadio::RedesSinLeer);
             continue;
         };
         let vistos = puntos_de.get(id_radio).map_or(&[][..], Vec::as_slice);
@@ -140,6 +144,8 @@ pub(super) fn marcar_emision(
             Some(NotaRadio::Ocultas(ocultas))
         } else if redes.iter().all(|r| *r == Some(false)) {
             Some(NotaRadio::SinRedes)
+        } else if sin_leer {
+            Some(NotaRadio::RedesSinLeer)
         } else {
             None
         };
@@ -232,6 +238,9 @@ pub(super) fn estado_red(
         (None, Some(false), _) => (E::Apagada, "ajustes-wifi-radio-apagada"),
         (None, Some(true), Some(NotaRadio::SinRedes)) => {
             (E::Atencion, "ajustes-wifi-radio-sin-redes-corto")
+        }
+        (None, Some(true), Some(NotaRadio::RedesSinLeer)) => {
+            (E::Atencion, "ajustes-wifi-radio-redes-sin-leer-corto")
         }
         (None, Some(true), _) => (E::Emite, "ajustes-wifi-red-encendida"),
         (None, None, _) => (E::Atencion, "ajustes-estado-desconocido"),
@@ -327,6 +336,7 @@ pub(super) fn nota(ctx: &Contexto, e: &Elemento) -> Option<String> {
     Some(match ctx.vista(radio)?.nota_radio? {
         NotaRadio::SinRedes => t!("ajustes-wifi-radio-sin-redes"),
         NotaRadio::Ocultas(n) => t!("ajustes-wifi-radio-ocultas", n = n),
+        NotaRadio::RedesSinLeer => t!("ajustes-wifi-radio-redes-sin-leer"),
     })
 }
 

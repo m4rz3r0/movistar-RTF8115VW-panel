@@ -33,6 +33,7 @@ id = "activa"
 escribe = { funcion = "cbSetWifiAccPt", parametro = "adm_state" }
 lee = "adm_state"
 tipo = "booleano"
+textos_valor = true
 recomendado = "true"
 
 [[ajuste.campo]]
@@ -123,6 +124,7 @@ id = "activa"
 escribe = { funcion = "cbSetWifiAccPt", parametro = "adm_state" }
 lee = "adm_state"
 tipo = "booleano"
+textos_valor = true
 recomendado = "true"
 
 [[ajuste.campo]]
@@ -213,6 +215,7 @@ id = "activa"
 escribe = { funcion = "cbSetWifiAccPt", parametro = "adm_state" }
 lee = "adm_state"
 tipo = "booleano"
+textos_valor = true
 recomendado = "false"
 
 [[ajuste.campo]]
@@ -303,6 +306,7 @@ id = "encendida"
 escribe = { funcion = "cbSetWifi", parametro = "radio_adm_state" }
 lee = "radio_adm_state"
 tipo = "booleano"
+textos_valor = true
 recomendado = "true"
 
 [[ajuste.campo]]
@@ -370,6 +374,7 @@ id = "encendida"
 escribe = { funcion = "cbSetWifi", parametro = "radio_adm_state" }
 lee = "radio_adm_state"
 tipo = "booleano"
+textos_valor = true
 recomendado = "true"
 
 [[ajuste.campo]]
