@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { PLAZO_CAMBIO, cambiarUpnp, esperarFinal, estadoCambio, plazoDeTest } from "./cambios";
 import { CONTRASENA, USUARIO, instalado } from "./instancias";
-import { asentar, entrar, recogerErrores } from "./util";
+import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 
 // La Biblioteca (una función de lectura con un parámetro) abierta justo
 // después de aplicar un cambio, con el router lento: el servidor pinta la
@@ -96,3 +96,56 @@ test.describe("Biblioteca tras un cambio", () => {
     }
   });
 });
+
+// Solo se censuran los secretos de verdad: en la lectura de TR-069, la
+// dirección del servidor y el usuario se ven en claro; las contraseñas van
+// con el ojo, y en el XML, censuradas hasta pulsar «Mostrar claves en el XML».
+for (const ancho of [360, 1440]) {
+  test.describe(`Biblioteca a ${ancho} px: datos sensibles en claro`, () => {
+    test.use({ viewport: { width: ancho, height: 900 }, locale: "es-ES" });
+
+    test("el usuario en claro, la contraseña con el ojo y el XML con su botón", async ({ page }) => {
+      const errores = recogerErrores(page);
+      await entrar(page);
+      const area = "tr069";
+      await page.goto(`/explorador/${area}/cbGetTr69Config`);
+      await asentar(page);
+      const resultado = page.locator(".resultado-lectura");
+      const tabla = resultado.locator("table").first();
+      await expect(tabla).toBeVisible({ timeout: 15_000 });
+      const columna = async (nombre: string) =>
+        (await tabla.locator("thead th").allInnerTexts()).findIndex((t) => t.trim() === nombre);
+      const celda = async (nombre: string) =>
+        tabla.locator("tbody tr").first().locator("td").nth(await columna(nombre));
+      // El usuario y la URL, texto a la vista; sin campo censurado.
+      for (const nombre of ["acs_username", "acs_URL", "connectionRequestUsername"]) {
+        const c = await celda(nombre);
+        await expect(c.locator("input")).toHaveCount(0);
+        await expect(c).toHaveText("X-REDACTED-X");
+      }
+      // La contraseña, censurada y con su ojo.
+      const clave = (await celda("acs_password")).locator("input.secreto-valor");
+      await expect(clave).toHaveAttribute("type", "password");
+      await expect(clave).toHaveValue("X-REDACTED-X");
+
+      // El XML: censurado hasta pulsar el botón, que lo vuelve a censurar.
+      const xml = resultado.locator("details.crudo");
+      await xml.locator("summary").click();
+      const pre = xml.locator("pre");
+      await expect(pre).toContainText("<acs_username>X-REDACTED-X</acs_username>");
+      await expect(pre).toContainText("<acs_password>••••••</acs_password>");
+      const mostrar = xml.getByRole("button", { name: "Mostrar claves en el XML" });
+      await expect(mostrar).toHaveAttribute("aria-pressed", "false");
+      await mostrar.click();
+      await expect(pre).toContainText("<acs_password>X-REDACTED-X</acs_password>");
+      await expect(pre).not.toContainText("••••••");
+      const ocultar = xml.getByRole("button", { name: "Ocultar claves en el XML" });
+      await expect(ocultar).toHaveAttribute("aria-pressed", "true");
+      await sinDesbordamiento(page, `biblioteca sensibles ${ancho}`);
+      await page.screenshot({ path: `capturas/biblioteca-sensibles-${ancho}.png`, fullPage: true });
+      await ocultar.click();
+      await expect(pre).toContainText("<acs_password>••••••</acs_password>");
+      expect(errores, "errores o avisos en la consola").toEqual([]);
+    });
+  });
+}
