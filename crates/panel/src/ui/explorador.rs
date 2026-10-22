@@ -339,7 +339,7 @@ fn tabla_parametros(params: &[ParamVista]) -> impl IntoView + use<> {
         })
         .collect_view();
     view! {
-        <div class="tabla-scroll">
+        <div class="tabla-scroll" tabindex="0">
             <table class="tabla">
                 <thead>
                     <tr>
@@ -532,7 +532,7 @@ fn vista_valores(v: Vista) -> impl IntoView + use<> {
             })
             .collect_view();
         view! {
-            <div class="tabla-scroll">
+            <div class="tabla-scroll" tabindex="0">
                 <table class="tabla tabla-clave-valor">
                     <thead>
                         <tr>
@@ -579,7 +579,7 @@ fn vista_valores(v: Vista) -> impl IntoView + use<> {
             };
             let titulo = format!("{}: {instancias}", g.nombre);
             view! {
-                <div class="tabla-scroll">
+                <div class="tabla-scroll" tabindex="0">
                     <table class="tabla">
                         <caption>{titulo}</caption>
                         <thead>

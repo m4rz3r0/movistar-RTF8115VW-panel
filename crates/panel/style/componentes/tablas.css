@@ -38,7 +38,7 @@
   z-index: 1;
   background: var(--sup2);
   color: var(--suave);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 500;
   letter-spacing: 0.02em;
 }
@@ -81,4 +81,17 @@
   color: var(--suave);
   letter-spacing: 0.12em;
   user-select: none;
+}
+
+/* Red WiFi: el icono de emisión, más pequeño, delante del SSID. */
+.celda-red {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--esp-2);
+  white-space: nowrap;
+}
+
+.celda-red .emision {
+  width: 22px;
+  height: 22px;
 }

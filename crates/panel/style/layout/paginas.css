@@ -32,7 +32,8 @@
   padding: var(--esp-5);
   background: var(--sup);
   border: 1px solid var(--borde);
-  border-radius: var(--radio);
+  border-radius: var(--radio-tarjeta);
+  box-shadow: var(--sombra);
 }
 
 .rejilla-tarjetas {

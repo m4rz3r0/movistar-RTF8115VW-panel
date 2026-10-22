@@ -75,7 +75,7 @@
 .resultado-area,
 .resultados-cuenta {
   color: var(--suave);
-  font-size: 12px;
+  font-size: 12.5px;
 }
 
 .cuenta {
@@ -84,7 +84,7 @@
   border-radius: 999px;
   background: var(--sup2);
   color: var(--suave);
-  font-size: 12px;
+  font-size: 12.5px;
   text-align: center;
 }
 
@@ -159,7 +159,7 @@
   border: 1px solid var(--borde);
   border-radius: 4px;
   color: var(--suave);
-  font-size: 12px;
+  font-size: 12.5px;
   white-space: nowrap;
 }
 
@@ -190,7 +190,7 @@
 
 .miga {
   margin-bottom: var(--esp-1);
-  font-size: 12px;
+  font-size: 12.5px;
 }
 
 .miga a {
@@ -206,7 +206,7 @@
 
 .datos-funcion dt {
   color: var(--suave);
-  font-size: 12px;
+  font-size: 12.5px;
 }
 
 .datos-funcion dd {

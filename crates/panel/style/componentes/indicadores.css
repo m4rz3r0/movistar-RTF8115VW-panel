@@ -25,7 +25,7 @@
 .indicador-titulo {
   color: var(--suave);
   font-family: var(--fuente-ui);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 500;
   letter-spacing: 0.02em;
 }
@@ -49,7 +49,7 @@
 
 .indicador-sub {
   color: var(--suave);
-  font-size: 12px;
+  font-size: 12.5px;
   overflow-wrap: anywhere;
 }
 

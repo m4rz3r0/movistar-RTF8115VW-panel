@@ -116,7 +116,7 @@ pub fn SelectorVista() -> impl IntoView {
             view! {
                 <button
                     type="button"
-                    class="selector-boton"
+                    class="b-sec"
                     value=m.codigo()
                     title=ayuda(m)
                     aria-pressed=move || (vista.get() == m).to_string()

@@ -99,36 +99,16 @@
   font-weight: 600;
 }
 
+/* Selector de modo o de intervalo: botones secundarios; el elegido, con
+   el acento (`.b-sec[aria-pressed="true"]`). */
 .selector {
   display: inline-flex;
-  padding: 3px;
-  border: 1px solid var(--borde);
-  border-radius: var(--radio);
-  background: var(--sup);
+  flex-wrap: wrap;
+  gap: var(--esp-1);
 }
 
-.selector-boton {
+.selector .b-sec {
   min-width: 52px;
-  min-height: 32px;
-  padding: 0 var(--esp-3);
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--suave);
-  font-variant-numeric: tabular-nums;
-  font-weight: 500;
-  cursor: pointer;
-  transition: color 120ms ease, background 120ms ease;
-}
-
-.selector-boton:hover {
-  color: var(--texto);
-}
-
-.selector-boton[aria-pressed="true"] {
-  background: var(--acento-velo);
-  color: var(--acento-texto);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--acento) 45%, transparent);
 }
 
 .franja-tarjeta {
@@ -137,7 +117,7 @@
 }
 
 .franja-titulo {
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .estado-espera {
