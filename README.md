@@ -12,14 +12,16 @@ habla con la web del router:
 - **Ajustes**: los ajustes del router agrupados por temas (Internet, WiFi,
   Red local, Puertos, Seguridad, Teléfono y Sistema) y explicados en lenguaje
   claro: qué hace cada uno, qué pasa al cambiarlo, su riesgo y el valor
-  recomendado, con para quién es, a favor y en contra. Lo avanzado va
-  plegado en «Más opciones». Un cambio de varios ajustes se aplica, se
-  vigila y se deshace junto.
-- **Explorador**: todas las funciones de la API del router, con su
+  recomendado, con para quién es, a favor y en contra. De un vistazo se ve
+  qué está encendido, qué pide atención y qué recomienda el panel; se
+  enciende o se apaga con un interruptor y se puede actuar sobre varios
+  elementos a la vez, con un solo deshacer.
+- **Biblioteca**: todas las funciones de la API del router, con su
   descripción. Los cambios se **vigilan**: si el router deja de responder o
   se pierde internet, se deshacen solos.
 - **Historial** de todo lo cambiado, con deshacer.
-- Usuarios propios con contraseña, en español e inglés, y usable en el móvil.
+- Usuarios propios con contraseña, en español e inglés, tema claro u oscuro
+  y usable en el móvil.
 
 Proyecto independiente, sin relación con Telefónica, Movistar, O2 ni Askey:
 lee el [aviso legal](AVISO-LEGAL.md) antes de usarlo.
@@ -29,6 +31,10 @@ lee el [aviso legal](AVISO-LEGAL.md) antes de usarlo.
 | Estado | En el móvil | Conexión con el router |
 |---|---|---|
 | ![Estado del router en el escritorio](docs/capturas/estado-escritorio.png) | ![Estado del router en el móvil](docs/capturas/estado-movil.png) | ![Configuración de la conexión con el router](docs/capturas/configuracion-escritorio.png) |
+
+| Ajustes: WiFi | Ajustes: Puertos, en el tema claro |
+|---|---|
+| ![Ajustes de la WiFi en tarjetas](docs/capturas/ajustes-wifi-escritorio.png) | ![Reglas de puertos en una lista con columnas](docs/capturas/ajustes-puertos-claro.png) |
 
 Hechas con el router simulado y datos inventados. Se regeneran con
 `npx playwright test capturas-readme` (en `e2e/`, ver
@@ -41,9 +47,9 @@ Hechas con el router simulado y datos inventados. Se regeneran con
 | Askey RTF8115VW | `ES_g14.17_RTF_TEF001_V9.17_V034` |
 
 Con otro firmware el panel arranca en **solo lectura**: ve el estado y lee,
-pero no cambia nada. Si todo cuadra, confírmalo en «Router → Conexión con el
-router» y cuéntalo en una incidencia del repositorio (modelo, firmware y qué
-has probado) para añadirlo a la lista.
+pero no cambia nada. Si todo cuadra, confírmalo en «Configuración del router
+→ Conexión con el router» y cuéntalo en una incidencia del repositorio
+(modelo, firmware y qué has probado) para añadirlo a la lista.
 
 ## Qué detecta y qué configuras
 
@@ -55,21 +61,43 @@ Tú **configuras**:
 
 - en el asistente de instalación, el primer usuario y las credenciales del
   router (se guardan cifradas);
-- en «Router → Conexión con el router», las credenciales, la confirmación del
-  firmware y, si la detección se equivoca, qué conexión es la de internet;
-- en «Ajustes del panel», el idioma y la zona horaria por defecto, DNS
-  preferidos, dispositivos de confianza, ventana de mantenimiento, servidor
-  propio y usuarios.
+- en «Configuración del router → Conexión con el router», las credenciales,
+  la confirmación del firmware y, si la detección se equivoca, qué conexión
+  es la de internet;
+- en «Ajustes del panel», el idioma y la zona horaria por defecto, tu modo
+  de visualización, tu tema (automático, como el del sistema, oscuro o
+  claro) y los usuarios.
 
 Los ajustes del router se cambian en «Ajustes» (`/ajustes/<tema>`), sin
 nombres de la API a la vista: cambiar la contraseña WiFi, apagar el WPS,
 fijar la IP de un dispositivo, abrir un puerto o apagar la gestión remota del
-operador (TR-069). Antes de aplicar, un resumen enseña lo que cambia («antes
-→ después»); después, el cambio se vigila y se puede deshacer desde el propio
+operador (TR-069). Cada tema dice cuándo leyó el router, con «Volver a
+leer»:
+
+- **WiFi, Internet, Seguridad, Teléfono y Sistema** empiezan con una franja
+  de resumen (las recomendaciones pendientes, en ámbar) y van en una rejilla
+  de tarjetas: cada una con su estado (verde si está encendida y emite, gris
+  si está apagada), su interruptor, sus datos principales y su
+  recomendación. Al abrirla, sus campos se despliegan debajo, a todo el
+  ancho.
+- **Puertos** (las reglas) y **Red local** (las IP fijas y los
+  dispositivos) van en listas con columnas, que se ordenan por columna y,
+  con más de ocho filas, se filtran; al abrir una fila, su detalle entra por
+  la derecha. Los ajustes que no son listas, como UPnP o el DHCP, van en
+  tarjetas encima.
+- Se marcan varias tarjetas o filas (un círculo que aparece al pasar el
+  ratón) y una barra ofrece lo que se puede hacer con todas: un solo cambio
+  con un solo deshacer. Cada elemento abierto tiene su dirección
+  (`/ajustes/<tema>/<elemento>`), y se recorren con el teclado.
+- Apagar algo que corta (una red WiFi con dispositivos conectados) pregunta
+  antes; lo demás se aplica al momento, con «Deshacer» en el aviso.
+
+Antes de guardar unos campos, un resumen enseña lo que cambia («antes →
+después»); después, el cambio se vigila y se puede deshacer desde el propio
 resumen o desde el Historial. «Cómo estaba al instalar» compara el router con
 la foto que tomó el asistente y deja volver a cualquier ajuste. Las
-contraseñas que la página enseña van censuradas, con un ojo para verlas. Lo
-que no está en Ajustes se cambia desde el Explorador, también con vigilancia.
+contraseñas van censuradas, con un ojo para verlas; lo demás, en claro. Lo
+que no está en Ajustes se cambia desde la Biblioteca, también con vigilancia.
 
 ## Instalación
 
@@ -155,6 +183,7 @@ el router es `http://127.0.0.1:8081`, usuario y contraseña `sim`.
 | Ruta | Qué es |
 |---|---|
 | `crates/hgu` | cliente del router: sesión, lecturas y escrituras, un único mutex y 150 ms entre peticiones; detección de la red; capturas saneadas en `fixtures/` |
+| `crates/ajustes` | catálogo de Ajustes (`ajustes/<tema>.toml`): cada ajuste con sus campos, los elementos de cada tema y las funciones del router que lee y escribe |
 | `crates/catalogo` | catálogo revisado de funciones (`funciones.toml`: riesgo, bloqueadas, lecturas pareadas) y secretos que se enmascaran (`secretos.toml`) |
 | `crates/panel` | servidor y web (SSR + hidratación), asistente de instalación, autenticación, sondeo, cambios vigilados, historial, ajustes; CLI `panel user add` y `panel user passwd` |
 | `crates/i18n` | textos de la interfaz en español e inglés (Fluent, `locales/{es,en}`) |

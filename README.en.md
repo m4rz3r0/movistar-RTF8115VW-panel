@@ -12,14 +12,16 @@ container) and talks to the router's web interface:
 - **Settings**: the router's settings grouped by topic (Internet, WiFi, Home
   network, Ports, Security, Phone and System) and explained in plain
   language: what each one does, what happens when you change it, its risk
-  and the recommended value, with who it is for, pros and cons. The advanced
-  ones are folded under "More options". A change of several settings is
-  applied, watched and undone together.
-- **Explorer**: every function of the router's API, with its description.
+  and the recommended value, with who it is for, pros and cons. At a glance
+  you see what is on, what needs your attention and what the panel
+  recommends; things are switched on or off with a toggle, and you can act
+  on several items at once, with a single undo.
+- **Library**: every function of the router's API, with its description.
   Changes are **watched**: if the router stops answering or internet goes
   down, they are undone on their own.
 - **History** of everything changed, with undo.
-- Its own users and passwords, in Spanish and English, and usable on a phone.
+- Its own users and passwords, in Spanish and English, light or dark theme,
+  and usable on a phone.
 
 Independent project, not affiliated with Telefónica, Movistar, O2 or Askey:
 read the [legal notice](AVISO-LEGAL.md#legal-notice) before using it.
@@ -29,6 +31,10 @@ read the [legal notice](AVISO-LEGAL.md#legal-notice) before using it.
 | Status | On a phone | Router connection |
 |---|---|---|
 | ![Router status on a desktop](docs/capturas/estado-escritorio.png) | ![Router status on a phone](docs/capturas/estado-movil.png) | ![Router connection settings](docs/capturas/configuracion-escritorio.png) |
+
+| Settings: WiFi | Settings: Ports, light theme |
+|---|---|
+| ![WiFi settings as cards](docs/capturas/ajustes-wifi-escritorio.png) | ![Port rules in a list with columns](docs/capturas/ajustes-puertos-claro.png) |
 
 Taken with the simulated router and made-up data, and in Spanish, the
 panel's default language (the language selector switches it to English).
@@ -43,7 +49,7 @@ see [Checks](#checks)).
 
 With any other firmware the panel starts **read-only**: it shows the status
 and reads, but changes nothing. If everything looks right, confirm it in
-"Router → Router connection" and report it in an issue on the
+"Router settings → Router connection" and report it in an issue on the
 repository (model, firmware and what you tried) so it can be added to the
 list.
 
@@ -58,21 +64,42 @@ You **configure**:
 
 - in the installation wizard, the first user and the router credentials
   (stored encrypted);
-- in "Router → Router connection", the credentials, the firmware
+- in "Router settings → Router connection", the credentials, the firmware
   confirmation and, if detection gets it wrong, which connection is the
   internet one;
-- in "Panel settings", the default language and time zone, preferred DNS,
-  trusted devices, maintenance window, own server and users.
+- in "Panel settings", the default language and time zone, your display
+  mode, your theme (automatic, following the system, dark or light) and the
+  users.
 
 The router settings are changed in "Settings" (`/ajustes/<topic>`), with no
 API names in sight: change the WiFi password, turn off WPS, fix a device's
-IP, open a port or turn off the operator's remote management (TR-069).
-Before applying, a summary shows what changes ("before → after"); afterwards
-the change is watched and can be undone from the summary itself or from the
-History. "How it was at installation" compares the router with the snapshot
-the wizard took and lets you go back to any setting. The passwords the page
-shows are masked, with an eye to reveal them. Whatever is not in Settings is
-changed from the Explorer, also with watching.
+IP, open a port or turn off the operator's remote management (TR-069). Each
+topic says when it read the router, with "Read again":
+
+- **WiFi, Internet, Security, Phone and System** start with a summary strip
+  (pending recommendations in amber) and show a grid of cards: each with its
+  status (green if it is on and broadcasting, grey if it is off), its
+  toggle, its main data and its recommendation. Opening one unfolds its
+  fields below it, full width.
+- **Ports** (the rules) and **Home network** (fixed IPs and devices) are
+  lists with columns, sortable by column and, with more than eight rows,
+  filterable; opening a row slides its detail in from the right. The
+  settings that are not lists, such as UPnP or DHCP, are cards above them.
+- You can mark several cards or rows (a circle that shows on hover) and a
+  bar offers what can be done with all of them: one change with one undo.
+  Each open item has its own address (`/ajustes/<topic>/<item>`), and they
+  can be browsed with the keyboard.
+- Turning off something that cuts people off (a WiFi network with connected
+  devices) asks first; the rest applies straight away, with "Undo" in the
+  notice.
+
+Before saving some fields, a summary shows what changes ("before → after");
+afterwards the change is watched and can be undone from the summary itself
+or from the History. "How it was at installation" compares the router with
+the snapshot the wizard took and lets you go back to any setting. Passwords
+are masked, with an eye to reveal them; everything else is shown in clear.
+Whatever is not in Settings is changed from the Library, also with
+watching.
 
 ## Installation
 
@@ -159,6 +186,7 @@ the router is `http://127.0.0.1:8081`, user and password `sim`.
 | Path | What it is |
 |---|---|
 | `crates/hgu` | router client: session, reads and writes, a single mutex and 150 ms between requests; network detection; sanitised captures in `fixtures/` |
+| `crates/ajustes` | Settings catalogue (`ajustes/<topic>.toml`): each setting with its fields, the items of each topic and the router functions it reads and writes |
 | `crates/catalogo` | reviewed catalogue of functions (`funciones.toml`: risk, blocked, paired reads) and secrets that are masked (`secretos.toml`) |
 | `crates/panel` | server and web (SSR + hydration), installation wizard, authentication, polling, watched changes, history, settings; CLI `panel user add` and `panel user passwd` |
 | `crates/i18n` | interface texts in Spanish and English (Fluent, `locales/{es,en}`) |

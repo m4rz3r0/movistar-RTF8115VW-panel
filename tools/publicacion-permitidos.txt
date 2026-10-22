@@ -87,6 +87,8 @@ valor 9732d6c5e2a098d3521fca8145d826ae0aaa067ef2385ead08e6feac88fa5792 — sha25
 
 # Capturas del README (e2e/capturas-readme.spec.ts, router-sim con las fixtures
 # neutras; revisadas a mano, sin metadatos). Al regenerarlas cambia el sha256.
-binario docs/capturas/estado-escritorio.png 23dd35291ceb4e1ee9bcfc4359414a3fc02b898bcf27d57c3750a93eab3a52ff — captura del README (estado-escritorio), del simulador con datos inventados
-binario docs/capturas/estado-movil.png 0498a3615323a6d14064f7b630e015b0368764120c55b9fd5739bfb6609c31cb — captura del README (estado-movil), del simulador con datos inventados
-binario docs/capturas/configuracion-escritorio.png 008b978a2ca9c0fa14bdcaa7aede8b5f5d2250905cd5a337909c48486943301d — captura del README (configuracion-escritorio), del simulador con datos inventados
+binario docs/capturas/estado-escritorio.png 4a841d359e679a10c631f39bb802a2f1cf05d2128231c1e87f827cd181ba1b42 — captura del README (estado-escritorio), del simulador con datos inventados
+binario docs/capturas/estado-movil.png 8982bbb85f1cccd30561e00693dd611b88eb21b6cba2d70930151a6756165abf — captura del README (estado-movil), del simulador con datos inventados
+binario docs/capturas/configuracion-escritorio.png 1583344aa01e9f6b461d285794db15030121fee07ea67de665e1418d13248b42 — captura del README (configuracion-escritorio), del simulador con datos inventados
+binario docs/capturas/ajustes-wifi-escritorio.png a304d9364d78cf9b25e79546c8728e0ca89043feab4cf1b419489ccd00fa613a — captura del README (ajustes-wifi-escritorio), del simulador con datos inventados
+binario docs/capturas/ajustes-puertos-claro.png b362522e3409434944c36476e2d3d38e8d7e5cab30b95f363804bd1986d603b8 — captura del README (ajustes-puertos-claro), del simulador con datos inventados

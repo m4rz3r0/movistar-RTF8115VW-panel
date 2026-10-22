@@ -126,3 +126,61 @@ for (const ancho of [360, 1440]) {
     });
   }
 }
+
+// Ajustes con listas a 360 px, en los dos temas: axe sin violaciones serias
+// con la página tal cual, con el detalle de la primera fila abierto y sus
+// «Detalles técnicos» desplegados, y con el resumen de un cambio. Una tabla que se desplaza en horizontal
+// tiene que poder recibir el foco (scrollable-region-focusable).
+const listas = [
+  { nombre: "red_local", ruta: "/ajustes/red_local" },
+  { nombre: "puertos", ruta: "/ajustes/puertos" },
+];
+
+for (const tema of ["oscuro", "claro"] as const) {
+  test.describe(`Ajustes con listas a 360 px en tema ${tema}`, () => {
+    test.use({
+      locale: "es-ES",
+      viewport: { width: 360, height: 900 },
+      colorScheme: tema === "oscuro" ? "dark" : "light",
+    });
+
+    test("axe con la lista, el detalle abierto y el resumen de un cambio", async ({ page }) => {
+      test.setTimeout(120_000);
+      const errores = recogerErrores(page);
+      await entrar(page);
+      for (const l of listas) {
+        await page.goto(l.ruta);
+        await asentar(page);
+        const fila = page.locator("main tr.lista-fila").first();
+        await expect(fila).toBeVisible({ timeout: 20_000 });
+        await sinDesbordamiento(page, `${l.nombre} 360-${tema}`);
+        expect.soft(await violacionesGraves(page), `${l.nombre} 360-${tema}`).toEqual([]);
+        await fila.locator(".lista-nombre").click();
+        const detalle = page.locator(".detalle-lateral");
+        await expect(detalle).toBeVisible();
+        for (const d of await detalle.locator("details.detalles-tecnicos").all()) {
+          await d.locator("summary").click();
+        }
+        expect
+          .soft(await violacionesGraves(page), `${l.nombre} 360-${tema} con el detalle`)
+          .toEqual([]);
+      }
+      // El resumen de un cambio, con su tabla de antes y después: el de
+      // quitar el WPS de dos redes (se cancela, no se aplica).
+      await page.goto("/ajustes/wifi");
+      await asentar(page);
+      for (const red of ["Red WiFi 2,4 GHz", "Red WiFi 5 GHz"]) {
+        await page.getByRole("button", { name: `Marcar ${red}`, exact: true }).click();
+      }
+      const barra = page.getByRole("toolbar", { name: "Acciones para lo marcado" });
+      await barra.getByRole("button", { name: "Quitar WPS" }).click();
+      const dialogo = page.locator("dialog[open]");
+      await expect(dialogo.locator(".tabla-scroll").first()).toBeVisible();
+      await sinDesbordamiento(page, `resumen del cambio 360-${tema}`);
+      expect.soft(await violacionesGraves(page), `resumen del cambio 360-${tema}`).toEqual([]);
+      await dialogo.getByRole("button", { name: "Cancelar" }).click();
+      await expect(page.locator("dialog[open]")).toHaveCount(0);
+      expect(errores, "errores o avisos en la consola").toEqual([]);
+    });
+  });
+}
