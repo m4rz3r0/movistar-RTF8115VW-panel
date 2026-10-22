@@ -109,7 +109,7 @@ pub(in crate::ajustes_router) async fn preparar_lote(
         // Nada que revisar. Si es porque no se pudo leer, no se sabe si ya
         // está aplicado.
         return Err(if sin_leer > 0 {
-            fallo(StatusCode::BAD_GATEWAY, t!("ajustes-error-lectura"))
+            fallo(StatusCode::BAD_GATEWAY, t!("mejoras-error-lectura"))
         } else {
             fallo(StatusCode::CONFLICT, t!("mejoras-error-ya-aplicado"))
         });
@@ -117,6 +117,11 @@ pub(in crate::ajustes_router) async fn preparar_lote(
     let pedidos: Vec<BTreeMap<String, String>> =
         grupo.pasos.iter().map(|p| p.req.valores.clone()).collect();
     let prep = g.preparar_grupo(grupo).await.map_err(|e| match e {
+        // Lo leído ya está, pero lo no leído no se da por hecho.
+        CambioError::SinCambios if sin_leer > 0 => fallo(
+            StatusCode::CONFLICT,
+            t!("mejoras-error-sin-leer", n = sin_leer),
+        ),
         CambioError::SinCambios => fallo(StatusCode::CONFLICT, t!("mejoras-error-ya-aplicado")),
         e => error_ajuste(e),
     })?;

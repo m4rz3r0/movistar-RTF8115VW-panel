@@ -102,8 +102,10 @@ fn cuenta(p: &PasoExpandido) -> bool {
 }
 
 /// Estado de un lote con el de sus pasos: «x de y pendientes» entre los
-/// que cuentan, hechos o pendientes; «aplicado» si no falta ninguno; «sin
-/// leer», con el motivo del primero, si no se pudo leer ninguno.
+/// que cuentan, hechos o pendientes; «aplicado» si no falta ninguno y se
+/// leyeron todos. Sin pendientes leídos y con pasos sin leer, «sin leer»:
+/// con el motivo del primero si no se pudo leer ninguno, y si no, con
+/// cuántos faltan.
 pub(super) fn estado_lote(pasos: &[(PasoExpandido, EstadoPaso)]) -> EstadoLote {
     let leidos: Vec<&EstadoPaso> = pasos
         .iter()
@@ -115,14 +117,25 @@ pub(super) fn estado_lote(pasos: &[(PasoExpandido, EstadoPaso)]) -> EstadoLote {
         .iter()
         .filter(|e| ***e == EstadoPaso::Pendiente)
         .count() as u32;
-    if total == 0 {
-        let motivo = pasos.iter().find_map(|(p, e)| match e {
-            EstadoPaso::SinLeer { motivo } if cuenta(p) => Some(motivo.clone()),
+    // Lo no leído no se da por hecho: sin pendientes leídos, un lote con
+    // pasos sin leer no está aplicado.
+    let sin_leer: Vec<&String> = pasos
+        .iter()
+        .filter(|(p, _)| cuenta(p))
+        .filter_map(|(_, e)| match e {
+            EstadoPaso::SinLeer { motivo } => Some(motivo),
             _ => None,
-        });
-        if let Some(motivo) = motivo {
-            return EstadoLote::SinLeer { motivo };
-        }
+        })
+        .collect();
+    if pendientes == 0
+        && let Some(primero) = sin_leer.first()
+    {
+        let motivo = if total == 0 {
+            (*primero).clone()
+        } else {
+            t!("mejoras-motivo-pasos-sin-leer", n = sin_leer.len())
+        };
+        return EstadoLote::SinLeer { motivo };
     }
     if pendientes == 0 {
         EstadoLote::Aplicado
@@ -383,5 +396,34 @@ mod tests {
             unreachable!()
         };
         assert_eq!(estado_lote(&pasos), EstadoLote::SinLeer { motivo });
+    }
+
+    /// Lo no leído no se da por hecho: sin pendientes leídos y con pasos
+    /// sin leer, el lote no está aplicado, y el motivo dice cuántos faltan.
+    #[test]
+    fn lote_con_pasos_sin_leer_y_lo_demas_hecho_no_esta_aplicado() {
+        let sin_leer = estado_paso(&espejo(), &falla, None);
+        let pasos = vec![
+            (paso("upnp", Vec::new()), EstadoPaso::Hecho),
+            (espejo(), sin_leer.clone()),
+            (paso("registro", Vec::new()), sin_leer),
+        ];
+        assert_eq!(
+            estado_lote(&pasos),
+            EstadoLote::SinLeer {
+                motivo: t!("mejoras-motivo-pasos-sin-leer", n = 2)
+            }
+        );
+        assert_eq!(pendientes_unicos(&pasos), Some(0));
+        // Con un pendiente leído, sigue siendo «x de y».
+        let mut pasos = pasos;
+        pasos[0].1 = EstadoPaso::Pendiente;
+        assert_eq!(
+            estado_lote(&pasos),
+            EstadoLote::Pendientes {
+                pendientes: 1,
+                total: 1
+            }
+        );
     }
 }

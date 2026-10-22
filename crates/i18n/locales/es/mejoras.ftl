@@ -64,3 +64,12 @@ mejoras-revision-sin-leer = { $n ->
 mejoras-error-lote = Ese lote de mejoras no existe.
 mejoras-error-ya-aplicado = Este lote ya está aplicado: no hay nada que cambiar.
 mejoras-error-proveedor = Ese servicio de DNS no está en la lista.
+mejoras-motivo-pasos-sin-leer = { $n ->
+    [one] Un paso no se pudo leer; lo demás ya está.
+   *[other] { $n } pasos no se pudieron leer; lo demás ya está.
+}
+mejoras-error-lectura = No se ha podido leer ningún paso de este lote del router. Prueba de nuevo en un momento.
+mejoras-error-sin-leer = { $n ->
+    [one] Lo que se pudo leer ya está, pero un paso no se pudo leer. Vuelve a leer y prueba de nuevo.
+   *[other] Lo que se pudo leer ya está, pero { $n } pasos no se pudieron leer. Vuelve a leer y prueba de nuevo.
+}

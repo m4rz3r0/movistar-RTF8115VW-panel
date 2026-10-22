@@ -257,6 +257,45 @@ async fn privacidad_con_proveedor_y_paso_desmarcado() {
     );
 }
 
+/// Privacidad máxima entera, con un solo deshacer: el pool 0 vuelve a sus
+/// DNS y lo demás, como estaba.
+#[tokio::test]
+async fn aplicar_privacidad_y_deshacer() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    let g = grupo(&p, &cookie, "privacidad", json!({})).await;
+    let id = confirmar_sin(&p, &cookie, &g, &[]).await;
+    assert_eq!(del_pool(&p, "ipv4_dns_addr_0").await, "9.9.9.9");
+    assert_eq!(del_pool(&p, "ipv4_dns_addr_1").await, "149.112.112.112");
+    assert_eq!(del_tr69(&p, "enableCWMP").await, "0");
+    assert_eq!(del_tr69(&p, "periodicInformEnable").await, "0");
+    assert_eq!(
+        del_sim(&p, "cbGetTimeNtp", &[], "ntp_svr_1").await,
+        "hora.roa.es"
+    );
+    assert_eq!(
+        lote(&mejoras(&p, &cookie).await, "privacidad")["estado"],
+        "Aplicado"
+    );
+
+    let inverso = ok(&p, "deshacer_ajuste", json!({ "cambio": id }), &cookie).await;
+    assert_eq!(
+        inverso["titulo"], "mejoras-lote-privacidad-titulo",
+        "{inverso}"
+    );
+    aplicar_ajuste(&p, &cookie, &inverso).await;
+    assert_eq!(del_pool(&p, "ipv4_dns_addr_0").await, "192.168.1.1");
+    assert_eq!(del_pool(&p, "ipv4_dns_addr_1").await, "192.168.1.1");
+    assert_eq!(del_tr69(&p, "enableCWMP").await, "1");
+    assert_eq!(del_tr69(&p, "periodicInformEnable").await, "1");
+    assert_eq!(
+        del_sim(&p, "cbGetTimeNtp", &[], "ntp_svr_1").await,
+        "hora.operador.example"
+    );
+    let m = mejoras(&p, &cookie).await;
+    assert_eq!(lote(&m, "privacidad")["estado"], pendientes(3, 5), "{m}");
+    assert_eq!(m["pendientes"], 6);
+}
+
 #[tokio::test]
 async fn lotes_seguidos_comparten_pasos() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;

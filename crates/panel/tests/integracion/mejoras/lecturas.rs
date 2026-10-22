@@ -1,7 +1,7 @@
 //! Mejoras con lecturas que fallan: la red de invitados, una pestaña o
 //! todas. Lo que no se lee no cuenta, y nada nombra la API.
 
-use super::{grupo, lote, mejoras, paso, pendientes};
+use super::{dns_del_pool, escribir, grupo, lote, mejoras, paso, pendientes, preparar};
 use crate::comun::{PanelPrueba, llamar, ok};
 use serde_json::{Value, json};
 
@@ -76,6 +76,37 @@ async fn contador_sin_lecturas_no_sale() {
             "{m}"
         );
     }
+    // Sin nada leído, la revisión no se abre y lo dice del lote.
+    let (status, body) = preparar(&p, &cookie, "seguridad", json!({})).await;
+    assert_eq!(status, 502, "{body}");
+    assert!(body.contains("lote"), "{body}");
+    assert!(!body.contains("este ajuste"), "{body}");
+}
+
+/// Con la gestión remota sin leer y lo demás de Privacidad hecho, el lote
+/// no sale «aplicado» ni la revisión dice «ya aplicado».
+#[tokio::test]
+async fn sin_leer_y_lo_demas_hecho_no_es_aplicado() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    dns_del_pool(&p, "9.9.9.9", "149.112.112.112").await;
+    escribir(
+        &p,
+        "ntp.asp",
+        "cbSetTimeNtp",
+        &[("ntp_svr_1", "hora.roa.es")],
+    )
+    .await;
+    p.sim.control.fail_reads("cbGetTr69Config", true);
+    let m = mejoras(&p, &cookie).await;
+    let motivo = lote(&m, "privacidad")["estado"]["SinLeer"]["motivo"]
+        .as_str()
+        .unwrap_or_else(|| panic!("{m}"))
+        .to_owned();
+    assert!(motivo.contains('2'), "{motivo}");
+    let (status, body) = preparar(&p, &cookie, "privacidad", json!({})).await;
+    assert_eq!(status, 409, "{body}");
+    assert!(!body.contains("ya está aplicado"), "{body}");
+    assert!(body.contains("leer"), "{body}");
 }
 
 #[tokio::test]

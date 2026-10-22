@@ -64,3 +64,12 @@ mejoras-revision-sin-leer = { $n ->
 mejoras-error-lote = That improvement bundle does not exist.
 mejoras-error-ya-aplicado = This bundle is already applied: there is nothing to change.
 mejoras-error-proveedor = That DNS service is not in the list.
+mejoras-motivo-pasos-sin-leer = { $n ->
+    [one] One step could not be read; the rest is already done.
+   *[other] { $n } steps could not be read; the rest is already done.
+}
+mejoras-error-lectura = None of the steps of this bundle could be read from the router. Try again in a moment.
+mejoras-error-sin-leer = { $n ->
+    [one] What could be read is already done, but one step could not be read. Read again and retry.
+   *[other] What could be read is already done, but { $n } steps could not be read. Read again and retry.
+}
