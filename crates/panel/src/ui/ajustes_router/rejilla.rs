@@ -9,14 +9,15 @@
 //! guardar, cambiar de elemento, cerrar o «Atrás» pregunta antes.
 
 use super::aviso::Seguimiento;
-use super::detalle::{Detalle, ID_TITULO_DETALLE, sin_guardar};
+use super::detalle::{Borradores, Detalle, sin_guardar};
 use super::piezas::enfocar;
-use super::resumen::ResumenTema;
+use super::resumen::{LecturaDelTema, ResumenTema};
 use super::seleccion::{BarraSeleccion, Seleccion, nombre};
 use super::tarjeta::{Tarjeta, id_tarjeta};
 use crate::ajustes_router::{PaginaTema, preparar_accion};
 use crate::t;
 use crate::ui::explorador::texto_error;
+use crate::ui::{Estado, IconoEstado};
 use leptos::{ev, html, prelude::*, task::spawn_local};
 use leptos_router::{NavigateOptions, hooks::use_navigate};
 
@@ -33,8 +34,10 @@ pub(crate) struct Pagina {
     pub abrir: Callback<String>,
     /// Vuelve a la del tema (cierra el detalle).
     pub cerrar: Callback<()>,
-    /// Vuelve a leer el tema.
-    pub recargar: Callback<()>,
+    /// Vuelve a leer el tema del router (sin la caché).
+    pub volver_a_leer: Callback<()>,
+    /// El detalle que se pinte lleva el foco a su título (se acaba de abrir).
+    pub enfocar_detalle: RwSignal<bool>,
 }
 
 /// Las tarjetas de la rejilla, en orden.
@@ -117,19 +120,38 @@ pub(crate) fn esqueleto() -> impl IntoView {
 #[component]
 pub(crate) fn ContenidoRejilla(
     p: PaginaTema,
-    recargar: Callback<()>,
+    volver_a_leer: Callback<()>,
     elemento: Memo<Option<String>>,
 ) -> impl IntoView {
     let sel = expect_context::<Seleccion>();
     let s = expect_context::<Seguimiento>();
     let navegar = use_navigate();
     let tema = StoredValue::new(p.tema.clone());
-    let existe = {
-        let ids: Vec<String> = p.elementos.iter().map(|e| e.id.clone()).collect();
-        move |id: &Option<String>| id.as_ref().filter(|i| ids.contains(i)).cloned()
+    // Sin señales: el efecto de la dirección puede correr justo cuando la
+    // página se está desmontando (al ir a otro tema).
+    let ids: std::sync::Arc<[String]> = p.elementos.iter().map(|e| e.id.clone()).collect();
+    let existe = move |id: &Option<String>| id.as_ref().filter(|i| ids.contains(i)).cloned();
+    // Un elemento en la dirección que el tema no tiene: se dice.
+    let desconocido = {
+        let existe = existe.clone();
+        move || {
+            elemento
+                .get()
+                .filter(|e| existe(&Some(e.clone())).is_none())
+                .map(|id| {
+                    view! {
+                        <p class="aviso estado-error" role="alert">
+                            <IconoEstado estado=Estado::Error />
+                            <span>{t!("ajustes-elemento-no-existe", id = id)}</span>
+                        </p>
+                    }
+                })
+        }
     };
+    let borradores = expect_context::<Borradores>();
     let abierto = RwSignal::new(existe(&elemento.get_untracked()));
     let registro = RwSignal::new(None);
+    let enfocar_detalle = RwSignal::new(false);
     let sucio = move || sin_guardar(registro, abierto.get_untracked().as_deref());
     // A dónde se iba con cambios sin guardar (la pregunta está abierta) y
     // si la dirección ya ha cambiado («Atrás»).
@@ -153,11 +175,13 @@ pub(crate) fn ContenidoRejilla(
     let cambiar_a = move |destino: Option<String>| {
         let antes = abierto.get_untracked();
         abierto.set(destino.clone());
-        request_animation_frame(move || match (destino, antes) {
-            (Some(_), _) => enfocar(ID_TITULO_DETALLE),
-            (None, Some(a)) => enfocar(&id_tarjeta(&a)),
+        // Al abrir, el detalle lleva el foco a su título en cuanto se pinta
+        // (`enfocar_detalle`); al cerrar, vuelve a la tarjeta.
+        match (destino, antes) {
+            (Some(_), _) => enfocar_detalle.set(true),
+            (None, Some(a)) => request_animation_frame(move || enfocar(&id_tarjeta(&a))),
             (None, None) => {}
-        });
+        }
     };
     Effect::new(move |_| {
         let destino = existe(&elemento.get());
@@ -197,7 +221,8 @@ pub(crate) fn ContenidoRejilla(
             let ir_a = ir_a.clone();
             move |()| ir_a(None)
         }),
-        recargar,
+        volver_a_leer,
+        enfocar_detalle,
     };
     provide_context(pagina);
 
@@ -252,6 +277,9 @@ pub(crate) fn ContenidoRejilla(
         salida.set(None);
         // Sin cambios que perder: ya no se pregunta.
         registro.set(None);
+        if let Some(id) = abierto.get_untracked() {
+            borradores.olvidar(&id);
+        }
         if navegado {
             cambiar_a(destino);
         } else {
@@ -259,6 +287,8 @@ pub(crate) fn ContenidoRejilla(
         }
     };
     view! {
+        <LecturaDelTema edad_s=p.leido_hace_s volver_a_leer />
+        {desconocido}
         <ResumenTema datos=p.resumen.clone() />
         <BarraSeleccion
             acciones=p.acciones.clone()

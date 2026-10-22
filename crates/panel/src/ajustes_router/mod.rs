@@ -93,9 +93,14 @@ pub async fn deshacer_ajuste(cambio: i64) -> Result<GrupoVista, ServerFnError> {
 /// en una tanda; si una falla, solo los elementos que la usan quedan
 /// [`EstadoLectura::SinLeer`]. 404 si el tema no existe. Exige sesión; la
 /// respuesta va con `no-store`.
+///
+/// Con `fresca` («Volver a leer»), lo de este tema no sale de la caché.
 #[server(endpoint = "leer_tema", input = Json)]
-pub async fn leer_tema(tema: String) -> Result<PaginaTema, ServerFnError> {
-    servidor::leer_tema(tema).await
+pub async fn leer_tema(
+    tema: String,
+    #[server(default)] fresca: bool,
+) -> Result<PaginaTema, ServerFnError> {
+    servidor::leer_tema(tema, fresca).await
 }
 
 /// Los dispositivos que el router conoce en la red de casa, los conectados

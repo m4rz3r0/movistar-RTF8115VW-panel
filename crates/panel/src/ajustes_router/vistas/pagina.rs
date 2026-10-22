@@ -23,6 +23,10 @@ pub struct PaginaTema {
     pub elementos: Vec<ElementoVista>,
     /// Acciones sobre varios elementos del tema.
     pub acciones: Vec<AccionVista>,
+    /// Cuánto hace que se leyó del router lo que se enseña (lo más antiguo
+    /// que salió de la caché corta), en segundos.
+    #[serde(default)]
+    pub leido_hace_s: u64,
 }
 
 /// Un dato de la franja de resumen.
@@ -94,6 +98,8 @@ pub struct DatoVista {
 /// La recomendación principal de un elemento y el cambio que la aplica.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RecomendacionVista {
+    /// Qué pasa ahora («El WPS está activado: …»), ya traducido.
+    pub problema: String,
     /// El porqué («Recomendado si…»), ya traducido.
     pub texto: String,
     /// Es un riesgo de seguridad: fondo ámbar.
@@ -113,8 +119,12 @@ pub struct PieVista {
     pub dispositivos: Vec<String>,
     /// Tráfico reciente (bytes por intervalo).
     pub trafico: Vec<u64>,
-    /// Una nota ya traducida (lo que no se ve en sus redes, «apagada desde…»).
+    /// Una nota ya traducida (lo que no se ve en sus redes).
     pub nota: Option<String>,
+    /// Desde cuándo está apagada (segundos Unix), si se apagó desde el
+    /// panel y sigue así.
+    #[serde(default)]
+    pub apagada_desde: Option<i64>,
 }
 
 /// Una acción sobre varios elementos.

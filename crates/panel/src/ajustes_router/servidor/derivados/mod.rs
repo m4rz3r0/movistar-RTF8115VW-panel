@@ -21,6 +21,9 @@ pub(super) struct Contexto<'a> {
     pub vistas: &'a [AjusteVista],
     /// Todas las lecturas de la tanda, también las que no son de un ajuste.
     pub leidas: &'a HashMap<Clave, Result<XmlNode, hgu::Error>>,
+    /// Desde cuándo está apagado cada punto de acceso que se apagó desde
+    /// el panel (su id → segundos Unix), del Historial.
+    pub apagadas: &'a HashMap<String, i64>,
 }
 
 impl<'a> Contexto<'a> {
@@ -76,6 +79,11 @@ pub(super) fn marcar(
 /// Nombre de la red, si el elemento es una red WiFi.
 pub(super) fn ssid(ctx: &Contexto, e: &Elemento) -> Option<String> {
     wifi::ssid(ctx, e)
+}
+
+/// Desde cuándo está apagado el elemento, si se apagó desde el panel.
+pub(super) fn apagada_desde(ctx: &Contexto, e: &Elemento) -> Option<i64> {
+    wifi::apagada_desde(ctx, e)
 }
 
 /// Nota del pie de un elemento, ya traducida.
@@ -134,11 +142,13 @@ mod tests {
         let cat = CatalogoAjustes::load().unwrap();
         let e = cat.elementos()[0].clone();
         let leidas = HashMap::new();
+        let apagadas = HashMap::new();
         let ctx = Contexto {
             del_tema: &[],
             nodos: &[],
             vistas: &[],
             leidas: &leidas,
+            apagadas: &apagadas,
         };
         for n in DERIVADOS_DATO {
             assert!(dato(n, &ctx, &e).is_ok(), "{n}");

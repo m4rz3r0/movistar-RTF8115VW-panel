@@ -340,3 +340,28 @@ fn ancho_en_mhz() {
     assert_eq!(mhz("3"), Some("80"));
     assert_eq!(mhz("9"), None);
 }
+
+/// «Apagada desde»: manda el último paso que tocó el `adm_state` de cada
+/// punto de acceso; encenderla lo borra, y otro punto no cuenta.
+#[test]
+fn apagada_desde_el_ultimo_paso() {
+    let paso = |punto: &str, campo: &str, despues: &str, cuando: i64| PasoDeRed {
+        valores: [(ID_PUNTO.to_owned(), punto.to_owned())].into(),
+        diff: format!(
+            r#"[{{"nombre":"{campo}","antes":"x","despues":"{despues}","secreto":false}}]"#
+        ),
+        cuando,
+    };
+    let pasos = [
+        paso("0", "adm_state", "0", 10),
+        paso("1", "adm_state", "0", 20),
+        paso("1", "adm_state", "1", 30),
+        paso("0", "ssid", "RED-9", 40),
+        paso("2", "adm_state", "0", 50),
+        paso("2", "adm_state", "0", 60),
+    ];
+    let m = ultimo_apagado(&pasos);
+    assert_eq!(m.get("0"), Some(&10), "el nombre no cuenta");
+    assert_eq!(m.get("1"), None, "se volvió a encender");
+    assert_eq!(m.get("2"), Some(&60));
+}

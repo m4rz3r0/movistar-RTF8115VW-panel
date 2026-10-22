@@ -1,7 +1,7 @@
 //! La página de un tema de una sola lectura (`leer_tema`): elementos con su
 //! estado, resumen, recomendación principal y lecturas que fallan solas.
 
-use crate::comun::{Panel, PanelPrueba, leer, ok, sesion};
+use crate::comun::{Panel, PanelPrueba, aplicar_ajuste, leer, ok, sesion};
 use regex::Regex;
 use serde_json::{Value, json};
 
@@ -134,6 +134,14 @@ async fn recomendacion_principal_prefiere_el_riesgo() {
     // antes en el catálogo), pero el WPS es un riesgo.
     let r = &elemento(&pagina, "red-24")["recomendacion"];
     assert_eq!(r["boton"], "Quitar WPS", "{r}");
+    // Qué pasa ahora, además de para quién es lo recomendado.
+    assert!(
+        r["problema"]
+            .as_str()
+            .unwrap()
+            .starts_with("El WPS está activado"),
+        "{r}"
+    );
     assert_eq!(r["riesgo"], true, "{r}");
     assert_eq!(
         (&r["ajuste"], &r["campo"], &r["valor"]),
@@ -247,4 +255,71 @@ async fn ajustes_sueltos_son_elementos() {
     assert_eq!(upnp["clave"], "ajuste-puertos-upnp");
     assert_eq!(pagina["resumen"], json!([]));
     assert_eq!(pagina["acciones"], json!([]));
+}
+
+/// «Volver a leer» (`fresca`) no sale de la caché corta; sin ella, sí. La
+/// página dice cuánto hace que se leyó lo que enseña.
+#[tokio::test]
+async fn volver_a_leer_sin_la_cache() {
+    let p = PanelPrueba::nuevo().arrancar().await;
+    let cookie = sesion(&p).await;
+    let ssid = |pagina: &Value| elemento(pagina, "red-5")["ssid"].clone();
+    let primera = leer(&p, &cookie, "wifi").await;
+    assert!(
+        primera["leido_hace_s"].as_u64().unwrap() < 5,
+        "{}",
+        primera["leido_hace_s"]
+    );
+    // Otro cambia el router (la web del operador): sin escribir desde el
+    // panel, la caché sigue valiendo.
+    let antes = ssid(&primera);
+    let otro = hgu::Client::new(hgu::ClientConfig::new(
+        &p.sim.base_url,
+        crate::comun::USER,
+        crate::comun::PASS,
+    ));
+    otro.write(
+        "wifi.asp",
+        "cbSetWifiAccPt",
+        &[("dpm_cfg_wifi_acc_pt_id", "1"), ("ssid", "RED-8")],
+    )
+    .await
+    .unwrap();
+    let cacheada = ok(&p, "leer_tema", json!({ "tema": "wifi" }), &cookie).await;
+    assert_eq!(ssid(&cacheada), antes);
+    let fresca = ok(
+        &p,
+        "leer_tema",
+        json!({ "tema": "wifi", "fresca": true }),
+        &cookie,
+    )
+    .await;
+    assert_eq!(ssid(&fresca), json!("RED-8"));
+}
+
+/// «Apagada desde»: si lo último que hizo el panel con la red fue apagarla
+/// y sigue apagada, cuándo; de una red que el panel no ha tocado, nada.
+#[tokio::test]
+async fn apagada_desde_segun_el_historial() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    let preparar = |valor: &str| {
+        json!({ "p": { "ajuste": "wifi.red_24", "instancia": null, "borrar": false,
+                       "valores": { "activa": valor } } })
+    };
+    let g = ok(&p, "preparar_ajuste", preparar("true"), &cookie).await;
+    aplicar_ajuste(&p, &cookie, &g).await;
+    let encendida = leer(&p, &cookie, "wifi").await;
+    assert!(elemento(&encendida, "red-24")["pie"]["apagada_desde"].is_null());
+    let antes = panel::series::now();
+    let g = ok(&p, "preparar_ajuste", preparar("false"), &cookie).await;
+    aplicar_ajuste(&p, &cookie, &g).await;
+    let pagina = leer(&p, &cookie, "wifi").await;
+    let desde = elemento(&pagina, "red-24")["pie"]["apagada_desde"]
+        .as_i64()
+        .unwrap_or_else(|| panic!("{pagina}"));
+    assert!(
+        desde >= antes - 1 && desde <= panel::series::now() + 1,
+        "{desde}"
+    );
+    assert!(elemento(&pagina, "red-5")["pie"]["apagada_desde"].is_null());
 }

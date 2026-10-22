@@ -156,6 +156,10 @@
   line-height: 1.45;
 }
 
+.tarjeta-rec-quien {
+  color: var(--suave);
+}
+
 .tarjeta-sin-leer {
   display: flex;
   flex-wrap: wrap;

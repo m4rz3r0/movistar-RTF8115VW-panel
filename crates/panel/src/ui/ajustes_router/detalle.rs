@@ -23,7 +23,7 @@ use crate::ui::i18n::traducir;
 use crate::ui::{Estado, IconoEstado};
 use ajustes::Nivel;
 use leptos::{ev, prelude::*, task::spawn_local};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 /// Id del título del detalle (recibe el foco al abrirlo).
 pub(crate) const ID_TITULO_DETALLE: &str = "detalle-titulo";
@@ -91,6 +91,51 @@ fn columna(
     }
 }
 
+/// Lo editado y sin guardar en el detalle de cada elemento (id del
+/// elemento → (ajuste, campo) → valor en edición). Vive fuera de la lectura
+/// del tema: cuando la página vuelve a leerlo (tras un cambio o con «Volver
+/// a leer»), el detalle se pinta de nuevo con lo editado.
+#[derive(Clone, Copy)]
+pub(crate) struct Borradores(RwSignal<HashMap<String, Borrador>>);
+
+/// Lo editado en un elemento: (ajuste, campo) → valor en edición.
+type Borrador = BTreeMap<(String, String), String>;
+
+impl Borradores {
+    pub(crate) fn nuevos() -> Borradores {
+        Borradores(RwSignal::new(HashMap::new()))
+    }
+
+    /// Olvida lo editado en todos los elementos (al cambiar de tema).
+    pub(crate) fn vaciar(self) {
+        self.0.update(HashMap::clear);
+    }
+
+    /// Olvida lo editado en el elemento `id` (se descartó).
+    pub(crate) fn olvidar(self, id: &str) {
+        self.0.update(|b| {
+            b.remove(id);
+        });
+    }
+
+    /// Guarda lo editado en `id` (sin nada, lo olvida).
+    fn guardar(self, id: &str, cambios: Borrador) {
+        self.0.update(|b| {
+            if cambios.is_empty() {
+                b.remove(id);
+            } else {
+                b.insert(id.to_owned(), cambios);
+            }
+        });
+    }
+
+    /// Lo editado en `id`.
+    fn de(self, id: &str) -> Borrador {
+        self.0
+            .with_untracked(|b| b.get(id).cloned().unwrap_or_default())
+    }
+}
+
 /// Lo que se edita en el detalle abierto: el id de su elemento y la edición
 /// de cada columna. La rejilla lo mira (al cambiar de elemento, cerrar o
 /// usar «Atrás») para no perder cambios sin guardar.
@@ -132,7 +177,28 @@ pub(crate) fn Detalle(e: ElementoVista, registro: Registro) -> impl IntoView {
         e.id.clone(),
         ediciones.iter().map(|(_, _, ed)| *ed).collect(),
     )));
+    // Lo editado antes de que la página volviera a leer el tema, de vuelta;
+    // y, desde ahora, guardado mientras se edita.
+    let borradores = expect_context::<Borradores>();
+    for ((ajuste, campo), v) in borradores.de(&e.id) {
+        if let Some((_, _, ed)) = ediciones.iter().find(|(a, _, _)| *a == ajuste) {
+            ed.poner(&campo, v);
+        }
+    }
     let ediciones = StoredValue::new(ediciones);
+    let id_borrador = e.id.clone();
+    Effect::new(move |_| {
+        let cambios: Borrador = ediciones.with_value(|es| {
+            es.iter()
+                .flat_map(|(ajuste, _, ed)| {
+                    ed.cambios()
+                        .into_iter()
+                        .map(move |(campo, v)| ((ajuste.clone(), campo), v))
+                })
+                .collect()
+        });
+        borradores.guardar(&id_borrador, cambios);
+    });
     let id = e.id.clone();
     let guardar = move |ev: ev::SubmitEvent| {
         ev.prevent_default();
@@ -202,13 +268,25 @@ pub(crate) fn Detalle(e: ElementoVista, registro: Registro) -> impl IntoView {
     let tema = pagina
         .tema
         .with_value(|t| traducir(&format!("ajustes-tema-{t}"), None));
+    // Recién abierto, el foco a su título en cuanto está en la página.
+    let titulo = NodeRef::<leptos::html::H2>::new();
+    Effect::new(move |_| {
+        if let Some(h) = titulo.get()
+            && pagina.enfocar_detalle.get_untracked()
+        {
+            pagina.enfocar_detalle.set(false);
+            let _ = h.focus();
+        }
+    });
     view! {
         <section class="detalle" aria-labelledby=ID_TITULO_DETALLE on:keydown=teclas>
             <header class="detalle-cabecera">
                 <button type="button" class="b-txt detalle-volver" on:click=cerrar>
                     {t!("ajustes-detalle-volver", tema = tema)}
                 </button>
-                <h2 id=ID_TITULO_DETALLE tabindex="-1">{nombre(&e)}</h2>
+                <h2 id=ID_TITULO_DETALLE tabindex="-1" node_ref=titulo>
+                    {nombre(&e)}
+                </h2>
                 <span class="detalle-insignia">{insignia}</span>
                 <button
                     type="button"

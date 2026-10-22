@@ -1,6 +1,15 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { PLAZO_CAMBIO, plazoDeTest } from "./cambios";
-import { asentar, entrar, quieta, recogerErrores, sinDesbordamiento, violacionesGraves } from "./util";
+import { CONTRASENA, USUARIO, rejillas } from "./instancias";
+import {
+  asentar,
+  entrar,
+  hidratada,
+  quieta,
+  recogerErrores,
+  sinDesbordamiento,
+  violacionesGraves,
+} from "./util";
 
 // Ajustes → WiFi en rejilla (la pestaña modelo del rediseño), en español a
 // 360, 1024 y 1440 px y en los dos temas, contra router-sim:
@@ -43,6 +52,7 @@ const t = {
   encendida: "Encendida",
   apagada: "Apagada",
   motivo: "No se ha podido leer este ajuste del router. Prueba de nuevo en un momento.",
+  enCurso: "Hay otro cambio en curso",
 };
 
 /** La tarjeta cuyo título es exactamente `titulo`. */
@@ -82,13 +92,24 @@ async function aplicarYSeguir(page: Page, boton: string, cards: Locator[]) {
   await expect(page.locator("dialog[open]")).toHaveCount(0);
   for (const c of cards) await expect(insignia(c)).toHaveText(t.aplicando);
   for (const c of cards) await expect(insignia(c)).toHaveText(t.comprobando, { timeout: 15_000 });
-  const aviso = page.locator(".avisos-cambio .aviso-cambio");
+  const aviso = page.locator(".avisos-cambio [role=status] .aviso-cambio");
   await expect(aviso).toContainText(t.hecho, { timeout: PLAZO_CAMBIO });
   await expect(aviso.getByRole("button", { name: t.deshacer, exact: true })).toBeVisible();
   return aviso;
 }
 
 const CAPTURAS = "capturas/rediseno-3";
+
+/** Entra en el panel de la prueba (`baseURL`), que no es el del worker. */
+async function entrarEnSuPanel(page: Page) {
+  await page.goto("/login");
+  await hidratada(page);
+  await page.waitForLoadState("networkidle");
+  await page.locator("#usuario").fill(USUARIO);
+  await page.locator("#contrasena").fill(CONTRASENA);
+  await page.locator("form button[type=submit]").click();
+  await page.waitForURL((url) => url.pathname === "/");
+}
 
 test.describe.configure({ mode: "parallel" });
 
@@ -169,6 +190,17 @@ for (const ancho of [360, 1024, 1440]) {
         const antes = await nombre.inputValue();
         await nombre.fill("RED-9");
         const pregunta = page.locator("dialog[open]");
+        // «Leído hace N s» y «Volver a leer»: leer de nuevo no pierde lo
+        // editado (en el móvil, el detalle tapa la cabecera).
+        const lectura = page.locator(".tema-lectura");
+        await expect(lectura).toContainText(/Leído (ahora mismo|hace)/);
+        if (ancho > 900) {
+          const relectura = page.waitForResponse((r) => r.url().endsWith("/api/leer_tema"));
+          await lectura.getByRole("button", { name: t.volverALeer }).click();
+          expect((await relectura).status()).toBe(200);
+          await expect(lectura).toContainText(/Leído (ahora mismo|hace [0-9] s)/);
+          await expect(nombre).toHaveValue("RED-9");
+        }
         if (ancho > 900) {
           await red24.getByRole("heading", { level: 2 }).click();
           await expect(pregunta.locator("h2")).toHaveText(t.sinGuardar);
@@ -248,11 +280,27 @@ for (const ancho of [360, 1024, 1440]) {
         expect(errores, "errores o avisos en la consola").toEqual([]);
       });
 
+    });
+
+    // Con cambios de verdad, en un panel propio (instancias.ts): su
+    // Historial no es el que cuentan las demás pruebas.
+    test.describe(`WiFi en rejilla a ${ancho} px en tema ${tema}: cambios`, () => {
+      test.use({
+        locale: "es-ES",
+        viewport: { width: ancho, height: 900 },
+        colorScheme: tema === "oscuro" ? "dark" : "light",
+        ...(deVerdad ? { baseURL: rejillas[`${ancho}-${tema}` as keyof typeof rejillas].url } : {}),
+      });
+
       test("acciones en lote e interruptores", async ({ page }) => {
         // Quitar WPS y encender la red de invitados, cada uno deshecho.
-        if (deVerdad) test.setTimeout(plazoDeTest(4));
+        if (deVerdad) test.setTimeout(plazoDeTest(6));
         const errores = recogerErrores(page);
-        await entrar(page);
+        if (deVerdad) {
+          await entrarEnSuPanel(page);
+        } else {
+          await entrar(page);
+        }
         await page.goto("/ajustes/wifi");
         await asentar(page);
         const dialogo = page.locator("dialog[open]");
@@ -266,6 +314,7 @@ for (const ancho of [360, 1024, 1440]) {
         await expect(dialogo.locator("tbody td").nth(1)).toHaveText(t.apagada);
         await quieta(page);
         await page.screenshot({ path: `${CAPTURAS}/wifi-interruptor-con-efecto-${sufijo}.png`, animations: "disabled" });
+        expect(await violacionesGraves(page), "diálogo del interruptor").toEqual([]);
         await dialogo.getByRole("button", { name: t.cancelar }).click();
         await expect(page.locator("dialog[open]")).toHaveCount(0);
         await expect(radio5.getByRole("switch")).toHaveAttribute("aria-checked", "true");
@@ -301,7 +350,16 @@ for (const ancho of [360, 1024, 1440]) {
         await expect(insignia(invitados)).toHaveText(t.aplicando);
         await expect(page.locator("dialog[open]")).toHaveCount(0);
         await expect(interruptor).toHaveAttribute("aria-checked", "true");
+        // Mientras su cambio se aplica, no se vuelve a pulsar.
+        await expect(interruptor).toHaveAttribute("aria-disabled", "true");
         await expect(insignia(invitados)).toHaveText(t.comprobando, { timeout: 15_000 });
+        // Otro interruptor mientras tanto: «hay otro cambio en curso» y su
+        // insignia vuelve a como estaba (el que se sigue, no se pierde).
+        await red24.getByRole("switch", { name: `${t.red24} apagada` }).click();
+        await expect(page.locator(".avisos-cambio [role=alert]")).toContainText(t.enCurso);
+        await expect(insignia(red24)).toHaveText(t.apagada);
+        await expect(red24.getByRole("switch")).toHaveAttribute("aria-checked", "false");
+        await expect(insignia(invitados)).toHaveText(t.comprobando);
         await expect(aviso).toContainText(
           `${t.invitados}: Red encendida, ${t.apagada} → ${t.encendida}`,
         );
@@ -312,7 +370,28 @@ for (const ancho of [360, 1024, 1440]) {
         await aplicarYSeguir(page, t.deshacer, [invitados]);
         await expect(insignia(invitados)).toHaveText(t.apagada);
         await expect(interruptor).toHaveAttribute("aria-checked", "false");
-        expect(errores, "errores o avisos en la consola").toEqual([]);
+
+        // Lo editado en el detalle sobrevive a la relectura tras un cambio
+        // del interruptor de la misma tarjeta (en el móvil, el detalle la
+        // tapa: solo en escritorio).
+        if (ancho > 900) {
+          await red5.getByRole("button", { name: `Abrir ${t.red5}` }).click();
+          const nombre = page.locator(".detalle").getByLabel(t.nombre, { exact: true });
+          await nombre.fill("RED-9");
+          await red5.getByRole("switch", { name: `${t.red5} apagada` }).click();
+          aviso = page.locator(".avisos-cambio [role=status] .aviso-cambio");
+          await expect(insignia(red5)).toHaveText(t.comprobando, { timeout: 15_000 });
+          await expect(aviso).toContainText(t.hecho, { timeout: PLAZO_CAMBIO });
+          await expect(insignia(red5)).toHaveText(t.encendida);
+          await expect(nombre).toHaveValue("RED-9");
+          await page.locator(".detalle").getByRole("button", { name: "Descartar", exact: true }).click();
+          await aviso.getByRole("button", { name: t.deshacer, exact: true }).click();
+          await aplicarYSeguir(page, t.deshacer, [red5]);
+          await expect(insignia(red5)).toHaveText(t.apagada);
+        }
+        // El 409 de «hay otro cambio en curso» lo provoca la prueba.
+        const otros = errores.filter((e) => !e.includes("status of 409 (Conflict)"));
+        expect(otros, "errores o avisos en la consola").toEqual([]);
       });
     });
   }

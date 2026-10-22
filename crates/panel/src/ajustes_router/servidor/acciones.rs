@@ -1,6 +1,6 @@
 //! Acciones sobre varios elementos: un grupo del gestor, un paso por elemento.
 
-use super::guardar::{grupo_de, instancias_fijas, paso_vista};
+use super::guardar::{exigir_tapados, grupo_de, instancias_fijas, paso_vista};
 use super::*;
 use ajustes::{Elemento, titulo_accion};
 
@@ -84,6 +84,19 @@ pub(in crate::ajustes_router) async fn preparar_accion(
         };
         let mut sub = grupo_de(aj, &p).map_err(|e| invalida(e.to_string()))?;
         instancias_fijas(&state.catalogo, aj, &mut sub).map_err(invalida)?;
+        // Una escritura que reenvía una clave que el router no deja leer
+        // (la de una línea de teléfono) la borraría: desde la barra no se
+        // puede escribir, así que esa acción no vale aquí.
+        exigir_tapados(&state.catalogo, aj, std::slice::from_ref(&p), &sub).map_err(|_| {
+            fallo(
+                StatusCode::BAD_REQUEST,
+                t!(
+                    "ajustes-accion-tapado",
+                    ajuste =
+                        crate::ui::i18n::traducir(&format!("{}-titulo", prefijo_i18n(aj)), None)
+                ),
+            )
+        })?;
         de_cada_paso.extend(std::iter::repeat_n(aj, sub.pasos.len()));
         grupo.pasos.extend(sub.pasos);
     }

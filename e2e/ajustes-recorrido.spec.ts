@@ -141,7 +141,7 @@ async function aplicarEnRejilla(page: Page, t: Textos, donde: string) {
   await sinDesbordamiento(page, `${donde}: resumen`);
   await dialogo.getByRole("button", { name: t.aplicar }).click();
   await expect(page.locator("dialog[open]")).toHaveCount(0);
-  const aviso = page.locator(".avisos-cambio .aviso-cambio");
+  const aviso = page.locator(".avisos-cambio [role=status] .aviso-cambio");
   await expect(aviso).not.toContainText(t.hecho);
   await expect(aviso).toContainText(t.hecho, { timeout: PLAZO_CAMBIO });
 }

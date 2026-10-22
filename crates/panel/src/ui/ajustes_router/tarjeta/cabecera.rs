@@ -72,11 +72,15 @@ fn interruptor(e: &ElementoVista, i: InterruptorVista, nombre: &str) -> impl Int
         });
     });
     let solo_lectura = pagina.solo_lectura;
+    // Mientras su propio cambio se aplica o se comprueba, no se pulsa otra
+    // vez (un doble clic prepararía el valor contrario).
+    let desactivado =
+        Signal::derive(move || solo_lectura || id.with_value(|id| s.insignia(id).is_some()));
     view! {
         <Interruptor
             encendido
             etiqueta
-            desactivado=solo_lectura
+            desactivado
             descrito=solo_lectura.then(|| ID_SOLO_LECTURA.to_owned())
             al_cambiar
         />

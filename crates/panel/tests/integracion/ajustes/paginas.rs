@@ -370,3 +370,21 @@ async fn red_oculta_encendida_se_avisa() {
         assert!(tarjeta(&html, "radio-5").contains(ninguna), "{idioma}");
     }
 }
+
+/// Un elemento que no existe en la dirección: en un tema en rejilla, se
+/// dice; en uno que no va en rejilla (no tiene elementos en la dirección),
+/// «página no encontrada».
+#[tokio::test]
+async fn elemento_desconocido_en_la_direccion() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    let (status, _, html) = pagina(&p, &cookie, "/ajustes/wifi/nada").await;
+    assert_eq!(status, 200, "{html}");
+    assert!(
+        html.contains("No hay nada que se llame «nada» en esta pestaña."),
+        "{html}"
+    );
+    assert!(!html.contains(r#"class="detalle""#), "{html}");
+    let (status, _, html) = pagina(&p, &cookie, "/ajustes/internet/x").await;
+    assert_eq!(status, 404, "{html}");
+    assert!(html.contains("Página no encontrada"), "{html}");
+}

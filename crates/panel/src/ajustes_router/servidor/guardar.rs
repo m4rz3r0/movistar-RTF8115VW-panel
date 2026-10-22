@@ -367,7 +367,7 @@ pub(in crate::ajustes_router) async fn preparar_elemento(
 /// Cada paso que escribe una función con un secreto tapado al leer lo
 /// reenvía: tiene que venir escrito en la petición (si no, 400 junto al
 /// campo, con el motivo). Al borrar no se reenvía.
-fn exigir_tapados(
+pub(super) fn exigir_tapados(
     f: &Catalogo,
     a: &Ajuste,
     partes: &[PeticionAjuste],

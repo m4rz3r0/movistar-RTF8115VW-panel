@@ -5,6 +5,7 @@
    pasar el ratón, con el foco o cuando ya hay alguna marcada
    (.hay-marcadas en el contenedor). Marcada: rellena de ámbar con ✓. */
 .marcar {
+  position: relative;
   display: grid;
   place-items: center;
   flex: none;
@@ -57,6 +58,16 @@
 @media (hover: none) {
   .marcar {
     opacity: 1;
+  }
+}
+
+/* En el móvil, zona táctil de 40 px sin agrandar el dibujo. */
+@media (pointer: coarse), (max-width: 860px) {
+  .marcar::before {
+    content: "";
+    position: absolute;
+    inset: -9px;
+    border-radius: 50%;
   }
 }
 

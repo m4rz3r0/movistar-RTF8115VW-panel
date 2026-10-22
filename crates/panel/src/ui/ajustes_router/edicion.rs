@@ -65,6 +65,33 @@ impl Edicion {
         })
     }
 
+    /// Los campos editables que tienen otro valor que el leído (id del campo
+    /// y valor en edición), sin validar. Reactivo.
+    pub(crate) fn cambios(self) -> Vec<(String, String)> {
+        self.campos.with_value(|cs| {
+            cs.iter()
+                .enumerate()
+                .filter(|(_, c)| c.solo_lectura.is_none())
+                .filter_map(|(i, c)| {
+                    let v = self.valor(i).get();
+                    cambiado(c, &v).then(|| (c.id.clone(), v))
+                })
+                .collect()
+        })
+    }
+
+    /// Pone en edición el valor `v` en el campo `id`, si existe y se puede
+    /// cambiar.
+    pub(crate) fn poner(self, id: &str, v: String) {
+        let i = self.campos.with_value(|cs| {
+            cs.iter()
+                .position(|c| c.id == id && c.solo_lectura.is_none())
+        });
+        if let Some(i) = i {
+            self.valor(i).set(v);
+        }
+    }
+
     /// Lo que cambia (id del campo → valor legible), validado como lo hará
     /// el servidor. Marca el error de cada campo que no vale; `Err` con el
     /// primero. Un campo que exige otro (encender el espejo exige la toma)

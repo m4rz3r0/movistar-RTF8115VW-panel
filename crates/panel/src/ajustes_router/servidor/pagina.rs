@@ -10,6 +10,7 @@ use ajustes::{
 
 pub(in crate::ajustes_router) async fn leer_tema(
     tema: String,
+    fresca: bool,
 ) -> Result<PaginaTema, ServerFnError> {
     let (state, _) = preparar().await?;
     let tema = Tema::from_slug(&tema)
@@ -22,7 +23,15 @@ pub(in crate::ajustes_router) async fn leer_tema(
         .cloned()
         .chain(derivados::claves_extra(&del_tema))
         .collect();
+    if fresca {
+        state.lecturas.olvidar(&todas);
+    }
     let leidas = state.lecturas.leer(&state.hgu, &todas).await;
+    let leido_hace_s = state.lecturas.edad(&todas).as_secs();
+    let apagadas = match tema {
+        Tema::Wifi => derivados::wifi::apagadas_desde(&state.db).await,
+        _ => HashMap::new(),
+    };
     let nodos: Vec<Option<&XmlNode>> = claves
         .iter()
         .map(|c| leidas.get(c).and_then(|r| r.as_ref().ok()))
@@ -38,6 +47,7 @@ pub(in crate::ajustes_router) async fn leer_tema(
         nodos: &nodos,
         vistas: &vistas,
         leidas: &leidas,
+        apagadas: &apagadas,
     };
     let (resumen, elementos, acciones) = montar(&state.catalogo, &state.ajustes, tema, &ctx);
     Ok(PaginaTema {
@@ -47,6 +57,7 @@ pub(in crate::ajustes_router) async fn leer_tema(
         resumen,
         elementos,
         acciones,
+        leido_hace_s,
     })
 }
 
@@ -205,6 +216,7 @@ fn elemento(
         recomendacion,
         pie: PieVista {
             nota: derivados::nota(ctx, e),
+            apagada_desde: derivados::apagada_desde(ctx, e),
             ..PieVista::default()
         },
         ajustes,
@@ -258,6 +270,31 @@ fn dato<'v>(
     }
 }
 
+/// Texto legible del valor actual de un campo (como en la página).
+fn texto_actual(c: &CampoVista) -> String {
+    match &c.valor {
+        ValorLegible::Booleano(b) => crate::ui::grupo::texto_booleano(&c.clave, *b),
+        ValorLegible::Opcion(o) => traducir(&format!("{}-{o}", c.clave), None),
+        ValorLegible::Texto(t) | ValorLegible::Desconocido(t) => t.clone(),
+        ValorLegible::Secreto => String::new(),
+    }
+}
+
+/// Qué pasa ahora con un campo que no tiene lo recomendado: su texto propio
+/// (`ajustes-problema-<campo>-<valor>`, «El WPS está activado: …») o, sin
+/// él, el valor que tiene («Ahora: WPS, Sí.»).
+fn problema(c: &CampoVista) -> String {
+    let propio = legible(&c.valor).map(|v| format!("ajustes-problema-{}-{v}", c.id));
+    match propio {
+        Some(k) if i18n::existe(crate::ui::i18n::idioma_actual(), &k) => traducir(&k, None),
+        _ => t!(
+            "ajustes-recomendacion-ahora",
+            campo = traducir(&c.clave, None),
+            valor = texto_actual(c)
+        ),
+    }
+}
+
 /// La recomendación pendiente más importante de los ajustes de un
 /// elemento: primero las de seguridad o de una escritura de riesgo alto;
 /// después, el resto en el orden del catálogo. Solo de campos editables.
@@ -293,6 +330,7 @@ fn recomendacion(
             |a| traducir(&clave_accion(&a.id), None),
         );
     Some(RecomendacionVista {
+        problema: problema(c),
         texto: c
             .motivo_recomendado
             .as_deref()

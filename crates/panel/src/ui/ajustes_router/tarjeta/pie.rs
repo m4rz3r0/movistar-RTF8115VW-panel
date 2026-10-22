@@ -21,7 +21,7 @@ fn iniciales(nombre: &str) -> String {
 }
 
 /// El pie de la tarjeta de `e`: los dispositivos conectados (con sus
-/// iniciales), la nota de una radio (con la Biblioteca, donde se ven todas
+/// iniciales), desde cuándo está apagada, la nota de una radio (con la Biblioteca, donde se ven todas
 /// sus redes) y «Abrir».
 pub(super) fn pie(e: &ElementoVista, nombre: &str, abrir: Callback<()>) -> impl IntoView + use<> {
     let dispositivos = (!e.pie.dispositivos.is_empty()).then(|| {
@@ -46,9 +46,17 @@ pub(super) fn pie(e: &ElementoVista, nombre: &str, abrir: Callback<()>) -> impl 
             <A href=BIBLIOTECA_WIFI attr:class="b-txt">{t!("ajustes-wifi-radio-ocultas-enlace")}</A>
         }
     });
+    let apagada = e.pie.apagada_desde.map(|ts| {
+        view! {
+            <span class="tarjeta-nota">
+                {t!("ajustes-apagada-desde", fecha = crate::ui::historial::fecha_hora(ts, false))}
+            </span>
+        }
+    });
     view! {
         <div class="tarjeta-pie">
             {dispositivos}
+            {apagada}
             {nota}
             <span class="tarjeta-hueco"></span>
             <button

@@ -68,7 +68,7 @@ pub(crate) fn Tarjeta(e: ElementoVista) -> impl IntoView {
                     <IconoEstado estado=Estado::Error />
                     <span>{motivo.clone()}</span>
                 </p>
-                <button type="button" class="b-sec" on:click=move |_| pagina.recargar.run(())>
+                <button type="button" class="b-sec" on:click=move |_| pagina.volver_a_leer.run(())>
                     {t!("ajustes-volver-a-leer")}
                 </button>
             </div>

@@ -188,15 +188,32 @@ ajustes-accion-quitar_wps = Turn off WPS
 ajustes-accion-ocultar_nombre = Hide the name
 ajustes-accion-mostrar_nombre = Show the name
 ajustes-accion-aislar = Isolate the devices
-ajuste-accion-encender-titulo = WiFi networks: turn on
-ajuste-accion-apagar-titulo = WiFi networks: turn off
-ajuste-accion-quitar_wps-titulo = WiFi networks: turn off WPS
-ajuste-accion-ocultar_nombre-titulo = WiFi networks: hide the name
-ajuste-accion-mostrar_nombre-titulo = WiFi networks: show the name
-ajuste-accion-aislar-titulo = WiFi networks: isolate the devices
+ajuste-accion-encender-titulo = WiFi networks, turn on
+ajuste-accion-apagar-titulo = WiFi networks, turn off
+ajuste-accion-quitar_wps-titulo = WiFi networks, turn off WPS
+ajuste-accion-ocultar_nombre-titulo = WiFi networks, hide the name
+ajuste-accion-mostrar_nombre-titulo = WiFi networks, show the name
+ajuste-accion-aislar-titulo = WiFi networks, isolate the devices
 ajustes-accion-demasiados = At most { $max } at a time: unmark some.
 ajustes-accion-no-aplica = That action can't be applied to everything marked.
 ajustes-accion-ya-estaba = All the marked ones were already like that: there is nothing to change.
+ajustes-accion-tapado = This action does not work for “{ $ajuste }”: saving it means typing a password the router won't let be read. Change it from its details.
+ajustes-recomendacion-ahora = Now: { $campo }, { $valor }.
+ajustes-problema-wps-true = WPS is on: anyone who gets to the router can connect by pressing its button, without the password.
+ajustes-problema-activa-false = The network is off: no device can connect to it.
+ajustes-problema-activa-true = The network is on: if you have no visitors right now, it is one more network visible from outside.
+ajustes-problema-aislamiento-false = Devices on this network can see each other: visitors would see yours.
+ajustes-problema-aislamiento-true = Devices on this network can't see each other: you won't be able to, for example, cast to the TV.
+ajustes-problema-visible-false = The network name is hidden: it has to be typed by hand to connect.
+ajustes-problema-seguridad-abierta = The network is open: anyone nearby can connect without a password.
+ajustes-leido-hace = { $s ->
+    [0] Read just now
+    [one] Read 1 s ago
+   *[other] Read { $s } s ago
+}
+ajustes-leido-hace-min = Read { $min } min ago
+ajustes-apagada-desde = Off since { $fecha }
+ajustes-elemento-no-existe = There is nothing called “{ $id }” in this tab. Pick one of its cards.
 
 ## Grid of elements: mark, bar, card, details and change notice
 ajustes-resumen = Summary of the section

@@ -188,15 +188,32 @@ ajustes-accion-quitar_wps = Quitar WPS
 ajustes-accion-ocultar_nombre = Ocultar el nombre
 ajustes-accion-mostrar_nombre = Mostrar el nombre
 ajustes-accion-aislar = Aislar los dispositivos
-ajuste-accion-encender-titulo = Redes WiFi: encender
-ajuste-accion-apagar-titulo = Redes WiFi: apagar
-ajuste-accion-quitar_wps-titulo = Redes WiFi: quitar el WPS
-ajuste-accion-ocultar_nombre-titulo = Redes WiFi: ocultar el nombre
-ajuste-accion-mostrar_nombre-titulo = Redes WiFi: mostrar el nombre
-ajuste-accion-aislar-titulo = Redes WiFi: aislar los dispositivos
+ajuste-accion-encender-titulo = Redes WiFi, encender
+ajuste-accion-apagar-titulo = Redes WiFi, apagar
+ajuste-accion-quitar_wps-titulo = Redes WiFi, quitar el WPS
+ajuste-accion-ocultar_nombre-titulo = Redes WiFi, ocultar el nombre
+ajuste-accion-mostrar_nombre-titulo = Redes WiFi, mostrar el nombre
+ajuste-accion-aislar-titulo = Redes WiFi, aislar los dispositivos
 ajustes-accion-demasiados = Como mucho { $max } a la vez: desmarca alguno.
 ajustes-accion-no-aplica = Esa acción no se puede aplicar a todo lo marcado.
 ajustes-accion-ya-estaba = Todas las marcadas ya estaban así: no hay nada que cambiar.
+ajustes-accion-tapado = Esta acción no vale para «{ $ajuste }»: guardarlo exige escribir una clave que el router no deja leer. Cámbialo desde su detalle.
+ajustes-recomendacion-ahora = Ahora: { $campo }, { $valor }.
+ajustes-problema-wps-true = El WPS está activado: quien llegue al router puede conectarse pulsando su botón, sin la contraseña.
+ajustes-problema-activa-false = La red está apagada: ningún dispositivo puede conectarse a ella.
+ajustes-problema-activa-true = La red está encendida: si ahora no tienes visitas, es una red más que se ve desde fuera.
+ajustes-problema-aislamiento-false = Los dispositivos de esta red pueden verse entre ellos: las visitas verían los tuyos.
+ajustes-problema-aislamiento-true = Los dispositivos de esta red no se ven entre ellos: no podrás, por ejemplo, enviar contenido a la tele.
+ajustes-problema-visible-false = El nombre de la red está oculto: hay que escribirlo a mano para conectarse.
+ajustes-problema-seguridad-abierta = La red está abierta: cualquiera que esté cerca puede conectarse sin contraseña.
+ajustes-leido-hace = { $s ->
+    [0] Leído ahora mismo
+    [one] Leído hace 1 s
+   *[other] Leído hace { $s } s
+}
+ajustes-leido-hace-min = Leído hace { $min } min
+ajustes-apagada-desde = Apagada desde { $fecha }
+ajustes-elemento-no-existe = No hay nada que se llame «{ $id }» en esta pestaña. Elige una de sus tarjetas.
 
 ## Rejilla de elementos: marca, barra, tarjeta, detalle y aviso del cambio
 ajustes-resumen = Resumen del tema

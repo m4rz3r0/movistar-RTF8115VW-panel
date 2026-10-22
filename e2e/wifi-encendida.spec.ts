@@ -60,7 +60,7 @@ async function ponerRed(page: Page, t: Textos, red: Locator, encender: boolean) 
   }
   // El aviso es el de este cambio (el anterior ya decía «hecho»): lo sigue
   // y lo dice al terminar (tras la vigilancia).
-  const aviso = page.locator(".avisos-cambio .aviso-cambio");
+  const aviso = page.locator(".avisos-cambio [role=status] .aviso-cambio");
   await expect(aviso).not.toContainText(t.hecho);
   await expect(aviso).toContainText(t.hecho, { timeout: PLAZO_CAMBIO });
 }

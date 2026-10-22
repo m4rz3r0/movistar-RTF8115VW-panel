@@ -35,12 +35,20 @@ const NUEVOS = 4;
 const RECORRIDOS = 2;
 
 /**
+ * Paneles de la rejilla de WiFi (ajustes-wifi.spec.ts), detrás de los del
+ * recorrido: los cambios de verdad (un lote de dos pasos, interruptores y
+ * sus deshacer) no ensucian el Historial de los instalados, que otras
+ * pruebas cuentan.
+ */
+const REJILLAS = 2;
+
+/**
  * Tope de E2E_WORKERS: los instalados, los nuevos y los del recorrido ocupan
- * WORKERS + 6 puertos seguidos desde E2E_PORT (y desde E2E_SIM_PORT), y la
+ * WORKERS + 8 puertos seguidos desde E2E_PORT (y desde E2E_SIM_PORT), y la
  * ventana reservada a cada prueba es de 20 (p. ej. 3710-3729 y 8710-8729).
  */
 const VENTANA_DE_PUERTOS = 20;
-const MAX_WORKERS = VENTANA_DE_PUERTOS - NUEVOS - RECORRIDOS;
+const MAX_WORKERS = VENTANA_DE_PUERTOS - NUEVOS - RECORRIDOS - REJILLAS;
 
 /**
  * Workers de Playwright (E2E_WORKERS; 1, en serie). Por defecto, uno por
@@ -60,7 +68,7 @@ function workers(valor: string | undefined): number {
   if (!Number.isInteger(n) || n < 1 || n > MAX_WORKERS) {
     throw new Error(
       `E2E_WORKERS debe ser un entero entre 1 y ${MAX_WORKERS} (con ${NUEVOS} paneles del ` +
-        `asistente y ${RECORRIDOS} del recorrido, ${VENTANA_DE_PUERTOS} puertos seguidos ` +
+        `asistente, ${RECORRIDOS} del recorrido y ${REJILLAS} de la rejilla, ${VENTANA_DE_PUERTOS} puertos seguidos ` +
         `desde E2E_PORT): ${valor}`,
     );
   }
@@ -155,10 +163,17 @@ export const recorridos = {
   en: instancia("recorrido-en", "instalado", WORKERS + NUEVOS + 1, VIGILANCIA_RECORRIDO_S),
 };
 
+/** Un panel instalado por combinación de la rejilla que cambia de verdad. */
+export const rejillas = {
+  "1440-oscuro": instancia("rejilla-1440-oscuro", "instalado", WORKERS + NUEVOS + RECORRIDOS + 0),
+  "360-claro": instancia("rejilla-360-claro", "instalado", WORKERS + NUEVOS + RECORRIDOS + 1),
+};
+
 export const todas: Instancia[] = [
   ...instalados,
   ...Object.values(nuevos),
   ...Object.values(recorridos),
+  ...Object.values(rejillas),
 ];
 
 /** Usuario del panel «instalado». */

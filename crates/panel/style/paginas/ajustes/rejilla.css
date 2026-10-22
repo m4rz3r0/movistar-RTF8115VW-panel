@@ -13,6 +13,18 @@
   margin-top: var(--esp-2);
 }
 
+/* «Leído hace N s» y «Volver a leer», encima del resumen. */
+.tema-lectura {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--esp-3);
+  margin-bottom: var(--esp-3);
+  color: var(--tenue);
+  font-size: 13px;
+}
+
 /* Mientras se lee: la forma de las tarjetas, sin datos. */
 .tarjeta-esqueleto {
   min-height: 240px;

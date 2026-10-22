@@ -129,7 +129,14 @@ async fn accion_ya_estaba_asi() {
         .count();
     assert_eq!(a_la_5, 1, "solo la escritura de la prueba: {escritas:?}");
 
-    // Las dos ya lo tienen: 409, sin ningún cambio nuevo.
+    // Las dos ya lo tienen: 409, sin ningún cambio nuevo en el Historial.
+    let cambios = || async {
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM changes")
+            .fetch_one(&p.state.db)
+            .await
+            .unwrap()
+    };
+    let antes = cambios().await;
     let (status, body) = accion(&p, &cookie, "quitar_wps", &["red-24", "red-5"]).await;
     assert_eq!(status, 409, "{body}");
     assert!(body.contains("ya estaban así"), "{body}");
@@ -137,6 +144,11 @@ async fn accion_ya_estaba_asi() {
     let (status, body) = accion(&p, &en, "quitar_wps", &["red-24", "red-5"]).await;
     assert_eq!(status, 409, "{body}");
     assert!(body.contains("already"), "{body}");
+    assert_eq!(
+        cambios().await,
+        antes,
+        "el 409 no deja nada en el Historial"
+    );
 }
 
 #[tokio::test]
@@ -199,6 +211,18 @@ async fn solo_lectura_desactiva_todo() {
     assert!(body.contains("solo se pueden consultar"), "{body}");
     let (status, body) =
         preparar_ajuste(&p, &cookie, "wifi.red_24", json!({ "activa": "true" })).await;
+    assert_eq!(status, 403, "{body}");
+    let peticion = |ajuste: &str, campo: &str, valor: &str| json!({ "ajuste": ajuste, "instancia": null, "borrar": false, "valores": { campo: valor } });
+    let (status, body) = llamar(
+        &p,
+        "preparar_elemento",
+        json!({ "peticiones": [
+            peticion("wifi.red_5", "nombre", "RED-9"),
+            peticion("wifi.red_5_avanzado", "max_clientes", "9"),
+        ] }),
+        Some(&cookie),
+    )
+    .await;
     assert_eq!(status, 403, "{body}");
     assert!(p.sim.control.writes().is_empty());
 
@@ -290,4 +314,57 @@ async fn detalle_guarda_dos_ajustes_en_un_cambio() {
     )
     .await;
     assert_eq!(status, 400);
+}
+
+/// Una acción sobre un ajuste que reenvía una clave que el router no deja
+/// leer (la de una línea de teléfono) la borraría: 400, sin escribir nada.
+#[tokio::test]
+async fn accion_sobre_una_clave_tapada_da_400() {
+    let toml = r#"
+[[ajuste]]
+id = "telefono.linea"
+tema = "telefono"
+nivel = "basico"
+leer = { funcion = "cbGetVoiceLine", params = { interwork_id = "0" } }
+fijos = { interwork_id = "0" }
+
+[[ajuste.campo]]
+id = "activa"
+escribe = { funcion = "cbSetVoiceLine", parametro = "adm_state" }
+lee = "adm_state"
+tipo = "booleano"
+
+[[ajuste.campo]]
+id = "contrasena"
+escribe = { funcion = "cbSetVoiceLine", parametro = "auth_password" }
+lee = "auth_password"
+tipo = "secreto"
+validar = { min = 1 }
+
+[[elemento]]
+id = "linea"
+tema = "telefono"
+ajustes = ["telefono.linea"]
+interruptor = "telefono.linea.activa"
+
+[[accion]]
+id = "apagar"
+tema = "telefono"
+campo = "activa"
+valor = "false"
+"#;
+    let (p, cookie) = PanelPrueba::nuevo()
+        .ajustes(toml)
+        .arrancar_con_gestor()
+        .await;
+    let (status, body) = llamar(
+        &p,
+        "preparar_accion",
+        json!({ "tema": "telefono", "accion": "apagar", "elementos": ["linea"] }),
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(status, 400, "{body}");
+    assert!(body.contains("no deja leer"), "{body}");
+    assert!(p.sim.control.writes().is_empty());
 }

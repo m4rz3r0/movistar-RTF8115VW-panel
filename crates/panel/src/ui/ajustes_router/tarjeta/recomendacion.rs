@@ -9,7 +9,8 @@ use crate::ui::explorador::texto_error;
 use leptos::{prelude::*, task::spawn_local};
 use std::collections::BTreeMap;
 
-/// La recomendación pendiente más importante de `e`: para quién es y el
+/// La recomendación pendiente más importante de `e`: qué pasa ahora, para
+/// quién es lo recomendado y el
 /// botón que prepara el cambio a lo recomendado (se revisa en el diálogo).
 /// Fondo ámbar si es un riesgo de seguridad; neutro, si no. En solo
 /// lectura, el botón se ve desactivado y dice por qué.
@@ -46,7 +47,11 @@ pub(super) fn recomendacion(
     };
     Some(view! {
         <div class="tarjeta-rec" class:riesgo=r.riesgo>
-            <p>{para_quien}</p>
+            <p>
+                {r.problema.clone()}
+                " "
+                <span class="tarjeta-rec-quien">{para_quien}</span>
+            </p>
             <button
                 type="button"
                 class="b-rec"

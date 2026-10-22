@@ -38,6 +38,7 @@ use crate::ui::i18n::traducir;
 use crate::ui::{Estado, IconoEstado};
 use ajustes::Tema;
 use aviso::{AvisoCambio, Seguimiento};
+use detalle::Borradores;
 use heredada::{ContenidoTema, tarjetas_sueltas};
 use leptos::prelude::*;
 use leptos_router::{
@@ -230,7 +231,7 @@ impl Precarga {
             };
             self.en_curso.set_value(true);
             leptos::task::spawn_local(async move {
-                let mut bien = leer_tema(slug.clone()).await.is_ok();
+                let mut bien = leer_tema(slug.clone(), false).await.is_ok();
                 // Las tarjetas de Red local piden esto en cuanto se pintan.
                 if bien && t == Tema::RedLocal {
                     bien = leer_dispositivos().await.is_ok() && leer_red_casa().await.is_ok();
@@ -347,15 +348,24 @@ pub fn PaginaTema() -> impl IntoView {
         Memo::new(move |_| Tema::from_slug(&slug.get()).is_some_and(|t| EN_REJILLA.contains(&t)));
     let ubicacion = use_location();
     let elemento = Memo::new(move |_| elemento_de(&ubicacion.pathname.get()));
+    // «Volver a leer»: la próxima lectura no sale de la caché del servidor.
+    let fresca = StoredValue::new(false);
     let datos = Resource::new(
         move || slug.get(),
-        |s| async move {
-            match Tema::from_slug(&s) {
-                Some(_) => leer_tema(s).await.map(Some),
-                None => Ok(None),
+        move |s| {
+            let fresca = fresca.try_update_value(std::mem::take).unwrap_or(false);
+            async move {
+                match Tema::from_slug(&s) {
+                    Some(_) => leer_tema(s, fresca).await.map(Some),
+                    None => Ok(None),
+                }
             }
         },
     );
+    // Un elemento en la dirección solo existe en los temas en rejilla. Un
+    // `Memo`: abrir o cerrar un detalle no vuelve a pintar la página.
+    let fuera_de_la_rejilla =
+        Memo::new(move |_| elemento.with(Option::is_some) && !en_rejilla.get());
     let foco = Foco(RwSignal::new(None));
     provide_context(foco);
     let precarga = Precarga::nueva();
@@ -363,15 +373,22 @@ pub fn PaginaTema() -> impl IntoView {
         precarga.olvidar();
         datos.refetch();
     });
+    let volver_a_leer = Callback::new(move |()| {
+        fresca.set_value(true);
+        recargar.run(());
+    });
     // Lo marcado y el cambio en curso viven fuera de la lectura: sobreviven
     // a la relectura tras un cambio. Al cambiar de tema, nada marcado.
     let seleccion = Seleccion::nueva();
     provide_context(seleccion);
+    let borradores = Borradores::nuevos();
+    provide_context(borradores);
     provide_context(Seguimiento::nuevo(recargar));
     Effect::new(move |anterior: Option<String>| {
         let ahora = slug.get();
         if anterior.is_some_and(|a| a != ahora) {
             seleccion.vaciar();
+            borradores.vaciar();
         }
         ahora
     });
@@ -392,7 +409,7 @@ pub fn PaginaTema() -> impl IntoView {
         }
     });
     move || {
-        if !existe.get() {
+        if !existe.get() || fuera_de_la_rejilla.get() {
             return no_encontrada().into_any();
         }
         view! {
@@ -431,7 +448,7 @@ pub fn PaginaTema() -> impl IntoView {
                             let intro = introduccion(&p.tema, p.foto_de_partida, p.solo_lectura);
                             view! {
                                 {intro}
-                                <ContenidoRejilla p recargar elemento />
+                                <ContenidoRejilla p volver_a_leer elemento />
                             }
                                 .into_any()
                         }
