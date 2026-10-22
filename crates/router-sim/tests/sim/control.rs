@@ -69,6 +69,25 @@ async fn fail_reads_hasta_desactivar() {
     assert!(c.call("cbGetTr69Config", &[]).await.is_ok());
 }
 
+/// Falla solo la lectura con ese parámetro: las de las otras instancias
+/// responden.
+#[tokio::test]
+async fn fail_reads_con_un_parametro() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    let punto = |id: &'static str| [("dpm_cfg_wifi_acc_pt_id", id)];
+    sim.control
+        .fail_reads_con("cbGetWifiAccPt", "dpm_cfg_wifi_acc_pt_id", "1", true);
+    assert!(matches!(
+        c.call("cbGetWifiAccPt", &punto("1")).await,
+        Err(Error::CallFailed { .. })
+    ));
+    assert!(c.call("cbGetWifiAccPt", &punto("0")).await.is_ok());
+    sim.control
+        .fail_reads_con("cbGetWifiAccPt", "dpm_cfg_wifi_acc_pt_id", "1", false);
+    assert!(c.call("cbGetWifiAccPt", &punto("1")).await.is_ok());
+}
+
 #[tokio::test]
 async fn counters_bump_moves_ip2_and_lan_port() {
     let sim = start().await;

@@ -287,7 +287,7 @@ pub fn PaginaTema() -> impl IntoView {
         move || slug.get(),
         |s| async move {
             match Tema::from_slug(&s) {
-                Some(_) => leer_tema(s).await.map(Some),
+                Some(_) => leer_tema(s).await.map(|p| Some(tarjetas_sueltas(p))),
                 None => Ok(None),
             }
         },
@@ -435,6 +435,17 @@ fn aviso_actualizando(pendiente: RwSignal<bool>) -> Actualizando {
         cancelar(minimo);
     });
     Actualizando { ocupado, aviso }
+}
+
+/// Adaptador temporal: la página de elementos como las tarjetas sueltas de
+/// siempre (un ajuste, una tarjeta), hasta que el tema pase a la rejilla.
+fn tarjetas_sueltas(p: crate::ajustes_router::PaginaTema) -> TemaVista {
+    TemaVista {
+        tema: p.tema,
+        solo_lectura: p.solo_lectura,
+        foto_de_partida: p.foto_de_partida,
+        ajustes: p.elementos.into_iter().flat_map(|e| e.ajustes).collect(),
+    }
 }
 
 /// Las tarjetas de un tema: lo esencial arriba; lo avanzado y lo oculto,

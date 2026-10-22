@@ -1,19 +1,22 @@
-//! Lado del servidor de Ajustes: lectura, guardado y errores comunes.
+//! Lado del servidor de Ajustes: lectura de la página, guardado y errores
+//! comunes.
 
+mod derivados;
 mod foto;
 mod guardar;
 mod historial;
 mod lectura;
+mod pagina;
 mod puertos;
 mod red_local;
 #[cfg(test)]
 mod tests;
-mod wifi;
 
 pub(super) use foto::{comparar_con_partida, preparar_volver_a_partida};
 pub(super) use guardar::{confirmar_ajuste, preparar_ajuste};
 pub(super) use historial::deshacer_ajuste;
 pub(crate) use historial::etiquetas_de_campos;
+pub(super) use pagina::leer_tema;
 pub(super) use red_local::{leer_dispositivos, leer_red_casa, leer_reservas};
 
 use super::*;
@@ -50,44 +53,6 @@ type Leidos = BTreeMap<String, String>;
 /// Lectura de un ajuste.
 fn clave(a: &Ajuste) -> Clave {
     Clave::new(&a.leer.funcion, &a.leer.params)
-}
-
-pub(super) async fn leer_tema(tema: String) -> Result<TemaVista, ServerFnError> {
-    let (state, _) = preparar().await?;
-    let tema = Tema::from_slug(&tema)
-        .ok_or_else(|| fallo(StatusCode::NOT_FOUND, t!("ajustes-error-tema")))?;
-    let del_tema: Vec<&Ajuste> = state.ajustes.por_tema(tema).collect();
-    let claves: Vec<Clave> = del_tema.iter().map(|a| clave(a)).collect();
-    let de_listas = wifi::claves_de_listas(&del_tema);
-    let todas: Vec<Clave> = claves
-        .iter()
-        .cloned()
-        .chain(de_listas.iter().map(|(_, c)| c.clone()))
-        .collect();
-    let leidas = state.lecturas.leer(&state.hgu, &todas).await;
-    let nodos: Vec<Option<&XmlNode>> = claves
-        .iter()
-        .map(|c| leidas.get(c).and_then(|r| r.as_ref().ok()))
-        .collect();
-    let mut ajustes: Vec<AjusteVista> = del_tema
-        .iter()
-        .zip(&nodos)
-        .map(|(a, nodo)| vista(&state.catalogo, a, *nodo))
-        .collect();
-    let listas: Vec<(String, Option<&XmlNode>)> = de_listas
-        .into_iter()
-        .map(|(radio, c)| {
-            let n = leidas.get(&c).and_then(|r| r.as_ref().ok());
-            (radio, n)
-        })
-        .collect();
-    wifi::marcar_emision(&del_tema, &mut ajustes, &nodos, &listas);
-    Ok(TemaVista {
-        tema: tema.slug().to_owned(),
-        solo_lectura: instancia::solo_lectura(&state.db).await,
-        foto_de_partida: crate::fotos::hay(&state.db, crate::fotos::TipoFoto::Partida).await,
-        ajustes,
-    })
 }
 
 /// Error del gestor al guardar un ajuste, con el mensaje traducido y sin

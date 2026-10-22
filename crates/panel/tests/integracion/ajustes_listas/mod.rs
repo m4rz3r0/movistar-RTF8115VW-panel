@@ -62,10 +62,8 @@ fn por_mac<'a>(lista: &'a [Value], mac: &str) -> &'a Value {
 /// Reservas de `leer_tema` como triples `(id, mac, ip)`.
 async fn reservas(p: &Panel, cookie: &str) -> Vec<(String, String, String)> {
     let tema = ok(p, "leer_tema", json!({ "tema": "red_local" }), cookie).await;
-    let a = tema["ajustes"]
-        .as_array()
-        .unwrap()
-        .iter()
+    let a = crate::comun::ajustes_de(&tema)
+        .into_iter()
         .find(|a| a["id"] == "red_local.reservas")
         .unwrap()
         .clone();

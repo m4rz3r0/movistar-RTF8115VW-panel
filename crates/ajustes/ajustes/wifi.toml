@@ -32,11 +32,8 @@ fijos = { dpm_cfg_wifi_acc_pt_id = "0" }
 id = "activa"
 escribe = { funcion = "cbSetWifiAccPt", parametro = "adm_state" }
 lee = "adm_state"
-tipo = "opcion"
-opciones = [
-  { valor = "1", clave = "encendida", recomendada = true },
-  { valor = "0", clave = "apagada" },
-]
+tipo = "booleano"
+recomendado = "true"
 
 [[ajuste.campo]]
 id = "nombre"
@@ -65,6 +62,7 @@ opciones = [
   { valor = "3", clave = "wpa2", recomendada = true, ademas = { encryption = "4" } },
   { valor = "0", clave = "abierta", aviso = "wifi_abierta", ademas = { encryption = "0" } },
 ]
+seguridad = true
 
 [[ajuste.campo]]
 id = "visible"
@@ -80,6 +78,7 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "wps_adm_state" }
 lee = "wps_adm_state"
 tipo = "booleano"
 recomendado = "false"
+seguridad = true
 
 [[ajuste]]
 id = "wifi.red_24_avanzado"
@@ -123,11 +122,8 @@ fijos = { dpm_cfg_wifi_acc_pt_id = "1" }
 id = "activa"
 escribe = { funcion = "cbSetWifiAccPt", parametro = "adm_state" }
 lee = "adm_state"
-tipo = "opcion"
-opciones = [
-  { valor = "1", clave = "encendida", recomendada = true },
-  { valor = "0", clave = "apagada" },
-]
+tipo = "booleano"
+recomendado = "true"
 
 [[ajuste.campo]]
 id = "nombre"
@@ -156,6 +152,7 @@ opciones = [
   { valor = "3", clave = "wpa2", recomendada = true, ademas = { encryption = "4" } },
   { valor = "0", clave = "abierta", aviso = "wifi_abierta", ademas = { encryption = "0" } },
 ]
+seguridad = true
 
 [[ajuste.campo]]
 id = "visible"
@@ -171,6 +168,7 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "wps_adm_state" }
 lee = "wps_adm_state"
 tipo = "booleano"
 recomendado = "false"
+seguridad = true
 
 [[ajuste]]
 id = "wifi.red_5_avanzado"
@@ -214,11 +212,8 @@ fijos = { dpm_cfg_wifi_acc_pt_id = "2" }
 id = "activa"
 escribe = { funcion = "cbSetWifiAccPt", parametro = "adm_state" }
 lee = "adm_state"
-tipo = "opcion"
-opciones = [
-  { valor = "1", clave = "encendida" },
-  { valor = "0", clave = "apagada", recomendada = true },
-]
+tipo = "booleano"
+recomendado = "false"
 
 [[ajuste.campo]]
 id = "nombre"
@@ -247,6 +242,7 @@ opciones = [
   { valor = "3", clave = "wpa2", recomendada = true, ademas = { encryption = "4" } },
   { valor = "0", clave = "abierta", aviso = "wifi_abierta", ademas = { encryption = "0" } },
 ]
+seguridad = true
 
 [[ajuste.campo]]
 id = "visible"
@@ -262,6 +258,7 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "wps_adm_state" }
 lee = "wps_adm_state"
 tipo = "booleano"
 recomendado = "false"
+seguridad = true
 
 [[ajuste]]
 id = "wifi.invitados_avanzado"
@@ -277,6 +274,7 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "isolation" }
 lee = "isolation"
 tipo = "booleano"
 recomendado = "true"
+seguridad = true
 
 [[ajuste.campo]]
 id = "wmm"
@@ -432,3 +430,92 @@ escribe = { funcion = "cbSetWifi", parametro = "beamforming" }
 lee = "beamforming"
 tipo = "booleano"
 recomendado = "true"
+
+# Elementos de la pestaña: cada red junta su tarjeta básica y la avanzada;
+# cada radio, igual. Los datos son los seis de la tarjeta (spec §5.1).
+[[elemento]]
+id = "red-24"
+tema = "wifi"
+ajustes = ["wifi.red_24", "wifi.red_24_avanzado"]
+papel = "principal"
+interruptor = "wifi.red_24.activa"
+datos = ["wifi.red_24.seguridad", "wifi.red_24.contrasena", "wifi.red_24.visible",
+         "derivado:canal_y_ancho", "wifi.red_24_avanzado.aislamiento", "derivado:conectados"]
+estado = "derivado:estado_red"
+
+[[elemento]]
+id = "red-5"
+tema = "wifi"
+ajustes = ["wifi.red_5", "wifi.red_5_avanzado"]
+papel = "principal"
+interruptor = "wifi.red_5.activa"
+datos = ["wifi.red_5.seguridad", "wifi.red_5.contrasena", "wifi.red_5.visible",
+         "derivado:canal_y_ancho", "wifi.red_5_avanzado.aislamiento", "derivado:conectados"]
+estado = "derivado:estado_red"
+
+[[elemento]]
+id = "invitados"
+tema = "wifi"
+ajustes = ["wifi.invitados", "wifi.invitados_avanzado"]
+papel = "invitados"
+interruptor = "wifi.invitados.activa"
+datos = ["wifi.invitados.seguridad", "wifi.invitados.contrasena", "wifi.invitados.visible",
+         "derivado:canal_y_ancho", "wifi.invitados_avanzado.aislamiento", "derivado:conectados"]
+estado = "derivado:estado_red"
+
+[[elemento]]
+id = "radio-24"
+tema = "wifi"
+ajustes = ["wifi.radio_24", "wifi.radio_24_avanzado"]
+papel = "radio"
+interruptor = "wifi.radio_24.encendida"
+datos = ["wifi.radio_24.canal", "wifi.radio_24.ancho", "wifi.radio_24_avanzado.potencia",
+         "wifi.radio_24_avanzado.modo"]
+estado = "derivado:estado_red"
+
+[[elemento]]
+id = "radio-5"
+tema = "wifi"
+ajustes = ["wifi.radio_5", "wifi.radio_5_avanzado"]
+papel = "radio"
+interruptor = "wifi.radio_5.encendida"
+datos = ["wifi.radio_5.canal", "wifi.radio_5.ancho", "wifi.radio_5_avanzado.potencia",
+         "wifi.radio_5_avanzado.modo"]
+estado = "derivado:estado_red"
+
+# Acciones sobre varias redes a la vez (spec §5.5).
+[[accion]]
+id = "encender"
+tema = "wifi"
+campo = "activa"
+valor = "true"
+
+[[accion]]
+id = "apagar"
+tema = "wifi"
+campo = "activa"
+valor = "false"
+
+[[accion]]
+id = "quitar_wps"
+tema = "wifi"
+campo = "wps"
+valor = "false"
+
+[[accion]]
+id = "ocultar_nombre"
+tema = "wifi"
+campo = "visible"
+valor = "false"
+
+[[accion]]
+id = "mostrar_nombre"
+tema = "wifi"
+campo = "visible"
+valor = "true"
+
+[[accion]]
+id = "aislar"
+tema = "wifi"
+campo = "aislamiento"
+valor = "true"

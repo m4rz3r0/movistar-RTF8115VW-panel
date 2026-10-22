@@ -53,13 +53,16 @@ pub async fn deshacer_ajuste(cambio: i64) -> Result<GrupoVista, ServerFnError> {
     servidor::deshacer_ajuste(cambio).await
 }
 
-/// Los ajustes del tema `tema` (`wifi`, `puertos`…) con su valor actual
-/// del router. Cada lectura distinta se hace una sola vez, de la caché
-/// corta si está ([`crate::lecturas`]) y, las que faltan, seguidas en una
-/// tanda; si una falla, solo sus ajustes quedan [`EstadoLectura::SinLeer`].
-/// 404 si el tema no existe. Exige sesión; la respuesta va con `no-store`.
+/// La página del tema `tema` (`wifi`, `puertos`…) entera: el resumen, los
+/// elementos con su estado, sus datos, su recomendación principal y el
+/// detalle de sus ajustes con el valor actual del router, y las acciones
+/// sobre varios elementos. Cada lectura distinta se hace una sola vez, de
+/// la caché corta si está ([`crate::lecturas`]) y, las que faltan, seguidas
+/// en una tanda; si una falla, solo los elementos que la usan quedan
+/// [`EstadoLectura::SinLeer`]. 404 si el tema no existe. Exige sesión; la
+/// respuesta va con `no-store`.
 #[server(endpoint = "leer_tema", input = Json)]
-pub async fn leer_tema(tema: String) -> Result<TemaVista, ServerFnError> {
+pub async fn leer_tema(tema: String) -> Result<PaginaTema, ServerFnError> {
     servidor::leer_tema(tema).await
 }
 

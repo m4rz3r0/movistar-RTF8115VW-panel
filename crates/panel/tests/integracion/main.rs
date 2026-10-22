@@ -29,6 +29,7 @@ mod instalar;
 mod instancia;
 mod lecturas;
 mod menu;
+mod pagina_tema;
 mod panel_ajustes;
 mod poller;
 mod red;

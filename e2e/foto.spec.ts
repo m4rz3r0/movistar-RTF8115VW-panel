@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { PLAZO_CAMBIO, cambiarUpnp, esperarFinal, plazoDeTest } from "./cambios";
+import { PLAZO_CAMBIO, ajusteDe, cambiarUpnp, esperarFinal, plazoDeTest } from "./cambios";
 import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 
 // «Cómo estaba al instalar» (/ajustes/foto-de-partida) contra router-sim: el
@@ -32,8 +32,8 @@ async function upnpCambiado(page: Page): Promise<boolean> {
 /** UPnP encendido ahora. */
 async function upnpActivo(page: Page): Promise<boolean> {
   const tema = await api(page, "leer_tema", { tema: "puertos" });
-  const a = tema.ajustes.find((a: { id: string }) => a.id === "puertos.upnp");
-  return a.campos.find((c: { id: string }) => c.id === "activo").valor.Booleano;
+  const a = ajusteDe(tema, "puertos.upnp");
+  return a.campos.find((c) => c.id === "activo")?.valor.Booleano as boolean;
 }
 
 /** Sin funciones ni parámetros de la API en un texto visible. */
@@ -123,8 +123,8 @@ test("Teléfono: volver a un valor pide la clave que el router no deja leer", as
   await entrar(page);
   // Cambia «Ahorro en los silencios» desde Ajustes (con la clave de la línea).
   const tema = await api(page, "leer_tema", { tema: "telefono" });
-  const linea = tema.ajustes.find((a: { id: string }) => a.id === "telefono.linea");
-  const silencio = linea.campos.find((c: { id: string }) => c.id === "silencio").valor.Booleano;
+  const linea = ajusteDe(tema, "telefono.linea");
+  const silencio = linea.campos.find((c) => c.id === "silencio")?.valor.Booleano;
   const grupo = await api(page, "preparar_ajuste", {
     p: {
       ajuste: "telefono.linea",

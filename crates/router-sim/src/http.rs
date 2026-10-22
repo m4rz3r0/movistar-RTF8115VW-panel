@@ -294,7 +294,11 @@ fn cgi_sync(s: &Inner, name: &str, headers: &HeaderMap, body: &Bytes) -> (Respon
     if is_read(name) {
         st.reads.push((name.to_owned(), params.clone()));
     }
-    if is_read(name) && st.failing_reads.contains(name) {
+    let falla_con = st
+        .failing_reads_con
+        .iter()
+        .any(|(n, k, v)| n == name && param(&params, k) == Some(v.as_str()));
+    if is_read(name) && (st.failing_reads.contains(name) || falla_con) {
         (xml(failure(name, "lectura fallida (simulado)")), false)
     } else if is_read(name) {
         (xml(read(s, &st, name, &params)), false)

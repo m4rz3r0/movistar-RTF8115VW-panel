@@ -68,6 +68,19 @@ impl SimControl {
         }
     }
 
+    /// Si `on`, la lectura `name` con el parámetro `param=valor` (p. ej. el
+    /// punto de acceso 1 de `cbGetWifiAccPt`) responde `Result=1` hasta que
+    /// se desactive; con otros parámetros responde como siempre.
+    pub fn fail_reads_con(&self, name: &str, param: &str, valor: &str, on: bool) {
+        let mut st = self.inner.state();
+        let clave = (name.to_owned(), param.to_owned(), valor.to_owned());
+        if on {
+            st.failing_reads_con.insert(clave);
+        } else {
+            st.failing_reads_con.remove(&clave);
+        }
+    }
+
     /// Tras la próxima escritura real (no de solo validación), la lectura
     /// `name` empieza a fallar como con [`SimControl::fail_reads`] hasta que
     /// se desactive con `fail_reads(name, false)`.

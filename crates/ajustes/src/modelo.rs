@@ -342,6 +342,10 @@ mod catalogo_toml {
         /// (`requiere = { campo = "puerto", cuando = "true" }`).
         #[serde(default)]
         pub requiere: Option<Requiere>,
+        /// Su recomendación es de seguridad (el WPS, el aislamiento de los
+        /// invitados): en la tarjeta va antes que las demás y como riesgo.
+        #[serde(default)]
+        pub seguridad: bool,
     }
 
     impl Campo {
@@ -419,6 +423,54 @@ mod catalogo_toml {
     pub struct Booleano {
         pub si: String,
         pub no: String,
+    }
+
+    /// Un elemento de una pestaña: lo que la persona ve como una cosa (una
+    /// red WiFi, una radio) aunque junte varios ajustes. Las referencias a
+    /// campos son `<ajuste>.<campo>` (`wifi.red_24.activa`) y las de datos
+    /// calculados, `derivado:<nombre>`.
+    #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+    #[serde(deny_unknown_fields)]
+    pub struct Elemento {
+        /// Id en la URL (`red-24`): minúsculas, cifras y `-`.
+        pub id: String,
+        pub tema: Tema,
+        /// Ids de sus ajustes; cada ajuste va en un solo elemento.
+        pub ajustes: Vec<String>,
+        /// Papel (`principal`, `invitados`, `radio`): da `ajustes-papel-<papel>`.
+        #[serde(default)]
+        pub papel: Option<String>,
+        /// Campo booleano escribible que lo enciende y lo apaga.
+        #[serde(default)]
+        pub interruptor: Option<String>,
+        /// Hasta seis datos de la tarjeta: campos o derivados.
+        #[serde(default)]
+        pub datos: Vec<String>,
+        /// Regla de estado (`derivado:estado_red`).
+        #[serde(default)]
+        pub estado: Option<String>,
+    }
+
+    /// Una acción que se aplica a varios elementos de una pestaña a la vez
+    /// (`quitar_wps`): pone el campo `campo` de cada uno a `valor` (legible).
+    /// `campo` y `valor` son opcionales en el formato para que una acción
+    /// sin ellos (borrar en una lista) quepa más adelante; hoy la
+    /// validación los exige.
+    #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+    #[serde(deny_unknown_fields)]
+    pub struct Accion {
+        /// Id (`quitar_wps`): da `ajustes-accion-<id>`.
+        pub id: String,
+        pub tema: Tema,
+        /// Id del campo, en el ajuste de cada elemento que lo tenga.
+        #[serde(default)]
+        pub campo: Option<String>,
+        /// Valor legible que se escribe (`false`, la clave de una opción…).
+        #[serde(default)]
+        pub valor: Option<String>,
+        /// Lleva el botón de peligro y confirmación.
+        #[serde(default)]
+        pub peligro: bool,
     }
 
     /// Función de escritura que ningún ajuste cubre, y por qué.

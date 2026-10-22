@@ -32,10 +32,8 @@ async fn sin_leer_el_router(p: &Panel, cookie: &str, tema: &str) {
 
 /// Valor legible del campo `campo` del ajuste `ajuste` en un tema leído.
 fn valor(tema: &Value, ajuste: &str, campo: &str) -> Value {
-    let a = tema["ajustes"]
-        .as_array()
-        .unwrap()
-        .iter()
+    let a = crate::comun::ajustes_de(tema)
+        .into_iter()
         .find(|a| a["id"] == ajuste)
         .unwrap_or_else(|| panic!("falta {ajuste}: {tema}"));
     a["campos"]

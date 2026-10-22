@@ -19,10 +19,8 @@ mod paginas;
 
 /// Ajuste `id` de la respuesta de `leer_tema`.
 fn ajuste<'a>(tema: &'a Value, id: &str) -> &'a Value {
-    tema["ajustes"]
-        .as_array()
-        .unwrap()
-        .iter()
+    crate::comun::ajustes_de(tema)
+        .into_iter()
         .find(|a| a["id"] == id)
         .unwrap_or_else(|| panic!("falta el ajuste {id}: {tema}"))
 }

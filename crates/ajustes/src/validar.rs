@@ -79,6 +79,7 @@ pub fn comprobar(c: &CatalogoAjustes, f: &Catalogo, m: &Mascara) -> Vec<String> 
         comprobar_ajuste(a, f, m, &mut fallos);
     }
     comprobar_excluidas(c, f, &mut fallos);
+    crate::elementos::comprobar_elementos(c, &mut fallos);
     fallos
 }
 
@@ -534,6 +535,9 @@ fn comprobar_forma(c: &Campo, mal: &mut impl FnMut(String)) {
             }
             _ => {}
         }
+    }
+    if c.seguridad && c.recomendado.is_none() && !c.opciones.iter().any(|o| o.recomendada) {
+        mal("`seguridad` sin recomendación".into());
     }
     if c.invertido && c.tipo != TipoCampo::Booleano {
         mal("`invertido` solo vale en un campo `booleano`".into());

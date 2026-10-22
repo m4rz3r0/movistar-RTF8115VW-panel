@@ -25,7 +25,7 @@ test.describe.configure({ mode: "parallel" });
 const textos = {
   es: {
     red5: "Red WiFi 5 GHz",
-    red: "Red",
+    red: "Red encendida",
     nombre: "Nombre de la red",
     seguridad: "Seguridad",
     aplicando: "Aplicando…",
@@ -45,7 +45,7 @@ const textos = {
   },
   en: {
     red5: "5 GHz WiFi network",
-    red: "Network",
+    red: "Network on",
     nombre: "Network name",
     seguridad: "Security",
     aplicando: "Applying…",

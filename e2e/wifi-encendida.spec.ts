@@ -15,7 +15,9 @@ const textos = {
   es: {
     red24: "Red WiFi 2,4 GHz",
     radio24: "Radio de 2,4 GHz",
-    red: "Red",
+    red: "Red encendida",
+    si: "Sí",
+    no: "No",
     encendida: "Encendida",
     apagada: "Apagada",
     nota: "La radio está encendida, pero ninguna de sus redes emite: en esta banda no hay WiFi.",
@@ -28,7 +30,9 @@ const textos = {
   en: {
     red24: "2.4 GHz WiFi network",
     radio24: "2.4 GHz radio",
-    red: "Network",
+    red: "Network on",
+    si: "Yes",
+    no: "No",
     encendida: "On",
     apagada: "Off",
     nota: "The radio is on, but none of its networks is broadcasting: there is no WiFi on this band.",
@@ -49,12 +53,12 @@ function tarjeta(page: Page, titulo: string): Locator {
   });
 }
 
-/** Desde la tarjeta básica, la red pasa a `opcion` (`encendida`/`apagada`). */
-async function ponerRed(page: Page, t: Textos, red: Locator, opcion: string, de: string, a: string) {
+/** Desde la tarjeta básica, enciende (`encender`) o apaga la red con su interruptor. */
+async function ponerRed(page: Page, t: Textos, red: Locator, encender: boolean, de: string, a: string) {
   await red.getByRole("button", { name: t.editar }).click();
-  const control = red.getByLabel(t.red, { exact: true });
+  const control = red.getByRole("switch", { name: t.red, exact: true });
   await expect(control).toBeFocused();
-  await control.selectOption(opcion);
+  await control.setChecked(encender);
   await red.getByRole("button", { name: t.guardar }).click();
   const dialogo = page.locator("dialog[open]");
   const fila = dialogo.locator("tbody tr");
@@ -106,10 +110,10 @@ for (const idioma of ["es", "en"] as const) {
         }
 
         if (cambia) {
-          await ponerRed(page, t, red24, "encendida", t.apagada, t.encendida);
+          await ponerRed(page, t, red24, true, t.no, t.si);
           await expect(insignia).toHaveText(t.encendida);
           await expect(nota).toHaveCount(0);
-          await ponerRed(page, t, red24, "apagada", t.encendida, t.apagada);
+          await ponerRed(page, t, red24, false, t.si, t.no);
           await expect(insignia).toHaveText(t.apagada);
           await expect(nota).toBeVisible();
         }

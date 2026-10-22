@@ -83,6 +83,9 @@ pub(crate) struct SimState {
     pub(crate) ignore_next: bool,
     /// Lecturas que fallan (`fail_reads`).
     pub(crate) failing_reads: HashSet<String>,
+    /// Lecturas que fallan con un parámetro (`fail_reads_con`): nombre,
+    /// parámetro y valor.
+    pub(crate) failing_reads_con: HashSet<(String, String, String)>,
     /// Lectura que empieza a fallar tras la próxima escritura.
     pub(crate) fail_reads_after_write: Option<String>,
     /// `hang_after_next_write`.

@@ -164,3 +164,37 @@ ajustes-wifi-radio-ocultas = { $n ->
    *[other] The radio broadcasts { $n } networks that the panel does not show.
 }
 ajustes-wifi-radio-ocultas-enlace = View in the Library
+ajustes-wifi-radio-apagada = Off
+ajustes-wifi-radio-sin-redes-corto = On, no networks
+
+## Elements of each tab: state, role, data, recommendation and actions
+ajustes-estado-sin-leer = Not read
+ajustes-estado-desconocido = No data
+ajustes-estado-leido = Read
+ajustes-papel-principal = Main
+ajustes-papel-invitados = Guests
+ajustes-papel-radio = Radio
+ajustes-dato-canal_y_ancho = Channel and width
+ajustes-dato-canal-auto = Automatic channel
+ajustes-dato-canal-numero = Channel { $canal }
+ajustes-dato-canal-y-ancho = { $canal } · { $ancho } MHz
+ajustes-dato-conectados = Connected devices
+ajustes-recomendacion-aplicar = Apply the recommendation
+ajustes-accion-encender = Turn on
+ajustes-accion-apagar = Turn off
+ajustes-accion-quitar_wps = Turn off WPS
+ajustes-accion-ocultar_nombre = Hide the name
+ajustes-accion-mostrar_nombre = Show the name
+ajustes-accion-aislar = Isolate the devices
+
+## WiFi summary strip
+ajustes-resumen-de = { $n } of { $total }
+ajustes-resumen-sin-dato = —
+ajustes-resumen-wifi-redes = Networks on
+ajustes-resumen-wifi-redes-detalle = The ones broadcasting right now.
+ajustes-resumen-wifi-radios = Radios on
+ajustes-resumen-wifi-radios-detalle = The 2.4 and 5 GHz bands.
+ajustes-resumen-wifi-conectados = Connected devices
+ajustes-resumen-wifi-conectados-detalle = Across all the networks in the panel.
+ajustes-resumen-recomendaciones = Pending recommendations
+ajustes-resumen-recomendaciones-detalle = Each card shows the most important one.

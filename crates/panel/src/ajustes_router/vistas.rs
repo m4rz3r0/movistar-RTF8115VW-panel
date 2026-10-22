@@ -1,11 +1,16 @@
 //! Tipos de Ajustes que comparten el servidor y el navegador.
 
+mod pagina;
+pub use pagina::*;
+
 use crate::ui::explorador::RiesgoCambio;
 use ajustes::{Nivel, Requiere, TipoCampo, ValorLegible};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-/// Los ajustes de un tema, leídos del router.
+/// Los ajustes de un tema, leídos del router. Ya no viaja: la interfaz de
+/// tarjetas sueltas la monta con [`PaginaTema`] hasta que pase a la
+/// rejilla de elementos.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TemaVista {
     /// Identificador corto del tema (`wifi`).

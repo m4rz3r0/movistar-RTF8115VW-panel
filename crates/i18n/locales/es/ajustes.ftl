@@ -164,3 +164,37 @@ ajustes-wifi-radio-ocultas = { $n ->
    *[other] La radio emite { $n } redes que el panel no muestra.
 }
 ajustes-wifi-radio-ocultas-enlace = Ver en la Biblioteca
+ajustes-wifi-radio-apagada = Apagada
+ajustes-wifi-radio-sin-redes-corto = Encendida, sin redes
+
+## Elementos de cada pestaña: estado, papel, datos, recomendación y acciones
+ajustes-estado-sin-leer = Sin leer
+ajustes-estado-desconocido = Sin datos
+ajustes-estado-leido = Leído
+ajustes-papel-principal = Principal
+ajustes-papel-invitados = Invitados
+ajustes-papel-radio = Radio
+ajustes-dato-canal_y_ancho = Canal y ancho
+ajustes-dato-canal-auto = Canal automático
+ajustes-dato-canal-numero = Canal { $canal }
+ajustes-dato-canal-y-ancho = { $canal } · { $ancho } MHz
+ajustes-dato-conectados = Dispositivos conectados
+ajustes-recomendacion-aplicar = Aplicar lo recomendado
+ajustes-accion-encender = Encender
+ajustes-accion-apagar = Apagar
+ajustes-accion-quitar_wps = Quitar WPS
+ajustes-accion-ocultar_nombre = Ocultar el nombre
+ajustes-accion-mostrar_nombre = Mostrar el nombre
+ajustes-accion-aislar = Aislar los dispositivos
+
+## Franja de resumen de la WiFi
+ajustes-resumen-de = { $n } de { $total }
+ajustes-resumen-sin-dato = —
+ajustes-resumen-wifi-redes = Redes encendidas
+ajustes-resumen-wifi-redes-detalle = Las que emiten ahora mismo.
+ajustes-resumen-wifi-radios = Radios encendidas
+ajustes-resumen-wifi-radios-detalle = Las bandas de 2,4 y 5 GHz.
+ajustes-resumen-wifi-conectados = Dispositivos conectados
+ajustes-resumen-wifi-conectados-detalle = En todas las redes del panel.
+ajustes-resumen-recomendaciones = Recomendaciones pendientes
+ajustes-resumen-recomendaciones-detalle = Cada tarjeta enseña la más importante.

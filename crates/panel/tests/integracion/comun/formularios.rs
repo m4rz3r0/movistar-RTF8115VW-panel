@@ -45,6 +45,17 @@ pub async fn leer(p: &Panel, cookie: &str, tema: &str) -> Value {
     ok(p, "leer_tema", json!({ "tema": tema }), cookie).await
 }
 
+/// Los ajustes de la página de un tema (`leer_tema`), de todos sus
+/// elementos y en orden.
+pub fn ajustes_de(pagina: &Value) -> Vec<&Value> {
+    pagina["elementos"]
+        .as_array()
+        .unwrap_or_else(|| panic!("sin elementos: {pagina}"))
+        .iter()
+        .flat_map(|e| e["ajustes"].as_array().unwrap())
+        .collect()
+}
+
 /// Los campos que cambia un grupo preparado, de todos sus pasos.
 pub fn cambios_del_grupo(grupo: &Value) -> Vec<&Value> {
     grupo["pasos"]

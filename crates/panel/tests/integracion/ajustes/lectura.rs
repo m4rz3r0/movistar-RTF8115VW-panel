@@ -246,12 +246,16 @@ async fn cada_lectura_una_sola_vez() {
             .por_tema(ajustes::Tema::from_slug(tema).unwrap())
             .map(|a| (a.leer.funcion.clone(), a.leer.params.clone()))
             .collect();
-        // La WiFi lee además la lista de puntos de acceso de cada radio
-        // (para saber si emite alguna red que el panel no muestra).
+        // La WiFi lee además, de cada radio, la lista de puntos de acceso
+        // (para saber si emite alguna red que el panel no muestra) y la de
+        // estaciones asociadas (los conectados de cada red), en la misma
+        // tanda.
         if tema == "wifi" {
             for radio in ["0", "1"] {
-                let params = vec![("dpm_cfg_wifi_id".to_owned(), radio.to_owned())];
-                distintas.insert(("cbListWifiAccPt".to_owned(), params));
+                for lista in ["cbListWifiAccPt", "cbListWifiAccPtAssociation"] {
+                    let params = vec![("dpm_cfg_wifi_id".to_owned(), radio.to_owned())];
+                    distintas.insert((lista.to_owned(), params));
+                }
             }
         }
         assert_eq!(leidas.len(), distintas.len(), "{tema}: {leidas:#?}");

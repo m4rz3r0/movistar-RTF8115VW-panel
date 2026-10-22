@@ -127,10 +127,8 @@ async fn una_ip_fija_dice_cual_es() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     tomar_foto(&p).await;
     let tema = ok(&p, "leer_tema", json!({ "tema": "red_local" }), &cookie).await;
-    let reservas = tema["ajustes"]
-        .as_array()
-        .unwrap()
-        .iter()
+    let reservas = crate::comun::ajustes_de(&tema)
+        .into_iter()
         .find(|a| a["id"] == "red_local.reservas")
         .unwrap()
         .clone();

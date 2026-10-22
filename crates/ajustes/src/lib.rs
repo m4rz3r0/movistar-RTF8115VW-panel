@@ -21,6 +21,8 @@ pub use modelo::{Nivel, Requiere, SIN_ELECCION, Tema, TipoCampo, ValorLegible};
 #[cfg(feature = "catalogo")]
 mod carga;
 #[cfg(feature = "catalogo")]
+mod elementos;
+#[cfg(feature = "catalogo")]
 mod validar;
 #[cfg(feature = "catalogo")]
 mod valores;
@@ -28,8 +30,14 @@ mod valores;
 #[cfg(feature = "catalogo")]
 pub use carga::{CatalogoAjustes, ErrorAjustes};
 #[cfg(feature = "catalogo")]
+pub use elementos::{
+    DERIVADOS_DATO, DERIVADOS_ESTADO, MAX_DATOS, PREFIJO_DERIVADO, clave_accion, clave_papel,
+    claves_de_elementos, partir_referencia,
+};
+#[cfg(feature = "catalogo")]
 pub use modelo::{
-    Adicional, Ajuste, Booleano, Campo, Componente, Escritura, Excluida, Lectura, Opcion, Validar,
+    Accion, Adicional, Ajuste, Booleano, Campo, Componente, Elemento, Escritura, Excluida, Lectura,
+    Opcion, Validar,
 };
 #[cfg(feature = "catalogo")]
 pub use validar::{claves_requeridas, comprobar, prefijo_i18n, riesgo};

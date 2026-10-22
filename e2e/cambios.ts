@@ -23,6 +23,16 @@ async function api(page: Page, nombre: string, cuerpo: unknown) {
   return r.json();
 }
 
+/** Un ajuste de la página de un tema (`leer_tema`), esté en el elemento que esté. */
+type AjusteLeido = { id: string; campos: { id: string; valor: Record<string, unknown> }[] };
+
+/** El ajuste `id` de la página de un tema leída con `leer_tema`. */
+export function ajusteDe(pagina: { elementos: { ajustes: AjusteLeido[] }[] }, id: string): AjusteLeido {
+  const a = pagina.elementos.flatMap((e) => e.ajustes).find((x) => x.id === id);
+  if (!a) throw new Error(`falta el ajuste ${id}`);
+  return a;
+}
+
 /**
  * Cambia la apertura automática de puertos (UPnP) al valor contrario: un
  * cambio de riesgo bajo, que se vigila RP_E2E_VIGILANCIA_S. Devuelve su id.
@@ -30,8 +40,8 @@ async function api(page: Page, nombre: string, cuerpo: unknown) {
  */
 export async function cambiarUpnp(page: Page): Promise<number> {
   const tema = await api(page, "leer_tema", { tema: "puertos" });
-  const upnp = tema.ajustes.find((a: { id: string }) => a.id === "puertos.upnp");
-  const activo = upnp.campos.find((c: { id: string }) => c.id === "activo").valor.Booleano;
+  const upnp = ajusteDe(tema, "puertos.upnp");
+  const activo = upnp.campos.find((c) => c.id === "activo")?.valor.Booleano;
   const grupo = await api(page, "preparar_ajuste", {
     p: { ajuste: "puertos.upnp", instancia: null, borrar: false, valores: { activo: String(!activo) } },
   });

@@ -244,3 +244,71 @@ fn cada_red_del_catalogo_tiene_su_radio() {
         }
     }
 }
+
+/// La tabla de estados de la tarjeta: la insignia de la red manda; en una
+/// radio, si emite y lo que no se ve en sus redes.
+#[test]
+fn estado_red_de_redes_y_radios() {
+    use EstadoVisual as E;
+    let casos = [
+        (
+            (Some(EmisionRed::Encendida), None, None),
+            (E::Emite, "ajustes-wifi-red-encendida"),
+        ),
+        (
+            (Some(EmisionRed::Apagada), Some(true), None),
+            (E::Apagada, "ajustes-wifi-red-apagada"),
+        ),
+        (
+            (Some(EmisionRed::SinRadio), None, None),
+            (E::Atencion, "ajustes-wifi-red-sin-radio"),
+        ),
+        (
+            (Some(EmisionRed::NoEmite), None, None),
+            (E::Atencion, "ajustes-wifi-red-no-emite"),
+        ),
+        (
+            (None, Some(false), None),
+            (E::Apagada, "ajustes-wifi-radio-apagada"),
+        ),
+        (
+            (None, Some(true), Some(NotaRadio::SinRedes)),
+            (E::Atencion, "ajustes-wifi-radio-sin-redes-corto"),
+        ),
+        (
+            (None, Some(true), Some(NotaRadio::Ocultas(2))),
+            (E::Emite, "ajustes-wifi-red-encendida"),
+        ),
+        (
+            (None, Some(true), None),
+            (E::Emite, "ajustes-wifi-red-encendida"),
+        ),
+        (
+            (None, None, None),
+            (E::Atencion, "ajustes-estado-desconocido"),
+        ),
+    ];
+    for ((ap, radio, ocultos), (estado, clave)) in casos {
+        assert_eq!(
+            estado_red(ap, radio, ocultos),
+            (estado, clave.to_owned()),
+            "{ap:?} {radio:?} {ocultos:?}"
+        );
+        for idioma in i18n::Idioma::TODOS {
+            assert!(i18n::existe(idioma, clave), "{clave}");
+        }
+    }
+    let es = |k: &str| i18n::tr(i18n::Idioma::Es, k, None);
+    assert_eq!(
+        es("ajustes-wifi-radio-sin-redes-corto"),
+        "Encendida, sin redes"
+    );
+}
+
+/// Ancho de banda de cada código del router.
+#[test]
+fn ancho_en_mhz() {
+    assert_eq!(mhz("1"), Some("20"));
+    assert_eq!(mhz("3"), Some("80"));
+    assert_eq!(mhz("9"), None);
+}
