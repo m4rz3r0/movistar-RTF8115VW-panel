@@ -248,7 +248,8 @@ async fn cada_lectura_una_sola_vez() {
             .collect();
         // La WiFi lee además, de cada radio, la lista de puntos de acceso
         // (para saber si emite alguna red que el panel no muestra) y la de
-        // estaciones asociadas (los conectados de cada red), en la misma
+        // estaciones asociadas (los conectados de cada red), y la lista de
+        // dispositivos de Red local (sus nombres, en el pie), en la misma
         // tanda.
         if tema == "wifi" {
             for radio in ["0", "1"] {
@@ -257,6 +258,7 @@ async fn cada_lectura_una_sola_vez() {
                     distintas.insert((lista.to_owned(), params));
                 }
             }
+            distintas.insert(("cbGetLanHostList".to_owned(), Vec::new()));
         }
         assert_eq!(leidas.len(), distintas.len(), "{tema}: {leidas:#?}");
         for radio in ["0", "1"].iter().filter(|_| tema == "wifi") {
