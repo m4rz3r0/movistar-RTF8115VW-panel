@@ -161,15 +161,6 @@ impl Mascara {
             children: node.children.iter().map(|c| self.enmascarar(c)).collect(),
         }
     }
-
-    /// Valor para registrar un parámetro (los dos niveles, enmascarados).
-    pub fn valor_visible<'a>(&self, nombre: &str, valor: &'a str) -> &'a str {
-        if self.oculta(nombre, valor) {
-            MASCARA
-        } else {
-            valor
-        }
-    }
 }
 
 fn es_entero(v: &str) -> bool {
@@ -278,7 +269,7 @@ mod tests {
         assert!(m.oculta("acs_password", "x"));
         assert!(!m.oculta_en_pantalla("acs_username", "usuario"));
         assert!(m.oculta("acs_username", "usuario"));
-        assert_eq!(m.valor_visible("acs_URL", "https://acs.example"), MASCARA);
+        assert!(m.oculta("acs_URL", "https://acs.example"));
         // Un sufijo numérico con texto: su nivel.
         assert_eq!(m.nivel_de("wep_key1_type", "abc"), Some(Nivel::Secreto));
         assert_eq!(m.nivel_de("serial_type", "abc"), Some(Nivel::Sensible));
@@ -302,8 +293,7 @@ mod tests {
         assert!(m.oculta("wep_key1_type", "abc"));
         assert!(!m.oculta("dpm_cfg_wifi_ssid_id", "-1"));
         assert!(!m.oculta("ssid", "Casa"));
-        assert_eq!(m.valor_visible("password", "x"), MASCARA);
-        assert_eq!(m.valor_visible("ssid", "Casa"), "Casa");
+        assert!(m.oculta("password", "x"));
     }
 
     #[test]

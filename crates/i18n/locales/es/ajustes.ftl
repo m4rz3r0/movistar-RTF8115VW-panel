@@ -10,8 +10,6 @@ ajustes-detalles-tecnicos-desc = Para quien quiera saber qué funciones del rout
 ajustes-detalles-lectura = Lectura
 ajustes-detalles-escrituras = Escrituras
 ajustes-detalles-parametros = Parámetros
-ajustes-recomendado = Recomendado
-ajustes-recomendado-desc = La opción que aconsejamos para la mayoría de las casas.
 ajustes-solo-lectura = Ahora solo se pueden consultar los ajustes: el firmware del router no está probado con el panel. Puedes confirmarlo en Configuración del router.
 ajustes-valor-desconocido = Valor no reconocido ({ $valor })
 ajustes-valor-desconocido-desc = El router tiene puesto un valor que el panel no conoce. Se conserva tal cual mientras no elijas otro.
@@ -23,7 +21,6 @@ ajustes-volver = Ir a los ajustes de Internet
 ajustes-solo-lectura-aviso = Ahora solo se pueden consultar los ajustes: el firmware del router aún no está probado con el panel.
 ajustes-solo-lectura-enlace = Confírmalo en Configuración del router
 ajustes-que-hace = ¿Qué hace esto?
-ajustes-editar = Editar
 ajustes-guardar = Guardar
 ajustes-cancelar = Cancelar
 ajustes-recomendado-valor = Recomendado: { $valor }
@@ -57,10 +54,7 @@ ajustes-tema-sistema = Sistema
 ajustes-tema-sistema-desc = La hora del router y la copia del tráfico para diagnóstico.
 
 ## Niveles
-ajustes-nivel-basico = Lo esencial
-ajustes-nivel-basico-desc = Siempre a la vista.
 ajustes-nivel-avanzado = Avanzado
-ajustes-nivel-avanzado-desc = Bajo «Más opciones»: para quien sabe lo que busca.
 ajustes-nivel-oculto = Oculto
 ajustes-nivel-oculto-desc = No aparece en la web del operador.
 

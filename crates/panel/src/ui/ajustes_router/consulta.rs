@@ -1,7 +1,6 @@
 //! Lo que solo se consulta: una lista sin componente propio y el enlace a la contraseña del router.
 //!
-//! Lo usan el detalle de un elemento ([`super::detalle`]) y las tarjetas de
-//! los temas que aún no van en rejilla ([`super::heredada`]).
+//! Lo usa el detalle de un elemento ([`super::detalle`]).
 
 use super::campo::{etiqueta, valor_resumido};
 use super::piezas::motivos;

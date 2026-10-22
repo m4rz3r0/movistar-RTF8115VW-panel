@@ -260,12 +260,12 @@ npx playwright test capturas-readme   # solo si cambian las capturas del README
 
 El e2e reparte los ficheros entre `E2E_WORKERS` workers (por defecto, uno por
 cada 3 hilos de la CPU, entre 1 y 2; en una máquina dedicada, 4; como mucho,
-11; `E2E_WORKERS=1`, en serie). Arranca un panel instalado por worker, cuatro
+10; `E2E_WORKERS=1`, en serie). Arranca un panel instalado por worker, cuatro
 recién instalados para el asistente, dos para el recorrido de Ajustes (uno
-por idioma), dos para la rejilla de la WiFi y uno para las demás pestañas en
-rejilla, cada uno con su simulador (`e2e/instancias.ts`), en puertos
-consecutivos a partir de `E2E_PORT` y `E2E_SIM_PORT` (3195 y 8195; con 4
-workers, 3195–3207 y 8195–8207). Cada
+por idioma), dos para la rejilla de la WiFi, uno para las demás pestañas en
+rejilla y uno para Mejoras, cada uno con su simulador (`e2e/instancias.ts`),
+en puertos consecutivos a partir de `E2E_PORT` y `E2E_SIM_PORT` (3195 y
+8195; con 4 workers, 3195–3208 y 8195–8208). Cada
 cambio se vigila 10 s en vez de 30 s o 2 min (`RP_E2E_VIGILANCIA_S`, que solo
 atiende el binario de depuración). Usa el Chromium de Playwright
 (`npx playwright install chromium` si no está; o `E2E_CHROMIUM=<ruta>`).

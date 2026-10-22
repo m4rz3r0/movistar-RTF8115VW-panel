@@ -83,7 +83,8 @@ function workers(valor: string | undefined): number {
   if (!Number.isInteger(n) || n < 1 || n > MAX_WORKERS) {
     throw new Error(
       `E2E_WORKERS debe ser un entero entre 1 y ${MAX_WORKERS} (con ${NUEVOS} paneles del ` +
-        `asistente, ${RECORRIDOS} del recorrido, ${REJILLAS} de la rejilla y ${TEMAS} de los temas, ` +
+        `asistente, ${RECORRIDOS} del recorrido, ${REJILLAS} de la rejilla, ${TEMAS} de los temas ` +
+        `y ${MEJORAS} de Mejoras; ` +
         `${VENTANA_DE_PUERTOS} puertos seguidos ` +
         `desde E2E_PORT): ${valor}`,
     );

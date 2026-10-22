@@ -1,20 +1,5 @@
-/* Ajustes del router: columna y pestañas de los temas. */
+/* Ajustes del router: pestañas de los temas. */
 /* ------------------------------------------------ Ajustes del router */
-
-/* Una sola columna, como una hoja de ajustes: cada tarjeta se lee de arriba
-   abajo sin saltar de columna al editar. */
-.ajustes-lista {
-  display: flex;
-  flex-direction: column;
-  gap: var(--esp-4);
-  max-width: 880px;
-}
-
-/* Vista resumida o formulario: solo uno a la vista. */
-.ajuste-resumen.oculto,
-.ajuste-edicion.oculto {
-  display: none;
-}
 
 /* Pestañas de los temas: subrayado ámbar en la actual. */
 .temas {
@@ -66,7 +51,6 @@
   color: var(--suave);
 }
 
-.ajustes-lista + .mas-opciones,
 .tema-desc + .aviso {
   max-width: 880px;
 }
