@@ -232,11 +232,15 @@ async fn ida_y_vuelta(tema: Tema) {
                 tocados.push(&t.id);
                 con_tapado.push(que.clone());
             }
-            // Con el valor que exige otro campo (encender el espejo), ese
-            // campo va también: su primera opción.
+            // Con el valor que exige otro campo (encender el espejo o el
+            // envío del registro), ese campo va también: su primera opción
+            // o, si no tiene, otro valor de prueba.
             if let Some(r) = c.requiere.as_ref().filter(|r| r.cuando == nuevo) {
                 let exigido = a.campo(&r.campo).unwrap();
-                valores[&r.campo] = json!(exigido.opciones[0].clave);
+                valores[&r.campo] = match exigido.opciones.first() {
+                    Some(o) => json!(o.clave),
+                    None => json!(otro_valor(exigido, &todo_antes[&exigido.id].0, n).0),
+                };
                 tocados.push(&exigido.id);
             }
             let (status, body) = llamar(

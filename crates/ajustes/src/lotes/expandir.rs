@@ -2,7 +2,10 @@
 
 use crate::carga::CatalogoAjustes;
 use crate::elementos::partir_referencia;
-use crate::lotes::{Destino, Lote, PasoExpandido, PasoLote, clave_lote, clave_paso, titulo_lote};
+use crate::lotes::{
+    Destino, ELECCION_DNS, Lote, PasoExpandido, PasoLote, clave_lote, clave_paso,
+    clave_proveedor_dns, titulo_lote,
+};
 use crate::modelo::{Accion, Ajuste, Campo, Elemento, Tema};
 
 /// Papeles de los elementos que recorre `para_cada = "red_wifi"`.
@@ -148,9 +151,15 @@ pub fn lotes_del_campo<'c>(c: &'c CatalogoAjustes, ajuste: &str, campo: &str) ->
 
 /// Claves de traducción que piden los lotes, sin repetir: nombre, `-desc` y
 /// `-titulo` de cada lote, nombre y `-desc` de cada paso,
-/// `mejoras-aviso-<id>` y `mejoras-consejo-<id>`.
+/// `mejoras-aviso-<id>` y `mejoras-consejo-<id>`, y nombre y `-desc` (su
+/// nota) de cada proveedor de DNS.
 pub fn claves_de_lotes(c: &CatalogoAjustes) -> Vec<String> {
     let mut claves = Vec::new();
+    for o in c.eleccion(ELECCION_DNS).iter().flat_map(|e| &e.opciones) {
+        let k = clave_proveedor_dns(&o.id);
+        claves.push(format!("{k}-desc"));
+        claves.push(k);
+    }
     for l in c.lotes() {
         let k = clave_lote(&l.id);
         claves.push(format!("{k}-desc"));

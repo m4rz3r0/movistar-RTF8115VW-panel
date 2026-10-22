@@ -4,7 +4,8 @@
 # suyos por id: un paso compartido no puede divergir y cuenta una vez. El
 # formato está en `src/lotes/mod.rs`; los textos, en `mejoras.ftl`:
 # `mejoras-lote-<id>`, `-desc` y `-titulo`; `mejoras-paso-<id>` y `-desc`;
-# `mejoras-aviso-<id>` y `mejoras-consejo-<id>`.
+# `mejoras-aviso-<id>` y `mejoras-consejo-<id>`; cada proveedor de DNS,
+# `mejoras-dns-<opción>` y su `-desc` (la nota).
 
 # Gestión remota del operador (TR-069) apagada.
 [[paso]]
@@ -57,6 +58,46 @@ tema = "sistema"
 campo = "sistema.diagnostico.espejo"
 valor = "false"
 
+# Registro del sistema sin envío a otro equipo.
+[[paso]]
+id = "registro"
+tema = "sistema"
+campo = "sistema.registro.envio"
+valor = "false"
+
+# DNS que el router reparte a la red de casa: los del proveedor elegido.
+[[paso]]
+id = "dns_casa"
+tema = "red_local"
+ajuste = "red_local.dns_casa"
+elegir = "proveedor_dns"
+
+# Proveedores de DNS neutros (spec §4.3). Mullvad no está: solo funciona
+# cifrado, y el router no cifra.
+[[eleccion]]
+id = "proveedor_dns"
+
+[[eleccion.opcion]]
+id = "quad9"
+defecto = true
+valores = { principal = "9.9.9.9", secundario = "149.112.112.112" }
+
+[[eleccion.opcion]]
+id = "quad9_sin_filtro"
+valores = { principal = "9.9.9.10", secundario = "149.112.112.10" }
+
+[[eleccion.opcion]]
+id = "dns4eu"
+valores = { principal = "86.54.11.100", secundario = "86.54.11.200" }
+
+[[eleccion.opcion]]
+id = "cloudflare"
+valores = { principal = "1.1.1.1", secundario = "1.0.0.1" }
+
+[[eleccion.opcion]]
+id = "adguard"
+valores = { principal = "94.140.14.14", secundario = "94.140.15.15" }
+
 # Hora por un servidor neutro: opcional, sale desmarcado.
 [[paso]]
 id = "hora_neutra"
@@ -67,12 +108,12 @@ opcional = true
 [[lote]]
 id = "seguridad"
 icono = "escudo"
-pasos = ["gestion_remota", "aviso_operador", "wps", "upnp", "wpa2", "aislar_invitados", "espejo"]
+pasos = ["gestion_remota", "aviso_operador", "wps", "upnp", "wpa2", "aislar_invitados", "espejo", "registro"]
 avisos = ["tr069"]
 consejos = ["wpa3", "nombre_y_mac", "contrasena_admin", "reenvios", "sin_api"]
 
 [[lote]]
 id = "privacidad"
 icono = "ojo"
-pasos = ["gestion_remota", "aviso_operador", "espejo", "hora_neutra"]
+pasos = ["gestion_remota", "aviso_operador", "espejo", "registro", "dns_casa", "hora_neutra"]
 avisos = ["tr069"]

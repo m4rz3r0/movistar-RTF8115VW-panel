@@ -194,6 +194,19 @@ fn comprobar_eleccion(e: &Eleccion, fallos: &mut Vec<String>) {
             mal(format!("la opción {} no da ningún valor", o.id));
         }
     }
+    // Todas dan valor a los mismos campos: si no, al aplicar una de ellas
+    // un campo que dan las otras se quedaría sin valor.
+    if let Some((primera, resto)) = e.opciones.split_first() {
+        for o in resto
+            .iter()
+            .filter(|o| !o.valores.keys().eq(primera.valores.keys()))
+        {
+            mal(format!(
+                "la opción {} no da valor a los mismos campos que {}",
+                o.id, primera.id
+            ));
+        }
+    }
     match e.opciones.iter().filter(|o| o.defecto).count() {
         0 if !e.opciones.is_empty() => mal("ninguna opción por defecto".into()),
         0 | 1 => {}

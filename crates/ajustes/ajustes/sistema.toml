@@ -1,5 +1,5 @@
-# Sistema: hora del router (servidores de hora) y espejo de la conexión a
-# internet para diagnóstico.
+# Sistema: hora del router (servidores de hora), espejo de la conexión a
+# internet para diagnóstico y registro del sistema.
 
 [[ajuste]]
 id = "sistema.hora"
@@ -69,8 +69,41 @@ opciones = [
   { valor = "8", clave = "puerto_4" },
 ]
 
-# Elementos de la pestaña (spec §5.1). El registro del sistema no está: el
-# router lo cambia con una acción (`cbSetSyslog`), no con un ajuste.
+# Registro del sistema: si el router envía su registro a otro equipo. «Sí»
+# es local y remoto (`2`: no se pierde el registro local) y «no», solo local
+# (`0`). Solo remoto (`1`) se lee como no reconocido. Encender el envío
+# exige el servidor. La escritura nunca lleva `export` (exportaría el
+# registro): no está en el catálogo de la función.
+[[ajuste]]
+id = "sistema.registro"
+tema = "sistema"
+nivel = "avanzado"
+leer = { funcion = "cbGetSyslog" }
+
+[[ajuste.campo]]
+id = "envio"
+escribe = { funcion = "cbSetSyslog", parametro = "syslog_mode" }
+lee = "syslog_mode"
+tipo = "booleano"
+booleano = { si = "2", no = "0" }
+recomendado = "false"
+requiere = { campo = "servidor", cuando = "true" }
+
+[[ajuste.campo]]
+id = "servidor"
+escribe = { funcion = "cbSetSyslog", parametro = "remote_ip" }
+lee = "remote_ip"
+tipo = "ip"
+opcional = true
+
+[[ajuste.campo]]
+id = "puerto"
+escribe = { funcion = "cbSetSyslog", parametro = "remote_port" }
+lee = "remote_port"
+tipo = "numero"
+validar = { min = 1, max = 65535 }
+
+# Elementos de la pestaña (spec §5.1).
 [[elemento]]
 id = "hora"
 tema = "sistema"
@@ -87,6 +120,15 @@ ajustes = ["sistema.diagnostico"]
 icono = "lupa"
 datos = ["sistema.diagnostico.espejo", "sistema.diagnostico.puerto"]
 estado = "derivado:estado_diagnostico"
+
+[[elemento]]
+id = "registro"
+tema = "sistema"
+ajustes = ["sistema.registro"]
+icono = "registro"
+interruptor = "sistema.registro.envio"
+datos = ["sistema.registro.servidor", "sistema.registro.puerto"]
+estado = "derivado:segun_lo_recomendado"
 
 # Acciones (spec §5.5).
 [[accion]]

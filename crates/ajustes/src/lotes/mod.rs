@@ -114,6 +114,17 @@ pub struct Eleccion {
     pub opciones: Vec<OpcionEleccion>,
 }
 
+impl Eleccion {
+    /// La opción que sale elegida. El catálogo comprobado tiene una y solo
+    /// una (si no, [`crate::comprobar`] falla): sin ella, la primera.
+    pub fn defecto(&self) -> &OpcionEleccion {
+        self.opciones
+            .iter()
+            .find(|o| o.defecto)
+            .unwrap_or(&self.opciones[0])
+    }
+}
+
 /// Opción de una elección: el valor legible de cada campo del ajuste.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -169,6 +180,15 @@ pub fn clave_lote(id: &str) -> String {
 /// Historial).
 pub fn titulo_lote(id: &str) -> String {
     format!("mejoras-lote-{id}-titulo")
+}
+
+/// Id de la elección del proveedor de DNS de la red de casa.
+pub const ELECCION_DNS: &str = "proveedor_dns";
+
+/// Clave de traducción del nombre de un proveedor de DNS (su `-desc` es la
+/// nota que lo describe).
+pub fn clave_proveedor_dns(id: &str) -> String {
+    format!("mejoras-dns-{id}")
 }
 
 /// Clave de traducción del nombre de un paso (su `-desc` es la

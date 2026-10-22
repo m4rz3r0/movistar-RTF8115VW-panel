@@ -769,7 +769,6 @@ fn tipo_de(name: &str) -> Tipo {
             | "cbModifyPwd"
             | "cbModifyPwdOther"
             | "cbSyncTime"
-            | "cbSetSyslog"
             | "restoreinfo.cgi"
             | "te_acceso_router.cgi"
             | "te_logout.cgi"

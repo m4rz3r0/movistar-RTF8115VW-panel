@@ -36,6 +36,7 @@ mod pagina_temas;
 mod panel_ajustes;
 mod poller;
 mod red;
+mod registro_y_dns;
 mod sensibles;
 mod tema;
 mod vista;

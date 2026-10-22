@@ -17,8 +17,8 @@ mejoras-aviso-tr069 = A factory reset or a technician can turn remote management
 mejoras-consejo-wpa3 = Use WPA3 and management frame protection if the router ever allows it: this one does not support it.
 mejoras-consejo-nombre_y_mac = Do not hide the network name or filter by MAC: they do not protect you, and a hidden name makes phones announce it wherever they go.
 mejoras-consejo-contrasena_admin = Change the admin password printed on the router's label (coming to the panel later).
-mejoras-consejo-reenvios = Check that no open port points to the router itself.
-mejoras-consejo-sin_api = The router does not let you block ping from the internet or turn off file sharing, the media server or USB.
+mejoras-consejo-reenvios = Check that no port forwarding rule points to the router itself.
+mejoras-consejo-sin_api = This panel cannot block ping from the internet or turn off file sharing, the media server or USB.
 
 ## Steps
 mejoras-paso-gestion_remota = Turn off the operator's remote management
@@ -34,6 +34,22 @@ mejoras-paso-wpa2-desc = Recommended if you have no WiFi devices from before abo
 mejoras-paso-aislar_invitados = Isolate the guest network
 mejoras-paso-aislar_invitados-desc = Recommended if you use the guest network for visitors or for connected home devices. Pros: devices on that network cannot see each other. Cons: they cannot cast to a TV or print to each other.
 mejoras-paso-espejo = Turn off the internet traffic mirror
-mejoras-paso-espejo-desc = Recommended if you are not running a diagnosis of the connection. Pros: no socket at home receives a copy of all the internet traffic. Cons: none; it is turned on only to diagnose.
+mejoras-paso-espejo-desc = Recommended if you are not running a diagnosis of the connection. Pros: no network port at home receives a copy of all the internet traffic. Cons: none; it is turned on only to diagnose.
+mejoras-paso-registro = Do not send the system log to another computer
+mejoras-paso-registro-desc = Recommended if you do not have your own server to collect logs, which is normal at home. Pros: the log, which tells which devices in your home connect and when, does not leave the router unencrypted towards another computer. Cons: if you use your own server for logs, it stops receiving the router's.
+mejoras-paso-dns_casa = Use neutral DNS on the home network
+mejoras-paso-dns_casa-desc = Recommended if you do not want the operator to answer or filter your website name lookups and you accept that they still travel unencrypted. Pros: the operator stops answering them, and some services block malicious domains. Cons: the operator still sees them on the way, you start trusting another company, and you may lose some operator feature that depends on its DNS.
 mejoras-paso-hora_neutra = Take the time from a neutral server
 mejoras-paso-hora_neutra-desc = Recommended if you want to depend as little as possible on the operator's servers. Pros: the time comes from the Spanish Navy's Royal Observatory. Cons: the privacy gain is minimal.
+
+## DNS providers (the note for each one, in the review's picker)
+mejoras-dns-quad9 = Quad9
+mejoras-dns-quad9-desc = Blocks malicious domains. Based in Switzerland, it does not keep your IP address.
+mejoras-dns-quad9_sin_filtro = Quad9 without filtering
+mejoras-dns-quad9_sin_filtro-desc = The same as Quad9, but without blocking anything.
+mejoras-dns-dns4eu = DNS4EU
+mejoras-dns-dns4eu-desc = European Union infrastructure and law. It applies the blocks ordered by the courts.
+mejoras-dns-cloudflare = Cloudflare
+mejoras-dns-cloudflare-desc = Very fast. It is a United States company.
+mejoras-dns-adguard = AdGuard
+mejoras-dns-adguard-desc = Blocks ads and trackers. It may break some websites.

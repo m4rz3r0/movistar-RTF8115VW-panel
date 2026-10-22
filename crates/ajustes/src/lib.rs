@@ -26,7 +26,7 @@ pub use modelo::{
 /// `ui::comun::Glifo`.
 pub const ICONOS: &[&str] = &[
     "globo", "escudo", "llave", "personas", "telefono", "fax", "reloj", "lupa", "puerta", "casa",
-    "ojo",
+    "ojo", "registro",
 ];
 
 /// Columnas que puede declarar la lista de los dispositivos (no es una
@@ -53,9 +53,9 @@ pub use elementos::{
 };
 #[cfg(feature = "catalogo")]
 pub use lotes::{
-    Condicion, Destino, Eleccion, Lote, OpcionEleccion, ParaCada, PasoExpandido, PasoLote,
-    clave_lote, clave_paso, claves_de_lotes, expandir, lotes_del_campo, pasos_del_lote,
-    titulo_lote,
+    Condicion, Destino, ELECCION_DNS, Eleccion, Lote, OpcionEleccion, ParaCada, PasoExpandido,
+    PasoLote, clave_lote, clave_paso, clave_proveedor_dns, claves_de_lotes, expandir,
+    lotes_del_campo, pasos_del_lote, titulo_lote,
 };
 #[cfg(feature = "catalogo")]
 pub use modelo::{

@@ -47,6 +47,14 @@ fn trazos(nombre: &str) -> &'static [&'static str] {
             "M2 12c2.5-4.5 6-7 10-7s7.5 2.5 10 7c-2.5 4.5-6 7-10 7s-7.5-2.5-10-7z",
             "M12 9a3 3 0 1 0 0 6a3 3 0 1 0 0-6z",
         ],
+        // Una hoja con renglones: el registro del sistema.
+        "registro" => &[
+            "M6 3h9l3 3v15H6z",
+            "M15 3v3h3",
+            "M9 10h6",
+            "M9 14h6",
+            "M9 18h4",
+        ],
         _ => &["M12 4a8 8 0 1 0 0 16a8 8 0 1 0 0-16z"],
     }
 }

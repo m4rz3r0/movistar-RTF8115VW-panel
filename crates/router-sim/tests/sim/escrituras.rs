@@ -231,3 +231,20 @@ async fn encender_una_red_wifi_la_pone_a_emitir() {
         );
     }
 }
+
+/// El registro del sistema: lo que se escribe se ve en su lectura.
+#[tokio::test]
+async fn escritura_del_registro_se_lee() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    c.write(
+        "syslog.asp",
+        "cbSetSyslog",
+        &[("syslog_mode", "2"), ("remote_ip", "192.0.2.5")],
+    )
+    .await
+    .unwrap();
+    let n = c.call("cbGetSyslog", &[]).await.unwrap();
+    assert_eq!(valor(&n, "syslog_mode").as_deref(), Some("2"));
+    assert_eq!(valor(&n, "remote_ip").as_deref(), Some("192.0.2.5"));
+}

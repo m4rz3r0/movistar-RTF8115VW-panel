@@ -17,8 +17,8 @@ mejoras-aviso-tr069 = Un reinicio de fábrica o un técnico pueden volver a ence
 mejoras-consejo-wpa3 = Usa WPA3 y la protección de las tramas de gestión si algún día el router lo permite: este no lo admite.
 mejoras-consejo-nombre_y_mac = No ocultes el nombre de la red ni filtres por MAC: no protegen, y ocultar el nombre hace que los móviles lo anuncien allá donde van.
 mejoras-consejo-contrasena_admin = Cambia la contraseña de administración que trae la etiqueta del router (llegará al panel más adelante).
-mejoras-consejo-reenvios = Revisa que ningún puerto abierto apunte al propio router.
-mejoras-consejo-sin_api = El router no deja bloquear el ping desde internet ni apagar la compartición de archivos, el servidor multimedia o el USB.
+mejoras-consejo-reenvios = Revisa que ningún reenvío de puertos apunte al propio router.
+mejoras-consejo-sin_api = Este panel no puede bloquear el ping desde internet ni apagar la compartición de archivos, el servidor multimedia o el USB.
 
 ## Pasos
 mejoras-paso-gestion_remota = Apagar la gestión remota del operador
@@ -26,7 +26,7 @@ mejoras-paso-gestion_remota-desc = Recomendado si quieres cerrar el canal por el
 mejoras-paso-aviso_operador = Apagar el aviso periódico al operador
 mejoras-paso-aviso_operador-desc = Recomendado si apagas la gestión remota: la refuerza. A favor: el router deja de ponerse en contacto con el operador cada cierto tiempo. En contra: los mismos que al apagar la gestión remota.
 mejoras-paso-wps = Quitar el WPS
-mejoras-paso-wps-desc = Recomendado si no necesitas conectar dispositivos pulsando el botón del router, que es casi siempre. A favor: se cierra el emparejamiento por código, que se puede adivinar probando unos 11 000 intentos. En contra: los dispositivos nuevos se conectan escribiendo la contraseña.
+mejoras-paso-wps-desc = Recomendado si no necesitas conectar dispositivos pulsando el botón del router, que es casi siempre. A favor: se cierra el emparejamiento por código, que se puede adivinar en unos 11 000 intentos. En contra: los dispositivos nuevos se conectan escribiendo la contraseña.
 mejoras-paso-upnp = Apagar la apertura automática de puertos (UPnP)
 mejoras-paso-upnp-desc = Recomendado si no tienes consolas ni programas que necesiten abrir puertos solos. A favor: ningún dispositivo ni programa malicioso abre puertos sin tu permiso. En contra: alguna consola pasará a una conexión restringida y tendrás que abrir sus puertos a mano.
 mejoras-paso-wpa2 = Cifrar la WiFi con WPA2-AES
@@ -34,6 +34,22 @@ mejoras-paso-wpa2-desc = Recomendado si no tienes dispositivos WiFi de antes de 
 mejoras-paso-aislar_invitados = Aislar la red de invitados
 mejoras-paso-aislar_invitados-desc = Recomendado si usas la red de invitados para las visitas o para dispositivos del hogar conectados. A favor: los dispositivos de esa red no se ven entre sí. En contra: entre ellos no se puede enviar contenido a una tele ni imprimir.
 mejoras-paso-espejo = Apagar el espejo del tráfico de internet
-mejoras-paso-espejo-desc = Recomendado si no estás haciendo un diagnóstico de la conexión. A favor: ninguna toma de casa recibe una copia de todo el tráfico de internet. En contra: ninguno; se enciende solo para diagnosticar.
+mejoras-paso-espejo-desc = Recomendado si no estás haciendo un diagnóstico de la conexión. A favor: ningún puerto de red de casa recibe una copia de todo el tráfico de internet. En contra: ninguno; se enciende solo para diagnosticar.
+mejoras-paso-registro = No enviar el registro del sistema a otro equipo
+mejoras-paso-registro-desc = Recomendado si no tienes tu propio servidor para recoger registros, que es lo normal en casa. A favor: el registro, que dice qué dispositivos de tu casa se conectan y cuándo, no sale del router sin cifrar hacia otro equipo. En contra: si usas un servidor propio para los registros, deja de recibir el del router.
+mejoras-paso-dns_casa = Usar DNS neutros en la red de casa
+mejoras-paso-dns_casa-desc = Recomendado si no quieres que el operador resuelva o filtre tus consultas de nombres de webs y aceptas que siguen viajando en claro. A favor: el operador deja de resolverlas, y algunos proveedores bloquean dominios maliciosos. En contra: el operador las sigue viendo por el camino, pasas a confiar en otro proveedor y puedes perder alguna función del operador que dependa de su DNS.
 mejoras-paso-hora_neutra = Tomar la hora de un servidor neutro
 mejoras-paso-hora_neutra-desc = Recomendado si quieres depender lo menos posible de los servidores del operador. A favor: la hora viene del Real Instituto y Observatorio de la Armada. En contra: la ganancia de privacidad es mínima.
+
+## Proveedores de DNS (la nota de cada uno, en el selector de la revisión)
+mejoras-dns-quad9 = Quad9
+mejoras-dns-quad9-desc = Bloquea dominios maliciosos. Está en Suiza y no guarda tu dirección IP.
+mejoras-dns-quad9_sin_filtro = Quad9 sin filtro
+mejoras-dns-quad9_sin_filtro-desc = Igual que Quad9, pero sin bloquear nada.
+mejoras-dns-dns4eu = DNS4EU
+mejoras-dns-dns4eu-desc = Infraestructura y leyes de la Unión Europea. Aplica los bloqueos que ordenan los jueces.
+mejoras-dns-cloudflare = Cloudflare
+mejoras-dns-cloudflare-desc = Muy rápido. Es una empresa de Estados Unidos.
+mejoras-dns-adguard = AdGuard
+mejoras-dns-adguard-desc = Bloquea anuncios y rastreadores. Puede romper alguna web.

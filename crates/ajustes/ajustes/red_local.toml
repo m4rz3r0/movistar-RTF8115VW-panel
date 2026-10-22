@@ -80,6 +80,33 @@ opciones = [
   { valor = "604800", clave = "semana" },
 ]
 
+# DNS que el router reparte a la red de casa, en el pool 0. Nunca los de
+# la conexión a internet ni el relé de DNS: afectan a la TV y a la voz. Los
+# pools 1 y 2 (los del deco) no se tocan. Solo el principal lleva
+# recomendación: el par entero lo pone el lote «Privacidad máxima», y otros
+# proveedores neutros valen como el recomendado.
+[[ajuste]]
+id = "red_local.dns_casa"
+tema = "red_local"
+nivel = "avanzado"
+leer = { funcion = "cbGetDhcpv4ServerPool", params = { rtm_cfg_dhcpv4_svr_pool_0i = "0" } }
+fijos = { rtm_cfg_dhcpv4_svr_pool_id = "0" }
+
+[[ajuste.campo]]
+id = "principal"
+escribe = { funcion = "cbSetDhcpv4ServerPool", parametro = "ipv4_dns_addr_0" }
+lee = "ipv4_dns_addr_0"
+tipo = "ip"
+recomendado = "9.9.9.9"
+aceptados = ["9.9.9.10", "86.54.11.100", "1.1.1.1", "94.140.14.14"]
+
+[[ajuste.campo]]
+id = "secundario"
+escribe = { funcion = "cbSetDhcpv4ServerPool", parametro = "ipv4_dns_addr_1" }
+lee = "ipv4_dns_addr_1"
+tipo = "ip"
+opcional = true
+
 [[ajuste]]
 id = "red_local.ipv6"
 tema = "red_local"
@@ -109,6 +136,14 @@ ajustes = ["red_local.dhcp"]
 icono = "casa"
 interruptor = "red_local.dhcp.activo"
 datos = ["red_local.dhcp.inicio", "red_local.dhcp.fin", "red_local.dhcp.concesion"]
+estado = "derivado:segun_lo_recomendado"
+
+[[elemento]]
+id = "dns-casa"
+tema = "red_local"
+ajustes = ["red_local.dns_casa"]
+icono = "globo"
+datos = ["red_local.dns_casa.principal", "red_local.dns_casa.secundario"]
 estado = "derivado:segun_lo_recomendado"
 
 [[elemento]]

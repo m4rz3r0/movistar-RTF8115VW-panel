@@ -410,7 +410,7 @@ fn comprobar_campo(a: &Ajuste, c: &Campo, f: &Catalogo, m: &Mascara, fallos: &mu
             "campo `secreto` sobre {}, que no es un parámetro secreto",
             p.nombre
         ));
-    } else if !campo_secreto && !compatibles(c.tipo, p) {
+    } else if !campo_secreto && !compatibles(c, p) {
         mal(format!(
             "tipo {:?} incompatible con el parámetro {} ({:?})",
             c.tipo, p.nombre, p.tipo
@@ -447,7 +447,7 @@ fn comprobar_campo(a: &Ajuste, c: &Campo, f: &Catalogo, m: &Mascara, fallos: &mu
         if m.es_protegido(&ad.lee) {
             mal(format!("el elemento leído {} es secreto", ad.lee));
         }
-        if !compatibles(TipoCampo::Opcion, pa) {
+        if !tipos_compatibles(TipoCampo::Opcion, pa) {
             mal(format!(
                 "parámetro {} ({:?}) incompatible con las opciones",
                 pa.nombre, pa.tipo
@@ -572,12 +572,20 @@ fn comprobar_forma(c: &Campo, mal: &mut impl FnMut(String)) {
             _ => {}
         }
     }
-    if !c.aceptados.is_empty() && (c.tipo != TipoCampo::Texto || c.recomendado.is_none()) {
-        mal("`aceptados` solo vale en un campo `texto` con `recomendado`".into());
+    let admite_aceptados = matches!(c.tipo, TipoCampo::Texto | TipoCampo::Ip);
+    if !c.aceptados.is_empty() && (!admite_aceptados || c.recomendado.is_none()) {
+        mal("`aceptados` solo vale en un campo `texto` o `ip` con `recomendado`".into());
     }
-    for a in c.aceptados.iter().filter_map(|a| a.strip_prefix("*.")) {
-        if a.is_empty() || a.contains('*') {
-            mal(format!("`aceptados`: «*.{a}» no es un dominio"));
+    for a in &c.aceptados {
+        match a.strip_prefix("*.") {
+            Some(d) if d.is_empty() || d.contains('*') => {
+                mal(format!("`aceptados`: «{a}» no es un dominio"));
+            }
+            // En un campo IP, cada uno es una IP: nada de `*.dominio`.
+            _ if c.tipo == TipoCampo::Ip && traducir(c, a).is_err() => {
+                mal(format!("`aceptados`: «{a}» no es una IP válida"));
+            }
+            _ => {}
         }
     }
     if c.seguridad && c.recomendado.is_none() && !c.opciones.iter().any(|o| o.recomendada) {
@@ -624,7 +632,14 @@ fn comprobar_forma(c: &Campo, mal: &mut impl FnMut(String)) {
 }
 
 /// Regla 4: el control del campo sirve para el tipo del parámetro.
-fn compatibles(t: TipoCampo, p: &Parametro) -> bool {
+fn compatibles(c: &Campo, p: &Parametro) -> bool {
+    tipos_compatibles(c.tipo, p)
+        // Un booleano que dice sus valores de sí y no vale sobre un `enum`
+        // de más de dos (los dos se comprueban en él, regla 6).
+        || (c.tipo == TipoCampo::Booleano && c.booleano.is_some() && p.tipo == TipoParam::Enum)
+}
+
+fn tipos_compatibles(t: TipoCampo, p: &Parametro) -> bool {
     match t {
         TipoCampo::Texto => p.tipo == TipoParam::Text,
         TipoCampo::Secreto => p.tipo == TipoParam::Secret,

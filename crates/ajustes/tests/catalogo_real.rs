@@ -137,7 +137,7 @@ fn claves_de_elementos_en_los_dos_idiomas() {
 fn ajustes_minimos_presentes() {
     use Nivel::{Avanzado, Basico, Oculto};
     let c = cargar();
-    let filas: [(&str, Nivel, bool, Option<Componente>); 31] = [
+    let filas: [(&str, Nivel, bool, Option<Componente>); 33] = [
         ("wifi.red_24", Basico, false, None),
         ("wifi.red_24_avanzado", Avanzado, false, None),
         ("wifi.red_5", Basico, false, None),
@@ -184,6 +184,8 @@ fn ajustes_minimos_presentes() {
         ("telefono.fisico", Avanzado, false, None),
         ("sistema.hora", Avanzado, false, None),
         ("sistema.diagnostico", Oculto, false, None),
+        ("sistema.registro", Avanzado, false, None),
+        ("red_local.dns_casa", Avanzado, false, None),
     ];
     for (id, nivel, lista, componente) in filas {
         let a = c.ajuste(id).unwrap_or_else(|| panic!("falta {id}"));

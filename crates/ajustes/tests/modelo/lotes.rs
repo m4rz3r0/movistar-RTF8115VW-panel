@@ -93,6 +93,7 @@ fn lotes_validos() {
     assert_eq!(l.icono, "escudo");
     assert!(c.paso("seguro").unwrap().opcional);
     assert_eq!(c.eleccion("tope").unwrap().opciones.len(), 2);
+    assert_eq!(c.eleccion("tope").unwrap().defecto().id, "poco");
     let pasos = pasos_del_lote(&c, l);
     let claves: Vec<String> = pasos.iter().map(PasoExpandido::clave).collect();
     assert_eq!(
@@ -224,6 +225,21 @@ fn eleccion_con_dos_por_defecto_es_error() {
         &fallos_de(&mal),
         "elección tope",
         "más de una opción por defecto",
+    );
+}
+
+/// Si una opción no diera valor a un campo que dan las otras, al aplicarla
+/// ese campo se quedaría sin valor.
+#[test]
+fn eleccion_con_opciones_de_campos_distintos_es_error() {
+    let mal = cambiado(
+        "valores = { maximo = \"32\" }",
+        "valores = { maximo = \"32\", otro = \"1\" }",
+    );
+    falla_con(
+        &fallos_de(&mal),
+        "elección tope",
+        "la opción mucho no da valor a los mismos campos que poco",
     );
 }
 
