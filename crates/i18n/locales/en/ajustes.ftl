@@ -274,6 +274,10 @@ ajustes-aviso-conectados = { $n ->
 ## WiFi summary strip
 ajustes-resumen-de = { $n } of { $total }
 ajustes-resumen-sin-dato = —
+ajustes-resumen-sin-leer = { $n ->
+    [one] 1 couldn't be read and doesn't count.
+   *[other] { $n } couldn't be read and don't count.
+}
 ajustes-resumen-wifi-redes = Networks on
 ajustes-resumen-wifi-redes-detalle = The ones broadcasting right now.
 ajustes-resumen-wifi-radios = Radios on

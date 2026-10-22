@@ -196,10 +196,56 @@ async fn pagina_con_lectura_fallida() {
             .unwrap()
             .is_empty()
     );
-    // El resumen sigue: dos redes que se pueden leer, ninguna encendida.
-    assert_eq!(
-        resumen(&pagina, "ajustes-resumen-wifi-redes")["cifra"],
-        "0 de 3"
+    // El resumen sigue, sin contar lo que no se ha leído: dos redes que se
+    // pueden leer, ninguna encendida, y la tercera dicha aparte.
+    let redes = resumen(&pagina, "ajustes-resumen-wifi-redes");
+    assert_eq!(redes["cifra"], "0 de 2", "{redes}");
+    assert!(
+        redes["detalle"]
+            .as_str()
+            .is_some_and(|d| d.contains("1 no se ha podido leer")),
+        "{redes}"
+    );
+    assert_eq!(redes["atencion"], true, "{redes}");
+    // Las radios, todas leídas: nada aparte.
+    let radios = resumen(&pagina, "ajustes-resumen-wifi-radios");
+    assert_eq!(radios["cifra"], "2 de 2", "{radios}");
+    assert!(
+        !radios["detalle"]
+            .as_str()
+            .is_some_and(|d| d.contains("leer")),
+        "{radios}"
+    );
+}
+
+/// Una radio que no se ha podido leer no cuenta ni como encendida ni como
+/// apagada en la franja: se dice aparte (en los dos idiomas).
+#[tokio::test]
+async fn resumen_sin_contar_una_radio_sin_leer() {
+    let p = PanelPrueba::nuevo().arrancar().await;
+    let cookie = sesion(&p).await;
+    p.sim
+        .control
+        .fail_reads_con("cbGetWifi", "dpm_cfg_wifi_0i", "1", true);
+    let pagina = leer(&p, &cookie, "wifi").await;
+    assert_eq!(elemento(&pagina, "radio-5")["texto_estado"], "Sin leer");
+    let radios = resumen(&pagina, "ajustes-resumen-wifi-radios");
+    assert_eq!(radios["cifra"], "1 de 1", "{radios}");
+    assert!(
+        radios["detalle"]
+            .as_str()
+            .is_some_and(|d| d.contains("1 no se ha podido leer")),
+        "{radios}"
+    );
+    let en = format!("{cookie}; rp_lang=en");
+    let pagina = leer(&p, &en, "wifi").await;
+    let radios = resumen(&pagina, "ajustes-resumen-wifi-radios");
+    assert_eq!(radios["cifra"], "1 of 1", "{radios}");
+    assert!(
+        radios["detalle"]
+            .as_str()
+            .is_some_and(|d| d.contains("1 couldn't be read")),
+        "{radios}"
     );
 }
 

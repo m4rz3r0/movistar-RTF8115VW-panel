@@ -345,6 +345,33 @@ pub(super) fn nota(ctx: &Contexto, e: &Elemento) -> Option<String> {
     })
 }
 
+/// Un dato de la franja que cuenta cuántos de los elementos `son` cumplen
+/// `si`: solo entre los que se han leído (uno sin leer no está ni encendido
+/// ni apagado). Los que no se han podido leer se dicen en la explicación, y
+/// el dato va en ámbar; si no se ha leído ninguno, «—».
+fn contar(
+    clave: &str,
+    son: &[&(&Elemento, &ElementoVista)],
+    si: fn(&ElementoVista) -> bool,
+) -> DatoResumen {
+    let (leidos, sin_leer): (Vec<&ElementoVista>, Vec<&ElementoVista>) = son
+        .iter()
+        .map(|(_, v)| *v)
+        .partition(|v| v.lectura == EstadoLectura::Leido);
+    let cifra = if leidos.is_empty() {
+        sin_dato()
+    } else {
+        let n = leidos.iter().filter(|v| si(v)).count();
+        t!("ajustes-resumen-de", n = n, total = leidos.len())
+    };
+    let mut detalle = detalle_fijo(clave);
+    if !sin_leer.is_empty() {
+        detalle.push(' ');
+        detalle.push_str(&t!("ajustes-resumen-sin-leer", n = sin_leer.len()));
+    }
+    dato_resumen(clave, cifra, detalle, !sin_leer.is_empty())
+}
+
 /// Franja de resumen de la WiFi: redes y radios encendidas, dispositivos
 /// conectados y recomendaciones pendientes. `elementos` son los del
 /// catálogo con su vista.
@@ -352,12 +379,10 @@ pub(super) fn resumen(
     ctx: &Contexto,
     elementos: &[(&Elemento, &ElementoVista)],
 ) -> Vec<DatoResumen> {
-    let de = |n: usize, total: usize| t!("ajustes-resumen-de", n = n, total = total);
     // Una red cuenta si emite; una radio, si está encendida (aunque no
     // emita ninguna red: eso lo dice su tarjeta).
-    let cuenta = |filtro: fn(&Elemento) -> bool, si: fn(&ElementoVista) -> bool| {
-        let son: Vec<_> = elementos.iter().filter(|(e, _)| filtro(e)).collect();
-        de(son.iter().filter(|(_, v)| si(v)).count(), son.len())
+    let de = |filtro: fn(&Elemento) -> bool| -> Vec<&(&Elemento, &ElementoVista)> {
+        elementos.iter().filter(|(e, _)| filtro(e)).collect()
     };
     let emite = |v: &ElementoVista| v.estado == EstadoVisual::Emite;
     let encendida = |v: &ElementoVista| v.interruptor.as_ref().is_some_and(|i| i.encendido);
@@ -366,19 +391,14 @@ pub(super) fn resumen(
         .filter(|(e, _)| es_red(e))
         .map(|(e, _)| conectados(ctx, e))
         .sum();
-    let dato = |clave: &str, cifra: String, atencion: bool| {
-        dato_resumen(clave, cifra, detalle_fijo(clave), atencion)
-    };
+    let clave = "ajustes-resumen-wifi-conectados";
     vec![
-        dato("ajustes-resumen-wifi-redes", cuenta(es_red, emite), false),
-        dato(
-            "ajustes-resumen-wifi-radios",
-            cuenta(es_radio, encendida),
-            false,
-        ),
-        dato(
-            "ajustes-resumen-wifi-conectados",
+        contar("ajustes-resumen-wifi-redes", &de(es_red), emite),
+        contar("ajustes-resumen-wifi-radios", &de(es_radio), encendida),
+        dato_resumen(
+            clave,
             conectados.map_or_else(sin_dato, |n| n.to_string()),
+            detalle_fijo(clave),
             false,
         ),
         recomendaciones(elementos),

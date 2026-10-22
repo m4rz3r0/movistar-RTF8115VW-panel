@@ -274,6 +274,10 @@ ajustes-aviso-conectados = { $n ->
 ## Franja de resumen de la WiFi
 ajustes-resumen-de = { $n } de { $total }
 ajustes-resumen-sin-dato = —
+ajustes-resumen-sin-leer = { $n ->
+    [one] 1 no se ha podido leer y no cuenta.
+   *[other] { $n } no se han podido leer y no cuentan.
+}
 ajustes-resumen-wifi-redes = Redes encendidas
 ajustes-resumen-wifi-redes-detalle = Las que emiten ahora mismo.
 ajustes-resumen-wifi-radios = Radios encendidas
