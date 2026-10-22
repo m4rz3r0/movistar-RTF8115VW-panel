@@ -15,8 +15,6 @@ use super::*;
 mod conectados;
 mod historial;
 
-#[cfg(test)]
-use conectados::dispositivos_del_punto;
 pub(super) use conectados::{conectados, dispositivos};
 
 pub(super) use historial::apagada_desde;
