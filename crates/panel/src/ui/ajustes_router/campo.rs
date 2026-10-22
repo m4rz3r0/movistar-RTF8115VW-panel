@@ -460,6 +460,7 @@ mod tests {
             valor_secreto: None,
             recomendado: Some("wpa2".into()),
             motivo_recomendado: None,
+            aceptados: Vec::new(),
             requiere: None,
             sin_eleccion: false,
         }

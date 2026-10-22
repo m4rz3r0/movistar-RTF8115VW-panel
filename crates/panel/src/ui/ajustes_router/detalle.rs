@@ -41,12 +41,18 @@ fn titulo_columna(n: Nivel) -> String {
 }
 
 /// Título, descripción y ayuda de la columna del ajuste `a` (`id`, el id
-/// de su título). Lo oculto dice qué significa.
-fn cabeza_columna(a: &AjusteVista, id: String) -> impl IntoView + use<> {
+/// de su título). Lo oculto dice qué significa. La única columna de un
+/// elemento se titula «Opciones» (su nivel solo dice algo junto a otras).
+fn cabeza_columna(a: &AjusteVista, id: String, unica: bool) -> impl IntoView + use<> {
+    let titulo = if unica {
+        t!("ajustes-detalle-opciones")
+    } else {
+        titulo_columna(a.nivel)
+    };
     let oculto = (a.nivel == Nivel::Oculto)
         .then(|| view! { <p class="detalle-nota-oculto">{t!("ajustes-nivel-oculto-desc")}</p> });
     view! {
-        <h3 id=id>{titulo_columna(a.nivel)}</h3>
+        <h3 id=id>{titulo}</h3>
         {oculto}
         <p class="ajuste-desc">{traducir(&format!("{}-desc", a.clave), None)}</p>
         {ayuda(a)}
@@ -61,7 +67,7 @@ fn se_edita(a: &AjusteVista) -> bool {
 
 /// La columna de un ajuste que solo se consulta: una lista en una tabla o
 /// el enlace a donde se cambia la contraseña del router.
-fn columna_de_consulta(a: &AjusteVista) -> impl IntoView + use<> {
+fn columna_de_consulta(a: &AjusteVista, unica: bool) -> impl IntoView + use<> {
     let col = format!("{}-columna", dom(a));
     let titulo = col.clone();
     let cuerpo = if a.componente.as_deref() == Some(super::CONTRASENA_ROUTER) {
@@ -73,7 +79,7 @@ fn columna_de_consulta(a: &AjusteVista) -> impl IntoView + use<> {
     };
     view! {
         <section class="detalle-columna" aria-labelledby=col>
-            {cabeza_columna(a, titulo)}
+            {cabeza_columna(a, titulo, unica)}
             {cuerpo}
             {detalles_tecnicos(&a.clave, &a.tecnico)}
         </section>
@@ -87,6 +93,7 @@ fn columna(
     ed: Edicion,
     editable: bool,
     bloqueado: Signal<bool>,
+    unica: bool,
 ) -> impl IntoView + use<> {
     let prefijo = dom(a);
     let col = format!("{prefijo}-columna");
@@ -123,7 +130,7 @@ fn columna(
     });
     view! {
         <section class="detalle-columna" aria-labelledby=col>
-            {cabeza_columna(a, col_titulo)}
+            {cabeza_columna(a, col_titulo, unica)}
             <div class="ajuste-campos">{campos}</div>
             {motivos(&a.campos)}
             {efecto}
@@ -169,7 +176,7 @@ impl Borradores {
         self.0.update(|b| {
             for cambios in b.values_mut() {
                 cambios.retain(|(ajuste, campo), _| {
-                    let clave = format!("ajuste-{}-{campo}", ajuste.replace('.', "-"));
+                    let clave = format!("{}-{campo}", ajustes::prefijo_de_ajuste(ajuste));
                     !claves.contains(&clave)
                 });
             }
@@ -234,11 +241,12 @@ pub(crate) fn Detalle(e: ElementoVista, registro: Registro) -> impl IntoView {
         .filter(|a| se_edita(a))
         .map(|a| (a.id.clone(), dom(a), Edicion::nueva(&a.campos)))
         .collect();
+    let unica = leidos.len() == 1;
     let columnas = leidos
         .iter()
         .map(|a| match ediciones.iter().find(|(id, _, _)| *id == a.id) {
-            Some((_, _, ed)) => columna(a, *ed, editable, preparando.into()).into_any(),
-            None => columna_de_consulta(a).into_any(),
+            Some((_, _, ed)) => columna(a, *ed, editable, preparando.into(), unica).into_any(),
+            None => columna_de_consulta(a, unica).into_any(),
         })
         .collect_view();
     registro.set(Some((
@@ -322,7 +330,7 @@ pub(crate) fn Detalle(e: ElementoVista, registro: Registro) -> impl IntoView {
     let (estado, texto) = (e.estado, e.texto_estado.clone());
     let insignia = move || {
         let (estado, texto) = s.insignia(&id_insignia).unwrap_or((estado, texto.clone()));
-        view! { <Insignia estado texto /> }
+        (!texto.is_empty()).then(|| view! { <Insignia estado texto /> })
     };
     let sin_leer = match &e.lectura {
         EstadoLectura::SinLeer(m) => Some(view! {

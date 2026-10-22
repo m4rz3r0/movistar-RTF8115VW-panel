@@ -54,8 +54,13 @@ pub struct ElementoVista {
     pub papel: Option<String>,
     /// Nombre de la red WiFi, si es una.
     pub ssid: Option<String>,
+    /// Glifo de su tarjeta (`reloj`); sin él, los arcos de emisión de la
+    /// WiFi.
+    #[serde(default)]
+    pub icono: Option<String>,
     pub estado: EstadoVisual,
-    /// Texto de la insignia, ya traducido («Apagada»).
+    /// Texto de la insignia, ya traducido («Apagada»). Vacío si el
+    /// elemento no tiene un estado que decir: entonces no hay insignia.
     pub texto_estado: String,
     pub interruptor: Option<InterruptorVista>,
     /// Como mucho seis, en el orden del catálogo.
@@ -81,6 +86,11 @@ pub struct InterruptorVista {
     pub encendido: bool,
     /// Clave de traducción del efecto al aplicarlo (`efecto-wifi_red`).
     pub efecto: Option<String>,
+    /// Su nombre accesible encendido y apagado, ya traducidos, si el
+    /// elemento tiene los suyos (`ajustes-interruptor-<elemento>-si`/`-no`:
+    /// «Relé DNS activado»); sin ellos, «<nombre> encendida/apagada».
+    #[serde(default)]
+    pub etiquetas: Option<(String, String)>,
 }
 
 /// Un dato de la tarjeta.

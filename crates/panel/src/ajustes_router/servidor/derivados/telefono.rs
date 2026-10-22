@@ -24,18 +24,11 @@ pub(super) fn estado_voz(ctx: &Contexto) -> (EstadoVisual, String) {
     )
 }
 
-/// `derivado:estado_paso_directo`: activado si lo está el del fax o el de
-/// los módems.
+/// `derivado:estado_paso_directo`: el del fax, que es el interruptor de su
+/// tarjeta (el de los módems va en sus datos).
 pub(super) fn estado_paso_directo(ctx: &Contexto) -> (EstadoVisual, String) {
-    let fax = si_no(ctx, "telefono.fisico", "fax");
-    let modem = si_no(ctx, "telefono.fisico", "modem");
-    let alguno = match (fax, modem) {
-        (Some(true), _) | (_, Some(true)) => Some(true),
-        (Some(false), Some(false)) => Some(false),
-        _ => None,
-    };
     segun(
-        alguno,
+        si_no(ctx, "telefono.fisico", "fax"),
         (EstadoVisual::Emite, "ajustes-estado-paso-directo-si"),
         (EstadoVisual::Apagada, "ajustes-estado-paso-directo-no"),
     )

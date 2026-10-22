@@ -91,6 +91,7 @@ pub(super) fn montar(
             interruptor: None,
             datos: Vec::new(),
             estado: None,
+            icono: None,
         })
         .collect();
     del_catalogo.extend(sueltos);
@@ -122,12 +123,13 @@ fn legible(v: &ValorLegible) -> Option<String> {
     }
 }
 
-/// El campo tiene recomendación y otro valor que el panel reconoce: uno que
-/// no reconoce no es una recomendación pendiente (no se sabe qué tiene).
+/// El campo tiene recomendación y otro valor que el panel reconoce (y que no
+/// vale igual, como otro servidor de hora neutro): uno que no reconoce no es
+/// una recomendación pendiente (no se sabe qué tiene).
 pub(super) fn pendiente(c: &CampoVista) -> bool {
     c.tipo != TipoCampo::Secreto
         && match (&c.recomendado, legible(&c.valor)) {
-            (Some(r), Some(v)) => v != *r,
+            (Some(r), Some(v)) => v != *r && !ajustes::valor_aceptado(&c.aceptados, &v),
             _ => false,
         }
 }
@@ -175,6 +177,7 @@ fn elemento(
                 campo: c.id.clone(),
                 encendido,
                 efecto: v.efecto.clone().filter(|_| encendido),
+                etiquetas: etiquetas_interruptor(&e.id),
             }),
             _ => None,
         });
@@ -209,6 +212,7 @@ fn elemento(
             .map_or_else(String::new, |a| a.clave.clone()),
         papel: e.papel.as_deref().map(clave_papel),
         ssid: derivados::ssid(ctx, e),
+        icono: e.icono.clone(),
         estado,
         texto_estado,
         interruptor,
@@ -225,8 +229,17 @@ fn elemento(
     }
 }
 
+/// Nombre accesible del interruptor del elemento `id` encendido y apagado,
+/// si tiene los suyos (`ajustes-interruptor-<id>-si`/`-no`).
+fn etiquetas_interruptor(id: &str) -> Option<(String, String)> {
+    let idioma = crate::ui::i18n::idioma_actual();
+    let [si, no] = ["si", "no"].map(|s| format!("ajustes-interruptor-{id}-{s}"));
+    (i18n::existe(idioma, &si) && i18n::existe(idioma, &no))
+        .then(|| (traducir(&si, None), traducir(&no, None)))
+}
+
 /// Estado de un elemento leído y el texto de su insignia: su regla del
-/// catálogo o, sin ella, «Leído».
+/// catálogo o, sin ella, ninguno (sin insignia: «Leído» no dice nada).
 fn estado(ctx: &Contexto, e: &Elemento) -> (EstadoVisual, String) {
     let regla = e
         .estado
@@ -236,9 +249,9 @@ fn estado(ctx: &Contexto, e: &Elemento) -> (EstadoVisual, String) {
         Some(Ok((estado, clave))) => (estado, traducir(&clave, None)),
         Some(Err(d)) => {
             tracing::error!("ajustes: {}: regla de estado desconocida {}", e.id, d.0);
-            (EstadoVisual::Emite, t!("ajustes-estado-leido"))
+            (EstadoVisual::Apagada, String::new())
         }
-        None => (EstadoVisual::Emite, t!("ajustes-estado-leido")),
+        None => (EstadoVisual::Apagada, String::new()),
     }
 }
 
@@ -391,6 +404,7 @@ mod tests {
             valor_secreto: None,
             recomendado: recomendado.map(str::to_owned),
             motivo_recomendado: None,
+            aceptados: Vec::new(),
             requiere: None,
             sin_eleccion: false,
         }

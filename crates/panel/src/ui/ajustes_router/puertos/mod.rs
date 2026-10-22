@@ -171,6 +171,7 @@ fn campo_propio(id: &str, tipo: TipoCampo, opcional: bool) -> CampoVista {
         valor_secreto: None,
         recomendado: None,
         motivo_recomendado: None,
+        aceptados: Vec::new(),
         requiere: None,
         sin_eleccion: false,
     }

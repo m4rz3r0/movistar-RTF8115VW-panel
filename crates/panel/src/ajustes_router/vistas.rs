@@ -130,6 +130,10 @@ pub struct CampoVista {
     /// Clave de traducción del porqué de la recomendación (para quién es, a
     /// favor y en contra): `<clave>-recomendado`. Solo si hay recomendación.
     pub motivo_recomendado: Option<String>,
+    /// Otros valores que valen como lo recomendado (otro servidor de hora
+    /// neutro); ver [`ajustes::valor_aceptado`].
+    #[serde(default)]
+    pub aceptados: Vec<String>,
     /// Otro campo del ajuste que hace falta cuando este toma un valor (la
     /// toma del espejo al encenderlo): la página lo pide junto a ese campo.
     pub requiere: Option<Requiere>,

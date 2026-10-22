@@ -1,5 +1,6 @@
 # Ajustes del tema Teléfono: la línea fija que llega por internet. Todo lo
-# configura el operador y va bajo «Más opciones».
+# configura el operador.
+efecto-telefono_corte = El teléfono fijo puede quedarse sin servicio: si lo apagas, hasta que lo vuelvas a encender; si cambias un servidor, hasta que el router vuelva a conectar con el operador.
 
 ## Línea de teléfono
 ajuste-telefono-linea-titulo = Línea de teléfono

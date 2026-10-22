@@ -134,6 +134,7 @@ id = "gestion-remota"
 tema = "seguridad"
 ajustes = ["seguridad.gestion_remota", "seguridad.gestion_remota_avanzado",
            "seguridad.gestion_remota_oculto"]
+icono = "escudo"
 datos = ["seguridad.gestion_remota.activa", "seguridad.gestion_remota_avanzado.aviso",
          "seguridad.gestion_remota_avanzado.intervalo", "seguridad.gestion_remota_oculto.servidor"]
 estado = "derivado:estado_gestion_remota"
@@ -142,11 +143,13 @@ estado = "derivado:estado_gestion_remota"
 id = "contrasena-router"
 tema = "seguridad"
 ajustes = ["seguridad.contrasena_router"]
+icono = "llave"
 
 [[elemento]]
 id = "usuarios"
 tema = "seguridad"
 ajustes = ["seguridad.usuarios_router"]
+icono = "personas"
 datos = ["derivado:cuentas"]
 
 # Acciones (spec §5.5).

@@ -180,6 +180,7 @@ mod tests {
             valor_secreto: Some("clave-de-prueba-9".into()),
             recomendado: None,
             motivo_recomendado: None,
+            aceptados: Vec::new(),
             requiere: None,
             sin_eleccion: false,
         };

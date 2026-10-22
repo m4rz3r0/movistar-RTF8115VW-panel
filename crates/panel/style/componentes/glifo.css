@@ -1,0 +1,16 @@
+/* Glifo de una tarjeta que no es WiFi: neutro (el estado va en la insignia). */
+.glifo {
+  flex: none;
+  padding: 5px;
+  border-radius: 10px;
+  background: var(--sup2);
+  color: var(--suave);
+}
+
+.glifo path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

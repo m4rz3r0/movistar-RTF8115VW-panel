@@ -12,7 +12,7 @@ use crate::valores::traducir;
 /// Prefijo de las claves de traducción de un ajuste: `ajuste-` más el id con
 /// `.` → `-` (`wifi.red_5` → `ajuste-wifi-red_5`).
 pub fn prefijo_i18n(a: &Ajuste) -> String {
-    format!("ajuste-{}", a.id.replace('.', "-"))
+    crate::prefijo_de_ajuste(&a.id)
 }
 
 /// Claves de traducción que necesita un ajuste, sin repetir:
@@ -539,6 +539,14 @@ fn comprobar_forma(c: &Campo, mal: &mut impl FnMut(String)) {
                 mal(format!("recomendado «{r}» no es un valor válido del campo"));
             }
             _ => {}
+        }
+    }
+    if !c.aceptados.is_empty() && (c.tipo != TipoCampo::Texto || c.recomendado.is_none()) {
+        mal("`aceptados` solo vale en un campo `texto` con `recomendado`".into());
+    }
+    for a in c.aceptados.iter().filter_map(|a| a.strip_prefix("*.")) {
+        if a.is_empty() || a.contains('*') {
+            mal(format!("`aceptados`: «*.{a}» no es un dominio"));
         }
     }
     if c.seguridad && c.recomendado.is_none() && !c.opciones.iter().any(|o| o.recomendada) {

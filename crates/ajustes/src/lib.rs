@@ -16,7 +16,15 @@
 mod legible;
 mod modelo;
 pub use legible::{ErrorValor, Limites, mac as normalizar_mac, validar_legible};
-pub use modelo::{Nivel, Requiere, SIN_ELECCION, Tema, TipoCampo, ValorLegible};
+pub use modelo::{
+    Nivel, Requiere, SIN_ELECCION, Tema, TipoCampo, ValorLegible, prefijo_de_ajuste, valor_aceptado,
+};
+
+/// Glifos que puede llevar la tarjeta de un elemento (`icono` en el
+/// catálogo); el panel los dibuja en `ui::comun::Glifo`.
+pub const ICONOS: &[&str] = &[
+    "globo", "escudo", "llave", "personas", "telefono", "fax", "reloj", "lupa",
+];
 
 #[cfg(feature = "catalogo")]
 mod carga;

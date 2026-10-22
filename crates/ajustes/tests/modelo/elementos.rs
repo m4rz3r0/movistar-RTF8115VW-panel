@@ -200,3 +200,16 @@ fn seguridad_solo_con_recomendacion() {
     );
     assert_eq!(fallos(&con, ""), Vec::<String>::new());
 }
+
+/// El glifo de un elemento tiene que ser uno de los que dibuja el panel.
+#[test]
+fn icono_de_un_elemento() {
+    let con = |icono: &str| {
+        ELEMENTOS.replace(
+            "papel = \"principal\"",
+            &format!("papel = \"principal\"\nicono = \"{icono}\""),
+        )
+    };
+    assert_eq!(fallos_con(&con("reloj")), Vec::<String>::new());
+    falla_con(&fallos_con(&con("cohete")), "red-1", "icono");
+}

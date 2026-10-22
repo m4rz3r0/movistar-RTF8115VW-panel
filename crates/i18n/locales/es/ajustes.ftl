@@ -51,7 +51,7 @@ ajustes-tema-seguridad-desc = Quién puede entrar al router y la gestión remota
 ajustes-tema-telefono = Teléfono
 ajustes-tema-telefono-desc = La línea de teléfono fijo del router.
 ajustes-tema-sistema = Sistema
-ajustes-tema-sistema-desc = Hora, registro y otros ajustes generales del router.
+ajustes-tema-sistema-desc = La hora del router y la copia del tráfico para diagnóstico.
 
 ## Niveles
 ajustes-nivel-basico = Lo esencial
@@ -172,7 +172,6 @@ ajustes-wifi-radio-redes-sin-leer = La radio está encendida, pero alguna de sus
 ## Elementos de cada pestaña: estado, papel, datos, recomendación y acciones
 ajustes-estado-sin-leer = Sin leer
 ajustes-estado-desconocido = Sin datos
-ajustes-estado-leido = Leído
 ajustes-papel-principal = Principal
 ajustes-papel-invitados = Invitados
 ajustes-papel-radio = Radio
@@ -337,3 +336,23 @@ ajustes-resumen-sistema-servidores-primero = El primero: { $servidor }.
 ajustes-resumen-sistema-servidores-ninguno = No hay ninguno puesto.
 ajustes-resumen-sistema-copia = Copia del tráfico
 ajustes-resumen-sistema-copia-detalle = Para diagnóstico; apagada, nadie la recibe.
+
+## Interruptores con su propio nombre, columna única del detalle y acciones de Internet y Teléfono
+ajustes-interruptor-dns-si = Relé DNS activado
+ajustes-interruptor-dns-no = Relé DNS desactivado
+ajustes-interruptor-hora-si = Hora automática activada
+ajustes-interruptor-hora-no = Hora automática desactivada
+ajustes-interruptor-servidores-si = Teléfono por internet encendido
+ajustes-interruptor-servidores-no = Teléfono por internet apagado
+ajustes-interruptor-fax-y-modem-si = Paso directo del fax activado
+ajustes-interruptor-fax-y-modem-no = Paso directo del fax desactivado
+ajustes-detalle-opciones = Opciones
+ajustes-accion-activar_rele = Activar el relé
+ajustes-accion-desactivar_rele = Desactivar el relé
+ajustes-accion-encender_voz = Encender el teléfono por internet
+ajustes-accion-apagar_voz = Apagar el teléfono por internet
+ajuste-accion-activar_rele-titulo = Relé DNS, activarlo
+ajuste-accion-desactivar_rele-titulo = Relé DNS, desactivarlo
+ajuste-accion-encender_voz-titulo = Teléfono por internet, encenderlo
+ajuste-accion-apagar_voz-titulo = Teléfono por internet, apagarlo
+ajustes-problema-sistema-servidor_2 = El servidor de reserva es { $valor }: depende de quien gestione ese servidor.

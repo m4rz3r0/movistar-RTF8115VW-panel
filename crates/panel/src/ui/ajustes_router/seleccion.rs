@@ -193,6 +193,7 @@ mod tests {
             clave: format!("ajuste-wifi-{id}"),
             papel: None,
             ssid: None,
+            icono: None,
             estado: EstadoVisual::Apagada,
             texto_estado: String::new(),
             interruptor: None,

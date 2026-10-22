@@ -1,5 +1,6 @@
 # Settings in the Phone topic: the landline that arrives over the internet.
-# The operator sets all of it and it sits under "More options".
+# The operator sets all of it.
+efecto-telefono_corte = The landline may lose service: if you turn it off, until you turn it back on; if you change a server, until the router reconnects to the operator.
 
 ## Phone line
 ajuste-telefono-linea-titulo = Phone line

@@ -70,6 +70,8 @@ validar = { min = 1 }
 id = "dns"
 tema = "internet"
 ajustes = ["internet.dns"]
+icono = "globo"
+interruptor = "internet.dns.rele"
 datos = ["internet.dns.rele"]
 estado = "derivado:estado_dns"
 
@@ -77,5 +79,19 @@ estado = "derivado:estado_dns"
 id = "ddns"
 tema = "internet"
 ajustes = ["internet.ddns"]
+icono = "globo"
 datos = ["derivado:nombres_ddns"]
 estado = "derivado:estado_ddns"
+
+# Acciones (spec §5.5): el relé, de un clic para lo marcado.
+[[accion]]
+id = "activar_rele"
+tema = "internet"
+campo = "rele"
+valor = "true"
+
+[[accion]]
+id = "desactivar_rele"
+tema = "internet"
+campo = "rele"
+valor = "false"

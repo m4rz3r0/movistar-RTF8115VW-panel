@@ -217,11 +217,24 @@ for (const ancho of [360, 1440]) {
         const remota = tarjeta(page, "Gestión remota del operador").locator(".tarjeta-rec");
         await expect(remota).toHaveClass(/riesgo/);
         await expect(remota.getByRole("button", { name: t.apagarRemota })).toBeVisible();
-        // Teléfono no tiene acciones en lote: sus tarjetas no se marcan.
+        // Teléfono: cada tarjeta con su glifo (no los arcos de la WiFi), el
+        // interruptor del teléfono por internet con su nombre y, con
+        // acciones en lote, la marca redonda.
         await page.goto("/ajustes/telefono");
         await asentar(page);
         await expect(page.locator("article.tarjeta-el")).toHaveCount(4);
-        await expect(page.locator("article.tarjeta-el .marcar")).toHaveCount(0);
+        await expect(page.locator("article.tarjeta-el .glifo")).toHaveCount(4);
+        await expect(page.locator("article.tarjeta-el .emision")).toHaveCount(0);
+        await expect(
+          tarjeta(page, "Servidores de teléfono del operador").getByRole("switch", {
+            name: "Teléfono por internet encendido",
+          }),
+        ).toBeVisible();
+        await expect(page.locator("article.tarjeta-el .marcar")).toHaveCount(4);
+        // La contraseña del router no tiene un estado que decir: sin insignia.
+        await page.goto("/ajustes/seguridad");
+        await asentar(page);
+        await expect(tarjeta(page, "Contraseña del router").locator(".ins")).toHaveCount(0);
         expect(errores, "errores o avisos en la consola").toEqual([]);
       });
     });
@@ -243,6 +256,38 @@ test.describe("temas en rejilla: guardados de verdad", () => {
       test.use({
         viewport: { width: ancho, height: 900 },
         colorScheme: tema === "oscuro" ? "dark" : "light",
+      });
+
+      test("el interruptor del relé DNS, con deshacer", async ({ page }) => {
+        test.setTimeout(plazoDeTest(2));
+        const errores = recogerErrores(page);
+        await entrarEnSuPanel(page);
+        await page.goto("/ajustes/internet");
+        await asentar(page);
+        const dns = tarjeta(page, "Relé DNS");
+        const interruptor = dns.getByRole("switch");
+        const antes = await interruptor.getAttribute("aria-checked");
+        const despues = antes === "true" ? "false" : "true";
+        // Sin efecto: se aplica sin preguntar.
+        await interruptor.click();
+        await expect(page.locator("dialog[open]")).toHaveCount(0);
+        const aviso = page.locator(".avisos-cambio [role=status] .aviso-cambio");
+        await expect(aviso).toContainText(t.hecho, { timeout: PLAZO_CAMBIO });
+        await expect(interruptor).toHaveAttribute("aria-checked", despues);
+        await expect(interruptor).toHaveAccessibleName(
+          despues === "true" ? "Relé DNS activado" : "Relé DNS desactivado",
+        );
+        await sinDesbordamiento(page, `interruptor ${sufijo}`);
+        // «Deshacer»: la revisión y, aplicada, como estaba.
+        await aviso.getByRole("button", { name: t.deshacer, exact: true }).click();
+        const dialogo = page.locator("dialog[open]");
+        await dialogo.getByRole("button", { name: t.deshacer, exact: true }).click();
+        await expect(page.locator("dialog[open]")).toHaveCount(0);
+        await expect(interruptor).toHaveAttribute("aria-checked", antes ?? "false", {
+          timeout: PLAZO_CAMBIO,
+        });
+        await expect(aviso).toContainText(t.hecho, { timeout: PLAZO_CAMBIO });
+        expect(errores, "errores o avisos en la consola").toEqual([]);
       });
 
       for (const c of casos) {

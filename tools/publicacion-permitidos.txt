@@ -19,6 +19,7 @@ valor 192.168.144.1 — puerta de enlace WAN de fábrica del operador
 
 # Servidor de hora público y neutro que recomienda el panel (Sistema).
 dominio hora.roa.es — servidor de hora oficial de España (ROA), público y neutro: el recomendado
+dominio pool.ntp.org — proyecto público NTP Pool: servidores de hora neutros que el panel también acepta
 
 # Valores de fábrica del modelo (A-18).
 valor 1234 — valor de fábrica público del modelo (usuario web)

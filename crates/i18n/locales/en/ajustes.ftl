@@ -51,7 +51,7 @@ ajustes-tema-seguridad-desc = Who can get into the router and the operator's rem
 ajustes-tema-telefono = Phone
 ajustes-tema-telefono-desc = The router's landline.
 ajustes-tema-sistema = System
-ajustes-tema-sistema-desc = Time, log and other general router settings.
+ajustes-tema-sistema-desc = The router clock and the traffic copy for diagnosis.
 
 ## Levels
 ajustes-nivel-basico = Essentials
@@ -172,7 +172,6 @@ ajustes-wifi-radio-redes-sin-leer = The radio is on, but some of its networks co
 ## Elements of each tab: state, role, data, recommendation and actions
 ajustes-estado-sin-leer = Not read
 ajustes-estado-desconocido = No data
-ajustes-estado-leido = Read
 ajustes-papel-principal = Main
 ajustes-papel-invitados = Guests
 ajustes-papel-radio = Radio
@@ -337,3 +336,23 @@ ajustes-resumen-sistema-servidores-primero = The first one: { $servidor }.
 ajustes-resumen-sistema-servidores-ninguno = None is set.
 ajustes-resumen-sistema-copia = Traffic copy
 ajustes-resumen-sistema-copia-detalle = For diagnosis; when off, nobody gets it.
+
+## Switches with their own name, single detail column and Internet and Phone actions
+ajustes-interruptor-dns-si = DNS relay on
+ajustes-interruptor-dns-no = DNS relay off
+ajustes-interruptor-hora-si = Automatic time on
+ajustes-interruptor-hora-no = Automatic time off
+ajustes-interruptor-servidores-si = Internet phone on
+ajustes-interruptor-servidores-no = Internet phone off
+ajustes-interruptor-fax-y-modem-si = Fax pass-through on
+ajustes-interruptor-fax-y-modem-no = Fax pass-through off
+ajustes-detalle-opciones = Options
+ajustes-accion-activar_rele = Turn on the relay
+ajustes-accion-desactivar_rele = Turn off the relay
+ajustes-accion-encender_voz = Turn on internet phone
+ajustes-accion-apagar_voz = Turn off internet phone
+ajuste-accion-activar_rele-titulo = DNS relay, turn it on
+ajuste-accion-desactivar_rele-titulo = DNS relay, turn it off
+ajuste-accion-encender_voz-titulo = Internet phone, turn it on
+ajuste-accion-apagar_voz-titulo = Internet phone, turn it off
+ajustes-problema-sistema-servidor_2 = The backup server is { $valor }: it depends on whoever runs that server.

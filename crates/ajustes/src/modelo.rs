@@ -95,6 +95,26 @@ pub enum ValorLegible {
 /// `requiere`.
 pub const SIN_ELECCION: &str = "ninguna";
 
+/// Prefijo de las claves de traducción del ajuste `id` (`wifi.red_24` →
+/// `ajuste-wifi-red_24`). Lo usan el catálogo y el navegador.
+pub fn prefijo_de_ajuste(id: &str) -> String {
+    format!("ajuste-{}", id.replace('.', "-"))
+}
+
+/// ¿`valor` es uno de los `aceptados` de un campo de texto? Cada uno vale
+/// tal cual o, si empieza por `*.`, por cualquier nombre de ese dominio
+/// (`*.pool.ntp.org` acepta `es.pool.ntp.org`). Sin distinguir mayúsculas.
+pub fn valor_aceptado(aceptados: &[String], valor: &str) -> bool {
+    let v = valor.trim().to_ascii_lowercase();
+    aceptados.iter().any(|a| {
+        let a = a.trim().to_ascii_lowercase();
+        match a.strip_prefix("*.") {
+            Some(dominio) => v.len() > dominio.len() && v.ends_with(&format!(".{dominio}")),
+            None => v == a,
+        }
+    })
+}
+
 /// Otro campo del mismo ajuste que hace falta cuando este toma un valor: al
 /// encender el espejo de puerto hay que elegir la toma. Lo comprueban el
 /// servidor al guardar y la página junto al campo exigido.
@@ -346,6 +366,11 @@ mod catalogo_toml {
         /// invitados): en la tarjeta va antes que las demás y como riesgo.
         #[serde(default)]
         pub seguridad: bool,
+        /// En un campo de texto con `recomendado`, otros valores que valen
+        /// igual que lo recomendado (otro servidor de hora neutro); ver
+        /// [`valor_aceptado`](super::valor_aceptado).
+        #[serde(default)]
+        pub aceptados: Vec<String>,
         /// Un `booleano` con sus propios textos para sí y no («Encendida» y
         /// «Apagada» en vez de «Sí» y «No»): `<p>-<campo>-true` y
         /// `<p>-<campo>-false`, en el resumen de un cambio y en su valor.
@@ -454,6 +479,10 @@ mod catalogo_toml {
         /// Regla de estado (`derivado:estado_red`).
         #[serde(default)]
         pub estado: Option<String>,
+        /// Glifo de su tarjeta (`reloj`) en vez de los arcos de emisión de
+        /// la WiFi; ver [`ICONOS`](crate::ICONOS).
+        #[serde(default)]
+        pub icono: Option<String>,
     }
 
     /// Una acción que se aplica a varios elementos de una pestaña a la vez

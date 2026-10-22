@@ -156,6 +156,9 @@ fn comprobar_elemento<'c>(
             }
         }
     }
+    if let Some(i) = e.icono.as_deref().filter(|i| !crate::ICONOS.contains(i)) {
+        mal(format!("el icono {i} no existe"));
+    }
     if let Some(r) = &e.estado {
         match r.strip_prefix(PREFIJO_DERIVADO) {
             Some(n) if DERIVADOS_ESTADO.contains(&n) => {}

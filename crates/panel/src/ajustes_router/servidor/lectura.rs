@@ -222,6 +222,7 @@ pub(super) fn campo(
         valor_secreto,
         motivo_recomendado: recomendado.as_ref().map(|_| format!("{clave}-recomendado")),
         recomendado,
+        aceptados: c.aceptados.clone(),
         requiere: c.requiere.clone(),
         sin_eleccion: c.sin_eleccion.is_some(),
         clave,

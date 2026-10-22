@@ -2,7 +2,7 @@
 //! rediseño): sus elementos, su estado, su recomendación principal y su
 //! franja de resumen.
 
-use crate::comun::{Panel, PanelPrueba, leer, sesion};
+use crate::comun::{Panel, PanelPrueba, aplicar_ajuste, leer, ok, sesion};
 use serde_json::{Value, json};
 
 /// Elemento `id` de la página.
@@ -132,6 +132,134 @@ async fn pagina_sistema_hora() {
     let pagina = leer(&p, &cookie, "sistema").await;
     let hora = elemento(&pagina, "hora");
     assert!(hora["recomendacion"].is_null(), "{hora}");
+
+    // Otro servidor neutro (del proyecto NTP Pool) tampoco se cambia.
+    escribir(
+        &p,
+        "ntp.asp",
+        "cbSetTimeNtp",
+        &[("ntp_svr_1", "es.pool.ntp.org")],
+    )
+    .await;
+    let pagina = leer(&p, &cookie, "sistema").await;
+    assert!(elemento(&pagina, "hora")["recomendacion"].is_null());
+
+    // El de reserva cuenta igual: vacío o neutro, nada; del operador, sí.
+    escribir(
+        &p,
+        "ntp.asp",
+        "cbSetTimeNtp",
+        &[("ntp_svr_2", "hora2.operador.example")],
+    )
+    .await;
+    let pagina = leer(&p, &cookie, "sistema").await;
+    let r = &elemento(&pagina, "hora")["recomendacion"];
+    assert_eq!(
+        (&r["campo"], &r["valor"]),
+        (&json!("servidor_2"), &json!("es.pool.ntp.org")),
+        "{r}"
+    );
+    assert!(
+        r["problema"]
+            .as_str()
+            .unwrap()
+            .contains("hora2.operador.example"),
+        "{r}"
+    );
+}
+
+/// Lo que se enciende y se apaga de un clic: el relé DNS, la hora
+/// automática, el teléfono por internet (que pregunta antes de apagarse:
+/// corta el fijo) y el paso directo del fax, cada uno con su nombre
+/// accesible. La línea (su clave no se lee) y la copia del tráfico (exige
+/// elegir toma), no. Cada tarjeta lleva su glifo, no los arcos de la WiFi,
+/// y la que no tiene un estado que decir no lleva insignia.
+#[tokio::test]
+async fn interruptores_glifos_y_acciones() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    let casos = [
+        (
+            "internet",
+            "dns",
+            "Relé DNS activado",
+            "Relé DNS desactivado",
+        ),
+        (
+            "sistema",
+            "hora",
+            "Hora automática activada",
+            "Hora automática desactivada",
+        ),
+        (
+            "telefono",
+            "servidores",
+            "Teléfono por internet encendido",
+            "Teléfono por internet apagado",
+        ),
+        (
+            "telefono",
+            "fax-y-modem",
+            "Paso directo del fax activado",
+            "Paso directo del fax desactivado",
+        ),
+    ];
+    for (tema, id, si, no) in casos {
+        let pagina = leer(&p, &cookie, tema).await;
+        let i = &elemento(&pagina, id)["interruptor"];
+        assert_eq!(i["etiquetas"], json!([si, no]), "{id}: {i}");
+    }
+    let telefono = leer(&p, &cookie, "telefono").await;
+    let voz = &elemento(&telefono, "servidores")["interruptor"];
+    assert_eq!(voz["encendido"], true, "{voz}");
+    assert_eq!(voz["efecto"], "efecto-telefono_corte", "{voz}");
+    assert!(elemento(&telefono, "linea")["interruptor"].is_null());
+    let acciones: Vec<&str> = telefono["acciones"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| a["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(acciones, ["encender_voz", "apagar_voz"]);
+    assert_eq!(
+        elemento(&telefono, "servidores")["acciones"],
+        json!(["encender_voz", "apagar_voz"])
+    );
+    let sistema = leer(&p, &cookie, "sistema").await;
+    assert!(elemento(&sistema, "diagnostico")["interruptor"].is_null());
+    assert_eq!(elemento(&sistema, "hora")["icono"], "reloj");
+    let seguridad = leer(&p, &cookie, "seguridad").await;
+    let llave = elemento(&seguridad, "contrasena-router");
+    assert_eq!(llave["icono"], "llave", "{llave}");
+    assert_eq!(llave["texto_estado"], "", "{llave}");
+
+    // El interruptor del relé: un cambio de un campo, que se aplica.
+    let internet = leer(&p, &cookie, "internet").await;
+    assert_eq!(
+        internet["acciones"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|a| a["id"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        ["activar_rele", "desactivar_rele"]
+    );
+    let dns = elemento(&internet, "dns");
+    assert_eq!(dns["interruptor"]["encendido"], false, "{dns}");
+    assert_eq!(dns["estado"], "apagada", "{dns}");
+    let g = ok(
+        &p,
+        "preparar_ajuste",
+        json!({ "p": { "ajuste": "internet.dns", "instancia": null, "borrar": false,
+                       "valores": { "rele": "true" } } }),
+        &cookie,
+    )
+    .await;
+    aplicar_ajuste(&p, &cookie, &g).await;
+    let internet = leer(&p, &cookie, "internet").await;
+    let dns = elemento(&internet, "dns");
+    assert_eq!(dns["interruptor"]["encendido"], true, "{dns}");
+    assert_eq!(dns["estado"], "emite", "{dns}");
+    assert_eq!(dns["texto_estado"], "Activado", "{dns}");
 }
 
 /// La línea de teléfono se guarda reenviando una clave que el router no
@@ -157,8 +285,8 @@ async fn telefono_sin_atajos_que_borren_la_clave() {
     assert_eq!(linea["estado"], "apagada", "{linea}");
     assert!(linea["interruptor"].is_null(), "{linea}");
     assert!(linea["recomendacion"].is_null(), "{linea}");
+    // Las acciones del tema (el teléfono por internet) no valen para ella.
     assert_eq!(linea["acciones"], json!([]), "{linea}");
-    assert_eq!(pagina["acciones"], json!([]));
 }
 
 /// Los cuatro temas tienen su franja de resumen, de cuatro datos, en los

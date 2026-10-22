@@ -5,7 +5,7 @@ use super::super::aviso::Seguimiento;
 use super::super::rejilla::Pagina;
 use crate::ajustes_router::{ElementoVista, InterruptorVista, PeticionAjuste, preparar_ajuste};
 use crate::t;
-use crate::ui::comun::{IconoEmision, Insignia, Interruptor};
+use crate::ui::comun::{Glifo, IconoEmision, Insignia, Interruptor};
 use crate::ui::explorador::texto_error;
 use crate::ui::i18n::traducir;
 use ajustes::ValorLegible;
@@ -33,12 +33,18 @@ fn interruptor(e: &ElementoVista, i: InterruptorVista, nombre: &str) -> impl Int
     let id = StoredValue::new(e.id.clone());
     let leido = i.encendido;
     let encendido = Signal::derive(move || id.with_value(|id| s.interruptor(id)).unwrap_or(leido));
-    let nombre = nombre.to_owned();
+    // Las suyas («Relé DNS activado») o «<nombre> encendida/apagada».
+    let (si, no) = i.etiquetas.clone().unwrap_or_else(|| {
+        (
+            t!("ajustes-interruptor-si", nombre = nombre.to_owned()),
+            t!("ajustes-interruptor-no", nombre = nombre.to_owned()),
+        )
+    });
     let etiqueta = Signal::derive(move || {
         if encendido.get() {
-            t!("ajustes-interruptor-si", nombre = nombre.clone())
+            si.clone()
         } else {
-            t!("ajustes-interruptor-no", nombre = nombre.clone())
+            no.clone()
         }
     });
     let conectados = conectados(e);
@@ -94,9 +100,11 @@ pub(super) fn cabecera(e: &ElementoVista, nombre: &str, titulo: String) -> impl 
     let s = expect_context::<Seguimiento>();
     let id = e.id.clone();
     let (estado, texto) = (e.estado, e.texto_estado.clone());
+    // Sin un estado que decir (la contraseña del router), sin insignia,
+    // salvo mientras cambia.
     let insignia = move || {
         let (estado, texto) = s.insignia(&id).unwrap_or((estado, texto.clone()));
-        view! { <Insignia estado texto /> }
+        (!texto.is_empty()).then(|| view! { <Insignia estado texto /> })
     };
     let papel = e.papel.as_deref().map(|k| traducir(k, None));
     let ssid = e
@@ -109,7 +117,10 @@ pub(super) fn cabecera(e: &ElementoVista, nombre: &str, titulo: String) -> impl 
     let interruptor = e.interruptor.clone().map(|i| interruptor(e, i, nombre));
     view! {
         <div class="tarjeta-cabecera">
-            <IconoEmision estado=e.estado />
+            {match e.icono.clone() {
+                Some(nombre) => view! { <Glifo nombre /> }.into_any(),
+                None => view! { <IconoEmision estado=e.estado /> }.into_any(),
+            }}
             <div class="tarjeta-nombre">
                 <h2 id=titulo>{nombre.to_owned()}</h2>
                 {sub}
