@@ -59,8 +59,8 @@ Los dos ajustes que los lotes necesitan:
   que el router reparte por DHCP, solo en el pool 0 (`cbGetDhcpv4ServerPool`
   y `cbSetDhcpv4ServerPool`, `ipv4_dns_addr_0` y `ipv4_dns_addr_1`). Nunca
   los de la WAN ni el relé de DNS, ni los pools 1 y 2 (los del
-  descodificador): pueden afectar a la televisión y al teléfono. El router
-  sigue reenviando las consultas sin cifrar.
+  descodificador): pueden afectar a la televisión y al teléfono. Cada
+  dispositivo pregunta directamente a esos servidores, sin cifrar.
 
 Todo esto se ha probado contra el simulador (`router-sim`). Lo pendiente de
 comprobar en el router real (fase 3): que el descodificador no usa el pool

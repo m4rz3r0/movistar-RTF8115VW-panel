@@ -30,6 +30,10 @@ async fn lote_con_invitados_sin_leer() {
     }
     assert_eq!(paso(&m, "seguridad", "wps@red-5")["estado"], "Pendiente");
     assert_eq!(m["pendientes"], 5, "{m}");
+    // Los tres pasos de invitados no cuentan: de 12 pasos quedan 9, y de
+    // los 5 pendientes con las fixtures sale el WPS de invitados: 4 de 9 (el
+    // contador, 5, suma el DNS de Privacidad).
+    assert_eq!(lote(&m, "seguridad")["estado"], pendientes(4, 9), "{m}");
     let g = grupo(&p, &cookie, "seguridad", json!({})).await;
     for paso in g["pasos"].as_array().unwrap() {
         assert!(

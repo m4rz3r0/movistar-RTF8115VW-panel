@@ -37,10 +37,10 @@ ajuste-sistema-diagnostico-puerto-puerto_4-desc = The fourth cable socket of the
 ## System log
 ajuste-sistema-registro-titulo = System log
 ajuste-sistema-registro-desc = The router writes down what it does in a log. Besides keeping it, it can send it to another computer.
-ajuste-sistema-registro-ayuda = The log tells which devices connect, when the router restarts and what fails. If you send it to another computer, that computer receives all of it, and it travels unencrypted on the way. With sending off, the log stays on the router. The panel never exports the log.
+ajuste-sistema-registro-ayuda = The log tells when the router restarts and what fails, and may tell which devices connect. If you send it to another computer, that computer receives all of it, and it travels unencrypted on the way. With sending off, the log stays on the router. The panel never exports the log.
 ajuste-sistema-registro-envio = Send the log to another computer
 ajuste-sistema-registro-envio-desc = If you turn it on, the router keeps its log and also sends it to the server you enter.
-ajuste-sistema-registro-envio-recomendado = Recommended if you do not have your own server to collect logs, which is normal at home. Pros: the log, which tells which devices in your home connect and when, does not leave the router unencrypted towards another computer. Cons: if you use your own server for logs, it stops receiving the router's.
+ajuste-sistema-registro-envio-recomendado = Recommended if you do not have your own server to collect logs, which is normal at home. Pros: the log, which may tell which devices in your home connect and when, does not leave the router unencrypted towards another computer. Cons: if you use your own server for logs, it stops receiving the router's.
 ajuste-sistema-registro-servidor = Server that receives the log
 ajuste-sistema-registro-servidor-desc = The IP address of the computer the log is sent to, for example 192.168.1.60. It is needed to turn sending on.
 ajuste-sistema-registro-puerto = Server port

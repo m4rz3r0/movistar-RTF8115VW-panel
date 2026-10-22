@@ -37,10 +37,10 @@ ajuste-sistema-diagnostico-puerto-puerto_4-desc = La cuarta toma de cable de la 
 ## Registro del sistema
 ajuste-sistema-registro-titulo = Registro del sistema
 ajuste-sistema-registro-desc = El router anota en un registro lo que hace. Además de guardarlo, puede enviarlo a otro equipo.
-ajuste-sistema-registro-ayuda = El registro cuenta qué dispositivos se conectan, cuándo se reinicia el router y qué falla. Si lo envías a otro equipo, ese equipo lo recibe todo, y viaja sin cifrar por el camino. Con el envío apagado, el registro se queda en el router. El panel nunca exporta el registro.
+ajuste-sistema-registro-ayuda = El registro cuenta cuándo se reinicia el router y qué falla, y puede decir qué dispositivos se conectan. Si lo envías a otro equipo, ese equipo lo recibe todo, y viaja sin cifrar por el camino. Con el envío apagado, el registro se queda en el router. El panel nunca exporta el registro.
 ajuste-sistema-registro-envio = Enviar el registro a otro equipo
 ajuste-sistema-registro-envio-desc = Si lo enciendes, el router guarda su registro y además lo envía al servidor que indiques.
-ajuste-sistema-registro-envio-recomendado = Recomendado si no tienes tu propio servidor para recoger registros, que es lo normal en casa. A favor: el registro, que dice qué dispositivos de tu casa se conectan y cuándo, no sale del router sin cifrar hacia otro equipo. En contra: si usas un servidor propio para los registros, deja de recibir el del router.
+ajuste-sistema-registro-envio-recomendado = Recomendado si no tienes tu propio servidor para recoger registros, que es lo normal en casa. A favor: el registro, que puede decir qué dispositivos de tu casa se conectan y cuándo, no sale del router sin cifrar hacia otro equipo. En contra: si usas un servidor propio para los registros, deja de recibir el del router.
 ajuste-sistema-registro-servidor = Servidor que recibe el registro
 ajuste-sistema-registro-servidor-desc = La dirección IP del equipo al que se envía el registro, por ejemplo 192.168.1.60. Hace falta para encender el envío.
 ajuste-sistema-registro-puerto = Puerto del servidor

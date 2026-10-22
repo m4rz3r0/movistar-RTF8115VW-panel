@@ -125,8 +125,9 @@ aplicar» abre la revisión con los pasos por pestaña, cada uno con su «antes
 solo deshacer. En Ajustes, una recomendación que forma parte de un lote lo
 dice y enlaza a Mejoras.
 
-Los DNS neutros solo cambian quién responde: el router reenvía las
-consultas sin cifrar, así que el operador las sigue viendo por el camino.
+Los DNS neutros solo cambian quién responde: el router los reparte y cada
+dispositivo les pregunta directamente, pero sin cifrar, así que el operador
+sigue viendo las consultas por el camino.
 Para ocultarlas hace falta DNS cifrado (DoH o DoT) en cada dispositivo o
 una VPN.
 

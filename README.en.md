@@ -128,8 +128,9 @@ checkbox; it is applied as a single change, watched and with a single
 undo. In Settings, a recommendation that is part of a batch says so and
 links to Improvements.
 
-Neutral DNS servers only change who answers: the router forwards the
-queries unencrypted, so the operator can still see them on the way. To
+Neutral DNS servers only change who answers: the router hands them out
+and each device asks them directly, but unencrypted, so the operator can
+still see the queries on the way. To
 hide them you need encrypted DNS (DoH or DoT) on each device or a VPN.
 
 The batches have been tested against the simulated router (`router-sim`);
