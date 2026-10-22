@@ -211,8 +211,8 @@ pub(super) fn vista_grupo(
 pub(in crate::ajustes_router) async fn preparar_ajuste(
     p: PeticionAjuste,
 ) -> Result<GrupoVista, ServerFnError> {
-    // Lleva los datos sensibles del resumen en claro.
-    crate::ui::explorador::servidor::sin_guardar();
+    // `preparar()` ya pone `no-store` (el resumen lleva los datos sensibles
+    // en claro).
     let (state, _) = preparar().await?;
     let a = ajuste_por_id(&state, &p.ajuste)?;
     if p.borrar && !a.lista {

@@ -362,17 +362,17 @@ fn validacion_de_valores() {
     let c = cat();
     let f = c.funcion("cbDhcpV4SvrPoolSetStatic").unwrap();
     let p = |n| f.parametro(n).unwrap();
-    assert!(validar(p("ipv4_addr"), "192.168.1.65").is_ok());
-    assert!(validar(p("ipv4_addr"), "192.168.1.256").is_err());
-    assert!(validar(p("mac_addr"), "02:00:00:00:00:aB").is_ok());
-    assert!(validar(p("mac_addr"), "02:00:00:00:00").is_err());
-    assert!(validar(p("mac_addr"), "02:00:00:00:00:zz").is_err());
-    assert!(validar(p("adm_state"), "1").is_ok());
-    assert!(validar(p("adm_state"), "2").is_err());
-    assert!(validar(p("rtm_cfg_dhcpv4_svr_pool_id"), "x").is_err());
+    assert!(validar(p("ipv4_addr"), "192.168.1.65", false).is_ok());
+    assert!(validar(p("ipv4_addr"), "192.168.1.256", false).is_err());
+    assert!(validar(p("mac_addr"), "02:00:00:00:00:aB", false).is_ok());
+    assert!(validar(p("mac_addr"), "02:00:00:00:00", false).is_err());
+    assert!(validar(p("mac_addr"), "02:00:00:00:00:zz", false).is_err());
+    assert!(validar(p("adm_state"), "1", false).is_ok());
+    assert!(validar(p("adm_state"), "2", false).is_err());
+    assert!(validar(p("rtm_cfg_dhcpv4_svr_pool_id"), "x", false).is_err());
     let w = c.funcion("cbSetWifiAccPt").unwrap();
-    assert!(validar(w.parametro("ssid").unwrap(), "a\nb").is_err());
-    let e = validar(w.parametro("key_phrase").unwrap(), "a\0b").unwrap_err();
+    assert!(validar(w.parametro("ssid").unwrap(), "a\nb", false).is_err());
+    let e = validar(w.parametro("key_phrase").unwrap(), "a\0b", false).unwrap_err();
     assert!(!e.contains("a\0b"), "el error no muestra el secreto");
 }
 

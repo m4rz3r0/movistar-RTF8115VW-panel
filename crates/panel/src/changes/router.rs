@@ -108,7 +108,7 @@ impl ChangeManager {
         if op != Operacion::Borrar && !explicito {
             for c in &campos {
                 if let Some(p) = f.parametro(&c.nombre) {
-                    validar(p, &c.despues).map_err(CambioError::Invalida)?;
+                    validar(p, &c.despues, c.secreto).map_err(CambioError::Invalida)?;
                 }
             }
         }

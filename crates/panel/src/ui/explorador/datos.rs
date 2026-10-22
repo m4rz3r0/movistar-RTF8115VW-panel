@@ -253,7 +253,7 @@ pub struct Grupo {
 
 /// Resultado de una lectura: los secretos con su valor para el ojo; los
 /// datos sensibles, en claro.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Vista {
     pub pares: Vec<Par>,
     pub grupos: Vec<Grupo>,
@@ -262,6 +262,21 @@ pub struct Vista {
     /// El mismo XML con los secretos a la vista, para «Mostrar claves en el
     /// XML» (como el ojo). `None` si no hay ningún secreto.
     pub crudo_con_claves: Option<String>,
+}
+
+/// Su `Debug` tapa el XML con las claves.
+impl std::fmt::Debug for Vista {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Vista")
+            .field("pares", &self.pares)
+            .field("grupos", &self.grupos)
+            .field("crudo", &self.crudo)
+            .field(
+                "crudo_con_claves",
+                &self.crudo_con_claves.as_ref().map(|_| "***"),
+            )
+            .finish()
+    }
 }
 
 /// Qué hace un formulario.
@@ -273,7 +288,7 @@ pub enum Operacion {
 }
 
 /// Campo de un formulario.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CampoForm {
     pub param: ParamVista,
     /// Valor actual. En un secreto, su valor, para el campo censurado con el
@@ -282,6 +297,22 @@ pub struct CampoForm {
     /// Secreto que el router no deja leer (`valor` vacío).
     #[serde(default)]
     pub sin_leer: bool,
+}
+
+/// Su `Debug` tapa el valor de un secreto.
+impl std::fmt::Debug for CampoForm {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let valor = if self.param.tipo == TipoCampo::Secret {
+            "***"
+        } else {
+            self.valor.as_str()
+        };
+        f.debug_struct("CampoForm")
+            .field("param", &self.param)
+            .field("valor", &valor)
+            .field("sin_leer", &self.sin_leer)
+            .finish()
+    }
 }
 
 /// Formulario generado del catálogo y rellenado con la lectura pareada.
@@ -556,6 +587,39 @@ pub async fn estado_cambio(id: i64) -> Result<CambioVista, ServerFnError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Lo que lleva secretos en claro para el ojo no los enseña en un
+    /// `{:?}` (un registro futuro).
+    #[test]
+    fn debug_sin_secretos() {
+        let param = |tipo| ParamVista {
+            nombre: "key_phrase".into(),
+            etiqueta: "Clave".into(),
+            tipo,
+            opciones: Vec::new(),
+            inicial: String::new(),
+        };
+        let c = CampoForm {
+            param: param(TipoCampo::Secret),
+            valor: "clave-en-claro-55".into(),
+            sin_leer: false,
+        };
+        assert!(!format!("{c:?}").contains("clave-en-claro-55"));
+        let c = CampoForm {
+            param: param(TipoCampo::Text),
+            ..c
+        };
+        assert!(
+            format!("{c:?}").contains("clave-en-claro-55"),
+            "lo que no es secreto, sí"
+        );
+        let v = Vista {
+            crudo: Some("<k>••••••</k>".into()),
+            crudo_con_claves: Some("<k>clave-en-claro-55</k>".into()),
+            ..Vista::default()
+        };
+        assert!(!format!("{v:?}").contains("clave-en-claro-55"));
+    }
 
     #[test]
     fn valida_cada_tipo() {

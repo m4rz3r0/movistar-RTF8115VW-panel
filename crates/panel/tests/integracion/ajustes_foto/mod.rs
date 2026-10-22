@@ -12,6 +12,7 @@ use serde_json::{Value, json};
 mod clave;
 mod completa;
 mod pagina;
+mod sensible;
 
 const RUTA: &str = "/ajustes/foto-de-partida";
 

@@ -376,16 +376,11 @@ riesgo = "bajo"
         let mut mal = Vec::new();
         for f in c.todas() {
             for p in f.parametros.iter().filter(|p| p.tipo == TipoParam::Secret) {
-                if !m.es_secreto(&p.nombre) && !es_contrasena(&p.nombre) {
+                if !m.es_secreto(&p.nombre) {
                     mal.push(format!("{}.{}", f.name, p.nombre));
                 }
             }
         }
         assert!(mal.is_empty(), "secret sin ser credencial: {mal:?}");
-    }
-
-    /// Contraseñas que el nombre no delata (`rqNPwd` sí: `pwd`).
-    fn es_contrasena(nombre: &str) -> bool {
-        nombre == "changePassword"
     }
 }

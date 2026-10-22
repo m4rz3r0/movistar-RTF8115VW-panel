@@ -83,3 +83,43 @@ fn sensible_vacio_se_borra_y_credencial_vacia_no_se_toca() {
     assert_eq!(r.campos[0].nombre, "acs_username");
     assert!(r.campos[0].secreto);
 }
+
+/// Un dato sensible que el router da tapado (`****`) no se reenvía: ni si
+/// vuelve tal cual del formulario (donde va en claro) ni si llega como
+/// máscara (de una foto de partida). La escritura se bloquea como la de un
+/// secreto tapado.
+#[test]
+fn sensible_tapado_no_se_reenvia() {
+    let c = Catalogo::load().unwrap();
+    let m = Mascara::load().unwrap();
+    let f = c.funcion("cbSetTr69Config").unwrap();
+    let actual = mapa(&[("acs_username", "****"), ("acs_password", "clave")]);
+    let valores = mapa(&[
+        ("acs_username", "****"),
+        ("acs_password", MASCARA),
+        ("acs_URL", "https://x.example"),
+    ]);
+    let r = componer(f, &m, Operacion::Editar, &actual, &valores, false);
+    assert_eq!(r.secretos_tapados, ["acs_username"], "{:?}", r.payload);
+    // Una máscara que no es lo leído (el router ya tiene otro usuario).
+    let actual = mapa(&[("acs_username", "usuario-nuevo")]);
+    let valores = mapa(&[("acs_username", "••••")]);
+    let r = componer(f, &m, Operacion::Editar, &actual, &valores, false);
+    assert_eq!(r.secretos_tapados, ["acs_username"]);
+    // Un usuario de verdad, sí.
+    let valores = mapa(&[("acs_username", "otro-usuario")]);
+    let r = componer(f, &m, Operacion::Editar, &actual, &valores, false);
+    assert!(r.secretos_tapados.is_empty());
+}
+
+/// El error de validación de un dato sensible no lleva su valor (va a la
+/// respuesta y puede ir a un registro).
+#[test]
+fn error_de_un_sensible_sin_su_valor() {
+    let c = Catalogo::load().unwrap();
+    let f = c.funcion("cbSetTr69Config").unwrap();
+    let p = f.parametro("acs_username").unwrap();
+    let e = validar(p, "usuario-4821\u{9}x", true).unwrap_err();
+    assert!(!e.contains("usuario-4821"), "{e}");
+    assert!(e.contains("acs_username"), "{e}");
+}

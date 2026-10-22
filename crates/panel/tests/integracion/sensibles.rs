@@ -5,7 +5,7 @@
 
 use crate::ajustes_secretos::llamada;
 use crate::comun::{
-    Panel, PanelPrueba, elemento, esperar_final, fijar, ok, registro_global, valores_de,
+    Panel, PanelPrueba, elemento, esperar_final, fijar, llamar, ok, registro_global, valores_de,
 };
 use serde_json::{Value, json};
 
@@ -211,4 +211,38 @@ async fn un_cambio_de_un_sensible_se_ve_en_claro_y_no_se_registra() {
     for dato in [URL, USUARIO, USUARIO_NUEVO, CLAVE] {
         assert!(!r.contains(dato), "{dato} en el registro");
     }
+}
+
+/// Un dato sensible que el router da tapado (`****`) va en claro al
+/// formulario; si se edita otro campo sin tocarlo, no se reenvía la máscara:
+/// el cambio no se prepara y no se escribe nada.
+#[tokio::test]
+async fn un_sensible_tapado_no_se_reenvia_desde_la_biblioteca() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    p.state
+        .hgu
+        .write("tr69.asp", "cbSetTr69Config", &[("acs_username", "****")])
+        .await
+        .unwrap();
+    let f = ok(
+        &p,
+        "formulario",
+        json!({ "funcion": "cbSetTr69Config", "instancia": null, "claves": [] }),
+        &cookie,
+    )
+    .await;
+    let mut valores = valores_de(&f);
+    fijar(&mut valores, "acs_URL", "https://otro-acs.example");
+    let antes = p.sim.control.writes().len();
+    let (status, body) = llamar(
+        &p,
+        "preparar_cambio",
+        json!({ "peticion": { "funcion": "cbSetTr69Config", "instancia": null,
+                              "valores": valores, "borrar": false } }),
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(status, 403, "{body}");
+    assert!(body.contains("reenviarla podría borrarla"), "{body}");
+    assert_eq!(p.sim.control.writes().len(), antes);
 }

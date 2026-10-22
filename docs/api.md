@@ -1829,7 +1829,7 @@ Lectura pareada: `cbGetUserList`
 
 *lectura* · UI avanzada · riesgo bajo · página `user_profile.asp`
 
-Lista los usuarios de la interfaz web con su rol. Incluye un usuario oculto del operador, con rol system, que la interfaz no deja tocar (su nombre se enmascara).
+Lista los usuarios de la interfaz web con su rol. Incluye un usuario oculto del operador, con rol system, que la interfaz no deja tocar. Los nombres son datos sensibles: en pantalla se ven en claro y en los registros se enmascaran.
 
 Elementos de la respuesta: `UserName` (sensible), `UserRole`
 

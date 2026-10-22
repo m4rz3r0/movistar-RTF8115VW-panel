@@ -174,8 +174,11 @@ pub(super) fn es_credencial(f: &Funcion, m: &Mascara, nombre: &str) -> bool {
         || m.es_secreto(nombre)
 }
 
-/// Comprueba el valor nuevo de un parámetro.
-pub(super) fn validar(p: &Parametro, v: &str) -> Result<(), String> {
+/// Comprueba el valor nuevo de un parámetro. Con `protegido` (un secreto o
+/// un dato sensible, [`es_secreto_param`]) o un `secret` del catálogo, el
+/// error no lleva el valor: acaba en la respuesta y puede acabar en un
+/// registro.
+pub(super) fn validar(p: &Parametro, v: &str, protegido: bool) -> Result<(), String> {
     let n = &p.nombre;
     let ok = match p.tipo {
         TipoParam::Ip => v.trim().parse::<Ipv4Addr>().is_ok(),
@@ -191,7 +194,7 @@ pub(super) fn validar(p: &Parametro, v: &str) -> Result<(), String> {
     };
     if ok {
         Ok(())
-    } else if p.tipo == TipoParam::Secret {
+    } else if protegido || p.tipo == TipoParam::Secret {
         Err(format!("{n}: contiene caracteres no válidos"))
     } else {
         Err(format!("{n}: «{v}» no es un valor válido"))
@@ -364,9 +367,14 @@ pub(super) fn componer(
             continue;
         };
         let secreto = es_secreto_param(f, m, &p.nombre);
-        // Lo que viene de una lectura: la de ahora o, con `explicito`, el
-        // valor anterior que se guardó de la de entonces.
-        if secreto && (leido || explicito) && no_reenviable(p, v) {
+        // Lo que viene de una lectura: la de ahora, con `explicito` el valor
+        // anterior que se guardó de la de entonces, o lo pedido si es lo
+        // mismo que se lee (un dato sensible va en claro en el formulario y
+        // vuelve tal cual) o una máscara (la de una foto de partida). Nadie
+        // escribe `****` como usuario ni como clave a propósito.
+        let como_lo_leido = buscar(actual, &p.nombre).is_some_and(|cur| cur == v);
+        if secreto && (leido || explicito || como_lo_leido || enmascarado(v)) && no_reenviable(p, v)
+        {
             if explicito {
                 omitidos.insert(p.nombre.clone());
                 continue;
