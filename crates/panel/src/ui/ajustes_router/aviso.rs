@@ -9,6 +9,8 @@
 //! no lo hizo), la insignia vuelve a su estado y el aviso da el motivo.
 
 use super::detalle::Borradores;
+use super::seleccion::Seleccion;
+use super::tras_borrar::{FocoTrasBorrar, antes_de_releer};
 use crate::ajustes_router::{GrupoVista, confirmar_ajuste, deshacer_ajuste};
 use crate::t;
 use crate::ui::comun::EstadoVisual;
@@ -17,6 +19,10 @@ use crate::ui::grupo::{DialogoGrupo, texto_valor};
 use crate::ui::i18n::traducir;
 use leptos::{prelude::*, task::spawn_local};
 use std::time::Duration;
+
+mod vista;
+
+pub(crate) use vista::AvisoCambio;
 
 /// Cada cuánto se pregunta por el estado del cambio.
 const SONDEO: Duration = Duration::from_secs(2);
@@ -39,6 +45,8 @@ struct CambioActivo {
     /// Al aplicarse, sus elementos se cierran (lo borrado ya no existe; lo
     /// creado desde el detalle de una nueva, ya está en su lista).
     cerrar: bool,
+    /// Los borra: al aplicarse, se desmarcan y el foco va a su vecina.
+    borra: bool,
 }
 
 impl CambioActivo {
@@ -72,14 +80,24 @@ pub(crate) struct Seguimiento {
     borradores: Borradores,
     /// Elementos que se acaban de cerrar así: la página deja su dirección.
     cerrados: RwSignal<Vec<String>>,
+    /// Lo marcado en la página: lo borrado deja de estarlo.
+    seleccion: Seleccion,
+    /// A dónde va el foco cuando la página se pinte tras un borrado.
+    foco: RwSignal<Option<FocoTrasBorrar>>,
 }
 
 impl Seguimiento {
     /// Sigue los cambios de la página; `recargar` vuelve a leer el tema
     /// cuando uno termina. Pregunta por el estado cada [`SONDEO`] mientras
     /// no termine; al desmontarse, deja de preguntar.
-    pub(crate) fn nuevo(recargar: Callback<()>, borradores: Borradores) -> Seguimiento {
+    pub(crate) fn nuevo(
+        recargar: Callback<()>,
+        borradores: Borradores,
+        seleccion: Seleccion,
+    ) -> Seguimiento {
         let s = Seguimiento {
+            seleccion,
+            foco: RwSignal::new(None),
             activo: RwSignal::new(None),
             error: RwSignal::new(None),
             dialogo: RwSignal::new(None),
@@ -127,7 +145,8 @@ impl Seguimiento {
         let mismo = self.activo.try_update(|a| match a {
             Some(a) if a.id == Some(id) => {
                 a.estado = Some(c);
-                Some((a.campos.clone(), a.cerrar.then(|| a.elementos.clone())))
+                let cerrar = a.cerrar.then(|| (a.elementos.clone(), a.borra));
+                Some((a.campos.clone(), cerrar))
             }
             _ => None,
         });
@@ -136,9 +155,15 @@ impl Seguimiento {
         {
             if aplicado {
                 self.borradores.olvidar_campos(&campos);
-                if let Some(elementos) = cerrar {
+                if let Some((elementos, borra)) = cerrar {
                     for e in &elementos {
                         self.borradores.olvidar(e);
+                    }
+                    // Lo borrado ya no existe: ni marcado (otra instancia
+                    // podría heredar su id) ni con el foco.
+                    if borra {
+                        self.seleccion.quitar(&elementos);
+                        self.foco.try_set(antes_de_releer(&elementos));
                     }
                     self.cerrados.try_set(elementos);
                 }
@@ -159,6 +184,7 @@ impl Seguimiento {
             campos: Vec::new(),
             estado: None,
             cerrar: false,
+            borra: false,
         }));
     }
 
@@ -201,6 +227,7 @@ impl Seguimiento {
         let cerrar = g.borra || cerrar;
         self.activo.set(Some(CambioActivo {
             cerrar,
+            borra: g.borra,
             id: None,
             elementos,
             texto: resumen(g),
@@ -254,6 +281,20 @@ impl Seguimiento {
         self.cerrados.with(|c| c.iter().any(|x| x == id))
     }
 
+    /// A dónde llevar el foco tras un borrado, si la página que se pinta
+    /// (con los elementos `ids`) ya no tiene lo borrado. Se atiende una vez.
+    pub(crate) fn tomar_foco(self, ids: &[String]) -> Option<FocoTrasBorrar> {
+        let listo = self.foco.with_untracked(|f| {
+            f.as_ref()
+                .is_some_and(|f| !f.borrados.iter().any(|b| ids.contains(b)))
+        });
+        if listo {
+            self.foco.try_update(Option::take).flatten()
+        } else {
+            None
+        }
+    }
+
     /// Los elementos cerrados, ya atendidos.
     pub(crate) fn olvidar_cerrados(self) {
         self.cerrados.set(Vec::new());
@@ -304,146 +345,5 @@ pub(crate) fn resumen(g: &GrupoVista) -> String {
             )
         }
         _ => t!("ajustes-aviso-varios", titulo = titulo, n = pasos.len()),
-    }
-}
-
-/// El diálogo de revisión abierto, que solo revisa: «Aplicar» lo cierra y
-/// la página sigue el cambio.
-#[component]
-pub(crate) fn DialogoDeLaPagina() -> impl IntoView {
-    let s = expect_context::<Seguimiento>();
-    move || {
-        s.dialogo.get().map(|r| {
-            let Revision {
-                grupo,
-                elementos,
-                deshacer,
-                cerrar,
-            } = r;
-            let g = grupo.clone();
-            view! {
-                <DialogoGrupo
-                    grupo=g
-                    deshacer
-                    on_cerrar=move |_| s.dialogo.set(None)
-                    al_aplicar=move |(_, desmarcados): (String, Vec<usize>)| {
-                        s.aplicar(&grupo, desmarcados, elementos.clone(), cerrar)
-                    }
-                />
-            }
-        })
-    }
-}
-
-/// Texto del estado de un cambio en el aviso.
-fn estado_texto(a: &CambioActivo) -> String {
-    match a.estado.as_ref().map(|c| c.estado) {
-        None | Some(EstadoDeCambio::Preparado | EstadoDeCambio::Aplicando) => {
-            t!("ajustes-insignia-aplicando")
-        }
-        Some(EstadoDeCambio::Vigilando) => t!("ajustes-insignia-comprobando"),
-        Some(EstadoDeCambio::Aplicado) => t!("ajustes-grupo-estado-aplicado"),
-        Some(EstadoDeCambio::Revertido) => t!("ajustes-grupo-estado-revertido"),
-        Some(EstadoDeCambio::Fallido) => t!("ajustes-grupo-estado-fallido"),
-        Some(EstadoDeCambio::RevertidoParcial) => t!("ajustes-grupo-estado-parcial"),
-    }
-}
-
-/// El aviso del cambio en curso (o del último), con «Deshacer» cuando se
-/// ha aplicado, y el de un fallo.
-#[component]
-pub(crate) fn AvisoCambio() -> impl IntoView {
-    let s = expect_context::<Seguimiento>();
-    let preparando = RwSignal::new(false);
-    let deshacer = move |_| {
-        let Some((id, elementos)) = s
-            .activo
-            .with_untracked(|a| a.as_ref().and_then(|a| Some((a.id?, a.elementos.clone()))))
-        else {
-            return;
-        };
-        if preparando.get_untracked() {
-            return;
-        }
-        preparando.set(true);
-        spawn_local(async move {
-            match deshacer_ajuste(id).await {
-                Ok(g) => {
-                    s.error.set(None);
-                    s.dialogo.set(Some(Revision {
-                        grupo: g,
-                        elementos,
-                        deshacer: true,
-                        cerrar: false,
-                    }));
-                }
-                Err(e) => s.error.set(Some(texto_error(&e))),
-            }
-            preparando.try_set(false);
-        });
-    };
-    let aviso = move || {
-        s.activo.get().map(|a| {
-            let aplicado = a
-                .estado
-                .as_ref()
-                .is_some_and(|c| c.estado == EstadoDeCambio::Aplicado);
-            let terminado = a.terminado();
-            let motivo = a.estado.as_ref().and_then(|c| c.error.clone());
-            view! {
-                <div class="aviso-cambio" class:aviso-cambio-hecho=terminado>
-                    <p>
-                        <strong>{a.texto.clone()}</strong>
-                        " "
-                        <span>{estado_texto(&a)}</span>
-                        {motivo.map(|m| view! { " " <span>{m}</span> })}
-                    </p>
-                    {aplicado.then(|| view! {
-                        <button
-                            type="button"
-                            class="b-sec"
-                            aria-disabled=move || preparando.get().then_some("true")
-                            on:click=deshacer
-                        >
-                            {move || if preparando.get() { t!("ajustes-grupo-preparando") } else { t!("ajustes-grupo-deshacer") }}
-                        </button>
-                    })}
-                    {terminado.then(|| view! {
-                        <button
-                            type="button"
-                            class="b-txt"
-                            aria-label=t!("ajustes-aviso-cerrar")
-                            on:click=move |_| s.activo.set(None)
-                        >
-                            "✕"
-                        </button>
-                    })}
-                </div>
-            }
-        })
-    };
-    let error = move || {
-        s.error.get().map(|m| {
-            view! {
-                <div class="aviso-cambio aviso-cambio-error">
-                    <p>{m}</p>
-                    <button
-                        type="button"
-                        class="b-txt"
-                        aria-label=t!("ajustes-aviso-cerrar")
-                        on:click=move |_| s.error.set(None)
-                    >
-                        "✕"
-                    </button>
-                </div>
-            }
-        })
-    };
-    view! {
-        <div class="avisos-cambio">
-            <div role="status" aria-live="polite">{aviso}</div>
-            <div role="alert">{error}</div>
-        </div>
-        <DialogoDeLaPagina />
     }
 }

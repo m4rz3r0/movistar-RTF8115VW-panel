@@ -31,6 +31,7 @@ mod resumen;
 mod seleccion;
 mod sin_guardar;
 mod tarjeta;
+mod tras_borrar;
 
 use crate::ajustes_router::{CADUCIDAD_LECTURAS, leer_tema};
 use crate::t;
@@ -358,7 +359,7 @@ pub fn PaginaTema() -> impl IntoView {
     provide_context(seleccion);
     let borradores = Borradores::nuevos();
     provide_context(borradores);
-    provide_context(Seguimiento::nuevo(recargar, borradores));
+    provide_context(Seguimiento::nuevo(recargar, borradores, seleccion));
     Effect::new(move |anterior: Option<String>| {
         let ahora = slug.get();
         if anterior.is_some_and(|a| a != ahora) {

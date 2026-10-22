@@ -37,6 +37,11 @@ impl Seleccion {
         });
     }
 
+    /// Desmarca `ids` (lo que ya no existe).
+    pub(crate) fn quitar(self, ids: &[String]) {
+        self.0.update(|s| s.retain(|id| !ids.contains(id)));
+    }
+
     pub(crate) fn vaciar(self) {
         self.0.update(BTreeSet::clear);
     }
