@@ -7,6 +7,10 @@ import { entrar, recogerErrores } from "./util";
 // simulador): mientras se lee el tema nuevo, lo anterior queda atenuado con
 // aria-busy y «Actualizando…»; al volver a un tema leído hace poco (la caché
 // del servidor), ni lo uno ni lo otro.
+//
+// Se usan Teléfono y Puertos (cada test el suyo: la caché dura 30 s), que
+// el contador de Mejoras no lee al entrar; Seguridad y Sistema sí, y ya
+// salen de la caché.
 
 async function retardo(ms: number) {
   const r = await fetch(`${instalado.urlSim}/__sim/retardo`, { method: "POST", body: String(ms) });
@@ -61,9 +65,9 @@ test.describe("ajustes: carga al cambiar de tema", () => {
     await page.waitForLoadState("networkidle");
     await retardo(300);
 
-    // Sistema: dos lecturas lentas. Lo anterior, ocupado mientras tanto.
+    // Teléfono: tres lecturas lentas. Lo anterior, ocupado mientras tanto.
     const antes = await page.locator(".tema-desc").textContent();
-    await page.locator('nav.temas a[href="/ajustes/sistema"]').click();
+    await page.locator('nav.temas a[href="/ajustes/telefono"]').click();
     const contenido = page.locator(".tema-contenido");
     await expect(contenido).toHaveAttribute("aria-busy", "true");
     await expect(page.locator(".tema-actualizando")).toHaveText("Actualizando…");
@@ -79,11 +83,11 @@ test.describe("ajustes: carga al cambiar de tema", () => {
     await expect(contenido).not.toHaveAttribute("inert", /.*/);
     await expect(page.locator(".tema-actualizando")).toHaveText("");
 
-    // Volver a Internet (leído al abrir la página) y otra vez a Sistema: de
+    // Volver a Internet (leído al abrir la página) y otra vez a Teléfono: de
     // la caché, sin «Actualizando…» ni aria-busy en ningún momento.
     await vigilarOcupado(page);
     await cambiar(page, "internet");
-    await cambiar(page, "sistema");
+    await cambiar(page, "telefono");
     expect(await ocupado(page)).toBe(false);
     expect(errores).toEqual([]);
   });
@@ -93,9 +97,9 @@ test.describe("ajustes: carga al cambiar de tema", () => {
     await entrar(page);
     await page.goto("/ajustes/internet");
     await page.waitForLoadState("networkidle");
-    // Seguridad (dos lecturas, sin leer aún) tarda unos 350 ms: un poco más
-    // que el umbral.
-    await retardo(100);
+    // Puertos (sin leer aún) tarda algo más de 170 ms: un poco más que el
+    // umbral (150 ms).
+    await retardo(170);
     await page.evaluate(() => {
       const w = window as unknown as { __visto?: number; __oculto?: number };
       const aviso = document.querySelector(".tema-actualizando")!;
@@ -107,7 +111,7 @@ test.describe("ajustes: carga al cambiar de tema", () => {
         }
       }).observe(aviso, { childList: true, subtree: true, characterData: true });
     });
-    await cambiar(page, "seguridad");
+    await cambiar(page, "puertos");
     const { visto, oculto } = await page.evaluate(() => {
       const w = window as unknown as { __visto?: number; __oculto?: number };
       return { visto: w.__visto, oculto: w.__oculto };
