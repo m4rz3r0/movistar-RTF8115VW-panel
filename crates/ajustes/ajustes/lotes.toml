@@ -1,0 +1,78 @@
+# Lotes de mejoras: varios ajustes de un clic con un solo deshacer.
+#
+# Cada paso se declara una vez, en `[[paso]]`, y cada `[[lote]]` lista los
+# suyos por id: un paso compartido no puede divergir y cuenta una vez. El
+# formato está en `src/lotes/mod.rs`; los textos, en `mejoras.ftl`:
+# `mejoras-lote-<id>`, `-desc` y `-titulo`; `mejoras-paso-<id>` y `-desc`;
+# `mejoras-aviso-<id>` y `mejoras-consejo-<id>`.
+
+# Gestión remota del operador (TR-069) apagada.
+[[paso]]
+id = "gestion_remota"
+tema = "seguridad"
+accion = "apagar_gestion_remota"
+
+# Aviso periódico al operador apagado.
+[[paso]]
+id = "aviso_operador"
+tema = "seguridad"
+campo = "seguridad.gestion_remota_avanzado.aviso"
+valor = "false"
+
+# WPS fuera, en cada red WiFi.
+[[paso]]
+id = "wps"
+tema = "wifi"
+accion = "quitar_wps"
+para_cada = "red_wifi"
+
+# UPnP apagado.
+[[paso]]
+id = "upnp"
+tema = "puertos"
+campo = "puertos.upnp.activo"
+valor = "false"
+
+# WPA2-AES sin modo mixto, en cada red WiFi.
+[[paso]]
+id = "wpa2"
+tema = "wifi"
+campo = "seguridad"
+valor = "wpa2"
+para_cada = "red_wifi"
+
+# Aislar la red de invitados, solo si está encendida. Es un paso de campo y
+# no la acción `aislar`, que vale para cualquier red marcada.
+[[paso]]
+id = "aislar_invitados"
+tema = "wifi"
+campo = "wifi.invitados_avanzado.aislamiento"
+valor = "true"
+si = { campo = "wifi.invitados.activa", valor = "true" }
+
+# Espejo del tráfico de internet apagado.
+[[paso]]
+id = "espejo"
+tema = "sistema"
+campo = "sistema.diagnostico.espejo"
+valor = "false"
+
+# Hora por un servidor neutro: opcional, sale desmarcado.
+[[paso]]
+id = "hora_neutra"
+tema = "sistema"
+accion = "usar_hora_neutra"
+opcional = true
+
+[[lote]]
+id = "seguridad"
+icono = "escudo"
+pasos = ["gestion_remota", "aviso_operador", "wps", "upnp", "wpa2", "aislar_invitados", "espejo"]
+avisos = ["tr069"]
+consejos = ["wpa3", "nombre_y_mac", "contrasena_admin", "reenvios", "sin_api"]
+
+[[lote]]
+id = "privacidad"
+icono = "ojo"
+pasos = ["gestion_remota", "aviso_operador", "espejo", "hora_neutra"]
+avisos = ["tr069"]

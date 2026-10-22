@@ -35,3 +35,7 @@ required-features = ["catalogo"]
 [[test]]
 name = "catalogo_real"
 required-features = ["catalogo"]
+
+[[test]]
+name = "lotes_real"
+required-features = ["catalogo"]

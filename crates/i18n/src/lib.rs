@@ -48,7 +48,8 @@ locales!(
     "ajustes-puertos",
     "ajustes-seguridad",
     "ajustes-telefono",
-    "ajustes-sistema"
+    "ajustes-sistema",
+    "mejoras"
 );
 
 /// Idioma de la interfaz.

@@ -11,6 +11,9 @@ use i18n::Idioma;
 use regex::Regex;
 use std::{collections::BTreeSet, fs, path::PathBuf};
 
+mod comun_textos;
+use comun_textos::{marcas_de_recomendacion, recomendacion_bien_formada};
+
 fn cargar() -> CatalogoAjustes {
     CatalogoAjustes::load().expect("ajustes/*.toml legibles")
 }
@@ -433,35 +436,6 @@ fn detector_de_nombres_de_la_api() {
     }
 }
 
-/// Marcas que exige cada `…-recomendado`, por idioma y en este orden: para
-/// quién es, lo que se gana y lo que se pierde (decisión del usuario,
-/// 2026-10-13).
-fn marcas_de_recomendacion(idioma: Idioma) -> [&'static str; 3] {
-    match idioma {
-        Idioma::Es => ["Recomendado si", "A favor:", "En contra:"],
-        Idioma::En => ["Recommended if", "Pros:", "Cons:"],
-    }
-}
-
-/// `texto` empieza por la primera marca, trae las tres en orden y, tras
-/// cada una, algo más que espacios y signos de puntuación.
-fn recomendacion_bien_formada(texto: &str, marcas: [&str; 3]) -> bool {
-    let Some(mut resto) = texto.strip_prefix(marcas[0]) else {
-        return false;
-    };
-    let con_texto = |s: &str| s.chars().any(char::is_alphanumeric);
-    for marca in &marcas[1..] {
-        let Some((antes, despues)) = resto.split_once(marca) else {
-            return false;
-        };
-        if !con_texto(antes) {
-            return false;
-        }
-        resto = despues;
-    }
-    con_texto(resto)
-}
-
 /// El formato no se cumple con marcas vacías: tras cada una hay texto.
 #[test]
 fn formato_de_recomendacion_exige_texto_tras_cada_marca() {
@@ -527,7 +501,7 @@ fn recomendaciones_con_pros_y_contras() {
     );
 }
 
-/// Ningún texto de los ajustes (ni de las recomendaciones) nombra una
+/// Ningún texto de los ajustes (ni de las recomendaciones ni de los lotes) nombra una
 /// función, una página o un parámetro de la API: eso solo lo enseñan los
 /// detalles técnicos plegados.
 #[test]
@@ -539,7 +513,7 @@ fn textos_de_ajustes_sin_api() {
     let mut fallos = Vec::new();
     for idioma in Idioma::TODOS {
         let rutas = ficheros_ftl(idioma.codigo(), |s| {
-            s.starts_with("ajustes") || s == "recomendaciones"
+            s.starts_with("ajustes") || s == "recomendaciones" || s == "mejoras"
         });
         assert!(!rutas.is_empty(), "sin ficheros de ajustes en {idioma:?}");
         for ruta in rutas {

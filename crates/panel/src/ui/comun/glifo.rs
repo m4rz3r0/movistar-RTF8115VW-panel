@@ -42,6 +42,11 @@ fn trazos(nombre: &str) -> &'static [&'static str] {
         // Una puerta entreabierta con una flecha que entra: puertos abiertos.
         "puerta" => &["M14 4h5v16h-5", "M3 12h10", "M9 8l4 4l-4 4"],
         "casa" => &["M4 11l8-7l8 7", "M6 9.5V20h12V9.5", "M10 20v-5h4v5"],
+        // Un ojo: lo que el router cuenta a otros (la privacidad).
+        "ojo" => &[
+            "M2 12c2.5-4.5 6-7 10-7s7.5 2.5 10 7c-2.5 4.5-6 7-10 7s-7.5-2.5-10-7z",
+            "M12 9a3 3 0 1 0 0 6a3 3 0 1 0 0-6z",
+        ],
         _ => &["M12 4a8 8 0 1 0 0 16a8 8 0 1 0 0-16z"],
     }
 }

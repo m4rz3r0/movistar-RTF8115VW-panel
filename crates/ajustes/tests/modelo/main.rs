@@ -13,5 +13,6 @@ use comun::*;
 mod campos;
 mod carga;
 mod elementos;
+mod lotes;
 mod sensibles;
 mod validar;

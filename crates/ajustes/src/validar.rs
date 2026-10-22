@@ -75,7 +75,8 @@ pub fn riesgo(a: &Ajuste, f: &Catalogo) -> Riesgo {
 
 /// Fallos del catálogo de ajustes frente al de funciones y la máscara de
 /// secretos: uno legible por regla incumplida, con el id del ajuste (o de la
-/// función excluida). Vacío si todo cuadra.
+/// función excluida, el elemento, la acción, el lote o el paso). Vacío si
+/// todo cuadra.
 pub fn comprobar(c: &CatalogoAjustes, f: &Catalogo, m: &Mascara) -> Vec<String> {
     let mut fallos = Vec::new();
     let mut ids = HashSet::new();
@@ -87,6 +88,7 @@ pub fn comprobar(c: &CatalogoAjustes, f: &Catalogo, m: &Mascara) -> Vec<String> 
     }
     comprobar_excluidas(c, f, &mut fallos);
     crate::elementos::comprobar_elementos(c, &mut fallos);
+    crate::lotes::comprobar_lotes(c, &mut fallos);
     fallos
 }
 
