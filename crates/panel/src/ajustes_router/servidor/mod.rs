@@ -8,6 +8,7 @@ mod puertos;
 mod red_local;
 #[cfg(test)]
 mod tests;
+mod wifi;
 
 pub(super) use foto::{comparar_con_partida, preparar_volver_a_partida};
 pub(super) use guardar::{confirmar_ajuste, preparar_ajuste};
@@ -58,14 +59,16 @@ pub(super) async fn leer_tema(tema: String) -> Result<TemaVista, ServerFnError> 
     let del_tema: Vec<&Ajuste> = state.ajustes.por_tema(tema).collect();
     let claves: Vec<Clave> = del_tema.iter().map(|a| clave(a)).collect();
     let leidas = state.lecturas.leer(&state.hgu, &claves).await;
-    let ajustes = del_tema
+    let nodos: Vec<Option<&XmlNode>> = claves
         .iter()
-        .zip(&claves)
-        .map(|(a, c)| {
-            let nodo = leidas.get(c).and_then(|r| r.as_ref().ok());
-            vista(&state.catalogo, a, nodo)
-        })
+        .map(|c| leidas.get(c).and_then(|r| r.as_ref().ok()))
         .collect();
+    let mut ajustes: Vec<AjusteVista> = del_tema
+        .iter()
+        .zip(&nodos)
+        .map(|(a, nodo)| vista(&state.catalogo, a, *nodo))
+        .collect();
+    wifi::marcar_emision(&mut ajustes, &nodos);
     Ok(TemaVista {
         tema: tema.slug().to_owned(),
         solo_lectura: instancia::solo_lectura(&state.db).await,

@@ -11,6 +11,13 @@
 # Ids de las instancias (fixtures del router): radio 0 = 2,4 GHz, radio 1 =
 # 5 GHz; punto de acceso 0 = red principal de 2,4 GHz, 1 = red principal de
 # 5 GHz, 2 = primera red de invitados (en la radio de 2,4 GHz).
+#
+# Encender o apagar una red es `activa` (`adm_state`), en la tarjeta básica.
+# Comprobado en el router real (2026-10-22): con las redes apagadas, todos
+# los puntos de acceso traen `adm_state=0` y `opr_status=0` mientras las
+# radios siguen con `radio_adm_state=1` y `radio_opr_status=1`: `adm_state`
+# enciende o apaga la red y `opr_status` dice si de verdad emite (de ahí la
+# insignia de la tarjeta).
 
 [[ajuste]]
 id = "wifi.red_24"
@@ -19,6 +26,17 @@ nivel = "basico"
 efecto = "wifi_red"
 leer = { funcion = "cbGetWifiAccPt", params = { dpm_cfg_wifi_acc_pt_id = "0" } }
 fijos = { dpm_cfg_wifi_acc_pt_id = "0" }
+
+# Encender o apagar la red: lo primero de la tarjeta (nota del principio).
+[[ajuste.campo]]
+id = "activa"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "adm_state" }
+lee = "adm_state"
+tipo = "opcion"
+opciones = [
+  { valor = "1", clave = "encendida", recomendada = true },
+  { valor = "0", clave = "apagada" },
+]
 
 [[ajuste.campo]]
 id = "nombre"
@@ -71,15 +89,6 @@ efecto = "wifi_corte"
 leer = { funcion = "cbGetWifiAccPt", params = { dpm_cfg_wifi_acc_pt_id = "0" } }
 fijos = { dpm_cfg_wifi_acc_pt_id = "0" }
 
-# Pendiente de la fase 3: en las fixtures todos los puntos de acceso traen
-# `adm_state=0`, también los que emiten; hasta confirmar qué significa, va
-# aquí y no en la tarjeta básica.
-[[ajuste.campo]]
-id = "activa"
-escribe = { funcion = "cbSetWifiAccPt", parametro = "adm_state" }
-lee = "adm_state"
-tipo = "booleano"
-
 [[ajuste.campo]]
 id = "aislamiento"
 escribe = { funcion = "cbSetWifiAccPt", parametro = "isolation" }
@@ -108,6 +117,17 @@ nivel = "basico"
 efecto = "wifi_red"
 leer = { funcion = "cbGetWifiAccPt", params = { dpm_cfg_wifi_acc_pt_id = "1" } }
 fijos = { dpm_cfg_wifi_acc_pt_id = "1" }
+
+# Encender o apagar la red: lo primero de la tarjeta (nota del principio).
+[[ajuste.campo]]
+id = "activa"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "adm_state" }
+lee = "adm_state"
+tipo = "opcion"
+opciones = [
+  { valor = "1", clave = "encendida", recomendada = true },
+  { valor = "0", clave = "apagada" },
+]
 
 [[ajuste.campo]]
 id = "nombre"
@@ -160,15 +180,6 @@ efecto = "wifi_corte"
 leer = { funcion = "cbGetWifiAccPt", params = { dpm_cfg_wifi_acc_pt_id = "1" } }
 fijos = { dpm_cfg_wifi_acc_pt_id = "1" }
 
-# Pendiente de la fase 3: en las fixtures todos los puntos de acceso traen
-# `adm_state=0`, también los que emiten; hasta confirmar qué significa, va
-# aquí y no en la tarjeta básica.
-[[ajuste.campo]]
-id = "activa"
-escribe = { funcion = "cbSetWifiAccPt", parametro = "adm_state" }
-lee = "adm_state"
-tipo = "booleano"
-
 [[ajuste.campo]]
 id = "aislamiento"
 escribe = { funcion = "cbSetWifiAccPt", parametro = "isolation" }
@@ -197,6 +208,17 @@ nivel = "basico"
 efecto = "wifi_red"
 leer = { funcion = "cbGetWifiAccPt", params = { dpm_cfg_wifi_acc_pt_id = "2" } }
 fijos = { dpm_cfg_wifi_acc_pt_id = "2" }
+
+# Encender o apagar la red: lo primero de la tarjeta (nota del principio).
+[[ajuste.campo]]
+id = "activa"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "adm_state" }
+lee = "adm_state"
+tipo = "opcion"
+opciones = [
+  { valor = "1", clave = "encendida" },
+  { valor = "0", clave = "apagada", recomendada = true },
+]
 
 [[ajuste.campo]]
 id = "nombre"
@@ -248,15 +270,6 @@ nivel = "avanzado"
 efecto = "wifi_corte"
 leer = { funcion = "cbGetWifiAccPt", params = { dpm_cfg_wifi_acc_pt_id = "2" } }
 fijos = { dpm_cfg_wifi_acc_pt_id = "2" }
-
-# Pendiente de la fase 3: en las fixtures todos los puntos de acceso traen
-# `adm_state=0`, también los que emiten; hasta confirmar qué significa, va
-# aquí y no en la tarjeta básica.
-[[ajuste.campo]]
-id = "activa"
-escribe = { funcion = "cbSetWifiAccPt", parametro = "adm_state" }
-lee = "adm_state"
-tipo = "booleano"
 
 [[ajuste.campo]]
 id = "aislamiento"

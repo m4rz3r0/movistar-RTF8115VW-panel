@@ -6,7 +6,14 @@ aviso-wifi_abierta = Without a password, anyone nearby can join this network and
 ## 2.4 GHz WiFi network
 ajuste-wifi-red_24-titulo = 2.4 GHz WiFi network
 ajuste-wifi-red_24-desc = The main WiFi network on the 2.4 GHz band: it reaches further and goes through walls better, but it is slower and usually more crowded.
-ajuste-wifi-red_24-ayuda = Here you change the name, password and security of your 2.4 GHz network. If you change the name or the password, every device on this network disconnects and you will have to reconnect them with the new details. If you reach this panel over this network, you will lose the connection until you reconnect.
+ajuste-wifi-red_24-ayuda = Here you turn your 2.4 GHz network on or off and change its name, password and security. If you change the name or the password, every device on this network disconnects and you will have to reconnect them with the new details. If you reach this panel over this network, you will lose the connection until you reconnect.
+ajuste-wifi-red_24-activa = Network
+ajuste-wifi-red_24-activa-desc = When it is off, this network does not appear in the list of WiFi networks and no device can connect to it. The other networks stay as they are.
+ajuste-wifi-red_24-activa-encendida = On
+ajuste-wifi-red_24-activa-encendida-desc = The network broadcasts, as long as its radio is on, and your devices can connect to it.
+ajuste-wifi-red_24-activa-apagada = Off
+ajuste-wifi-red_24-activa-apagada-desc = The network disappears and the devices on it lose WiFi.
+ajuste-wifi-red_24-activa-recomendado = Recommended if any device at home connects over 2.4 GHz WiFi, as in almost every home. Pros: distant or older devices, which only know this band, get WiFi. Cons: one more network visible from outside; turning it off only makes sense if nothing uses it.
 ajuste-wifi-red_24-nombre = Network name
 ajuste-wifi-red_24-nombre-desc = The name you see when you look for WiFi networks on your phone or laptop. Up to 32 plain letters; accented letters and ñ count double, and emoji count four times.
 ajuste-wifi-red_24-contrasena = Password
@@ -27,10 +34,8 @@ ajuste-wifi-red_24-wps-recomendado = Recommended if you connect your devices by 
 
 ## 2.4 GHz WiFi network: more options
 ajuste-wifi-red_24_avanzado-titulo = 2.4 GHz WiFi network: more options
-ajuste-wifi-red_24_avanzado-desc = Less common options of the 2.4 GHz network: turning it on or off, isolation between devices, traffic priority and device limit.
-ajuste-wifi-red_24_avanzado-ayuda = The factory values work well in almost every home. Only change them if you know why: a change here can stop some devices from connecting or from doing things like casting to the TV. Whether the network shows as on or off is something the panel has not yet checked against this router: it may not match what you see on your devices.
-ajuste-wifi-red_24_avanzado-activa = Network on
-ajuste-wifi-red_24_avanzado-activa-desc = If you turn it off, this network disappears and the devices on it lose WiFi. The other networks keep working.
+ajuste-wifi-red_24_avanzado-desc = Less common options of the 2.4 GHz network: isolation between devices, traffic priority and device limit.
+ajuste-wifi-red_24_avanzado-ayuda = The factory values work well in almost every home. Only change them if you know why: a change here can stop some devices from connecting or from doing things like casting to the TV.
 ajuste-wifi-red_24_avanzado-aislamiento = Isolate devices from each other
 ajuste-wifi-red_24_avanzado-aislamiento-desc = Devices connected to this network over WiFi cannot see each other: for example, you will not be able to cast to a TV on the same WiFi. They can usually still reach the internet and devices connected by cable.
 ajuste-wifi-red_24_avanzado-aislamiento-recomendado = Recommended if this is your home network and your devices need to see each other. Pros: you can print, cast to the TV or use speakers over WiFi. Cons: if a device on this network gets infected, it can reach the others.
@@ -43,7 +48,14 @@ ajuste-wifi-red_24_avanzado-max_clientes-desc = How many devices can be connecte
 ## 5 GHz WiFi network
 ajuste-wifi-red_5-titulo = 5 GHz WiFi network
 ajuste-wifi-red_5-desc = The main WiFi network on the 5 GHz band: it is faster and has less interference, but its range is shorter.
-ajuste-wifi-red_5-ayuda = Here you change the name, password and security of your 5 GHz network. If you change the name or the password, every device on this network disconnects and you will have to reconnect them with the new details. If you reach this panel over this network, you will lose the connection until you reconnect.
+ajuste-wifi-red_5-ayuda = Here you turn your 5 GHz network on or off and change its name, password and security. If you change the name or the password, every device on this network disconnects and you will have to reconnect them with the new details. If you reach this panel over this network, you will lose the connection until you reconnect.
+ajuste-wifi-red_5-activa = Network
+ajuste-wifi-red_5-activa-desc = When it is off, this network does not appear in the list of WiFi networks and no device can connect to it. The other networks stay as they are.
+ajuste-wifi-red_5-activa-encendida = On
+ajuste-wifi-red_5-activa-encendida-desc = The network broadcasts, as long as its radio is on, and your devices can connect to it.
+ajuste-wifi-red_5-activa-apagada = Off
+ajuste-wifi-red_5-activa-apagada-desc = The network disappears and the devices on it lose WiFi.
+ajuste-wifi-red_5-activa-recomendado = Recommended if you have modern devices near the router, as in almost every home. Pros: it is the fastest and least crowded network. Cons: one more network visible from outside; turning it off only makes sense if nothing uses it.
 ajuste-wifi-red_5-nombre = Network name
 ajuste-wifi-red_5-nombre-desc = The name you see when you look for WiFi networks on your phone or laptop. Up to 32 plain letters; accented letters and ñ count double, and emoji count four times.
 ajuste-wifi-red_5-contrasena = Password
@@ -64,10 +76,8 @@ ajuste-wifi-red_5-wps-recomendado = Recommended if you connect your devices by t
 
 ## 5 GHz WiFi network: more options
 ajuste-wifi-red_5_avanzado-titulo = 5 GHz WiFi network: more options
-ajuste-wifi-red_5_avanzado-desc = Less common options of the 5 GHz network: turning it on or off, isolation between devices, traffic priority and device limit.
-ajuste-wifi-red_5_avanzado-ayuda = The factory values work well in almost every home. Only change them if you know why: a change here can stop some devices from connecting or from doing things like casting to the TV. Whether the network shows as on or off is something the panel has not yet checked against this router: it may not match what you see on your devices.
-ajuste-wifi-red_5_avanzado-activa = Network on
-ajuste-wifi-red_5_avanzado-activa-desc = If you turn it off, this network disappears and the devices on it lose WiFi. The other networks keep working.
+ajuste-wifi-red_5_avanzado-desc = Less common options of the 5 GHz network: isolation between devices, traffic priority and device limit.
+ajuste-wifi-red_5_avanzado-ayuda = The factory values work well in almost every home. Only change them if you know why: a change here can stop some devices from connecting or from doing things like casting to the TV.
 ajuste-wifi-red_5_avanzado-aislamiento = Isolate devices from each other
 ajuste-wifi-red_5_avanzado-aislamiento-desc = Devices connected to this network over WiFi cannot see each other: for example, you will not be able to cast to a TV on the same WiFi. They can usually still reach the internet and devices connected by cable.
 ajuste-wifi-red_5_avanzado-aislamiento-recomendado = Recommended if this is your home network and your devices need to see each other. Pros: you can print, cast to the TV or use speakers over WiFi. Cons: if a device on this network gets infected, it can reach the others.
@@ -80,7 +90,14 @@ ajuste-wifi-red_5_avanzado-max_clientes-desc = How many devices can be connected
 ## Guest network
 ajuste-wifi-invitados-titulo = Guest network
 ajuste-wifi-invitados-desc = A separate WiFi network, on the 2.4 GHz band, to give visitors internet access without sharing the password of your main network.
-ajuste-wifi-invitados-ayuda = You can turn it on when you have visitors and off when you no longer need it, in its advanced options. Use a password different from your main network's. If you change the name or the password, devices on this network disconnect and will have to reconnect with the new details.
+ajuste-wifi-invitados-ayuda = You can turn it on when you have visitors and off when you no longer need it. Use a password different from your main network's. If you change the name or the password, devices on this network disconnect and will have to reconnect with the new details.
+ajuste-wifi-invitados-activa = Network
+ajuste-wifi-invitados-activa-desc = When it is off, this network does not appear in the list of WiFi networks and no device can connect to it. The other networks stay as they are.
+ajuste-wifi-invitados-activa-encendida = On
+ajuste-wifi-invitados-activa-encendida-desc = The network broadcasts, as long as its radio is on, and your devices can connect to it.
+ajuste-wifi-invitados-activa-apagada = Off
+ajuste-wifi-invitados-activa-apagada-desc = The network disappears and the devices on it lose WiFi.
+ajuste-wifi-invitados-activa-recomendado = Recommended if you have no visitors right now. Pros: one less network visible from outside that someone could try to get into. Cons: your visitors will have no WiFi until you turn it on.
 ajuste-wifi-invitados-nombre = Network name
 ajuste-wifi-invitados-nombre-desc = The name you see when you look for WiFi networks on your phone or laptop. Up to 32 plain letters; accented letters and ñ count double, and emoji count four times.
 ajuste-wifi-invitados-contrasena = Password
@@ -101,10 +118,8 @@ ajuste-wifi-invitados-wps-recomendado = Recommended if you connect your devices 
 
 ## Guest network: more options
 ajuste-wifi-invitados_avanzado-titulo = Guest network: more options
-ajuste-wifi-invitados_avanzado-desc = Less common options of the guest network: turning it on or off, isolation between devices, traffic priority and device limit.
-ajuste-wifi-invitados_avanzado-ayuda = The factory values work well in almost every home. Only change them if you know why: a change here can stop some devices from connecting or from doing things like casting to the TV. Whether the network shows as on or off is something the panel has not yet checked against this router: it may not match what you see on your devices.
-ajuste-wifi-invitados_avanzado-activa = Network on
-ajuste-wifi-invitados_avanzado-activa-desc = If you turn it off, this network disappears and the devices on it lose WiFi. The other networks keep working.
+ajuste-wifi-invitados_avanzado-desc = Less common options of the guest network: isolation between devices, traffic priority and device limit.
+ajuste-wifi-invitados_avanzado-ayuda = The factory values work well in almost every home. Only change them if you know why: a change here can stop some devices from connecting or from doing things like casting to the TV.
 ajuste-wifi-invitados_avanzado-aislamiento = Isolate devices from each other
 ajuste-wifi-invitados_avanzado-aislamiento-desc = Devices connected to this network over WiFi cannot see each other: for example, you will not be able to cast to a TV on the same WiFi. They can usually still reach the internet and devices connected by cable.
 ajuste-wifi-invitados_avanzado-aislamiento-recomendado = Recommended if you give this network to your guests. Pros: devices connected to it cannot see each other, so one cannot snoop on another. Cons: from this network you cannot cast to a TV or speaker connected to it.

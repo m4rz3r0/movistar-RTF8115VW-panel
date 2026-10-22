@@ -63,6 +63,8 @@ pub(super) fn vista(f: &Catalogo, a: &Ajuste, nodo: Option<&XmlNode>) -> AjusteV
         instancias,
         tecnico: tecnico(a),
         clave: prefijo,
+        red_wifi: None,
+        radio_sin_redes: false,
     }
 }
 

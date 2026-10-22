@@ -46,6 +46,23 @@ pub struct AjusteVista {
     /// Instancias de una lista, en el orden del router.
     pub instancias: Vec<InstanciaVista>,
     pub tecnico: DetallesTecnicos,
+    /// En la tarjeta de una red WiFi, si emite (su insignia); `None` en el
+    /// resto o si la lectura no lo dice.
+    #[serde(default)]
+    pub red_wifi: Option<EmisionRed>,
+    /// En la de una radio WiFi: está encendida, pero ninguna de sus redes
+    /// lo está, así que no emite ninguna WiFi (lleva una nota).
+    #[serde(default)]
+    pub radio_sin_redes: bool,
+}
+
+/// Si una red WiFi emite, para la insignia de su tarjeta.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EmisionRed {
+    Encendida,
+    Apagada,
+    /// Encendida, pero su radio está apagada: no emite.
+    SinRadio,
 }
 
 /// Si se pudo leer el valor actual de un ajuste.

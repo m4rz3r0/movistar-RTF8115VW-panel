@@ -127,7 +127,8 @@ fn escritura_generica(
             ident.push((x.to_owned(), valor.to_owned()));
         }
     }
-    let campos = campos_escritos(p, &[]);
+    let mut campos = campos_escritos(p, &[]);
+    derivar_campos(name, &mut campos);
     match st
         .ediciones
         .iter_mut()
@@ -141,6 +142,17 @@ fn escritura_generica(
         }),
     }
     Ok(())
+}
+
+/// Lo que el router cambia por su cuenta al escribir: encender o apagar
+/// una red WiFi (`adm_state`) hace que emita o deje de emitir
+/// (`opr_status`).
+fn derivar_campos(name: &str, campos: &mut BTreeMap<String, String>) {
+    if name == "cbSetWifiAccPt"
+        && let Some(v) = campos.get("adm_state").cloned()
+    {
+        campos.insert("opr_status".to_owned(), v);
+    }
 }
 
 /// Reglas de una reserva DHCP que el router aplica y el catálogo no recoge:

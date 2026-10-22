@@ -268,3 +268,54 @@ async fn descripcion_de_la_opcion_en_el_selector() {
     }
     assert!(vistos > 0, "sin <select> en WiFi");
 }
+
+/// La tarjeta `ajuste` (`wifi.red_24`) de la página, sin los datos de la
+/// hidratación.
+fn tarjeta<'h>(html: &'h str, ajuste: &str) -> &'h str {
+    let marca = format!(
+        "aria-labelledby=\"ajuste-{}-titulo\"",
+        ajuste.replace('.', "-")
+    );
+    let desde = &html[html.find(&marca).unwrap_or_else(|| panic!("{ajuste}"))..];
+    &desde[..desde.find("</article>").unwrap()]
+}
+
+/// Cada red dice en su cabecera si está encendida o apagada, y la radio
+/// encendida sin ninguna red encendida lo avisa (en es y en en). En las
+/// fixtures, como en el router real, todas las redes están apagadas y las
+/// radios, encendidas: aquí se enciende la de 5 GHz.
+#[tokio::test]
+async fn cada_red_dice_si_esta_encendida() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    p.state
+        .hgu
+        .write(
+            "wifi.asp",
+            "cbSetWifiAccPt",
+            &[("dpm_cfg_wifi_acc_pt_id", "1"), ("adm_state", "1")],
+        )
+        .await
+        .unwrap();
+    let casos = [
+        (
+            "es",
+            "Apagada",
+            "Encendida",
+            "ninguna de sus redes está activa",
+        ),
+        ("en", "Off", "On", "none of its networks is active"),
+    ];
+    for (idioma, apagada, encendida, nota) in casos {
+        let cookie = format!("{cookie}; rp_lang={idioma}");
+        let (status, _, html) = pagina(&p, &cookie, "/ajustes/wifi").await;
+        assert_eq!(status, 200, "{html}");
+        let insignia = |texto: &str| format!("</svg>{texto}</span>");
+        let red_24 = tarjeta(&html, "wifi.red_24");
+        assert!(red_24.contains(&insignia(apagada)), "{idioma}: {red_24}");
+        let red_5 = tarjeta(&html, "wifi.red_5");
+        assert!(red_5.contains(&insignia(encendida)), "{idioma}: {red_5}");
+        assert!(tarjeta(&html, "wifi.radio_24").contains(nota), "{idioma}");
+        assert!(!tarjeta(&html, "wifi.radio_5").contains(nota), "{idioma}");
+        assert!(!tarjeta(&html, "wifi.red_24").contains(nota), "{idioma}");
+    }
+}

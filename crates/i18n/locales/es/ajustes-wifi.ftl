@@ -6,7 +6,14 @@ aviso-wifi_abierta = Sin contraseña, cualquiera que esté cerca puede conectars
 ## Red WiFi 2,4 GHz
 ajuste-wifi-red_24-titulo = Red WiFi 2,4 GHz
 ajuste-wifi-red_24-desc = La red WiFi principal en la banda de 2,4 GHz: llega más lejos y atraviesa mejor las paredes, pero es más lenta y suele estar más saturada.
-ajuste-wifi-red_24-ayuda = Aquí cambias el nombre, la contraseña y la seguridad de tu red de 2,4 GHz. Si cambias el nombre o la contraseña, todos los dispositivos conectados a esta red se desconectan y tendrás que volver a conectarlos con los datos nuevos. Si este panel te llega por esta red, perderás la conexión hasta que te vuelvas a conectar.
+ajuste-wifi-red_24-ayuda = Aquí enciendes o apagas tu red de 2,4 GHz y cambias su nombre, su contraseña y su seguridad. Si cambias el nombre o la contraseña, todos los dispositivos conectados a esta red se desconectan y tendrás que volver a conectarlos con los datos nuevos. Si este panel te llega por esta red, perderás la conexión hasta que te vuelvas a conectar.
+ajuste-wifi-red_24-activa = Red
+ajuste-wifi-red_24-activa-desc = Si está apagada, esta red no aparece en la lista de redes WiFi y ningún dispositivo puede conectarse a ella. Las demás redes siguen como estén.
+ajuste-wifi-red_24-activa-encendida = Encendida
+ajuste-wifi-red_24-activa-encendida-desc = La red emite, siempre que su radio esté encendida, y tus dispositivos pueden conectarse a ella.
+ajuste-wifi-red_24-activa-apagada = Apagada
+ajuste-wifi-red_24-activa-apagada-desc = La red deja de verse y los dispositivos conectados a ella se quedan sin WiFi.
+ajuste-wifi-red_24-activa-recomendado = Recomendado si algún dispositivo de casa se conecta por WiFi en 2,4 GHz, lo normal en casi todas las casas. A favor: los dispositivos lejanos o antiguos, que solo conocen esta banda, tienen WiFi. En contra: una red más que se ve desde fuera; apagarla solo tiene sentido si nada la usa.
 ajuste-wifi-red_24-nombre = Nombre de la red
 ajuste-wifi-red_24-nombre-desc = El nombre que ves al buscar redes WiFi en el móvil o el portátil. Hasta 32 letras sin tilde; las letras con tilde y la ñ cuentan doble, y los emoji, cuádruple.
 ajuste-wifi-red_24-contrasena = Contraseña
@@ -27,10 +34,8 @@ ajuste-wifi-red_24-wps-recomendado = Recomendado si conectas tus dispositivos es
 
 ## Red WiFi 2,4 GHz: más opciones
 ajuste-wifi-red_24_avanzado-titulo = Red WiFi 2,4 GHz: más opciones
-ajuste-wifi-red_24_avanzado-desc = Opciones menos habituales de la red de 2,4 GHz: encenderla o apagarla, aislamiento entre dispositivos, prioridad del tráfico y límite de dispositivos.
-ajuste-wifi-red_24_avanzado-ayuda = Los valores de fábrica funcionan bien en casi todas las casas. Cámbialos solo si sabes para qué: un cambio aquí puede impedir que algunos dispositivos se conecten o hagan cosas como enviar contenido a la tele. Que la red figure activa o apagada es un dato que el panel aún no ha comprobado con este router: puede no coincidir con lo que ves en tus dispositivos.
-ajuste-wifi-red_24_avanzado-activa = Red activa
-ajuste-wifi-red_24_avanzado-activa-desc = Si la apagas, esta red deja de verse y los dispositivos conectados a ella se quedan sin WiFi. Las demás redes siguen funcionando.
+ajuste-wifi-red_24_avanzado-desc = Opciones menos habituales de la red de 2,4 GHz: aislamiento entre dispositivos, prioridad del tráfico y límite de dispositivos.
+ajuste-wifi-red_24_avanzado-ayuda = Los valores de fábrica funcionan bien en casi todas las casas. Cámbialos solo si sabes para qué: un cambio aquí puede impedir que algunos dispositivos se conecten o hagan cosas como enviar contenido a la tele.
 ajuste-wifi-red_24_avanzado-aislamiento = Aislar los dispositivos entre sí
 ajuste-wifi-red_24_avanzado-aislamiento-desc = Los dispositivos conectados por WiFi a esta red no se ven entre ellos: por ejemplo, no podrás enviar contenido a una tele que esté en la misma WiFi. Normalmente siguen llegando a internet y a los dispositivos conectados por cable.
 ajuste-wifi-red_24_avanzado-aislamiento-recomendado = Recomendado si es tu red de casa y tus dispositivos tienen que verse entre ellos. A favor: puedes imprimir, enviar contenido a la tele o usar altavoces por WiFi. En contra: si un dispositivo de esta red queda infectado, puede llegar a los demás.
@@ -43,7 +48,14 @@ ajuste-wifi-red_24_avanzado-max_clientes-desc = Cuántos dispositivos pueden est
 ## Red WiFi 5 GHz
 ajuste-wifi-red_5-titulo = Red WiFi 5 GHz
 ajuste-wifi-red_5-desc = La red WiFi principal en la banda de 5 GHz: es más rápida y tiene menos interferencias, pero llega menos lejos.
-ajuste-wifi-red_5-ayuda = Aquí cambias el nombre, la contraseña y la seguridad de tu red de 5 GHz. Si cambias el nombre o la contraseña, todos los dispositivos conectados a esta red se desconectan y tendrás que volver a conectarlos con los datos nuevos. Si este panel te llega por esta red, perderás la conexión hasta que te vuelvas a conectar.
+ajuste-wifi-red_5-ayuda = Aquí enciendes o apagas tu red de 5 GHz y cambias su nombre, su contraseña y su seguridad. Si cambias el nombre o la contraseña, todos los dispositivos conectados a esta red se desconectan y tendrás que volver a conectarlos con los datos nuevos. Si este panel te llega por esta red, perderás la conexión hasta que te vuelvas a conectar.
+ajuste-wifi-red_5-activa = Red
+ajuste-wifi-red_5-activa-desc = Si está apagada, esta red no aparece en la lista de redes WiFi y ningún dispositivo puede conectarse a ella. Las demás redes siguen como estén.
+ajuste-wifi-red_5-activa-encendida = Encendida
+ajuste-wifi-red_5-activa-encendida-desc = La red emite, siempre que su radio esté encendida, y tus dispositivos pueden conectarse a ella.
+ajuste-wifi-red_5-activa-apagada = Apagada
+ajuste-wifi-red_5-activa-apagada-desc = La red deja de verse y los dispositivos conectados a ella se quedan sin WiFi.
+ajuste-wifi-red_5-activa-recomendado = Recomendado si tienes dispositivos actuales cerca del router, lo normal en casi todas las casas. A favor: es la red más rápida y la menos saturada. En contra: una red más que se ve desde fuera; apagarla solo tiene sentido si nada la usa.
 ajuste-wifi-red_5-nombre = Nombre de la red
 ajuste-wifi-red_5-nombre-desc = El nombre que ves al buscar redes WiFi en el móvil o el portátil. Hasta 32 letras sin tilde; las letras con tilde y la ñ cuentan doble, y los emoji, cuádruple.
 ajuste-wifi-red_5-contrasena = Contraseña
@@ -64,10 +76,8 @@ ajuste-wifi-red_5-wps-recomendado = Recomendado si conectas tus dispositivos esc
 
 ## Red WiFi 5 GHz: más opciones
 ajuste-wifi-red_5_avanzado-titulo = Red WiFi 5 GHz: más opciones
-ajuste-wifi-red_5_avanzado-desc = Opciones menos habituales de la red de 5 GHz: encenderla o apagarla, aislamiento entre dispositivos, prioridad del tráfico y límite de dispositivos.
-ajuste-wifi-red_5_avanzado-ayuda = Los valores de fábrica funcionan bien en casi todas las casas. Cámbialos solo si sabes para qué: un cambio aquí puede impedir que algunos dispositivos se conecten o hagan cosas como enviar contenido a la tele. Que la red figure activa o apagada es un dato que el panel aún no ha comprobado con este router: puede no coincidir con lo que ves en tus dispositivos.
-ajuste-wifi-red_5_avanzado-activa = Red activa
-ajuste-wifi-red_5_avanzado-activa-desc = Si la apagas, esta red deja de verse y los dispositivos conectados a ella se quedan sin WiFi. Las demás redes siguen funcionando.
+ajuste-wifi-red_5_avanzado-desc = Opciones menos habituales de la red de 5 GHz: aislamiento entre dispositivos, prioridad del tráfico y límite de dispositivos.
+ajuste-wifi-red_5_avanzado-ayuda = Los valores de fábrica funcionan bien en casi todas las casas. Cámbialos solo si sabes para qué: un cambio aquí puede impedir que algunos dispositivos se conecten o hagan cosas como enviar contenido a la tele.
 ajuste-wifi-red_5_avanzado-aislamiento = Aislar los dispositivos entre sí
 ajuste-wifi-red_5_avanzado-aislamiento-desc = Los dispositivos conectados por WiFi a esta red no se ven entre ellos: por ejemplo, no podrás enviar contenido a una tele que esté en la misma WiFi. Normalmente siguen llegando a internet y a los dispositivos conectados por cable.
 ajuste-wifi-red_5_avanzado-aislamiento-recomendado = Recomendado si es tu red de casa y tus dispositivos tienen que verse entre ellos. A favor: puedes imprimir, enviar contenido a la tele o usar altavoces por WiFi. En contra: si un dispositivo de esta red queda infectado, puede llegar a los demás.
@@ -80,7 +90,14 @@ ajuste-wifi-red_5_avanzado-max_clientes-desc = Cuántos dispositivos pueden esta
 ## Red de invitados
 ajuste-wifi-invitados-titulo = Red de invitados
 ajuste-wifi-invitados-desc = Una red WiFi aparte, en la banda de 2,4 GHz, para dar internet a las visitas sin darles la contraseña de tu red principal.
-ajuste-wifi-invitados-ayuda = Puedes encenderla cuando tengas visitas y apagarla cuando ya no la necesites, en sus opciones avanzadas. Usa una contraseña distinta de la de tu red principal. Si cambias el nombre o la contraseña, los dispositivos conectados a esta red se desconectan y tendrán que volver a conectarse con los datos nuevos.
+ajuste-wifi-invitados-ayuda = Puedes encenderla cuando tengas visitas y apagarla cuando ya no la necesites. Usa una contraseña distinta de la de tu red principal. Si cambias el nombre o la contraseña, los dispositivos conectados a esta red se desconectan y tendrán que volver a conectarse con los datos nuevos.
+ajuste-wifi-invitados-activa = Red
+ajuste-wifi-invitados-activa-desc = Si está apagada, esta red no aparece en la lista de redes WiFi y ningún dispositivo puede conectarse a ella. Las demás redes siguen como estén.
+ajuste-wifi-invitados-activa-encendida = Encendida
+ajuste-wifi-invitados-activa-encendida-desc = La red emite, siempre que su radio esté encendida, y tus dispositivos pueden conectarse a ella.
+ajuste-wifi-invitados-activa-apagada = Apagada
+ajuste-wifi-invitados-activa-apagada-desc = La red deja de verse y los dispositivos conectados a ella se quedan sin WiFi.
+ajuste-wifi-invitados-activa-recomendado = Recomendado si ahora no tienes visitas. A favor: una red menos que se ve desde fuera y a la que alguien podría intentar entrar. En contra: tus visitas no tendrán WiFi hasta que la enciendas.
 ajuste-wifi-invitados-nombre = Nombre de la red
 ajuste-wifi-invitados-nombre-desc = El nombre que ves al buscar redes WiFi en el móvil o el portátil. Hasta 32 letras sin tilde; las letras con tilde y la ñ cuentan doble, y los emoji, cuádruple.
 ajuste-wifi-invitados-contrasena = Contraseña
@@ -101,10 +118,8 @@ ajuste-wifi-invitados-wps-recomendado = Recomendado si conectas tus dispositivos
 
 ## Red de invitados: más opciones
 ajuste-wifi-invitados_avanzado-titulo = Red de invitados: más opciones
-ajuste-wifi-invitados_avanzado-desc = Opciones menos habituales de la red de invitados: encenderla o apagarla, aislamiento entre dispositivos, prioridad del tráfico y límite de dispositivos.
-ajuste-wifi-invitados_avanzado-ayuda = Los valores de fábrica funcionan bien en casi todas las casas. Cámbialos solo si sabes para qué: un cambio aquí puede impedir que algunos dispositivos se conecten o hagan cosas como enviar contenido a la tele. Que la red figure activa o apagada es un dato que el panel aún no ha comprobado con este router: puede no coincidir con lo que ves en tus dispositivos.
-ajuste-wifi-invitados_avanzado-activa = Red activa
-ajuste-wifi-invitados_avanzado-activa-desc = Si la apagas, esta red deja de verse y los dispositivos conectados a ella se quedan sin WiFi. Las demás redes siguen funcionando.
+ajuste-wifi-invitados_avanzado-desc = Opciones menos habituales de la red de invitados: aislamiento entre dispositivos, prioridad del tráfico y límite de dispositivos.
+ajuste-wifi-invitados_avanzado-ayuda = Los valores de fábrica funcionan bien en casi todas las casas. Cámbialos solo si sabes para qué: un cambio aquí puede impedir que algunos dispositivos se conecten o hagan cosas como enviar contenido a la tele.
 ajuste-wifi-invitados_avanzado-aislamiento = Aislar los dispositivos entre sí
 ajuste-wifi-invitados_avanzado-aislamiento-desc = Los dispositivos conectados por WiFi a esta red no se ven entre ellos: por ejemplo, no podrás enviar contenido a una tele que esté en la misma WiFi. Normalmente siguen llegando a internet y a los dispositivos conectados por cable.
 ajuste-wifi-invitados_avanzado-aislamiento-recomendado = Recomendado si das esta red a tus visitas. A favor: los dispositivos conectados a ella no se ven entre ellos, así que uno no puede curiosear en el de otro. En contra: desde esta red no se puede enviar contenido a una tele o un altavoz conectados a ella.
