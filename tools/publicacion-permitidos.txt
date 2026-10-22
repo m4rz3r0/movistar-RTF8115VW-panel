@@ -16,7 +16,9 @@ valor 1.0.0.1 — DNS público (Cloudflare) de ejemplo en las pruebas
 
 # Valores de fábrica del operador, iguales en todas las líneas.
 valor 192.168.144.1 — puerta de enlace WAN de fábrica del operador
-dominio hora.ngn.rima-tde.net — servidor NTP de fábrica del operador
+
+# Servidor de hora público y neutro que recomienda el panel (Sistema).
+dominio hora.roa.es — servidor de hora oficial de España (ROA), público y neutro: el recomendado
 
 # Valores de fábrica del modelo (A-18).
 valor 1234 — valor de fábrica público del modelo (usuario web)

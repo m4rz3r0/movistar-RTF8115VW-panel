@@ -43,12 +43,20 @@ const RECORRIDOS = 2;
 const REJILLAS = 2;
 
 /**
- * Tope de E2E_WORKERS: los instalados, los nuevos y los del recorrido ocupan
- * WORKERS + 8 puertos seguidos desde E2E_PORT (y desde E2E_SIM_PORT), y la
- * ventana reservada a cada prueba es de 20 (p. ej. 3710-3729 y 8710-8729).
+ * Panel de las otras pestañas en rejilla (ajustes-temas.spec.ts): sus
+ * guardados de verdad van en serie en él, con la vigilancia corta del
+ * recorrido, sin ensuciar el Historial de los instalados.
+ */
+const TEMAS = 1;
+
+/**
+ * Tope de E2E_WORKERS: los instalados, los nuevos, los del recorrido, los de
+ * la rejilla y el de los temas ocupan WORKERS + 9 puertos seguidos desde
+ * E2E_PORT (y desde E2E_SIM_PORT), y la ventana reservada a cada prueba es
+ * de 20 (p. ej. 3710-3729 y 8710-8729).
  */
 const VENTANA_DE_PUERTOS = 20;
-const MAX_WORKERS = VENTANA_DE_PUERTOS - NUEVOS - RECORRIDOS - REJILLAS;
+const MAX_WORKERS = VENTANA_DE_PUERTOS - NUEVOS - RECORRIDOS - REJILLAS - TEMAS;
 
 /**
  * Workers de Playwright (E2E_WORKERS; 1, en serie). Por defecto, uno por
@@ -68,7 +76,8 @@ function workers(valor: string | undefined): number {
   if (!Number.isInteger(n) || n < 1 || n > MAX_WORKERS) {
     throw new Error(
       `E2E_WORKERS debe ser un entero entre 1 y ${MAX_WORKERS} (con ${NUEVOS} paneles del ` +
-        `asistente, ${RECORRIDOS} del recorrido y ${REJILLAS} de la rejilla, ${VENTANA_DE_PUERTOS} puertos seguidos ` +
+        `asistente, ${RECORRIDOS} del recorrido, ${REJILLAS} de la rejilla y ${TEMAS} de los temas, ` +
+        `${VENTANA_DE_PUERTOS} puertos seguidos ` +
         `desde E2E_PORT): ${valor}`,
     );
   }
@@ -169,11 +178,20 @@ export const rejillas = {
   "360-claro": instancia("rejilla-360-claro", "instalado", WORKERS + NUEVOS + RECORRIDOS + 1),
 };
 
+/** El panel de los guardados de verdad de Internet, Seguridad, Teléfono y Sistema. */
+export const temas = instancia(
+  "temas",
+  "instalado",
+  WORKERS + NUEVOS + RECORRIDOS + REJILLAS,
+  VIGILANCIA_RECORRIDO_S,
+);
+
 export const todas: Instancia[] = [
   ...instalados,
   ...Object.values(nuevos),
   ...Object.values(recorridos),
   ...Object.values(rejillas),
+  temas,
 ];
 
 /** Usuario del panel «instalado». */

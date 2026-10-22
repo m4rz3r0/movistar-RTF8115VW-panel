@@ -28,6 +28,9 @@ pub(crate) struct Pagina {
     pub tema: StoredValue<String>,
     /// El panel está en solo lectura: nada se cambia.
     pub solo_lectura: bool,
+    /// El tema tiene acciones sobre varios elementos: las tarjetas llevan
+    /// la marca redonda (sin acciones, marcar no serviría de nada).
+    pub marcar: bool,
     /// El elemento cuyo detalle se ve.
     pub abierto: RwSignal<Option<String>>,
     /// Lleva a la dirección de un elemento (abre su detalle).
@@ -73,7 +76,7 @@ pub(crate) fn teclas_de_tarjeta(ev: &ev::KeyboardEvent, id: &str, p: Pagina, sel
     }
     match ev.key().as_str() {
         "Enter" => p.abrir.run(id.to_owned()),
-        " " => {
+        " " if p.marcar => {
             ev.prevent_default();
             sel.alternar(id);
         }
@@ -212,6 +215,7 @@ pub(crate) fn ContenidoRejilla(
     let pagina = Pagina {
         tema,
         solo_lectura: p.solo_lectura,
+        marcar: !p.acciones.is_empty(),
         abierto,
         abrir: Callback::new({
             let ir_a = ir_a.clone();

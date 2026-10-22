@@ -9,6 +9,7 @@ ajuste-sistema-hora-activa-desc = If you turn it off, the router does not correc
 ajuste-sistema-hora-activa-recomendado = Recommended if you want the router to always have the right time, as is usual. Pros: the clock corrects itself, also after a power cut, because home routers do not usually have a clock battery. Cons: the router checks an internet time server every so often.
 ajuste-sistema-hora-servidor_1 = Time server
 ajuste-sistema-hora-servidor_1-desc = The name of the server asked for the time, for example hora.example. No spaces or accented letters.
+ajuste-sistema-hora-servidor_1-recomendado = Recommended if you would rather the router's time did not depend on your operator. Pros: hora.roa.es is the server of the Spanish Navy's Royal Institute and Observatory, which keeps Spain's official time, and no company runs it. Cons: if it ever does not answer, the router takes longer to set its time; add a backup server.
 ajuste-sistema-hora-servidor_2 = Backup time server
 ajuste-sistema-hora-servidor_2-desc = Used if the first one does not answer. You can leave it empty.
 

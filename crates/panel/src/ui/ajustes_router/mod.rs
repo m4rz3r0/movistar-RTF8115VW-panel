@@ -6,9 +6,9 @@
 //! WiFi va en rejilla ([`rejilla`]): la franja de resumen, la barra de lo
 //! marcado, una tarjeta por elemento ([`tarjeta`]) y el detalle del que se
 //! abre ([`detalle`], `/ajustes/<tema>/<elemento>`), con los cambios
-//! seguidos en la propia tarjeta y un aviso con «Deshacer» ([`aviso`]). Los
-//! demás temas, hasta que pasen a la rejilla, con sus tarjetas de siempre
-//! ([`heredada`]); los dispositivos y las IP fijas de Red local tienen su
+//! seguidos en la propia tarjeta y un aviso con «Deshacer» ([`aviso`]). Lo
+//! mismo Internet, Seguridad, Teléfono y Sistema. Puertos y Red local, hasta
+//! que pasen a la rejilla, con sus tarjetas de siempre ([`heredada`]); los dispositivos y las IP fijas de Red local tienen su
 //! propio componente ([`dispositivos`], [`reservas`]), y las reglas de
 //! apertura de puertos el suyo ([`puertos`]). Un tema que no existe es
 //! «página no encontrada». Si hay foto de partida, cada tema enlaza a
@@ -16,6 +16,7 @@
 
 mod aviso;
 mod campo;
+mod consulta;
 mod detalle;
 mod dispositivos;
 mod edicion;
@@ -73,7 +74,13 @@ pub(crate) const NOTA_OCULTO: &str = "ajustes-nota-oculto";
 pub(crate) const ID_SOLO_LECTURA: &str = "ajustes-solo-lectura";
 
 /// Temas que ya van en rejilla (los demás, con sus tarjetas de siempre).
-const EN_REJILLA: [Tema; 1] = [Tema::Wifi];
+const EN_REJILLA: [Tema; 5] = [
+    Tema::Internet,
+    Tema::Wifi,
+    Tema::Seguridad,
+    Tema::Telefono,
+    Tema::Sistema,
+];
 
 /// Vista que no pinta nada: la de las rutas hijas de un tema, que solo
 /// eligen el elemento abierto (lo pinta la página del tema).
@@ -383,7 +390,7 @@ pub fn PaginaTema() -> impl IntoView {
     provide_context(seleccion);
     let borradores = Borradores::nuevos();
     provide_context(borradores);
-    provide_context(Seguimiento::nuevo(recargar));
+    provide_context(Seguimiento::nuevo(recargar, borradores));
     Effect::new(move |anterior: Option<String>| {
         let ahora = slug.get();
         if anterior.is_some_and(|a| a != ahora) {

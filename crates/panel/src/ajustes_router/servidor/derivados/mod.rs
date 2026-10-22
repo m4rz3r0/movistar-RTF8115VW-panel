@@ -4,7 +4,14 @@
 //! catálogo (`derivado:<nombre>`, ver [`ajustes::DERIVADOS_DATO`] y
 //! [`ajustes::DERIVADOS_ESTADO`]) se resuelven aquí con un `match`: uno que
 //! no está es un error del catálogo, que ya rechaza `ajustes::comprobar`.
+//! Aquí van también las piezas que comparten: el valor de un campo según su
+//! vista, el estado de algo que se enciende y se apaga y los datos comunes
+//! de la franja de resumen.
 
+mod internet;
+mod seguridad;
+mod sistema;
+mod telefono;
 pub(super) mod wifi;
 
 use super::*;
@@ -57,8 +64,129 @@ impl<'a> Contexto<'a> {
 pub(super) struct Desconocido(pub String);
 
 /// Lecturas que hacen falta además de las de los ajustes del tema.
-pub(super) fn claves_extra(del_tema: &[&Ajuste]) -> Vec<Clave> {
-    wifi::claves_extra(del_tema)
+pub(super) fn claves_extra(tema: Tema, del_tema: &[&Ajuste]) -> Vec<Clave> {
+    match tema {
+        Tema::Wifi => wifi::claves_extra(del_tema),
+        Tema::Internet => internet::claves_extra(),
+        _ => Vec::new(),
+    }
+}
+
+/// Valor del campo `campo` del ajuste `ajuste` según su vista (`None` si
+/// el ajuste no es del tema o no tiene ese campo).
+pub(super) fn valor<'a>(ctx: &Contexto<'a>, ajuste: &str, campo: &str) -> Option<&'a ValorLegible> {
+    ctx.vista(ajuste)?
+        .campos
+        .iter()
+        .find(|c| c.id == campo)
+        .map(|c| &c.valor)
+}
+
+/// Un campo sí/no según su vista.
+pub(super) fn si_no(ctx: &Contexto, ajuste: &str, campo: &str) -> Option<bool> {
+    match valor(ctx, ajuste, campo)? {
+        ValorLegible::Booleano(b) => Some(*b),
+        _ => None,
+    }
+}
+
+/// La opción (su clave) o el texto de un campo según su vista.
+pub(super) fn texto<'a>(ctx: &Contexto<'a>, ajuste: &str, campo: &str) -> Option<&'a str> {
+    match valor(ctx, ajuste, campo)? {
+        ValorLegible::Opcion(t) | ValorLegible::Texto(t) => Some(t.as_str()),
+        _ => None,
+    }
+}
+
+/// Instancias de un ajuste de tipo lista (`None` si no se pudo leer).
+pub(super) fn instancias<'a>(ctx: &Contexto<'a>, ajuste: &str) -> Option<&'a [InstanciaVista]> {
+    ctx.vista(ajuste)
+        .filter(|v| v.estado == EstadoLectura::Leido)
+        .map(|v| v.instancias.as_slice())
+}
+
+/// Estado de algo que se enciende y se apaga: `si` (estado y clave de su
+/// texto) si está encendido, `no` si está apagado y «Sin datos» si la
+/// lectura no lo dice.
+pub(super) fn segun(
+    encendido: Option<bool>,
+    si: (EstadoVisual, &str),
+    no: (EstadoVisual, &str),
+) -> (EstadoVisual, String) {
+    let (estado, clave) = match encendido {
+        Some(true) => si,
+        Some(false) => no,
+        None => (EstadoVisual::Atencion, "ajustes-estado-desconocido"),
+    };
+    (estado, clave.to_owned())
+}
+
+/// `derivado:segun_lo_recomendado`: «Como se recomienda» si ninguno de sus
+/// campos tiene una recomendación pendiente; si alguno la tiene, en ámbar.
+fn segun_lo_recomendado(ctx: &Contexto, e: &Elemento) -> (EstadoVisual, String) {
+    let pendiente = e
+        .ajustes
+        .iter()
+        .filter_map(|id| ctx.vista(id))
+        .flat_map(|v| v.campos.iter())
+        .any(|c| c.solo_lectura.is_none() && super::pagina::pendiente(c));
+    let (estado, clave) = if pendiente {
+        (EstadoVisual::Atencion, "ajustes-estado-con-recomendacion")
+    } else {
+        (EstadoVisual::Emite, "ajustes-estado-como-se-recomienda")
+    };
+    (estado, clave.to_owned())
+}
+
+/// Un dato de la franja de resumen: su clave, la cifra y la explicación ya
+/// traducidas, y si va en ámbar.
+pub(super) fn dato_resumen(
+    clave: &str,
+    cifra: String,
+    detalle: String,
+    atencion: bool,
+) -> DatoResumen {
+    DatoResumen {
+        clave: clave.to_owned(),
+        cifra,
+        detalle,
+        atencion,
+    }
+}
+
+/// La explicación fija de un dato del resumen (`<clave>-detalle`).
+pub(super) fn detalle_fijo(clave: &str) -> String {
+    crate::ui::i18n::traducir(&format!("{clave}-detalle"), None)
+}
+
+/// Cifra de un dato del resumen que la lectura no dice: «—».
+pub(super) fn sin_dato() -> String {
+    t!("ajustes-resumen-sin-dato")
+}
+
+/// «Sí» o «No» (o «—» si no se sabe), como cifra del resumen.
+pub(super) fn cifra_si_no(b: Option<bool>) -> String {
+    match b {
+        Some(true) => t!("comun-si"),
+        Some(false) => t!("comun-no"),
+        None => sin_dato(),
+    }
+}
+
+/// El último dato de la franja de todos los temas: cuántas recomendaciones
+/// hay pendientes (en ámbar si alguna).
+pub(super) fn recomendaciones(elementos: &[(&Elemento, &ElementoVista)]) -> DatoResumen {
+    let pendientes = elementos
+        .iter()
+        .filter(|(_, v)| v.recomendacion.is_some())
+        .count();
+    let clave = "ajustes-resumen-recomendaciones";
+    dato_resumen(
+        clave,
+        pendientes.to_string(),
+        detalle_fijo(clave),
+        pendientes > 0,
+    )
 }
 
 /// Marca en las vistas de los ajustes lo que la interfaz de tarjetas
@@ -99,6 +227,10 @@ pub(super) fn resumen(
 ) -> Vec<DatoResumen> {
     match tema {
         Tema::Wifi => wifi::resumen(ctx, elementos),
+        Tema::Internet => internet::resumen(ctx, elementos),
+        Tema::Seguridad => seguridad::resumen(ctx, elementos),
+        Tema::Telefono => telefono::resumen(ctx, elementos),
+        Tema::Sistema => sistema::resumen(ctx, elementos),
         _ => Vec::new(),
     }
 }
@@ -113,6 +245,8 @@ pub(super) fn dato(
     match nombre {
         "canal_y_ancho" => Ok(wifi::canal_y_ancho(ctx, e)),
         "conectados" => Ok(wifi::conectados(ctx, e).map(|n| ValorLegible::Texto(n.to_string()))),
+        "nombres_ddns" => Ok(internet::nombres_ddns(ctx)),
+        "cuentas" => Ok(seguridad::cuentas(ctx)),
         otro => Err(Desconocido(otro.to_owned())),
     }
 }
@@ -126,6 +260,15 @@ pub(super) fn estado(
 ) -> Result<(EstadoVisual, String), Desconocido> {
     match nombre {
         "estado_red" => Ok(wifi::estado(ctx, e)),
+        "estado_dns" => Ok(internet::estado_dns(ctx)),
+        "estado_ddns" => Ok(internet::estado_ddns(ctx)),
+        "estado_gestion_remota" => Ok(seguridad::estado_gestion_remota(ctx)),
+        "estado_linea" => Ok(telefono::estado_linea(ctx)),
+        "estado_voz" => Ok(telefono::estado_voz(ctx)),
+        "estado_paso_directo" => Ok(telefono::estado_paso_directo(ctx)),
+        "estado_hora" => Ok(sistema::estado_hora(ctx)),
+        "estado_diagnostico" => Ok(sistema::estado_diagnostico(ctx)),
+        "segun_lo_recomendado" => Ok(segun_lo_recomendado(ctx, e)),
         otro => Err(Desconocido(otro.to_owned())),
     }
 }

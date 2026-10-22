@@ -267,13 +267,14 @@ test.describe("cambiar la contraseña del router", () => {
   test("Ajustes → Seguridad enlaza con la tarjeta sin repetir el formulario", async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 900 });
     await entrar(page);
-    await page.goto("/ajustes/seguridad");
+    // En el detalle de la contraseña del router, en la rejilla de Seguridad.
+    await page.goto("/ajustes/seguridad/contrasena-router");
     await asentar(page);
     const enlace = page.getByRole("link", { name: "Cambiar la contraseña del router" });
     await expect(enlace).toBeVisible();
     await expect(page.locator("#router-contrasena-nueva")).toHaveCount(0);
     await sinDesbordamiento(page, "seguridad 360");
-    await enlace.locator("xpath=ancestor::article").screenshot({
+    await enlace.locator("xpath=ancestor::section[contains(@class, 'detalle-columna')]").screenshot({
       path: `${SDD}/contrasena-enlace-seguridad-es-360.png`,
     });
     await enlace.click();

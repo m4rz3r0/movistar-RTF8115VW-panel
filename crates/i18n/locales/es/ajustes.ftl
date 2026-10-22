@@ -199,13 +199,13 @@ ajustes-accion-no-aplica = Esa acción no se puede aplicar a todo lo marcado.
 ajustes-accion-ya-estaba = Todas las marcadas ya estaban así: no hay nada que cambiar.
 ajustes-accion-tapado = Esta acción no vale para «{ $ajuste }»: guardarlo exige escribir una clave que el router no deja leer. Cámbialo desde su detalle.
 ajustes-recomendacion-ahora = Ahora: { $campo }, { $valor }.
-ajustes-problema-wps-true = El WPS está activado: quien llegue al router puede conectarse pulsando su botón, sin la contraseña.
-ajustes-problema-activa-false = La red está apagada: ningún dispositivo puede conectarse a ella.
-ajustes-problema-activa-true = La red está encendida: si ahora no tienes visitas, es una red más que se ve desde fuera.
-ajustes-problema-aislamiento-false = Los dispositivos de esta red pueden verse entre ellos: las visitas verían los tuyos.
-ajustes-problema-aislamiento-true = Los dispositivos de esta red no se ven entre ellos: no podrás, por ejemplo, enviar contenido a la tele.
-ajustes-problema-visible-false = El nombre de la red está oculto: hay que escribirlo a mano para conectarse.
-ajustes-problema-seguridad-abierta = La red está abierta: cualquiera que esté cerca puede conectarse sin contraseña.
+ajustes-problema-wifi-wps-true = El WPS está activado: quien llegue al router puede conectarse pulsando su botón, sin la contraseña.
+ajustes-problema-wifi-activa-false = La red está apagada: ningún dispositivo puede conectarse a ella.
+ajustes-problema-wifi-activa-true = La red está encendida: si ahora no tienes visitas, es una red más que se ve desde fuera.
+ajustes-problema-wifi-aislamiento-false = Los dispositivos de esta red pueden verse entre ellos: las visitas verían los tuyos.
+ajustes-problema-wifi-aislamiento-true = Los dispositivos de esta red no se ven entre ellos: no podrás, por ejemplo, enviar contenido a la tele.
+ajustes-problema-wifi-visible-false = El nombre de la red está oculto: hay que escribirlo a mano para conectarse.
+ajustes-problema-wifi-seguridad-abierta = La red está abierta: cualquiera que esté cerca puede conectarse sin contraseña.
 ajustes-leido-hace = { $s ->
     [0] Leído ahora mismo
     [one] Leído hace 1 s
@@ -264,3 +264,76 @@ ajustes-resumen-wifi-conectados = Dispositivos conectados
 ajustes-resumen-wifi-conectados-detalle = En todas las redes del panel.
 ajustes-resumen-recomendaciones = Recomendaciones pendientes
 ajustes-resumen-recomendaciones-detalle = Cada tarjeta enseña la más importante.
+
+## Internet, Seguridad, Teléfono y Sistema en rejilla: estados de las tarjetas
+ajustes-estado-como-se-recomienda = Como se recomienda
+ajustes-estado-con-recomendacion = Con una recomendación
+ajustes-estado-dns-si = Activado
+ajustes-estado-dns-no = Desactivado
+ajustes-estado-ddns-si = Activo
+ajustes-estado-ddns-no = Desactivado
+ajustes-estado-ddns-sin-usar = Sin usar
+ajustes-estado-gestion-remota-si = Encendida
+ajustes-estado-gestion-remota-no = Apagada
+ajustes-estado-linea-si = Activa
+ajustes-estado-linea-no = Apagada
+ajustes-estado-voz-si = Encendido
+ajustes-estado-voz-no = Apagado
+ajustes-estado-paso-directo-si = Activado
+ajustes-estado-paso-directo-no = Desactivado
+ajustes-estado-hora-si = Automática
+ajustes-estado-hora-no = Sin corregir
+ajustes-estado-diagnostico-si = Copiando el tráfico
+ajustes-estado-diagnostico-no = Apagada
+ajustes-dato-nombres_ddns = Nombres
+ajustes-dato-nombres_ddns-ninguno = Ninguno
+ajustes-dato-cuentas = Cuentas
+
+## Acciones de Seguridad y Sistema
+ajustes-accion-apagar_gestion_remota = Apagar la gestión remota
+ajustes-accion-usar_hora_neutra = Usar un servidor de hora neutro
+ajuste-accion-apagar_gestion_remota-titulo = Gestión remota, apagarla
+ajuste-accion-usar_hora_neutra-titulo = Hora del router, usar un servidor neutro
+
+## Qué pasa ahora (la recomendación de la tarjeta)
+ajustes-problema-seguridad-activa-encendida = La gestión remota está encendida: el operador puede entrar en el router desde internet y cambiar cualquier ajuste sin preguntarte.
+ajustes-problema-sistema-activa-false = El router no se pone en hora por internet: su reloj se va desajustando, y tras un corte de luz puede quedarse con una hora muy distinta.
+ajustes-problema-sistema-servidor_1 = El router se pone en hora con { $valor }: depende de quien gestione ese servidor.
+ajustes-problema-sistema-espejo-true = La copia del tráfico está encendida: quien se enchufe a esa toma puede ver todo lo que hace tu casa en internet.
+ajustes-problema-telefono-tonos-en_la_voz = Las teclas que pulsas en una llamada van mezcladas con la voz: si la llamada se oye mal, un menú por teléfono puede no reconocerlas.
+ajustes-problema-telefono-tonos-mensajes = Las teclas que pulsas en una llamada van como mensajes aparte: si el operador no lo admite, los menús por teléfono no las reciben.
+ajustes-problema-telefono-activo-false = El teléfono por internet está apagado: el teléfono fijo no puede llamar ni recibir llamadas.
+
+## Franja de resumen de Internet, Seguridad, Teléfono y Sistema
+ajustes-resumen-internet-conexion = Conexión a internet
+ajustes-resumen-internet-conectada = Conectada
+ajustes-resumen-internet-sin-conexion = Sin conexión
+ajustes-resumen-internet-conexion-sin-leer = No se ha podido leer la conexión.
+ajustes-resumen-internet-tipo-pppoe = Por PPPoE, con usuario y contraseña del operador.
+ajustes-resumen-internet-tipo-dhcp = Con una dirección que da el operador sola (DHCP).
+ajustes-resumen-internet-tipo-fija = Con una dirección fija.
+ajustes-resumen-internet-tipo-otro = De un tipo que el panel no reconoce.
+ajustes-resumen-internet-rele = Relé DNS
+ajustes-resumen-internet-rele-detalle = Si el router reenvía las consultas de nombres.
+ajustes-resumen-internet-ddns = Nombres fijos
+ajustes-resumen-internet-ddns-detalle = Dados de alta en el DNS dinámico.
+ajustes-resumen-seguridad-remota = Gestión remota
+ajustes-resumen-seguridad-remota-detalle = Si el operador puede cambiar el router a distancia.
+ajustes-resumen-seguridad-aviso = Aviso al operador
+ajustes-resumen-seguridad-aviso-detalle = Cada cuánto le escribe el router por su cuenta.
+ajustes-resumen-seguridad-cuentas = Cuentas del router
+ajustes-resumen-seguridad-cuentas-detalle = Las que pueden entrar en su web, también la del operador.
+ajustes-resumen-telefono-linea = Línea
+ajustes-resumen-telefono-linea-detalle = El teléfono fijo enchufado al router.
+ajustes-resumen-telefono-voz = Teléfono por internet
+ajustes-resumen-telefono-voz-detalle = La conexión del router con el operador para las llamadas.
+ajustes-resumen-telefono-fax = Fax por internet
+ajustes-resumen-telefono-fax-detalle = Los faxes van de una forma pensada para internet.
+ajustes-resumen-sistema-hora = Hora por internet
+ajustes-resumen-sistema-hora-detalle = El router corrige su reloj solo.
+ajustes-resumen-sistema-servidores = Servidores de hora
+ajustes-resumen-sistema-servidores-detalle = Los que consulta el router.
+ajustes-resumen-sistema-servidores-primero = El primero: { $servidor }.
+ajustes-resumen-sistema-servidores-ninguno = No hay ninguno puesto.
+ajustes-resumen-sistema-copia = Copia del tráfico
+ajustes-resumen-sistema-copia-detalle = Para diagnóstico; apagada, nadie la recibe.

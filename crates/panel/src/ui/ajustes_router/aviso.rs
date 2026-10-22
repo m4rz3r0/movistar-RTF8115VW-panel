@@ -8,6 +8,7 @@
 //! con «Deshacer» si se aplicó. Si falla (otro cambio en curso, el router
 //! no lo hizo), la insignia vuelve a su estado y el aviso da el motivo.
 
+use super::detalle::Borradores;
 use crate::ajustes_router::{GrupoVista, confirmar_ajuste, deshacer_ajuste};
 use crate::t;
 use crate::ui::comun::EstadoVisual;
@@ -32,6 +33,8 @@ struct CambioActivo {
     texto: String,
     /// El interruptor pulsado y su valor nuevo, que se ve mientras tanto.
     interruptor: Option<(String, bool)>,
+    /// Claves de los campos que escribe (`ajuste-wifi-red_24-nombre`).
+    campos: Vec<String>,
     estado: Option<CambioVista>,
 }
 
@@ -51,18 +54,21 @@ pub(crate) struct Seguimiento {
     /// cambia y si deshace otro cambio.
     dialogo: RwSignal<Option<(GrupoVista, Vec<String>, bool)>>,
     recargar: Callback<()>,
+    /// Lo editado en cada detalle: el de lo que se aplica se olvida.
+    borradores: Borradores,
 }
 
 impl Seguimiento {
     /// Sigue los cambios de la página; `recargar` vuelve a leer el tema
     /// cuando uno termina. Pregunta por el estado cada [`SONDEO`] mientras
     /// no termine; al desmontarse, deja de preguntar.
-    pub(crate) fn nuevo(recargar: Callback<()>) -> Seguimiento {
+    pub(crate) fn nuevo(recargar: Callback<()>, borradores: Borradores) -> Seguimiento {
         let s = Seguimiento {
             activo: RwSignal::new(None),
             error: RwSignal::new(None),
             dialogo: RwSignal::new(None),
             recargar,
+            borradores,
         };
         let vigilado = Memo::new(move |_| {
             s.activo
@@ -94,17 +100,26 @@ impl Seguimiento {
     }
 
     /// Llega el estado `c` del cambio `id`; si ha terminado, la página lo
-    /// vuelve a leer.
+    /// vuelve a leer. Si se aplicó, lo editado en los campos que escribió ya
+    /// está en el router: se olvida (una clave que el router no deja leer
+    /// seguiría escrita, como un cambio sin guardar). Lo demás editado
+    /// sigue.
     fn al_saber(self, id: i64, c: CambioVista) {
         let terminado = c.estado.final_();
+        let aplicado = c.estado == EstadoDeCambio::Aplicado;
         let mismo = self.activo.try_update(|a| match a {
             Some(a) if a.id == Some(id) => {
                 a.estado = Some(c);
-                true
+                Some(a.campos.clone())
             }
-            _ => false,
+            _ => None,
         });
-        if mismo == Some(true) && terminado {
+        if let Some(Some(campos)) = mismo
+            && terminado
+        {
+            if aplicado {
+                self.borradores.olvidar_campos(&campos);
+            }
             self.recargar.run(());
         }
     }
@@ -118,6 +133,7 @@ impl Seguimiento {
             elementos: vec![elemento.to_owned()],
             texto,
             interruptor: interruptor.map(|v| (elemento.to_owned(), v)),
+            campos: Vec::new(),
             estado: None,
         }));
     }
@@ -154,6 +170,12 @@ impl Seguimiento {
             elementos,
             texto: resumen(g),
             interruptor,
+            campos: g
+                .pasos
+                .iter()
+                .filter(|p| !p.sin_cambios && !desmarcados.contains(&p.indice))
+                .flat_map(|p| p.campos.iter().map(|c| c.campo.clone()))
+                .collect(),
             estado: None,
         }));
         let token = g.token.clone();

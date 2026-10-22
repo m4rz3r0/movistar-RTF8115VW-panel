@@ -1,0 +1,93 @@
+//! Derivados de Teléfono: la línea, el teléfono por internet, el paso directo y la franja de resumen.
+//!
+//! El estado de cada uno es el que tiene puesto (encendido o apagado): el
+//! router da también si la línea está registrada (`clt_status`), pero su
+//! significado no se ha comprobado con el router real y no se usa.
+
+use super::*;
+
+/// `derivado:estado_linea`: la línea, activa o apagada.
+pub(super) fn estado_linea(ctx: &Contexto) -> (EstadoVisual, String) {
+    segun(
+        si_no(ctx, "telefono.linea", "activa"),
+        (EstadoVisual::Emite, "ajustes-estado-linea-si"),
+        (EstadoVisual::Apagada, "ajustes-estado-linea-no"),
+    )
+}
+
+/// `derivado:estado_voz`: el teléfono por internet, encendido o apagado.
+pub(super) fn estado_voz(ctx: &Contexto) -> (EstadoVisual, String) {
+    segun(
+        si_no(ctx, "telefono.sip_oculto", "activo"),
+        (EstadoVisual::Emite, "ajustes-estado-voz-si"),
+        (EstadoVisual::Apagada, "ajustes-estado-voz-no"),
+    )
+}
+
+/// `derivado:estado_paso_directo`: activado si lo está el del fax o el de
+/// los módems.
+pub(super) fn estado_paso_directo(ctx: &Contexto) -> (EstadoVisual, String) {
+    let fax = si_no(ctx, "telefono.fisico", "fax");
+    let modem = si_no(ctx, "telefono.fisico", "modem");
+    let alguno = match (fax, modem) {
+        (Some(true), _) | (_, Some(true)) => Some(true),
+        (Some(false), Some(false)) => Some(false),
+        _ => None,
+    };
+    segun(
+        alguno,
+        (EstadoVisual::Emite, "ajustes-estado-paso-directo-si"),
+        (EstadoVisual::Apagada, "ajustes-estado-paso-directo-no"),
+    )
+}
+
+/// Cifra de algo que se enciende: el texto de su estado o «—».
+fn cifra(encendido: Option<bool>, si: &str, no: &str) -> String {
+    match encendido {
+        Some(true) => crate::ui::i18n::traducir(si, None),
+        Some(false) => crate::ui::i18n::traducir(no, None),
+        None => sin_dato(),
+    }
+}
+
+/// Franja de resumen de Teléfono: la línea, el teléfono por internet, el
+/// fax por internet y las recomendaciones pendientes.
+pub(super) fn resumen(
+    ctx: &Contexto,
+    elementos: &[(&Elemento, &ElementoVista)],
+) -> Vec<DatoResumen> {
+    let [l, v, f] = [
+        "ajustes-resumen-telefono-linea",
+        "ajustes-resumen-telefono-voz",
+        "ajustes-resumen-telefono-fax",
+    ];
+    vec![
+        dato_resumen(
+            l,
+            cifra(
+                si_no(ctx, "telefono.linea", "activa"),
+                "ajustes-estado-linea-si",
+                "ajustes-estado-linea-no",
+            ),
+            detalle_fijo(l),
+            false,
+        ),
+        dato_resumen(
+            v,
+            cifra(
+                si_no(ctx, "telefono.sip_oculto", "activo"),
+                "ajustes-estado-voz-si",
+                "ajustes-estado-voz-no",
+            ),
+            detalle_fijo(v),
+            false,
+        ),
+        dato_resumen(
+            f,
+            cifra_si_no(si_no(ctx, "telefono.sip", "fax")),
+            detalle_fijo(f),
+            false,
+        ),
+        recomendaciones(elementos),
+    ]
+}

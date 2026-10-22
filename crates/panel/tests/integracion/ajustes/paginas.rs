@@ -87,16 +87,28 @@ async fn pagina_tema_sin_nombres_de_api_fuera_de_detalles() {
         .iter()
         .map(|n| regex::Regex::new(&format!(r"(?i)\b{}\b", regex::escape(n))).unwrap())
         .collect();
-    // La WiFi va en rejilla: los detalles técnicos, en el detalle abierto
-    // de un elemento (y, cerrado, ni eso).
-    for tema in ["wifi", "wifi/red-24", "puertos", "seguridad", "red_local"] {
+    // En los temas en rejilla, los detalles técnicos van en el detalle
+    // abierto de un elemento (y, cerrado, ni eso).
+    let en_rejilla = ["wifi", "internet", "seguridad", "telefono", "sistema"];
+    for tema in [
+        "wifi",
+        "wifi/red-24",
+        "puertos",
+        "red_local",
+        "internet",
+        "internet/ddns",
+        "seguridad/gestion-remota",
+        "seguridad/usuarios",
+        "telefono/linea",
+        "sistema/hora",
+    ] {
         let ruta = format!("/ajustes/{tema}");
         let (status, _, html) = pagina(&p, &cookie, &ruta).await;
         assert_eq!(status, 200, "{ruta}: {html}");
         let (sin_detalles, detalles) =
             partir(&html, r#"<details class="detalles-tecnicos""#, "</details>");
         assert!(
-            tema == "wifi" || !detalles.is_empty(),
+            en_rejilla.contains(&tema) || !detalles.is_empty(),
             "{ruta}: sin detalles técnicos"
         );
         // Los datos de la hidratación (`<script>`) no se pintan: llevan los
@@ -192,30 +204,51 @@ async fn espejo_apagado_es_ninguna() {
     assert!(!html.contains("Valor no reconocido (0)"), "{html}");
 }
 
-/// Un tema sin ajustes básicos (Sistema) no esconde todo bajo «Más
-/// opciones»: sus tarjetas se ven directamente.
+/// Los temas en rejilla no esconden nada bajo «Más opciones»: cada
+/// elemento tiene su tarjeta (también Sistema, sin ajustes básicos, y lo
+/// oculto de Teléfono). Puertos, que aún no va en rejilla, sí lo pliega.
 #[tokio::test]
-async fn tema_sin_basicos_sin_plegar() {
+async fn rejilla_sin_mas_opciones() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
-    let (_, _, html) = pagina(&p, &cookie, "/ajustes/sistema").await;
-    assert!(html.contains("Hora del router"), "{html}");
-    assert!(!html.contains(r#"<details class="mas-opciones""#), "{html}");
-    let (_, _, html) = pagina(&p, &cookie, "/ajustes/seguridad").await;
+    for (ruta, tarjeta) in [
+        ("/ajustes/wifi", "Red WiFi 2,4 GHz"),
+        ("/ajustes/internet", "Relé DNS"),
+        ("/ajustes/seguridad", "Gestión remota del operador"),
+        ("/ajustes/telefono", "Servidores de teléfono del operador"),
+        ("/ajustes/sistema", "Hora del router"),
+    ] {
+        let (_, _, html) = pagina(&p, &cookie, ruta).await;
+        assert!(html.contains("rejilla-elementos"), "{ruta}: {html}");
+        assert!(html.contains(tarjeta), "{ruta}: {html}");
+        assert!(
+            !html.contains(r#"<details class="mas-opciones""#),
+            "{ruta}: {html}"
+        );
+    }
+    let (_, _, html) = pagina(&p, &cookie, "/ajustes/puertos").await;
     assert!(html.contains(r#"<details class="mas-opciones""#), "{html}");
-    // La WiFi va en rejilla: sin «Más opciones».
-    let (_, _, html) = pagina(&p, &cookie, "/ajustes/wifi").await;
-    assert!(html.contains("rejilla-elementos"), "{html}");
-    assert!(!html.contains(r#"<details class="mas-opciones""#), "{html}");
 }
 
-/// La nota de «Oculto» va una sola vez por página, aunque haya varias
-/// tarjetas ocultas (Teléfono tiene dos).
+/// La nota de «Oculto» va una sola vez por página en los temas que no van
+/// en rejilla (Puertos); en el detalle de uno en rejilla, bajo el título de
+/// la columna de lo oculto.
 #[tokio::test]
 async fn nota_de_oculto_una_vez() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
-    let (_, _, html) = pagina(&p, &cookie, "/ajustes/telefono").await;
+    let (_, _, html) = pagina(&p, &cookie, "/ajustes/telefono/servidores").await;
     let (visible, _) = partir(&html, "<script", "</script>");
-    assert!(visible.matches("chip-oculto").count() >= 2, "{visible}");
+    assert_eq!(
+        visible.matches("No aparece en la web del operador").count(),
+        1,
+        "{visible}"
+    );
+    assert!(
+        visible.contains(r#"class="detalle-nota-oculto""#),
+        "{visible}"
+    );
+    let (_, _, html) = pagina(&p, &cookie, "/ajustes/puertos").await;
+    let (visible, _) = partir(&html, "<script", "</script>");
+    assert!(visible.matches("chip-oculto").count() >= 1, "{visible}");
     // Cada etiqueta «Oculto» es un enlace a la nota, que la describe (un
     // lector de pantalla no siempre anuncia la descripción de un `<span>`).
     let chip = "<a href=\"#ajustes-nota-oculto\" aria-describedby=\"ajustes-nota-oculto\" \
@@ -384,7 +417,30 @@ async fn elemento_desconocido_en_la_direccion() {
         "{html}"
     );
     assert!(!html.contains(r#"class="detalle""#), "{html}");
-    let (status, _, html) = pagina(&p, &cookie, "/ajustes/internet/x").await;
+    let (status, _, html) = pagina(&p, &cookie, "/ajustes/puertos/x").await;
     assert_eq!(status, 404, "{html}");
     assert!(html.contains("Página no encontrada"), "{html}");
+}
+
+/// En el detalle, lo que solo se consulta: la contraseña del router lleva
+/// el enlace a donde se cambia y las cuentas van en una tabla; ninguno de
+/// los dos tiene «Guardar cambios». Lo que se edita (la hora), sí.
+#[tokio::test]
+async fn detalle_de_lo_que_solo_se_consulta() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    let guardar = "Guardar cambios";
+    let (status, _, html) = pagina(&p, &cookie, "/ajustes/seguridad/contrasena-router").await;
+    assert_eq!(status, 200, "{html}");
+    let (visible, _) = partir(&html, "<script", "</script>");
+    assert!(visible.contains(r#"class="detalle""#), "{visible}");
+    assert!(visible.contains("#router-cambiar-contrasena"), "{visible}");
+    assert!(!visible.contains(guardar), "{visible}");
+    let (_, _, html) = pagina(&p, &cookie, "/ajustes/seguridad/usuarios").await;
+    let (visible, _) = partir(&html, "<script", "</script>");
+    assert!(visible.contains(r#"<table class="tabla">"#), "{visible}");
+    assert!(visible.contains("Administrador"), "{visible}");
+    assert!(!visible.contains(guardar), "{visible}");
+    let (_, _, html) = pagina(&p, &cookie, "/ajustes/sistema/hora").await;
+    let (visible, _) = partir(&html, "<script", "</script>");
+    assert!(visible.contains(guardar), "{visible}");
 }

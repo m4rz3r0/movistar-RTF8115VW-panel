@@ -9,6 +9,9 @@
 }
 
 .resumen-dato {
+  min-width: 0;
+  /* Un nombre largo (un servidor) parte la línea antes que salirse. */
+  overflow-wrap: anywhere;
   padding: 14px var(--esp-4);
   border: 1px solid var(--borde);
   border-radius: 12px;

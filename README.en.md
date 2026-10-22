@@ -200,12 +200,13 @@ npx playwright test capturas-readme   # only if the README screenshots change
 ```
 
 The e2e run spreads the files over `E2E_WORKERS` workers (by default, one per
-3 CPU threads, between 1 and 2; 4 on a dedicated machine; at most 14;
+3 CPU threads, between 1 and 2; 4 on a dedicated machine; at most 11;
 `E2E_WORKERS=1` runs them one after another). It starts one installed panel
-per worker, four freshly installed ones for the setup wizard and two for the
-Settings walkthrough (one per language), each with its own simulator
-(`e2e/instancias.ts`), on consecutive ports from `E2E_PORT` and
-`E2E_SIM_PORT` (3195 and 8195; with 4 workers, 3195–3204 and 8195–8204). Each
+per worker, four freshly installed ones for the setup wizard, two for the
+Settings walkthrough (one per language), two for the WiFi grid and one for
+the other grid tabs, each with its own simulator (`e2e/instancias.ts`), on
+consecutive ports from `E2E_PORT` and `E2E_SIM_PORT` (3195 and 8195; with 4
+workers, 3195–3207 and 8195–8207). Each
 change is watched for 10 s instead of 30 s or 2 min (`RP_E2E_VIGILANCIA_S`,
 honoured only by the debug build). It uses Playwright's Chromium
 (`npx playwright install chromium` if missing; or `E2E_CHROMIUM=<path>`).

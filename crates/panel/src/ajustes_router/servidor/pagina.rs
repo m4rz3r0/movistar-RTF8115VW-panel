@@ -21,7 +21,7 @@ pub(in crate::ajustes_router) async fn leer_tema(
     let todas: Vec<Clave> = claves
         .iter()
         .cloned()
-        .chain(derivados::claves_extra(&del_tema))
+        .chain(derivados::claves_extra(tema, &del_tema))
         .collect();
     if fresca {
         state.lecturas.olvidar(&todas);
@@ -124,7 +124,7 @@ fn legible(v: &ValorLegible) -> Option<String> {
 
 /// El campo tiene recomendación y otro valor que el panel reconoce: uno que
 /// no reconoce no es una recomendación pendiente (no se sabe qué tiene).
-fn pendiente(c: &CampoVista) -> bool {
+pub(super) fn pendiente(c: &CampoVista) -> bool {
     c.tipo != TipoCampo::Secreto
         && match (&c.recomendado, legible(&c.valor)) {
             (Some(r), Some(v)) => v != *r,
@@ -280,24 +280,50 @@ fn texto_actual(c: &CampoVista) -> String {
     }
 }
 
+/// Claves del texto de lo que pasa ahora con el campo `c` del ajuste
+/// `ajuste`, de la más concreta a la menos: la de su valor
+/// (`ajustes-problema-<tema>-<campo>-<valor>`, «El WPS está activado: …») y
+/// la del campo con el valor como argumento
+/// (`ajustes-problema-<tema>-<campo>`, para un texto libre como un servidor).
+fn claves_problema(ajuste: &str, c: &CampoVista) -> Vec<String> {
+    let tema = ajuste.split_once('.').map_or(ajuste, |(t, _)| t);
+    let campo = format!("ajustes-problema-{tema}-{}", c.id);
+    let mut claves: Vec<String> = legible(&c.valor)
+        .map(|v| format!("{campo}-{v}"))
+        .into_iter()
+        .collect();
+    claves.push(campo);
+    claves
+}
+
 /// Qué pasa ahora con un campo que no tiene lo recomendado: su texto propio
-/// (`ajustes-problema-<campo>-<valor>`, «El WPS está activado: …») o, sin
-/// él, el valor que tiene («Ahora: WPS, Sí.»).
-fn problema(c: &CampoVista) -> String {
-    let propio = legible(&c.valor).map(|v| format!("ajustes-problema-{}-{v}", c.id));
-    match propio {
-        Some(k) if i18n::existe(crate::ui::i18n::idioma_actual(), &k) => traducir(&k, None),
-        _ => t!(
+/// ([`claves_problema`]) o, sin él, el valor que tiene («Ahora: WPS, Sí.»).
+fn problema(ajuste: &str, c: &CampoVista) -> String {
+    let idioma = crate::ui::i18n::idioma_actual();
+    let actual = texto_actual(c);
+    match claves_problema(ajuste, c)
+        .into_iter()
+        .find(|k| i18n::existe(idioma, k))
+    {
+        Some(k) => {
+            let mut args = ::i18n::FluentArgs::new();
+            args.set("valor", actual);
+            traducir(&k, Some(&args))
+        }
+        None => t!(
             "ajustes-recomendacion-ahora",
             campo = traducir(&c.clave, None),
-            valor = texto_actual(c)
+            valor = actual
         ),
     }
 }
 
 /// La recomendación pendiente más importante de los ajustes de un
 /// elemento: primero las de seguridad o de una escritura de riesgo alto;
-/// después, el resto en el orden del catálogo. Solo de campos editables.
+/// después, el resto en el orden del catálogo. Solo de campos editables y
+/// que el botón puede cambiar solos: ni los de una lista (sus campos son la
+/// plantilla de una instancia nueva) ni los de un ajuste con una clave que
+/// el router no deja leer (guardarlo la exige; se cambia desde el detalle).
 fn recomendacion(
     f: &Catalogo,
     cat: &CatalogoAjustes,
@@ -306,6 +332,7 @@ fn recomendacion(
 ) -> Option<RecomendacionVista> {
     let candidatas: Vec<(&AjusteVista, &CampoVista, bool)> = ajustes
         .iter()
+        .filter(|v| !v.lista && !v.campos.iter().any(|c| c.tapado))
         .flat_map(|v| v.campos.iter().map(move |c| (v, c)))
         .filter(|(_, c)| c.solo_lectura.is_none() && pendiente(c))
         .map(|(v, c)| {
@@ -330,7 +357,7 @@ fn recomendacion(
             |a| traducir(&clave_accion(&a.id), None),
         );
     Some(RecomendacionVista {
-        problema: problema(c),
+        problema: problema(&v.id, c),
         texto: c
             .motivo_recomendado
             .as_deref()
@@ -367,6 +394,68 @@ mod tests {
             requiere: None,
             sin_eleccion: false,
         }
+    }
+
+    /// Cada recomendación de Internet, Seguridad, Teléfono y Sistema que
+    /// puede salir en una tarjeta dice qué pasa ahora con su propio texto
+    /// (no «Ahora: …»), en los dos idiomas. No salen las de una lista ni
+    /// las de un ajuste que exige una clave que el router no deja leer.
+    #[test]
+    fn cada_recomendacion_dice_que_pasa() {
+        let cat = CatalogoAjustes::load().unwrap();
+        let f = Catalogo::load().unwrap();
+        let temas = [
+            Tema::Internet,
+            Tema::Seguridad,
+            Tema::Telefono,
+            Tema::Sistema,
+        ];
+        let mut vistas = 0;
+        for a in cat
+            .todos()
+            .iter()
+            .filter(|a| temas.contains(&a.tema) && !a.lista)
+        {
+            if a.campos
+                .iter()
+                .any(|c| super::super::lectura::tapado(&f, c))
+            {
+                continue;
+            }
+            for c in a.campos.iter().filter(|c| c.escribible().is_some()) {
+                // Los valores que no son lo recomendado.
+                let otros: Vec<ValorLegible> = match (&c.tipo, &c.recomendado) {
+                    (TipoCampo::Booleano, Some(r)) => {
+                        vec![ValorLegible::Booleano(r != "true")]
+                    }
+                    (TipoCampo::Opcion, _) if c.opciones.iter().any(|o| o.recomendada) => c
+                        .opciones
+                        .iter()
+                        .filter(|o| !o.recomendada)
+                        .map(|o| ValorLegible::Opcion(o.clave.clone()))
+                        .collect(),
+                    (_, Some(_)) => vec![ValorLegible::Texto("hora.example".into())],
+                    _ => Vec::new(),
+                };
+                for valor in otros {
+                    vistas += 1;
+                    let mut v = campo(c.tipo, valor, None);
+                    v.id = c.id.clone();
+                    for idioma in i18n::Idioma::TODOS {
+                        assert!(
+                            claves_problema(&a.id, &v)
+                                .iter()
+                                .any(|k| i18n::existe(idioma, k)),
+                            "{}.{} = {:?} en {idioma:?}",
+                            a.id,
+                            c.id,
+                            v.valor
+                        );
+                    }
+                }
+            }
+        }
+        assert!(vistas >= 5, "{vistas}");
     }
 
     /// Solo cuenta como pendiente un valor reconocido distinto del

@@ -199,13 +199,13 @@ ajustes-accion-no-aplica = That action can't be applied to everything marked.
 ajustes-accion-ya-estaba = All the marked ones were already like that: there is nothing to change.
 ajustes-accion-tapado = This action does not work for “{ $ajuste }”: saving it means typing a password the router won't let be read. Change it from its details.
 ajustes-recomendacion-ahora = Now: { $campo }, { $valor }.
-ajustes-problema-wps-true = WPS is on: anyone who gets to the router can connect by pressing its button, without the password.
-ajustes-problema-activa-false = The network is off: no device can connect to it.
-ajustes-problema-activa-true = The network is on: if you have no visitors right now, it is one more network visible from outside.
-ajustes-problema-aislamiento-false = Devices on this network can see each other: visitors would see yours.
-ajustes-problema-aislamiento-true = Devices on this network can't see each other: you won't be able to, for example, cast to the TV.
-ajustes-problema-visible-false = The network name is hidden: it has to be typed by hand to connect.
-ajustes-problema-seguridad-abierta = The network is open: anyone nearby can connect without a password.
+ajustes-problema-wifi-wps-true = WPS is on: anyone who gets to the router can connect by pressing its button, without the password.
+ajustes-problema-wifi-activa-false = The network is off: no device can connect to it.
+ajustes-problema-wifi-activa-true = The network is on: if you have no visitors right now, it is one more network visible from outside.
+ajustes-problema-wifi-aislamiento-false = Devices on this network can see each other: visitors would see yours.
+ajustes-problema-wifi-aislamiento-true = Devices on this network can't see each other: you won't be able to, for example, cast to the TV.
+ajustes-problema-wifi-visible-false = The network name is hidden: it has to be typed by hand to connect.
+ajustes-problema-wifi-seguridad-abierta = The network is open: anyone nearby can connect without a password.
 ajustes-leido-hace = { $s ->
     [0] Read just now
     [one] Read 1 s ago
@@ -264,3 +264,76 @@ ajustes-resumen-wifi-conectados = Connected devices
 ajustes-resumen-wifi-conectados-detalle = Across all the networks in the panel.
 ajustes-resumen-recomendaciones = Pending recommendations
 ajustes-resumen-recomendaciones-detalle = Each card shows the most important one.
+
+## Internet, Security, Phone and System in a grid: card states
+ajustes-estado-como-se-recomienda = As recommended
+ajustes-estado-con-recomendacion = Has a recommendation
+ajustes-estado-dns-si = On
+ajustes-estado-dns-no = Off
+ajustes-estado-ddns-si = Active
+ajustes-estado-ddns-no = Off
+ajustes-estado-ddns-sin-usar = Not in use
+ajustes-estado-gestion-remota-si = On
+ajustes-estado-gestion-remota-no = Off
+ajustes-estado-linea-si = Active
+ajustes-estado-linea-no = Off
+ajustes-estado-voz-si = On
+ajustes-estado-voz-no = Off
+ajustes-estado-paso-directo-si = On
+ajustes-estado-paso-directo-no = Off
+ajustes-estado-hora-si = Automatic
+ajustes-estado-hora-no = Not corrected
+ajustes-estado-diagnostico-si = Copying traffic
+ajustes-estado-diagnostico-no = Off
+ajustes-dato-nombres_ddns = Names
+ajustes-dato-nombres_ddns-ninguno = None
+ajustes-dato-cuentas = Accounts
+
+## Security and System actions
+ajustes-accion-apagar_gestion_remota = Turn off remote management
+ajustes-accion-usar_hora_neutra = Use a neutral time server
+ajuste-accion-apagar_gestion_remota-titulo = Remote management, turn it off
+ajuste-accion-usar_hora_neutra-titulo = Router time, use a neutral server
+
+## What is happening now (the card's recommendation)
+ajustes-problema-seguridad-activa-encendida = Remote management is on: the operator can get into the router from the internet and change any setting without asking you.
+ajustes-problema-sistema-activa-false = The router does not set its clock over the internet: it drifts, and after a power cut it can end up with a very different time.
+ajustes-problema-sistema-servidor_1 = The router sets its clock from { $valor }: it depends on whoever runs that server.
+ajustes-problema-sistema-espejo-true = The traffic copy is on: anyone who plugs into that socket can see everything your home does on the internet.
+ajustes-problema-telefono-tonos-en_la_voz = The keys you press during a call are mixed into the voice: if the call sounds bad, a phone menu may not recognise them.
+ajustes-problema-telefono-tonos-mensajes = The keys you press during a call go as separate messages: if the operator does not support it, phone menus do not get them.
+ajustes-problema-telefono-activo-false = Internet phone is off: the landline cannot make or receive calls.
+
+## Summary strip of Internet, Security, Phone and System
+ajustes-resumen-internet-conexion = Internet connection
+ajustes-resumen-internet-conectada = Connected
+ajustes-resumen-internet-sin-conexion = Not connected
+ajustes-resumen-internet-conexion-sin-leer = The connection could not be read.
+ajustes-resumen-internet-tipo-pppoe = Over PPPoE, with the operator's user name and password.
+ajustes-resumen-internet-tipo-dhcp = With an address the operator gives on its own (DHCP).
+ajustes-resumen-internet-tipo-fija = With a fixed address.
+ajustes-resumen-internet-tipo-otro = Of a type the panel does not recognise.
+ajustes-resumen-internet-rele = DNS relay
+ajustes-resumen-internet-rele-detalle = Whether the router forwards name lookups.
+ajustes-resumen-internet-ddns = Fixed names
+ajustes-resumen-internet-ddns-detalle = Registered with dynamic DNS.
+ajustes-resumen-seguridad-remota = Remote management
+ajustes-resumen-seguridad-remota-detalle = Whether the operator can change the router remotely.
+ajustes-resumen-seguridad-aviso = Check-in with the operator
+ajustes-resumen-seguridad-aviso-detalle = How often the router contacts it on its own.
+ajustes-resumen-seguridad-cuentas = Router accounts
+ajustes-resumen-seguridad-cuentas-detalle = The ones that can log in to its web, the operator's too.
+ajustes-resumen-telefono-linea = Line
+ajustes-resumen-telefono-linea-detalle = The landline plugged into the router.
+ajustes-resumen-telefono-voz = Internet phone
+ajustes-resumen-telefono-voz-detalle = The router's connection to the operator for calls.
+ajustes-resumen-telefono-fax = Fax over the internet
+ajustes-resumen-telefono-fax-detalle = Faxes are sent in a way designed for the internet.
+ajustes-resumen-sistema-hora = Time over the internet
+ajustes-resumen-sistema-hora-detalle = The router corrects its clock on its own.
+ajustes-resumen-sistema-servidores = Time servers
+ajustes-resumen-sistema-servidores-detalle = The ones the router asks.
+ajustes-resumen-sistema-servidores-primero = The first one: { $servidor }.
+ajustes-resumen-sistema-servidores-ninguno = None is set.
+ajustes-resumen-sistema-copia = Traffic copy
+ajustes-resumen-sistema-copia-detalle = For diagnosis; when off, nobody gets it.

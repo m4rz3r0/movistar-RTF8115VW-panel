@@ -1,14 +1,17 @@
 //! Detalle de un elemento: sus campos por columnas, «Descartar» y «Guardar cambios».
 //!
 //! Se pinta con lo que ya trajo la página (sin otra petición): una columna
-//! por ajuste del elemento (lo esencial y lo avanzado), cada una con su
-//! ayuda, sus campos, su efecto y sus detalles técnicos plegados.
+//! por ajuste del elemento (lo esencial, lo avanzado y lo oculto), cada una
+//! con su ayuda, sus campos, su efecto y sus detalles técnicos plegados. Una
+//! lista sin componente propio se ve como tabla, y la contraseña del router
+//! con el enlace a donde se cambia: se consultan, no se editan aquí.
 //! «Guardar cambios» prepara un solo cambio con lo de todas las columnas y
 //! lo abre en el diálogo de revisión. Se cierra con ✕ o con Esc; en el
 //! móvil ocupa la pantalla y vuelve con «‹ WiFi».
 
 use super::aviso::Seguimiento;
 use super::campo::Campo;
+use super::consulta;
 use super::edicion::Edicion;
 use super::piezas::{ayuda, detalles_tecnicos, dom, enfocar, fila, motivos};
 use super::rejilla::Pagina;
@@ -34,6 +37,46 @@ fn titulo_columna(n: Nivel) -> String {
         Nivel::Basico => t!("ajustes-detalle-basico"),
         Nivel::Avanzado => t!("ajustes-nivel-avanzado"),
         Nivel::Oculto => t!("ajustes-nivel-oculto"),
+    }
+}
+
+/// Título, descripción y ayuda de la columna del ajuste `a` (`id`, el id
+/// de su título). Lo oculto dice qué significa.
+fn cabeza_columna(a: &AjusteVista, id: String) -> impl IntoView + use<> {
+    let oculto = (a.nivel == Nivel::Oculto)
+        .then(|| view! { <p class="detalle-nota-oculto">{t!("ajustes-nivel-oculto-desc")}</p> });
+    view! {
+        <h3 id=id>{titulo_columna(a.nivel)}</h3>
+        {oculto}
+        <p class="ajuste-desc">{traducir(&format!("{}-desc", a.clave), None)}</p>
+        {ayuda(a)}
+    }
+}
+
+/// ¿Se editan en el detalle los campos de `a`? Ni una lista (sus campos son
+/// la plantilla de una instancia nueva) ni un ajuste con componente propio.
+fn se_edita(a: &AjusteVista) -> bool {
+    !a.lista && a.componente.is_none()
+}
+
+/// La columna de un ajuste que solo se consulta: una lista en una tabla o
+/// el enlace a donde se cambia la contraseña del router.
+fn columna_de_consulta(a: &AjusteVista) -> impl IntoView + use<> {
+    let col = format!("{}-columna", dom(a));
+    let titulo = col.clone();
+    let cuerpo = if a.componente.as_deref() == Some(super::CONTRASENA_ROUTER) {
+        consulta::enlace_contrasena_router().into_any()
+    } else if a.lista {
+        consulta::lista(a).into_any()
+    } else {
+        view! { <p class="nota-hueco">{t!("ajustes-hueco")}</p> }.into_any()
+    };
+    view! {
+        <section class="detalle-columna" aria-labelledby=col>
+            {cabeza_columna(a, titulo)}
+            {cuerpo}
+            {detalles_tecnicos(&a.clave, &a.tecnico)}
+        </section>
     }
 }
 
@@ -80,9 +123,7 @@ fn columna(
     });
     view! {
         <section class="detalle-columna" aria-labelledby=col>
-            <h3 id=col_titulo>{titulo_columna(a.nivel)}</h3>
-            <p class="ajuste-desc">{traducir(&format!("{}-desc", a.clave), None)}</p>
-            {ayuda(a)}
+            {cabeza_columna(a, col_titulo)}
             <div class="ajuste-campos">{campos}</div>
             {motivos(&a.campos)}
             {efecto}
@@ -115,6 +156,24 @@ impl Borradores {
     pub(crate) fn olvidar(self, id: &str) {
         self.0.update(|b| {
             b.remove(id);
+        });
+    }
+
+    /// Olvida lo editado en los campos de `claves` (las de traducción,
+    /// `ajuste-wifi-red_24-nombre`), en todos los elementos: ya están en el
+    /// router.
+    pub(crate) fn olvidar_campos(self, claves: &[String]) {
+        if claves.is_empty() {
+            return;
+        }
+        self.0.update(|b| {
+            for cambios in b.values_mut() {
+                cambios.retain(|(ajuste, campo), _| {
+                    let clave = format!("ajuste-{}-{campo}", ajuste.replace('.', "-"));
+                    !claves.contains(&clave)
+                });
+            }
+            b.retain(|_, cambios| !cambios.is_empty());
         });
     }
 
@@ -156,7 +215,6 @@ pub(crate) fn Detalle(e: ElementoVista, registro: Registro) -> impl IntoView {
     let pagina = expect_context::<Pagina>();
     let s = expect_context::<Seguimiento>();
     let leido = e.lectura == EstadoLectura::Leido;
-    let editable = leido && !pagina.solo_lectura;
     let preparando = RwSignal::new(false);
     let error = RwSignal::new(None::<String>);
     let leidos: Vec<&AjusteVista> = e
@@ -164,14 +222,24 @@ pub(crate) fn Detalle(e: ElementoVista, registro: Registro) -> impl IntoView {
         .iter()
         .filter(|a| a.estado == EstadoLectura::Leido)
         .collect();
+    // Sin nada que se pueda cambiar (la contraseña del router, una lista de
+    // consulta), sin «Guardar cambios».
+    let editable = leido
+        && !pagina.solo_lectura
+        && leidos
+            .iter()
+            .any(|a| se_edita(a) && a.campos.iter().any(|c| c.solo_lectura.is_none()));
     let ediciones: Vec<(String, String, Edicion)> = leidos
         .iter()
+        .filter(|a| se_edita(a))
         .map(|a| (a.id.clone(), dom(a), Edicion::nueva(&a.campos)))
         .collect();
     let columnas = leidos
         .iter()
-        .zip(&ediciones)
-        .map(|(a, (_, _, ed))| columna(a, *ed, editable, preparando.into()))
+        .map(|a| match ediciones.iter().find(|(id, _, _)| *id == a.id) {
+            Some((_, _, ed)) => columna(a, *ed, editable, preparando.into()).into_any(),
+            None => columna_de_consulta(a).into_any(),
+        })
         .collect_view();
     registro.set(Some((
         e.id.clone(),

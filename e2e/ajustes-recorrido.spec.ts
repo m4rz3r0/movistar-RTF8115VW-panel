@@ -46,6 +46,7 @@ const textos = {
     dispositivo: "Dispositivo",
     nombreRegla: "Servidor web",
     gestion: "Gestión remota del operador",
+    abrirGestion: "Abrir Gestión remota del operador",
     gestionCampo: "Gestión remota",
     apagada: "Apagada",
     recomendada: /^Recomendado: Apagada Recomendado si [^.]+\.$/,
@@ -82,6 +83,7 @@ const textos = {
     dispositivo: "Device",
     nombreRegla: "Web server",
     gestion: "Operator's remote management",
+    abrirGestion: "Open Operator's remote management",
     gestionCampo: "Remote management",
     apagada: "Off",
     recomendada: /^Recommended: Off Recommended if [^.]+\.$/,
@@ -249,23 +251,24 @@ for (const { idioma, locale, ancho } of pasadas) {
       await expect(regla).toContainText("8443");
       await expect(regla).toContainText("host-2");
 
-      // 5. La gestión remota del operador (TR-069), apagada.
+      // 5. La gestión remota del operador (TR-069), apagada, en su detalle
+      // (Seguridad va en rejilla).
       await irA(page, ancho, "seguridad", t.seguridad);
-      const gestion = tarjeta(page, t.gestion);
-      await gestion.getByRole("button", { name: t.editar }).click();
-      await gestion.getByLabel(t.gestionCampo, { exact: true }).selectOption("apagada");
+      const gestion = page.locator("article.tarjeta-el").filter({
+        has: page.getByRole("heading", { level: 2, name: t.gestion, exact: true }),
+      });
+      await gestion.getByRole("button", { name: t.abrirGestion, exact: true }).click();
+      await detalle.getByLabel(t.gestionCampo, { exact: true }).selectOption("apagada");
       // La recomendación: para quién es y, plegado, a favor y en contra.
-      const reco = gestion.locator(".recomendacion");
+      const reco = detalle.locator(".recomendacion").first();
       await expect(reco.locator(":scope > p")).toHaveText(t.recomendada);
       await reco.locator("details.recomendacion-pros > summary").click();
       await expect(reco.locator("details.recomendacion-pros > p")).toHaveText(t.pros);
       await sinDesbordamiento(page, "gestión remota");
-      await gestion.getByRole("button", { name: t.guardar }).click();
+      await detalle.getByRole("button", { name: t.guardarCambios }).click();
       await expect(dialogo.locator("tbody td").nth(1)).toHaveText(t.apagada);
-      await aplicar(page, t, "gestión remota", gestion);
-      await expect(gestion.locator(".ajuste-resumen .ajuste-fila dd").first()).toContainText(
-        t.apagada,
-      );
+      await aplicarEnRejilla(page, t, "gestión remota");
+      await expect(gestion.locator(".tarjeta-datos dd").first()).toContainText(t.apagada);
       await page.screenshot({ path: `capturas/recorrido-${idioma}-${ancho}.png`, fullPage: true });
 
       // El Historial: los cinco cambios, sin la API a la vista.

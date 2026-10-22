@@ -9,6 +9,7 @@ ajuste-sistema-hora-activa-desc = Si lo apagas, el router no corrige su reloj y 
 ajuste-sistema-hora-activa-recomendado = Recomendado si quieres que el router tenga siempre la hora bien, lo normal. A favor: el reloj se corrige solo, también tras un corte de luz, porque los routers de casa no suelen tener pila para el reloj. En contra: el router consulta de vez en cuando un servidor de hora de internet.
 ajuste-sistema-hora-servidor_1 = Servidor de hora
 ajuste-sistema-hora-servidor_1-desc = El nombre del servidor al que se pregunta la hora, por ejemplo hora.example. Sin espacios, tildes ni ñ.
+ajuste-sistema-hora-servidor_1-recomendado = Recomendado si prefieres que la hora del router no dependa del operador. A favor: hora.roa.es es el servidor del Real Instituto y Observatorio de la Armada, que da la hora oficial de España, y no lo gestiona ninguna empresa. En contra: si un día no contesta, el router tarda más en ponerse en hora; pon otro de reserva.
 ajuste-sistema-hora-servidor_2 = Servidor de hora de reserva
 ajuste-sistema-hora-servidor_2-desc = Se usa si el primero no contesta. Puedes dejarlo vacío.
 

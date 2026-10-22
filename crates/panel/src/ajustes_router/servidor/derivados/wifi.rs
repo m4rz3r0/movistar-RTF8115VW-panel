@@ -438,15 +438,8 @@ pub(super) fn resumen(
         .filter(|(e, _)| es_red(e))
         .map(|(e, _)| conectados(ctx, e))
         .sum();
-    let pendientes = elementos
-        .iter()
-        .filter(|(_, v)| v.recomendacion.is_some())
-        .count();
-    let dato = |clave: &str, cifra: String, atencion: bool| DatoResumen {
-        clave: clave.to_owned(),
-        cifra,
-        detalle: crate::ui::i18n::traducir(&format!("{clave}-detalle"), None),
-        atencion,
+    let dato = |clave: &str, cifra: String, atencion: bool| {
+        dato_resumen(clave, cifra, detalle_fijo(clave), atencion)
     };
     vec![
         dato("ajustes-resumen-wifi-redes", cuenta(es_red, emite), false),
@@ -457,14 +450,10 @@ pub(super) fn resumen(
         ),
         dato(
             "ajustes-resumen-wifi-conectados",
-            conectados.map_or_else(|| t!("ajustes-resumen-sin-dato"), |n| n.to_string()),
+            conectados.map_or_else(sin_dato, |n| n.to_string()),
             false,
         ),
-        dato(
-            "ajustes-resumen-recomendaciones",
-            pendientes.to_string(),
-            pendientes > 0,
-        ),
+        recomendaciones(elementos),
     ]
 }
 

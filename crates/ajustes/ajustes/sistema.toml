@@ -20,6 +20,9 @@ escribe = { funcion = "cbSetTimeNtp", parametro = "ntp_svr_1" }
 lee = "ntp_svr_1"
 tipo = "texto"
 validar = { min = 1, max = 253, ascii = true }
+# Un servidor público y neutro (el de la hora oficial de España), en lugar
+# del que deja puesto el operador.
+recomendado = "hora.roa.es"
 
 [[ajuste.campo]]
 id = "servidor_2"
@@ -60,3 +63,26 @@ opciones = [
   { valor = "4", clave = "puerto_3" },
   { valor = "8", clave = "puerto_4" },
 ]
+
+# Elementos de la pestaña (spec §5.1). El registro del sistema no está: el
+# router lo cambia con una acción (`cbSetSyslog`), no con un ajuste.
+[[elemento]]
+id = "hora"
+tema = "sistema"
+ajustes = ["sistema.hora"]
+datos = ["sistema.hora.activa", "sistema.hora.servidor_1", "sistema.hora.servidor_2"]
+estado = "derivado:estado_hora"
+
+[[elemento]]
+id = "diagnostico"
+tema = "sistema"
+ajustes = ["sistema.diagnostico"]
+datos = ["sistema.diagnostico.espejo", "sistema.diagnostico.puerto"]
+estado = "derivado:estado_diagnostico"
+
+# Acciones (spec §5.5).
+[[accion]]
+id = "usar_hora_neutra"
+tema = "sistema"
+campo = "servidor_1"
+valor = "hora.roa.es"

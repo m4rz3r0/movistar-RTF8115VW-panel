@@ -31,6 +31,7 @@ mod instancia;
 mod lecturas;
 mod menu;
 mod pagina_tema;
+mod pagina_temas;
 mod panel_ajustes;
 mod poller;
 mod red;

@@ -11,7 +11,8 @@
 //! descripción; una lista sin componente se ve como tabla.
 
 use super::super::Foco;
-use super::super::campo::{Campo, etiqueta, valor_resumido};
+use super::super::campo::Campo;
+use super::super::consulta;
 use super::super::dispositivos::Dispositivos;
 use super::super::edicion::Edicion;
 use super::super::piezas::{ayuda, cabecera, detalles_tecnicos, dom, enfocar, fila, motivos};
@@ -26,7 +27,6 @@ use crate::ui::grupo::DialogoGrupo;
 use crate::ui::i18n::traducir;
 use crate::ui::{Estado, IconoEstado};
 use leptos::{ev::SubmitEvent, html, prelude::*, task::spawn_local};
-use leptos_router::components::A;
 use std::collections::BTreeMap;
 
 /// Tarjeta de un ajuste del tema. `solo_lectura`: el panel no escribe
@@ -61,23 +61,12 @@ pub(crate) fn Tarjeta(
     }
 }
 
-/// La contraseña del router: se cambia en «Configuración del router»
-/// (junto a la que usa el panel para entrar); aquí, el enlace.
+/// La contraseña del router: el enlace a «Configuración del router».
 fn enlace_contrasena(a: &AjusteVista) -> impl IntoView + use<> {
-    let href = format!(
-        "{}#{}",
-        crate::ui::router::RUTA_CONEXION,
-        crate::ui::router::ID_CAMBIAR_CONTRASENA
-    );
     view! {
         {cabecera(a, false)}
         {ayuda(a)}
-        <p class="ayuda">{t!("contrasena-router-enlace-texto")}</p>
-        <p>
-            <A href=href attr:class="b-sec">
-                {t!("contrasena-router-enlace")}
-            </A>
-        </p>
+        {consulta::enlace_contrasena_router()}
     }
 }
 
@@ -91,53 +80,20 @@ fn hueco(a: &AjusteVista) -> impl IntoView + use<> {
 
 /// Lista sin componente propio: sus instancias en una tabla, sin editar.
 fn lista(a: &AjusteVista) -> impl IntoView + use<> {
-    let sin_leer = match &a.estado {
-        EstadoLectura::SinLeer(m) => Some(m.clone()),
-        EstadoLectura::Leido => None,
-    };
-    let cuerpo = if let Some(m) = sin_leer {
-        view! { <p class="aviso estado-error" role="status"><IconoEstado estado=Estado::Error /><span>{m}</span></p> }
-            .into_any()
-    } else if a.instancias.is_empty() {
-        view! { <p class="ayuda">{t!("ajustes-lista-vacia")}</p> }.into_any()
-    } else {
-        let cabeza = a
-            .campos
-            .iter()
-            .map(|c| view! { <th scope="col">{etiqueta(c)}</th> })
-            .collect_view();
-        let filas = a
-            .instancias
-            .iter()
-            .map(|i| {
-                let celdas = i
-                    .campos
-                    .iter()
-                    .map(|c| view! { <td>{valor_resumido(c)}</td> })
-                    .collect_view();
-                view! { <tr>{celdas}</tr> }
-            })
-            .collect_view();
-        view! {
-            <div class="tabla-scroll">
-                <table class="tabla">
-                    <thead><tr>{cabeza}</tr></thead>
-                    <tbody>{filas}</tbody>
-                </table>
-            </div>
+    let cuerpo = match &a.estado {
+        EstadoLectura::SinLeer(m) => view! {
+            <p class="aviso estado-error" role="status">
+                <IconoEstado estado=Estado::Error />
+                <span>{m.clone()}</span>
+            </p>
         }
-        .into_any()
+        .into_any(),
+        EstadoLectura::Leido => consulta::lista(a).into_any(),
     };
-    let todo_consulta = a.campos.iter().all(|c| c.solo_lectura.is_some());
     view! {
         {cabecera(a, false)}
         {ayuda(a)}
         {cuerpo}
-        {if todo_consulta {
-            motivos(&a.campos).into_any()
-        } else {
-            view! { <p class="nota-solo-lectura">{t!("ajustes-lista-sin-editar")}</p> }.into_any()
-        }}
         {detalles_tecnicos(&a.clave, &a.tecnico)}
     }
 }

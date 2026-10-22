@@ -4,14 +4,7 @@ import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 
 test.describe.configure({ mode: "parallel" });
 
-/** La tarjeta de siempre cuyo título es exactamente `titulo`. */
-function tarjeta(page: Page, titulo: string): Locator {
-  return page.locator("article.ajuste").filter({
-    has: page.getByRole("heading", { level: 2, name: titulo, exact: true }),
-  });
-}
-
-/** La tarjeta de la rejilla (WiFi) cuyo título es exactamente `titulo`. */
+/** La tarjeta de la rejilla cuyo título es exactamente `titulo`. */
 function tarjetaDeRejilla(page: Page, titulo: string): Locator {
   return page.locator("article.tarjeta-el").filter({
     has: page.getByRole("heading", { level: 2, name: titulo, exact: true }),
@@ -46,6 +39,8 @@ const textosSecreto = {
     hecho: "Hecho: el router tiene ya el cambio.",
     cerrar: "Cerrar",
     linea: "Línea de teléfono",
+    abrirLinea: "Abrir Línea de teléfono",
+    guardarCambios: "Guardar cambios",
     lineaActiva: "Línea encendida",
     lineaClave: "Contraseña de la línea",
     sinLeer: "El router no deja leerla",
@@ -71,6 +66,8 @@ const textosSecreto = {
     hecho: "Done: the router now has the change.",
     cerrar: "Close",
     linea: "Phone line",
+    abrirLinea: "Open Phone line",
+    guardarCambios: "Save changes",
     lineaActiva: "Line on",
     lineaClave: "Line password",
     sinLeer: "The router won't let it be read",
@@ -170,23 +167,23 @@ for (const idioma of ["es", "en"] as const) {
         expect(await page.content()).not.toContain(CLAVE_5);
 
         // Teléfono: la clave que el router no deja leer sale vacía, con su
-        // motivo, y se pide al guardar.
+        // motivo, y se pide al guardar el detalle de la línea.
         await page.goto("/ajustes/telefono");
         await asentar(page);
-        const linea = tarjeta(page, t.linea);
-        const resumen = linea.locator(".ajuste-resumen .ajuste-fila").filter({ hasText: t.lineaClave });
-        await expect(resumen.locator("input.secreto-valor")).toHaveValue("");
-        await expect(resumen.locator("input.secreto-valor")).toHaveAttribute("placeholder", t.sinLeer);
-        await linea.getByRole("button", { name: t.editar }).click();
-        const lineaEdicion = linea.locator(".ajuste-edicion");
+        const linea = tarjetaDeRejilla(page, t.linea);
+        await linea.getByRole("button", { name: t.abrirLinea, exact: true }).click();
+        // Su primera columna: lo esencial de la línea, con su clave.
+        const lineaEdicion = page.locator(".detalle .detalle-columna").first();
         const lineaClave = lineaEdicion.getByLabel(t.lineaClave, { exact: true });
         await expect(lineaClave).toHaveValue("");
+        await expect(lineaClave).toHaveAttribute("placeholder", t.sinLeer);
         await lineaEdicion.getByRole("switch", { name: t.lineaActiva }).click();
         let preparados = 0;
         page.on("request", (r) => {
-          if (r.url().endsWith("/api/preparar_ajuste")) preparados += 1;
+          if (/\/api\/preparar_(ajuste|elemento)$/.test(r.url())) preparados += 1;
         });
-        await lineaEdicion.getByRole("button", { name: t.guardar }).click();
+        const guardarLinea = page.locator(".detalle").getByRole("button", { name: t.guardarCambios });
+        await guardarLinea.click();
         await expect(lineaClave).toBeFocused();
         await expect(lineaEdicion.locator(".campo-error").filter({ hasText: t.pideLaClave })).toBeVisible();
         expect(preparados, "sin la clave no se pide nada al servidor").toBe(0);
@@ -196,15 +193,15 @@ for (const idioma of ["es", "en"] as const) {
           // Con la clave escrita (y la línea como estaba), se guarda.
           await lineaEdicion.getByRole("switch", { name: t.lineaActiva }).click();
           await lineaClave.fill("clave-de-prueba-voz");
-          await lineaEdicion.getByRole("button", { name: t.guardar }).click();
+          await guardarLinea.click();
           const dialogo = page.locator("dialog[open]");
           await dialogo.getByRole("button", { name: t.aplicar }).click();
-          await expect(dialogo.getByText(t.hecho)).toBeVisible({ timeout: PLAZO_CAMBIO });
-          await dialogo.getByRole("button", { name: t.cerrar }).click();
-          // Sigue sin poder leerse: vacía otra vez.
-          await expect(
-            linea.locator(".ajuste-resumen .ajuste-fila").filter({ hasText: t.lineaClave }).locator("input"),
-          ).toHaveValue("");
+          await expect(page.locator("dialog[open]")).toHaveCount(0);
+          const aviso = page.locator(".avisos-cambio [role=status] .aviso-cambio");
+          await expect(aviso).toContainText(t.hecho, { timeout: PLAZO_CAMBIO });
+          // Sigue sin poder leerse: vacía otra vez (lo escrito se olvida al
+          // aplicarse, sin quedarse como un cambio sin guardar).
+          await expect(lineaClave).toHaveValue("");
           // En el Historial no se ofrece deshacerlo, y se dice por qué; lo
           // de antes de la clave no se sabe.
           await page.goto("/historial");
@@ -216,10 +213,9 @@ for (const idioma of ["es", "en"] as const) {
           await expect(voz.locator(".hist-detalle .tabla-scroll")).toContainText(t.claveSinLeer);
           await sinDesbordamiento(page, `historial sin deshacer ${idioma} ${ancho}`);
           await page.screenshot({ path: `capturas/secreto-sin-deshacer-${idioma}-${ancho}.png`, fullPage: true });
-          await page.goto("/ajustes/telefono");
-          await asentar(page);
         } else {
-          await linea.getByRole("button", { name: t.cancelar }).click();
+          await page.locator(".detalle").getByRole("button", { name: t.descartar, exact: true }).click();
+          await expect(lineaClave).toHaveValue("");
         }
 
         // Biblioteca: la celda secreta de una lectura, con el mismo ojo.

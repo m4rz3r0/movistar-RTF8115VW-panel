@@ -37,9 +37,21 @@ fn valor(e: &ElementoVista, d: &DatoVista) -> AnyView {
 }
 
 /// Los datos de la tarjeta de `e`; el que no tiene el valor recomendado, en
-/// ámbar.
-pub(super) fn datos(e: &ElementoVista) -> Option<impl IntoView + use<>> {
-    (!e.datos.is_empty()).then(|| {
+/// ámbar. Sin datos (la contraseña del router), lo que es: la descripción
+/// de su ajuste, para que la tarjeta no quede vacía.
+pub(super) fn datos(e: &ElementoVista) -> AnyView {
+    if e.datos.is_empty() {
+        return e
+            .ajustes
+            .first()
+            .map(|a| {
+                view! {
+                    <p class="tarjeta-desc">{traducir(&format!("{}-desc", a.clave), None)}</p>
+                }
+            })
+            .into_any();
+    }
+    {
         let filas = e
             .datos
             .iter()
@@ -52,6 +64,6 @@ pub(super) fn datos(e: &ElementoVista) -> Option<impl IntoView + use<>> {
                 }
             })
             .collect_view();
-        view! { <dl class="tarjeta-datos">{filas}</dl> }
-    })
+        view! { <dl class="tarjeta-datos">{filas}</dl> }.into_any()
+    }
 }

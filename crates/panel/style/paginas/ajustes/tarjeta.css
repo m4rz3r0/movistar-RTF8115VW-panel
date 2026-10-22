@@ -88,6 +88,13 @@
 }
 
 /* Datos: hasta seis, en tres columnas (dos en el móvil). */
+/* Una tarjeta sin datos (la contraseña del router) dice qué es. */
+.tarjeta-desc {
+  margin: 0;
+  color: var(--suave);
+  font-size: 14px;
+}
+
 .tarjeta-datos {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
