@@ -14,15 +14,22 @@ pub(crate) fn DialogoDeLaPagina() -> impl IntoView {
                 elementos,
                 deshacer,
                 cerrar,
+                extra,
             } = r;
             let g = grupo.clone();
+            let nuevo_grupo = extra.as_ref().map(|e| e.nuevo_grupo);
             view! {
                 <DialogoGrupo
                     grupo=g
                     deshacer
+                    antes_de_pasos=extra.as_ref().map(|e| e.antes_de_pasos.clone())
+                    nuevo_grupo
+                    ocupado=extra.as_ref().map(|e| e.ocupado)
                     on_cerrar=move |_| s.dialogo.set(None)
                     al_aplicar=move |(_, desmarcados): (String, Vec<usize>)| {
-                        s.aplicar(&grupo, desmarcados, elementos.clone(), cerrar)
+                        // Se aplica el último preparado (otra opción elegida).
+                        let ultimo = nuevo_grupo.and_then(|n| n.get_untracked());
+                        s.aplicar(ultimo.as_ref().unwrap_or(&grupo), desmarcados, elementos.clone(), cerrar)
                     }
                 />
             }
@@ -70,6 +77,7 @@ pub(crate) fn AvisoCambio() -> impl IntoView {
                         elementos,
                         deshacer: true,
                         cerrar: false,
+                        extra: None,
                     }));
                 }
                 Err(e) => s.error.set(Some(texto_error(&e))),

@@ -1,26 +1,28 @@
-//! Diálogo para guardar un grupo de cambios de Ajustes ([`DialogoGrupo`]):
-//! resumen legible «antes → después» por pasos, casillas para no aplicar un
-//! paso, riesgo, efecto y plazo de vigilancia, «Aplicar», seguimiento del
-//! cambio y «Deshacer». Lo usan las páginas de Ajustes y lo usarán los
-//! prestablecidos.
+//! Diálogo para guardar un grupo de cambios de Ajustes ([`DialogoGrupo`]): pasos «antes → después», «Aplicar» y «Deshacer».
+//!
+//! Resumen legible «antes → después» por pasos (agrupados por pestaña en un
+//! lote de Mejoras), casillas para no aplicar un paso, riesgo, efecto y
+//! plazo de vigilancia, «Aplicar», seguimiento del cambio y «Deshacer». Lo
+//! usan las páginas de Ajustes y la de Mejoras.
 //!
 //! Es un `<dialog>` nativo abierto con `showModal()`: el resto de la página
 //! queda inerte. Al abrirse, el foco va al título; al cerrarse, vuelve al
 //! botón que lo abrió. Sin nombres de la API: solo etiquetas de los ajustes.
 
-use crate::ajustes_router::{
-    CambioLegible, GrupoVista, PasoVista, confirmar_ajuste, deshacer_ajuste,
-};
+use crate::ajustes_router::{CambioLegible, GrupoVista, confirmar_ajuste, deshacer_ajuste};
 use crate::t;
 use crate::ui::comun::{EstadoVisual, Insignia};
 use crate::ui::explorador::{
-    CambioVista, EstadoDeCambio, MASCARA, RiesgoCambio, duracion, estado_cambio, texto_error,
+    CambioVista, EstadoDeCambio, RiesgoCambio, duracion, estado_cambio, texto_error,
 };
 use crate::ui::i18n::{idioma_actual, traducir};
 use crate::ui::{Estado, IconoEstado};
 use ajustes::TipoCampo;
 use leptos::{ev::SubmitEvent, html, prelude::*, task::spawn_local};
+use pasos::{desmarcados, marcados_de, marcas_conservadas};
 use std::time::Duration;
+
+mod pasos;
 
 /// Cada cuánto se pregunta por el estado del cambio.
 const SONDEO: Duration = Duration::from_secs(2);
@@ -78,72 +80,12 @@ pub(crate) fn texto_booleano(clave: &str, v: bool) -> String {
     }
 }
 
-fn valor(c: &CambioLegible, v: &str) -> AnyView {
-    if c.secreto {
-        return view! {
-            <span class="secreto" aria-hidden="true">{MASCARA}</span>
-            <span class="solo-lector">{t!("comun-valor-oculto")}</span>
-        }
-        .into_any();
-    }
-    view! { <span>{texto_valor(c, v)}</span> }.into_any()
-}
-
-/// Tabla «antes → después» de los campos de un paso.
-fn tabla(campos: &[CambioLegible]) -> AnyView {
-    if campos.is_empty() {
-        return ().into_any();
-    }
-    let filas = campos
-        .iter()
-        .map(|c| {
-            view! {
-                <tr>
-                    <th scope="row">{traducir(&c.campo, None)}</th>
-                    <td>{valor(c, &c.antes)}</td>
-                    <td>{valor(c, &c.despues)}</td>
-                </tr>
-            }
-        })
-        .collect_view();
-    view! {
-        <div class="tabla-scroll">
-            <table class="tabla">
-                <thead>
-                    <tr>
-                        <th scope="col">{t!("ajustes-grupo-col-dato")}</th>
-                        <th scope="col">{t!("ajustes-grupo-col-antes")}</th>
-                        <th scope="col">{t!("ajustes-grupo-col-despues")}</th>
-                    </tr>
-                </thead>
-                <tbody>{filas}</tbody>
-            </table>
-        </div>
-    }
-    .into_any()
-}
-
 fn riesgo(r: RiesgoCambio) -> (String, String) {
     match r {
         RiesgoCambio::Bajo => (t!("ajustes-riesgo-bajo"), t!("ajustes-riesgo-bajo-desc")),
         RiesgoCambio::Medio => (t!("ajustes-riesgo-medio"), t!("ajustes-riesgo-medio-desc")),
         RiesgoCambio::Alto => (t!("ajustes-riesgo-alto"), t!("ajustes-riesgo-alto-desc")),
     }
-}
-
-/// Casillas iniciales: marcado todo paso que cambia algo.
-fn marcados_de(g: &GrupoVista) -> Vec<bool> {
-    g.pasos.iter().map(|p| !p.sin_cambios).collect()
-}
-
-/// Índices de los pasos con cambios que se han desmarcado.
-fn desmarcados(pasos: &[PasoVista], marcados: &[bool]) -> Vec<usize> {
-    pasos
-        .iter()
-        .zip(marcados)
-        .filter(|(p, m)| !p.sin_cambios && !**m)
-        .map(|(p, _)| p.indice)
-        .collect()
 }
 
 /// Cambio que se deshace tras pulsar «Deshacer» sobre el cambio `id`
@@ -167,13 +109,24 @@ fn siguiente_deshace(actual: Option<i64>, id: i64) -> Option<i64> {
 /// y sigue el cambio (la rejilla, con la insignia de cada tarjeta y el
 /// aviso con «Deshacer»). `deshacer`: el grupo deshace otro cambio (título
 /// y botón de deshacer).
+///
+/// Para una revisión con opciones (el proveedor de DNS de un lote):
+/// `antes_de_pasos` se pinta encima de los pasos; cada grupo que llega por
+/// `nuevo_grupo` sustituye al revisado, conservando las casillas por la
+/// `clave` de cada paso; mientras `ocupado` (se prepara el nuevo), ni Esc ni
+/// «Cancelar» cierran y no se aplica.
 #[component]
 pub fn DialogoGrupo(
     grupo: GrupoVista,
     #[prop(into)] on_cerrar: Callback<Option<i64>>,
     #[prop(optional, into)] al_aplicar: Option<Callback<(String, Vec<usize>)>>,
     #[prop(optional)] deshacer: bool,
+    #[prop(optional_no_strip)] antes_de_pasos: Option<ViewFn>,
+    #[prop(optional_no_strip)] nuevo_grupo: Option<Signal<Option<GrupoVista>>>,
+    #[prop(optional_no_strip)] ocupado: Option<Signal<bool>>,
 ) -> impl IntoView {
+    let ocupado_ahora = move || ocupado.is_some_and(|o| o.get_untracked());
+    let ocupado = move || ocupado.is_some_and(|o| o.get());
     let dlg = NodeRef::<html::Dialog>::new();
     let titulo_ref = NodeRef::<html::H2>::new();
     let marcados = RwSignal::new(marcados_de(&grupo));
@@ -188,6 +141,21 @@ pub fn DialogoGrupo(
         Memo::new(move |_| cambio.with(|c| c.as_ref().is_some_and(|c| c.estado.final_())));
     let ultimo_confirmado = StoredValue::new(None::<i64>);
     let quien_abrio = StoredValue::new_local(None::<leptos::web_sys::HtmlElement>);
+
+    // Un grupo nuevo (otra opción elegida) sustituye al revisado, con las
+    // casillas que se habían tocado.
+    if let Some(nuevo) = nuevo_grupo {
+        Effect::new(move |_| {
+            let Some(g) = nuevo.get() else {
+                return;
+            };
+            let marcas = grupo.with_untracked(|viejo| {
+                marcados.with_untracked(|m| marcas_conservadas(viejo, m, &g))
+            });
+            marcados.set(marcas);
+            grupo.set(g);
+        });
+    }
 
     let enfocar_titulo = move || {
         if let Some(h) = titulo_ref.get_untracked() {
@@ -213,7 +181,7 @@ pub fn DialogoGrupo(
 
     let aplicar = move |ev: SubmitEvent| {
         ev.prevent_default();
-        if fase.get_untracked() != Fase::Revisar {
+        if fase.get_untracked() != Fase::Revisar || ocupado_ahora() {
             return;
         }
         let quitar = grupo.with_untracked(|g| desmarcados(&g.pasos, &marcados.get_untracked()));
@@ -297,6 +265,7 @@ pub fn DialogoGrupo(
 
     let cerrar = move || {
         if !matches!(fase.get_untracked(), Fase::Confirmando | Fase::Preparando)
+            && !ocupado_ahora()
             && let Some(d) = dlg.get_untracked()
         {
             d.close();
@@ -358,80 +327,8 @@ pub fn DialogoGrupo(
         t!("ajustes-grupo-vigilancia", plazo = plazo.as_str())
     };
 
-    let pasos = move || {
-        let g = grupo.get();
-        let varios = g.pasos.len() > 1;
-        let bloqueado = move || fase.get() != Fase::Revisar;
-        let lista = g
-            .pasos
-            .iter()
-            .enumerate()
-            .map(|(i, p)| {
-                let sin_cambios = p.sin_cambios;
-                let id = format!("grupo-paso-{i}");
-                // Su título («TCP») o, sin él, «Paso N».
-                let nombre = p
-                    .titulo
-                    .as_ref()
-                    .map_or_else(|| t!("ajustes-grupo-paso", n = i + 1), |c| traducir(c, None));
-                // La nota de un paso que solo enseña lo que cambia respecto
-                // al primero («Igual que la regla TCP…»): si el primero se
-                // desmarca, su variante `-sin-el-primero` lo dice.
-                let nota_paso = p.nota.clone().map(|c| {
-                    let sin_el_primero = format!("{c}-sin-el-primero");
-                    let texto = move || {
-                        let desmarcado =
-                            i > 0 && !marcados.with(|m| m.first().copied().unwrap_or(true));
-                        if desmarcado && i18n::existe(idioma_actual(), &sin_el_primero) {
-                            traducir(&sin_el_primero, None)
-                        } else {
-                            traducir(&c, None)
-                        }
-                    };
-                    view! { <p class="pagina-sub grupo-paso-nota">{texto}</p> }
-                });
-                let cabeza = varios.then(|| {
-                    view! {
-                        <legend class="grupo-paso-titulo">
-                            <input
-                                id=id.clone()
-                                type="checkbox"
-                                prop:checked=move || marcados.with(|m| m.get(i).copied().unwrap_or(false))
-                                disabled=move || sin_cambios || bloqueado()
-                                on:change=move |ev| {
-                                    let v = event_target_checked(&ev);
-                                    marcados.update(|m| {
-                                        if let Some(x) = m.get_mut(i) {
-                                            *x = v;
-                                        }
-                                    });
-                                }
-                            />
-                            <label for=id>{nombre}</label>
-                            {sin_cambios.then(|| view! {
-                                <span class="chip">{t!("ajustes-grupo-ya-esta")}</span>
-                            })}
-                        </legend>
-                    }
-                });
-                let nota = sin_cambios.then(|| {
-                    view! { <p class="pagina-sub">{t!("ajustes-grupo-ya-esta-desc")}</p> }
-                });
-                view! {
-                    <fieldset class="grupo-paso">
-                        {cabeza}
-                        {nota}
-                        {nota_paso}
-                        {tabla(&p.campos)}
-                    </fieldset>
-                }
-            })
-            .collect_view();
-        view! {
-            {varios.then(|| view! { <p class="pagina-sub">{t!("ajustes-grupo-pasos-desc")}</p> })}
-            <div class="grupo-pasos">{lista}</div>
-        }
-    };
+    let bloqueado = Signal::derive(move || fase.get() != Fase::Revisar);
+    let pasos = move || grupo.with(|g| pasos::lista(g, marcados, bloqueado));
 
     let estado = move || {
         if !matches!(fase.get(), Fase::Seguimiento(_) | Fase::Confirmando) {
@@ -496,7 +393,7 @@ pub fn DialogoGrupo(
             <button
                 class="b-sec"
                 type="button"
-                disabled=f == Fase::Confirmando
+                disabled=move || f == Fase::Confirmando || ocupado()
                 on:click=move |_| cerrar()
             >
                 {t!("ajustes-grupo-cancelar")}
@@ -505,7 +402,7 @@ pub fn DialogoGrupo(
             <button
                 class=if borra { "b-pel" } else { "b-pri" }
                 type="submit"
-                disabled=f == Fase::Confirmando
+                disabled=move || f == Fase::Confirmando || ocupado()
             >
                 {if f == Fase::Confirmando {
                     t!("ajustes-grupo-aplicando")
@@ -529,7 +426,9 @@ pub fn DialogoGrupo(
             aria-labelledby="grupo-titulo"
             aria-modal="true"
             on:cancel=move |ev: leptos::ev::Event| {
-                if matches!(fase.get_untracked(), Fase::Confirmando | Fase::Preparando) {
+                if matches!(fase.get_untracked(), Fase::Confirmando | Fase::Preparando)
+                    || ocupado_ahora()
+                {
                     ev.prevent_default();
                 }
             }
@@ -552,6 +451,7 @@ pub fn DialogoGrupo(
                     " · "
                     {t!("ajustes-grupo-intro")}
                 </p>
+                {antes_de_pasos.map(|v| v.run())}
                 {pasos}
                 {aviso}
                 {efecto}
@@ -570,7 +470,10 @@ pub fn DialogoGrupo(
 
 #[cfg(all(test, feature = "ssr"))]
 mod tests {
+    use super::pasos::por_pestana;
     use super::*;
+    use crate::ajustes_router::PasoVista;
+    use crate::ui::explorador::MASCARA;
 
     fn cambio(campo: &str, antes: &str, despues: &str, tipo: TipoCampo) -> CambioLegible {
         CambioLegible {
@@ -807,5 +710,107 @@ mod tests {
             Vec::<usize>::new()
         );
         assert_eq!(marcados_de(&grupo(pasos)), vec![true, false, true]);
+    }
+
+    #[test]
+    fn marcados_iniciales_respetan_desmarcado() {
+        let paso = |indice, sin_cambios, desmarcado| PasoVista {
+            indice,
+            sin_cambios,
+            desmarcado,
+            ..Default::default()
+        };
+        let g = grupo(vec![
+            paso(0, false, false),
+            paso(1, false, true),
+            paso(2, true, false),
+        ]);
+        assert_eq!(marcados_de(&g), vec![true, false, false]);
+    }
+
+    /// Al cambiar de proveedor, el grupo nuevo conserva lo que se había
+    /// tocado, paso a paso por su clave, aunque cambie de posición.
+    #[test]
+    fn marcas_se_conservan_por_clave() {
+        let paso = |indice, clave: &str, desmarcado| PasoVista {
+            indice,
+            clave: Some(clave.into()),
+            desmarcado,
+            ..Default::default()
+        };
+        let viejo = grupo(vec![
+            paso(0, "dns_casa", false),
+            paso(1, "aviso_operador", false),
+            paso(2, "hora_neutra", true),
+        ]);
+        // El aviso, desmarcado a mano; la hora, marcada a mano.
+        let marcas = [true, false, true];
+        let mut nuevo = grupo(vec![
+            paso(0, "aviso_operador", false),
+            paso(1, "gestion_remota", false),
+            paso(2, "dns_casa", false),
+            paso(3, "hora_neutra", true),
+        ]);
+        assert_eq!(
+            marcas_conservadas(&viejo, &marcas, &nuevo),
+            vec![false, true, true, true]
+        );
+        // Lo que ya no cambia nada, desmarcado.
+        nuevo.pasos[2].sin_cambios = true;
+        assert_eq!(
+            marcas_conservadas(&viejo, &marcas, &nuevo),
+            vec![false, true, false, true]
+        );
+    }
+
+    #[test]
+    fn por_pestana_agrupa_seguidos() {
+        let paso = |indice, pestana: Option<&str>| PasoVista {
+            indice,
+            pestana: pestana.map(str::to_owned),
+            ..Default::default()
+        };
+        let red = Some("ajustes-tema-red_local");
+        let seg = Some("ajustes-tema-seguridad");
+        let pasos = [
+            paso(0, red),
+            paso(1, seg),
+            paso(2, seg),
+            paso(3, None),
+            paso(4, None),
+            paso(5, red),
+        ];
+        let s = |x: Option<&str>| x.map(str::to_owned);
+        assert_eq!(
+            por_pestana(&pasos),
+            vec![
+                (s(red), vec![0]),
+                (s(seg), vec![1, 2]),
+                (None, vec![3, 4]),
+                (s(red), vec![5]),
+            ]
+        );
+    }
+
+    /// Los pasos de un lote van bajo el nombre de su pestaña; los de un
+    /// ajuste (sin pestaña), sin encabezado.
+    #[test]
+    fn encabezado_por_pestana() {
+        let paso = |indice, pestana: Option<&str>| PasoVista {
+            indice,
+            pestana: pestana.map(str::to_owned),
+            ..Default::default()
+        };
+        let h = html(grupo(vec![
+            paso(0, Some("ajustes-tema-red_local")),
+            paso(1, Some("ajustes-tema-seguridad")),
+            paso(2, Some("ajustes-tema-seguridad")),
+        ]));
+        assert_eq!(h.matches("<h3").count(), 2, "{h}");
+        let red = h.find(&t!("ajustes-tema-red_local")).expect("Red local");
+        let seg = h.find(&t!("ajustes-tema-seguridad")).expect("Seguridad");
+        assert!(red < seg, "{h}");
+        let h = html(grupo(vec![paso(0, None), paso(1, None)]));
+        assert!(!h.contains("<h3"), "{h}");
     }
 }

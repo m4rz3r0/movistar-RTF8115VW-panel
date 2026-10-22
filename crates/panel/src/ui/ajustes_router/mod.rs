@@ -39,8 +39,6 @@ use crate::ui::explorador::texto_error;
 use crate::ui::i18n::traducir;
 use crate::ui::{Estado, IconoEstado};
 use ajustes::Tema;
-use aviso::{AvisoCambio, Seguimiento};
-use detalle::Borradores;
 use leptos::prelude::*;
 use leptos_router::{
     NavigateOptions,
@@ -48,11 +46,13 @@ use leptos_router::{
     hooks::{use_location, use_navigate, use_params_map},
 };
 use rejilla::{ContenidoRejilla, esqueleto};
-use seleccion::Seleccion;
 use std::{collections::HashSet, time::Duration};
 
+pub(crate) use aviso::{AvisoCambio, ExtraRevision, Seguimiento};
 pub(crate) use campo::partir_motivo;
+pub(crate) use detalle::Borradores;
 pub use foto::{PaginaFoto, RUTA_FOTO};
+pub(crate) use seleccion::Seleccion;
 
 /// Espera antes de enseñar «Actualizando…»: una lectura más rápida (de la
 /// caché del servidor) no hace parpadear la página.

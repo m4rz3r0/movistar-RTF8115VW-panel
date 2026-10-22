@@ -53,6 +53,7 @@ mejoras-dns-cloudflare = Cloudflare
 mejoras-dns-cloudflare-desc = Very fast. It is a United States company.
 mejoras-dns-adguard = AdGuard
 mejoras-dns-adguard-desc = Blocks ads and trackers. It may break some websites.
+mejoras-dns-elegir = DNS service for the home network
 
 ## State of the bundles and their review
 mejoras-motivo-sin-leer = The { $pestana } tab could not be read.

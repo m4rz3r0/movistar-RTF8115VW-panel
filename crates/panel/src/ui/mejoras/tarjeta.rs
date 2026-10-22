@@ -78,6 +78,10 @@ pub(super) fn TarjetaLote(
     solo_lectura: bool,
     al_revisar: Callback<String>,
     volver_a_leer: Callback<()>,
+    /// Se está preparando su revisión.
+    preparando: Signal<bool>,
+    /// Por qué no se pudo preparar (ya aplicado, pasos sin leer…).
+    error: Signal<Option<String>>,
 ) -> impl IntoView {
     let titulo_id = format!("lote-{}-titulo", lote.id);
     let etiquetado = titulo_id.clone();
@@ -141,13 +145,19 @@ pub(super) fn TarjetaLote(
     let pie = (!solo_lectura).then(|| {
         view! {
             <div class="lote-pie">
+                {move || error.get().map(|m| view! {
+                    <p class="aviso estado-error" role="alert">
+                        <IconoEstado estado=Estado::Error />
+                        <span>{m}</span>
+                    </p>
+                })}
                 <button
                     type="button"
                     class="b-pri"
-                    disabled=!hay_pendientes
+                    disabled=move || !hay_pendientes || preparando.get()
                     on:click=move |_| al_revisar.run(id.clone())
                 >
-                    {t!("mejoras-revisar")}
+                    {move || if preparando.get() { t!("ajustes-grupo-preparando") } else { t!("mejoras-revisar") }}
                 </button>
             </div>
         }

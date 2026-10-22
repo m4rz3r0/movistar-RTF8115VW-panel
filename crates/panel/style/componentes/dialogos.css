@@ -73,6 +73,38 @@
   color: var(--suave);
 }
 
+/* Un lote de Mejoras: los pasos de cada pestaña bajo su nombre. */
+.grupo-pestana {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-2);
+  min-width: 0;
+}
+
+.grupo-pestana-titulo {
+  margin: 0;
+  padding-bottom: var(--esp-1);
+  border-bottom: 1px solid var(--borde);
+  color: var(--suave);
+  font-family: var(--fuente-ui);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* El selector de proveedor de DNS de la revisión de un lote. */
+.revision-dns {
+  padding: var(--esp-3) var(--esp-4);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+}
+
+.revision-dns-titulo {
+  padding: 0 var(--esp-1);
+  font-weight: 600;
+}
+
 .estado-cambio {
   display: flex;
   flex-direction: column;
@@ -115,6 +147,21 @@
   .dialogo .tabla th,
   .dialogo .tabla td {
     padding: 7px var(--esp-2);
+  }
+
+  /* Los pasos del grupo caben sin desplazar: los valores largos (un
+     servidor de hora) se parten. */
+  .dialogo-grupo .tabla th,
+  .dialogo-grupo .tabla td {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  /* El nombre del dato se parte por palabras y deja a los valores (una IP)
+     el ancho para ir enteros. */
+  .dialogo-grupo .tabla tbody th[scope="row"] {
+    width: 34%;
+    overflow-wrap: normal;
   }
 
   .cabecera-funcion h1 {

@@ -53,6 +53,7 @@ mejoras-dns-cloudflare = Cloudflare
 mejoras-dns-cloudflare-desc = Muy rápido. Es una empresa de Estados Unidos.
 mejoras-dns-adguard = AdGuard
 mejoras-dns-adguard-desc = Bloquea anuncios y rastreadores. Puede romper alguna web.
+mejoras-dns-elegir = Servicio de DNS para la red de casa
 
 ## Estado de los lotes y su revisión
 mejoras-motivo-sin-leer = No se pudo leer la pestaña { $pestana }.

@@ -169,10 +169,18 @@
 
 .lote-pie {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
+  gap: var(--esp-2);
   margin-top: auto;
   padding-top: var(--esp-3);
   border-top: 1px solid var(--borde);
+}
+
+/* Por qué no se pudo preparar la revisión, encima del botón. */
+.lote-pie .aviso {
+  flex: 1 1 100%;
+  margin: 0;
 }
 
 @media (max-width: 600px) {

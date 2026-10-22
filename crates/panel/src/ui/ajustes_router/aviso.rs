@@ -24,6 +24,18 @@ mod vista;
 
 pub(crate) use vista::AvisoCambio;
 
+/// Lo que añade a su diálogo una revisión con opciones (el proveedor de DNS
+/// de un lote de Mejoras), para [`Seguimiento::revisar_con`].
+#[derive(Clone)]
+pub(crate) struct ExtraRevision {
+    /// Se pinta encima de los pasos (el selector).
+    pub antes_de_pasos: ViewFn,
+    /// El grupo preparado de nuevo con otra opción: sustituye al revisado.
+    pub nuevo_grupo: Signal<Option<GrupoVista>>,
+    /// Se está preparando el grupo nuevo: el diálogo no se cierra ni aplica.
+    pub ocupado: Signal<bool>,
+}
+
 /// Cada cuánto se pregunta por el estado del cambio.
 const SONDEO: Duration = Duration::from_secs(2);
 
@@ -65,6 +77,8 @@ struct Revision {
     deshacer: bool,
     /// Al aplicarse, sus elementos se cierran (una instancia nueva, ya creada).
     cerrar: bool,
+    /// Las opciones de la revisión, si las tiene.
+    extra: Option<ExtraRevision>,
 }
 
 /// El cambio en curso de la página y el diálogo de revisión abierto. Vive
@@ -257,22 +271,35 @@ impl Seguimiento {
 
     /// Abre el diálogo de revisión del grupo `g`, que cambia `elementos`.
     pub(crate) fn revisar(self, g: GrupoVista, elementos: Vec<String>) {
-        self.revisar_con(g, elementos, false);
+        self.abrir(g, elementos, false, None);
     }
 
     /// Como [`Seguimiento::revisar`], pero al aplicarse se cierran sus
     /// elementos (el detalle de una instancia nueva, ya creada).
     pub(crate) fn revisar_y_cerrar(self, g: GrupoVista, elementos: Vec<String>) {
-        self.revisar_con(g, elementos, true);
+        self.abrir(g, elementos, true, None);
     }
 
-    fn revisar_con(self, g: GrupoVista, elementos: Vec<String>, cerrar: bool) {
+    /// Abre el diálogo de revisión del grupo `g` con sus opciones (`extra`):
+    /// un lote de Mejoras, que no cambia ningún elemento de la página.
+    pub(crate) fn revisar_con(self, g: GrupoVista, extra: ExtraRevision) {
+        self.abrir(g, Vec::new(), false, Some(extra));
+    }
+
+    fn abrir(
+        self,
+        g: GrupoVista,
+        elementos: Vec<String>,
+        cerrar: bool,
+        extra: Option<ExtraRevision>,
+    ) {
         self.error.set(None);
         self.dialogo.set(Some(Revision {
             grupo: g,
             elementos,
             deshacer: false,
             cerrar,
+            extra,
         }));
     }
 

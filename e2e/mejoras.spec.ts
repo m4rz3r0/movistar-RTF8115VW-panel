@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
+import { PLAZO_CAMBIO, plazoDeTest } from "./cambios";
 import { CONTRASENA, mejoras, USUARIO } from "./instancias";
 import {
   asentar,
@@ -214,6 +215,173 @@ test.describe("contador sin consultas de más", () => {
       await expect(cuenta).toHaveText("6");
     }
     expect(consultas, "consultas del contador al navegar").toEqual([]);
+    expect(errores, "errores o avisos en la consola").toEqual([]);
+  });
+});
+
+// Revisar un lote en su diálogo, aplicarlo y deshacerlo, en el panel de
+// Mejoras (que vuelve a las fixtures al deshacer). La revisión agrupa los
+// pasos por pestaña, en el orden de las pestañas; la hora neutra (opcional)
+// sale desmarcada; el selector de DNS vuelve a preparar el lote con el
+// proveedor elegido. Un solo cambio, con un solo «Deshacer» en el aviso de la
+// página; al terminar, la página y el contador se ponen al día.
+const CAPTURAS_REVISION = "capturas/mejoras-5";
+const HECHO = "Hecho: el router tiene ya el cambio.";
+
+/** El contador de la barra lateral (en el móvil, abriendo el menú). */
+async function esperarContador(page: Page, ancho: number, valor: string) {
+  if (ancho <= 860) await page.locator("button.menu-boton").click();
+  await expect(page.locator("nav .cuenta")).toHaveText(valor);
+  if (ancho <= 860) await page.locator("button.menu-boton").click();
+}
+
+/** Entradas del Historial del panel. */
+async function entradasDelHistorial(page: Page): Promise<number> {
+  const r = await page.request.post("/api/historial", { data: { pagina: 1 } });
+  expect(r.status()).toBe(200);
+  return (await r.json()).total;
+}
+
+/** Retardo de cada respuesta del simulador del panel de Mejoras, en ms. */
+async function retardoDelSim(ms: number) {
+  const r = await fetch(`${mejoras.urlSim}/__sim/retardo`, { method: "POST", body: String(ms) });
+  expect(r.ok).toBe(true);
+}
+
+/** Los pasos del diálogo, con sus tablas. */
+function pasosDe(dialogo: Locator): Locator {
+  return dialogo.locator(".grupo-pasos").first();
+}
+
+/** Abre la revisión de Privacidad máxima. */
+async function revisarPrivacidad(page: Page): Promise<Locator> {
+  await page.goto("/mejoras");
+  await asentar(page);
+  const privacidad = tarjeta(page, "Privacidad máxima");
+  await expect(privacidad.locator(".ins-aviso")).toHaveText("3 de 5 pendientes", {
+    timeout: 20_000,
+  });
+  await privacidad.getByRole("button", { name: "Revisar y aplicar" }).click();
+  const dialogo = page.locator("dialog[open]");
+  await expect(dialogo.locator("#grupo-titulo")).toHaveText("Revisa el cambio");
+  return dialogo;
+}
+
+for (const [ancho, tema] of [
+  [1440, "oscuro"],
+  [360, "claro"],
+] as const) {
+  const sufijo = `${ancho}-${tema}`;
+  test.describe(`Revisión de un lote a ${ancho} px en tema ${tema}`, () => {
+    test.use({
+      locale: "es-ES",
+      baseURL: mejoras.url,
+      viewport: { width: ancho, height: 900 },
+      colorScheme: tema === "oscuro" ? "dark" : "light",
+    });
+
+    test("revisar, aplicar y deshacer", async ({ page }) => {
+      test.setTimeout(plazoDeTest(2));
+      const errores = recogerErrores(page);
+      await entrarEnSuPanel(page);
+      const dialogo = await revisarPrivacidad(page);
+
+      // Por pestañas, en el orden de las pestañas.
+      await expect(dialogo.locator("h3.grupo-pestana-titulo")).toHaveText([
+        "Red local",
+        "Seguridad",
+        "Sistema",
+      ]);
+      // La hora neutra, opcional, sale desmarcada; lo demás que cambia, marcado.
+      await expect(dialogo.getByRole("checkbox", { name: "Hora del router" })).not.toBeChecked();
+      const aviso = dialogo.getByRole("checkbox", { name: "Aviso periódico al operador" });
+      await expect(aviso).toBeChecked();
+      // Quad9, por defecto; con DNS4EU, la tabla dice sus servidores.
+      await expect(dialogo.getByRole("radio", { name: "Quad9", exact: true })).toBeChecked();
+      await expect(dialogo).toContainText("9.9.9.9");
+      await dialogo.getByRole("radio", { name: "DNS4EU", exact: true }).check();
+      await expect(pasosDe(dialogo)).toContainText("86.54.11.100");
+      await expect(dialogo).not.toContainText("9.9.9.9");
+      await expect(dialogo.getByRole("button", { name: "Aplicar", exact: true })).toBeEnabled();
+
+      await sinDesbordamiento(page, `revisión ${sufijo}`);
+      expect.soft(await violacionesGraves(page), `revisión ${sufijo}`).toEqual([]);
+      await quieta(page);
+      await page.screenshot({
+        path: `${CAPTURAS_REVISION}/revision-${sufijo}.png`,
+        animations: "disabled",
+      });
+
+      // Sin el aviso periódico: se aplica lo demás, como un solo cambio.
+      await aviso.uncheck();
+      await dialogo.getByRole("button", { name: "Aplicar", exact: true }).click();
+      await expect(page.locator("dialog[open]")).toHaveCount(0);
+      const cambio = page.locator(".avisos-cambio [role=status] .aviso-cambio");
+      await expect(cambio).toContainText(HECHO, { timeout: PLAZO_CAMBIO });
+      const privacidad = tarjeta(page, "Privacidad máxima");
+      const seguridad = tarjeta(page, "Seguridad recomendada");
+      await expect(privacidad.locator(".ins-aviso")).toHaveText("1 de 5 pendientes");
+      await expect(seguridad.locator(".ins-aviso")).toHaveText("4 de 11 pendientes");
+      await esperarContador(page, ancho, "4");
+
+      // Un solo «Deshacer» lo devuelve todo.
+      await cambio.getByRole("button", { name: "Deshacer", exact: true }).click();
+      await expect(dialogo.locator("#grupo-titulo")).toHaveText("Volver a como estaba");
+      await dialogo.getByRole("button", { name: "Deshacer", exact: true }).click();
+      await expect(page.locator("dialog[open]")).toHaveCount(0);
+      await expect(privacidad.locator(".ins-aviso")).toHaveText("3 de 5 pendientes", {
+        timeout: PLAZO_CAMBIO,
+      });
+      await expect(seguridad.locator(".ins-aviso")).toHaveText("5 de 11 pendientes");
+      await expect(cambio).toContainText(HECHO);
+      await esperarContador(page, ancho, "6");
+      expect(errores, "errores o avisos en la consola").toEqual([]);
+    });
+  });
+}
+
+test.describe("Revisión de un lote: casos raros", () => {
+  test.use({ locale: "es-ES", baseURL: mejoras.url, viewport: { width: 1440, height: 900 } });
+
+  test("Esc mientras prepara", async ({ page }) => {
+    // Con el retardo, preparar el lote de nuevo lee el router despacio.
+    test.setTimeout(120_000);
+    const errores = recogerErrores(page);
+    await entrarEnSuPanel(page);
+    const dialogo = await revisarPrivacidad(page);
+    await retardoDelSim(1_500);
+    try {
+      const preparar = page.waitForResponse((r) => r.url().endsWith("/api/preparar_lote"), {
+        timeout: 90_000,
+      });
+      await dialogo.getByRole("radio", { name: "Cloudflare", exact: true }).check();
+      await expect(dialogo.getByRole("button", { name: "Cancelar" })).toBeDisabled();
+      await page.keyboard.press("Escape");
+      await expect(page.locator("dialog[open]")).toHaveCount(1);
+      await preparar;
+    } finally {
+      await retardoDelSim(0);
+    }
+    await expect(pasosDe(dialogo)).toContainText("1.1.1.1");
+    await dialogo.getByRole("button", { name: "Cancelar" }).click();
+    await expect(page.locator("dialog[open]")).toHaveCount(0);
+    expect(errores, "errores o avisos en la consola").toEqual([]);
+  });
+
+  test("todo desmarcado", async ({ page }) => {
+    const errores = recogerErrores(page);
+    await entrarEnSuPanel(page);
+    const antes = await entradasDelHistorial(page);
+    const dialogo = await revisarPrivacidad(page);
+    const casillas = dialogo.locator("input[type=checkbox]:enabled");
+    for (const c of await casillas.all()) await c.uncheck();
+    await dialogo.getByRole("button", { name: "Aplicar", exact: true }).click();
+    await expect(dialogo.locator(".dialogo-cuerpo > .error-formulario")).toHaveText(
+      "Marca al menos un paso para aplicar el cambio.",
+    );
+    await expect(page.locator("dialog[open]")).toHaveCount(1);
+    expect(await entradasDelHistorial(page)).toBe(antes);
+    await dialogo.getByRole("button", { name: "Cancelar" }).click();
     expect(errores, "errores o avisos en la consola").toEqual([]);
   });
 });
