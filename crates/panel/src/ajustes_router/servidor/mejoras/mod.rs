@@ -18,6 +18,9 @@ use std::net::Ipv4Addr;
 
 /// Texto del paso de los DNS hecho con DNS propios, en vez de «Hecho».
 const NOTA_DNS_PROPIOS: &str = "mejoras-paso-estado-dns-propios";
+/// Texto del paso de los DNS hecho con solo el principal de un proveedor,
+/// con su nombre (`$proveedor`).
+const NOTA_DNS_SOLO_PRINCIPAL: &str = "mejoras-paso-estado-dns-solo-principal";
 
 /// Lo leído para unos lotes: sus pasos expandidos, la vista de cada ajuste
 /// que tocan y la IP del router en casa (para saber si los DNS son propios).
@@ -131,6 +134,13 @@ impl Lecturas {
             && dns::propios(cat, p, &|a, c| self.leer(a, c), self.ip_router) == Some(true)
     }
 
+    /// El proveedor de la lista del que el router tiene solo el DNS
+    /// principal (ver [`dns::solo_principal`]).
+    fn dns_solo_principal<'c>(&self, cat: &'c CatalogoAjustes) -> Option<&'c OpcionEleccion> {
+        let e = cat.eleccion(ELECCION_DNS)?;
+        dns::solo_principal(cat, self.paso_dns()?, &|a, c| self.leer(a, c), e)
+    }
+
     /// Los valores que tiene ahora el router en los campos del paso de los
     /// DNS, como una opción más: «Mantener los actuales». `None` si alguno
     /// no se leyó.
@@ -167,11 +177,19 @@ pub(crate) async fn calcular(state: &AppState, fresca: bool) -> (Vec<LoteVista>,
     let lotes: Vec<&Lote> = state.ajustes.lotes().iter().collect();
     let lecturas = Lecturas::de(state, &lotes, fresca).await;
     let estados = lecturas.estados(&state.ajustes);
-    // El paso de los DNS hecho con DNS propios lo dice.
+    // El paso de los DNS hecho con el principal de un proveedor (sin su
+    // secundario) o con DNS propios lo dice: el proveedor o «DNS propios».
+    let solo_principal = lecturas.dns_solo_principal(&state.ajustes);
     let propios = lecturas.dns_propios(&state.ajustes);
-    let nota = |p: &PasoExpandido, e: &EstadoPaso| {
-        (propios && *e == EstadoPaso::Hecho && p.elegir.as_deref() == Some(ELECCION_DNS))
-            .then(|| NOTA_DNS_PROPIOS.to_owned())
+    let nota = |p: &PasoExpandido, e: &EstadoPaso| -> (Option<String>, Option<String>) {
+        if *e != EstadoPaso::Hecho || p.elegir.as_deref() != Some(ELECCION_DNS) {
+            return (None, None);
+        }
+        match solo_principal {
+            Some(o) => (Some(NOTA_DNS_SOLO_PRINCIPAL.to_owned()), Some(o.id.clone())),
+            None if propios => (Some(NOTA_DNS_PROPIOS.to_owned()), None),
+            None => (None, None),
+        }
     };
     let pendientes = pendientes_unicos(&estados.concat());
     let vistas = lotes
@@ -183,13 +201,17 @@ pub(crate) async fn calcular(state: &AppState, fresca: bool) -> (Vec<LoteVista>,
             estado: estado_lote(pasos),
             pasos: pasos
                 .iter()
-                .map(|(p, e)| PasoLoteVista {
-                    clave: p.clave(),
-                    texto: clave_paso(&p.paso),
-                    detalle: detalle(&state.ajustes, p),
-                    estado: e.clone(),
-                    nota: nota(p, e),
-                    opcional: p.opcional,
+                .map(|(p, e)| {
+                    let (nota, nota_proveedor) = nota(p, e);
+                    PasoLoteVista {
+                        clave: p.clave(),
+                        texto: clave_paso(&p.paso),
+                        detalle: detalle(&state.ajustes, p),
+                        estado: e.clone(),
+                        nota,
+                        nota_proveedor,
+                        opcional: p.opcional,
+                    }
                 })
                 .collect(),
             avisos: l

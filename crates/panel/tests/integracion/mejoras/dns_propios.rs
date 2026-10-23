@@ -118,3 +118,32 @@ async fn la_tarjeta_dice_dns_propios() {
     let html = crate::comun::pagina(&p, &cookie, "/mejoras").await;
     assert!(html.contains("DNS propios"), "{html}");
 }
+
+/// El principal de un proveedor de la lista sin su secundario: hecho, y la
+/// nota dice el proveedor («solo principal»), no «DNS propios».
+#[tokio::test]
+async fn principal_de_un_proveedor_sin_secundario() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    dns_del_pool(&p, "9.9.9.9", "").await;
+    let m = mejoras(&p, &cookie).await;
+    let dns = paso(&m, "privacidad", "dns_casa");
+    assert_eq!(dns["estado"], "Hecho", "{dns}");
+    assert_eq!(
+        dns["nota"], "mejoras-paso-estado-dns-solo-principal",
+        "{dns}"
+    );
+    assert_eq!(dns["nota_proveedor"], "quad9", "{dns}");
+    let html = crate::comun::pagina(&p, &cookie, "/mejoras").await;
+    assert!(html.contains("Quad9 (solo principal)"), "{html}");
+}
+
+/// Con el secundario del operador, el paso sigue pendiente.
+#[tokio::test]
+async fn secundario_del_operador_sigue_pendiente() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    dns_del_pool(&p, PROPIO, "80.58.61.254").await;
+    let m = mejoras(&p, &cookie).await;
+    let dns = paso(&m, "privacidad", "dns_casa");
+    assert_eq!(dns["estado"], "Pendiente", "{dns}");
+    assert!(dns["nota"].is_null(), "{dns}");
+}

@@ -52,7 +52,13 @@ pub(crate) fn read_node(
     } else if params.is_empty() {
         all_instances(s, name).ok_or_else(|| "no fixture".to_owned())?
     } else {
-        return Err("no fixture".to_owned());
+        // Una posición que no existe: lo que responde el router.
+        return Err(if por_posicion {
+            "BAD_PARAM"
+        } else {
+            "no fixture"
+        }
+        .to_owned());
     };
     aplicar_ediciones(st, name, &mut node);
     patch(s, st, name, &mut node);

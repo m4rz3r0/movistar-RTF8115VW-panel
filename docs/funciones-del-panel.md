@@ -65,7 +65,10 @@ Los dos ajustes que los lotes necesitan:
   sin cifrar. Un DNS principal que no es el router (su IP de casa, vacío o
   `0.0.0.0`) ni del operador (`del_operador` en el catálogo: los DNS
   públicos de Movistar) es **propio**: la tarjeta no recomienda cambiarlo y
-  el paso de Privacidad máxima lo da por hecho.
+  el paso de Privacidad máxima lo da por hecho («DNS propios»), salvo que
+  el secundario sea el router o del operador (entonces sigue pendiente).
+  El principal de un proveedor de la lista sin secundario también cuenta
+  como hecho, y el paso dice el proveedor («Quad9 (solo principal)»).
 
 **El pool DHCP se busca por su id (0.5.1).** `cbGetDhcpv4ServerPool` elige
 el pool por su **posición** (`rtm_cfg_dhcpv4_svr_pool_0i`) y
@@ -83,14 +86,17 @@ router real.
 
 **Red de invitados.** Tiene dos valores: si está separada de la red de casa
 (`guest_networking`) y si aísla entre sí a sus dispositivos (`isolation`).
-El panel solo puede cambiar el segundo: la escritura de los puntos de
-acceso de la web avanzada (`cbSetWifiAccPt`) no tiene el primero, así que
-«Separada de la red de casa» se enseña, pero solo se lee.
+El panel solo sabe cambiar el segundo: ninguna escritura del catálogo de
+funciones tiene el primero (ni `cbSetWifiAccPt`), así que «Separada de la
+red de casa» se enseña, pero solo se lee.
 
 Todo esto se ha probado contra el simulador (`router-sim`). Lo pendiente de
 comprobar en el router real (fase 3): que el descodificador no usa el pool
 de casa; que `cbSetSyslog` sin `export` cambia `syslog_mode` y que cargar
 `syslog.asp` no exporta el registro; que guardar «no enviar» con el puerto
-remoto vacío o `0` no falla; que
-la televisión y el teléfono siguen tras apagar TR-069 y reiniciar; y si
-1.1.1.1 resuelve en este firmware.
+remoto vacío o `0` no falla; que la televisión y el teléfono siguen tras
+apagar TR-069 y reiniciar; si 1.1.1.1 resuelve en este firmware; qué
+significa `guest_networking = 1` (se lee como «separada»); y si la
+posición de `cbGetWifi` coincide con el id de la radio, porque las
+lecturas de estado de la WiFi (`hgu::read::wifi` y la detección de radios)
+aún toman la posición como id.

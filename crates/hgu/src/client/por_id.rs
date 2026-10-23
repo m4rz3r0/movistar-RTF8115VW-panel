@@ -39,26 +39,49 @@ fn instancias(n: &XmlNode) -> Vec<&XmlNode> {
     }
 }
 
-/// ¿Es `n` la instancia de `ident`? Una respuesta sin el primer campo de
-/// `ident` en ninguna instancia es el final de la lista.
-fn leida(n: &XmlNode, ident: &[(&str, &str)]) -> Leida {
-    let valor = |i: &XmlNode, k: &str| i.text_of(k).map(str::trim).map(str::to_owned);
+/// Campo del id de la instancia en las respuestas de la posición
+/// `posicion` (`X_0i` → `X_id`).
+fn campo_id(posicion: &str) -> Option<String> {
+    posicion
+        .strip_suffix("_0i")
+        .map(|base| format!("{base}_id"))
+}
+
+fn valor(i: &XmlNode, k: &str) -> Option<String> {
+    i.text_of(k).map(|v| v.trim().to_owned())
+}
+
+/// ¿Es `i` la instancia de `ident`?
+fn casa(i: &XmlNode, ident: &[(&str, &str)]) -> bool {
+    ident
+        .iter()
+        .all(|(k, v)| valor(i, k).as_deref() == Some(v.trim()))
+}
+
+/// ¿Trae `n` la instancia de `ident`? Una respuesta en la que ninguna
+/// instancia trae `fin` (el id de la posición) es el final de la lista.
+fn leida(n: &XmlNode, ident: &[(&str, &str)], fin: &str) -> Leida {
     let instancias = instancias(n);
-    let Some((primero, _)) = ident.first() else {
-        return Leida::Fin;
-    };
-    if !instancias.iter().any(|i| valor(i, primero).is_some()) {
-        return Leida::Fin;
-    }
-    if instancias.iter().any(|i| {
-        ident
-            .iter()
-            .all(|(k, v)| valor(i, k).as_deref() == Some(v.trim()))
-    }) {
+    if !instancias.iter().any(|i| valor(i, fin).is_some()) {
+        Leida::Fin
+    } else if instancias.iter().any(|i| casa(i, ident)) {
         Leida::Esa
     } else {
         Leida::Otra
     }
+}
+
+/// La respuesta `n` con solo la instancia de `ident` (y sus hojas sueltas,
+/// como `Result`): quien la use no puede tomar otra.
+fn solo_esa(mut n: XmlNode, ident: &[(&str, &str)]) -> XmlNode {
+    n.children
+        .retain(|c| c.children.is_empty() || casa(c, ident));
+    n
+}
+
+/// ¿Es `e` el error del final de la lista (`BAD_PARAM`)?
+fn fin_de_lista(e: &Error) -> bool {
+    matches!(e, Error::CallFailed { error, .. } if error.contains("BAD_PARAM"))
 }
 
 /// Posiciones en el orden en que se prueban: primero la que coincide con el
@@ -94,10 +117,11 @@ impl Llamar for Turno<'_> {
 }
 
 /// Lee `name` con `params` en cada posición (`posicion`) de [`orden`] hasta
-/// la instancia de `ident`. La primera prueba (la del id) puede fallar o no
-/// existir sin que se acabe la búsqueda; en las demás, el final de la lista
-/// la acaba. Un error que no es del propio router (red, sesión) se devuelve
-/// al momento. Sin la instancia, [`Error::SinInstancia`].
+/// la instancia de `ident`, y devuelve la respuesta con solo esa instancia.
+/// La primera prueba (la del id) puede no existir sin que se acabe la
+/// búsqueda; en las demás, la acaba el final de la lista (`BAD_PARAM`, una
+/// respuesta sin instancia) o un id ya visto. Cualquier otro error se
+/// devuelve al momento. Sin la instancia, [`Error::SinInstancia`].
 async fn buscar(
     l: &mut impl Llamar,
     name: &str,
@@ -107,6 +131,10 @@ async fn buscar(
 ) -> Result<XmlNode, Error> {
     let orden = orden(posicion, ident);
     let adivinada = orden.first().copied().filter(|i| *i != 0);
+    let fin_campo = campo_id(posicion)
+        .or_else(|| ident.first().map(|(k, _)| (*k).to_owned()))
+        .unwrap_or_default();
+    let mut vistos: Vec<String> = Vec::new();
     for i in orden {
         let pos = i.to_string();
         let mut p: Vec<(&str, &str)> = params
@@ -116,12 +144,21 @@ async fn buscar(
             .collect();
         p.push((posicion, &pos));
         let fin = match l.llamar(name, &p).await {
-            Ok(n) => match leida(&n, ident) {
-                Leida::Esa => return Ok(n),
-                Leida::Otra => false,
+            Ok(n) => match leida(&n, ident, &fin_campo) {
+                Leida::Esa => return Ok(solo_esa(n, ident)),
+                Leida::Otra => {
+                    // Un id ya visto: la lista vuelve a empezar o repite.
+                    let ids: Vec<String> = instancias(&n)
+                        .into_iter()
+                        .filter_map(|x| valor(x, &fin_campo))
+                        .collect();
+                    let repetido = ids.iter().any(|id| vistos.contains(id));
+                    vistos.extend(ids);
+                    repetido
+                }
                 Leida::Fin => true,
             },
-            Err(Error::CallFailed { .. }) => true,
+            Err(e) if fin_de_lista(&e) => true,
             Err(e) => return Err(e),
         };
         if fin && Some(i) != adivinada {
@@ -191,6 +228,129 @@ mod tests {
         }
     }
 
+    /// Router de mentira: da las respuestas en orden y, acabadas, el
+    /// `BAD_PARAM` del final de la lista. Apunta las posiciones pedidas.
+    struct Guion {
+        respuestas: std::collections::VecDeque<Result<XmlNode, Error>>,
+        pedidas: Vec<String>,
+    }
+
+    impl Llamar for Guion {
+        async fn llamar(&mut self, name: &str, params: &[(&str, &str)]) -> Result<XmlNode, Error> {
+            self.pedidas.extend(
+                params
+                    .iter()
+                    .filter(|(k, _)| *k == "x_0i")
+                    .map(|(_, v)| (*v).to_owned()),
+            );
+            self.respuestas.pop_front().unwrap_or_else(|| {
+                Err(Error::CallFailed {
+                    name: name.to_owned(),
+                    result: "1".into(),
+                    error: "BAD_PARAM".into(),
+                })
+            })
+        }
+    }
+
+    fn guion(respuestas: Vec<Result<XmlNode, Error>>) -> Guion {
+        Guion {
+            respuestas: respuestas.into(),
+            pedidas: Vec::new(),
+        }
+    }
+
+    fn instancia(hojas: &[(&str, &str)]) -> XmlNode {
+        XmlNode {
+            tag: "x".into(),
+            text: String::new(),
+            children: hojas.iter().map(|(k, v)| hoja(k, v)).collect(),
+        }
+    }
+
+    fn respuesta(instancias: Vec<XmlNode>) -> XmlNode {
+        let mut children = instancias;
+        children.push(hoja("Result", "0"));
+        XmlNode {
+            tag: "cbGetX".into(),
+            text: String::new(),
+            children,
+        }
+    }
+
+    fn buscar_en(g: &mut Guion, ident: &[(&str, &str)]) -> Result<XmlNode, Error> {
+        tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap()
+            .block_on(buscar(g, "cbGetX", &[], "x_0i", ident))
+    }
+
+    /// Una respuesta con varias instancias (un router que no hiciera caso
+    /// de la posición): sale solo la del id, aunque sea la segunda.
+    #[test]
+    fn devuelve_solo_la_instancia_del_id() {
+        let otra = instancia(&[("x_id", "1"), ("v", "otra")]);
+        let esa = instancia(&[("x_id", "0"), ("v", "esa")]);
+        let mut g = guion(vec![Ok(respuesta(vec![otra, esa.clone()]))]);
+        let n = buscar_en(&mut g, &[("x_id", "0")]).unwrap();
+        let con_hijos: Vec<&XmlNode> = n
+            .children
+            .iter()
+            .filter(|c| !c.children.is_empty())
+            .collect();
+        assert_eq!(con_hijos, vec![&esa]);
+        assert_eq!(n.text_of("Result"), Some("0"));
+    }
+
+    /// Solo el `BAD_PARAM` o una respuesta sin instancia acaban la lista:
+    /// otro error del router a mitad se devuelve.
+    #[test]
+    fn un_error_a_mitad_no_es_el_final() {
+        let fallo = Error::CallFailed {
+            name: "cbGetX".into(),
+            result: "1".into(),
+            error: "otro fallo".into(),
+        };
+        let mut g = guion(vec![
+            Ok(respuesta(vec![instancia(&[("x_id", "1")])])),
+            Err(fallo),
+        ]);
+        let r = buscar_en(&mut g, &[("x_id", "0")]);
+        assert!(
+            matches!(&r, Err(Error::CallFailed { error, .. }) if error == "otro fallo"),
+            "{r:?}"
+        );
+        let mut g = guion(vec![Ok(respuesta(vec![instancia(&[("x_id", "1")])]))]);
+        assert!(matches!(
+            buscar_en(&mut g, &[("x_id", "0")]),
+            Err(Error::SinInstancia(_))
+        ));
+    }
+
+    /// El final se decide por el id de la posición (`x_id`), no por el
+    /// primer campo de `ident`.
+    #[test]
+    fn el_final_lo_dice_el_id_de_la_posicion() {
+        let mut g = guion(vec![
+            Ok(respuesta(vec![instancia(&[("x_id", "1")])])),
+            Ok(respuesta(vec![instancia(&[("x_id", "0"), ("aaa", "z")])])),
+        ]);
+        assert!(buscar_en(&mut g, &[("aaa", "z"), ("x_id", "0")]).is_ok());
+    }
+
+    /// Un id que se repite (la lista vuelve a empezar o repite la última)
+    /// acaba la búsqueda.
+    #[test]
+    fn un_id_repetido_acaba_la_busqueda() {
+        let uno = || Ok(respuesta(vec![instancia(&[("x_id", "1")])]));
+        let mut g = guion(vec![uno(), uno(), uno(), uno()]);
+        assert!(matches!(
+            buscar_en(&mut g, &[("x_id", "0")]),
+            Err(Error::SinInstancia(_))
+        ));
+        assert_eq!(g.pedidas, ["0", "1"]);
+    }
+
     #[test]
     fn primero_la_posicion_del_id() {
         let o = orden("x_0i", &[("x_id", "1")]);
@@ -207,22 +367,22 @@ mod tests {
     #[test]
     fn la_instancia_otra_o_el_final() {
         let id = [("x_id", "0")];
-        assert_eq!(leida(&pool("0"), &id), Leida::Esa);
-        assert_eq!(leida(&pool("1"), &id), Leida::Otra);
+        assert_eq!(leida(&pool("0"), &id, "x_id"), Leida::Esa);
+        assert_eq!(leida(&pool("1"), &id, "x_id"), Leida::Otra);
         // Solo el índice (la respuesta sin instancia): el final.
         let vacia = XmlNode {
             tag: "cbGetX".into(),
             text: String::new(),
             children: vec![hoja("x_0i", "0"), hoja("Result", "0")],
         };
-        assert_eq!(leida(&vacia, &id), Leida::Fin);
+        assert_eq!(leida(&vacia, &id, "x_id"), Leida::Fin);
         // Valores sueltos en la propia respuesta.
         let suelta = XmlNode {
             tag: "cbGetX".into(),
             text: String::new(),
             children: vec![hoja("x_id", " 0 "), hoja("Result", "0")],
         };
-        assert_eq!(leida(&suelta, &id), Leida::Esa);
+        assert_eq!(leida(&suelta, &id, "x_id"), Leida::Esa);
     }
 
     /// Con los dos pools de las fixtures (posición 0 = id 1, posición 1 =

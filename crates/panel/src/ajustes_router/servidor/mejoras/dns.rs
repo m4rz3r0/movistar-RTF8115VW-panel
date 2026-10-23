@@ -40,37 +40,87 @@ pub(super) fn opcion_leida<'e>(
 }
 
 /// El destino del paso `p` cuyo campo declara los resolutores del operador
-/// (el DNS principal), con su valor leído: `None` si no hay o no se leyó
-/// como texto.
-fn principal<'c>(
+/// (el DNS principal): su id de campo, su definición y su valor leído.
+/// `None` si no hay o no se leyó como texto.
+fn principal<'c, 'p>(
     cat: &'c CatalogoAjustes,
-    p: &PasoExpandido,
+    p: &'p PasoExpandido,
     leer: &dyn Fn(&str, &str) -> Leido,
-) -> Option<(&'c ajustes::Campo, String)> {
+) -> Option<(&'p str, &'c ajustes::Campo, String)> {
     p.destinos.iter().find_map(|d| {
         let def = cat.ajuste(&d.ajuste)?.campo(&d.campo)?;
         if def.del_operador.is_empty() {
             return None;
         }
         match leer(&d.ajuste, &d.campo) {
-            Leido::Valor(ValorLegible::Texto(t)) => Some((def, t)),
+            Leido::Valor(ValorLegible::Texto(t)) => Some((d.campo.as_str(), def, t)),
             _ => None,
         }
     })
 }
 
+/// Los valores leídos de los demás destinos del paso (el DNS secundario),
+/// por campo; `None` si alguno no se leyó como texto.
+fn demas(
+    p: &PasoExpandido,
+    leer: &dyn Fn(&str, &str) -> Leido,
+    principal: &str,
+) -> Option<Vec<(String, String)>> {
+    p.destinos
+        .iter()
+        .filter(|d| d.campo != principal)
+        .map(|d| match leer(&d.ajuste, &d.campo) {
+            Leido::Valor(ValorLegible::Texto(t)) => Some((d.campo.clone(), t)),
+            _ => None,
+        })
+        .collect()
+}
+
 /// ¿Tiene el router DNS propios en los campos del paso `p`? Un DNS
 /// principal que no es el router (`ip_router`, vacío o `0.0.0.0`) ni del
-/// operador ([`dns_propio`]). `None` si no se puede saber (sin la IP del
-/// router) o el paso no tiene un campo que lo diga.
+/// operador ([`dns_propio`]), y un secundario vacío o que tampoco lo es:
+/// con el secundario del operador, parte de las consultas sigue yendo allí.
+/// `None` si no se puede saber (sin la IP del router) o el paso no tiene un
+/// campo que lo diga.
 pub(super) fn propios(
     cat: &CatalogoAjustes,
     p: &PasoExpandido,
     leer: &dyn Fn(&str, &str) -> Leido,
     ip_router: Option<Ipv4Addr>,
 ) -> Option<bool> {
-    let (def, valor) = principal(cat, p, leer)?;
-    dns_propio(def, &valor, ip_router)
+    let (campo, def, valor) = principal(cat, p, leer)?;
+    if dns_propio(def, &valor, ip_router)? {
+        for (_, v) in demas(p, leer, campo)? {
+            if !v.trim().is_empty() && !dns_propio(def, &v, ip_router)? {
+                return Some(false);
+            }
+        }
+        return Some(true);
+    }
+    Some(false)
+}
+
+/// El proveedor de `e` cuyo DNS principal es el del router, con los demás
+/// campos vacíos (9.9.9.9 sin secundario): se dice con su nombre, no como
+/// «DNS propios».
+pub(super) fn solo_principal<'e>(
+    cat: &CatalogoAjustes,
+    p: &PasoExpandido,
+    leer: &dyn Fn(&str, &str) -> Leido,
+    e: &'e Eleccion,
+) -> Option<&'e OpcionEleccion> {
+    let (campo, _, valor) = principal(cat, p, leer)?;
+    if !demas(p, leer, campo)?
+        .iter()
+        .all(|(_, v)| v.trim().is_empty())
+    {
+        return None;
+    }
+    e.opciones.iter().find(|o| {
+        o.valores
+            .get(campo)
+            .is_some_and(|x| x.trim() == valor.trim())
+    })
 }
 
 /// Estado del paso de los DNS (`p`, que elige con `e`): el de
@@ -221,6 +271,17 @@ mod tests {
             estado("80.58.61.250", "80.58.61.254", router),
             EstadoPaso::Pendiente
         );
+        // Principal propio, pero el secundario es del operador o el router:
+        // parte de las consultas sigue yendo allí.
+        assert_eq!(
+            estado("192.168.1.70", "80.58.61.250", router),
+            EstadoPaso::Pendiente
+        );
+        assert_eq!(
+            estado("192.168.1.70", "192.168.1.1", router),
+            EstadoPaso::Pendiente
+        );
+        assert_eq!(estado("192.168.1.70", "", router), EstadoPaso::Hecho);
         // Un proveedor entero: hecho, y no son «propios».
         assert_eq!(
             estado("9.9.9.9", "149.112.112.112", None),

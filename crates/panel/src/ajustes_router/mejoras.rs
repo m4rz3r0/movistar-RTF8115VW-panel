@@ -66,6 +66,10 @@ pub struct PasoLoteVista {
     /// de los DNS hecho con unos que no son de la lista).
     #[serde(default)]
     pub nota: Option<String>,
+    /// Id del proveedor de DNS que nombra la nota (`$proveedor`, con
+    /// `mejoras-dns-<id>`), si la nota lo lleva.
+    #[serde(default)]
+    pub nota_proveedor: Option<String>,
     /// Sale desmarcado en la revisión y no cuenta como pendiente.
     pub opcional: bool,
 }

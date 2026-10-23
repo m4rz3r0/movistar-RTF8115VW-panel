@@ -18,3 +18,21 @@ async fn invitados_separada_solo_se_lee() {
     );
     assert!(campo(a, "aislamiento")["solo_lectura"].is_null(), "{a}");
 }
+
+/// El motivo dice que es el panel quien aún no sabe escribirlo, no que el
+/// router no deje (no está comprobado).
+#[test]
+fn motivo_de_separada_no_culpa_al_router() {
+    let ruta = concat!(env!("CARGO_MANIFEST_DIR"), "/../i18n/locales");
+    for (idioma, esperado) in [
+        ("es", "El panel todavía no sabe"),
+        ("en", "The panel does not yet know"),
+    ] {
+        let ftl = std::fs::read_to_string(format!("{ruta}/{idioma}/ajustes-wifi.ftl")).unwrap();
+        let linea = ftl
+            .lines()
+            .find(|l| l.starts_with("ajuste-wifi-invitados_avanzado-separada-motivo ="))
+            .unwrap();
+        assert!(linea.contains(esperado), "{idioma}: {linea}");
+    }
+}

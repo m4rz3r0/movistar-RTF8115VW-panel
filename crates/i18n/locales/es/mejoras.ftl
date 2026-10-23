@@ -88,6 +88,7 @@ mejoras-paso-estado-pendiente = Pendiente
 mejoras-paso-estado-sin-leer = Sin leer
 mejoras-paso-estado-no-aplica = No aplica
 mejoras-paso-estado-dns-propios = DNS propios
+mejoras-paso-estado-dns-solo-principal = { $proveedor } (solo principal)
 mejoras-opcional = Opcional
 mejoras-revisar = Revisar y aplicar
 mejoras-volver-a-leer = Volver a leer
