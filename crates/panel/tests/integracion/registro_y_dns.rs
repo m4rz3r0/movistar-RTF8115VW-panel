@@ -1,6 +1,6 @@
 //! Los dos ajustes de las mejoras contra `router-sim`: el registro del
 //! sistema (sin envío remoto y sin `export`) y los DNS que el router reparte
-//! a la red de casa (pool DHCP 0), con su ida, su vuelta y su recomendación.
+//! a la red de casa (pool DHCP de id 0), con su ida, su vuelta y su recomendación.
 
 use crate::comun::{Panel, PanelPrueba, aplicar_ajuste, elemento, leer, llamar, ok};
 use serde_json::{Value, json};
@@ -18,14 +18,15 @@ async fn del_registro(p: &Panel, nombre: &str) -> String {
     elemento(&n, nombre).unwrap_or_else(|| panic!("falta {nombre}"))
 }
 
-/// Elemento `nombre` del pool DHCP 0 en el simulador.
+/// Elemento `nombre` del pool DHCP de casa (id 0, en la posición 1 de las
+/// fixtures) en el simulador.
 async fn del_pool(p: &Panel, nombre: &str) -> String {
     let n = p
         .state
         .hgu
         .call(
             "cbGetDhcpv4ServerPool",
-            &[("rtm_cfg_dhcpv4_svr_pool_0i", "0")],
+            &[("rtm_cfg_dhcpv4_svr_pool_0i", "1")],
         )
         .await
         .unwrap();
@@ -106,7 +107,7 @@ async fn registro_ida_y_vuelta() {
     );
 }
 
-/// Toda escritura del pool DHCP va al pool 0: los del deco no se tocan.
+/// Toda escritura del pool DHCP va al de id 0: los demás no se tocan.
 fn solo_pool_0(p: &Panel) {
     for (f, ps) in p.sim.control.writes() {
         if f == "cbSetDhcpv4ServerPool" {

@@ -69,6 +69,7 @@ ajustes-riesgo-alto-desc = Puede dejarte sin internet o sin acceso al router. Se
 ## Errores
 ajustes-error-tema = Ese tema de ajustes no existe.
 ajustes-error-lectura = No se ha podido leer este ajuste del router. Prueba de nuevo en un momento.
+ajustes-error-sin-instancia = El router no tiene la parte de su configuración que lee este ajuste: no se muestra ni se cambia.
 ajustes-error-vacio = Este campo no puede quedar vacío.
 ajustes-error-corto = Demasiado corto: tiene que ocupar al menos lo que { $min } letras sin tilde. Cada letra con tilde o eñe ocupa como dos, el «€» como tres y un emoji como cuatro.
 ajustes-error-largo = Demasiado largo: cabe lo que { $max } letras sin tilde. Cada letra con tilde o eñe ocupa como dos, el «€» como tres y un emoji como cuatro.
@@ -217,7 +218,7 @@ ajustes-recomendacion-ver-mejoras = Ver en Mejoras
 ajustes-problema-wifi-wps-true = El WPS está activado: quien llegue al router puede conectarse pulsando su botón, sin la contraseña.
 ajustes-problema-wifi-activa-false = La red está apagada: ningún dispositivo puede conectarse a ella.
 ajustes-problema-wifi-activa-true = La red está encendida: si ahora no tienes visitas, es una red más que se ve desde fuera.
-ajustes-problema-wifi-aislamiento-false = Los dispositivos de esta red pueden verse entre ellos: las visitas verían los tuyos.
+ajustes-problema-wifi-aislamiento-false = Los dispositivos de esta red pueden verse entre ellos: una visita podría curiosear en el dispositivo de otra.
 ajustes-problema-wifi-aislamiento-true = Los dispositivos de esta red no se ven entre ellos: no podrás, por ejemplo, enviar contenido a la tele.
 ajustes-problema-wifi-visible-false = El nombre de la red está oculto: hay que escribirlo a mano para conectarse.
 ajustes-problema-wifi-seguridad-abierta = La red está abierta: cualquiera que esté cerca puede conectarse sin contraseña.

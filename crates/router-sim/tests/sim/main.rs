@@ -12,5 +12,6 @@ mod escrituras;
 mod fixtures;
 mod lecturas;
 mod listas;
+mod pools;
 mod reservas;
 mod sesion;

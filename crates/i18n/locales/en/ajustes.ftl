@@ -69,6 +69,7 @@ ajustes-riesgo-alto-desc = May leave you without internet or without access to t
 ## Errors
 ajustes-error-tema = That settings section does not exist.
 ajustes-error-lectura = This setting could not be read from the router. Try again in a moment.
+ajustes-error-sin-instancia = The router does not have the part of its configuration this setting reads: it is not shown or changed.
 ajustes-error-vacio = This field cannot be left empty.
 ajustes-error-corto = Too short: it must take up at least as much as { $min } unaccented letters. Each accented letter takes up about two, "€" about three and an emoji about four.
 ajustes-error-largo = Too long: there is room for { $max } unaccented letters. Each accented letter takes up about two, "€" about three and an emoji about four.
@@ -217,7 +218,7 @@ ajustes-recomendacion-ver-mejoras = See in Improvements
 ajustes-problema-wifi-wps-true = WPS is on: anyone who gets to the router can connect by pressing its button, without the password.
 ajustes-problema-wifi-activa-false = The network is off: no device can connect to it.
 ajustes-problema-wifi-activa-true = The network is on: if you have no visitors right now, it is one more network visible from outside.
-ajustes-problema-wifi-aislamiento-false = Devices on this network can see each other: visitors would see yours.
+ajustes-problema-wifi-aislamiento-false = Devices on this network can see each other: one visitor could snoop on another visitor's device.
 ajustes-problema-wifi-aislamiento-true = Devices on this network can't see each other: you won't be able to, for example, cast to the TV.
 ajustes-problema-wifi-visible-false = The network name is hidden: it has to be typed by hand to connect.
 ajustes-problema-wifi-seguridad-abierta = The network is open: anyone nearby can connect without a password.

@@ -37,6 +37,7 @@ mod pagina_tema_lotes;
 mod pagina_temas;
 mod panel_ajustes;
 mod poller;
+mod pool_por_id;
 mod red;
 mod registro_y_dns;
 mod sensibles;

@@ -144,11 +144,13 @@ fn claves_de_mejoras(idioma: Idioma) -> Vec<String> {
 /// no trae textos de lotes, pasos, avisos o consejos que nadie pide.
 #[test]
 fn claves_de_lotes_en_los_dos_idiomas() {
-    const ESTADOS_DE_PASO: [&str; 4] = [
+    const ESTADOS_DE_PASO: [&str; 6] = [
         "mejoras-paso-estado-hecho",
         "mejoras-paso-estado-pendiente",
         "mejoras-paso-estado-sin-leer",
         "mejoras-paso-estado-no-aplica",
+        "mejoras-paso-estado-dns-propios",
+        "mejoras-paso-estado-dns-solo-principal",
     ];
     let c = cargar();
     let claves: BTreeSet<String> = claves_de_lotes(&c).into_iter().collect();

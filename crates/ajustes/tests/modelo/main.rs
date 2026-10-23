@@ -14,5 +14,6 @@ mod campos;
 mod carga;
 mod elementos;
 mod lotes;
+mod por_id;
 mod sensibles;
 mod validar;

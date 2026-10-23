@@ -143,8 +143,9 @@ async fn cualquier_punto_de_acceso_se_lee_por_id() {
 }
 
 /// Cada ajuste del catálogo se lee en el sim con su lectura y sus
-/// parámetros, y la respuesta trae el elemento de cada campo (salvo en una
-/// lista vacía, como la de DNS dinámico de las fixtures).
+/// parámetros (o buscando su instancia por id, si su lectura lo pide), y la
+/// respuesta trae el elemento de cada campo (salvo en una lista vacía, como
+/// la de DNS dinámico de las fixtures).
 #[tokio::test]
 async fn cada_ajuste_del_catalogo_se_lee() {
     let sim = start().await;
@@ -158,7 +159,14 @@ async fn cada_ajuste_del_catalogo_se_lee() {
             .iter()
             .map(|(k, v)| (k.as_str(), v.as_str()))
             .collect();
-        let n = match c.call(&a.leer.funcion, &params).await {
+        let leida = match a.busqueda() {
+            Some((posicion, ident)) => {
+                c.call_por_id(&a.leer.funcion, &params, posicion, &ident)
+                    .await
+            }
+            None => c.call(&a.leer.funcion, &params).await,
+        };
+        let n = match leida {
             Ok(n) => n,
             Err(e) => {
                 fallos.push(format!("{}: {e}", a.id));

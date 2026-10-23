@@ -1,5 +1,6 @@
 //! Pruebas internas de la planificación de escrituras.
 
+use super::super::CambioError;
 use super::*;
 use catalogo::Catalogo;
 
@@ -328,6 +329,28 @@ fn inversa_de_cada_operacion() {
     assert_eq!(inversa(&plan), None);
 }
 
+/// La lectura pareada del pool DHCP pasa el id como posición: no se lee esa
+/// posición, se busca la instancia de ese id.
+#[test]
+fn lectura_pareada_por_posicion_busca_el_id() {
+    let c = cat();
+    let f = c.funcion("cbSetDhcpv4ServerPool").unwrap();
+    let l = lectura_de(f, &mapa(&[("rtm_cfg_dhcpv4_svr_pool_id", "0")]), Some("0")).unwrap();
+    assert_eq!(
+        l,
+        Lectura::Xml {
+            funcion: "cbGetDhcpv4ServerPool".into(),
+            params: Vec::new(),
+            clave_id: Some("rtm_cfg_dhcpv4_svr_pool_0i".into()),
+            buscar: Some(super::lectura::BuscarId {
+                posicion: "rtm_cfg_dhcpv4_svr_pool_0i".into(),
+                campo: "rtm_cfg_dhcpv4_svr_pool_id".into(),
+                valor: "0".into(),
+            }),
+        }
+    );
+}
+
 #[test]
 fn lectura_pareada_sustituye_parametros() {
     let c = cat();
@@ -346,6 +369,7 @@ fn lectura_pareada_sustituye_parametros() {
                 ("rtm_dhcpv4_svr_pool_static_id".into(), "4".into()),
             ],
             clave_id: Some("rtm_dhcpv4_svr_pool_static_id".into()),
+            buscar: None,
         }
     );
     let falta = lectura_de(f, &mapa(&[]), Some("4"));

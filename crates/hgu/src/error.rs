@@ -30,4 +30,8 @@ pub enum Error {
     /// Respuesta que no se esperaba.
     #[error("respuesta inesperada: {0}")]
     Unexpected(String),
+    /// Ninguna posición de una lista tiene la instancia que se busca por su
+    /// id ([`Client::call_por_id`](crate::Client::call_por_id)).
+    #[error("instancia no encontrada: {0}")]
+    SinInstancia(String),
 }

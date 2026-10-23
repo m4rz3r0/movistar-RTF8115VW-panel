@@ -31,7 +31,7 @@ mejoras-paso-upnp = Apagar la apertura automática de puertos (UPnP)
 mejoras-paso-upnp-desc = Recomendado si no tienes consolas ni programas que necesiten abrir puertos solos. A favor: ningún dispositivo ni programa malicioso abre puertos sin tu permiso. En contra: alguna consola pasará a una conexión restringida y tendrás que abrir sus puertos a mano.
 mejoras-paso-wpa2 = Cifrar la WiFi con WPA2-AES
 mejoras-paso-wpa2-desc = Recomendado si no tienes dispositivos WiFi de antes de 2006, más o menos. A favor: se quitan el cifrado antiguo y el modo mixto, que son más débiles. En contra: los dispositivos muy viejos no se conectarán.
-mejoras-paso-aislar_invitados = Aislar la red de invitados
+mejoras-paso-aislar_invitados = Aislar entre sí los dispositivos de la red de invitados
 mejoras-paso-aislar_invitados-desc = Recomendado si usas la red de invitados para las visitas o para dispositivos del hogar conectados. A favor: los dispositivos de esa red no se ven entre sí. En contra: entre ellos no se puede enviar contenido a una tele ni imprimir.
 mejoras-paso-espejo = Apagar el espejo del tráfico de internet
 mejoras-paso-espejo-desc = Recomendado si no estás haciendo un diagnóstico de la conexión. A favor: ningún puerto de la red de casa recibe una copia de todo el tráfico de internet. En contra: ninguno; se enciende solo para diagnosticar.
@@ -43,6 +43,8 @@ mejoras-paso-hora_neutra = Tomar la hora de un servidor neutro
 mejoras-paso-hora_neutra-desc = Recomendado si quieres depender lo menos posible de los servidores del operador. A favor: la hora viene del Real Instituto y Observatorio de la Armada. En contra: la ganancia de privacidad es mínima.
 
 ## Proveedores de DNS (la nota de cada uno, en el selector de la revisión)
+mejoras-dns-mantener = Mantener los actuales
+mejoras-dns-mantener-desc = No cambia los DNS que el router reparte ahora a la red de casa.
 mejoras-dns-quad9 = Quad9
 mejoras-dns-quad9-desc = Bloquea dominios maliciosos. Está en Suiza y no guarda tu dirección IP.
 mejoras-dns-quad9_sin_filtro = Quad9 sin filtro
@@ -85,6 +87,8 @@ mejoras-paso-estado-hecho = Hecho
 mejoras-paso-estado-pendiente = Pendiente
 mejoras-paso-estado-sin-leer = Sin leer
 mejoras-paso-estado-no-aplica = No aplica
+mejoras-paso-estado-dns-propios = DNS propios
+mejoras-paso-estado-dns-solo-principal = { $proveedor } (solo principal)
 mejoras-opcional = Opcional
 mejoras-revisar = Revisar y aplicar
 mejoras-volver-a-leer = Volver a leer

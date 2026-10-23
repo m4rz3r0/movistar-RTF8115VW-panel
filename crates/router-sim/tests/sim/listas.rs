@@ -97,17 +97,17 @@ async fn crear_nat(c: &Client, desc: &str) -> String {
         .to_owned()
 }
 
+/// `…_0i` es la posición en la lista, como en el router real: al borrar
+/// una del medio, las de detrás se adelantan, y la posición ya no es el id.
 #[tokio::test]
-async fn lectura_pareada_por_0i_sigue_valida_tras_borrar_en_medio() {
+async fn lectura_por_0i_es_la_posicion_tras_borrar_en_medio() {
     let sim = start().await;
     let c = client(&sim, Duration::from_secs(5));
-    let pareada = |id: &str| [("nat_port_mapping_0i", id.to_owned())];
-    let leer = |id: String| {
+    let leer = |posicion: &'static str| {
         let c = c.clone();
         async move {
-            let p = pareada(&id);
-            let p: Vec<(&str, &str)> = p.iter().map(|(k, v)| (*k, v.as_str())).collect();
-            c.call("cbGetNatPortMapping", &p).await
+            c.call("cbGetNatPortMapping", &[("nat_port_mapping_0i", posicion)])
+                .await
         }
     };
     let primera = crear_nat(&c, "primera").await;
@@ -134,8 +134,14 @@ async fn lectura_pareada_por_0i_sigue_valida_tras_borrar_en_medio() {
     )
     .await
     .unwrap();
-    // La lectura pareada `…_0i={id}` lee la instancia escrita, no otra.
-    let n = leer(tercera.clone()).await.unwrap();
+    // Detrás de la de las fixtures (posición 0) van la primera y la tercera.
+    let n = leer("1").await.unwrap();
+    assert_eq!(campo_de(&n, NAT, "desc").as_deref(), Some("primera"));
+    assert_eq!(
+        campo_de(&n, NAT, "nat_port_mapping_0i").as_deref(),
+        Some("1")
+    );
+    let n = leer("2").await.unwrap();
     assert_eq!(
         campo_de(&n, NAT, "nat_port_mapping_id"),
         Some(tercera.clone())
@@ -144,9 +150,7 @@ async fn lectura_pareada_por_0i_sigue_valida_tras_borrar_en_medio() {
         campo_de(&n, NAT, "desc").as_deref(),
         Some("tercera-editada")
     );
-    let n = leer(primera.clone()).await.unwrap();
-    assert_eq!(campo_de(&n, NAT, "desc").as_deref(), Some("primera"));
-    assert!(leer(segunda).await.is_err(), "la borrada ya no se lee");
+    assert!(leer("3").await.is_err(), "no hay cuarta posición");
     // El 0i de la instancia de las fixtures no cambia; el de las nuevas es su id.
     let todas = c
         .call("cbGetNatPortMapping", &[("all", "ALL")])

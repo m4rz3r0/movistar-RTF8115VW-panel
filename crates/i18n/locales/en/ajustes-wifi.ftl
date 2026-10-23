@@ -112,10 +112,13 @@ ajuste-wifi-invitados-wps-recomendado = Recommended if you connect your devices 
 
 ## Guest network: more options
 ajuste-wifi-invitados_avanzado-titulo = Guest network: more options
-ajuste-wifi-invitados_avanzado-desc = Less common options of the guest network: isolation between devices, traffic priority and device limit.
+ajuste-wifi-invitados_avanzado-desc = Less common options of the guest network: whether it is separated from the home network, isolation between devices, traffic priority and device limit.
 ajuste-wifi-invitados_avanzado-ayuda = The factory values work well in almost every home. Only change them if you know why: a change here can stop some devices from connecting or from doing things like casting to the TV.
+ajuste-wifi-invitados_avanzado-separada = Separated from the home network
+ajuste-wifi-invitados_avanzado-separada-desc = If on, devices on the guest network reach the internet but not the devices on your home network.
+ajuste-wifi-invitados_avanzado-separada-motivo = The panel does not yet know how to change it: it only shows it.
 ajuste-wifi-invitados_avanzado-aislamiento = Isolate devices from each other
-ajuste-wifi-invitados_avanzado-aislamiento-desc = Devices connected to this network over WiFi cannot see each other: for example, you will not be able to cast to a TV on the same WiFi. They can usually still reach the internet and devices connected by cable.
+ajuste-wifi-invitados_avanzado-aislamiento-desc = Devices connected to the guest network cannot see each other: for example, one visitor cannot snoop on another one's phone. It does not decide whether they reach the devices on your home network: that is “Separated from the home network”.
 ajuste-wifi-invitados_avanzado-aislamiento-recomendado = Recommended if you give this network to your guests. Pros: devices connected to it cannot see each other, so one cannot snoop on another. Cons: from this network you cannot cast to a TV or speaker connected to it.
 ajuste-wifi-invitados_avanzado-wmm = Traffic priority (WMM)
 ajuste-wifi-invitados_avanzado-wmm-desc = Gives calls and video priority over downloads. It is also needed for the high speeds of modern WiFi.

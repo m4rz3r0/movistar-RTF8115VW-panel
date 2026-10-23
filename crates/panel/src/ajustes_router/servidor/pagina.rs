@@ -43,10 +43,15 @@ pub(in crate::ajustes_router) async fn leer_tema(
         .collect();
     let mut vistas: Vec<AjusteVista> = del_tema
         .iter()
-        .zip(&nodos)
-        .map(|(a, nodo)| vista(&state.catalogo, a, *nodo))
+        .zip(&claves)
+        .map(|(a, c)| vista_leida(&state.catalogo, a, leidas.get(c)))
         .collect();
     derivados::marcar(&del_tema, &mut vistas, &nodos, &leidas);
+    super::dns_propios::aceptar(
+        &state.ajustes,
+        &mut vistas,
+        super::red_local::ip_router(&leidas),
+    );
     let ctx = Contexto {
         del_tema: &del_tema,
         nodos: &nodos,

@@ -164,8 +164,8 @@ async fn escritura_por_instancia_no_toca_otra() {
 }
 
 /// El pool DHCP es una lista cuya fixture sin parámetros solo trae el índice
-/// (ninguna instancia): una escritura del pool 0 se ve en su lectura, sin
-/// tocar el resto del pool.
+/// (ninguna instancia): una escritura del pool de id 0 (en la posición 1,
+/// como en el router real) se ve en su lectura, sin tocar el resto del pool.
 #[tokio::test]
 async fn escritura_del_pool_dhcp_se_lee() {
     let sim = start().await;
@@ -173,7 +173,7 @@ async fn escritura_del_pool_dhcp_se_lee() {
     let leer = || {
         c.call(
             "cbGetDhcpv4ServerPool",
-            &[("rtm_cfg_dhcpv4_svr_pool_0i", "0")],
+            &[("rtm_cfg_dhcpv4_svr_pool_0i", "1")],
         )
     };
     let antes = leer().await.unwrap();

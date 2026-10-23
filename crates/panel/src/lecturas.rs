@@ -36,23 +36,57 @@ pub use crate::ajustes_router::CADUCIDAD_LECTURAS;
 pub const NO_INTENTADA: &str = "no se intentó: el router no respondió a la lectura anterior";
 
 /// Una lectura: función y parámetros, ordenados por nombre (el orden no
-/// cambia lo que se lee).
+/// cambia lo que se lee) y, si busca una instancia de una lista por su id,
+/// cómo ([`Busqueda`]).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Clave {
     pub funcion: String,
     pub params: Vec<(String, String)>,
+    pub busqueda: Option<Busqueda>,
+}
+
+/// Instancia de una lista que se busca por su id recorriendo posiciones
+/// ([`hgu::Client::call_por_id`]).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Busqueda {
+    /// Parámetro de posición (`X_0i`).
+    pub posicion: String,
+    /// Campos que identifican la instancia (`X_id`), ordenados.
+    pub ident: Vec<(String, String)>,
+}
+
+fn pares<K: AsRef<str>, V: AsRef<str>>(pares: &[(K, V)]) -> Vec<(String, String)> {
+    let mut v: Vec<(String, String)> = pares
+        .iter()
+        .map(|(k, v)| (k.as_ref().to_owned(), v.as_ref().to_owned()))
+        .collect();
+    v.sort();
+    v
 }
 
 impl Clave {
     pub fn new<K: AsRef<str>, V: AsRef<str>>(funcion: &str, params: &[(K, V)]) -> Clave {
-        let mut params: Vec<(String, String)> = params
-            .iter()
-            .map(|(k, v)| (k.as_ref().to_owned(), v.as_ref().to_owned()))
-            .collect();
-        params.sort();
         Clave {
             funcion: funcion.to_owned(),
-            params,
+            params: pares(params),
+            busqueda: None,
+        }
+    }
+
+    /// Lectura de la instancia de `funcion` cuyos campos valen `ident`,
+    /// buscada por el parámetro de posición `posicion`.
+    pub fn buscando<K: AsRef<str>, V: AsRef<str>>(
+        funcion: &str,
+        params: &[(K, V)],
+        posicion: &str,
+        ident: &[(&str, &str)],
+    ) -> Clave {
+        Clave {
+            busqueda: Some(Busqueda {
+                posicion: posicion.to_owned(),
+                ident: pares(ident),
+            }),
+            ..Clave::new(funcion, params)
         }
     }
 }
@@ -210,10 +244,20 @@ impl CacheLecturas {
                 .iter()
                 .map(|(k, v)| (k.as_str(), v.as_str()))
                 .collect();
-            let r = turno
-                .call(&c.funcion, &params)
-                .await
-                .inspect(|n| self.guardar(hgu, generacion, c.clone(), n.clone()));
+            let r = match &c.busqueda {
+                None => turno.call(&c.funcion, &params).await,
+                Some(b) => {
+                    let ident: Vec<(&str, &str)> = b
+                        .ident
+                        .iter()
+                        .map(|(k, v)| (k.as_str(), v.as_str()))
+                        .collect();
+                    turno
+                        .call_por_id(&c.funcion, &params, &b.posicion, &ident)
+                        .await
+                }
+            }
+            .inspect(|n| self.guardar(hgu, generacion, c.clone(), n.clone()));
             if let Err(e) = &r {
                 tracing::warn!("no se puede leer {}: {e}", c.funcion);
                 sin_router = matches!(e, hgu::Error::Network(_));

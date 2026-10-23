@@ -1,8 +1,9 @@
 //! Cálculo puro del estado de cada paso y de cada lote de mejoras, y del contador.
 
+use super::dns::opcion_de;
 use crate::ajustes_router::{EstadoLote, EstadoPaso};
 use crate::t;
-use ajustes::{Eleccion, OpcionEleccion, PasoExpandido, Tema, ValorLegible, partir_referencia};
+use ajustes::{Eleccion, PasoExpandido, Tema, ValorLegible, partir_referencia};
 use std::collections::BTreeSet;
 
 /// Lo leído de un campo: su valor legible o una lectura que falló.
@@ -14,7 +15,7 @@ pub(super) enum Leido {
 /// ¿Vale `v` lo que dice `esperado` (legible)? `None` si el router no da
 /// el dato (un valor vacío que el panel no reconoce). Otro valor que no
 /// reconoce no es el esperado.
-fn coincide(v: &ValorLegible, esperado: &str) -> Option<bool> {
+pub(super) fn coincide(v: &ValorLegible, esperado: &str) -> Option<bool> {
     match v {
         ValorLegible::Desconocido(t) if t.is_empty() => None,
         ValorLegible::Desconocido(_) | ValorLegible::Secreto => Some(false),
@@ -24,7 +25,7 @@ fn coincide(v: &ValorLegible, esperado: &str) -> Option<bool> {
 }
 
 /// «Sin leer» porque falló la lectura de la pestaña `tema`.
-fn sin_leer(tema: Tema) -> EstadoPaso {
+pub(super) fn sin_leer(tema: Tema) -> EstadoPaso {
     let pestana = crate::ui::i18n::traducir(&format!("ajustes-tema-{}", tema.slug()), None);
     EstadoPaso::SinLeer {
         motivo: t!("mejoras-motivo-sin-leer", pestana = pestana),
@@ -86,37 +87,6 @@ pub(super) fn estado_paso(
     } else {
         EstadoPaso::Pendiente
     }
-}
-
-/// La opción de `e` que tiene entera los valores `leidos` (por campo): el
-/// DNS de un proveedor con el secundario de otro (o vacío) no es ninguno.
-fn opcion_de<'e>(leidos: &[(&str, ValorLegible)], e: &'e Eleccion) -> Option<&'e OpcionEleccion> {
-    e.opciones.iter().find(|o| {
-        leidos.iter().all(|(campo, v)| {
-            o.valores
-                .get(*campo)
-                .is_some_and(|x| coincide(v, x) == Some(true))
-        })
-    })
-}
-
-/// La opción de la elección `e` que ya tiene el router en los campos del
-/// paso `p` (`leer(ajuste, campo)`): el proveedor de DNS que está puesto.
-/// `None` si no es ninguna o falta alguna lectura.
-pub(super) fn opcion_leida<'e>(
-    p: &PasoExpandido,
-    leer: &dyn Fn(&str, &str) -> Leido,
-    e: &'e Eleccion,
-) -> Option<&'e OpcionEleccion> {
-    let leidos: Vec<(&str, ValorLegible)> = p
-        .destinos
-        .iter()
-        .map(|d| match leer(&d.ajuste, &d.campo) {
-            Leido::Valor(v) => Some((d.campo.as_str(), v)),
-            Leido::Fallo => None,
-        })
-        .collect::<Option<_>>()?;
-    opcion_de(&leidos, e)
 }
 
 /// ¿Cuenta el paso en «x de y» y en el contador? Los opcionales no.
@@ -186,8 +156,7 @@ pub(super) fn pendientes_unicos(pasos: &[(PasoExpandido, EstadoPaso)]) -> Option
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ajustes::{Condicion, Destino, OpcionEleccion};
-    use std::collections::BTreeMap;
+    use ajustes::{Condicion, Destino};
 
     fn destino(ajuste: &str, campo: &str, valor: Option<&str>) -> Destino {
         Destino {
@@ -349,64 +318,6 @@ mod tests {
             (hora, EstadoPaso::Pendiente),
         ];
         assert_eq!(pendientes_unicos(&pasos), None);
-    }
-
-    /// Vigilancia 5: el DNS solo está hecho con el par entero de un proveedor.
-    #[test]
-    fn dns_por_pares_de_proveedor() {
-        let opcion = |id: &str, principal: &str, secundario: &str| OpcionEleccion {
-            id: id.into(),
-            defecto: id == "neutro",
-            valores: BTreeMap::from([
-                ("principal".to_owned(), principal.to_owned()),
-                ("secundario".to_owned(), secundario.to_owned()),
-            ]),
-        };
-        let e = Eleccion {
-            id: "proveedor_dns".into(),
-            opciones: vec![
-                opcion("neutro", "9.9.9.9", "149.112.112.112"),
-                opcion("rapido", "1.1.1.1", "1.0.0.1"),
-            ],
-        };
-        let dns = PasoExpandido {
-            tema: Tema::RedLocal,
-            elegir: Some("proveedor_dns".into()),
-            ..paso(
-                "dns_casa",
-                vec![
-                    destino("red_local.dns_casa", "principal", None),
-                    destino("red_local.dns_casa", "secundario", None),
-                ],
-            )
-        };
-        let par = |principal: &'static str, secundario: &'static str| {
-            move |_: &str, campo: &str| {
-                Leido::Valor(ValorLegible::Texto(
-                    if campo == "principal" {
-                        principal
-                    } else {
-                        secundario
-                    }
-                    .into(),
-                ))
-            }
-        };
-        let estado =
-            |principal, secundario| estado_paso(&dns, &par(principal, secundario), Some(&e));
-        assert_eq!(estado("9.9.9.9", "149.112.112.112"), EstadoPaso::Hecho);
-        assert_eq!(estado("1.1.1.1", "1.0.0.1"), EstadoPaso::Hecho);
-        assert_eq!(estado("9.9.9.9", ""), EstadoPaso::Pendiente);
-        assert_eq!(estado("1.1.1.1", "9.9.9.9"), EstadoPaso::Pendiente);
-        assert_eq!(estado("192.168.1.1", "192.168.1.1"), EstadoPaso::Pendiente);
-        // El proveedor que está puesto, solo con el par entero.
-        let puesto = |principal, secundario| {
-            opcion_leida(&dns, &par(principal, secundario), &e).map(|o| o.id.as_str())
-        };
-        assert_eq!(puesto("1.1.1.1", "1.0.0.1"), Some("rapido"));
-        assert_eq!(puesto("9.9.9.9", "149.112.112.112"), Some("neutro"));
-        assert_eq!(puesto("1.1.1.1", "9.9.9.9"), None);
-        assert_eq!(opcion_leida(&dns, &falla, &e).map(|o| o.id.as_str()), None);
     }
 
     #[test]

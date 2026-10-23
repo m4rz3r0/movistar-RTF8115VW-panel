@@ -160,13 +160,22 @@ impl ChangeManager {
         let c = &self.state.hgu;
         match l {
             Lectura::Xml {
-                funcion, params, ..
+                funcion,
+                params,
+                buscar,
+                ..
             } => {
                 let p: Vec<(&str, &str)> = params
                     .iter()
                     .map(|(k, v)| (k.as_str(), v.as_str()))
                     .collect();
-                let n = c.call(funcion, &p).await?;
+                let n = match buscar {
+                    None => c.call(funcion, &p).await?,
+                    Some(b) => {
+                        let ident = [(b.campo.as_str(), b.valor.as_str())];
+                        c.call_por_id(funcion, &p, &b.posicion, &ident).await?
+                    }
+                };
                 Ok(elementos(&n).into_iter().next().unwrap_or_default())
             }
             Lectura::Pagina(page) => {
@@ -187,6 +196,7 @@ impl ChangeManager {
             funcion,
             params,
             clave_id,
+            ..
         } = l
         else {
             return Ok(Vec::new());
@@ -316,7 +326,7 @@ impl ChangeManager {
                         comparar(f, &plan.campos, &a, Lado::Anterior)
                             == Comprobacion::Coincide(None)
                     }
-                    Err(hgu::Error::CallFailed { .. }) => false,
+                    Err(hgu::Error::CallFailed { .. } | hgu::Error::SinInstancia(_)) => false,
                     Err(e) => return no_leido(e),
                 };
                 match (lado, existe) {

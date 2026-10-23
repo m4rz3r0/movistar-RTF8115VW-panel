@@ -110,13 +110,14 @@ y dice, en cada uno, para quién es, qué se gana y qué se pierde:
 - **Seguridad recomendada**: apaga la gestión remota del operador (TR-069)
   y su aviso periódico, el WPS de cada red WiFi, la apertura automática de
   puertos (UPnP), el espejo del tráfico y el envío del registro del sistema
-  a otro equipo; deja cada red WiFi en WPA2-AES y aísla la red de invitados
-  si está encendida. Lleva además unos consejos sin botón, para lo que el
-  router no deja cambiar desde su web.
+  a otro equipo; deja cada red WiFi en WPA2-AES y, si la red de invitados
+  está encendida, aísla entre sí sus dispositivos. Lleva además unos
+  consejos sin botón, para lo que el router no deja cambiar desde su web.
 - **Privacidad máxima**: apaga la gestión remota, su aviso, el espejo y el
   envío del registro; reparte a la red de casa unos DNS neutros, con el
   proveedor a elegir (Quad9, Quad9 sin filtro, DNS4EU, Cloudflare o
-  AdGuard), y, si lo marcas, toma la hora de un servidor neutro.
+  AdGuard) o, si ya usas unos DNS propios, los mantiene; y, si lo marcas,
+  toma la hora de un servidor neutro.
 
 Cada tarjeta dice qué pasos están hechos, cuáles faltan y cuáles no se
 pudieron leer, y la barra lateral cuenta los pendientes. «Revisar y

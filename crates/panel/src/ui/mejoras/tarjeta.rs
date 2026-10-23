@@ -47,9 +47,18 @@ fn estado_paso(estado: &EstadoPaso) -> (Estado, &'static str, String) {
 }
 
 /// Un paso de la lista: qué hace, de qué elemento (una red WiFi), si es
-/// opcional y, si no se pudo leer, por qué.
+/// opcional y, si no se pudo leer, por qué. Su nota («DNS propios», o el
+/// proveedor con solo su principal), en vez del texto del estado.
 fn paso(p: PasoLoteVista) -> impl IntoView {
     let (icono, clase, texto) = estado_paso(&p.estado);
+    let mut args = ::i18n::FluentArgs::new();
+    if let Some(id) = &p.nota_proveedor {
+        args.set("proveedor", traducir(&format!("mejoras-dns-{id}"), None));
+    }
+    let texto = p
+        .nota
+        .as_deref()
+        .map_or(texto, |k| traducir(k, Some(&args)));
     let motivo = match p.estado {
         EstadoPaso::SinLeer { motivo } => Some(motivo),
         _ => None,

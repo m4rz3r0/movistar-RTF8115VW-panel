@@ -244,7 +244,19 @@ async fn cada_lectura_una_sola_vez() {
             .state
             .ajustes
             .por_tema(ajustes::Tema::from_slug(tema).unwrap())
-            .map(|a| (a.leer.funcion.clone(), a.leer.params.clone()))
+            .map(|a| {
+                // Una radio se busca por su id: en las fixtures, su posición
+                // es la misma, así que basta con la primera lectura.
+                let mut params = a.leer.params.clone();
+                if let Some((posicion, ident)) = a.busqueda() {
+                    params.extend(
+                        ident
+                            .iter()
+                            .map(|(_, v)| (posicion.to_owned(), (*v).to_owned())),
+                    );
+                }
+                (a.leer.funcion.clone(), params)
+            })
             .collect();
         // La WiFi lee además, de cada radio, la lista de puntos de acceso
         // (para saber si emite alguna red que el panel no muestra) y la de

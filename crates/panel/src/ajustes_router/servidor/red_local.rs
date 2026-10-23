@@ -26,8 +26,14 @@ fn clave_reservas() -> Clave {
 }
 
 /// IP y máscara del router en la red de casa.
-fn clave_red_casa() -> Clave {
+pub(super) fn clave_red_casa() -> Clave {
     Clave::new::<&str, &str>("cbGetLanIPv4Addr", &[])
+}
+
+/// IP del router en la red de casa, si se leyó ([`clave_red_casa`]).
+pub(super) fn ip_router(leidas: &HashMap<Clave, Result<XmlNode, hgu::Error>>) -> Option<Ipv4Addr> {
+    let n = leidas.get(&clave_red_casa())?.as_ref().ok()?;
+    hgu::read::lan_ipv4_de(n).map(|(ip, _)| ip)
 }
 
 /// Lecturas de los dispositivos: la lista, las reservas y las

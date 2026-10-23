@@ -40,6 +40,8 @@ mod elementos;
 #[cfg(feature = "catalogo")]
 mod lotes;
 #[cfg(feature = "catalogo")]
+mod propios;
+#[cfg(feature = "catalogo")]
 mod validar;
 #[cfg(feature = "catalogo")]
 mod valores;
@@ -62,6 +64,8 @@ pub use modelo::{
     Accion, Adicional, Ajuste, Booleano, Campo, Componente, Elemento, Escritura, Excluida, Lectura,
     Opcion, Validar,
 };
+#[cfg(feature = "catalogo")]
+pub use propios::dns_propio;
 #[cfg(feature = "catalogo")]
 pub use validar::{claves_requeridas, comprobar, prefijo_i18n, riesgo};
 #[cfg(feature = "catalogo")]

@@ -14,6 +14,7 @@ use std::time::Duration;
 mod catalogo_real;
 mod deshacer;
 mod guardar;
+mod invitados;
 mod lectura;
 mod paginas;
 

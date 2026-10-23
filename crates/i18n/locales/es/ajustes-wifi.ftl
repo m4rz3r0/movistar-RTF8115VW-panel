@@ -112,10 +112,13 @@ ajuste-wifi-invitados-wps-recomendado = Recomendado si conectas tus dispositivos
 
 ## Red de invitados: más opciones
 ajuste-wifi-invitados_avanzado-titulo = Red de invitados: más opciones
-ajuste-wifi-invitados_avanzado-desc = Opciones menos habituales de la red de invitados: aislamiento entre dispositivos, prioridad del tráfico y límite de dispositivos.
+ajuste-wifi-invitados_avanzado-desc = Opciones menos habituales de la red de invitados: si está separada de la red de casa, aislamiento entre dispositivos, prioridad del tráfico y límite de dispositivos.
 ajuste-wifi-invitados_avanzado-ayuda = Los valores de fábrica funcionan bien en casi todas las casas. Cámbialos solo si sabes para qué: un cambio aquí puede impedir que algunos dispositivos se conecten o hagan cosas como enviar contenido a la tele.
+ajuste-wifi-invitados_avanzado-separada = Separada de la red de casa
+ajuste-wifi-invitados_avanzado-separada-desc = Si está activado, los dispositivos de la red de invitados llegan a internet, pero no a los de tu red de casa.
+ajuste-wifi-invitados_avanzado-separada-motivo = El panel todavía no sabe cambiarlo: solo lo enseña.
 ajuste-wifi-invitados_avanzado-aislamiento = Aislar los dispositivos entre sí
-ajuste-wifi-invitados_avanzado-aislamiento-desc = Los dispositivos conectados por WiFi a esta red no se ven entre ellos: por ejemplo, no podrás enviar contenido a una tele que esté en la misma WiFi. Normalmente siguen llegando a internet y a los dispositivos conectados por cable.
+ajuste-wifi-invitados_avanzado-aislamiento-desc = Los dispositivos conectados a la red de invitados no se ven entre ellos: por ejemplo, una visita no puede curiosear en el móvil de otra. No decide si llegan a los de tu red de casa: eso lo dice «Separada de la red de casa».
 ajuste-wifi-invitados_avanzado-aislamiento-recomendado = Recomendado si das esta red a tus visitas. A favor: los dispositivos conectados a ella no se ven entre ellos, así que uno no puede curiosear en el de otro. En contra: desde esta red no se puede enviar contenido a una tele o un altavoz conectados a ella.
 ajuste-wifi-invitados_avanzado-wmm = Prioridad del tráfico (WMM)
 ajuste-wifi-invitados_avanzado-wmm-desc = Da prioridad a las llamadas y al vídeo sobre las descargas. También hace falta para las velocidades altas de la WiFi moderna.

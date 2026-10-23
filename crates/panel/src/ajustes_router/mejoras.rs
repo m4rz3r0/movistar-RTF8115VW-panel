@@ -62,6 +62,14 @@ pub struct PasoLoteVista {
     /// en un paso repetido por elemento.
     pub detalle: Option<String>,
     pub estado: EstadoPaso,
+    /// Clave del texto que sustituye al del estado («DNS propios» en el paso
+    /// de los DNS hecho con unos que no son de la lista).
+    #[serde(default)]
+    pub nota: Option<String>,
+    /// Id del proveedor de DNS que nombra la nota (`$proveedor`, con
+    /// `mejoras-dns-<id>`), si la nota lo lleva.
+    #[serde(default)]
+    pub nota_proveedor: Option<String>,
     /// Sale desmarcado en la revisión y no cuenta como pendiente.
     pub opcional: bool,
 }
@@ -79,6 +87,11 @@ pub enum EstadoPaso {
     NoAplica,
 }
 
+/// Id de la opción del selector de DNS que no cambia los DNS de casa
+/// («Mantener los actuales»): sale la primera, y marcada si el paso está
+/// hecho con DNS propios.
+pub const MANTENER_DNS: &str = "mantener";
+
 /// Un proveedor de DNS del selector de la revisión: da `mejoras-dns-<id>` y
 /// su `-desc`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -94,7 +107,8 @@ pub struct ProveedorVista {
 /// índices al confirmar ([`confirmar_ajuste`](super::confirmar_ajuste)).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OpcionesLote {
-    /// Id del proveedor de DNS; sin él, el de por defecto.
+    /// Id del proveedor de DNS, o [`MANTENER_DNS`]; sin él, el que ya está
+    /// puesto (con DNS propios, se mantienen) o el de por defecto.
     #[serde(default)]
     pub proveedor_dns: Option<String>,
 }

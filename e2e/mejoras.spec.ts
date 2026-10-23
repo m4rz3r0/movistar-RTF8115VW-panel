@@ -70,7 +70,9 @@ for (const ancho of [360, 1440]) {
         // El paso de invitados no aplica: la red está apagada.
         const invitados = seguridad
           .locator("li.paso")
-          .filter({ hasText: "Aislar la red de invitados" });
+          .filter({
+            hasText: "Aislar entre sí los dispositivos de la red de invitados",
+          });
         await expect(invitados).toContainText("No aplica");
 
         // «Más consejos», plegado, se abre.

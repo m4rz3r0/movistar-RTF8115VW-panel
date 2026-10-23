@@ -27,10 +27,14 @@ pub(crate) fn read_node(
     {
         return r;
     }
-    let raw = s
-        .fixtures
-        .get(&fixture_key(name, params))
-        .or_else(|| s.fixtures.get(&(name.to_owned(), Vec::new())));
+    // Una lectura por posición (`X_0i`) de una lista sin fixture para esa
+    // posición no cae en la de sin parámetros: la posición no existe.
+    let por_posicion = params.iter().any(|(k, _)| k.ends_with("_0i"));
+    let raw = s.fixtures.get(&fixture_key(name, params)).or_else(|| {
+        (!(por_posicion && es_lectura_de_lista(s, name)))
+            .then(|| s.fixtures.get(&(name.to_owned(), Vec::new())))
+            .flatten()
+    });
     // Una lista que se puede escribir y todavía no se ha tocado atiende
     // también las lecturas de una instancia que solo existe en `all=ALL`.
     if raw.is_none()
@@ -48,7 +52,13 @@ pub(crate) fn read_node(
     } else if params.is_empty() {
         all_instances(s, name).ok_or_else(|| "no fixture".to_owned())?
     } else {
-        return Err("no fixture".to_owned());
+        // Una posición que no existe: lo que responde el router.
+        return Err(if por_posicion {
+            "BAD_PARAM"
+        } else {
+            "no fixture"
+        }
+        .to_owned());
     };
     aplicar_ediciones(st, name, &mut node);
     patch(s, st, name, &mut node);
@@ -185,51 +195,63 @@ fn es_lectura_de_lista(s: &Inner, name: &str) -> bool {
 }
 
 /// Lectura servida desde la lista materializada de `name`, si la hay y la
-/// lectura pide todas (`all=ALL`, o sin parámetros) o filtra por un campo de
-/// la instancia; `None` si no aplica.
+/// lectura pide todas (`all=ALL`, o sin parámetros), una posición o filtra
+/// por un campo de la instancia; `None` si no aplica.
 ///
-/// Un parámetro `X_0i=v` elige la instancia cuyo `X_id` vale `v` (así lo usan
-/// las lecturas pareadas: `X_0i={X_id}`). Una lectura por `*_id` devuelve
-/// `*_0i = -1`, como el router real; con `all=ALL` o por `*_0i`, el de la
-/// instancia.
+/// Un parámetro `X_0i=v` elige la instancia de la posición `v` de la lista,
+/// como el router real: la posición no tiene por qué ser su id (`X_id`), y
+/// cambia al borrar otra antes. La instancia leída así trae `X_0i = v`. Una
+/// lectura por `*_id` devuelve `*_0i = -1`, como el router real; con
+/// `all=ALL`, el `X_0i` de cada instancia.
 fn read_lista(
     lista: &ListaViva,
     name: &str,
     params: &[(String, String)],
 ) -> Option<Result<XmlNode, String>> {
-    // (hijo que se compara, valor, el parámetro era un índice)
-    let mut filtros: Vec<(String, &str, bool)> = Vec::new();
+    // (hijo que se compara, valor)
+    let mut filtros: Vec<(String, &str)> = Vec::new();
+    // (parámetro de posición, posición)
+    let mut posicion: Option<(&str, &str)> = None;
     for (k, v) in params
         .iter()
         .filter(|(k, _)| k != "all" && k != "sessionKey")
     {
-        let por_id = k
+        let de_posicion = k
             .strip_suffix("_0i")
-            .map(|b| format!("{b}_id"))
-            .filter(|id| lista.plantilla.get(id).is_some());
-        if let Some(id) = por_id {
-            filtros.push((id, v, true));
+            .is_some_and(|b| lista.plantilla.get(&format!("{b}_id")).is_some());
+        if de_posicion {
+            posicion = Some((k, v));
         } else if lista.plantilla.get(k).is_some() {
-            filtros.push((k.clone(), v, false));
+            filtros.push((k.clone(), v));
         }
     }
     let todas = param(params, "all") == Some("ALL");
     let sin_parametros = params.iter().all(|(k, _)| k == "sessionKey");
-    if !(todas || sin_parametros || !filtros.is_empty()) {
+    if !(todas || sin_parametros || posicion.is_some() || !filtros.is_empty()) {
         return None;
     }
-    let mut nodos: Vec<XmlNode> = lista
-        .nodos
-        .iter()
-        .filter(|n| filtros.iter().all(|(k, v, _)| n.text_of(k) == Some(*v)))
-        .cloned()
-        .collect();
-    if !filtros.is_empty() && nodos.is_empty() {
+    let mut nodos: Vec<XmlNode> = match posicion {
+        Some((k, v)) => {
+            let Some(mut n) = v
+                .parse::<usize>()
+                .ok()
+                .and_then(|i| lista.nodos.get(i))
+                .cloned()
+            else {
+                return Some(Err("BAD_PARAM".to_owned()));
+            };
+            set_child(&mut n, k, v);
+            vec![n]
+        }
+        None => lista.nodos.clone(),
+    };
+    nodos.retain(|n| filtros.iter().all(|(k, v)| n.text_of(k) == Some(*v)));
+    if (posicion.is_some() || !filtros.is_empty()) && nodos.is_empty() {
         return Some(Err("no existe".to_owned()));
     }
     if !todas {
-        for (hijo, _, indice) in &filtros {
-            if let (false, Some(base)) = (indice, hijo.strip_suffix("_id")) {
+        for (hijo, _) in &filtros {
+            if let Some(base) = hijo.strip_suffix("_id") {
                 for n in &mut nodos {
                     set_child(n, &format!("{base}_0i"), "-1");
                 }

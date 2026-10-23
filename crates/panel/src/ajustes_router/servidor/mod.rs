@@ -4,6 +4,7 @@
 mod acciones;
 mod acciones_lista;
 mod derivados;
+mod dns_propios;
 mod foto;
 mod guardar;
 mod historial;
@@ -47,16 +48,24 @@ use ajustes::{TipoCampo, ValorLegible};
 use axum::http::StatusCode;
 use catalogo::{Catalogo, Riesgo};
 use hgu::xml::XmlNode;
+#[cfg(test)]
 use lectura::vista;
+use lectura::vista_leida;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 
 /// Elementos de una lectura: nombre → valor.
 type Leidos = BTreeMap<String, String>;
 
-/// Lectura de un ajuste.
-fn clave(a: &Ajuste) -> Clave {
-    Clave::new(&a.leer.funcion, &a.leer.params)
+/// Lectura de un ajuste: la de su `leer` o, si busca su instancia por id,
+/// la búsqueda.
+pub(crate) fn clave(a: &Ajuste) -> Clave {
+    match a.busqueda() {
+        Some((posicion, ident)) => {
+            Clave::buscando(&a.leer.funcion, &a.leer.params, posicion, &ident)
+        }
+        None => Clave::new(&a.leer.funcion, &a.leer.params),
+    }
 }
 
 /// Error del gestor al guardar un ajuste, con el mensaje traducido y sin

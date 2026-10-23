@@ -31,7 +31,7 @@ mejoras-paso-upnp = Turn off automatic port opening (UPnP)
 mejoras-paso-upnp-desc = Recommended if you have no consoles or programs that need to open ports on their own. Pros: no device or malicious program opens ports without your permission. Cons: some consoles will switch to a restricted connection and you will have to open their ports by hand.
 mejoras-paso-wpa2 = Encrypt the WiFi with WPA2-AES
 mejoras-paso-wpa2-desc = Recommended if you have no WiFi devices from before about 2006. Pros: the old TKIP cipher and the mixed mode, which are weaker, are removed. Cons: very old devices will not connect.
-mejoras-paso-aislar_invitados = Isolate the guest network
+mejoras-paso-aislar_invitados = Isolate guest network devices from each other
 mejoras-paso-aislar_invitados-desc = Recommended if you use the guest network for visitors or for connected home devices. Pros: devices on that network cannot see each other. Cons: they cannot cast to a TV or print to each other.
 mejoras-paso-espejo = Turn off the internet traffic mirror
 mejoras-paso-espejo-desc = Recommended if you are not running a diagnosis of the connection. Pros: no network port at home receives a copy of all the internet traffic. Cons: none; it is turned on only to diagnose.
@@ -43,6 +43,8 @@ mejoras-paso-hora_neutra = Take the time from a neutral server
 mejoras-paso-hora_neutra-desc = Recommended if you want to depend as little as possible on the operator's servers. Pros: the time comes from the Spanish Navy's Royal Observatory. Cons: the privacy gain is minimal.
 
 ## DNS providers (the note for each one, in the review's picker)
+mejoras-dns-mantener = Keep the current ones
+mejoras-dns-mantener-desc = Does not change the DNS servers the router now hands out to the home network.
 mejoras-dns-quad9 = Quad9
 mejoras-dns-quad9-desc = Blocks malicious domains. Based in Switzerland, it does not keep your IP address.
 mejoras-dns-quad9_sin_filtro = Quad9 without filtering
@@ -85,6 +87,8 @@ mejoras-paso-estado-hecho = Done
 mejoras-paso-estado-pendiente = Pending
 mejoras-paso-estado-sin-leer = Not read
 mejoras-paso-estado-no-aplica = Does not apply
+mejoras-paso-estado-dns-propios = Own DNS
+mejoras-paso-estado-dns-solo-principal = { $proveedor } (primary only)
 mejoras-opcional = Optional
 mejoras-revisar = Review and apply
 mejoras-volver-a-leer = Read again
