@@ -206,6 +206,37 @@ async fn modify_pwd_con_retraso_se_aplica_al_entrar_despues() {
         .unwrap();
 }
 
+/// Tras unos inicios: los `n` inicios de sesión siguientes al cambio aún
+/// entran con la anterior (los fallidos también cuentan) y el siguiente ya
+/// la aplica.
+#[tokio::test]
+async fn modify_pwd_tras_inicios_se_aplica_en_el_siguiente() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    sim.control.modify_pwd_tras_inicios(2);
+    modificar(&c, USER, PASS, "clave-nueva").await.unwrap();
+    assert!(
+        cliente_con(&sim, "clave-nueva")
+            .call("cbGetSummary", &[])
+            .await
+            .is_err()
+    );
+    cliente_con(&sim, PASS)
+        .call("cbGetSummary", &[])
+        .await
+        .unwrap();
+    assert!(
+        cliente_con(&sim, PASS)
+            .call("cbGetSummary", &[])
+            .await
+            .is_err()
+    );
+    cliente_con(&sim, "clave-nueva")
+        .call("cbGetSummary", &[])
+        .await
+        .unwrap();
+}
+
 #[tokio::test]
 async fn login_falla_con_aunque_sea_la_vigente() {
     let sim = start().await;

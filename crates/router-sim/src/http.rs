@@ -152,7 +152,7 @@ pub(crate) async fn basic_login(
     let f = form(&body);
     let rechazada = {
         let mut st = s.state();
-        s.aplicar_contrasena_pendiente(&mut st);
+        s.aplicar_contrasena_pendiente(&mut st, true);
         st.login_falla_con.clone()
     };
     let good = param(&f, "loginUsername") == Some(mess_userpass(&s.user).as_str())
@@ -327,7 +327,7 @@ fn advanced_login(
     if !has_basic(st, c) {
         return LOGGED_OUT.into();
     }
-    s.aplicar_contrasena_pendiente(st);
+    s.aplicar_contrasena_pendiente(st, false);
     let good = param(params, "rqUsername") == Some(mess_userpass(&s.user).as_str())
         && param(params, "rqPasswd") == Some(mess_userpass(&s.password()).as_str())
         && st

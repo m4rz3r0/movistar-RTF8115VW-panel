@@ -275,11 +275,19 @@ pub(crate) mod servidor {
                 return restaurar_o_grave(state, &mut sesion, actual, nueva).await;
             }
             if !aplicada_tarde(state, &c).await {
-                tracing::warn!(
-                    "el router no aceptó la contraseña nueva: sigue con la anterior y el panel \
-                     también"
-                );
-                return Err(Fallo::Rechazada);
+                // Agotado el plazo, se confirma que la anterior sigue
+                // entrando: el router pudo aplicar la nueva justo después
+                // del último reintento.
+                if entra(state, actual).await {
+                    tracing::warn!(
+                        "el router no aceptó la contraseña nueva: sigue con la anterior y el \
+                         panel también"
+                    );
+                    return Err(Fallo::Rechazada);
+                }
+                if !entra(state, &c).await {
+                    return restaurar_o_grave(state, &mut sesion, actual, nueva).await;
+                }
             }
             tracing::info!("el router ha aplicado la contraseña nueva con retraso");
         }
@@ -300,7 +308,7 @@ pub(crate) mod servidor {
     /// El router respondió al cambio, la nueva no entra y la anterior sí:
     /// puede que aún la esté aplicando. Se reintenta entrar con `nueva`
     /// cada [`PAUSA_REINTENTO`] hasta [`AppState::plazo_rechazada`]; dice
-    /// si llegó a entrar.
+    /// si llegó a entrar. Si no, `en_el_router` aún comprueba la anterior.
     async fn aplicada_tarde(state: &AppState, nueva: &CredencialesRouter) -> bool {
         let fin = tokio::time::Instant::now() + state.plazo_rechazada;
         loop {

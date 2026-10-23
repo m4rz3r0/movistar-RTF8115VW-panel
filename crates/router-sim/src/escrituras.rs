@@ -1,6 +1,6 @@
 //! Escrituras avanzadas reflejadas en sus lecturas pareadas.
 
-use crate::estado::{Edicion, HangAfterWrite, Inner, ListaViva, Params, SimState};
+use crate::estado::{Aplazada, Edicion, HangAfterWrite, Inner, ListaViva, Params, SimState};
 use crate::http::param;
 use crate::lecturas::{all_instances, aplicar_campos};
 use crate::xml::{failure, leaf, ok, response, result_node, set_child};
@@ -81,8 +81,8 @@ pub(crate) fn write(
 /// Cambia la contraseña del usuario del sim (`rqUser`, `rqOPwd`, `rqNPwd`,
 /// leídos con la misma codificación con la que los manda el panel:
 /// [`codificar_cambio_contrasena`]). Las sesiones abiertas siguen valiendo,
-/// como en el router. Con `modify_pwd_con_retraso`, la nueva queda
-/// pendiente y la aplica el primer inicio de sesión tras el retraso.
+/// como en el router. Con `modify_pwd_con_retraso` o
+/// `modify_pwd_tras_inicios`, la nueva queda pendiente hasta que toca.
 fn modify_pwd(s: &Inner, st: &mut SimState, p: &[(String, String)]) -> Result<(), String> {
     let leer = |k: &str| param(p, k).map(codificar_cambio_contrasena);
     let nueva = leer("rqNPwd").ok_or("falta rqNPwd")?;
@@ -95,8 +95,16 @@ fn modify_pwd(s: &Inner, st: &mut SimState, p: &[(String, String)]) -> Result<()
     if std::mem::take(&mut st.modify_pwd_sin_efecto) {
         return Ok(());
     }
-    match st.modify_pwd_retraso.take() {
-        Some(retraso) => st.pwd_pendiente = Some((nueva, Instant::now() + retraso)),
+    let aplazada = match (
+        st.modify_pwd_retraso.take(),
+        st.modify_pwd_tras_inicios.take(),
+    ) {
+        (_, Some(n)) => Some(Aplazada::TrasInicios(n)),
+        (Some(retraso), None) => Some(Aplazada::Desde(Instant::now() + retraso)),
+        (None, None) => None,
+    };
+    match aplazada {
+        Some(a) => st.pwd_pendiente = Some((nueva, a)),
         None => *s.password.lock().unwrap_or_else(|e| e.into_inner()) = nueva,
     }
     Ok(())

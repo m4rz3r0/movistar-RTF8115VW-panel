@@ -41,18 +41,32 @@ impl Inner {
         self.state.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    /// Aplica la contraseña pendiente de un `cbModifyPwd` con retraso si ya
-    /// pasó (`modify_pwd_con_retraso`). La llama cada inicio de sesión.
-    pub(crate) fn aplicar_contrasena_pendiente(&self, st: &mut SimState) {
-        if st
-            .pwd_pendiente
-            .as_ref()
-            .is_some_and(|(_, desde)| Instant::now() >= *desde)
-            && let Some((nueva, _)) = st.pwd_pendiente.take()
-        {
+    /// Aplica la contraseña pendiente de un `cbModifyPwd` aplazado si ya
+    /// toca (`modify_pwd_con_retraso`, `modify_pwd_tras_inicios`). La llama
+    /// cada inicio de sesión; `basico` dice si es el básico, el único que
+    /// cuenta para `modify_pwd_tras_inicios`.
+    pub(crate) fn aplicar_contrasena_pendiente(&self, st: &mut SimState, basico: bool) {
+        let toca = match &mut st.pwd_pendiente {
+            Some((_, Aplazada::Desde(desde))) => Instant::now() >= *desde,
+            Some((_, Aplazada::TrasInicios(n))) if basico => {
+                let toca = *n == 0;
+                *n = n.saturating_sub(1);
+                toca
+            }
+            _ => false,
+        };
+        if toca && let Some((nueva, _)) = st.pwd_pendiente.take() {
             *self.password.lock().unwrap_or_else(|e| e.into_inner()) = nueva;
         }
     }
+}
+
+/// Cuándo aplica el router la contraseña de un `cbModifyPwd` aplazado.
+pub(crate) enum Aplazada {
+    /// En el primer inicio de sesión desde este instante.
+    Desde(Instant),
+    /// En el inicio de sesión básico que sigue a estos (que aún no la ven).
+    TrasInicios(u32),
 }
 
 /// Lo escrito en una instancia de una lectura que no es una lista: campos
@@ -126,8 +140,11 @@ pub(crate) struct SimState {
     pub(crate) modify_pwd_sin_efecto: bool,
     /// `modify_pwd_con_retraso`: el retraso del próximo `cbModifyPwd`.
     pub(crate) modify_pwd_retraso: Option<Duration>,
-    /// Contraseña de un `cbModifyPwd` con retraso y desde cuándo vale.
-    pub(crate) pwd_pendiente: Option<(String, Instant)>,
+    /// `modify_pwd_tras_inicios`: los inicios de sesión del próximo
+    /// `cbModifyPwd` que aún no ven la nueva.
+    pub(crate) modify_pwd_tras_inicios: Option<u32>,
+    /// Contraseña de un `cbModifyPwd` aplazado y cuándo vale.
+    pub(crate) pwd_pendiente: Option<(String, Aplazada)>,
     /// `login_falla_con`.
     pub(crate) login_falla_con: Option<String>,
     /// Último `cbReboot`: `SysUptime` cuenta desde aquí.

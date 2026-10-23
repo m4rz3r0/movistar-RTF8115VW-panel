@@ -17,6 +17,7 @@ mod auth;
 mod binario_e2e;
 mod changes;
 mod contrasena_router;
+mod contrasena_router_plazo;
 mod contraste;
 mod estado;
 mod estaticos;
