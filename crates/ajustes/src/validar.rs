@@ -591,6 +591,16 @@ fn comprobar_forma(c: &Campo, mal: &mut impl FnMut(String)) {
             _ => {}
         }
     }
+    if !c.del_operador.is_empty() && (c.tipo != TipoCampo::Ip || c.recomendado.is_none()) {
+        mal("`del_operador` solo vale en un campo `ip` con `recomendado`".into());
+    }
+    for d in c
+        .del_operador
+        .iter()
+        .filter(|d| d.parse::<std::net::Ipv4Addr>().is_err())
+    {
+        mal(format!("`del_operador`: «{d}» no es una IP válida"));
+    }
     if c.seguridad && c.recomendado.is_none() && !c.opciones.iter().any(|o| o.recomendada) {
         mal("`seguridad` sin recomendación".into());
     }

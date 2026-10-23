@@ -4,6 +4,7 @@
 mod acciones;
 mod acciones_lista;
 mod derivados;
+mod dns_propios;
 mod foto;
 mod guardar;
 mod historial;

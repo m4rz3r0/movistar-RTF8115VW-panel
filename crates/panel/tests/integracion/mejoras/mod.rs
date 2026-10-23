@@ -9,6 +9,7 @@ use crate::comun::{
 use panel::instancia::{self, claves};
 use serde_json::{Value, json};
 
+mod dns_propios;
 mod lecturas;
 mod pagina;
 mod proveedor;
@@ -173,9 +174,10 @@ async fn mejoras_con_las_fixtures() {
         5
     );
     let proveedores = m["proveedores"].as_array().unwrap();
-    assert_eq!(proveedores.len(), 5, "{m}");
+    assert_eq!(proveedores.len(), 6, "«Mantener» y los cinco: {m}");
+    assert_eq!(proveedores[0]["id"], "mantener", "{m}");
     assert_eq!(
-        proveedores[0],
+        proveedores[1],
         json!({ "id": "quad9", "servidores": ["9.9.9.9", "149.112.112.112"], "defecto": true })
     );
     assert_eq!(ok(&p, "contar_mejoras", json!({}), &cookie).await, json!(6));

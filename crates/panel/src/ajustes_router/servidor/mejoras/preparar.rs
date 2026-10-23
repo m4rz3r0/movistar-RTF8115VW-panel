@@ -4,18 +4,29 @@ use super::super::acciones::{subgrupo, vista_por_pasos};
 use super::*;
 use ajustes::{OpcionEleccion, titulo_lote};
 
-/// Opción del proveedor de DNS `id`; 400 si no existe. Sin `id`, `None`:
-/// se decide con lo leído (ver [`preparar_lote`]).
+/// Los DNS que pone el lote: los de un proveedor o los que ya tiene el
+/// router («Mantener los actuales»).
+enum Dns<'a> {
+    Proveedor(&'a OpcionEleccion),
+    Mantener,
+}
+
+/// Lo elegido en el selector de DNS (`id`): un proveedor o
+/// [`MANTENER_DNS`]; 400 si no existe. Sin `id`, `None`: se decide con lo
+/// leído (ver [`preparar_lote`]).
 fn proveedor<'a>(
     cat: &'a CatalogoAjustes,
     id: Option<&str>,
-) -> Result<Option<&'a OpcionEleccion>, ServerFnError> {
+) -> Result<Option<Dns<'a>>, ServerFnError> {
     let Some(id) = id else {
         return Ok(None);
     };
+    if id == MANTENER_DNS {
+        return Ok(Some(Dns::Mantener));
+    }
     cat.eleccion(ELECCION_DNS)
         .and_then(|e| e.opciones.iter().find(|o| o.id == id))
-        .map(Some)
+        .map(|o| Some(Dns::Proveedor(o)))
         .ok_or_else(|| fallo(StatusCode::BAD_REQUEST, t!("mejoras-error-proveedor")))
 }
 
@@ -74,13 +85,29 @@ pub(in crate::ajustes_router) async fn preparar_lote(
     let g = gestor(&state)?;
     libre(&g)?;
     let lecturas = Lecturas::de(&state, &[lote], true).await;
-    // Sin proveedor elegido, el que ya está puesto (el paso sale sin
-    // cambios) y, si no es ninguno de la lista, el de por defecto.
-    let dns = elegido.or_else(|| {
+    // Sin proveedor elegido: con DNS propios, se mantienen; si no, el que
+    // ya está puesto (el paso sale sin cambios) y, si no es ninguno de la
+    // lista, el de por defecto.
+    let elegido = elegido.or_else(|| {
+        if lecturas.dns_propios(&state.ajustes) {
+            return Some(Dns::Mantener);
+        }
         lecturas
             .proveedor_dns(&state.ajustes)
             .or_else(|| state.ajustes.eleccion(ELECCION_DNS).map(|e| e.defecto()))
+            .map(Dns::Proveedor)
     });
+    // «Mantener»: los valores que ya tiene, como una opción más (el paso
+    // sale sin cambios).
+    let actuales = match elegido {
+        Some(Dns::Mantener) => lecturas.dns_actuales(),
+        _ => None,
+    };
+    let dns: Option<&OpcionEleccion> = match &elegido {
+        Some(Dns::Proveedor(o)) => Some(o),
+        Some(Dns::Mantener) => actuales.as_ref(),
+        None => None,
+    };
     // Lo que no aplica o no se pudo leer no se revisa: el aviso lo dice.
     let pasos = lecturas.estados(&state.ajustes).pop().unwrap_or_default();
     let sin_leer = pasos

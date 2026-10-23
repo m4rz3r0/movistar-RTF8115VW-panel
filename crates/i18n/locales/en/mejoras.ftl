@@ -43,6 +43,8 @@ mejoras-paso-hora_neutra = Take the time from a neutral server
 mejoras-paso-hora_neutra-desc = Recommended if you want to depend as little as possible on the operator's servers. Pros: the time comes from the Spanish Navy's Royal Observatory. Cons: the privacy gain is minimal.
 
 ## DNS providers (the note for each one, in the review's picker)
+mejoras-dns-mantener = Keep the current ones
+mejoras-dns-mantener-desc = Does not change the DNS servers the router now hands out to the home network.
 mejoras-dns-quad9 = Quad9
 mejoras-dns-quad9-desc = Blocks malicious domains. Based in Switzerland, it does not keep your IP address.
 mejoras-dns-quad9_sin_filtro = Quad9 without filtering
@@ -85,6 +87,7 @@ mejoras-paso-estado-hecho = Done
 mejoras-paso-estado-pendiente = Pending
 mejoras-paso-estado-sin-leer = Not read
 mejoras-paso-estado-no-aplica = Does not apply
+mejoras-paso-estado-dns-propios = Own DNS
 mejoras-opcional = Optional
 mejoras-revisar = Review and apply
 mejoras-volver-a-leer = Read again

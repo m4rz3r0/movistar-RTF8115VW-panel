@@ -58,8 +58,8 @@ impl SelectorDns {
     /// Las opciones de la revisión del grupo `g` del lote `lote`: el
     /// selector con `proveedores` si el grupo lleva el paso de los DNS,
     /// marcado en el proveedor con el que lo preparó el servidor (el que ya
-    /// estaba puesto o, si no era ninguno, el de por defecto). `None` si no
-    /// lo lleva.
+    /// estaba puesto, «Mantener los actuales» si son DNS propios o, si no,
+    /// el de por defecto). `None` si no lo lleva.
     pub(super) fn extra(
         self,
         lote: String,
@@ -118,7 +118,8 @@ impl SelectorDns {
         });
     }
 
-    /// Los proveedores, uno por radio con su nota.
+    /// Los proveedores (el primero, «Mantener los actuales»), uno por radio
+    /// con su nota.
     fn vista(self, lote: &str, proveedores: &[ProveedorVista]) -> AnyView {
         let opciones = proveedores
             .iter()

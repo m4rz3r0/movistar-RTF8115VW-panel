@@ -310,6 +310,13 @@ mod catalogo_toml {
         /// [`valor_aceptado`](super::valor_aceptado).
         #[serde(default)]
         pub aceptados: Vec<String>,
+        /// En un campo IP con `recomendado` (el DNS principal de casa), los
+        /// resolutores del operador. Un valor que no es uno de estos ni el
+        /// propio router (vacío, `0.0.0.0` o su IP de casa) es **propio** y
+        /// vale como lo recomendado: no se recomienda cambiarlo (ver
+        /// [`dns_propio`](crate::dns_propio)).
+        #[serde(default)]
+        pub del_operador: Vec<String>,
         /// Un `booleano` con sus propios textos para sí y no («Encendida» y
         /// «Apagada» en vez de «Sí» y «No»): `<p>-<campo>-true` y
         /// `<p>-<campo>-false`, en el resumen de un cambio y en su valor.

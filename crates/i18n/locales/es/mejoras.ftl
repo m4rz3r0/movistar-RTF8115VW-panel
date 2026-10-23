@@ -43,6 +43,8 @@ mejoras-paso-hora_neutra = Tomar la hora de un servidor neutro
 mejoras-paso-hora_neutra-desc = Recomendado si quieres depender lo menos posible de los servidores del operador. A favor: la hora viene del Real Instituto y Observatorio de la Armada. En contra: la ganancia de privacidad es mínima.
 
 ## Proveedores de DNS (la nota de cada uno, en el selector de la revisión)
+mejoras-dns-mantener = Mantener los actuales
+mejoras-dns-mantener-desc = No cambia los DNS que el router reparte ahora a la red de casa.
 mejoras-dns-quad9 = Quad9
 mejoras-dns-quad9-desc = Bloquea dominios maliciosos. Está en Suiza y no guarda tu dirección IP.
 mejoras-dns-quad9_sin_filtro = Quad9 sin filtro
@@ -85,6 +87,7 @@ mejoras-paso-estado-hecho = Hecho
 mejoras-paso-estado-pendiente = Pendiente
 mejoras-paso-estado-sin-leer = Sin leer
 mejoras-paso-estado-no-aplica = No aplica
+mejoras-paso-estado-dns-propios = DNS propios
 mejoras-opcional = Opcional
 mejoras-revisar = Revisar y aplicar
 mejoras-volver-a-leer = Volver a leer

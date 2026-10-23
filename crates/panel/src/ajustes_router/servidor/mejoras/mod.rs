@@ -1,22 +1,30 @@
 //! Lotes de mejoras en el servidor: el estado de cada paso con las lecturas del router, el contador y sus server fns.
 
 mod calculo;
+mod dns;
 mod preparar;
 
 pub(in crate::ajustes_router) use preparar::preparar_lote;
 
 use super::*;
+use crate::ajustes_router::MANTENER_DNS;
 use ajustes::{
     CatalogoAjustes, ELECCION_DNS, Lote, OpcionEleccion, PasoExpandido, clave_paso,
     partir_referencia, pasos_del_lote,
 };
-use calculo::{Leido, estado_lote, estado_paso, opcion_leida, pendientes_unicos};
+use calculo::{Leido, estado_lote, estado_paso, pendientes_unicos};
+use dns::{estado_dns, opcion_leida};
+use std::net::Ipv4Addr;
 
-/// Lo leído para unos lotes: sus pasos expandidos y la vista de cada ajuste
-/// que tocan.
+/// Texto del paso de los DNS hecho con DNS propios, en vez de «Hecho».
+const NOTA_DNS_PROPIOS: &str = "mejoras-paso-estado-dns-propios";
+
+/// Lo leído para unos lotes: sus pasos expandidos, la vista de cada ajuste
+/// que tocan y la IP del router en casa (para saber si los DNS son propios).
 struct Lecturas {
     expandidos: Vec<Vec<PasoExpandido>>,
     vistas: HashMap<String, AjusteVista>,
+    ip_router: Option<Ipv4Addr>,
 }
 
 impl Lecturas {
@@ -42,16 +50,25 @@ impl Lecturas {
             }
         }
         let claves: Vec<Clave> = a_leer.iter().map(|a| clave(a)).collect();
+        let todas: Vec<Clave> = claves
+            .iter()
+            .cloned()
+            .chain(std::iter::once(super::red_local::clave_red_casa()))
+            .collect();
         if fresca {
-            state.lecturas.olvidar(&claves);
+            state.lecturas.olvidar(&todas);
         }
-        let leidas = state.lecturas.leer(&state.hgu, &claves).await;
+        let leidas = state.lecturas.leer(&state.hgu, &todas).await;
         let vistas = a_leer
             .iter()
             .zip(&claves)
             .map(|(a, c)| (a.id.clone(), vista_leida(&state.catalogo, a, leidas.get(c))))
             .collect();
-        Lecturas { expandidos, vistas }
+        Lecturas {
+            expandidos,
+            vistas,
+            ip_router: super::red_local::ip_router(&leidas),
+        }
     }
 
     /// El valor leído del campo `campo` del ajuste `ajuste`.
@@ -76,36 +93,62 @@ impl Lecturas {
                     .iter()
                     .map(|p| {
                         let e = p.elegir.as_deref().and_then(|id| cat.eleccion(id));
-                        (p.clone(), estado_paso(p, &leer, e))
+                        let estado = match e {
+                            Some(e) if e.id == ELECCION_DNS => {
+                                estado_dns(cat, p, &leer, e, self.ip_router)
+                            }
+                            _ => estado_paso(p, &leer, e),
+                        };
+                        (p.clone(), estado)
                     })
                     .collect()
             })
             .collect()
     }
 
+    /// El paso de los DNS de estos lotes, si lo tienen.
+    fn paso_dns(&self) -> Option<&PasoExpandido> {
+        self.expandidos
+            .iter()
+            .flatten()
+            .find(|p| p.elegir.as_deref() == Some(ELECCION_DNS))
+    }
+
     /// El proveedor de DNS que ya tiene el router, si es uno de la lista
     /// entero (ver [`opcion_leida`]).
     fn proveedor_dns<'c>(&self, cat: &'c CatalogoAjustes) -> Option<&'c OpcionEleccion> {
         let e = cat.eleccion(ELECCION_DNS)?;
-        let p = self
-            .expandidos
-            .iter()
-            .flatten()
-            .find(|p| p.elegir.as_deref() == Some(ELECCION_DNS))?;
-        opcion_leida(p, &|a, c| self.leer(a, c), e)
+        opcion_leida(self.paso_dns()?, &|a, c| self.leer(a, c), e)
     }
-}
 
-/// Pasos expandidos de cada lote de `lotes`, con su estado (ver
-/// [`Lecturas::de`]).
-async fn estados(
-    state: &AppState,
-    lotes: &[&Lote],
-    fresca: bool,
-) -> Vec<Vec<(PasoExpandido, EstadoPaso)>> {
-    Lecturas::de(state, lotes, fresca)
-        .await
-        .estados(&state.ajustes)
+    /// ¿Tiene el router DNS propios, que no son de ningún proveedor de la
+    /// lista ni del router o del operador (ver [`dns::propios`])?
+    fn dns_propios(&self, cat: &CatalogoAjustes) -> bool {
+        let Some(p) = self.paso_dns() else {
+            return false;
+        };
+        self.proveedor_dns(cat).is_none()
+            && dns::propios(cat, p, &|a, c| self.leer(a, c), self.ip_router) == Some(true)
+    }
+
+    /// Los valores que tiene ahora el router en los campos del paso de los
+    /// DNS, como una opción más: «Mantener los actuales». `None` si alguno
+    /// no se leyó.
+    fn dns_actuales(&self) -> Option<OpcionEleccion> {
+        let p = self.paso_dns()?;
+        let mut valores = BTreeMap::new();
+        for d in &p.destinos {
+            let Leido::Valor(ValorLegible::Texto(t)) = self.leer(&d.ajuste, &d.campo) else {
+                return None;
+            };
+            valores.insert(d.campo.clone(), t);
+        }
+        Some(OpcionEleccion {
+            id: MANTENER_DNS.to_owned(),
+            defecto: false,
+            valores,
+        })
+    }
 }
 
 /// Clave del título del ajuste del elemento de un paso repetido por
@@ -122,7 +165,14 @@ fn detalle(cat: &CatalogoAjustes, p: &PasoExpandido) -> Option<String> {
 /// se pudo leer nada).
 pub(crate) async fn calcular(state: &AppState, fresca: bool) -> (Vec<LoteVista>, Option<u32>) {
     let lotes: Vec<&Lote> = state.ajustes.lotes().iter().collect();
-    let estados = estados(state, &lotes, fresca).await;
+    let lecturas = Lecturas::de(state, &lotes, fresca).await;
+    let estados = lecturas.estados(&state.ajustes);
+    // El paso de los DNS hecho con DNS propios lo dice.
+    let propios = lecturas.dns_propios(&state.ajustes);
+    let nota = |p: &PasoExpandido, e: &EstadoPaso| {
+        (propios && *e == EstadoPaso::Hecho && p.elegir.as_deref() == Some(ELECCION_DNS))
+            .then(|| NOTA_DNS_PROPIOS.to_owned())
+    };
     let pendientes = pendientes_unicos(&estados.concat());
     let vistas = lotes
         .iter()
@@ -138,6 +188,7 @@ pub(crate) async fn calcular(state: &AppState, fresca: bool) -> (Vec<LoteVista>,
                     texto: clave_paso(&p.paso),
                     detalle: detalle(&state.ajustes, p),
                     estado: e.clone(),
+                    nota: nota(p, e),
                     opcional: p.opcional,
                 })
                 .collect(),
@@ -156,20 +207,25 @@ pub(crate) async fn calcular(state: &AppState, fresca: bool) -> (Vec<LoteVista>,
     (vistas, pendientes)
 }
 
-/// Los proveedores de DNS del selector, en el orden del catálogo.
+/// Los proveedores de DNS del selector: primero «Mantener los actuales»
+/// ([`MANTENER_DNS`]) y después los del catálogo, en su orden.
 fn proveedores(cat: &CatalogoAjustes) -> Vec<ProveedorVista> {
     let Some(el) = cat.eleccion(ELECCION_DNS) else {
         return Vec::new();
     };
     let defecto = el.defecto().id.as_str();
-    el.opciones
-        .iter()
-        .map(|o| ProveedorVista {
+    let mantener = ProveedorVista {
+        id: MANTENER_DNS.to_owned(),
+        servidores: [String::new(), String::new()],
+        defecto: false,
+    };
+    std::iter::once(mantener)
+        .chain(el.opciones.iter().map(|o| ProveedorVista {
             id: o.id.clone(),
-            servidores: ["principal", "secundario"]
-                .map(|c| o.valores.get(c).cloned().unwrap_or_default()),
+            servidores:
+                ["principal", "secundario"].map(|c| o.valores.get(c).cloned().unwrap_or_default()),
             defecto: o.id == defecto,
-        })
+        }))
         .collect()
 }
 
