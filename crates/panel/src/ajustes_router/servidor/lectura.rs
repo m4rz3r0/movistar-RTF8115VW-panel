@@ -32,6 +32,21 @@ fn sin_recomendacion_que_no_vale(a: &Ajuste, campos: &mut [CampoVista]) {
     }
 }
 
+/// Vista de un ajuste con el resultado de su lectura (`None` si no se
+/// leyó). Si su instancia no está en el router (se busca por su id y
+/// ninguna posición la tiene), «sin leer» lo dice.
+pub(super) fn vista_leida(
+    f: &Catalogo,
+    a: &Ajuste,
+    leida: Option<&Result<XmlNode, hgu::Error>>,
+) -> AjusteVista {
+    let mut v = vista(f, a, leida.and_then(|r| r.as_ref().ok()));
+    if let Some(Err(hgu::Error::SinInstancia(_))) = leida {
+        v.estado = EstadoLectura::SinLeer(t!("ajustes-error-sin-instancia"));
+    }
+    v
+}
+
 /// Vista de un ajuste con la respuesta de su lectura (`None` si falló).
 pub(super) fn vista(f: &Catalogo, a: &Ajuste, nodo: Option<&XmlNode>) -> AjusteVista {
     let prefijo = prefijo_i18n(a);
@@ -343,6 +358,10 @@ fn tecnico(a: &Ajuste) -> DetallesTecnicos {
             .map(|(k, v)| format!("{k}={v}"))
             .collect();
         lectura = format!("{lectura} ({})", params.join(", "));
+    }
+    if let Some((posicion, ident)) = a.busqueda() {
+        let ident: Vec<String> = ident.iter().map(|(k, v)| format!("{k}={v}")).collect();
+        lectura = format!("{lectura}, {posicion} → {}", ident.join(", "));
     }
     let mut escrituras: Vec<String> = Vec::new();
     let mut parametros = Vec::new();

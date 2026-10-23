@@ -45,7 +45,8 @@ async fn crudo(p: &Panel, a: &Ajuste, lee: &str) -> String {
         .unwrap_or_else(|| panic!("{}: el simulador no da {lee}", a.id))
 }
 
-/// Como [`crudo`], `None` si el simulador no da el elemento.
+/// Como [`crudo`], `None` si el simulador no da el elemento. Un ajuste que
+/// busca su instancia por id (el pool DHCP de casa, una radio) se lee igual.
 async fn crudo_opcional(p: &Panel, a: &Ajuste, lee: &str) -> Option<String> {
     let params: Vec<(&str, &str)> = a
         .leer
@@ -53,7 +54,15 @@ async fn crudo_opcional(p: &Panel, a: &Ajuste, lee: &str) -> Option<String> {
         .iter()
         .map(|(k, v)| (k.as_str(), v.as_str()))
         .collect();
-    let n = p.state.hgu.call(&a.leer.funcion, &params).await.unwrap();
+    let c = &p.state.hgu;
+    let n = match a.busqueda() {
+        Some((posicion, ident)) => {
+            c.call_por_id(&a.leer.funcion, &params, posicion, &ident)
+                .await
+        }
+        None => c.call(&a.leer.funcion, &params).await,
+    }
+    .unwrap();
     elemento(&n, lee)
 }
 

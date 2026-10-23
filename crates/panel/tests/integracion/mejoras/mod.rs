@@ -109,11 +109,13 @@ async fn del_punto(p: &Panel, id: &str) -> String {
     .await
 }
 
+/// Elemento `nombre` del pool DHCP de casa (id 0, en la posición 1 de las
+/// fixtures).
 async fn del_pool(p: &Panel, nombre: &str) -> String {
     del_sim(
         p,
         "cbGetDhcpv4ServerPool",
-        &[("rtm_cfg_dhcpv4_svr_pool_0i", "0")],
+        &[("rtm_cfg_dhcpv4_svr_pool_0i", "1")],
         nombre,
     )
     .await

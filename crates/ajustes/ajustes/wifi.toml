@@ -11,6 +11,8 @@
 # Ids de las instancias (fixtures del router): radio 0 = 2,4 GHz, radio 1 =
 # 5 GHz; punto de acceso 0 = red principal de 2,4 GHz, 1 = red principal de
 # 5 GHz, 2 = primera red de invitados (en la radio de 2,4 GHz).
+# Las radios se leen buscando su id (`buscar`): el router las elige por su
+# posición, que no tiene por qué ser el id con que se escriben.
 #
 # Encender o apagar una red es `activa` (`adm_state`), en la tarjeta básica.
 # Comprobado en el router real (2026-10-22): con las redes apagadas, todos
@@ -298,7 +300,7 @@ id = "wifi.radio_24"
 tema = "wifi"
 nivel = "basico"
 efecto = "wifi_corte"
-leer = { funcion = "cbGetWifi", params = { dpm_cfg_wifi_0i = "0" } }
+leer = { funcion = "cbGetWifi", buscar = "dpm_cfg_wifi_0i" }
 fijos = { dpm_cfg_wifi_id = "0" }
 
 [[ajuste.campo]]
@@ -336,7 +338,7 @@ id = "wifi.radio_24_avanzado"
 tema = "wifi"
 nivel = "avanzado"
 efecto = "wifi_corte"
-leer = { funcion = "cbGetWifi", params = { dpm_cfg_wifi_0i = "0" } }
+leer = { funcion = "cbGetWifi", buscar = "dpm_cfg_wifi_0i" }
 fijos = { dpm_cfg_wifi_id = "0" }
 
 [[ajuste.campo]]
@@ -366,7 +368,7 @@ id = "wifi.radio_5"
 tema = "wifi"
 nivel = "basico"
 efecto = "wifi_corte"
-leer = { funcion = "cbGetWifi", params = { dpm_cfg_wifi_0i = "1" } }
+leer = { funcion = "cbGetWifi", buscar = "dpm_cfg_wifi_0i" }
 fijos = { dpm_cfg_wifi_id = "1" }
 
 [[ajuste.campo]]
@@ -404,7 +406,7 @@ id = "wifi.radio_5_avanzado"
 tema = "wifi"
 nivel = "avanzado"
 efecto = "wifi_corte"
-leer = { funcion = "cbGetWifi", params = { dpm_cfg_wifi_0i = "1" } }
+leer = { funcion = "cbGetWifi", buscar = "dpm_cfg_wifi_0i" }
 fijos = { dpm_cfg_wifi_id = "1" }
 
 [[ajuste.campo]]

@@ -1,7 +1,7 @@
 //! Planificación de cambios, sin E/S: carga a enviar, diff, inversa,
 //! comparación con lo que muestra el router, validación y enmascarado.
 
-use super::{CambioError, CampoDiff, ChangeRequest, Diff};
+use super::{CampoDiff, ChangeRequest, Diff};
 use catalogo::{
     Funcion, Parametro, Tipo, TipoParam,
     mask::{MASCARA, Mascara},
@@ -17,6 +17,10 @@ pub const PALABRA_REINICIO: &str = "REINICIAR";
 /// Palabra para las demás acciones.
 pub const PALABRA_ACCION: &str = "CONFIRMAR";
 pub(super) const REBOOT: &str = "cbReboot";
+
+mod lectura;
+pub(crate) use lectura::identidad;
+pub(super) use lectura::{Lectura, lectura_de};
 
 // ------------------------------------------------------------- planes
 
@@ -48,22 +52,6 @@ impl Operacion {
         .into_iter()
         .find(|o| o.as_str() == s)
     }
-}
-
-/// Dónde leer lo que escribe una función.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) enum Lectura {
-    /// Llamada `cb*` de la UI avanzada. `clave_id`: parámetro de la lectura
-    /// que lleva el id de la instancia (se quita para listarlas todas).
-    Xml {
-        funcion: String,
-        params: Vec<(String, String)>,
-        clave_id: Option<String>,
-    },
-    /// Variables `var x='…'` de una página de la UI básica.
-    Pagina(String),
-    /// Sin lectura comprobable.
-    Ninguna,
 }
 
 /// Un campo que cambia, con los valores en claro (solo en memoria; su
@@ -199,70 +187,6 @@ pub(super) fn validar(p: &Parametro, v: &str, protegido: bool) -> Result<(), Str
     } else {
         Err(format!("{n}: «{v}» no es un valor válido"))
     }
-}
-
-/// Parámetros que identifican la instancia: los que usa la lectura pareada
-/// (`{param}`) y el id de la lista.
-pub(crate) fn identidad(f: &Funcion) -> BTreeSet<String> {
-    let mut out: BTreeSet<String> = f
-        .lectura_pareada
-        .iter()
-        .flat_map(|lp| &lp.params)
-        .filter_map(|(_, v)| v.strip_prefix('{').and_then(|v| v.strip_suffix('}')))
-        .map(str::to_owned)
-        .collect();
-    if let Some(l) = &f.lista {
-        out.insert(l.id_param.clone());
-    }
-    out
-}
-
-/// Lectura pareada con los `{param}` sustituidos por `valores` (o la
-/// instancia, para el id de la lista).
-pub(super) fn lectura_de(
-    f: &Funcion,
-    valores: &BTreeMap<String, String>,
-    instancia: Option<&str>,
-) -> Result<Lectura, CambioError> {
-    let Some(lp) = &f.lectura_pareada else {
-        return Ok(Lectura::Ninguna);
-    };
-    if lp.funcion.ends_with(".asp") {
-        return Ok(Lectura::Pagina(lp.funcion.clone()));
-    }
-    if !lp.funcion.starts_with("cb") {
-        // Lecturas `.cmd` de la UI básica (texto sin formato conocido).
-        return Ok(Lectura::Ninguna);
-    }
-    let id_param = f.lista.as_ref().map(|l| l.id_param.as_str());
-    let mut params = Vec::new();
-    let mut clave_id = None;
-    for (k, v) in &lp.params {
-        let valor = match v.strip_prefix('{').and_then(|v| v.strip_suffix('}')) {
-            Some(p) => {
-                if Some(p) == id_param {
-                    clave_id = Some(k.clone());
-                }
-                valores
-                    .get(p)
-                    .map(String::as_str)
-                    .or(if Some(p) == id_param { instancia } else { None })
-                    .ok_or_else(|| CambioError::Invalida(format!("falta el parámetro {p}")))?
-                    .to_owned()
-            }
-            None if Some(k.as_str()) == id_param => {
-                clave_id = Some(k.clone());
-                instancia.unwrap_or(v).to_owned()
-            }
-            None => v.clone(),
-        };
-        params.push((k.clone(), valor));
-    }
-    Ok(Lectura::Xml {
-        funcion: lp.funcion.clone(),
-        params,
-        clave_id,
-    })
 }
 
 /// Campos hoja de un elemento.

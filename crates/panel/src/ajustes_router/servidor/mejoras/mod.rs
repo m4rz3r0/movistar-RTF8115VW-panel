@@ -49,10 +49,7 @@ impl Lecturas {
         let vistas = a_leer
             .iter()
             .zip(&claves)
-            .map(|(a, c)| {
-                let nodo = leidas.get(c).and_then(|r| r.as_ref().ok());
-                (a.id.clone(), vista(&state.catalogo, a, nodo))
-            })
+            .map(|(a, c)| (a.id.clone(), vista_leida(&state.catalogo, a, leidas.get(c))))
             .collect();
         Lecturas { expandidos, vistas }
     }

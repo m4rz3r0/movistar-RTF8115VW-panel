@@ -9,6 +9,8 @@ use crate::legible::admite_opcional;
 use crate::modelo::{Ajuste, Campo, SIN_ELECCION, TipoCampo};
 use crate::valores::traducir;
 
+mod por_id;
+
 /// Prefijo de las claves de traducción de un ajuste: `ajuste-` más el id con
 /// `.` → `-` (`wifi.red_5` → `ajuste-wifi-red_5`).
 pub fn prefijo_i18n(a: &Ajuste) -> String {
@@ -147,6 +149,7 @@ fn comprobar_ajuste(a: &Ajuste, f: &Catalogo, m: &Mascara, fallos: &mut Vec<Stri
             if a.lista {
                 comprobar_id_de_lista(a, l, m, fallos);
             }
+            por_id::comprobar(a, l, fallos);
             for (k, _) in &a.leer.params {
                 match l.parametro(k) {
                     None => fallos.push(format!(

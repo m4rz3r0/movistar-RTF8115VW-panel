@@ -6,9 +6,10 @@
 //! admite). Después, la lectura exacta de cada ajuste del catálogo de
 //! ajustes (su `leer`, la misma que hace la página para el «ahora») que no
 //! sea una de esas: un punto de acceso WiFi o una radio por su id, el pool
-//! DHCP de casa, sus IP fijas. Son lecturas que el panel ya hace al enseñar
-//! esos ajustes. Sus instancias se juntan en el nodo de su función
-//! ([`juntar`]), así que la foto sigue siendo «función → XML».
+//! DHCP de casa (buscado por su id, como lo lee la página), sus IP fijas.
+//! Son lecturas que el panel ya hace al enseñar esos ajustes. Sus
+//! instancias se juntan en el nodo de su función ([`juntar`]), así que la
+//! foto sigue siendo «función → XML».
 
 use crate::instalar::lecturas_de_partida;
 use crate::lecturas::Clave;
@@ -143,7 +144,7 @@ pub async fn leer_partida(state: &AppState) -> FotoLeida {
         }
     }
     for a in state.ajustes.todos() {
-        let clave = Clave::new(&a.leer.funcion, &a.leer.params);
+        let clave = crate::ajustes_router::servidor::clave(a);
         if hechas.contains(&clave) {
             continue;
         }
@@ -167,7 +168,16 @@ pub async fn leer_partida(state: &AppState) -> FotoLeida {
             .iter()
             .map(|(k, v)| (k.as_str(), v.as_str()))
             .collect();
-        match state.hgu.call(&a.leer.funcion, &params).await {
+        let leida = match a.busqueda() {
+            Some((posicion, ident)) => {
+                state
+                    .hgu
+                    .call_por_id(&a.leer.funcion, &params, posicion, &ident)
+                    .await
+            }
+            None => state.hgu.call(&a.leer.funcion, &params).await,
+        };
+        match leida {
             Ok(n) => juntar(
                 &mut nodos,
                 &a.leer.funcion,

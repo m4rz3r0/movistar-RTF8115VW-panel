@@ -67,7 +67,7 @@ fn valor_en_foto_por_instancia() {
     assert_eq!(nombre("wifi.red_5").as_deref(), Some("RED-1"));
     // El de invitados (2) no está en esta foto.
     assert_eq!(nombre("wifi.invitados"), None);
-    // Las radios, por `dpm_cfg_wifi_0i` (su `leer`) y `dpm_cfg_wifi_id`.
+    // Las radios, por su `dpm_cfg_wifi_id` (sus `fijos`).
     let radios = juntadas(
         "cbGetWifi",
         ["0", "1"]
@@ -96,4 +96,35 @@ fn valor_en_foto_por_instancia() {
     // Sin ninguno de sus campos, no hay dato.
     let vacio = "<cbGetUpnpCfg><Result>0</Result></cbGetUpnpCfg>";
     assert_eq!(valor_en_foto(&f, upnp, &upnp.campos[0], vacio, None), None);
+}
+
+/// Con los dos pools DHCP en la foto (el de id 1 en la posición 0, como en
+/// el router real), los ajustes del pool de casa toman el de id 0.
+#[test]
+fn valor_en_foto_del_pool_de_casa() {
+    let f = Catalogo::load().unwrap();
+    let cat = CatalogoAjustes::load().unwrap();
+    let funcion = "cbGetDhcpv4ServerPool";
+    let xml = juntadas(
+        funcion,
+        ["0", "1"]
+            .into_iter()
+            .map(|i| {
+                respuesta(
+                    funcion,
+                    &format!("{funcion}__rtm_cfg_dhcpv4_svr_pool_0i={i}"),
+                )
+            })
+            .collect(),
+    );
+    let a = cat.ajuste("red_local.dhcp").unwrap();
+    assert_eq!(
+        valor_en_foto(&f, a, a.campo("inicio").unwrap(), &xml, None).as_deref(),
+        Some("192.168.1.100")
+    );
+    let a = cat.ajuste("red_local.dns_casa").unwrap();
+    assert_eq!(
+        valor_en_foto(&f, a, a.campo("principal").unwrap(), &xml, None).as_deref(),
+        Some("192.168.1.1")
+    );
 }

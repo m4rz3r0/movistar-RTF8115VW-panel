@@ -73,6 +73,8 @@ red 192.168.1.96/30 — equipos de la LAN renumerados en las fixtures (.60–.99
 valor 192.168.1.0 — red LAN de fábrica del router
 valor 192.168.1.100 — inicio del pool DHCP neutro de las fixtures; IP de ejemplo de la biblioteca y del explorador
 valor 192.168.1.199 — fin del pool DHCP neutro de las fixtures
+valor 192.168.1.230 — inicio del rango de fábrica del pool DHCP de otros dispositivos del operador (id 1) en las fixtures
+valor 192.168.1.250 — fin del rango de fábrica del pool DHCP de otros dispositivos del operador (id 1) en las fixtures
 red 10.255.0.0/24 — direcciones del operador renumeradas en las fixtures
 valor 172.16.0.1 — ejemplo genérico de red privada 172.16/12 en las pruebas
 valor 10.0.0.0 — red privada 10/8 (RFC 1918) del ejemplo de nginx de docs/proxy-tls.md

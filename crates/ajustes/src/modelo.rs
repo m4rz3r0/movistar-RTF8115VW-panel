@@ -213,6 +213,27 @@ mod catalogo_toml {
         /// Parámetros de la lectura (en el TOML, una tabla).
         #[serde(default, deserialize_with = "tabla_a_pares")]
         pub params: Vec<(String, String)>,
+        /// Parámetro de posición de una lectura de lista (`X_0i`) con que se
+        /// busca la instancia de los `fijos` del ajuste (su `X_id`): el
+        /// router elige por posición, que no tiene por qué ser el id (en el
+        /// router real, el pool DHCP de casa es el de id 0 y está en la
+        /// posición 1). Se recorren las posiciones hasta dar con ella.
+        #[serde(default)]
+        pub buscar: Option<String>,
+    }
+
+    impl Ajuste {
+        /// Si la lectura busca la instancia: el parámetro de posición y los
+        /// `fijos` que la identifican.
+        pub fn busqueda(&self) -> Option<(&str, Vec<(&str, &str)>)> {
+            let posicion = self.leer.buscar.as_deref()?;
+            let ident = self
+                .fijos
+                .iter()
+                .map(|(k, v)| (k.as_str(), v.as_str()))
+                .collect();
+            Some((posicion, ident))
+        }
     }
 
     fn tabla_a_pares<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<(String, String)>, D::Error> {

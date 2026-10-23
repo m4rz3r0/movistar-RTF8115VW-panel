@@ -17,6 +17,9 @@ use tokio::{
     time::Instant,
 };
 
+mod por_id;
+pub use por_id::TOPE_POSICIONES;
+
 /// Lecturas seguidas como mucho en un [`Turno`] antes de ceder el cerrojo
 /// una vez a quien espera (el sondeo, el gestor de cambios): una tanda
 /// larga no los deja sin turno. Un tema de Ajustes hace hasta 5.

@@ -69,6 +69,7 @@ ajustes-riesgo-alto-desc = May leave you without internet or without access to t
 ## Errors
 ajustes-error-tema = That settings section does not exist.
 ajustes-error-lectura = This setting could not be read from the router. Try again in a moment.
+ajustes-error-sin-instancia = The router does not have the part of its configuration this setting reads: it is not shown or changed.
 ajustes-error-vacio = This field cannot be left empty.
 ajustes-error-corto = Too short: it must take up at least as much as { $min } unaccented letters. Each accented letter takes up about two, "€" about three and an emoji about four.
 ajustes-error-largo = Too long: there is room for { $max } unaccented letters. Each accented letter takes up about two, "€" about three and an emoji about four.

@@ -49,15 +49,18 @@ fn filtros(a: &Ajuste) -> Vec<(&str, &str)> {
 
 /// ¿La instancia `leidos` es la del parámetro `k = v`? El router da cada
 /// instancia con su índice (`X_0i`) y su id (`X_id`), y leída por id
-/// devuelve `X_0i = -1`: vale cualquiera de los dos.
+/// devuelve `X_0i = -1`. Manda el que pide `k`; solo si la instancia no lo
+/// trae, vale el otro: la posición no es el id (el pool DHCP de id 0 está en
+/// la posición 1 del router real).
 fn casa(leidos: &Leidos, k: &str, v: &str) -> bool {
+    if let Some(propio) = leido(leidos, k) {
+        return propio == v;
+    }
     let otro = k
         .strip_suffix("_0i")
         .map(|base| format!("{base}_id"))
         .or_else(|| k.strip_suffix("_id").map(|base| format!("{base}_0i")));
-    std::iter::once(k)
-        .chain(otro.as_deref())
-        .any(|k| leido(leidos, k) == Some(v))
+    otro.is_some_and(|k| leido(leidos, &k) == Some(v))
 }
 
 /// Elementos de la instancia de `a` (que no es lista) en la respuesta `n` de
