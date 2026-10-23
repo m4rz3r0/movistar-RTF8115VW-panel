@@ -10,13 +10,14 @@
 
 use super::aviso::Seguimiento;
 use super::rejilla::Pagina;
-use crate::ajustes_router::{AjusteVista, InstanciaVista};
+use crate::ajustes_router::{AjusteVista, EstadoLectura, InstanciaVista};
 use crate::contrasena_forma::{MIN_BYTES, validar_forma_hasta};
 use crate::t;
 use crate::ui::explorador::texto_error;
 use crate::ui::i18n::traducir;
 use crate::ui::panel_ajustes::{DialogoReautenticar, Reautenticacion, campo, repetible};
 use crate::ui::secreto::Secreto;
+use crate::ui::{Estado, IconoEstado};
 use crate::usuarios_router::{
     GrupoUsuario, MAX_OTRO, OperacionUsuario, cambiar_usuario_router, preparar_usuario_router,
     texto_error_otro,
@@ -47,6 +48,28 @@ fn valor(i: &InstanciaVista, id: &str) -> String {
         Some(ValorLegible::Texto(t) | ValorLegible::Opcion(t)) => t.clone(),
         _ => String::new(),
     }
+}
+
+/// Lo que dice la lista cuando no tiene filas que pintar (`None` si las
+/// tiene): sin leerla, su motivo; leída y `vacia`, que no hay usuarios.
+#[derive(Debug, PartialEq, Eq)]
+enum SinFilas {
+    Motivo(String),
+    Vacia,
+}
+
+/// Ver [`SinFilas`].
+fn sin_filas(estado: &EstadoLectura, vacia: bool) -> Option<SinFilas> {
+    match estado {
+        EstadoLectura::SinLeer(m) => Some(SinFilas::Motivo(m.clone())),
+        EstadoLectura::Leido => vacia.then_some(SinFilas::Vacia),
+    }
+}
+
+/// Sin crear ni borrar usuarios: el panel en solo lectura, la función sin
+/// validar o la lista sin leer (no se sabe quién hay).
+fn gestor_bloqueado(solo_lectura: bool, sin_validar: bool, estado: &EstadoLectura) -> bool {
+    solo_lectura || sin_validar || *estado != EstadoLectura::Leido
 }
 
 /// Elegir el tipo de cuenta: «Usuario» o «Administrador». `nombre` agrupa
@@ -123,7 +146,7 @@ pub(crate) fn Usuarios(a: AjusteVista, elemento: String) -> impl IntoView {
     // motivo (el servidor también lo rechaza).
     let motivo_usuarios = sin_validar(Funcion3::Usuarios);
     let motivo_otro = sin_validar(Funcion3::ContrasenaOtro);
-    let sin_gestor = pagina.solo_lectura || motivo_usuarios.is_some();
+    let sin_gestor = gestor_bloqueado(pagina.solo_lectura, motivo_usuarios.is_some(), &a.estado);
     let sin_otro = pagina.solo_lectura || motivo_otro.is_some();
     let preparar = move |op: OperacionUsuario| {
         if ocupado.get_untracked() {
@@ -145,10 +168,19 @@ pub(crate) fn Usuarios(a: AjusteVista, elemento: String) -> impl IntoView {
             ocupado.try_set(false);
         });
     };
-    let filas = if a.instancias.is_empty() {
-        view! { <p class="ayuda">{t!("ajuste-seguridad-usuarios_router-vacia")}</p> }.into_any()
-    } else {
-        a.instancias
+    let filas = match sin_filas(&a.estado, a.instancias.is_empty()) {
+        Some(SinFilas::Motivo(m)) => view! {
+            <p class="aviso estado-error">
+                <IconoEstado estado=Estado::Error />
+                <span>{m}</span>
+            </p>
+        }
+        .into_any(),
+        Some(SinFilas::Vacia) => {
+            view! { <p class="ayuda">{t!("ajuste-seguridad-usuarios_router-vacia")}</p> }.into_any()
+        }
+        None => a
+            .instancias
             .iter()
             .map(|i| {
                 fila(
@@ -162,7 +194,7 @@ pub(crate) fn Usuarios(a: AjusteVista, elemento: String) -> impl IntoView {
                 )
             })
             .collect_view()
-            .into_any()
+            .into_any(),
     };
     let motivos = [motivo_usuarios, motivo_otro]
         .into_iter()
@@ -387,5 +419,37 @@ fn NuevoUsuario(
                 </button>
             </div>
         </section>
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{SinFilas, gestor_bloqueado, sin_filas};
+    use crate::ajustes_router::EstadoLectura;
+
+    /// Sin poder leer la lista, la tarjeta da el motivo y no dice que el
+    /// router no tenga usuarios; leída y vacía, sí lo dice.
+    #[test]
+    fn la_lista_sin_leer_no_se_da_por_vacia() {
+        let fallo = EstadoLectura::SinLeer("No se pudo leer".into());
+        assert_eq!(
+            sin_filas(&fallo, true),
+            Some(SinFilas::Motivo("No se pudo leer".into()))
+        );
+        assert_eq!(
+            sin_filas(&EstadoLectura::Leido, true),
+            Some(SinFilas::Vacia)
+        );
+        assert_eq!(sin_filas(&EstadoLectura::Leido, false), None);
+    }
+
+    /// Sin la lista leída no se crea ni se borra nadie.
+    #[test]
+    fn sin_leer_la_lista_no_se_crea_usuario() {
+        let fallo = EstadoLectura::SinLeer("No se pudo leer".into());
+        assert!(gestor_bloqueado(false, false, &fallo));
+        assert!(!gestor_bloqueado(false, false, &EstadoLectura::Leido));
+        assert!(gestor_bloqueado(true, false, &EstadoLectura::Leido));
+        assert!(gestor_bloqueado(false, true, &EstadoLectura::Leido));
     }
 }
