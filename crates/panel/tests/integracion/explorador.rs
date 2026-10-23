@@ -304,6 +304,8 @@ async fn bloqueada_sin_formulario() {
         ("cbRestoreConfig", ""),
         ("te_wifi.wl", "v1"),
         ("cbSetLanIPv4Addr", "IP del router"),
+        ("scbidirectionalflt.cmd?action=add", "cortafuegos"),
+        ("scbidirectionalfwl.cmd?action=save", "cortafuegos"),
     ] {
         let d = ok(&p, "explorador_funcion", json!({ "nombre": f }), &cookie).await;
         let b = d["resumen"]["bloqueada"]

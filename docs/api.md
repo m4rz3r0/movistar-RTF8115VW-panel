@@ -39,9 +39,9 @@ Las funciones del propio panel (`/api/…`) están en
 | [LAN/DHCP](#landhcp) | 22 | 12 | 10 | 0 | 0 |
 | [WiFi](#wifi) | 20 | 11 | 8 | 1 | 0 |
 | [NAT](#nat) | 16 | 6 | 10 | 0 | 0 |
-| [Cortafuegos](#cortafuegos) | 4 | 1 | 3 | 0 | 0 |
+| [Cortafuegos](#cortafuegos) | 4 | 1 | 3 | 0 | 3 |
 | [DNS](#dns) | 6 | 3 | 3 | 0 | 0 |
-| [IPv6](#ipv6) | 8 | 2 | 6 | 0 | 0 |
+| [IPv6](#ipv6) | 8 | 2 | 6 | 0 | 3 |
 | [Multicast/IGMP](#multicastigmp) | 5 | 3 | 2 | 0 | 0 |
 | [QoS](#qos) | 7 | 4 | 3 | 0 | 0 |
 | [VoIP](#voip) | 7 | 4 | 3 | 0 | 0 |
@@ -974,7 +974,7 @@ Elementos de la respuesta: `adm_state`, `ip_intf_id`, `nat_intf_0i`, `nat_intf_i
 
 ### `cbSetNatIntf`
 
-*escritura* · UI avanzada · riesgo bajo · página `natintf.asp`
+*escritura* · UI avanzada · riesgo alto · página `natintf.asp`
 
 Activa o cambia el NAT de una interfaz.
 
@@ -1163,6 +1163,8 @@ Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalida
 
 Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Añade una entrada (interfaz, versión, acción por defecto) o una regla (protocolo, origen, destino, puertos, acción).
 
+**Bloqueada:** cortafuegos sin lectura comprobable: la Biblioteca no lo escribe; el panel solo pone y quita su propia regla desde Seguridad
+
 Lectura pareada: `scbidirectionalflt.cmd?action=view`
 
 | Parámetro | Etiqueta | Tipo | Opciones |
@@ -1196,6 +1198,8 @@ Lectura pareada: `scbidirectionalflt.cmd?action=view`
 
 Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Modifica una entrada o regla.
 
+**Bloqueada:** cortafuegos sin lectura comprobable: la Biblioteca no lo escribe; el panel solo pone y quita su propia regla desde Seguridad
+
 Lectura pareada: `scbidirectionalflt.cmd?action=view`
 
 | Parámetro | Etiqueta | Tipo | Opciones |
@@ -1228,6 +1232,8 @@ Lectura pareada: `scbidirectionalflt.cmd?action=view`
 *escritura* · oculta · riesgo alto · página `scbidirectionalflt_ls.asp`
 
 Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Borra una entrada o regla.
+
+**Bloqueada:** cortafuegos sin lectura comprobable: la Biblioteca no lo escribe; el panel solo pone y quita su propia regla desde Seguridad
 
 Lectura pareada: `scbidirectionalflt.cmd?action=view`
 
@@ -1367,6 +1373,8 @@ Lectura pareada: `cbGetLanIPv6Config`
 
 Abre puertos IPv6 hacia un equipo de la LAN (UI básica).
 
+**Bloqueada:** cortafuegos sin lectura comprobable: la Biblioteca no lo escribe; el panel solo pone y quita su propia regla desde Seguridad
+
 Lectura pareada: `te_ipv6.asp`
 
 | Parámetro | Etiqueta | Tipo | Opciones |
@@ -1380,6 +1388,8 @@ Lectura pareada: `te_ipv6.asp`
 
 Borra una apertura de puertos IPv6 (UI básica).
 
+**Bloqueada:** cortafuegos sin lectura comprobable: la Biblioteca no lo escribe; el panel solo pone y quita su propia regla desde Seguridad
+
 Lectura pareada: `te_ipv6.asp`
 
 | Parámetro | Etiqueta | Tipo | Opciones |
@@ -1392,6 +1402,8 @@ Lectura pareada: `te_ipv6.asp`
 *escritura* · UI básica · riesgo alto · página `te_ipv6.asp`
 
 Guarda la lista de aperturas de puertos IPv6 (UI básica).
+
+**Bloqueada:** cortafuegos sin lectura comprobable: la Biblioteca no lo escribe; el panel solo pone y quita su propia regla desde Seguridad
 
 Lectura pareada: `te_ipv6.asp`
 

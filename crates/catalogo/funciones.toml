@@ -2118,7 +2118,7 @@ origen = "avanzada"
 tipo = "escritura"
 pagina = "natintf.asp"
 descripcion = "Activa o cambia el NAT de una interfaz."
-riesgo = "bajo"
+riesgo = "alto"
 lectura_pareada = { funcion = "cbGetNatIntf", params = [] }
 
 [[funcion.parametro]]
@@ -2449,6 +2449,7 @@ tipo = "escritura"
 pagina = "scbidirectionalflt_ed.asp"
 descripcion = "Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Añade una entrada (interfaz, versión, acción por defecto) o una regla (protocolo, origen, destino, puertos, acción)."
 riesgo = "alto"
+bloqueada = "cortafuegos sin lectura comprobable: la Biblioteca no lo escribe; el panel solo pone y quita su propia regla desde Seguridad"
 lectura_pareada = { funcion = "scbidirectionalflt.cmd?action=view", params = [] }
 
 [[funcion.parametro]]
@@ -2569,6 +2570,7 @@ tipo = "escritura"
 pagina = "scbidirectionalflt_ed.asp"
 descripcion = "Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Modifica una entrada o regla."
 riesgo = "alto"
+bloqueada = "cortafuegos sin lectura comprobable: la Biblioteca no lo escribe; el panel solo pone y quita su propia regla desde Seguridad"
 lectura_pareada = { funcion = "scbidirectionalflt.cmd?action=view", params = [] }
 
 [[funcion.parametro]]
@@ -2689,6 +2691,7 @@ tipo = "escritura"
 pagina = "scbidirectionalflt_ls.asp"
 descripcion = "Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Borra una entrada o regla."
 riesgo = "alto"
+bloqueada = "cortafuegos sin lectura comprobable: la Biblioteca no lo escribe; el panel solo pone y quita su propia regla desde Seguridad"
 lectura_pareada = { funcion = "scbidirectionalflt.cmd?action=view", params = [] }
 
 [[funcion.parametro]]
@@ -2968,6 +2971,7 @@ tipo = "escritura"
 pagina = "te_ipv6.asp"
 descripcion = "Abre puertos IPv6 hacia un equipo de la LAN (UI básica)."
 riesgo = "alto"
+bloqueada = "cortafuegos sin lectura comprobable: la Biblioteca no lo escribe; el panel solo pone y quita su propia regla desde Seguridad"
 lectura_pareada = { funcion = "te_ipv6.asp", params = [] }
 
 [[funcion.parametro]]
@@ -2988,6 +2992,7 @@ tipo = "escritura"
 pagina = "te_ipv6.asp"
 descripcion = "Borra una apertura de puertos IPv6 (UI básica)."
 riesgo = "alto"
+bloqueada = "cortafuegos sin lectura comprobable: la Biblioteca no lo escribe; el panel solo pone y quita su propia regla desde Seguridad"
 lectura_pareada = { funcion = "te_ipv6.asp", params = [] }
 
 [[funcion.parametro]]
@@ -3008,6 +3013,7 @@ tipo = "escritura"
 pagina = "te_ipv6.asp"
 descripcion = "Guarda la lista de aperturas de puertos IPv6 (UI básica)."
 riesgo = "alto"
+bloqueada = "cortafuegos sin lectura comprobable: la Biblioteca no lo escribe; el panel solo pone y quita su propia regla desde Seguridad"
 lectura_pareada = { funcion = "te_ipv6.asp", params = [] }
 
 [[funcion.parametro]]

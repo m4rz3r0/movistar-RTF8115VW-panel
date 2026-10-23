@@ -131,32 +131,6 @@ motivo = "conexión a internet: depende de la detectada; fase 3"
 funcion = "cbSetDnsRelayServer"
 motivo = "conexión a internet: depende de la detectada; fase 3"
 
-# ---- Cortafuegos.
-
-[[excluida]]
-funcion = "scbidirectionalflt.cmd?action=add"
-motivo = "cortafuegos de la web oculta: formato por validar con el router real; fase 3"
-
-[[excluida]]
-funcion = "scbidirectionalflt.cmd?action=modify"
-motivo = "cortafuegos de la web oculta: formato por validar con el router real; fase 3"
-
-[[excluida]]
-funcion = "scbidirectionalflt.cmd?action=remove"
-motivo = "cortafuegos de la web oculta: formato por validar con el router real; fase 3"
-
-[[excluida]]
-funcion = "scbidirectionalfwl.cmd?action=create"
-motivo = "cortafuegos IPv6 de la web básica: formato por validar con el router real; fase 3"
-
-[[excluida]]
-funcion = "scbidirectionalfwl.cmd?action=delete"
-motivo = "cortafuegos IPv6 de la web básica: formato por validar con el router real; fase 3"
-
-[[excluida]]
-funcion = "scbidirectionalfwl.cmd?action=save"
-motivo = "cortafuegos IPv6 de la web básica: formato por validar con el router real; fase 3"
-
 # ---- Fuera de las familias del plan (ver el informe de la Tarea 5).
 
 [[excluida]]

@@ -287,6 +287,30 @@ riesgo = "bajo"
         }
     }
 
+    /// El cortafuegos no tiene lectura comprobable: la Biblioteca no lo
+    /// escribe (el panel solo pone y quita su propia regla desde Seguridad).
+    /// El NAT de una interfaz puede dejar la casa sin internet: riesgo alto.
+    #[test]
+    fn cortafuegos_bloqueado_en_la_biblioteca() {
+        let c = cat();
+        for n in [
+            "scbidirectionalflt.cmd?action=add",
+            "scbidirectionalflt.cmd?action=modify",
+            "scbidirectionalflt.cmd?action=remove",
+            "scbidirectionalfwl.cmd?action=create",
+            "scbidirectionalfwl.cmd?action=delete",
+            "scbidirectionalfwl.cmd?action=save",
+        ] {
+            let f = c.funcion(n).unwrap_or_else(|| panic!("falta {n}"));
+            let m = f
+                .bloqueada
+                .as_deref()
+                .unwrap_or_else(|| panic!("{n} no está bloqueada"));
+            assert!(m.len() > 10, "{n}: motivo demasiado corto");
+        }
+        assert_eq!(c.funcion("cbSetNatIntf").unwrap().riesgo, Riesgo::Alto);
+    }
+
     #[test]
     fn reboot_es_accion_alto() {
         let c = cat();

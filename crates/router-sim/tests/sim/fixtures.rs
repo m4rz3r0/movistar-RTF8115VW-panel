@@ -113,3 +113,22 @@ fn fixtures_have_no_secrets() {
     }
     assert!(files > 50, "faltan fixtures ({files})");
 }
+
+/// Cada entrada de la caché ARP tiene su MAC: una MAC repetida en varias IP
+/// haría pasar a un dispositivo por varios.
+#[test]
+fn arp_sin_mac_repetida() {
+    let raw = std::fs::read_to_string(fixtures_dir().join("cbGetArpCache.xml")).unwrap();
+    let doc = roxmltree::Document::parse(&raw).expect("fixture XML válida");
+    let registros = doc
+        .descendants()
+        .filter(|n| n.has_tag_name("arp_record"))
+        .count();
+    let macs: HashSet<&str> = doc
+        .descendants()
+        .filter(|n| n.has_tag_name("hwaddr"))
+        .filter_map(|n| n.text())
+        .collect();
+    assert!(registros > 1, "faltan entradas ARP");
+    assert_eq!(macs.len(), registros, "MAC repetida en la caché ARP");
+}
