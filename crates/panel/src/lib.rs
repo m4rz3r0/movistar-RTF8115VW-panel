@@ -11,6 +11,7 @@
 pub mod ajustes_router;
 pub mod app;
 pub mod auth;
+pub mod contrasena_forma;
 pub mod contrasena_router;
 pub mod instalar;
 pub mod panel_ajustes;

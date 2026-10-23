@@ -150,7 +150,11 @@ pub(crate) async fn basic_login(
     body: Bytes,
 ) -> Response {
     let f = form(&body);
-    let rechazada = s.state().login_falla_con.clone();
+    let rechazada = {
+        let mut st = s.state();
+        s.aplicar_contrasena_pendiente(&mut st);
+        st.login_falla_con.clone()
+    };
     let good = param(&f, "loginUsername") == Some(mess_userpass(&s.user).as_str())
         && param(&f, "loginPassword") == Some(mess_userpass(&s.password()).as_str())
         && rechazada.is_none_or(|r| param(&f, "loginPassword") != Some(mess_userpass(&r).as_str()));
@@ -323,6 +327,7 @@ fn advanced_login(
     if !has_basic(st, c) {
         return LOGGED_OUT.into();
     }
+    s.aplicar_contrasena_pendiente(st);
     let good = param(params, "rqUsername") == Some(mess_userpass(&s.user).as_str())
         && param(params, "rqPasswd") == Some(mess_userpass(&s.password()).as_str())
         && st

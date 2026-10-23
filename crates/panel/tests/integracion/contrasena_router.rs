@@ -69,6 +69,17 @@ fn cambios_de_contrasena(p: &Panel) -> Vec<Vec<(String, String)>> {
         .collect()
 }
 
+/// Los cambios de contraseña recibidos por el simulador, tal como llegaron.
+fn cambios_crudos(p: &Panel) -> Vec<Vec<(String, String)>> {
+    p.sim
+        .control
+        .writes()
+        .into_iter()
+        .filter(|(f, _)| f == hgu::fmt::CAMBIO_CONTRASENA)
+        .map(|(_, ps)| ps)
+        .collect()
+}
+
 fn valor<'a>(ps: &'a [(String, String)], k: &str) -> &'a str {
     ps.iter()
         .find(|(n, _)| n == k)
@@ -127,6 +138,11 @@ async fn contrasena_router_cambia_y_se_guarda() {
     assert_eq!(valor(&cambios[0], "rqUser"), USER);
     assert_eq!(valor(&cambios[0], "rqOPwd"), PASS);
     assert_eq!(valor(&cambios[0], "rqNPwd"), NUEVA);
+    // Lo que viaja, en XOR como la web oficial (`mess_userpass`).
+    let crudos = cambios_crudos(&p);
+    assert_eq!(valor(&crudos[0], "rqUser"), ".-,+");
+    assert_eq!(valor(&crudos[0], "rqOPwd"), hgu::fmt::mess_userpass(PASS));
+    assert_ne!(valor(&crudos[0], "rqOPwd"), PASS);
 
     // El sondeo sigue leyendo, ya con la nueva (sin sesiones abiertas).
     p.sim.control.invalidate_sessions();
@@ -185,12 +201,51 @@ async fn contrasena_router_cambia_y_se_guarda() {
     assert!(!html.contains(NUEVA) && !html.contains(PASS));
 }
 
+/// El router acepta la nueva, pero tarda en aplicarla: la primera prueba
+/// con ella falla y la anterior aún entra. El reintento la da por buena.
+#[tokio::test]
+async fn contrasena_router_aplicada_con_retraso_se_guarda() {
+    let (mut p, cookie) = preparado().await;
+    p.state.plazo_rechazada = Duration::from_secs(2);
+    p.app = panel::build_router(p.state.clone());
+    p.sim
+        .control
+        .modify_pwd_con_retraso(Duration::from_millis(300));
+    let inicio = Instant::now();
+    let (status, body) = cambiar(&p, &cookie, NUEVA).await;
+    assert_eq!(status, 200, "{body}");
+    // Solo entra con la nueva cuando el router la aplica, tras el retraso.
+    assert!(
+        inicio.elapsed() >= Duration::from_millis(300),
+        "{:?}",
+        inicio.elapsed()
+    );
+    assert_eq!(contrasena_guardada(&p).await, NUEVA);
+    assert_eq!(cambios_de_contrasena(&p).len(), 1);
+    assert!(entra(&p, NUEVA).await);
+    assert!(!entra(&p, PASS).await);
+    let (_, estado, error, _, _) = ultima_fila(&p).await;
+    assert_eq!(estado, "aplicado", "{error:?}");
+    // El panel entra con la nueva.
+    p.sim.control.invalidate_sessions();
+    hgu::read::summary(&p.state.hgu).await.unwrap();
+}
+
 #[tokio::test]
 async fn contrasena_router_rechazada_conserva_la_anterior() {
-    let (p, cookie) = preparado().await;
+    let (mut p, cookie) = preparado().await;
+    p.state.plazo_rechazada = Duration::from_millis(300);
+    p.app = panel::build_router(p.state.clone());
     p.sim.control.modify_pwd_sin_efecto();
+    let inicio = Instant::now();
     let (status, body) = cambiar(&p, &cookie, NUEVA).await;
     assert_eq!(status, 502, "{body}");
+    // Reintenta hasta el plazo antes de darla por rechazada.
+    assert!(
+        inicio.elapsed() >= Duration::from_millis(300),
+        "{:?}",
+        inicio.elapsed()
+    );
     assert!(body.contains("no aceptó la contraseña nueva"), "{body}");
     assert!(entra(&p, PASS).await);
     assert!(!entra(&p, NUEVA).await);
@@ -337,8 +392,10 @@ async fn contrasena_router_valida_la_nueva() {
     let (p, cookie) = preparado().await;
     for (nueva, texto) in [
         ("corta", "demasiado corta"),
-        (&*"x".repeat(65), "demasiado larga"),
+        (&*"x".repeat(33), "demasiado larga"),
         ("clave\nde-prueba", "saltos de línea"),
+        ("clave`de-prueba", "teclado inglés"),
+        (" clave-de-prueba", "espacio"),
         (PASS, "la misma que ya tiene"),
     ] {
         for f in ["comprobar_contrasena_router", "cambiar_contrasena_router"] {

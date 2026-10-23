@@ -97,8 +97,14 @@ fn cliente_con(sim: &SimHandle, password: &str) -> Client {
     })
 }
 
-fn cambio_pwd<'a>(actual: &'a str, nueva: &'a str) -> [(&'a str, &'a str); 3] {
-    [("rqUser", USER), ("rqOPwd", actual), ("rqNPwd", nueva)]
+/// `cbModifyPwd` de `usuario`, de `actual` a `nueva`, codificado como lo
+/// manda el panel (XOR, como la web oficial).
+async fn modificar(c: &Client, usuario: &str, actual: &str, nueva: &str) -> Result<(), Error> {
+    let p = hgu::fmt::parametros_cambio_contrasena(usuario, actual, nueva);
+    let p: Vec<(&str, &str)> = p.iter().map(|(k, v)| (*k, v.as_str())).collect();
+    c.write("user_profile.asp", "cbModifyPwd", &p)
+        .await
+        .map(|_| ())
 }
 
 #[tokio::test]
@@ -106,13 +112,7 @@ async fn modify_pwd_cambia_y_el_login_nuevo_entra() {
     let sim = start().await;
     let c = client(&sim, Duration::from_secs(5));
     c.call("cbGetSummary", &[]).await.unwrap();
-    c.write(
-        "user_profile.asp",
-        "cbModifyPwd",
-        &cambio_pwd(PASS, "clave-nueva"),
-    )
-    .await
-    .unwrap();
+    modificar(&c, USER, PASS, "clave-nueva").await.unwrap();
     // La sesión abierta sigue valiendo.
     c.call("cbGetSummary", &[]).await.unwrap();
     // La nueva entra; la vieja ya no.
@@ -132,26 +132,14 @@ async fn modify_pwd_cambia_y_el_login_nuevo_entra() {
 async fn modify_pwd_con_actual_mala_falla() {
     let sim = start().await;
     let c = client(&sim, Duration::from_secs(5));
-    let e = c
-        .write(
-            "user_profile.asp",
-            "cbModifyPwd",
-            &cambio_pwd("otra", "clave-nueva"),
-        )
+    let e = modificar(&c, USER, "otra", "clave-nueva")
         .await
         .unwrap_err();
     assert!(
         matches!(&e, Error::CallFailed { result, .. } if result != "0"),
         "{e:?}"
     );
-    let e = c
-        .write(
-            "user_profile.asp",
-            "cbModifyPwd",
-            &[("rqUser", "otro"), ("rqOPwd", PASS), ("rqNPwd", "x")],
-        )
-        .await
-        .unwrap_err();
+    let e = modificar(&c, "otro", PASS, "x").await.unwrap_err();
     assert!(matches!(e, Error::CallFailed { .. }));
     cliente_con(&sim, PASS)
         .call("cbGetSummary", &[])
@@ -164,26 +152,55 @@ async fn modify_pwd_sin_efecto_responde_ok_y_no_cambia() {
     let sim = start().await;
     let c = client(&sim, Duration::from_secs(5));
     sim.control.modify_pwd_sin_efecto();
-    c.write(
-        "user_profile.asp",
-        "cbModifyPwd",
-        &cambio_pwd(PASS, "clave-nueva"),
-    )
-    .await
-    .unwrap();
+    modificar(&c, USER, PASS, "clave-nueva").await.unwrap();
     cliente_con(&sim, PASS)
         .call("cbGetSummary", &[])
         .await
         .unwrap();
     // Solo la próxima: la siguiente sí cambia.
-    c.write(
-        "user_profile.asp",
-        "cbModifyPwd",
-        &cambio_pwd(PASS, "clave-nueva"),
-    )
-    .await
-    .unwrap();
+    modificar(&c, USER, PASS, "clave-nueva").await.unwrap();
     cliente_con(&sim, "clave-nueva")
+        .call("cbGetSummary", &[])
+        .await
+        .unwrap();
+}
+
+/// Con retraso, el cambio responde OK y queda pendiente: hasta que pasa, la
+/// anterior sigue entrando y la nueva no; el primer inicio de sesión
+/// después lo aplica.
+#[tokio::test]
+async fn modify_pwd_con_retraso_se_aplica_al_entrar_despues() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    sim.control
+        .modify_pwd_con_retraso(Duration::from_millis(300));
+    modificar(&c, USER, PASS, "clave-nueva").await.unwrap();
+    assert!(
+        cliente_con(&sim, "clave-nueva")
+            .call("cbGetSummary", &[])
+            .await
+            .is_err()
+    );
+    cliente_con(&sim, PASS)
+        .call("cbGetSummary", &[])
+        .await
+        .unwrap();
+    tokio::time::sleep(Duration::from_millis(350)).await;
+    cliente_con(&sim, "clave-nueva")
+        .call("cbGetSummary", &[])
+        .await
+        .unwrap();
+    assert!(
+        cliente_con(&sim, PASS)
+            .call("cbGetSummary", &[])
+            .await
+            .is_err()
+    );
+    // Solo el próximo: el siguiente cambio se aplica enseguida.
+    modificar(&c, USER, "clave-nueva", "otra-clave")
+        .await
+        .unwrap();
+    cliente_con(&sim, "otra-clave")
         .call("cbGetSummary", &[])
         .await
         .unwrap();

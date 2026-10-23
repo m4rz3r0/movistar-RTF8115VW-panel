@@ -41,7 +41,8 @@ fn IconoOjo(visible: Signal<bool>) -> impl IntoView {
 /// escribe en `valor` (el formulario lo envía si cambió); si no, es de solo
 /// lectura. `id` va en el `<input>` (para su `<label for>`); sin etiqueta
 /// visible, `nombre` es su nombre accesible. `vacio` es lo que se lee si no
-/// hay valor (el router no deja leerlo).
+/// hay valor (el router no deja leerlo). `maxlength`, lo más que deja
+/// escribir.
 #[component]
 pub fn Secreto(
     valor: RwSignal<String>,
@@ -53,6 +54,7 @@ pub fn Secreto(
     #[prop(optional, into)] invalido: Signal<bool>,
     #[prop(optional, into)] bloqueado: Signal<bool>,
     #[prop(optional)] error: Option<RwSignal<Option<String>>>,
+    #[prop(optional)] maxlength: Option<usize>,
 ) -> impl IntoView {
     let visible = RwSignal::new(false);
     // Sin `<label>` (una celda, una fila de la vista resumida), el nombre.
@@ -75,6 +77,7 @@ pub fn Secreto(
                 aria-describedby=descrito
                 aria-invalid=move || invalido.get().then_some("true")
                 placeholder=vacio
+                maxlength=maxlength
                 // Que los gestores de contraseñas no la rellenen ni la
                 // guarden: es una clave del router, no de este sitio.
                 data-1p-ignore=""

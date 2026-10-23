@@ -57,7 +57,7 @@ router-error-conexion-no-existe = The router has no connection named { $nombre }
 contrasena-router-titulo = Change the router password
 contrasena-router-texto = Changes the password of the router's web interface. From then on, the panel logs in with the new one and you will need it too to log in to the router. The panel tries the new one before keeping it and, if anything fails, puts the previous one back.
 contrasena-router-nueva = New password
-contrasena-router-nueva-ayuda = { $min } to { $max } characters. Accented letters and some symbols take up more than one. Press the eye to check what you have typed.
+contrasena-router-nueva-ayuda = { $min } to { $max } characters: unaccented letters, digits, spaces and the symbols on an English keyboard, except "`". No space at the start or the end, and never two in a row. Press the eye to check what you have typed.
 contrasena-router-solo-lectura = It cannot be changed while the panel is read-only: first confirm the firmware in the "Firmware" card.
 contrasena-router-cambiar = Change
 contrasena-router-cambiando = Changing…
@@ -70,9 +70,11 @@ contrasena-router-confirmar-boton = Change the password
 # (and panel-solo-lectura and comun-error-interno, in their files) are
 # stored in each installation's database, in the History: never rename or
 # delete them (only change their text).
-contrasena-router-error-corta = The new password is too short: it needs at least { $n } characters. Accented letters and some symbols take up more than one.
-contrasena-router-error-larga = The new password is too long: { $n } characters at most. Accented letters and some symbols take up more than one.
+contrasena-router-error-corta = The new password is too short: it needs at least { $n } characters.
+contrasena-router-error-larga = The new password is too long: { $n } characters at most.
 contrasena-router-error-control = The new password cannot contain line breaks, tabs or other invisible characters.
+contrasena-router-error-caracter = The new password can only contain unaccented letters, digits, spaces and the symbols on an English keyboard, except "`": no accented letters or other symbols.
+contrasena-router-error-espacios = The new password cannot start or end with a space, or have two spaces in a row.
 contrasena-router-error-igual = The new password is the same one the router already has.
 contrasena-router-error-en-curso = Another change is in progress on the router: wait for it to finish before changing the password.
 contrasena-router-error-sin-router = The panel does not know how to log in to the router yet: save its address, username and password first.

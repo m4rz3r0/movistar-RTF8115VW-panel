@@ -81,7 +81,8 @@ pub(crate) fn write(
 /// Cambia la contraseña del usuario del sim (`rqUser`, `rqOPwd`, `rqNPwd`,
 /// leídos con la misma codificación con la que los manda el panel:
 /// [`codificar_cambio_contrasena`]). Las sesiones abiertas siguen valiendo,
-/// como en el router.
+/// como en el router. Con `modify_pwd_con_retraso`, la nueva queda
+/// pendiente y la aplica el primer inicio de sesión tras el retraso.
 fn modify_pwd(s: &Inner, st: &mut SimState, p: &[(String, String)]) -> Result<(), String> {
     let leer = |k: &str| param(p, k).map(codificar_cambio_contrasena);
     let nueva = leer("rqNPwd").ok_or("falta rqNPwd")?;
@@ -91,8 +92,12 @@ fn modify_pwd(s: &Inner, st: &mut SimState, p: &[(String, String)]) -> Result<()
     {
         return Err("usuario o contraseña actual incorrectos".to_owned());
     }
-    if !std::mem::take(&mut st.modify_pwd_sin_efecto) {
-        *s.password.lock().unwrap_or_else(|e| e.into_inner()) = nueva;
+    if std::mem::take(&mut st.modify_pwd_sin_efecto) {
+        return Ok(());
+    }
+    match st.modify_pwd_retraso.take() {
+        Some(retraso) => st.pwd_pendiente = Some((nueva, Instant::now() + retraso)),
+        None => *s.password.lock().unwrap_or_else(|e| e.into_inner()) = nueva,
     }
     Ok(())
 }

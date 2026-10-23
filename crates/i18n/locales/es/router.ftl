@@ -57,7 +57,7 @@ router-error-conexion-no-existe = El router no tiene ninguna conexión { $nombre
 contrasena-router-titulo = Cambiar la contraseña del router
 contrasena-router-texto = Cambia la contraseña de la web del router. Desde ese momento, el panel entra con la nueva y tú también tendrás que usarla para entrar en el router. El panel prueba la nueva antes de quedarse con ella y, si algo falla, vuelve a poner la anterior.
 contrasena-router-nueva = Contraseña nueva
-contrasena-router-nueva-ayuda = Entre { $min } y { $max } caracteres. Las letras con tilde, la ñ y algunos símbolos ocupan más de uno. Pulsa el ojo para comprobar lo que has escrito.
+contrasena-router-nueva-ayuda = Entre { $min } y { $max } caracteres: letras sin tilde, números, espacios y signos del teclado inglés, sin «`». Sin espacio al principio ni al final, ni dos seguidos. Pulsa el ojo para comprobar lo que has escrito.
 contrasena-router-solo-lectura = No se puede cambiar mientras el panel esté en solo lectura: primero confirma el firmware en la tarjeta «Firmware».
 contrasena-router-cambiar = Cambiar
 contrasena-router-cambiando = Cambiando…
@@ -70,9 +70,11 @@ contrasena-router-confirmar-boton = Cambiar la contraseña
 # (y panel-solo-lectura y comun-error-interno, en sus ficheros) se guardan
 # en la base de datos de cada instalación, en el Historial: no se renombran
 # ni se borran (solo se cambia su texto).
-contrasena-router-error-corta = La contraseña nueva es demasiado corta: tiene que tener al menos { $n } caracteres. Las letras con tilde, la ñ y algunos símbolos ocupan más de uno.
-contrasena-router-error-larga = La contraseña nueva es demasiado larga: como mucho { $n } caracteres. Las letras con tilde, la ñ y algunos símbolos ocupan más de uno.
+contrasena-router-error-corta = La contraseña nueva es demasiado corta: tiene que tener al menos { $n } caracteres.
+contrasena-router-error-larga = La contraseña nueva es demasiado larga: como mucho { $n } caracteres.
 contrasena-router-error-control = La contraseña nueva no puede llevar saltos de línea, tabuladores ni otros caracteres invisibles.
+contrasena-router-error-caracter = La contraseña nueva solo puede llevar letras sin tilde, números, espacios y signos del teclado inglés, sin «`»: ni ñ, ni tildes, ni otros símbolos.
+contrasena-router-error-espacios = La contraseña nueva no puede empezar ni acabar con un espacio, ni llevar dos espacios seguidos.
 contrasena-router-error-igual = La contraseña nueva es la misma que ya tiene el router.
 contrasena-router-error-en-curso = Hay otro cambio en curso en el router: espera a que termine para cambiar la contraseña.
 contrasena-router-error-sin-router = El panel aún no sabe cómo entrar en el router: guarda primero su dirección, usuario y contraseña.

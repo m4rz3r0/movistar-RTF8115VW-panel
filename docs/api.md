@@ -1855,9 +1855,9 @@ Cambia la contraseña del usuario con sesión iniciada (contraseña actual y nue
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
-| `rqUser` | Usuario | text |  |
-| `rqOPwd` | Contraseña actual | secret |  |
-| `rqNPwd` | Contraseña nueva | secret |  |
+| `rqUser` | Usuario (XOR 0x1f) | text |  |
+| `rqOPwd` | Contraseña actual (XOR 0x1f) | secret |  |
+| `rqNPwd` | Contraseña nueva (XOR 0x1f) | secret |  |
 
 ### `cbModifyPwdOther`
 

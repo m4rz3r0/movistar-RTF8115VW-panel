@@ -76,6 +76,10 @@ impl RedActual {
 /// [`AppState::espera_prueba_router`]).
 pub const ESPERA_PRUEBA_ROUTER: std::time::Duration = std::time::Duration::from_secs(20);
 
+/// Cuánto se reintenta entrar con la contraseña nueva del router cuando la
+/// anterior aún vale (ver [`AppState::plazo_rechazada`]).
+pub const PLAZO_RECHAZADA: std::time::Duration = std::time::Duration::from_secs(10);
+
 /// Estado del servidor, compartido por las rutas Axum y las server functions.
 /// Barato de clonar.
 #[derive(Clone)]
@@ -109,6 +113,11 @@ pub struct AppState {
     /// router ([`crate::contrasena_router`]): si vence, cuenta como «no
     /// entra». Por defecto [`ESPERA_PRUEBA_ROUTER`]; las pruebas la acortan.
     pub espera_prueba_router: std::time::Duration,
+    /// Al cambiar la contraseña del router, si la nueva no entra y la
+    /// anterior sí, cuánto se sigue reintentando con la nueva (el router
+    /// puede aplicarla con retraso) antes de darla por rechazada. Por
+    /// defecto [`PLAZO_RECHAZADA`]; las pruebas lo acortan.
+    pub plazo_rechazada: std::time::Duration,
     /// Idioma por defecto de la instancia (`claves::IDIOMA`), si se ha fijado:
     /// copia en memoria para decidir el idioma de cada página sin ir a la
     /// base de datos. Lo carga [`AppState::new`] y lo cambia
@@ -248,6 +257,7 @@ impl AppState {
             cambios: changes::Ranura::default(),
             instalacion: Arc::default(),
             espera_prueba_router: ESPERA_PRUEBA_ROUTER,
+            plazo_rechazada: PLAZO_RECHAZADA,
             idioma_por_defecto: Arc::new(std::sync::RwLock::new(idioma_por_defecto)),
             zona: Arc::new(std::sync::RwLock::new(zona)),
             red,

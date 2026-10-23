@@ -24,17 +24,12 @@ pub const CAMBIO_CONTRASENA: &str = "cbModifyPwd";
 /// Es el único sitio que decide cómo viajan: lo usan el panel al escribir y
 /// el simulador al leer lo recibido.
 ///
-/// **Sin validar con el router real.** Aquí no está el JavaScript de su
-/// página y el inicio de sesión sí ofusca usuario y contraseña
-/// ([`mess_userpass`]), pero las demás claves de la web avanzada van en
-/// claro: por eso, de momento, también en claro. La fase 3 lo comprobará con
-/// el router (plan de la fase 2, «Lo que esta fase deja para después»); si es
-/// otro formato, basta con cambiar esta función.
-///
-/// Debe ser involutiva (aplicarla dos veces devuelve el original), como el
-/// claro y como [`mess_userpass`]: el simulador la usa también para leer.
+/// Es [`mess_userpass`] (XOR 0x1f por carácter), como en `js/user_profile.js`
+/// de la web oficial, que pasa los tres valores por `mess_userpass` (validado
+/// con el router real en la fase 3: en claro, lo rechaza). Es involutiva:
+/// el simulador la usa también para leer.
 pub fn codificar_cambio_contrasena(valor: &str) -> String {
-    valor.to_owned()
+    mess_userpass(valor)
 }
 
 /// Parámetros de [`CAMBIO_CONTRASENA`] para pasar la contraseña de `usuario`
@@ -87,14 +82,14 @@ mod tests {
     }
 
     #[test]
-    fn cambio_de_contrasena_en_claro_e_involutivo() {
+    fn cambio_de_contrasena_con_xor_e_involutivo() {
         let p = parametros_cambio_contrasena("1234", "clave-de-prueba-1", "clave-nueva-de-prueba");
         assert_eq!(
             p.map(|(k, v)| format!("{k}={v}")),
             [
-                "rqUser=1234",
-                "rqOPwd=clave-de-prueba-1",
-                "rqNPwd=clave-nueva-de-prueba"
+                "rqUser=.-,+",
+                "rqOPwd=|s~iz2{z2omjz}~2.",
+                "rqNPwd=|s~iz2qjzi~2{z2omjz}~"
             ]
         );
         for v in ["", "clave-de-prueba-1", "ñ€ $&=+"] {

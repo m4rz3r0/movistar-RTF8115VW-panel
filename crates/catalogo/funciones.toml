@@ -3999,17 +3999,17 @@ bloqueada = "cambia la contraseña con la que el propio panel inicia sesión: la
 
 [[funcion.parametro]]
 nombre = "rqUser"
-etiqueta = "Usuario"
+etiqueta = "Usuario (XOR 0x1f)"
 tipo = "text"
 
 [[funcion.parametro]]
 nombre = "rqOPwd"
-etiqueta = "Contraseña actual"
+etiqueta = "Contraseña actual (XOR 0x1f)"
 tipo = "secret"
 
 [[funcion.parametro]]
 nombre = "rqNPwd"
-etiqueta = "Contraseña nueva"
+etiqueta = "Contraseña nueva (XOR 0x1f)"
 tipo = "secret"
 
 [[funcion]]

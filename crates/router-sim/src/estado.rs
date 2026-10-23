@@ -8,7 +8,7 @@ use std::{
         Mutex, MutexGuard,
         atomic::{AtomicBool, AtomicU64},
     },
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 pub(crate) type Params = Vec<(String, String)>;
@@ -39,6 +39,19 @@ impl Inner {
 
     pub(crate) fn state(&self) -> MutexGuard<'_, SimState> {
         self.state.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Aplica la contraseña pendiente de un `cbModifyPwd` con retraso si ya
+    /// pasó (`modify_pwd_con_retraso`). La llama cada inicio de sesión.
+    pub(crate) fn aplicar_contrasena_pendiente(&self, st: &mut SimState) {
+        if st
+            .pwd_pendiente
+            .as_ref()
+            .is_some_and(|(_, desde)| Instant::now() >= *desde)
+            && let Some((nueva, _)) = st.pwd_pendiente.take()
+        {
+            *self.password.lock().unwrap_or_else(|e| e.into_inner()) = nueva;
+        }
     }
 }
 
@@ -111,6 +124,10 @@ pub(crate) struct SimState {
     pub(crate) listas: HashMap<String, ListaViva>,
     /// `modify_pwd_sin_efecto`.
     pub(crate) modify_pwd_sin_efecto: bool,
+    /// `modify_pwd_con_retraso`: el retraso del próximo `cbModifyPwd`.
+    pub(crate) modify_pwd_retraso: Option<Duration>,
+    /// Contraseña de un `cbModifyPwd` con retraso y desde cuándo vale.
+    pub(crate) pwd_pendiente: Option<(String, Instant)>,
     /// `login_falla_con`.
     pub(crate) login_falla_con: Option<String>,
     /// Último `cbReboot`: `SysUptime` cuenta desde aquí.

@@ -168,6 +168,13 @@ impl SimControl {
         self.inner.state().modify_pwd_sin_efecto = true;
     }
 
+    /// El próximo `cbModifyPwd` responde OK, pero el router tarda
+    /// `retraso` en aplicarlo: hasta entonces sigue entrando la anterior y
+    /// la nueva no. Lo aplica el primer inicio de sesión después.
+    pub fn modify_pwd_con_retraso(&self, retraso: Duration) {
+        self.inner.state().modify_pwd_retraso = Some(retraso);
+    }
+
     /// El inicio de sesión (básico y avanzado) con `password` falla aunque
     /// sea la vigente: simula un formato que el router no acepta al entrar.
     pub fn login_falla_con(&self, password: &str) {

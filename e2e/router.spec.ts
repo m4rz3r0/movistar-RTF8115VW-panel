@@ -193,6 +193,8 @@ test.describe("cambiar la contraseña del router", () => {
       const nueva = cambio.locator("#router-contrasena-nueva");
       await expect(nueva).toHaveAttribute("autocomplete", "new-password");
       await expect(nueva).toHaveAttribute("data-1p-ignore", "");
+      // Lo más que admite la web oficial del router.
+      await expect(nueva).toHaveAttribute("maxlength", "32");
       await nueva.fill(NUEVA_ROUTER);
       await cambio.getByRole("button", { name: "Mostrar Contraseña nueva" }).click();
       await expect(nueva).toHaveAttribute("type", "text");
@@ -237,8 +239,7 @@ test.describe("cambiar la contraseña del router", () => {
     // El simulador no sabe dejar al panel fuera con las dos contraseñas a
     // la vez: la respuesta de un error de verdad (la nueva corta), con el
     // texto del error grave (el de router.ftl en inglés).
-    const corta =
-      "The new password is too short: it needs at least 8 characters. Accented letters and some symbols take up more than one.";
+    const corta = "The new password is too short: it needs at least 8 characters.";
     const grave =
       "The panel cannot log in to the router with either the new password or the previous one. " +
       "To get access back, log in to the router's web interface (try the new one and, if that " +
