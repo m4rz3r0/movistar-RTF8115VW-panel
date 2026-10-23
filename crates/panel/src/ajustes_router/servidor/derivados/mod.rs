@@ -270,6 +270,7 @@ pub(super) fn estado(
         "estado_dns" => Ok(internet::estado_dns(ctx)),
         "estado_ddns" => Ok(internet::estado_ddns(ctx)),
         "estado_gestion_remota" => Ok(seguridad::estado_gestion_remota(ctx)),
+        "estado_cortafuegos" => Ok(seguridad::estado_cortafuegos(ctx)),
         "estado_linea" => Ok(telefono::estado_linea(ctx)),
         "estado_voz" => Ok(telefono::estado_voz(ctx)),
         "estado_paso_directo" => Ok(telefono::estado_paso_directo(ctx)),

@@ -452,10 +452,13 @@ impl Client {
         )))
     }
 
+    /// El `sessionKey` de `page`: su `var sessionKey` o, si no lo trae, su
+    /// `var sessKey` (las páginas del cortafuegos solo traen este).
     async fn session_key_locked(&self, st: &mut State, page: &str) -> Result<String, Error> {
         let html = self.page_locked(st, page).await?;
-        page_vars(&html)
-            .remove("sessionKey")
+        let mut vars = page_vars(&html);
+        vars.remove("sessionKey")
+            .or_else(|| vars.remove("sessKey"))
             .ok_or_else(|| Error::Unexpected(format!("{page}: no contiene sessionKey")))
     }
 
@@ -620,14 +623,28 @@ impl Turno<'_> {
     /// [`LECTURAS_POR_TURNO`] lecturas cede el cerrojo y espera a volver a
     /// tenerlo (el `Mutex` de tokio es justo: pasa antes quien esperaba).
     pub async fn call(&mut self, name: &str, params: &[(&str, &str)]) -> Result<XmlNode, Error> {
+        self.ceder_si_toca().await;
+        let st = self.st.as_mut().expect("el turno tiene el cerrojo");
+        self.client.call_locked(st, name, params).await
+    }
+
+    /// Como [`Client::basic_page`], dentro del turno (cuenta como una
+    /// lectura más de [`LECTURAS_POR_TURNO`]).
+    pub async fn pagina(&mut self, path: &str) -> Result<String, Error> {
+        self.ceder_si_toca().await;
+        let st = self.st.as_mut().expect("el turno tiene el cerrojo");
+        self.client.page_locked(st, path).await
+    }
+
+    /// Cuenta una lectura y, cada [`LECTURAS_POR_TURNO`], cede el cerrojo y
+    /// espera a volver a tenerlo.
+    async fn ceder_si_toca(&mut self) {
         if self.hechas >= LECTURAS_POR_TURNO {
             self.st = None;
             self.st = Some(self.client.shared.state.lock().await);
             self.hechas = 0;
         }
         self.hechas += 1;
-        let st = self.st.as_mut().expect("el turno tiene el cerrojo");
-        self.client.call_locked(st, name, params).await
     }
 }
 

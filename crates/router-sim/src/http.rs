@@ -1,6 +1,7 @@
 //! Rutas HTTP: login, páginas, CGI y middlewares.
 
 use crate::LOGGED_OUT;
+use crate::cortafuegos;
 use crate::escrituras::write;
 use crate::estado::{HangAfterWrite, Inner, Params, SimState};
 use crate::lecturas::read;
@@ -205,6 +206,9 @@ pub(crate) async fn page(
     }
     let key = st.next_token();
     st.session_key = Some(key.clone());
+    if cortafuegos::es_suya(&page) {
+        return cortafuegos::pagina(&st, &page, &key).into_response();
+    }
     let vars: String = PAGE_VARS
         .iter()
         .filter(|(p, _)| *p == page)
@@ -234,7 +238,8 @@ pub const PAGE_VARS: &[(&str, &[(&str, &str)])] = &[(
 )];
 
 /// Escritura de la UI básica: `GET /cgi-bin/<x>.cmd|.cgi|.wl?…&sessionKey=…`.
-/// Se registra en `writes` y responde OK; no cambia el estado simulado.
+/// Se registra en `writes` y responde OK; solo cambia el estado simulado la
+/// del cortafuegos (`scbidirectionalflt.cmd`).
 pub(crate) async fn basic_cgi(
     State(s): State<Arc<Inner>>,
     Path(file): Path<String>,
@@ -260,6 +265,9 @@ pub(crate) async fn basic_cgi(
         .into_iter()
         .filter(|(k, _)| k != "sessionKey")
         .collect();
+    if file == cortafuegos::ORDEN {
+        cortafuegos::escribir(&mut st, &clean);
+    }
     st.writes.push((file, clean));
     "<html><body>ok</body></html>".into_response()
 }

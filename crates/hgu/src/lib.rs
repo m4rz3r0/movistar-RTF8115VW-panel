@@ -1,6 +1,7 @@
 //! Cliente y utilidades para el router Askey RTF8115VW (Movistar/O2).
 
 pub mod client;
+pub mod cortafuegos;
 pub mod deteccion;
 pub mod error;
 pub mod fmt;

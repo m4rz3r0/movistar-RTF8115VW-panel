@@ -122,17 +122,19 @@ impl ChangeManager {
         desmarcados: &[usize],
         usuario: &str,
     ) -> Result<i64, CambioError> {
-        let funciones: Vec<String> = {
+        // Cada petición entera: la regla «sin ping» del cortafuegos solo se
+        // escribe con su carga exacta (ver `especiales`).
+        let peticiones: Vec<ChangeRequest> = {
             let p = lock(&self.pendientes);
             match p.get(token) {
                 Some(v) if v.caduca > Instant::now() => {
-                    v.pasos.iter().map(|p| p.req.funcion.clone()).collect()
+                    v.pasos.iter().map(|p| p.req.clone()).collect()
                 }
                 _ => return Err(CambioError::TokenInvalido),
             }
         };
-        for nombre in &funciones {
-            let f = self.funcion_escribible(nombre)?;
+        for req in &peticiones {
+            let f = self.funcion_escribible_para(req)?;
             if let Some(esperada) = palabra_requerida(f)
                 && palabra != Some(esperada)
             {

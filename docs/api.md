@@ -39,7 +39,7 @@ Las funciones del propio panel (`/api/…`) están en
 | [LAN/DHCP](#landhcp) | 22 | 12 | 10 | 0 | 0 |
 | [WiFi](#wifi) | 20 | 11 | 8 | 1 | 0 |
 | [NAT](#nat) | 16 | 6 | 10 | 0 | 0 |
-| [Cortafuegos](#cortafuegos) | 4 | 1 | 3 | 0 | 3 |
+| [Cortafuegos](#cortafuegos) | 4 | 1 | 3 | 0 | 4 |
 | [DNS](#dns) | 6 | 3 | 3 | 0 | 0 |
 | [IPv6](#ipv6) | 8 | 2 | 6 | 0 | 3 |
 | [Multicast/IGMP](#multicastigmp) | 5 | 3 | 2 | 0 | 0 |
@@ -1153,6 +1153,8 @@ Lectura pareada: `cbGetUpnpCfg`
 
 Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Lista las reglas IPv4/IPv6 (HTML).
 
+**Bloqueada:** no responde en el router real; la lista sale de scbidirectionalflt_ls.asp
+
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
 | `escape` | Escapar (true) | text |  |
@@ -1165,7 +1167,7 @@ Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalida
 
 **Bloqueada:** cortafuegos sin lectura comprobable: la Biblioteca no lo escribe; el panel solo pone y quita su propia regla desde Seguridad
 
-Lectura pareada: `scbidirectionalflt.cmd?action=view`
+Lectura pareada: `scbidirectionalflt_ls.asp`
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
@@ -1235,7 +1237,7 @@ Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalida
 
 **Bloqueada:** cortafuegos sin lectura comprobable: la Biblioteca no lo escribe; el panel solo pone y quita su propia regla desde Seguridad
 
-Lectura pareada: `scbidirectionalflt.cmd?action=view`
+Lectura pareada: `scbidirectionalflt_ls.asp`
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|

@@ -39,7 +39,7 @@ impl ChangeManager {
         req: &ChangeRequest,
         explicito: bool,
     ) -> Result<Plan, CambioError> {
-        let f = self.funcion_escribible(&req.funcion)?;
+        let f = self.funcion_escribible_para(req)?;
         if let Some(e) = Especial::de(f) {
             return self.planificar_especial(e, f, req, explicito).await;
         }
@@ -188,7 +188,7 @@ impl ChangeManager {
                 Ok(vars)
             }
             // Una lista sin instancia que leer sola: se lista.
-            Lectura::Ninguna | Lectura::Usuarios => Ok(BTreeMap::new()),
+            Lectura::Ninguna | Lectura::Usuarios | Lectura::Cortafuegos => Ok(BTreeMap::new()),
         }
     }
 
@@ -204,6 +204,13 @@ impl ChangeManager {
                 .call(especiales::LECTURA_USUARIOS, &[])
                 .await?;
             return Ok(especiales::usuarios_de(&n));
+        }
+        if *l == Lectura::Cortafuegos {
+            let filtros = hgu::cortafuegos::leer(&self.state.hgu).await?;
+            return Ok(especiales::filas_del_cortafuegos(&filtros)
+                .into_iter()
+                .map(|(fila, _)| fila)
+                .collect());
         }
         let Lectura::Xml {
             funcion,
@@ -236,7 +243,8 @@ impl ChangeManager {
         let f = &plan.funcion;
         let pagina = f.pagina.as_deref().unwrap_or_default();
         // Borrar una instancia especial es otra escritura (un usuario:
-        // `cbDeleteUser` con su nombre).
+        // `cbDeleteUser` con su nombre; la regla del cortafuegos, la baja
+        // de la UI básica con `item=<FID>|<RID>`, desde su lista).
         if plan.operacion == Operacion::Borrar
             && let Some(e) = Especial::de(f)
         {
@@ -246,7 +254,14 @@ impl ChangeManager {
                 .iter()
                 .map(|(k, v)| (k.as_str(), v.as_str()))
                 .collect();
-            return self.state.hgu.write(pagina, funcion, &p).await.map(drop);
+            let c = &self.state.hgu;
+            return match e {
+                Especial::Cortafuegos => c
+                    .basic_write(hgu::cortafuegos::PAGINA_LISTA, funcion, &p)
+                    .await
+                    .map(drop),
+                Especial::Usuarios => c.write(pagina, funcion, &p).await.map(drop),
+            };
         }
         let basica = !f.name.starts_with("cb");
         let m = &self.state.mascara;
@@ -285,6 +300,9 @@ impl ChangeManager {
     async fn comprobar_en_el_router(&self, plan: &Plan, lado: Lado) -> Comprobacion {
         if plan.lectura == Lectura::Usuarios {
             return self.comprobar_usuarios(plan, lado).await;
+        }
+        if plan.lectura == Lectura::Cortafuegos {
+            return self.comprobar_cortafuegos(plan, lado).await;
         }
         let f = &plan.funcion;
         let no_leido =

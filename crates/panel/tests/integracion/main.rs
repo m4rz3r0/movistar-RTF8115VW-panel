@@ -19,6 +19,7 @@ mod changes;
 mod contrasena_router;
 mod contrasena_router_plazo;
 mod contraste;
+mod cortafuegos;
 mod estado;
 mod estaticos;
 mod explorador;

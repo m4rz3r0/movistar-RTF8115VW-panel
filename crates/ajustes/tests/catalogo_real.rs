@@ -137,7 +137,7 @@ fn claves_de_elementos_en_los_dos_idiomas() {
 fn ajustes_minimos_presentes() {
     use Nivel::{Avanzado, Basico, Oculto};
     let c = cargar();
-    let filas: [(&str, Nivel, bool, Option<Componente>); 33] = [
+    let filas: [(&str, Nivel, bool, Option<Componente>); 34] = [
         ("wifi.red_24", Basico, false, None),
         ("wifi.red_24_avanzado", Avanzado, false, None),
         ("wifi.red_5", Basico, false, None),
@@ -181,6 +181,12 @@ fn ajustes_minimos_presentes() {
             Avanzado,
             true,
             Some(Componente::UsuariosRouter),
+        ),
+        (
+            "seguridad.cortafuegos",
+            Avanzado,
+            true,
+            Some(Componente::Cortafuegos),
         ),
         ("telefono.linea", Avanzado, false, None),
         ("telefono.linea_oculto", Oculto, false, None),
@@ -342,16 +348,25 @@ fn valores_del_fichero(ruta: &PathBuf) -> Vec<(String, String)> {
 ///   inglesas de uso diario («your WiFi password», «all devices»);
 /// - «isolation»: término corriente al explicar el aislamiento de la WiFi;
 /// - «beamforming»: el nombre de la técnica, que el texto explica;
-/// - «WMM»: el nombre del estándar de la WiFi, en mayúsculas como se escribe.
-const FORMAS_CORRIENTES: [&str; 9] = [
+/// - «WMM»: el nombre del estándar de la WiFi, en mayúsculas como se escribe;
+/// - «name», «Name», «protocol», «Protocol», «version» y «action»: palabras
+///   inglesas de uso diario («Network name», «Protocol») que el cortafuegos
+///   lee con ese nombre (`Name`, `Protocol`, `Version`, `Action`).
+const FORMAS_CORRIENTES: [&str; 15] = [
     "account",
     "Account",
+    "action",
     "all",
     "All",
     "beamforming",
     "isolation",
+    "name",
+    "Name",
     "password",
     "Password",
+    "protocol",
+    "Protocol",
+    "version",
     "WMM",
 ];
 

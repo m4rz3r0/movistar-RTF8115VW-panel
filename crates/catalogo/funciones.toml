@@ -2435,6 +2435,7 @@ tipo = "lectura"
 pagina = "scbidirectionalflt_ls.asp"
 descripcion = "Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Lista las reglas IPv4/IPv6 (HTML)."
 riesgo = "bajo"
+bloqueada = "no responde en el router real; la lista sale de scbidirectionalflt_ls.asp"
 
 [[funcion.parametro]]
 nombre = "escape"
@@ -2450,7 +2451,7 @@ pagina = "scbidirectionalflt_ed.asp"
 descripcion = "Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Añade una entrada (interfaz, versión, acción por defecto) o una regla (protocolo, origen, destino, puertos, acción)."
 riesgo = "alto"
 bloqueada = "cortafuegos sin lectura comprobable: la Biblioteca no lo escribe; el panel solo pone y quita su propia regla desde Seguridad"
-lectura_pareada = { funcion = "scbidirectionalflt.cmd?action=view", params = [] }
+lectura_pareada = { funcion = "scbidirectionalflt_ls.asp", params = [] }
 
 [[funcion.parametro]]
 nombre = "id"
@@ -2692,7 +2693,7 @@ pagina = "scbidirectionalflt_ls.asp"
 descripcion = "Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Borra una entrada o regla."
 riesgo = "alto"
 bloqueada = "cortafuegos sin lectura comprobable: la Biblioteca no lo escribe; el panel solo pone y quita su propia regla desde Seguridad"
-lectura_pareada = { funcion = "scbidirectionalflt.cmd?action=view", params = [] }
+lectura_pareada = { funcion = "scbidirectionalflt_ls.asp", params = [] }
 
 [[funcion.parametro]]
 nombre = "item"

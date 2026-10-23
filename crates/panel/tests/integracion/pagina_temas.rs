@@ -46,7 +46,12 @@ async fn pagina_seguridad_gestion_remota() {
     let pagina = leer(&p, &cookie, "seguridad").await;
     assert_eq!(
         ids(&pagina),
-        ["gestion-remota", "contrasena-router", "usuarios"]
+        [
+            "gestion-remota",
+            "contrasena-router",
+            "usuarios",
+            "cortafuegos"
+        ]
     );
     let e = elemento(&pagina, "gestion-remota");
     assert_eq!(e["estado"], "apagada", "{e}");

@@ -66,7 +66,7 @@ const casos: Caso[] = [
   {
     tema: "seguridad",
     nombre: "Seguridad",
-    tarjetas: 3,
+    tarjetas: 4,
     elemento: "Gestión remota del operador",
     id: "gestion-remota",
     editar: async (detalle) => {

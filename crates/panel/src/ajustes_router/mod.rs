@@ -65,6 +65,18 @@ pub async fn preparar_elemento(
     servidor::preparar_elemento(peticiones).await
 }
 
+/// Prepara «No responder al ping desde internet»: la regla propia del panel
+/// en el cortafuegos (ICMP `echo_request` descartado en el filtro de
+/// entrada IPv4 de la conexión a internet), que se confirma con
+/// [`confirmar_ajuste`] y se deshace con [`deshacer_ajuste`] (borra solo su
+/// regla). 409 si el cortafuegos no se puede leer, la regla ya está, la
+/// función espera su validación en el router real o hay otro cambio en
+/// curso; 403 en solo lectura. Exige sesión.
+#[server(endpoint = "preparar_sin_ping", input = Json)]
+pub async fn preparar_sin_ping() -> Result<GrupoVista, ServerFnError> {
+    servidor::preparar_sin_ping().await
+}
+
 /// Como mucho, elementos en una acción sobre varios.
 pub const MAX_ELEMENTOS_ACCION: usize = 20;
 

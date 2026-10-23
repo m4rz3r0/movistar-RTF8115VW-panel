@@ -17,6 +17,7 @@ pub const DERIVADOS_ESTADO: &[&str] = &[
     "estado_dns",
     "estado_ddns",
     "estado_gestion_remota",
+    "estado_cortafuegos",
     "estado_linea",
     "estado_voz",
     "estado_paso_directo",

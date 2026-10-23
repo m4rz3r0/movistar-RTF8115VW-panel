@@ -3,10 +3,13 @@
 //! Sirve las fixtures saneadas con el mismo protocolo que el router real
 //! (login básico y avanzado, cookies, `sessionKey` en las páginas `.asp`) y
 //! refleja en memoria cualquier escritura avanzada en su lectura pareada del
-//! catálogo (`catalogo`), con listas (crear, editar y borrar), `cbModifyPwd` y
-//! los usuarios de su web (`usuarios`: alta, baja, cambio de otro y lista).
+//! catálogo (`catalogo`), con listas (crear, editar y borrar), `cbModifyPwd`,
+//! los usuarios de su web (`usuarios`: alta, baja, cambio de otro y lista) y
+//! el cortafuegos (`cortafuegos`: sus dos páginas y el alta y la baja de
+//! reglas).
 
 mod control;
+mod cortafuegos;
 mod escrituras;
 mod estado;
 mod fixtures;
@@ -129,6 +132,7 @@ impl Sim {
                     .duration_since(UNIX_EPOCH)
                     .map_or(0, |d| d.subsec_nanos()),
                 wan_up: true,
+                cortafuegos: cortafuegos::de_partida(),
                 ..SimState::default()
             }),
         });

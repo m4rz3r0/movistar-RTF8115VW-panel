@@ -169,6 +169,12 @@ pub async fn leer_partida(state: &AppState) -> FotoLeida {
             .map(|(k, v)| (k.as_str(), v.as_str()))
             .collect();
         let leida = match a.busqueda() {
+            // El cortafuegos, de su página (como en Ajustes).
+            None if a.leer.funcion == hgu::cortafuegos::PAGINA_LISTA => {
+                hgu::cortafuegos::leer(&state.hgu)
+                    .await
+                    .map(|f| hgu::cortafuegos::a_xml(&f))
+            }
             Some((posicion, ident)) => {
                 state
                     .hgu

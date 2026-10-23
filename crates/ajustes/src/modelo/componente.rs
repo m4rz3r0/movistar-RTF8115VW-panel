@@ -11,6 +11,7 @@ pub enum Componente {
     Puertos,
     ContrasenaRouter,
     UsuariosRouter,
+    Cortafuegos,
 }
 
 impl Componente {
@@ -22,6 +23,7 @@ impl Componente {
             Componente::Puertos => "puertos",
             Componente::ContrasenaRouter => "contrasena_router",
             Componente::UsuariosRouter => "usuarios_router",
+            Componente::Cortafuegos => "cortafuegos",
         }
     }
 
@@ -117,6 +119,14 @@ impl Componente {
                 "borrar",
                 "borrar-de",
                 "vacia",
+            ],
+            Componente::Cortafuegos => &[
+                "sin-ping",
+                "sin-ping-ayuda",
+                "sin-ping-recomendado",
+                "ya-puesta",
+                "sin-leer",
+                "sin-filtro",
             ],
         }
     }

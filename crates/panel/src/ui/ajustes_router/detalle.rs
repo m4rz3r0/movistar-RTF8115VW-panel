@@ -67,15 +67,26 @@ fn se_edita(a: &AjusteVista) -> bool {
 }
 
 /// La columna de un ajuste que no se edita aquí: una lista en una tabla, el
-/// enlace a donde se cambia la contraseña del router o los usuarios del
-/// router con sus acciones (del elemento `elemento`).
-fn columna_de_consulta(a: &AjusteVista, unica: bool, elemento: &str) -> impl IntoView + use<> {
+/// enlace a donde se cambia la contraseña del router, los usuarios del
+/// router con sus acciones o las reglas del cortafuegos con «No responder
+/// al ping» (del elemento `e`).
+fn columna_de_consulta(a: &AjusteVista, unica: bool, e: &ElementoVista) -> impl IntoView + use<> {
+    let elemento = e.id.as_str();
     let col = format!("{}-columna", dom(a));
     let titulo = col.clone();
     let cuerpo = if a.componente.as_deref() == Some(super::CONTRASENA_ROUTER) {
         consulta::enlace_contrasena_router().into_any()
     } else if a.componente.as_deref() == Some(super::USUARIOS_ROUTER) {
         view! { <super::usuarios::Usuarios a=a.clone() elemento=elemento.to_owned() /> }.into_any()
+    } else if a.componente.as_deref() == Some(super::cortafuegos::CORTAFUEGOS) {
+        view! {
+            <super::cortafuegos::Cortafuegos
+                a=a.clone()
+                accion=e.accion_propia.clone()
+                elemento=elemento.to_owned()
+            />
+        }
+        .into_any()
     } else if a.lista {
         consulta::lista(a).into_any()
     } else {
@@ -249,7 +260,7 @@ pub(crate) fn Detalle(e: ElementoVista, registro: Registro) -> impl IntoView {
         .iter()
         .map(|a| match ediciones.iter().find(|(id, _, _)| *id == a.id) {
             Some((_, _, ed)) => columna(a, *ed, editable, preparando.into(), unica).into_any(),
-            None => columna_de_consulta(a, unica, &e.id).into_any(),
+            None => columna_de_consulta(a, unica, &e).into_any(),
         })
         .collect_view();
     let eds: Vec<Edicion> = ediciones.iter().map(|(_, _, ed)| *ed).collect();

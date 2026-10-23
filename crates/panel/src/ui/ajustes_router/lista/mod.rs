@@ -105,6 +105,7 @@ fn como_elemento(e: &ElementoVista, f: &Fila) -> ElementoVista {
         ajustes: Vec::new(),
         lectura: e.lectura.clone(),
         acciones: e.acciones.clone(),
+        accion_propia: None,
     }
 }
 

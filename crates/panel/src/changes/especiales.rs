@@ -1,4 +1,4 @@
-//! Escrituras del gestor que no siguen el molde del catálogo: los usuarios de la web del router.
+//! Escrituras del gestor que no siguen el molde del catálogo: los usuarios de la web del router y la regla propia del cortafuegos.
 //!
 //! `cbAddUser` y `cbDeleteUser` no tienen lista en el catálogo (la lectura,
 //! `cbGetUserList`, da pares nombre/papel seguidos, sin id). El gestor las
@@ -17,10 +17,16 @@
 //! nunca el usuario con el que entra el panel ni el del operador (`system`),
 //! un solo nombre por baja, grupo `user` o `admin`, el nombre de
 //! `^\w{4,20}$` y sin repetir, y la contraseña de 8 a 16 caracteres.
+//!
+//! La regla «sin ping» del cortafuegos tiene su propio módulo
+//! ([`cortafuegos`]).
 
 use super::*;
 use hgu::fmt::{ALTA_USUARIO, BAJA_USUARIO, lista_de_baja, nombres_de_baja, usuario_valido};
 use hgu::xml::XmlNode;
+
+mod cortafuegos;
+pub(crate) use cortafuegos::{SIN_PING_YA_PUESTA, filas_del_cortafuegos};
 
 /// Lectura de la lista de usuarios ([`Lectura::Usuarios`]).
 pub(crate) const LECTURA_USUARIOS: &str = "cbGetUserList";
@@ -36,33 +42,50 @@ const SISTEMA: &str = "system";
 pub(super) enum Especial {
     /// Alta y baja de usuarios de la web del router.
     Usuarios,
+    /// La regla «sin ping» del cortafuegos (alta y su baja), con el RID como
+    /// id.
+    Cortafuegos,
 }
 
 impl Especial {
     /// La especial de `f`, si lo es.
     pub(super) fn de(f: &Funcion) -> Option<Especial> {
-        matches!(f.name.as_str(), ALTA_USUARIO | BAJA_USUARIO).then_some(Especial::Usuarios)
+        match f.name.as_str() {
+            ALTA_USUARIO | BAJA_USUARIO => Some(Especial::Usuarios),
+            hgu::cortafuegos::ALTA | hgu::cortafuegos::BAJA => Some(Especial::Cortafuegos),
+            _ => None,
+        }
+    }
+
+    /// Lectura con la que se planifica y se comprueba.
+    pub(super) fn lectura(self) -> Lectura {
+        match self {
+            Especial::Usuarios => Lectura::Usuarios,
+            Especial::Cortafuegos => Lectura::Cortafuegos,
+        }
     }
 
     /// Campo que identifica cada instancia en lo que da [`ChangeManager::listar`].
     pub(super) fn id(self) -> &'static str {
         match self {
             Especial::Usuarios => "rqUser",
+            Especial::Cortafuegos => "RID",
         }
     }
 
-    /// Función y parámetros que borran la instancia `id` (con sus valores
-    /// `instancia`, que el usuario no necesita).
+    /// Función y parámetros que borran la instancia `id` (con los valores
+    /// del plan, `valores`: el filtro de una regla del cortafuegos).
     pub(super) fn baja(
         self,
         id: &str,
-        _instancia: &BTreeMap<String, String>,
+        valores: &BTreeMap<String, String>,
     ) -> (&'static str, Vec<(String, String)>) {
         match self {
             Especial::Usuarios => (
                 BAJA_USUARIO,
                 vec![("rqDelList".to_owned(), lista_de_baja(&[id]))],
             ),
+            Especial::Cortafuegos => cortafuegos::baja(id, valores),
         }
     }
 }
@@ -129,7 +152,7 @@ pub(super) fn con_contrasena_nueva(req: &mut ChangeRequest) {
 pub(super) fn instancia_en_registro(plan: &Plan) -> &str {
     match Especial::de(&plan.funcion) {
         Some(Especial::Usuarios) => MASCARA,
-        None => plan.instancia.as_deref().unwrap_or("-"),
+        Some(Especial::Cortafuegos) | None => plan.instancia.as_deref().unwrap_or("-"),
     }
 }
 
@@ -153,7 +176,9 @@ impl ChangeManager {
         req: &ChangeRequest,
         explicito: bool,
     ) -> Result<Plan, CambioError> {
-        let Especial::Usuarios = e;
+        if e == Especial::Cortafuegos {
+            return self.planificar_cortafuegos(f, req).await;
+        }
         for k in req.valores.keys() {
             if f.parametro(k).is_none() {
                 return Err(CambioError::Invalida(format!(

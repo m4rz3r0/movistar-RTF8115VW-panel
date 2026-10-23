@@ -818,6 +818,10 @@ pub(crate) fn campo_cambio(
 pub async fn preparar(state: &AppState, p: Peticion) -> Result<PreparadoVista, ServerFnError> {
     let f = funcion(state, &p.funcion)?;
     let g = gestor(state)?;
+    // Por el nombre, antes que nada: una función bloqueada no se escribe
+    // desde la Biblioteca ni con la carga que el gestor admite a la regla
+    // «sin ping» del cortafuegos (esa solo llega desde Seguridad).
+    g.escribible(&p.funcion).map_err(error_cambio)?;
     // Validación de tipo de los valores nuevos (el gestor vuelve a validar
     // lo que cambia): un MASCARA o un secreto vacío es "sin tocar".
     for (k, v) in &p.valores {

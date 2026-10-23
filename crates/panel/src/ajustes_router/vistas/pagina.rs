@@ -94,6 +94,20 @@ pub struct ElementoVista {
     /// Ids de las acciones de [`PaginaTema::acciones`] que se le pueden
     /// aplicar.
     pub acciones: Vec<String>,
+    /// Una acción propia del elemento que no es un campo («No responder al
+    /// ping desde internet», en el cortafuegos), si la tiene.
+    #[serde(default)]
+    pub accion_propia: Option<AccionPropia>,
+}
+
+/// Una acción propia de un elemento, con su componente
+/// ([`ElementoVista::accion_propia`]).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AccionPropia {
+    /// Id de la acción (`sin_ping`).
+    pub id: String,
+    /// Por qué no está disponible, ya traducido; `None`: disponible.
+    pub motivo: Option<String>,
 }
 
 /// El interruptor de la cabecera de un elemento.
@@ -143,6 +157,10 @@ pub struct RecomendacionVista {
     /// (`mejoras-lote-<id>`), en el orden del catálogo.
     #[serde(default)]
     pub lotes: Vec<String>,
+    /// Solo informa: no tiene botón (lo que recomienda se hace con una
+    /// acción propia del elemento, desde su detalle).
+    #[serde(default)]
+    pub informativa: bool,
 }
 
 /// El pie de la tarjeta: información viva.

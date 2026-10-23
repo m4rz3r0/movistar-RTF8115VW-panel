@@ -304,6 +304,8 @@ ajustes-estado-ddns-no = Off
 ajustes-estado-ddns-sin-usar = Not in use
 ajustes-estado-gestion-remota-si = On
 ajustes-estado-gestion-remota-no = Off
+ajustes-estado-cortafuegos-ping = Answers ping
+ajustes-estado-cortafuegos-sin-ping = Does not answer ping
 ajustes-estado-linea-si = Active
 ajustes-estado-linea-no = Off
 ajustes-estado-voz-si = On
@@ -326,6 +328,7 @@ ajuste-accion-usar_hora_neutra-titulo = Router time, use a neutral server
 
 ## What is happening now (the card's recommendation)
 ajustes-problema-seguridad-activa-encendida = Remote management is on: the operator can get into the router from the internet and change any setting without asking you.
+ajustes-problema-seguridad-cortafuegos-ping = The router answers ping from the internet: anyone can tell that your connection is on.
 ajustes-problema-sistema-activa-false = The router does not set its clock over the internet: it drifts, and after a power cut it can end up with a very different time.
 ajustes-problema-sistema-servidor_1 = The router sets its clock from { $valor }: it depends on whoever runs that server.
 ajustes-problema-sistema-espejo-true = The traffic copy is on: anyone who plugs into that socket can see everything your home does on the internet.

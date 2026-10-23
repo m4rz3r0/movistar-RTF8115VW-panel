@@ -10,6 +10,11 @@ import { asentar, hidratada, recogerErrores, sinDesbordamiento, violacionesGrave
 // deshacer no le devuelve la contraseña) y se deshace el borrado. Cada
 // ancho usa su propio usuario. Axe sin violaciones serias ni críticas y sin
 // scroll horizontal.
+//
+// Cortafuegos, también a 360 y 1440 px y en el mismo panel: la tabla de
+// reglas va en su caja con scroll (la página no se desborda); «No responder
+// al ping desde internet» se aplica (la regla del panel aparece y el botón
+// dice que ya está puesta) y se deshace (vuelven las reglas de antes).
 
 const t = {
   aplicar: "Aplicar",
@@ -20,6 +25,8 @@ const t = {
   protegidoPanel: "Es el usuario con el que entra el panel",
   avisoBorrar: "Si luego deshaces el borrado",
   avisoDeshacer: "El usuario vuelve con una contraseña nueva",
+  sinPing: "No responder al ping desde internet",
+  yaPuesta: "ya puesta",
 };
 
 /** Entra en el panel de Seguridad (`baseURL`), que no es el del worker. */
@@ -106,6 +113,53 @@ test.describe("usuarios del router", () => {
       }
       await expect(fila(page, nuevo)).toHaveCount(1, { timeout: PLAZO_CAMBIO });
       await sinDesbordamiento(page, `deshecho ${ancho}`);
+      expect(errores, "errores o avisos en la consola").toEqual([]);
+    });
+  }
+});
+
+test.describe("cortafuegos", () => {
+  test.describe.configure({ mode: "serial" });
+  test.use({ locale: "es-ES", baseURL: seguridad.url });
+
+  for (const ancho of [360, 1440]) {
+    test(`a ${ancho} px: no responder al ping y deshacer`, async ({ page }) => {
+      test.setTimeout(plazoDeTest(3));
+      await page.setViewportSize({ width: ancho, height: 900 });
+      const errores = recogerErrores(page);
+      await entrarEnSuPanel(page);
+      await page.goto("/ajustes/seguridad/cortafuegos");
+      await asentar(page);
+      const filas = page.locator(".cortafuegos-reglas .tabla-scroll tbody tr");
+      await expect(filas).toHaveCount(16);
+      await sinDesbordamiento(page, `cortafuegos ${ancho}`);
+      expect(await violacionesGraves(page), `cortafuegos ${ancho}`).toEqual([]);
+
+      // Aplicar: el diálogo de revisión y, hecho, la regla 17 y el motivo.
+      await page.getByRole("button", { name: t.sinPing, exact: true }).click();
+      await expect(page.locator("dialog[open] #grupo-titulo")).toHaveText("Revisa el cambio");
+      expect(await violacionesGraves(page), `diálogo sin ping ${ancho}`).toEqual([]);
+      const aviso = await aplicar(page, t.aplicar);
+      await expect(filas).toHaveCount(17, { timeout: PLAZO_CAMBIO });
+      await expect(page.locator(".cortafuegos-sin-ping")).toContainText(t.yaPuesta);
+      await sinDesbordamiento(page, `sin ping ${ancho}`);
+
+      // Deshacer: quita solo su regla. En el móvil, el detalle tapa el aviso.
+      const movil = ancho < 900;
+      if (movil) {
+        await page.getByRole("button", { name: "‹ Seguridad" }).click();
+        await page.waitForURL((u) => u.pathname === "/ajustes/seguridad");
+      }
+      await aviso.getByRole("button", { name: t.deshacer, exact: true }).click();
+      await expect(page.locator("dialog[open] #grupo-titulo")).toBeVisible();
+      await aplicar(page, t.deshacer);
+      if (movil) {
+        await page.getByRole("button", { name: "Abrir Cortafuegos" }).click();
+        await page.waitForURL((u) => u.pathname === "/ajustes/seguridad/cortafuegos");
+      }
+      await expect(filas).toHaveCount(16, { timeout: PLAZO_CAMBIO });
+      await expect(page.locator(".cortafuegos-sin-ping")).not.toContainText(t.yaPuesta);
+      expect(await violacionesGraves(page), `deshecho ${ancho}`).toEqual([]);
       expect(errores, "errores o avisos en la consola").toEqual([]);
     });
   }

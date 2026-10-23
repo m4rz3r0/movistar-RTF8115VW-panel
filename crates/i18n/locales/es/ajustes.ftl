@@ -304,6 +304,8 @@ ajustes-estado-ddns-no = Desactivado
 ajustes-estado-ddns-sin-usar = Sin usar
 ajustes-estado-gestion-remota-si = Encendida
 ajustes-estado-gestion-remota-no = Apagada
+ajustes-estado-cortafuegos-ping = Responde al ping
+ajustes-estado-cortafuegos-sin-ping = No responde al ping
 ajustes-estado-linea-si = Activa
 ajustes-estado-linea-no = Apagada
 ajustes-estado-voz-si = Encendido
@@ -326,6 +328,7 @@ ajuste-accion-usar_hora_neutra-titulo = Hora del router, usar un servidor neutro
 
 ## Qué pasa ahora (la recomendación de la tarjeta)
 ajustes-problema-seguridad-activa-encendida = La gestión remota está encendida: el operador puede entrar en el router desde internet y cambiar cualquier ajuste sin preguntarte.
+ajustes-problema-seguridad-cortafuegos-ping = El router responde al ping desde internet: cualquiera puede saber que tu conexión está encendida.
 ajustes-problema-sistema-activa-false = El router no se pone en hora por internet: su reloj se va desajustando, y tras un corte de luz puede quedarse con una hora muy distinta.
 ajustes-problema-sistema-servidor_1 = El router se pone en hora con { $valor }: depende de quien gestione ese servidor.
 ajustes-problema-sistema-espejo-true = La copia del tráfico está encendida: quien se enchufe a esa toma puede ver todo lo que hace tu casa en internet.

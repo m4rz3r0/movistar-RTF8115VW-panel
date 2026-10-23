@@ -344,6 +344,11 @@ fn id_instancia<'f>(f: &'f Catalogo, a: &Ajuste) -> Option<&'f str> {
     if a.componente == Some(Componente::UsuariosRouter) {
         return Some("UserName");
     }
+    // Las reglas del cortafuegos, su RID (el que borra el deshacer de la
+    // regla del panel).
+    if a.componente == Some(Componente::Cortafuegos) {
+        return Some("RID");
+    }
     a.campos
         .iter()
         .filter_map(|c| c.escribe.as_ref())
@@ -387,7 +392,8 @@ fn tecnico(a: &Ajuste) -> DetallesTecnicos {
                 .map(|ad| (c.id.clone(), ad.parametro.clone())),
         );
     }
-    // Los usuarios del router escriben con su componente, no por campos.
+    // Los usuarios del router y la regla del cortafuegos escriben con su
+    // componente, no por campos.
     if a.componente == Some(Componente::UsuariosRouter) {
         escrituras = [
             hgu::fmt::ALTA_USUARIO,
@@ -396,6 +402,11 @@ fn tecnico(a: &Ajuste) -> DetallesTecnicos {
         ]
         .map(String::from)
         .to_vec();
+    }
+    if a.componente == Some(Componente::Cortafuegos) {
+        escrituras = [hgu::cortafuegos::ALTA, hgu::cortafuegos::BAJA]
+            .map(String::from)
+            .to_vec();
     }
     DetallesTecnicos {
         lectura,

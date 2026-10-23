@@ -3,6 +3,7 @@
 
 mod acciones;
 mod acciones_lista;
+mod cortafuegos;
 mod derivados;
 mod dns_propios;
 mod foto;
@@ -17,6 +18,7 @@ mod red_local;
 mod tests;
 
 pub(super) use acciones::preparar_accion;
+pub(super) use cortafuegos::preparar_sin_ping;
 pub(super) use foto::{comparar_con_partida, preparar_volver_a_partida};
 pub(super) use guardar::{confirmar_ajuste, preparar_ajuste, preparar_elemento};
 pub(super) use historial::deshacer_ajuste;
@@ -88,6 +90,10 @@ pub(crate) fn error_ajuste(e: CambioError) -> ServerFnError {
         E::InstanciaCambiada(m) if m == USUARIO_YA_EXISTE => {
             fallo(StatusCode::CONFLICT, t!("usuarios-router-error-existe"))
         }
+        E::InstanciaCambiada(m) if m == crate::changes::SIN_PING_YA_PUESTA => fallo(
+            StatusCode::CONFLICT,
+            t!("ajuste-seguridad-cortafuegos-ya-puesta"),
+        ),
         E::Bloqueada(m) => {
             tracing::warn!("ajustes: escritura bloqueada: {m}");
             fallo(StatusCode::FORBIDDEN, t!("ajustes-error-bloqueada"))

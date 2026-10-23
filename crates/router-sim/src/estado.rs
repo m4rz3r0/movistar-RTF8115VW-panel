@@ -167,6 +167,10 @@ pub(crate) struct SimState {
     pub(crate) rebooted: Option<Instant>,
     /// `SWVersion` de `cbGetSummary` (`set_firmware`).
     pub(crate) firmware: Option<String>,
+    /// Filtros del cortafuegos (ver `cortafuegos`).
+    pub(crate) cortafuegos: Vec<hgu::cortafuegos::Filtro>,
+    /// `cortafuegos_ilegible`: la página de la lista sale sin `var filter`.
+    pub(crate) cortafuegos_ilegible: bool,
 }
 
 impl SimState {

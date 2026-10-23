@@ -120,6 +120,11 @@ pub(in crate::ajustes_router) async fn deshacer_ajuste(
             ..vista
         });
     }
+    // La regla «sin ping» del cortafuegos, también: su deshacer la quita.
+    if a.componente == Some(Componente::Cortafuegos) {
+        let vista = super::cortafuegos::vista(&g, prep.token, &prep.pasos, prep.riesgo);
+        return Ok(GrupoVista { aviso, ..vista });
+    }
     // El ajuste de cada paso (el detalle de un elemento guarda varios en un
     // cambio: cada paso lleva el título del suyo) y lo que no cambia en
     // él, como lo muestra ahora el router (una lectura por paso con

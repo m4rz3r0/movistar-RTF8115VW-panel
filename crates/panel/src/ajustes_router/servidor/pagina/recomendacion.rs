@@ -136,6 +136,7 @@ pub(super) fn recomendacion(
             .into_iter()
             .map(ajustes::clave_lote)
             .collect(),
+        informativa: false,
         ajuste: v.id.clone(),
         campo: c.id.clone(),
         valor,

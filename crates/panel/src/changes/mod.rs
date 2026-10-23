@@ -56,6 +56,9 @@ mod router;
 mod tipos;
 mod vigilancia;
 
+/// Motivo (clave i18n) de un 409 cuando la regla «sin ping» del
+/// cortafuegos ya está en el router.
+pub(crate) use especiales::SIN_PING_YA_PUESTA;
 /// La lista de usuarios del router, como la lee el gestor (para el cambio
 /// de otro usuario, que no pasa por él).
 pub(crate) use especiales::{LECTURA_USUARIOS, usuarios_de};

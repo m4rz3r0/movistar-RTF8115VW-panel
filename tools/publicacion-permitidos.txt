@@ -67,6 +67,7 @@ ruta tools/publicacion-permitidos.txt clave — las sumas sha256 de los binarios
 
 # Pruebas de split_mac: una MAC sintética de siete grupos cuya cola parece una MAC.
 ruta crates/hgu/src/fmt.rs mac — solo MACs sintéticas en las pruebas de split_mac
+ruta crates/hgu/fixtures/paginas/*.asp fixture — páginas HTML del router saneadas a mano (sin datos reales): sus etiquetas son de HTML, no hojas XML con clase; las reglas genéricas siguen aplicándose
 
 # Direcciones neutras de las fixtures y las pruebas (Neutralizador del saneador).
 red 192.168.1.60/30 — equipos de la LAN renumerados en las fixtures (.60–.99) y en las pruebas

@@ -1,5 +1,5 @@
-# Seguridad: gestión remota del operador (TR-069), contraseña del router y
-# usuarios de la web del router.
+# Seguridad: gestión remota del operador (TR-069), contraseña del router,
+# usuarios de la web del router y cortafuegos.
 
 # Gestión remota: activarla o no (básico), el aviso periódico al operador
 # (avanzado) y la dirección y las credenciales del servidor del operador
@@ -129,6 +129,102 @@ opciones = [
   { valor = "user", clave = "usuario" },
 ]
 
+# Cortafuegos (fase 3): las reglas de la web oculta del router, solo de
+# lectura. Se leen de la página de la lista (`var filter`), una instancia
+# por regla (su id es el RID). La única escritura es la regla propia del
+# panel, «No responder al ping desde internet», con su componente y por el
+# gestor de cambios (alta y su deshacer).
+[[ajuste]]
+id = "seguridad.cortafuegos"
+tema = "seguridad"
+nivel = "avanzado"
+lista = true
+componente = "cortafuegos"
+leer = { funcion = "scbidirectionalflt_ls.asp" }
+
+[[ajuste.campo]]
+id = "filtro"
+lee = "Name"
+tipo = "texto"
+solo_lectura = "ajuste-seguridad-cortafuegos-motivo"
+
+[[ajuste.campo]]
+id = "version"
+lee = "Version"
+tipo = "opcion"
+solo_lectura = "ajuste-seguridad-cortafuegos-motivo"
+opciones = [
+  { valor = "0", clave = "ipv4" },
+  { valor = "1", clave = "ipv6" },
+]
+
+# No `activa`: la acción `apagar_gestion_remota` escribe el campo
+# `activa` de los ajustes del tema.
+[[ajuste.campo]]
+id = "regla_activa"
+lee = "Enable"
+tipo = "booleano"
+solo_lectura = "ajuste-seguridad-cortafuegos-motivo"
+
+[[ajuste.campo]]
+id = "protocolo"
+lee = "Protocol"
+tipo = "opcion"
+solo_lectura = "ajuste-seguridad-cortafuegos-motivo"
+opciones = [
+  { valor = "1", clave = "icmp" },
+  { valor = "2", clave = "tcp" },
+  { valor = "3", clave = "udp" },
+]
+
+[[ajuste.campo]]
+id = "accion"
+lee = "Action"
+tipo = "opcion"
+solo_lectura = "ajuste-seguridad-cortafuegos-motivo"
+opciones = [
+  { valor = "0", clave = "descartar" },
+  { valor = "1", clave = "rechazar" },
+  { valor = "2", clave = "permitir" },
+]
+
+# 0 en las reglas que no son ICMP.
+[[ajuste.campo]]
+id = "icmp"
+lee = "IcmpType"
+tipo = "opcion"
+solo_lectura = "ajuste-seguridad-cortafuegos-motivo"
+opciones = [
+  { valor = "0", clave = "ninguno" },
+  { valor = "1", clave = "cualquiera" },
+  { valor = "25", clave = "eco" },
+  { valor = "55", clave = "eco_v6" },
+]
+
+[[ajuste.campo]]
+id = "origen"
+lee = "OrigAddr"
+tipo = "texto"
+solo_lectura = "ajuste-seguridad-cortafuegos-motivo"
+
+[[ajuste.campo]]
+id = "origen_mascara"
+lee = "OrigMask"
+tipo = "texto"
+solo_lectura = "ajuste-seguridad-cortafuegos-motivo"
+
+[[ajuste.campo]]
+id = "puerto_desde"
+lee = "DestStartPort"
+tipo = "texto"
+solo_lectura = "ajuste-seguridad-cortafuegos-motivo"
+
+[[ajuste.campo]]
+id = "puerto_hasta"
+lee = "DestEndPort"
+tipo = "texto"
+solo_lectura = "ajuste-seguridad-cortafuegos-motivo"
+
 # Elementos de la pestaña (spec §5.1): la gestión remota junta sus tres
 # ajustes (lo esencial, el aviso y el servidor).
 [[elemento]]
@@ -153,6 +249,15 @@ tema = "seguridad"
 ajustes = ["seguridad.usuarios_router"]
 icono = "personas"
 datos = ["derivado:cuentas"]
+
+# El estado dice si el router responde al ping desde internet (o si ya
+# tiene la regla del panel).
+[[elemento]]
+id = "cortafuegos"
+tema = "seguridad"
+ajustes = ["seguridad.cortafuegos"]
+icono = "escudo"
+estado = "derivado:estado_cortafuegos"
 
 # Acciones (spec §5.5).
 [[accion]]

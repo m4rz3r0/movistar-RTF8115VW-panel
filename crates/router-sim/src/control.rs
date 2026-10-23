@@ -214,6 +214,32 @@ impl SimControl {
             .map(|u| u.contrasena.clone())
     }
 
+    /// Filtros del cortafuegos, con lo escrito hasta ahora.
+    pub fn cortafuegos(&self) -> Vec<hgu::cortafuegos::Filtro> {
+        self.inner.state().cortafuegos.clone()
+    }
+
+    /// Si `on`, la página de la lista del cortafuegos sale sin `var filter`
+    /// (no se puede leer) hasta que se desactive.
+    pub fn cortafuegos_ilegible(&self, on: bool) {
+        self.inner.state().cortafuegos_ilegible = on;
+    }
+
+    /// Sustituye la regla `rid` del filtro `fid` por `r` (con el RID de `r`):
+    /// otra regla en su lugar, como si alguien la hubiera cambiado.
+    pub fn cortafuegos_sustituir(&self, fid: &str, rid: &str, r: hgu::cortafuegos::Regla) {
+        let mut st = self.inner.state();
+        if let Some(regla) = st
+            .cortafuegos
+            .iter_mut()
+            .filter(|f| f.fid == fid)
+            .flat_map(|f| f.reglas.iter_mut())
+            .find(|x| x.rid == rid)
+        {
+            *regla = r;
+        }
+    }
+
     /// Cambia la versión de firmware (`SWVersion`) que da `cbGetSummary`.
     pub fn set_firmware(&self, firmware: &str) {
         self.inner.state().firmware = Some(firmware.to_owned());

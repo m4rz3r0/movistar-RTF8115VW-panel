@@ -13,6 +13,7 @@ hgu = { path = "../hgu" }
 catalogo = { path = "../catalogo" }
 axum.workspace = true
 regex.workspace = true
+serde_json.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]

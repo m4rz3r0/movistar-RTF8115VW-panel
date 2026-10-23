@@ -543,3 +543,22 @@ async fn escrituras_cuenta_escrituras_y_reconfiguraciones_no_lecturas() {
     c.reconfigurar(ClientConfig::new(&url, USER, PASS)).await;
     assert!(c.escrituras() > antes);
 }
+
+/// Las páginas del cortafuegos solo traen `var sessKey`: vale como el
+/// `sessionKey` de una escritura (contra el simulador).
+#[tokio::test]
+async fn sesskey_vale_como_sessionkey() {
+    use hgu::cortafuegos::{ALTA, PAGINA_EDITOR, carga_sin_ping, leer};
+    use router_sim::{Sim, SimConfig};
+    let fixtures = concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures");
+    let sim = Sim::start(SimConfig::new(USER, PASS, fixtures)).await;
+    let c = Client::new(ClientConfig {
+        min_gap: Duration::from_millis(1),
+        ..ClientConfig::new(&sim.base_url, USER, PASS)
+    });
+    let filtros = leer(&c).await.unwrap();
+    let carga = carga_sin_ping(&filtros[0]);
+    let p: Vec<(&str, &str)> = carga.iter().map(|(k, v)| (*k, v.as_str())).collect();
+    c.basic_write(PAGINA_EDITOR, ALTA, &p).await.unwrap();
+    assert_eq!(sim.control.cortafuegos()[0].reglas.len(), 11);
+}

@@ -209,9 +209,15 @@ fn elemento(
     } else {
         Vec::new()
     };
-    let recomendacion = leido
+    let mut recomendacion = leido
         .then(|| recomendacion(f, cat, acciones, &ajustes))
         .flatten();
+    // El cortafuegos: su recomendación solo informa y «No responder al
+    // ping» es una acción propia.
+    let accion_propia = super::cortafuegos::del_elemento(ctx, e, leido).map(|(r, a)| {
+        recomendacion = r;
+        a
+    });
     let aplicables = acciones
         .iter()
         .filter(|a| leido && se_aplica(a, &ajustes))
@@ -238,6 +244,7 @@ fn elemento(
         ajustes,
         lectura,
         acciones: aplicables,
+        accion_propia,
     }
 }
 

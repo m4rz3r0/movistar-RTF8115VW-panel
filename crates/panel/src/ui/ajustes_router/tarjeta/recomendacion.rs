@@ -32,7 +32,8 @@ fn texto_lotes(lotes: &[String]) -> Option<String> {
 /// enlace a Mejoras) y el
 /// botón que prepara el cambio a lo recomendado (se revisa en el diálogo).
 /// Fondo ámbar si es un riesgo de seguridad; neutro, si no. En solo
-/// lectura, el botón se ve desactivado y dice por qué.
+/// lectura, el botón se ve desactivado y dice por qué. Una recomendación
+/// informativa no tiene botón (se aplica desde el detalle del elemento).
 pub(super) fn recomendacion(
     e: &ElementoVista,
     solo_lectura: bool,
@@ -75,14 +76,8 @@ pub(super) fn recomendacion(
             preparando.try_set(false);
         });
     };
-    Some(view! {
-        <div class="tarjeta-rec" class:riesgo=r.riesgo>
-            <p>
-                {r.problema.clone()}
-                " "
-                <span class="tarjeta-rec-quien">{para_quien}</span>
-                {lotes}
-            </p>
+    let boton = (!r.informativa).then(|| {
+        view! {
             <button
                 type="button"
                 class="b-rec"
@@ -92,6 +87,17 @@ pub(super) fn recomendacion(
             >
                 {r.boton}
             </button>
+        }
+    });
+    Some(view! {
+        <div class="tarjeta-rec" class:riesgo=r.riesgo>
+            <p>
+                {r.problema.clone()}
+                " "
+                <span class="tarjeta-rec-quien">{para_quien}</span>
+                {lotes}
+            </p>
+            {boton}
         </div>
     })
 }

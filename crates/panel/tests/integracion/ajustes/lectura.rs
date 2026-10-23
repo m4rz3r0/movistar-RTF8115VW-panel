@@ -252,6 +252,9 @@ async fn cada_lectura_una_sola_vez() {
             .state
             .ajustes
             .por_tema(ajustes::Tema::from_slug(tema).unwrap())
+            // El cortafuegos se lee de su página, no con una llamada `cb*`
+            // (las únicas que cuenta `reads`).
+            .filter(|a| a.leer.funcion != hgu::cortafuegos::PAGINA_LISTA)
             .map(|a| {
                 // Una radio se busca por su id: en las fixtures, su posición
                 // es la misma, así que basta con la primera lectura.

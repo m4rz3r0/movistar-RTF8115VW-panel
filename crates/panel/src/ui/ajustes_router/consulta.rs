@@ -32,8 +32,10 @@ pub(crate) fn lista(a: &AjusteVista) -> impl IntoView + use<> {
                 view! { <tr>{celdas}</tr> }
             })
             .collect_view();
+        // Con foco: una tabla ancha (las reglas del cortafuegos) se recorre
+        // con el teclado dentro de su caja.
         view! {
-            <div class="tabla-scroll">
+            <div class="tabla-scroll" tabindex="0">
                 <table class="tabla">
                     <thead><tr>{cabeza}</tr></thead>
                     <tbody>{filas}</tbody>
