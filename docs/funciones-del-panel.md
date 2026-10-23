@@ -17,7 +17,7 @@ código, junto a cada `#[server(endpoint = "…")]`.
 | `preparar_elemento` | Prepara el guardado del detalle de un elemento: los cambios de varios de sus ajustes (lo esencial y lo avanzado de una red) en un solo cambio, con un paso por escritura y un solo deshacer; se confirma con `confirmar_ajuste`. Errores como `preparar_ajuste`. |
 | `leer_mejoras` | La página Mejoras, su única función: lee (de la caché corta si está) las pestañas que tocan los lotes y da, por lote, el estado de cada paso (hecho, pendiente, sin leer con su motivo, o no aplica), «x de y pendientes» y el estado del lote (aplicado, pendiente o sin leer); además, el contador. Lo que no se pudo leer no se da por hecho ni por pendiente. Con `fresca` («Volver a leer»), nada sale de la caché. `no-store`. |
 | `contar_mejoras` | El contador de «Mejoras» en la barra lateral: los pasos pendientes de todos los lotes, sin repetir los compartidos, con el mismo cálculo que `leer_mejoras`; `null` si no se pudo leer nada. Se pide al cargar la página y tras un cambio, no en cada navegación mientras la caché siga viva. |
-| `preparar_lote` | Prepara un lote (`id`, `opciones` con el proveedor de DNS) como un solo cambio, con un paso por cada paso que se pudo leer y aplica, agrupados por pestaña; la hora neutra sale desmarcada. Lo ya hecho sale como «ya estaba así». Se confirma con `confirmar_ajuste` (sin los pasos desmarcados) y se deshace entero. 403 en solo lectura (antes de leer nada); 404 si el lote no existe; 400 si el proveedor no existe; 409 si ya está aplicado, si solo faltan pasos sin leer o hay otro cambio en curso; 502 si no se pudo leer nada. |
+| `preparar_lote` | Prepara un lote (`id`, `opciones` con el proveedor de DNS o `mantener`, «Mantener los actuales») como un solo cambio, con un paso por cada paso que se pudo leer y aplica, agrupados por pestaña; la hora neutra sale desmarcada. Lo ya hecho sale como «ya estaba así». Se confirma con `confirmar_ajuste` (sin los pasos desmarcados) y se deshace entero. 403 en solo lectura (antes de leer nada); 404 si el lote no existe; 400 si el proveedor no existe; 409 si ya está aplicado, si solo faltan pasos sin leer o hay otro cambio en curso; 502 si no se pudo leer nada. |
 | `confirmar_ajuste` | Aplica el ajuste preparado (sin los pasos desmarcados) y devuelve el id del cambio, que se sigue con `estado_cambio`. |
 | `deshacer_ajuste` | Prepara el cambio que deshace uno aplicado desde Ajustes; se confirma con `confirmar_ajuste`. |
 | `comparar_con_partida` | Lo que ha cambiado desde la foto de partida que tomó el asistente. Solo viajan los secretos que difieren. `no-store`. |
@@ -34,7 +34,8 @@ Los lotes se declaran en `crates/ajustes/ajustes/lotes.toml`: cada uno con
 sus textos (en los `.ftl`, en español y en inglés) y sus pasos. Un paso
 apunta a una acción de Ajustes o a un campo y su valor, y puede repetirse
 en cada red WiFi (`para_cada`), aplicar solo si se cumple una condición
-(`si`: aislar la red de invitados solo si está encendida), salir
+(`si`: aislar entre sí los dispositivos de la red de invitados solo si
+está encendida), salir
 desmarcado (`opcional`: la hora neutra) o tomar el valor de una elección
 (`elegir`: el proveedor de DNS). Un test del catálogo comprueba que cada
 paso apunta a algo que existe y se puede escribir, con valores válidos y
@@ -42,8 +43,8 @@ sus textos en los dos idiomas.
 
 | Lote | Pasos |
 |---|---|
-| Seguridad recomendada | Gestión remota del operador (TR-069) y su aviso periódico apagados; WPS fuera y WPA2-AES en cada red WiFi; UPnP apagado; red de invitados aislada (si está encendida); espejo del tráfico apagado; registro sin envío remoto. Además, consejos sin botón (lo que la API no deja cambiar). |
-| Privacidad máxima | Gestión remota y aviso periódico apagados; espejo apagado; registro sin envío remoto; DNS neutros en la red de casa, con proveedor a elegir (Quad9, Quad9 sin filtro, DNS4EU, Cloudflare o AdGuard); hora de un servidor neutro (`hora.roa.es`), opcional. |
+| Seguridad recomendada | Gestión remota del operador (TR-069) y su aviso periódico apagados; WPS fuera y WPA2-AES en cada red WiFi; UPnP apagado; dispositivos de la red de invitados aislados entre sí (si está encendida); espejo del tráfico apagado; registro sin envío remoto. Además, consejos sin botón (lo que la API no deja cambiar). |
+| Privacidad máxima | Gestión remota y aviso periódico apagados; espejo apagado; registro sin envío remoto; DNS neutros en la red de casa, con proveedor a elegir (Quad9, Quad9 sin filtro, DNS4EU, Cloudflare o AdGuard) o «Mantener los actuales»: con DNS propios (ni el router ni del operador) el paso ya está hecho («DNS propios») y se mantienen salvo que se elija un proveedor; hora de un servidor neutro (`hora.roa.es`), opcional. |
 
 Los dos ajustes que los lotes necesitan:
 
@@ -56,16 +57,40 @@ Los dos ajustes que los lotes necesitan:
   Antes de escribir, el panel carga `syslog.asp` para obtener el
   `sessionKey`.
 - **DNS de la red de casa** (`red_local.dns_casa`, en Red local): los DNS
-  que el router reparte por DHCP, solo en el pool 0 (`cbGetDhcpv4ServerPool`
-  y `cbSetDhcpv4ServerPool`, `ipv4_dns_addr_0` y `ipv4_dns_addr_1`). Nunca
-  los de la WAN ni el relé de DNS, ni los pools 1 y 2 (los del
-  descodificador): pueden afectar a la televisión y al teléfono. Cada
-  dispositivo pregunta directamente a esos servidores, sin cifrar.
+  que el router reparte por DHCP, solo en el pool de id 0
+  (`cbGetDhcpv4ServerPool` y `cbSetDhcpv4ServerPool`, `ipv4_dns_addr_0` y
+  `ipv4_dns_addr_1`). Nunca los de la WAN ni el relé de DNS, ni los demás
+  pools: pueden afectar a la televisión, al teléfono o a otros dispositivos
+  del operador. Cada dispositivo pregunta directamente a esos servidores,
+  sin cifrar. Un DNS principal que no es el router (su IP de casa, vacío o
+  `0.0.0.0`) ni del operador (`del_operador` en el catálogo: los DNS
+  públicos de Movistar) es **propio**: la tarjeta no recomienda cambiarlo y
+  el paso de Privacidad máxima lo da por hecho.
+
+**El pool DHCP se busca por su id (0.5.1).** `cbGetDhcpv4ServerPool` elige
+el pool por su **posición** (`rtm_cfg_dhcpv4_svr_pool_0i`) y
+`cbSetDhcpv4ServerPool`, por su **id** (`rtm_cfg_dhcpv4_svr_pool_id`), y en
+el router real no coinciden: en la posición 0 está el pool de id 1 (otros
+dispositivos del operador) y en la 1, el de casa (id 0). Los ajustes que
+leen una lista por posición y escriben por id lo declaran con `buscar` en
+su `leer` (los del pool DHCP de casa y los de cada radio WiFi): el panel
+lee la posición del id y, si no es esa instancia, las demás desde la 0,
+hasta dar con la de su id; si no está, el ajuste queda «sin leer» y nunca
+toma otra. El gestor de cambios hace lo mismo con toda lectura pareada que
+pasa el id como posición (`X_0i = {X_id}`), para comprobar y para el
+«antes» del deshacer. El simulador tiene los dos pools en el orden del
+router real.
+
+**Red de invitados.** Tiene dos valores: si está separada de la red de casa
+(`guest_networking`) y si aísla entre sí a sus dispositivos (`isolation`).
+El panel solo puede cambiar el segundo: la escritura de los puntos de
+acceso de la web avanzada (`cbSetWifiAccPt`) no tiene el primero, así que
+«Separada de la red de casa» se enseña, pero solo se lee.
 
 Todo esto se ha probado contra el simulador (`router-sim`). Lo pendiente de
 comprobar en el router real (fase 3): que el descodificador no usa el pool
-0; que `cbSetSyslog` sin `export` cambia `syslog_mode` y que cargar
+de casa; que `cbSetSyslog` sin `export` cambia `syslog_mode` y que cargar
 `syslog.asp` no exporta el registro; que guardar «no enviar» con el puerto
-remoto vacío o `0` no falla; qué aísla exactamente la red de invitados; que
+remoto vacío o `0` no falla; que
 la televisión y el teléfono siguen tras apagar TR-069 y reiniciar; y si
 1.1.1.1 resuelve en este firmware.
