@@ -343,6 +343,13 @@ pub(super) const BLOQUEO_IP_LAN: &str = "bloqueada en v1: cambiar la IP del rout
 /// leído): podría borrar esa clave. Es la clave i18n del texto. Se quitará
 /// cuando la fase 3 compruebe qué hace el router real con ese reenvío.
 pub const BLOQUEO_SECRETO_TAPADO: &str = "cambio-error-secreto-tapado";
+/// Motivo de [`CambioError::Bloqueada`] al pedir borrar o cambiar el
+/// usuario del router con el que entra el panel o el del operador
+/// (`system`). Es la clave i18n del texto.
+pub const BLOQUEO_USUARIO_PROTEGIDO: &str = "usuarios-router-error-protegido";
+/// Motivo de [`CambioError::InstanciaCambiada`] al crear un usuario del
+/// router con un nombre que ya tiene otro. Es la clave i18n del texto.
+pub const USUARIO_YA_EXISTE: &str = "usuarios-router-error-existe";
 /// Motivo de [`CambioError::Invalida`] al deshacer un cambio en el que solo
 /// cambió lo que el router no deja leer: no hay valor anterior al que volver.
 pub const DESHACER_SOLO_TAPADOS: &str =

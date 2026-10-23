@@ -394,8 +394,15 @@ pub(super) fn inversa(plan: &Plan) -> Option<ChangeRequest> {
             (None, false)
         }
     };
+    // Un usuario borrado vuelve con `cbAddUser`, aunque el borrado llegase
+    // como `cbDeleteUser` (de la Biblioteca); la contraseña la pone quien
+    // lo deshace (`especiales::con_contrasena_nueva`).
+    let funcion = match plan.operacion {
+        Operacion::Borrar if plan.lectura == Lectura::Usuarios => hgu::fmt::ALTA_USUARIO.to_owned(),
+        _ => f.name.clone(),
+    };
     Some(ChangeRequest {
-        funcion: f.name.clone(),
+        funcion,
         instancia,
         valores,
         borrar,

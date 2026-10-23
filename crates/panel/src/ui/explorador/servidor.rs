@@ -89,6 +89,14 @@ pub(crate) fn error_cambio(e: CambioError) -> ServerFnError {
             StatusCode::FORBIDDEN,
             crate::t!("cambio-error-secreto-tapado"),
         ),
+        E::Bloqueada(m) if m == crate::changes::BLOQUEO_USUARIO_PROTEGIDO => (
+            StatusCode::FORBIDDEN,
+            crate::t!("usuarios-router-error-protegido"),
+        ),
+        E::InstanciaCambiada(m) if m == crate::changes::USUARIO_YA_EXISTE => (
+            StatusCode::CONFLICT,
+            crate::t!("usuarios-router-error-existe"),
+        ),
         E::Bloqueada(m) => (
             StatusCode::FORBIDDEN,
             crate::t!("biblioteca-error-bloqueada", motivo = m),

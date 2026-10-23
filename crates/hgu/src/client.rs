@@ -340,6 +340,21 @@ impl Client {
         self.page_locked(&mut st, path).await
     }
 
+    /// Inicia sesión, la básica y la avanzada, sin leer nada más: comprueba
+    /// unas credenciales que quizá no pueden leer otra cosa (las de otro
+    /// usuario de la web del router). Error si el router las rechaza.
+    pub async fn entrar(&self) -> Result<(), Error> {
+        let mut st = self.shared.state.lock().await;
+        for _ in 0..2 {
+            if self.ensure_advanced(&mut st).await? {
+                return Ok(());
+            }
+        }
+        Err(Error::SessionExpired(
+            "el router sigue pidiendo iniciar sesión".into(),
+        ))
+    }
+
     /// Cierra la sesión en el router (best effort) y olvida las cookies.
     pub async fn logout(&self) {
         let mut st = self.shared.state.lock().await;
@@ -398,10 +413,17 @@ impl Client {
         }
         match parse_response(name, &raw) {
             Ok(node) if node.result_ok() => Ok(Some(node)),
+            // El texto del error: `ErrorString` o, si no viene, `Msg` (como
+            // responde el router a un alta de usuario que no acepta).
             Ok(node) => Err(Error::CallFailed {
                 name: name.to_owned(),
                 result: node.text_of("Result").unwrap_or("").to_owned(),
-                error: node.text_of("ErrorString").unwrap_or("").to_owned(),
+                error: node
+                    .text_of("ErrorString")
+                    .filter(|e| !e.is_empty())
+                    .or_else(|| node.text_of("Msg"))
+                    .unwrap_or("")
+                    .to_owned(),
             }),
             Err(XmlError::NotResponse) => {
                 Self::invalidate(st);

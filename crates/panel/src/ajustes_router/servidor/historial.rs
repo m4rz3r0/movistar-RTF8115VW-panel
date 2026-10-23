@@ -102,6 +102,24 @@ pub(in crate::ajustes_router) async fn deshacer_ajuste(
             .ok_or_else(|| fallo(StatusCode::NOT_FOUND, t!("ajustes-error-cambio")))?;
         return Ok(GrupoVista { aviso, ..vista });
     };
+    // Los usuarios del router tienen su propio resumen. Un deshacer que
+    // vuelve a crear un usuario borrado le da una contraseña nueva.
+    if a.componente == Some(Componente::UsuariosRouter) {
+        let recrea = prep
+            .pasos
+            .iter()
+            .any(|p| p.diff.campos.iter().any(|c| c.nombre == "rqPwd"));
+        let borra = prep.borrar;
+        let detalle = prep.instancia.clone().or(instancia);
+        let vista =
+            crate::usuarios_router::servidor::vista(&g, prep.token, &prep.pasos, prep.riesgo);
+        return Ok(GrupoVista {
+            aviso: aviso.or_else(|| recrea.then(|| t!("usuarios-router-aviso-deshacer"))),
+            borra,
+            detalle,
+            ..vista
+        });
+    }
     // El ajuste de cada paso (el detalle de un elemento guarda varios en un
     // cambio: cada paso lleva el título del suyo) y lo que no cambia en
     // él, como lo muestra ahora el router (una lectura por paso con

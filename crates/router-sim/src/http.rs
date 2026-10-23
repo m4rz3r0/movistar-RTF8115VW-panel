@@ -4,6 +4,7 @@ use crate::LOGGED_OUT;
 use crate::escrituras::write;
 use crate::estado::{HangAfterWrite, Inner, Params, SimState};
 use crate::lecturas::read;
+use crate::usuarios;
 use crate::xml::{failure, leaf, response, result_node};
 use axum::{
     body::Bytes,
@@ -155,8 +156,7 @@ pub(crate) async fn basic_login(
         s.aplicar_contrasena_pendiente(&mut st, true);
         st.login_falla_con.clone()
     };
-    let good = param(&f, "loginUsername") == Some(mess_userpass(&s.user).as_str())
-        && param(&f, "loginPassword") == Some(mess_userpass(&s.password()).as_str())
+    let good = credenciales_validas(&s, &f, ("loginUsername", "loginPassword"))
         && rechazada.is_none_or(|r| param(&f, "loginPassword") != Some(mess_userpass(&r).as_str()));
     if !good {
         return "<script>location.href = \"/te_acceso_router.asp\"</script>".into_response();
@@ -328,8 +328,7 @@ fn advanced_login(
         return LOGGED_OUT.into();
     }
     s.aplicar_contrasena_pendiente(st, false);
-    let good = param(params, "rqUsername") == Some(mess_userpass(&s.user).as_str())
-        && param(params, "rqPasswd") == Some(mess_userpass(&s.password()).as_str())
+    let good = credenciales_validas(s, params, ("rqUsername", "rqPasswd"))
         && st
             .login_falla_con
             .as_deref()
@@ -345,6 +344,15 @@ fn advanced_login(
         "0",
         "",
     ))
+}
+
+/// ¿Vienen en `params` (con XOR 0x1f, en los campos `campos`: usuario y
+/// contraseña) las credenciales de un usuario de la tabla?
+fn credenciales_validas(s: &Inner, params: &[(String, String)], campos: (&str, &str)) -> bool {
+    match (param(params, campos.0), param(params, campos.1)) {
+        (Some(u), Some(c)) => usuarios::entra(&s.usuarios(), &mess_userpass(u), &mess_userpass(c)),
+        _ => false,
+    }
 }
 
 fn is_read(name: &str) -> bool {

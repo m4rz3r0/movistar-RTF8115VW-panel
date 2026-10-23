@@ -32,6 +32,7 @@ mod seleccion;
 mod sin_guardar;
 mod tarjeta;
 mod tras_borrar;
+mod usuarios;
 
 use crate::ajustes_router::{CADUCIDAD_LECTURAS, leer_tema};
 use crate::t;
@@ -113,6 +114,9 @@ pub(crate) const PUERTOS: &str = "puertos";
 /// Componente de Seguridad (como [`DISPOSITIVOS`]): un enlace a
 /// «Configuración del router», donde se cambia.
 pub(crate) const CONTRASENA_ROUTER: &str = "contrasena_router";
+/// Componente de Seguridad (como [`DISPOSITIVOS`]): los usuarios de la web
+/// del router con sus acciones ([`usuarios`]).
+pub(crate) const USUARIOS_ROUTER: &str = "usuarios_router";
 
 /// Primera página de la sección (la del menú).
 pub const RUTA_AJUSTES: &str = "/ajustes/internet";

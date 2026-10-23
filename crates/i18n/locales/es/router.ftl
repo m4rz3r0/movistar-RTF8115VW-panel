@@ -86,3 +86,26 @@ contrasena-router-error-grave = El panel no consigue entrar en el router ni con 
 contrasena-router-historial-nota = Este cambio no se puede deshacer desde aquí: para poner otra contraseña, vuelve a cambiarla en Configuración del router.
 contrasena-router-enlace = Cambiar la contraseña del router
 contrasena-router-enlace-texto = Se cambia en Configuración del router, junto a la contraseña con la que entra el panel.
+
+## Usuarios de la web del router (Ajustes → Seguridad → Usuarios)
+# Las claves usuarios-router-error-* y usuarios-router-historial-nota quedan
+# guardadas en el Historial: no se renombran ni se borran.
+usuarios-router-contrasena = Contraseña
+usuarios-router-protegido-panel = Es el usuario con el que entra el panel: no se puede borrar ni cambiar desde aquí.
+usuarios-router-protegido-sistema = Es la cuenta del operador: no se puede borrar ni cambiar desde aquí.
+usuarios-router-aviso-borrar = Si luego deshaces el borrado, el usuario vuelve con una contraseña nueva: la de ahora no se puede recuperar. La nueva solo se verá con el ojo, en el detalle del cambio en el Historial.
+usuarios-router-aviso-deshacer = El usuario vuelve con una contraseña nueva: la de antes no se puede recuperar. La verás con el ojo en el detalle de este cambio, en el Historial.
+usuarios-router-error-protegido = Este usuario está protegido: es el que usa el panel para entrar en el router o la cuenta del operador. No se puede borrar ni cambiar desde aquí.
+usuarios-router-error-existe = Ya hay un usuario con ese nombre en el router.
+usuarios-router-error-nombre = El nombre tiene que tener de 4 a 20 letras sin tilde, números o «_», sin espacios.
+usuarios-router-error-no-existe = Ese usuario ya no está en el router: vuelve a leer la lista.
+usuarios-router-error-en-curso = Hay otro cambio en curso en el router: espera a que termine.
+usuarios-router-error-rechazado = El router no aceptó el cambio: el usuario sigue como estaba.
+usuarios-router-error-no-entra = El router respondió, pero el usuario no entra con la contraseña nueva. Prueba otra vez o cámbiala desde la web del router.
+usuarios-router-error-grupo = El usuario ya entra con la contraseña nueva, pero el router no muestra el tipo de cuenta pedido. Vuelve a leer la lista.
+usuarios-router-historial-nota = La contraseña nueva no se guarda en el panel: este cambio no se puede deshacer desde aquí.
+
+## Funciones pendientes de comprobar con el router de verdad
+validacion-real-pendiente-usuarios = Crear y borrar usuarios aún no se ha comprobado con el router de verdad: de momento no se puede.
+validacion-real-pendiente-contrasena-otro = Cambiar la contraseña de otro usuario aún no se ha comprobado con el router de verdad: de momento no se puede.
+validacion-real-pendiente-sin-ping = No responder al ping aún no se ha comprobado con el router de verdad: de momento no se puede.

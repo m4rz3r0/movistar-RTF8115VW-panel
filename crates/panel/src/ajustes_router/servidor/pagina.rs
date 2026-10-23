@@ -47,6 +47,7 @@ pub(in crate::ajustes_router) async fn leer_tema(
         .map(|(a, c)| vista_leida(&state.catalogo, a, leidas.get(c)))
         .collect();
     derivados::marcar(&del_tema, &mut vistas, &nodos, &leidas);
+    marcar_protegidos(&state, &mut vistas).await;
     super::dns_propios::aceptar(
         &state.ajustes,
         &mut vistas,
@@ -72,6 +73,33 @@ pub(in crate::ajustes_router) async fn leer_tema(
         leido_hace_s,
         red,
     })
+}
+
+/// Pone la nota a las filas protegidas de los usuarios del router (el
+/// usuario con el que entra el panel y el del operador): no tienen
+/// acciones. Si no se pueden leer las credenciales, solo la del operador;
+/// el servidor las protege igual al pedir un cambio.
+async fn marcar_protegidos(state: &AppState, vistas: &mut [AjusteVista]) {
+    let slug = Componente::UsuariosRouter.slug();
+    let Some(v) = vistas
+        .iter_mut()
+        .find(|v| v.componente.as_deref() == Some(slug))
+    else {
+        return;
+    };
+    let panel = instancia::leer_credenciales(&state.db, &state.history_key)
+        .await
+        .ok()
+        .flatten()
+        .map(|c| c.usuario)
+        .unwrap_or_default();
+    for i in &mut v.instancias {
+        let sistema = i.campos.iter().any(|c| {
+            c.id == "papel" && matches!(&c.valor, ValorLegible::Opcion(o) if o == "operador")
+        });
+        let papel = if sistema { "system" } else { "" };
+        i.nota = crate::usuarios_router::protegido(&i.id, papel, &panel).map(str::to_owned);
+    }
 }
 
 /// Id en la URL del elemento implícito de un ajuste suelto

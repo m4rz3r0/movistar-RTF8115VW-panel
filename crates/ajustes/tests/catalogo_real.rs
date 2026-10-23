@@ -176,7 +176,12 @@ fn ajustes_minimos_presentes() {
             false,
             Some(Componente::ContrasenaRouter),
         ),
-        ("seguridad.usuarios_router", Avanzado, true, None),
+        (
+            "seguridad.usuarios_router",
+            Avanzado,
+            true,
+            Some(Componente::UsuariosRouter),
+        ),
         ("telefono.linea", Avanzado, false, None),
         ("telefono.linea_oculto", Oculto, false, None),
         ("telefono.sip", Avanzado, false, None),

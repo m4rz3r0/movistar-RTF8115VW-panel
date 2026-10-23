@@ -159,3 +159,20 @@ fn resumen_legible_de_una_opcion_con_ademas() {
         None
     );
 }
+
+/// Los usuarios del router llegan como pares nombre/papel seguidos, sin
+/// elemento que agrupe cada uno: una hoja suelta en la respuesta (la de la
+/// variante `listas-irregulares`) no crea un usuario de más ni se mezcla.
+#[test]
+fn pares_seguidos_con_ruido() {
+    let raw = "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\r\n<Response><cbGetUserList>\
+        <Result>0</Result><opr_status>1</opr_status><opr_status>1</opr_status>\
+        <UserName>X-REDACTED-X</UserName><UserRole>system</UserRole><Result>0</Result>\
+        <UserName>X-REDACTED-X</UserName><UserRole>admin</UserRole><Result>0</Result>\
+        <UserName>X-REDACTED-X</UserName><UserRole>user</UserRole></cbGetUserList></Response>";
+    let n = hgu::xml::parse_response("cbGetUserList", raw).unwrap();
+    let v = super::lectura::instancias(&n, &["UserName", "UserRole"]);
+    let papeles: Vec<&str> = v.iter().map(|l| l["UserRole"].as_str()).collect();
+    assert_eq!(papeles, ["system", "admin", "user"]);
+    assert!(v.iter().all(|l| l.len() == 2), "{v:?}");
+}

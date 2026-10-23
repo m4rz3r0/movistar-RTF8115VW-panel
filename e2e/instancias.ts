@@ -57,13 +57,21 @@ const TEMAS = 1;
 const MEJORAS = 1;
 
 /**
+ * Panel de los usuarios del router (seguridad-router.spec.ts), detrás del de
+ * Mejoras: crea, borra y deshace usuarios de verdad en serie, sin cambiar
+ * la lista de usuarios ni el Historial de los instalados.
+ */
+const SEGURIDAD = 1;
+
+/**
  * Tope de E2E_WORKERS: los instalados, los nuevos, los del recorrido, los de
- * la rejilla, el de los temas y el de Mejoras ocupan WORKERS + 10 puertos
- * seguidos desde E2E_PORT (y desde E2E_SIM_PORT), y la ventana reservada a
- * cada prueba es de 20 (p. ej. 3710-3729 y 8710-8729).
+ * la rejilla, el de los temas, el de Mejoras y el de Seguridad ocupan
+ * WORKERS + 11 puertos seguidos desde E2E_PORT (y desde E2E_SIM_PORT), y la
+ * ventana reservada a cada prueba es de 20 (p. ej. 3710-3729 y 8710-8729).
  */
 const VENTANA_DE_PUERTOS = 20;
-const MAX_WORKERS = VENTANA_DE_PUERTOS - NUEVOS - RECORRIDOS - REJILLAS - TEMAS - MEJORAS;
+const MAX_WORKERS =
+  VENTANA_DE_PUERTOS - NUEVOS - RECORRIDOS - REJILLAS - TEMAS - MEJORAS - SEGURIDAD;
 
 /**
  * Workers de Playwright (E2E_WORKERS; 1, en serie). Por defecto, uno por
@@ -83,8 +91,8 @@ function workers(valor: string | undefined): number {
   if (!Number.isInteger(n) || n < 1 || n > MAX_WORKERS) {
     throw new Error(
       `E2E_WORKERS debe ser un entero entre 1 y ${MAX_WORKERS} (con ${NUEVOS} paneles del ` +
-        `asistente, ${RECORRIDOS} del recorrido, ${REJILLAS} de la rejilla, ${TEMAS} de los temas ` +
-        `y ${MEJORAS} de Mejoras; ` +
+        `asistente, ${RECORRIDOS} del recorrido, ${REJILLAS} de la rejilla, ${TEMAS} de los temas, ` +
+        `${MEJORAS} de Mejoras y ${SEGURIDAD} de Seguridad; ` +
         `${VENTANA_DE_PUERTOS} puertos seguidos ` +
         `desde E2E_PORT): ${valor}`,
     );
@@ -214,6 +222,14 @@ export const mejoras = instancia(
   true,
 );
 
+/** El panel de los usuarios del router (seguridad-router.spec.ts). */
+export const seguridad = instancia(
+  "seguridad",
+  "instalado",
+  WORKERS + NUEVOS + RECORRIDOS + REJILLAS + TEMAS + MEJORAS,
+  VIGILANCIA_RECORRIDO_S,
+);
+
 export const todas: Instancia[] = [
   ...instalados,
   ...Object.values(nuevos),
@@ -221,6 +237,7 @@ export const todas: Instancia[] = [
   ...Object.values(rejillas),
   temas,
   mejoras,
+  seguridad,
 ];
 
 /** Usuario del panel «instalado». */

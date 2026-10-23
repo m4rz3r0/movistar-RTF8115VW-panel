@@ -46,6 +46,57 @@ pub fn parametros_cambio_contrasena(
     ]
 }
 
+/// Página del router desde la que se gestionan los usuarios de su web
+/// (alta, baja y cambio de otro usuario).
+pub const PAGINA_USUARIOS: &str = "user_profile.asp";
+/// Función del router que crea un usuario (`rqUser`, `rqPwd` y `rqGroup`,
+/// en claro, como en `js/user_profile.js`).
+pub const ALTA_USUARIO: &str = "cbAddUser";
+/// Función del router que borra usuarios (`rqDelList`, ver
+/// [`lista_de_baja`]).
+pub const BAJA_USUARIO: &str = "cbDeleteUser";
+/// Función del router que cambia la contraseña y el grupo de otro usuario
+/// (ventana `user_profile_modifyOthers.asp`).
+pub const CAMBIO_OTRO: &str = "cbModifyPwdOther";
+
+/// Parámetros de [`CAMBIO_OTRO`] para dejar a `usuario` con la contraseña
+/// `nueva` y el grupo `grupo`. Van en claro, como en `js/user_profile.js`:
+/// a diferencia de [`CAMBIO_CONTRASENA`], la web oficial no los pasa por
+/// [`mess_userpass`]. `rqNPwd` va siempre: el JavaScript lo exige también
+/// para cambiar solo el grupo.
+pub fn parametros_cambio_otro(
+    usuario: &str,
+    nueva: &str,
+    grupo: &str,
+) -> [(&'static str, String); 3] {
+    [
+        ("rqUser", usuario.to_owned()),
+        ("rqNPwd", nueva.to_owned()),
+        ("rqGroup", grupo.to_owned()),
+    ]
+}
+
+/// `rqDelList` de [`BAJA_USUARIO`]: los nombres seguidos, cada uno con `:`
+/// detrás (`ana:pepe:`), como `deleteUser` en `js/user_profile.js`.
+pub fn lista_de_baja(usuarios: &[&str]) -> String {
+    usuarios.iter().map(|u| format!("{u}:")).collect()
+}
+
+/// Los nombres de un `rqDelList` ([`lista_de_baja`] al revés); los huecos
+/// vacíos (el `:` final, dos seguidos) no cuentan.
+pub fn nombres_de_baja(lista: &str) -> Vec<&str> {
+    lista.split(':').filter(|n| !n.is_empty()).collect()
+}
+
+/// ¿Vale `nombre` como usuario nuevo? La regla de `js/user_profile.js`,
+/// `/^\w{4,20}$/`: de 4 a 20 letras ASCII, cifras o `_`.
+pub fn usuario_valido(nombre: &str) -> bool {
+    (4..=20).contains(&nombre.len())
+        && nombre
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_')
+}
+
 /// Divide una MAC en 6 campos; `None` si no tiene exactamente 6.
 pub fn split_mac(s: &str) -> Option<[String; 6]> {
     split_exact(s, ':')
@@ -98,6 +149,34 @@ mod tests {
                 v
             );
         }
+    }
+
+    #[test]
+    fn lista_de_baja_con_dos_puntos() {
+        assert_eq!(lista_de_baja(&["ana", "pepe"]), "ana:pepe:");
+        assert_eq!(nombres_de_baja("ana:pepe:"), ["ana", "pepe"]);
+        assert_eq!(nombres_de_baja(":ana::"), ["ana"]);
+        assert!(nombres_de_baja("").is_empty());
+    }
+
+    #[test]
+    fn usuario_valido_como_el_javascript() {
+        assert!(usuario_valido("prueba1"));
+        assert!(usuario_valido("con_guion_bajo"));
+        assert!(!usuario_valido("ab"));
+        assert!(!usuario_valido("con espacio"));
+        assert!(!usuario_valido(&"a".repeat(21)));
+        assert!(usuario_valido(&"a".repeat(20)));
+        assert!(!usuario_valido("año1"));
+    }
+
+    #[test]
+    fn cambio_de_otro_en_claro() {
+        let p = parametros_cambio_otro("invitado1", "clave-nueva-1", "user");
+        assert_eq!(
+            p.map(|(k, v)| format!("{k}={v}")),
+            ["rqUser=invitado1", "rqNPwd=clave-nueva-1", "rqGroup=user"]
+        );
     }
 
     #[test]

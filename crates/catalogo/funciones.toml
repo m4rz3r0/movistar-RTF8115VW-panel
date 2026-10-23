@@ -3899,8 +3899,10 @@ area = "usuarios"
 origen = "avanzada"
 tipo = "escritura"
 pagina = "user_profile.asp"
-descripcion = "Crea un usuario de la interfaz web con su grupo (user, admin; system solo si la sesión es system)."
-riesgo = "bajo"
+descripcion = "Crea un usuario de la interfaz web con su grupo (user, admin; system solo si la sesión es system). Usuario, contraseña y grupo van en claro."
+# Medio: crea una cuenta que puede entrar en el router. El gestor no deja
+# crear uno con el nombre del panel ni con el papel system.
+riesgo = "medio"
 lectura_pareada = { funcion = "cbGetUserList", params = [] }
 
 [[funcion.parametro]]
@@ -3968,8 +3970,10 @@ area = "usuarios"
 origen = "avanzada"
 tipo = "escritura"
 pagina = "user_profile.asp"
-descripcion = "Borra usuarios de la interfaz web (lista de nombres)."
-riesgo = "bajo"
+descripcion = "Borra usuarios de la interfaz web (lista de nombres, cada uno seguido de «:»)."
+# Medio: borrar el usuario con el que entra el panel lo dejaría fuera. El
+# gestor no deja borrar ese ni el del operador (system), y de uno en uno.
+riesgo = "medio"
 lectura_pareada = { funcion = "cbGetUserList", params = [] }
 
 [[funcion.parametro]]
@@ -4020,7 +4024,7 @@ tipo = "accion"
 pagina = "user_profile.asp"
 descripcion = "Cambia la contraseña y el grupo de otro usuario (ventana user_profile_modifyOthers.asp). No se puede comprobar después: acción."
 riesgo = "medio"
-bloqueada = "puede cambiar la contraseña del usuario con el que el propio panel inicia sesión (RP_ROUTER_USER): la vigilancia no podría volver a entrar ni revertir; se cambia desde el router"
+bloqueada = "puede cambiar la contraseña del usuario con el que el propio panel inicia sesión (RP_ROUTER_USER): la vigilancia no podría volver a entrar ni revertir; se cambia en Ajustes → Seguridad → Usuarios, con guardas y comprobando que entra con la nueva"
 
 [[funcion.parametro]]
 nombre = "rqUser"

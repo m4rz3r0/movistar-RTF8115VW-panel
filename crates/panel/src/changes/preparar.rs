@@ -217,7 +217,10 @@ impl ChangeManager {
             }
             let plan = self.reconstruir(paso).map_err(CambioError::Invalida)?;
             let etiqueta: Option<String> = paso.get("etiqueta");
-            reqs.push((inversa(&plan).ok_or_else(no_se_puede)?, etiqueta));
+            let mut req = inversa(&plan).ok_or_else(no_se_puede)?;
+            // Un usuario borrado vuelve con una contraseña nueva aleatoria.
+            super::especiales::con_contrasena_nueva(&mut req);
+            reqs.push((req, etiqueta));
         }
         if reqs.is_empty() {
             return Err(no_se_puede());

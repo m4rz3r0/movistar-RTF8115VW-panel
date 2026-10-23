@@ -27,8 +27,9 @@ pub(super) use pagina::leer_tema;
 use super::*;
 use crate::{
     changes::{
-        BLOQUEO_SECRETO_TAPADO, BLOQUEO_SOLO_LECTURA, CambioError, ChangeManager, ChangeRequest,
-        Diff, GrupoRequest, Paso, PasoPreparado, buscar,
+        BLOQUEO_SECRETO_TAPADO, BLOQUEO_SOLO_LECTURA, BLOQUEO_USUARIO_PROTEGIDO, CambioError,
+        ChangeManager, ChangeRequest, Diff, GrupoRequest, Paso, PasoPreparado, USUARIO_YA_EXISTE,
+        buscar,
     },
     instalar::servidor::fallo,
     instancia,
@@ -70,7 +71,7 @@ pub(crate) fn clave(a: &Ajuste) -> Clave {
 
 /// Error del gestor al guardar un ajuste, con el mensaje traducido y sin
 /// nombres de la API (el detalle técnico va al registro).
-fn error_ajuste(e: CambioError) -> ServerFnError {
+pub(crate) fn error_ajuste(e: CambioError) -> ServerFnError {
     use CambioError as E;
     match e {
         E::SinCambios => fallo(StatusCode::CONFLICT, t!("ajustes-error-sin-cambios")),
@@ -80,6 +81,12 @@ fn error_ajuste(e: CambioError) -> ServerFnError {
         }
         E::Bloqueada(m) if m == BLOQUEO_SECRETO_TAPADO => {
             fallo(StatusCode::FORBIDDEN, t!("cambio-error-secreto-tapado"))
+        }
+        E::Bloqueada(m) if m == BLOQUEO_USUARIO_PROTEGIDO => {
+            fallo(StatusCode::FORBIDDEN, t!("usuarios-router-error-protegido"))
+        }
+        E::InstanciaCambiada(m) if m == USUARIO_YA_EXISTE => {
+            fallo(StatusCode::CONFLICT, t!("usuarios-router-error-existe"))
         }
         E::Bloqueada(m) => {
             tracing::warn!("ajustes: escritura bloqueada: {m}");

@@ -3,8 +3,9 @@
 //! Se pinta con lo que ya trajo la página (sin otra petición): una columna
 //! por ajuste del elemento (lo esencial, lo avanzado y lo oculto), cada una
 //! con su ayuda, sus campos, su efecto y sus detalles técnicos plegados. Una
-//! lista sin componente propio se ve como tabla, y la contraseña del router
-//! con el enlace a donde se cambia: se consultan, no se editan aquí.
+//! lista sin componente propio se ve como tabla, la contraseña del router
+//! con el enlace a donde se cambia y los usuarios del router con sus propias
+//! acciones ([`super::usuarios`]): no se editan con «Guardar cambios».
 //! «Guardar cambios» prepara un solo cambio con lo de todas las columnas y
 //! lo abre en el diálogo de revisión. Se cierra con ✕ o con Esc; en el
 //! móvil ocupa la pantalla y vuelve con «‹ WiFi».
@@ -65,13 +66,16 @@ fn se_edita(a: &AjusteVista) -> bool {
     !a.lista && a.componente.is_none()
 }
 
-/// La columna de un ajuste que solo se consulta: una lista en una tabla o
-/// el enlace a donde se cambia la contraseña del router.
-fn columna_de_consulta(a: &AjusteVista, unica: bool) -> impl IntoView + use<> {
+/// La columna de un ajuste que no se edita aquí: una lista en una tabla, el
+/// enlace a donde se cambia la contraseña del router o los usuarios del
+/// router con sus acciones (del elemento `elemento`).
+fn columna_de_consulta(a: &AjusteVista, unica: bool, elemento: &str) -> impl IntoView + use<> {
     let col = format!("{}-columna", dom(a));
     let titulo = col.clone();
     let cuerpo = if a.componente.as_deref() == Some(super::CONTRASENA_ROUTER) {
         consulta::enlace_contrasena_router().into_any()
+    } else if a.componente.as_deref() == Some(super::USUARIOS_ROUTER) {
+        view! { <super::usuarios::Usuarios a=a.clone() elemento=elemento.to_owned() /> }.into_any()
     } else if a.lista {
         consulta::lista(a).into_any()
     } else {
@@ -245,7 +249,7 @@ pub(crate) fn Detalle(e: ElementoVista, registro: Registro) -> impl IntoView {
         .iter()
         .map(|a| match ediciones.iter().find(|(id, _, _)| *id == a.id) {
             Some((_, _, ed)) => columna(a, *ed, editable, preparando.into(), unica).into_any(),
-            None => columna_de_consulta(a, unica).into_any(),
+            None => columna_de_consulta(a, unica, &e.id).into_any(),
         })
         .collect_view();
     let eds: Vec<Edicion> = ediciones.iter().map(|(_, _, ed)| *ed).collect();

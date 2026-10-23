@@ -60,6 +60,9 @@ pub(crate) fn write(
     }
     let result = match name {
         "cbModifyPwd" => modify_pwd(s, st, &clean),
+        n if crate::usuarios::es_suya(n) => {
+            return crate::usuarios::escribir(&mut s.usuarios(), n, &clean);
+        }
         "cbReboot" => {
             st.invalidate_sessions();
             st.rebooted = Some(Instant::now());
@@ -105,7 +108,7 @@ fn modify_pwd(s: &Inner, st: &mut SimState, p: &[(String, String)]) -> Result<()
     };
     match aplazada {
         Some(a) => st.pwd_pendiente = Some((nueva, a)),
-        None => *s.password.lock().unwrap_or_else(|e| e.into_inner()) = nueva,
+        None => s.fijar_password(nueva),
     }
     Ok(())
 }

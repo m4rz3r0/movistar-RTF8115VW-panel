@@ -269,7 +269,7 @@ impl ChangeManager {
             cambio = id,
             pasos = n,
             funcion = %plan0.funcion.name,
-            instancia = plan0.instancia.as_deref().unwrap_or("-"),
+            instancia = crate::changes::especiales::instancia_en_registro(&plan0),
             usuario,
             diff = %resumen(&plan0.campos),
             "cambio aplicándose"
@@ -385,7 +385,7 @@ impl ChangeManager {
             cambio = id,
             paso = i + 1,
             funcion = %plan.funcion.name,
-            instancia = plan.instancia.as_deref().unwrap_or("-"),
+            instancia = crate::changes::especiales::instancia_en_registro(&plan),
             diff = %resumen(&plan.campos),
             "paso aplicándose"
         );

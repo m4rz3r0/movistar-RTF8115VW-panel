@@ -155,11 +155,7 @@ impl SimControl {
     /// Cambia la contraseña que acepta el login (las sesiones abiertas
     /// siguen valiendo).
     pub fn set_password(&self, password: &str) {
-        *self
-            .inner
-            .password
-            .lock()
-            .unwrap_or_else(|e| e.into_inner()) = password.to_owned();
+        self.inner.fijar_password(password.to_owned());
     }
 
     /// El próximo `cbModifyPwd` responde OK sin cambiar nada (el router lo
@@ -197,6 +193,25 @@ impl SimControl {
         let st = self.inner.state();
         let nodo = read_node(&self.inner, &st, lectura, &[]).ok()?;
         valor_de(&nodo, campo)
+    }
+
+    /// Usuarios de la web del router como `(nombre, papel)`, en el orden de
+    /// `cbGetUserList` (con lo escrito hasta ahora).
+    pub fn usuarios(&self) -> Vec<(String, String)> {
+        self.inner
+            .usuarios()
+            .iter()
+            .map(|u| (u.nombre.clone(), u.grupo.clone()))
+            .collect()
+    }
+
+    /// Contraseña actual del usuario `nombre` (`None` si no existe).
+    pub fn contrasena_de(&self, nombre: &str) -> Option<String> {
+        self.inner
+            .usuarios()
+            .iter()
+            .find(|u| u.nombre == nombre)
+            .map(|u| u.contrasena.clone())
     }
 
     /// Cambia la versión de firmware (`SWVersion`) que da `cbGetSummary`.

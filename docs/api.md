@@ -1785,9 +1785,9 @@ Lectura pareada: `cbGetTr69Config`
 
 ### `cbAddUser`
 
-*escritura* · UI avanzada · riesgo bajo · página `user_profile.asp`
+*escritura* · UI avanzada · riesgo medio · página `user_profile.asp`
 
-Crea un usuario de la interfaz web con su grupo (user, admin; system solo si la sesión es system).
+Crea un usuario de la interfaz web con su grupo (user, admin; system solo si la sesión es system). Usuario, contraseña y grupo van en claro.
 
 Lectura pareada: `cbGetUserList`
 
@@ -1827,9 +1827,9 @@ Comprueba la sesión: devuelve LoginRole y AccessMask. Todas las páginas avanza
 
 ### `cbDeleteUser`
 
-*escritura* · UI avanzada · riesgo bajo · página `user_profile.asp`
+*escritura* · UI avanzada · riesgo medio · página `user_profile.asp`
 
-Borra usuarios de la interfaz web (lista de nombres).
+Borra usuarios de la interfaz web (lista de nombres, cada uno seguido de «:»).
 
 Lectura pareada: `cbGetUserList`
 
@@ -1865,7 +1865,7 @@ Cambia la contraseña del usuario con sesión iniciada (contraseña actual y nue
 
 Cambia la contraseña y el grupo de otro usuario (ventana user_profile_modifyOthers.asp). No se puede comprobar después: acción.
 
-**Bloqueada:** puede cambiar la contraseña del usuario con el que el propio panel inicia sesión (RP_ROUTER_USER): la vigilancia no podría volver a entrar ni revertir; se cambia desde el router
+**Bloqueada:** puede cambiar la contraseña del usuario con el que el propio panel inicia sesión (RP_ROUTER_USER): la vigilancia no podría volver a entrar ni revertir; se cambia en Ajustes → Seguridad → Usuarios, con guardas y comprobando que entra con la nueva
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|

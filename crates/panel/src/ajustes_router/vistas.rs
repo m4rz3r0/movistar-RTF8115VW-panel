@@ -170,9 +170,15 @@ pub struct OpcionVista {
 /// Una instancia de una lista (una regla, una reserva…).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InstanciaVista {
-    /// Id de la instancia en el router (su posición si el router no da uno).
+    /// Id de la instancia en el router (su posición si el router no da uno;
+    /// en los usuarios del router, su nombre).
     pub id: String,
     pub campos: Vec<CampoVista>,
+    /// Clave de traducción de una nota de la fila que sustituye a sus
+    /// acciones (un usuario del router protegido: el del panel o el del
+    /// operador).
+    #[serde(default)]
+    pub nota: Option<String>,
 }
 
 /// Funciones y parámetros del router detrás de un ajuste. Lo único con

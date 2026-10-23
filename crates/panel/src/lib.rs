@@ -18,6 +18,8 @@ pub mod panel_ajustes;
 pub mod preferencias;
 pub mod tema;
 pub mod ui;
+pub mod usuarios_router;
+pub mod validacion_real;
 pub mod vista;
 
 #[cfg(feature = "ssr")]

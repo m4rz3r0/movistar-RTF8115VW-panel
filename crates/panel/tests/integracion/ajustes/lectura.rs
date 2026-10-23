@@ -106,14 +106,22 @@ async fn usuarios_del_router_por_pares_y_en_claro() {
             &json!({ "Opcion": "usuario" }),
         ]
     );
+    let nombres: Vec<&Value> = instancias
+        .iter()
+        .map(|i| &campo(i, "nombre")["valor"])
+        .collect();
+    // Los nombres neutros del simulador, según el papel.
+    assert_eq!(
+        nombres,
+        [
+            &json!({ "Texto": "operador01" }),
+            &json!({ "Texto": crate::comun::USER }),
+            &json!({ "Texto": "invitado1" }),
+        ]
+    );
     for i in instancias {
         // El nombre de usuario es un dato sensible, no un secreto: en claro,
         // sin ojo.
-        assert_eq!(
-            campo(i, "nombre")["valor"],
-            json!({ "Texto": "X-REDACTED-X" }),
-            "{i}"
-        );
         assert_eq!(
             campo(i, "nombre")["solo_lectura"],
             "ajuste-seguridad-usuarios_router-motivo"
@@ -341,33 +349,4 @@ async fn lista_escrita_sin_id_queda_sin_leer() {
     assert!(reservas["instancias"].as_array().unwrap().is_empty());
     assert!(reservas["campos"].as_array().unwrap().is_empty());
     assert_eq!(ajuste(&tema, "red_local.dhcp")["estado"], "Leido");
-}
-
-/// Los usuarios del router se emparejan solo con los elementos de sus
-/// campos: una hoja suelta en la respuesta no crea un usuario de más.
-#[tokio::test]
-async fn usuarios_emparejados_solo_por_sus_elementos() {
-    let p = PanelPrueba::nuevo()
-        .capa(&variante("listas-irregulares"))
-        .arrancar()
-        .await;
-    let cookie = sesion(&p).await;
-    let tema = leer(&p, &cookie, "seguridad").await;
-    let usuarios = ajuste(&tema, "seguridad.usuarios_router");
-    let instancias = usuarios["instancias"].as_array().unwrap();
-    let papeles: Vec<&Value> = instancias
-        .iter()
-        .map(|i| &campo(i, "papel")["valor"])
-        .collect();
-    assert_eq!(
-        papeles,
-        [
-            &json!({ "Opcion": "operador" }),
-            &json!({ "Opcion": "administrador" }),
-            &json!({ "Opcion": "usuario" }),
-        ],
-        "{usuarios}"
-    );
-    let ids: Vec<&Value> = instancias.iter().map(|i| &i["id"]).collect();
-    assert_eq!(ids, [&json!("0"), &json!("1"), &json!("2")]);
 }

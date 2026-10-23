@@ -10,6 +10,7 @@ pub enum Componente {
     Reservas,
     Puertos,
     ContrasenaRouter,
+    UsuariosRouter,
 }
 
 impl Componente {
@@ -20,6 +21,7 @@ impl Componente {
             Componente::Reservas => "reservas",
             Componente::Puertos => "puertos",
             Componente::ContrasenaRouter => "contrasena_router",
+            Componente::UsuariosRouter => "usuarios_router",
         }
     }
 
@@ -100,6 +102,22 @@ impl Componente {
                 "error-cambiada",
             ],
             Componente::ContrasenaRouter => &[],
+            Componente::UsuariosRouter => &[
+                "crear",
+                "crear-titulo",
+                "nuevo-nombre",
+                "nuevo-nombre-ayuda",
+                "contrasena",
+                "contrasena-ayuda",
+                "cambiar",
+                "cambiar-de",
+                "cambiar-boton",
+                "cambiar-nota",
+                "cambiado",
+                "borrar",
+                "borrar-de",
+                "vacia",
+            ],
         }
     }
 }

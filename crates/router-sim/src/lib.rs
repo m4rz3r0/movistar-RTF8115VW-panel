@@ -3,7 +3,8 @@
 //! Sirve las fixtures saneadas con el mismo protocolo que el router real
 //! (login básico y avanzado, cookies, `sessionKey` en las páginas `.asp`) y
 //! refleja en memoria cualquier escritura avanzada en su lectura pareada del
-//! catálogo (`catalogo`), con listas (crear, editar y borrar) y `cbModifyPwd`.
+//! catálogo (`catalogo`), con listas (crear, editar y borrar), `cbModifyPwd` y
+//! los usuarios de su web (`usuarios`: alta, baja, cambio de otro y lista).
 
 mod control;
 mod escrituras;
@@ -14,6 +15,7 @@ mod lecturas;
 pub mod sanitize;
 #[cfg(test)]
 mod tests;
+mod usuarios;
 mod xml;
 
 pub use control::SimControl;
@@ -113,9 +115,10 @@ impl Sim {
             fixtures.extend(cargar(capa));
         }
         let wan = wan_de_las_fixtures(&fixtures);
+        let usuarios = usuarios::de_partida(&fixtures, &cfg.user, &cfg.password);
         let inner = Arc::new(Inner {
             user: cfg.user,
-            password: Mutex::new(cfg.password),
+            usuarios: Mutex::new(usuarios),
             fixtures,
             catalogo: Catalogo::load().expect("el catálogo de funciones carga"),
             wan,

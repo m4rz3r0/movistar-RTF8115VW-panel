@@ -145,6 +145,7 @@ pub(super) fn lista(
                         )
                     })
                     .collect(),
+                nota: None,
             })
             .collect(),
     )
@@ -336,8 +337,13 @@ pub(super) fn instancias(n: &XmlNode, elementos: &[&str]) -> Vec<Leidos> {
 
 /// Elemento que da el id de cada instancia de una lista: el parámetro de
 /// instancia de su función de escritura o, si no escribe, el de su
-/// lectura.
+/// lectura; en los usuarios del router, `UserName`.
 fn id_instancia<'f>(f: &'f Catalogo, a: &Ajuste) -> Option<&'f str> {
+    // Los usuarios del router no traen id: el suyo es el nombre (el que
+    // borra y cambia su componente).
+    if a.componente == Some(Componente::UsuariosRouter) {
+        return Some("UserName");
+    }
     a.campos
         .iter()
         .filter_map(|c| c.escribe.as_ref())
@@ -380,6 +386,16 @@ fn tecnico(a: &Ajuste) -> DetallesTecnicos {
                 .iter()
                 .map(|ad| (c.id.clone(), ad.parametro.clone())),
         );
+    }
+    // Los usuarios del router escriben con su componente, no por campos.
+    if a.componente == Some(Componente::UsuariosRouter) {
+        escrituras = [
+            hgu::fmt::ALTA_USUARIO,
+            hgu::fmt::BAJA_USUARIO,
+            hgu::fmt::CAMBIO_OTRO,
+        ]
+        .map(String::from)
+        .to_vec();
     }
     DetallesTecnicos {
         lectura,

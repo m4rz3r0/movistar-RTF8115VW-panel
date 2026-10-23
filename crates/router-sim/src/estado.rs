@@ -1,5 +1,6 @@
 //! Estado en memoria del simulador: fixtures, sesiones, escrituras y fallos programados.
 
+use crate::usuarios::Usuario;
 use catalogo::Catalogo;
 use hgu::xml::XmlNode;
 use std::{
@@ -15,9 +16,11 @@ pub(crate) type Params = Vec<(String, String)>;
 pub(crate) type FixtureKey = (String, Params);
 
 pub(crate) struct Inner {
+    /// Usuario del simulador: el que cambia `cbModifyPwd`.
     pub(crate) user: String,
-    /// Contraseña aceptada (cambiable con [`SimControl::set_password`]).
-    pub(crate) password: Mutex<String>,
+    /// Usuarios de la web del router, con el del simulador (su contraseña
+    /// se cambia con [`SimControl::set_password`]).
+    pub(crate) usuarios: Mutex<Vec<Usuario>>,
     pub(crate) fixtures: HashMap<FixtureKey, String>,
     /// Catálogo de funciones (lecturas pareadas y listas).
     pub(crate) catalogo: Catalogo,
@@ -30,11 +33,24 @@ pub(crate) struct Inner {
 }
 
 impl Inner {
+    /// Contraseña del usuario del simulador (vacía si alguien lo borró).
     pub(crate) fn password(&self) -> String {
-        self.password
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .clone()
+        self.usuarios()
+            .iter()
+            .find(|u| u.nombre == self.user)
+            .map(|u| u.contrasena.clone())
+            .unwrap_or_default()
+    }
+
+    /// Pone `nueva` como contraseña del usuario del simulador.
+    pub(crate) fn fijar_password(&self, nueva: String) {
+        if let Some(u) = self.usuarios().iter_mut().find(|u| u.nombre == self.user) {
+            u.contrasena = nueva;
+        }
+    }
+
+    pub(crate) fn usuarios(&self) -> MutexGuard<'_, Vec<Usuario>> {
+        self.usuarios.lock().unwrap_or_else(|e| e.into_inner())
     }
 
     pub(crate) fn state(&self) -> MutexGuard<'_, SimState> {
@@ -56,7 +72,7 @@ impl Inner {
             _ => false,
         };
         if toca && let Some((nueva, _)) = st.pwd_pendiente.take() {
-            *self.password.lock().unwrap_or_else(|e| e.into_inner()) = nueva;
+            self.fijar_password(nueva);
         }
     }
 }

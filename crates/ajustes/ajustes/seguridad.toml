@@ -99,15 +99,17 @@ nivel = "basico"
 componente = "contrasena_router"
 leer = { funcion = "cbGetUserList" }
 
-# Usuarios de la web del router, solo lectura: cambiar la contraseña de otro
-# usuario está bloqueado (puede ser el usuario con el que entra el panel) y
-# crear o borrar usuarios queda para la fase 3. La respuesta trae pares
-# nombre/papel seguidos, sin elemento que agrupe cada usuario.
+# Usuarios de la web del router: su componente (fase 3) crea y borra por el
+# gestor de cambios y cambia la contraseña o el grupo de otro usuario por su
+# flujo propio, con guardas: nunca el usuario con el que entra el panel ni
+# el del operador (system). El id de cada fila es su nombre. La respuesta
+# trae pares nombre/papel seguidos, sin elemento que agrupe cada usuario.
 [[ajuste]]
 id = "seguridad.usuarios_router"
 tema = "seguridad"
 nivel = "avanzado"
 lista = true
+componente = "usuarios_router"
 leer = { funcion = "cbGetUserList" }
 
 [[ajuste.campo]]

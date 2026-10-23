@@ -1,5 +1,6 @@
 //! Planificación de las escrituras y E/S con el router.
 
+use super::especiales::{self, Especial};
 use super::*;
 
 impl ChangeManager {
@@ -39,6 +40,9 @@ impl ChangeManager {
         explicito: bool,
     ) -> Result<Plan, CambioError> {
         let f = self.funcion_escribible(&req.funcion)?;
+        if let Some(e) = Especial::de(f) {
+            return self.planificar_especial(e, f, req, explicito).await;
+        }
         for k in req.valores.keys() {
             if f.parametro(k).is_none() {
                 return Err(CambioError::Invalida(format!(
@@ -183,7 +187,8 @@ impl ChangeManager {
                 vars.remove("sessionKey");
                 Ok(vars)
             }
-            Lectura::Ninguna => Ok(BTreeMap::new()),
+            // Una lista sin instancia que leer sola: se lista.
+            Lectura::Ninguna | Lectura::Usuarios => Ok(BTreeMap::new()),
         }
     }
 
@@ -192,6 +197,14 @@ impl ChangeManager {
         &self,
         l: &Lectura,
     ) -> Result<Vec<BTreeMap<String, String>>, hgu::Error> {
+        if *l == Lectura::Usuarios {
+            let n = self
+                .state
+                .hgu
+                .call(especiales::LECTURA_USUARIOS, &[])
+                .await?;
+            return Ok(especiales::usuarios_de(&n));
+        }
         let Lectura::Xml {
             funcion,
             params,
@@ -222,6 +235,19 @@ impl ChangeManager {
     pub(super) async fn enviar(&self, plan: &Plan) -> Result<(), hgu::Error> {
         let f = &plan.funcion;
         let pagina = f.pagina.as_deref().unwrap_or_default();
+        // Borrar una instancia especial es otra escritura (un usuario:
+        // `cbDeleteUser` con su nombre).
+        if plan.operacion == Operacion::Borrar
+            && let Some(e) = Especial::de(f)
+        {
+            let (funcion, params) =
+                e.baja(plan.instancia.as_deref().unwrap_or_default(), &plan.valores);
+            let p: Vec<(&str, &str)> = params
+                .iter()
+                .map(|(k, v)| (k.as_str(), v.as_str()))
+                .collect();
+            return self.state.hgu.write(pagina, funcion, &p).await.map(drop);
+        }
         let basica = !f.name.starts_with("cb");
         let m = &self.state.mascara;
         let params: Vec<(String, String)> = plan
@@ -257,6 +283,9 @@ impl ChangeManager {
     }
 
     async fn comprobar_en_el_router(&self, plan: &Plan, lado: Lado) -> Comprobacion {
+        if plan.lectura == Lectura::Usuarios {
+            return self.comprobar_usuarios(plan, lado).await;
+        }
         let f = &plan.funcion;
         let no_leido =
             |e: hgu::Error| Comprobacion::SinLectura(format!("no se puede releer el estado: {e}"));

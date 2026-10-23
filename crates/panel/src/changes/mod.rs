@@ -45,6 +45,7 @@
 //! muestran secretos enmascarados; sus valores anteriores van cifrados.
 
 mod consultas;
+mod especiales;
 mod grupo;
 mod nota;
 mod persistencia;
@@ -55,6 +56,9 @@ mod router;
 mod tipos;
 mod vigilancia;
 
+/// La lista de usuarios del router, como la lee el gestor (para el cambio
+/// de otro usuario, que no pasa por él).
+pub(crate) use especiales::{LECTURA_USUARIOS, usuarios_de};
 use grupo::{Ejecucion, PasoGuardado};
 pub use grupo::{EstadoPaso, GrupoRequest, Paso, PasoCambio, PasoPreparado, PreparadoGrupo};
 pub use nota::Nota;

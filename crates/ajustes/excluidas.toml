@@ -147,11 +147,11 @@ motivo = "nombre e icono de un equipo en el mapa de la web básica: no cambia la
 
 [[excluida]]
 funcion = "cbAddUser"
-motivo = "usuarios de la web del router: crear uno fija una contraseña que el panel no puede comprobar ni deshacer; fase 3, con las contraseñas de otros usuarios"
+motivo = "usuarios de la web del router: se gestionan en el componente usuarios_router, con guardas"
 
 [[excluida]]
 funcion = "cbDeleteUser"
-motivo = "usuarios de la web del router: puede borrar el usuario con el que entra el panel y dejarlo fuera; fase 3, con las contraseñas de otros usuarios"
+motivo = "usuarios de la web del router: se gestionan en el componente usuarios_router, con guardas"
 
 [[excluida]]
 funcion = "cbSetWifiWds"

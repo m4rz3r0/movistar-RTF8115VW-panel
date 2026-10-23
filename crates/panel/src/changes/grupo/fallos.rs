@@ -138,7 +138,7 @@ impl ChangeManager {
     /// transitorios (router sin respuesta, relectura fallida) se reintentan
     /// durante `alto`; los deterministas terminan en el acto.
     async fn revertir_plan(&self, id: i64, plan: &Plan) -> Result<(), ErrorReversion> {
-        let Some(req) = inversa(plan) else {
+        let Some(mut req) = inversa(plan) else {
             // Sin inversa, vale si el router ya muestra lo de antes (p. ej.
             // una creación sin instancia conocida que no llegó a hacerse).
             return match plan.operacion {
@@ -152,6 +152,9 @@ impl ChangeManager {
                 },
             };
         };
+        // Un usuario borrado vuelve con una contraseña nueva aleatoria (la
+        // de antes no se puede leer): no se enseña, habrá que cambiarla.
+        crate::changes::especiales::con_contrasena_nueva(&mut req);
         let fin = Instant::now() + self.tiempos.alto;
         // Plan del último intento que llegó a escribir (o pudo llegar).
         let mut enviado = None;

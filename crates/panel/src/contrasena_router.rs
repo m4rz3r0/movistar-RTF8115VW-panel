@@ -191,7 +191,20 @@ pub(crate) mod servidor {
             .await
             .map_err(|_| Fallo::Sondeo)?;
         let r = en_el_router(state, &actual, nueva).await;
-        anotar(state, usuario, &r).await;
+        let resultado = match &r {
+            // La clave, no el texto: el Historial la pinta en el idioma de
+            // quien lo mira.
+            Ok(()) => Ok(Nota::clave("contrasena-router-historial-nota")),
+            Err(f) => Err(nota(f)),
+        };
+        anotar(
+            state,
+            usuario,
+            hgu::fmt::CAMBIO_CONTRASENA,
+            TITULO,
+            resultado,
+        )
+        .await;
         // Lo leído para mostrar pudo ser con la sesión de antes.
         state.lecturas.invalidar();
         r
@@ -347,30 +360,29 @@ pub(crate) mod servidor {
     }
 
     /// Riesgo del cambio en el Historial: el de la función en el catálogo.
-    fn riesgo(state: &AppState) -> &'static str {
-        match state
-            .catalogo
-            .funcion(hgu::fmt::CAMBIO_CONTRASENA)
-            .map(|f| f.riesgo)
-        {
+    fn riesgo(state: &AppState, funcion: &str) -> &'static str {
+        match state.catalogo.funcion(funcion).map(|f| f.riesgo) {
             Some(catalogo::Riesgo::Bajo) => "bajo",
             Some(catalogo::Riesgo::Alto) => "alto",
             _ => "medio",
         }
     }
 
-    /// Apunta el intento en el Historial: aplicado o fallido con el motivo,
-    /// sin ningún valor y sin nada que deshacer (sin pasos).
-    async fn anotar(state: &AppState, usuario: &str, r: &Result<(), Fallo>) {
+    /// Apunta en el Historial un intento de `funcion` (un cambio que no pasa
+    /// por el gestor), con el título `titulo`: aplicado con su nota o
+    /// fallido con el motivo, sin ningún valor y sin nada que deshacer (sin
+    /// pasos). Lo usan este cambio y el de la contraseña de otro usuario
+    /// (`usuarios_router`).
+    pub(crate) async fn anotar(
+        state: &AppState,
+        usuario: &str,
+        funcion: &str,
+        titulo: &str,
+        r: Result<Nota, Nota>,
+    ) {
         let (estado, error, nota) = match r {
-            Ok(()) => (
-                "aplicado",
-                None,
-                // La clave, no el texto: el Historial la pinta en el idioma
-                // de quien lo mira.
-                Some(Nota::clave("contrasena-router-historial-nota").guardar()),
-            ),
-            Err(f) => ("fallido", Some(nota(f).guardar()), None),
+            Ok(n) => ("aplicado", None, Some(n.guardar())),
+            Err(n) => ("fallido", Some(n.guardar()), None),
         };
         let ahora = crate::series::now();
         let fila = sqlx::query(
@@ -383,16 +395,16 @@ pub(crate) mod servidor {
         .bind(ahora)
         .bind(usuario)
         .bind(usuario)
-        .bind(hgu::fmt::CAMBIO_CONTRASENA)
-        .bind(riesgo(state))
+        .bind(funcion)
+        .bind(riesgo(state, funcion))
         .bind(estado)
         .bind(error)
         .bind(nota)
-        .bind(TITULO)
+        .bind(titulo)
         .execute(&state.db)
         .await;
         if let Err(e) = fila {
-            tracing::error!("no se puede apuntar en el Historial el cambio de contraseña: {e}");
+            tracing::error!("no se puede apuntar en el Historial el cambio ({funcion}): {e}");
         }
     }
 }
