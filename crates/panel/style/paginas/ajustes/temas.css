@@ -72,3 +72,16 @@
 .tema-nota li + li {
   margin-top: 0.4rem;
 }
+
+.tema-nota h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  color: var(--texto);
+}
+
+/* El enlace se distingue del texto sin pasar el ratón (en el móvil no hay). */
+.tema-nota .b-txt {
+  padding-left: 0;
+  color: var(--texto);
+  text-decoration: underline;
+}

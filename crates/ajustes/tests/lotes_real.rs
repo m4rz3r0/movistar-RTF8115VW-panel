@@ -69,10 +69,34 @@ fn lotes_del_catalogo_real() {
     );
     let proveedor = c.eleccion("proveedor_dns").unwrap();
     assert_eq!(proveedor.defecto().id, "quad9");
-    assert_eq!(proveedor.opciones.len(), 5);
+    assert_eq!(proveedor.opciones.len(), 6);
     let quad9 = proveedor.defecto();
     assert_eq!(quad9.valores["principal"], "9.9.9.9");
     assert_eq!(quad9.valores["secundario"], "149.112.112.112");
+    // El DNS familiar (filtra malware y contenido para adultos), sin ser
+    // el de por defecto.
+    let familiar = proveedor
+        .opciones
+        .iter()
+        .find(|o| o.id == "cloudflare_familiar")
+        .expect("opción de DNS familiar");
+    assert!(!familiar.defecto);
+    assert_eq!(familiar.valores["principal"], "1.1.1.3");
+    assert_eq!(familiar.valores["secundario"], "1.0.0.3");
+    // El principal de cada proveedor vale como el recomendado de los DNS de
+    // casa: ninguno sale como un DNS desconocido.
+    let principal = c
+        .ajuste("red_local.dns_casa")
+        .and_then(|a| a.campo("principal"))
+        .unwrap();
+    for o in &proveedor.opciones {
+        let ip = &o.valores["principal"];
+        assert!(
+            principal.recomendado.as_ref() == Some(ip) || principal.aceptados.contains(ip),
+            "{}: {ip} no es aceptado",
+            o.id
+        );
+    }
     assert_eq!(
         lotes_del_campo(&c, "sistema.registro", "envio"),
         ["seguridad", "privacidad"]

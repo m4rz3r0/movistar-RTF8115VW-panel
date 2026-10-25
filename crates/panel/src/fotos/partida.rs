@@ -124,6 +124,8 @@ fn id_param<'a>(state: &'a AppState, nombre: &str) -> Option<&'a str> {
 /// que una lista que lee con un filtro la misma función que otra lista lee
 /// sin él (la DMZ, con `dmz=1`, frente a las reglas de puertos) mezclaría
 /// sus instancias con las de la otra: ni se lee para la foto ni se compara.
+/// Es por ajuste; `instalar::FUERA_DE_LA_FOTO` deja fuera, por función, lo
+/// que no lee el router (la sesión del propio panel).
 pub fn fuera_de_la_foto(ajustes: &[Ajuste], a: &Ajuste) -> bool {
     a.lista
         && !a.leer.params.is_empty()

@@ -462,6 +462,7 @@ fn detector_de_nombres_de_la_api() {
         "ENABLECWMP",
         "el campo UserName",
         "pon wmm a 1",
+        "el parámetro dmz",
     ] {
         assert!(
             !hallazgos(&patrones, delator).is_empty(),
@@ -472,6 +473,7 @@ fn detector_de_nombres_de_la_api() {
         "Change your WiFi password for all devices.",
         "Turn on isolation and beamforming; All your Account details stay safe.",
         "Activa WMM en la red de casa, por ejemplo hora.example.",
+        "Quita la DMZ desde la web del router.",
     ] {
         assert!(
             hallazgos(&patrones, llano).is_empty(),

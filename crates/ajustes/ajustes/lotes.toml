@@ -98,6 +98,15 @@ valores = { principal = "1.1.1.1", secundario = "1.0.0.1" }
 id = "adguard"
 valores = { principal = "94.140.14.14", secundario = "94.140.15.15" }
 
+# DNS familiar: Cloudflare for Families, la variante que bloquea malware y
+# contenido para adultos (1.1.1.3 y 1.0.0.3). Fuentes oficiales de
+# Cloudflare: https://1.1.1.1/family/ y
+# https://developers.cloudflare.com/1.1.1.1/setup/#1111-for-families
+# Es el camino del DNS que propone la nota del control parental de Puertos.
+[[eleccion.opcion]]
+id = "cloudflare_familiar"
+valores = { principal = "1.1.1.3", secundario = "1.0.0.3" }
+
 # Hora por un servidor neutro: opcional, sale desmarcado.
 [[paso]]
 id = "hora_neutra"

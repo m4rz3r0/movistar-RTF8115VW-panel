@@ -55,6 +55,8 @@ mejoras-dns-cloudflare = Cloudflare
 mejoras-dns-cloudflare-desc = Very fast. It is a United States company.
 mejoras-dns-adguard = AdGuard
 mejoras-dns-adguard-desc = Blocks ads and trackers. It may break some websites.
+mejoras-dns-cloudflare_familiar = Cloudflare for Families
+mejoras-dns-cloudflare_familiar-desc = Recommended if there are children at home and you want a family filter. Pros: it filters adult websites and malware on every device at home, with nothing to install. Cons: it filters for everyone, adults included; changing the device's DNS gets around it, and Cloudflare sees the lookups.
 mejoras-dns-elegir = DNS service for the home network
 
 ## State of the bundles and their review

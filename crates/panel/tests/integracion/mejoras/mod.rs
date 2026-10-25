@@ -174,7 +174,12 @@ async fn mejoras_con_las_fixtures() {
         5
     );
     let proveedores = m["proveedores"].as_array().unwrap();
-    assert_eq!(proveedores.len(), 6, "«Mantener» y los cinco: {m}");
+    assert_eq!(proveedores.len(), 7, "«Mantener» y los seis: {m}");
+    assert_eq!(
+        proveedores[6],
+        json!({ "id": "cloudflare_familiar", "servidores": ["1.1.1.3", "1.0.0.3"], "defecto": false }),
+        "{m}"
+    );
     assert_eq!(proveedores[0]["id"], "mantener", "{m}");
     assert_eq!(
         proveedores[1],

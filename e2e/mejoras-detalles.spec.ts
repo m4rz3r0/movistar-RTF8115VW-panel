@@ -95,6 +95,10 @@ test.describe("Mejoras: detalles de la revisión y de las tarjetas", () => {
     const dialogo = await revisar(page, "Privacidad máxima");
     await expect(dialogo.getByRole("radio", { name: "Cloudflare", exact: true })).toBeChecked();
     await expect(dialogo.getByRole("radio", { name: "Quad9", exact: true })).not.toBeChecked();
+    // El DNS familiar, una opción más con su nota en el formato de siempre.
+    const familiar = dialogo.getByRole("radio", { name: "Cloudflare familiar", exact: true });
+    await expect(familiar).not.toBeChecked();
+    await expect(familiar).toHaveAccessibleDescription(/^Recomendado si .* A favor: .* En contra: /);
     await dialogo.getByRole("button", { name: "Cancelar" }).click();
     await page.unrouteAll({ behavior: "wait" });
     expect(errores, "errores o avisos en la consola").toEqual([]);

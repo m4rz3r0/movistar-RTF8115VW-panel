@@ -115,8 +115,8 @@ y dice, en cada uno, para quién es, qué se gana y qué se pierde:
   consejos sin botón, para lo que el router no deja cambiar desde su web.
 - **Privacidad máxima**: apaga la gestión remota, su aviso, el espejo y el
   envío del registro; reparte a la red de casa unos DNS neutros, con el
-  proveedor a elegir (Quad9, Quad9 sin filtro, DNS4EU, Cloudflare o
-  AdGuard) o, si ya usas unos DNS propios, los mantiene; y, si lo marcas,
+  proveedor a elegir (Quad9, Quad9 sin filtro, DNS4EU, Cloudflare,
+  AdGuard o Cloudflare familiar, que filtra webs para adultos) o, si ya usas unos DNS propios, los mantiene; y, si lo marcas,
   toma la hora de un servidor neutro.
 
 Cada tarjeta dice qué pasos están hechos, cuáles faltan y cuáles no se

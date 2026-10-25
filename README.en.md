@@ -118,8 +118,8 @@ lose:
   for what the router does not let you change from its web interface.
 - **Maximum privacy**: turns off remote management, its check-in, the mirror
   and sending the log; hands out neutral DNS servers to the home network,
-  with a choice of provider (Quad9, Quad9 unfiltered, DNS4EU, Cloudflare or
-  AdGuard) or, if you already use your own DNS servers, keeps them; and, if
+  with a choice of provider (Quad9, Quad9 unfiltered, DNS4EU, Cloudflare,
+  AdGuard or Cloudflare for Families, which filters adult websites) or, if you already use your own DNS servers, keeps them; and, if
   you tick it, takes the time from a neutral server.
 
 Each card says which steps are done, which are left and which could not be

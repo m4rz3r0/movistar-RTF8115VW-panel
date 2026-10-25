@@ -55,6 +55,8 @@ mejoras-dns-cloudflare = Cloudflare
 mejoras-dns-cloudflare-desc = Muy rápido. Es una empresa de Estados Unidos.
 mejoras-dns-adguard = AdGuard
 mejoras-dns-adguard-desc = Bloquea anuncios y rastreadores. Puede romper alguna web.
+mejoras-dns-cloudflare_familiar = Cloudflare familiar
+mejoras-dns-cloudflare_familiar-desc = Recomendado si en casa hay menores y quieres un filtro familiar. A favor: filtra las webs para adultos y el malware en todos los dispositivos de casa, sin instalar nada. En contra: filtra para todos, incluidos los adultos; se salta cambiando el DNS del dispositivo, y Cloudflare ve las consultas.
 mejoras-dns-elegir = Servicio de DNS para la red de casa
 
 ## Estado de los lotes y su revisión

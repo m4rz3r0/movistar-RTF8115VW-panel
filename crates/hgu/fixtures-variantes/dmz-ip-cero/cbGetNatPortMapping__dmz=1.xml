@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Response><cbGetNatPortMapping><rtm_cfg_nat_port_mapping><adm_state>1</adm_state><int_ip_addr>0.0.0.0</int_ip_addr></rtm_cfg_nat_port_mapping><Result>0</Result></cbGetNatPortMapping></Response>

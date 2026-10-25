@@ -98,3 +98,24 @@ async fn revision_sin_proveedor_conocido_usa_quad9() {
     .await;
     assert_eq!(g["proveedor_dns"], "adguard", "{g}");
 }
+
+/// El DNS familiar es un proveedor más: con él en el pool 0, el paso está
+/// hecho, la revisión lo marca y los DNS de casa no salen como desconocidos.
+#[tokio::test]
+async fn dns_familiar_cuenta_como_proveedor() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    dns_del_pool(&p, "1.1.1.3", "1.0.0.3").await;
+    let m = mejoras(&p, &cookie).await;
+    assert_eq!(paso(&m, "privacidad", "dns_casa")["estado"], "Hecho", "{m}");
+    let g = grupo(&p, &cookie, "privacidad", json!({})).await;
+    assert_eq!(del_grupo(&g, "dns_casa")["sin_cambios"], true, "{g}");
+    assert_eq!(g["proveedor_dns"], "cloudflare_familiar", "{g}");
+    let red = crate::comun::leer(&p, &cookie, "red_local").await;
+    let dns = red["elementos"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"] == "dns-casa")
+        .unwrap_or_else(|| panic!("sin dns-casa: {red}"));
+    assert!(dns["recomendacion"].is_null(), "{dns}");
+}

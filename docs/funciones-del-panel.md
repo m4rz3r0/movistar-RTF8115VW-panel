@@ -44,7 +44,7 @@ sus textos en los dos idiomas.
 | Lote | Pasos |
 |---|---|
 | Seguridad recomendada | Gestión remota del operador (TR-069) y su aviso periódico apagados; WPS fuera y WPA2-AES en cada red WiFi; UPnP apagado; dispositivos de la red de invitados aislados entre sí (si está encendida); espejo del tráfico apagado; registro sin envío remoto. Además, consejos sin botón (lo que la API no deja cambiar). |
-| Privacidad máxima | Gestión remota y aviso periódico apagados; espejo apagado; registro sin envío remoto; DNS neutros en la red de casa, con proveedor a elegir (Quad9, Quad9 sin filtro, DNS4EU, Cloudflare o AdGuard) o «Mantener los actuales»: con DNS propios (ni el router ni del operador) el paso ya está hecho («DNS propios») y se mantienen salvo que se elija un proveedor; hora de un servidor neutro (`hora.roa.es`), opcional. |
+| Privacidad máxima | Gestión remota y aviso periódico apagados; espejo apagado; registro sin envío remoto; DNS neutros en la red de casa, con proveedor a elegir (Quad9, Quad9 sin filtro, DNS4EU, Cloudflare, AdGuard o Cloudflare familiar, que filtra webs para adultos y malware) o «Mantener los actuales»: con DNS propios (ni el router ni del operador) el paso ya está hecho («DNS propios») y se mantienen salvo que se elija un proveedor; hora de un servidor neutro (`hora.roa.es`), opcional. |
 
 Los dos ajustes que los lotes necesitan:
 

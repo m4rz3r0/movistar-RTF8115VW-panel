@@ -311,14 +311,16 @@ const dmzTextos = {
   es: {
     dmz: "Dispositivo expuesto (DMZ)",
     desactivada: "Desactivada",
+    titulo: "Control parental",
     parental: "control parental",
-    mejoras: "Ver qué DNS reparte el router en las mejoras",
+    mejoras: "Elegir el DNS familiar en las mejoras",
   },
   en: {
     dmz: "Exposed device (DMZ)",
     desactivada: "Off",
+    titulo: "Parental controls",
     parental: "parental controls",
-    mejoras: "See which DNS the router hands out in the improvements",
+    mejoras: "Choose the family DNS in the improvements",
   },
 } as const;
 
@@ -341,11 +343,15 @@ for (const idioma of ["es", "en"] as const) {
       await expect(dmz).toBeVisible();
       await expect(dmz.locator(".tarjeta-insignia")).toContainText(t.desactivada);
       sinApi(await dmz.innerText());
-      const nota = page.locator(".tema-nota");
+      // Una región con nombre: su encabezado.
+      const nota = page.getByRole("region", { name: t.titulo, exact: true });
+      await expect(nota).toHaveClass(/tema-nota/);
       await expect(nota).toContainText(t.parental);
       const enlace = nota.getByRole("link", { name: t.mejoras });
       await expect(enlace).toHaveAttribute("href", "/mejoras");
       await expect(enlace).toHaveClass(/b-txt/);
+      // Se distingue del texto sin pasar el ratón: subrayado.
+      await expect(enlace).toHaveCSS("text-decoration-line", "underline");
       await sinDesbordamiento(page, `dmz ${idioma} 360`);
       await enlace.click();
       await page.waitForURL((u) => u.pathname === "/mejoras");
