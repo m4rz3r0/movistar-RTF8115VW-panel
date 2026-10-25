@@ -14,6 +14,7 @@
 use crate::instalar::lecturas_de_partida;
 use crate::lecturas::Clave;
 use crate::state::AppState;
+use ajustes::Ajuste;
 use hgu::xml::XmlNode;
 use std::collections::BTreeMap;
 
@@ -119,6 +120,18 @@ fn id_param<'a>(state: &'a AppState, nombre: &str) -> Option<&'a str> {
         .map(|l| l.id_param.as_str())
 }
 
+/// ¿Se deja `a` fuera de la foto? La foto guarda un nodo por función, así
+/// que una lista que lee con un filtro la misma función que otra lista lee
+/// sin él (la DMZ, con `dmz=1`, frente a las reglas de puertos) mezclaría
+/// sus instancias con las de la otra: ni se lee para la foto ni se compara.
+pub fn fuera_de_la_foto(ajustes: &[Ajuste], a: &Ajuste) -> bool {
+    a.lista
+        && !a.leer.params.is_empty()
+        && ajustes.iter().any(|b| {
+            b.id != a.id && b.lista && b.leer.funcion == a.leer.funcion && b.leer.params.is_empty()
+        })
+}
+
 /// Lee la foto de partida del router de `state` (ver el módulo). Quien la
 /// toma de verdad (el asistente) pausa antes el sondeo.
 pub async fn leer_partida(state: &AppState) -> FotoLeida {
@@ -145,7 +158,7 @@ pub async fn leer_partida(state: &AppState) -> FotoLeida {
     }
     for a in state.ajustes.todos() {
         let clave = crate::ajustes_router::servidor::clave(a);
-        if hechas.contains(&clave) {
+        if hechas.contains(&clave) || fuera_de_la_foto(state.ajustes.todos(), a) {
             continue;
         }
         // Nunca una función que el catálogo bloquea (o no conoce), aunque
@@ -215,6 +228,20 @@ mod tests {
             text: String::new(),
             children,
         }
+    }
+
+    /// La DMZ lee con un filtro la función de las reglas de puertos: queda
+    /// fuera de la foto. Las reglas, el pool de casa y la WiFi, no.
+    #[test]
+    fn la_dmz_queda_fuera_de_la_foto() {
+        let cat = ajustes::CatalogoAjustes::load().unwrap();
+        let todos = cat.todos();
+        let fuera: Vec<&str> = todos
+            .iter()
+            .filter(|a| fuera_de_la_foto(todos, a))
+            .map(|a| a.id.as_str())
+            .collect();
+        assert_eq!(fuera, ["puertos.dmz"]);
     }
 
     /// Una segunda lectura de la misma función añade sus instancias, sin

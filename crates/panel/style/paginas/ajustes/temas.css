@@ -54,3 +54,21 @@
 .tema-desc + .aviso {
   max-width: 880px;
 }
+
+/* Nota al pie de un tema (en Puertos, el control parental). */
+.tema-nota {
+  max-width: 880px;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--borde);
+  color: var(--suave);
+}
+
+.tema-nota ul {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+}
+
+.tema-nota li + li {
+  margin-top: 0.4rem;
+}

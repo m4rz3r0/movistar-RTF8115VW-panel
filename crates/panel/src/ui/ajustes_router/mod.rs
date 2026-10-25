@@ -25,6 +25,7 @@ mod dispositivos;
 mod edicion;
 mod foto;
 mod lista;
+mod nota_tema;
 mod piezas;
 mod puertos;
 mod rejilla;
@@ -420,9 +421,11 @@ pub fn PaginaTema() -> impl IntoView {
                     match datos.await {
                         Ok(Some(p)) => {
                             let intro = introduccion(&p.tema, p.foto_de_partida, p.solo_lectura);
+                            let nota = nota_tema::nota_tema(&p.tema);
                             view! {
                                 {intro}
                                 <ContenidoRejilla p volver_a_leer elemento />
+                                {nota}
                             }
                                 .into_any()
                         }

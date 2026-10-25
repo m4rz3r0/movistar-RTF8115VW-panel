@@ -9,6 +9,7 @@
 //! de la franja de resumen.
 
 mod internet;
+mod puertos;
 mod seguridad;
 mod sistema;
 mod telefono;
@@ -227,13 +228,17 @@ pub(super) fn dispositivos(ctx: &Contexto, e: &Elemento) -> Vec<Option<String>> 
     wifi::dispositivos(ctx, e)
 }
 
-/// Recomendación que no sale de un campo del elemento: en la red de
-/// invitados, si alguna red de invitados encendida no está separada de la
-/// red de casa (solo informa).
+/// Recomendación que no sale de un campo del elemento (las dos solo
+/// informan): en la red de invitados, si alguna red de invitados encendida
+/// no está separada de la red de casa; en la DMZ, si está activa.
 pub(super) fn recomendacion_propia(ctx: &Contexto, e: &Elemento) -> Option<RecomendacionVista> {
-    (e.papel.as_deref() == Some("invitados"))
-        .then(|| wifi::invitada_sin_separar(ctx))
-        .flatten()
+    if e.papel.as_deref() == Some("invitados") {
+        wifi::invitada_sin_separar(ctx)
+    } else if e.estado.as_deref() == Some("derivado:estado_dmz") {
+        puertos::dmz_activa(ctx)
+    } else {
+        None
+    }
 }
 
 /// Nota del pie de un elemento, ya traducida.
@@ -294,6 +299,7 @@ pub(super) fn estado(
         "estado_paso_directo" => Ok(telefono::estado_paso_directo(ctx)),
         "estado_hora" => Ok(sistema::estado_hora(ctx)),
         "estado_diagnostico" => Ok(sistema::estado_diagnostico(ctx)),
+        "estado_dmz" => Ok(puertos::estado_dmz(ctx)),
         "segun_lo_recomendado" => Ok(segun_lo_recomendado(ctx, e)),
         otro => Err(Desconocido(otro.to_owned())),
     }

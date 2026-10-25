@@ -221,9 +221,9 @@ fn elemento(
         recomendacion = r;
         a
     });
-    // Una red de invitados sin separar de la de casa pesa más que lo que
-    // recomienden los campos de la tarjeta (es un riesgo y el panel no
-    // puede cambiarlo): solo informa.
+    // Una red de invitados sin separar de la de casa, o la DMZ activa, pesa
+    // más que lo que recomienden los campos de la tarjeta (es un riesgo y
+    // el panel no puede cambiarlo): solo informa.
     if let Some(r) = derivados::recomendacion_propia(ctx, e).filter(|_| leido) {
         recomendacion = Some(r);
     }

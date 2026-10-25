@@ -84,3 +84,13 @@ ajuste-puertos-alg-pptp = Redes privadas (PPTP)
 ajuste-puertos-alg-pptp-desc = Deja que los ordenadores de tu red se conecten a redes privadas (VPN) antiguas de tipo PPTP.
 ajuste-puertos-alg-h323 = Videoconferencia (H.323)
 ajuste-puertos-alg-h323-desc = Hace que funcionen los equipos de videoconferencia antiguos que usan H.323.
+
+## Dispositivo expuesto (DMZ), solo de lectura
+ajuste-puertos-dmz-titulo = Dispositivo expuesto (DMZ)
+ajuste-puertos-dmz-desc = Un dispositivo de tu casa que recibe todo lo que llega de internet sin una regla de puertos.
+ajuste-puertos-dmz-ayuda = Con la DMZ activa, el router manda a ese dispositivo todo lo que llega de internet y no tiene una regla propia: queda expuesto como si no hubiera router delante. A veces se usa con una consola o con un router propio detrás de este. Aquí ves si está activa y hacia qué dispositivo.
+ajuste-puertos-dmz-motivo = El panel no puede cambiar la DMZ: hazlo desde la web del router.
+ajuste-puertos-dmz-equipo = Dispositivo (IP)
+ajuste-puertos-dmz-equipo-desc = La dirección IP del dispositivo que recibe todo lo que llega de internet.
+ajuste-puertos-dmz-activa = Activa
+ajuste-puertos-dmz-activa-desc = Si está activa, ese dispositivo recibe todo lo que llega de internet sin una regla.

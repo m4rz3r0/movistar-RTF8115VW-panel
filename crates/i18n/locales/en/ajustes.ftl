@@ -324,6 +324,8 @@ ajustes-estado-hora-si = Automatic
 ajustes-estado-hora-no = Not corrected
 ajustes-estado-diagnostico-si = Copying traffic
 ajustes-estado-diagnostico-no = Off
+ajustes-estado-dmz-activa = On
+ajustes-estado-dmz-desactivada = Off
 ajustes-dato-nombres_ddns = Names
 ajustes-dato-nombres_ddns-ninguno = None
 ajustes-dato-cuentas = Accounts
@@ -412,3 +414,12 @@ ajuste-accion-desactivar_rele-titulo = DNS relay, turn it off
 ajuste-accion-encender_voz-titulo = Internet phone, turn it on
 ajuste-accion-apagar_voz-titulo = Internet phone, turn it off
 ajustes-problema-sistema-servidor_2 = The backup server is { $valor }: it depends on whoever runs that server.
+
+## DMZ and parental controls (Ports)
+ajustes-problema-puertos-dmz = Everything that arrives from the internet goes to { $ip }: that device is exposed as if there were no router in front of it.
+ajustes-problema-puertos-dmz-sin-ip = Everything that arrives from the internet goes to a device in your home: it is exposed as if there were no router in front of it.
+ajustes-puertos-dmz-recomendado = Recommended if that device is not your own router that protects itself: turn the DMZ off from the router's web page and open only the ports it needs; the panel can't do it yet. Pros: the device stops receiving everything from the internet and only what you decide stays open. Cons: whatever relied on the DMZ, such as a console or a server, may stop working until you open its ports.
+ajustes-puertos-parental = This router has no parental controls: no connection schedules and no website filter. If you need to limit what can be reached from home, there are two ways:
+ajustes-puertos-parental-dns = A DNS service with a family filter, set as the home network's DNS. Recommended if blocking adult or dangerous websites is enough. Pros: nothing to buy and it takes a moment to change. Cons: it sets no schedules, and a device with a different DNS configured gets around it.
+ajustes-puertos-parental-router = Your own router behind this one. Recommended if you want schedules and limits per device. Pros: it does all of that, usually with its own app. Cons: you have to buy it and set it up.
+ajustes-puertos-parental-enlace = See which DNS the router hands out in the improvements

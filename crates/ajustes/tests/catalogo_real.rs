@@ -370,10 +370,13 @@ fn valores_del_fichero(ruta: &PathBuf) -> Vec<(String, String)> {
 ///   inglesas de uso diario («Network name», «Protocol») que el cortafuegos
 ///   lee con ese nombre (`Name`, `Protocol`, `Version`, `Action`);
 /// - «MTU»: el nombre del dato, en mayúsculas como se escribe (la conexión a
-///   internet lo lee como `mtu`).
-const FORMAS_CORRIENTES: [&str; 16] = [
+///   internet lo lee como `mtu`);
+/// - «DMZ»: el nombre corriente de la función, en mayúsculas como se escribe
+///   (Puertos la lee con el parámetro `dmz`).
+const FORMAS_CORRIENTES: [&str; 17] = [
     "account",
     "Account",
+    "DMZ",
     "action",
     "all",
     "All",

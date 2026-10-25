@@ -265,12 +265,14 @@ fn diferencias(
 }
 
 /// Ajustes que se comparan: los que tienen campos (no los dispositivos
-/// conectados ni el enlace a la contraseña del router), por temas.
+/// conectados ni el enlace a la contraseña del router) y están en la foto
+/// (no la DMZ, ver [`fotos::fuera_de_la_foto`]), por temas.
 fn comparables(state: &AppState) -> Vec<&Ajuste> {
+    let todos = state.ajustes.todos();
     Tema::TODOS
         .into_iter()
         .flat_map(|t| state.ajustes.por_tema(t))
-        .filter(|a| !a.campos.is_empty())
+        .filter(|a| !a.campos.is_empty() && !fotos::fuera_de_la_foto(todos, a))
         .collect()
 }
 

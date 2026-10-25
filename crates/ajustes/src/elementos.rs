@@ -31,6 +31,7 @@ pub const DERIVADOS_ESTADO: &[&str] = &[
     "estado_paso_directo",
     "estado_hora",
     "estado_diagnostico",
+    "estado_dmz",
     "segun_lo_recomendado",
 ];
 

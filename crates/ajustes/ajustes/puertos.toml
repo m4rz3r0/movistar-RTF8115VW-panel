@@ -115,6 +115,29 @@ lee = "h323_enable"
 tipo = "booleano"
 solo_lectura = "ajuste-puertos-alg-motivo"
 
+# DMZ (fase 3), solo de lectura: el equipo que recibe todo lo que llega de
+# internet sin regla. El router real del usuario no tiene DMZ, así que el
+# formato de una DMZ activa es una suposición: cualquier respuesta con
+# instancias se da por activa (`derivado:estado_dmz`).
+[[ajuste]]
+id = "puertos.dmz"
+tema = "puertos"
+nivel = "avanzado"
+lista = true
+leer = { funcion = "cbGetNatPortMapping", params = { dmz = "1" } }
+
+[[ajuste.campo]]
+id = "equipo"
+lee = "int_ip_addr"
+tipo = "ip"
+solo_lectura = "ajuste-puertos-dmz-motivo"
+
+[[ajuste.campo]]
+id = "activa"
+lee = "adm_state"
+tipo = "booleano"
+solo_lectura = "ajuste-puertos-dmz-motivo"
+
 # Encima de la lista de reglas, una tarjeta por ajuste que no es lista
 # (spec §4.2); las reglas son los elementos de la lista.
 [[elemento]]
@@ -124,6 +147,15 @@ ajustes = ["puertos.upnp"]
 icono = "puerta"
 interruptor = "puertos.upnp.activo"
 estado = "derivado:segun_lo_recomendado"
+
+# Estado: desactivada (gris) o activa (en ámbar, con una recomendación que
+# solo informa).
+[[elemento]]
+id = "dmz"
+tema = "puertos"
+ajustes = ["puertos.dmz"]
+icono = "puerta"
+estado = "derivado:estado_dmz"
 
 [[elemento]]
 id = "alg"

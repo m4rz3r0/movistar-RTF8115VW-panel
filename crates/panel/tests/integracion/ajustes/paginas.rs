@@ -59,10 +59,12 @@ fn parametros_del_catalogo() -> Vec<String> {
 }
 
 /// Palabras corrientes que también son parámetros (las mismas que deja
-/// pasar `ajustes::catalogo_real`).
-const FORMAS_CORRIENTES: [&str; 9] = [
+/// pasar `ajustes::catalogo_real`; «DMZ», el nombre corriente de la
+/// función, que Puertos lee con el parámetro `dmz`).
+const FORMAS_CORRIENTES: [&str; 10] = [
     "account",
     "Account",
+    "DMZ",
     "all",
     "All",
     "beamforming",

@@ -3,7 +3,7 @@
 
 mod partida;
 
-pub use partida::{FotoLeida, juntar, leer_partida};
+pub use partida::{FotoLeida, fuera_de_la_foto, juntar, leer_partida};
 
 use crate::crypto::HistoryKey;
 use sqlx::SqlitePool;
