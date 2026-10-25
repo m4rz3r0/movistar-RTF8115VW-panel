@@ -119,18 +119,15 @@ impl ChangeManager {
     /// entera: la regla «sin ping» del cortafuegos se escribe aunque su
     /// función esté bloqueada, solo con su carga exacta o con la baja de
     /// una regla por su RID (las guardas de `especiales::cortafuegos` miran
-    /// después su huella). Cualquier otra petición, como siempre.
+    /// después su huella). La exención salta solo el bloqueo del catálogo
+    /// de la función: el resto de guardas se comprueba siempre. Cualquier
+    /// otra petición, como siempre.
     pub(in crate::changes) fn funcion_escribible_para(
         &self,
         req: &ChangeRequest,
     ) -> Result<&Funcion, CambioError> {
-        match self.funcion_escribible(&req.funcion) {
-            Err(CambioError::Bloqueada(m)) => match self.state.catalogo.funcion(&req.funcion) {
-                Some(f) if exento_de_bloqueo(req) => Ok(f),
-                _ => Err(CambioError::Bloqueada(m)),
-            },
-            r => r,
-        }
+        let f = self.funcion_del_catalogo(&req.funcion)?;
+        crate::changes::router::guardas(f, f.bloqueada.is_some() && exento_de_bloqueo(req))
     }
 
     /// Los filtros del router; si no se pueden leer, `Router`.
@@ -393,5 +390,26 @@ mod tests {
                 ("escape".to_owned(), "true".to_owned())
             ]
         );
+    }
+
+    /// La exención salta solo el bloqueo del catálogo: las demás guardas
+    /// (aquí, que sea una lectura) se comprueban igual.
+    #[test]
+    fn exento_no_salta_las_demas_guardas() {
+        let cat = catalogo::Catalogo::load().unwrap();
+        let alta = cat.funcion(ALTA).unwrap();
+        assert!(alta.bloqueada.is_some());
+        let guardas = crate::changes::router::guardas;
+        assert!(matches!(
+            guardas(alta, false),
+            Err(CambioError::Bloqueada(_))
+        ));
+        assert!(guardas(alta, true).is_ok());
+        let mut lectura = alta.clone();
+        lectura.tipo = Tipo::Lectura;
+        assert!(matches!(
+            guardas(&lectura, true),
+            Err(CambioError::Invalida(_))
+        ));
     }
 }

@@ -22,15 +22,20 @@ pub(super) fn estado_gestion_remota(ctx: &Contexto) -> (EstadoVisual, String) {
 }
 
 /// `derivado:estado_cortafuegos`: si el router responde al ping desde
-/// internet (en ámbar) o no (la regla del panel está puesta o nada lo
-/// abre).
+/// internet, por versión (en ámbar), si solo está la regla del panel (de
+/// IPv4, sin afirmar su efecto) o si nada lo abre.
 pub(super) fn estado_cortafuegos(ctx: &Contexto) -> (EstadoVisual, String) {
-    segun(
-        super::super::cortafuegos::filtros(ctx)
-            .map(|f| super::super::cortafuegos::responde_al_ping(&f)),
-        (EstadoVisual::Atencion, "ajustes-estado-cortafuegos-ping"),
-        (EstadoVisual::Emite, "ajustes-estado-cortafuegos-sin-ping"),
-    )
+    use super::super::cortafuegos as cf;
+    match cf::filtros(ctx) {
+        Some(f) => {
+            let (estado, clave) = cf::estado(cf::ping(&f));
+            (estado, clave.to_owned())
+        }
+        None => (
+            EstadoVisual::Atencion,
+            "ajustes-estado-desconocido".to_owned(),
+        ),
+    }
 }
 
 /// Cuántas cuentas tiene la web del router.

@@ -224,3 +224,65 @@ async fn sin_ping_ya_puesta_409() {
     assert!(body.contains("ya puesta"), "{body}");
     assert_eq!(escrituras(&p).len(), 1);
 }
+
+/// Con la regla del panel puesta (solo IPv4) y el ping de IPv6 abierto, la
+/// tarjeta no dice que el router no responde: sigue en ámbar por IPv6 y el
+/// motivo no afirma el efecto de la regla.
+#[tokio::test]
+async fn sin_ping_puesta_con_ipv6_abierto_no_afirma_el_efecto() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    aplicar_sin_ping(&p, &cookie).await;
+    let e = elemento(&p, &cookie, "cortafuegos").await;
+    assert_eq!(e["estado"], "atencion", "{e}");
+    assert_eq!(e["texto_estado"], "Responde al ping por IPv6", "{e}");
+    let motivo = e["accion_propia"]["motivo"].as_str().unwrap_or_default();
+    assert!(motivo.contains("IPv4"), "{e}");
+    assert!(!motivo.contains("no contesta"), "{e}");
+    let problema = e["recomendacion"]["problema"].as_str().unwrap_or_default();
+    assert!(problema.contains("por IPv6"), "{e}");
+}
+
+/// Sin la regla y con los dos abiertos, «Responde al ping» a secas.
+#[tokio::test]
+async fn sin_regla_responde_al_ping_por_las_dos() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    let e = elemento(&p, &cookie, "cortafuegos").await;
+    assert_eq!(e["texto_estado"], "Responde al ping", "{e}");
+}
+
+/// La recomendación informativa nombra la web, el SSH y la gestión remota
+/// del operador abiertos solo desde redes concretas y, si una regla los
+/// abre a cualquiera, desde cualquier sitio.
+#[tokio::test]
+async fn recomendacion_con_la_web_y_el_ssh_abiertos() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    let e = elemento(&p, &cookie, "cortafuegos").await;
+    let problema = e["recomendacion"]["problema"].as_str().unwrap_or_default();
+    assert!(
+        problema.contains(
+            "Abierto solo desde redes concretas: la web del router, el SSH y la gestión remota del operador."
+        ),
+        "{e}"
+    );
+    assert!(!problema.contains("Abierto desde cualquier sitio"), "{e}");
+    // El SSH de la regla 0, abierto a cualquiera.
+    let mut ssh = p.sim.control.cortafuegos()[0].reglas[0].clone();
+    assert_eq!(ssh.rid, "0");
+    ssh.orig_addr = "0.0.0.0".into();
+    p.sim.control.cortafuegos_sustituir("0", "0", ssh);
+    p.state.lecturas.invalidar();
+    let e = elemento(&p, &cookie, "cortafuegos").await;
+    let problema = e["recomendacion"]["problema"].as_str().unwrap_or_default();
+    assert!(
+        problema.contains("Abierto desde cualquier sitio de internet: el SSH."),
+        "{e}"
+    );
+    assert!(
+        problema.contains(
+            "Abierto solo desde redes concretas: la web del router y la gestión remota del operador."
+        ),
+        "{e}"
+    );
+    let texto = e["recomendacion"]["texto"].as_str().unwrap_or_default();
+    assert!(texto.contains("pedir al operador"), "{e}");
+}

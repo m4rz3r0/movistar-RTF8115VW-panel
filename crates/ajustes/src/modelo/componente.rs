@@ -127,6 +127,12 @@ impl Componente {
                 "ya-puesta",
                 "sin-leer",
                 "sin-filtro",
+                "revisar-recomendado",
+                "servicio-ping",
+                "servicio-web",
+                "servicio-ssh",
+                "servicio-gestion",
+                "y",
             ],
         }
     }

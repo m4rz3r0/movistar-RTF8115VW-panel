@@ -5,32 +5,15 @@ use super::*;
 
 impl ChangeManager {
     pub(super) fn funcion_escribible(&self, nombre: &str) -> Result<&Funcion, CambioError> {
-        let f = self
-            .state
+        guardas(self.funcion_del_catalogo(nombre)?, false)
+    }
+
+    /// La función `nombre` del catálogo; `Invalida` si no está.
+    pub(super) fn funcion_del_catalogo(&self, nombre: &str) -> Result<&Funcion, CambioError> {
+        self.state
             .catalogo
             .funcion(nombre)
-            .ok_or_else(|| CambioError::Invalida(format!("función desconocida: {nombre}")))?;
-        if let Some(m) = &f.bloqueada {
-            return Err(CambioError::Bloqueada(m.clone()));
-        }
-        if f.tipo == Tipo::Lectura {
-            return Err(CambioError::Invalida(format!("{nombre} es una lectura")));
-        }
-        if f.pagina.is_none() {
-            return Err(CambioError::Invalida(format!("{nombre}: sin página")));
-        }
-        if CAMBIAN_IP_LAN.contains(&f.name.as_str()) {
-            return Err(CambioError::Bloqueada(BLOQUEO_IP_LAN.into()));
-        }
-        let basica = f.origen == catalogo::Origen::Basica || !f.name.starts_with("cb");
-        if basica
-            && f.parametros
-                .iter()
-                .any(|p| p.tipo == catalogo::TipoParam::Secret)
-        {
-            return Err(CambioError::Bloqueada(BLOQUEO_SECRETOS_BASICA.into()));
-        }
-        Ok(f)
+            .ok_or_else(|| CambioError::Invalida(format!("función desconocida: {nombre}")))
     }
 
     /// `explicito`: valores exactos (reversión/deshacer; ver [`componer`]).
@@ -405,6 +388,33 @@ pub(super) fn identidad_cambiada<'a>(
                 .is_some_and(|a| a.trim().eq_ignore_ascii_case(v.trim()))
         })
         .map(|(k, _)| k.as_str())
+}
+
+/// Las guardas de escritura de `f`. `exento` salta solo su bloqueo del
+/// catálogo (`f.bloqueada`): las demás se comprueban siempre.
+pub(super) fn guardas(f: &Funcion, exento: bool) -> Result<&Funcion, CambioError> {
+    let nombre = &f.name;
+    if let Some(m) = f.bloqueada.as_ref().filter(|_| !exento) {
+        return Err(CambioError::Bloqueada(m.clone()));
+    }
+    if f.tipo == Tipo::Lectura {
+        return Err(CambioError::Invalida(format!("{nombre} es una lectura")));
+    }
+    if f.pagina.is_none() {
+        return Err(CambioError::Invalida(format!("{nombre}: sin página")));
+    }
+    if CAMBIAN_IP_LAN.contains(&f.name.as_str()) {
+        return Err(CambioError::Bloqueada(BLOQUEO_IP_LAN.into()));
+    }
+    let basica = f.origen == catalogo::Origen::Basica || !f.name.starts_with("cb");
+    if basica
+        && f.parametros
+            .iter()
+            .any(|p| p.tipo == catalogo::TipoParam::Secret)
+    {
+        return Err(CambioError::Bloqueada(BLOQUEO_SECRETOS_BASICA.into()));
+    }
+    Ok(f)
 }
 
 #[cfg(test)]

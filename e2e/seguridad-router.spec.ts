@@ -135,7 +135,7 @@ test.describe("cortafuegos", () => {
       await sinDesbordamiento(page, `cortafuegos ${ancho}`);
       expect(await violacionesGraves(page), `cortafuegos ${ancho}`).toEqual([]);
 
-      // Aplicar: el diálogo de revisión y, hecho, la regla 17 y el motivo.
+      // Aplicar: el diálogo de revisión y, hecho, la fila 17 (la regla RID 16) y el motivo.
       await page.getByRole("button", { name: t.sinPing, exact: true }).click();
       await expect(page.locator("dialog[open] #grupo-titulo")).toHaveText("Revisa el cambio");
       expect(await violacionesGraves(page), `diálogo sin ping ${ancho}`).toEqual([]);
