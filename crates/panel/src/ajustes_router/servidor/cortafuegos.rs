@@ -112,7 +112,7 @@ fn nombre(s: Servicio) -> String {
 }
 
 /// «a», «a y b», «a, b y c».
-fn enumerar(nombres: &[String]) -> String {
+pub(super) fn enumerar(nombres: &[String]) -> String {
     match nombres {
         [] => String::new(),
         [uno] => uno.clone(),

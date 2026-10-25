@@ -32,8 +32,11 @@ ajuste-wifi-red_24-wps-recomendado = Recommended if you connect your devices by 
 
 ## 2.4 GHz WiFi network: more options
 ajuste-wifi-red_24_avanzado-titulo = 2.4 GHz WiFi network: more options
-ajuste-wifi-red_24_avanzado-desc = Less common options of the 2.4 GHz network: isolation between devices, traffic priority and device limit.
+ajuste-wifi-red_24_avanzado-desc = Less common options of the 2.4 GHz network: isolation between devices, traffic priority, device limit and group key renewal. It also shows, without changing them, whether it is separated from the home network, management frame protection and the WPS lock.
 ajuste-wifi-red_24_avanzado-ayuda = The factory values work well in almost every home. Only change them if you know why: a change here can stop some devices from connecting or from doing things like casting to the TV.
+ajuste-wifi-red_24_avanzado-separada = Separated from the home network
+ajuste-wifi-red_24_avanzado-separada-desc = If on, devices on this network reach the internet but not the devices on your home network. On a main network it is normally off: it is your home network.
+ajuste-wifi-red_24_avanzado-separada-motivo = The panel does not yet know how to change it: it only shows it.
 ajuste-wifi-red_24_avanzado-aislamiento = Isolate devices from each other
 ajuste-wifi-red_24_avanzado-aislamiento-desc = Devices connected to this network over WiFi cannot see each other: for example, you will not be able to cast to a TV on the same WiFi. They can usually still reach the internet and devices connected by cable.
 ajuste-wifi-red_24_avanzado-aislamiento-recomendado = Recommended if this is your home network and your devices need to see each other. Pros: you can print, cast to the TV or use speakers over WiFi. Cons: if a device on this network gets infected, it can reach the others.
@@ -42,6 +45,22 @@ ajuste-wifi-red_24_avanzado-wmm-desc = Gives calls and video priority over downl
 ajuste-wifi-red_24_avanzado-wmm-recomendado = Recommended if you want the WiFi to run at full speed, as in almost every home. Pros: current devices reach their speed (without WMM they are stuck at 54 Mbit/s at most), and calls and video go ahead of downloads. Cons: none significant for most people.
 ajuste-wifi-red_24_avanzado-max_clientes = Maximum devices
 ajuste-wifi-red_24_avanzado-max_clientes-desc = How many devices can be connected to this network at once, from 1 to 64. Once the limit is reached, the next ones cannot connect.
+ajuste-wifi-red_24_avanzado-pmf = Management frame protection (PMF)
+ajuste-wifi-red_24_avanzado-pmf-desc = Protects the WiFi control messages, such as the order to disconnect, so that no one outside can kick your devices off the network. Some old devices do not connect if it is mandatory.
+ajuste-wifi-red_24_avanzado-pmf-desactivada = Off
+ajuste-wifi-red_24_avanzado-pmf-desactivada-desc = WiFi control messages travel unprotected, as on almost every WPA2 network.
+ajuste-wifi-red_24_avanzado-pmf-motivo = The panel does not change it yet: it still has to check which values this router accepts.
+ajuste-wifi-red_24_avanzado-wps_bloqueo = WPS locked
+ajuste-wifi-red_24_avanzado-wps_bloqueo-desc = If on, the router does not accept the WPS PIN code of this network. Routers usually lock it on their own after several failed attempts.
+ajuste-wifi-red_24_avanzado-wps_bloqueo-motivo = The router decides it: the panel only shows it.
+ajuste-wifi-red_24_avanzado-renovacion_clave = Group key renewal
+ajuste-wifi-red_24_avanzado-renovacion_clave-desc = How often the router changes the key that all devices on the network share for messages sent to everyone at once. Devices get the new one on their own, without disconnecting.
+ajuste-wifi-red_24_avanzado-renovacion_clave-nunca = Never
+ajuste-wifi-red_24_avanzado-renovacion_clave-nunca-desc = The same key lasts as long as the network stays on.
+ajuste-wifi-red_24_avanzado-renovacion_clave-hora = Every hour
+ajuste-wifi-red_24_avanzado-renovacion_clave-hora-desc = The router changes it every hour: if someone managed to get it, it would be useful only for a short time.
+ajuste-wifi-red_24_avanzado-renovacion_clave-dia = Every day
+ajuste-wifi-red_24_avanzado-renovacion_clave-dia-desc = The router changes it once a day.
 
 ## 5 GHz WiFi network
 ajuste-wifi-red_5-titulo = 5 GHz WiFi network
@@ -72,8 +91,11 @@ ajuste-wifi-red_5-wps-recomendado = Recommended if you connect your devices by t
 
 ## 5 GHz WiFi network: more options
 ajuste-wifi-red_5_avanzado-titulo = 5 GHz WiFi network: more options
-ajuste-wifi-red_5_avanzado-desc = Less common options of the 5 GHz network: isolation between devices, traffic priority and device limit.
+ajuste-wifi-red_5_avanzado-desc = Less common options of the 5 GHz network: isolation between devices, traffic priority, device limit and group key renewal. It also shows, without changing them, whether it is separated from the home network, management frame protection and the WPS lock.
 ajuste-wifi-red_5_avanzado-ayuda = The factory values work well in almost every home. Only change them if you know why: a change here can stop some devices from connecting or from doing things like casting to the TV.
+ajuste-wifi-red_5_avanzado-separada = Separated from the home network
+ajuste-wifi-red_5_avanzado-separada-desc = If on, devices on this network reach the internet but not the devices on your home network. On a main network it is normally off: it is your home network.
+ajuste-wifi-red_5_avanzado-separada-motivo = The panel does not yet know how to change it: it only shows it.
 ajuste-wifi-red_5_avanzado-aislamiento = Isolate devices from each other
 ajuste-wifi-red_5_avanzado-aislamiento-desc = Devices connected to this network over WiFi cannot see each other: for example, you will not be able to cast to a TV on the same WiFi. They can usually still reach the internet and devices connected by cable.
 ajuste-wifi-red_5_avanzado-aislamiento-recomendado = Recommended if this is your home network and your devices need to see each other. Pros: you can print, cast to the TV or use speakers over WiFi. Cons: if a device on this network gets infected, it can reach the others.
@@ -82,6 +104,22 @@ ajuste-wifi-red_5_avanzado-wmm-desc = Gives calls and video priority over downlo
 ajuste-wifi-red_5_avanzado-wmm-recomendado = Recommended if you want the WiFi to run at full speed, as in almost every home. Pros: current devices reach their speed (without WMM they are stuck at 54 Mbit/s at most), and calls and video go ahead of downloads. Cons: none significant for most people.
 ajuste-wifi-red_5_avanzado-max_clientes = Maximum devices
 ajuste-wifi-red_5_avanzado-max_clientes-desc = How many devices can be connected to this network at once, from 1 to 64. Once the limit is reached, the next ones cannot connect.
+ajuste-wifi-red_5_avanzado-pmf = Management frame protection (PMF)
+ajuste-wifi-red_5_avanzado-pmf-desc = Protects the WiFi control messages, such as the order to disconnect, so that no one outside can kick your devices off the network. Some old devices do not connect if it is mandatory.
+ajuste-wifi-red_5_avanzado-pmf-desactivada = Off
+ajuste-wifi-red_5_avanzado-pmf-desactivada-desc = WiFi control messages travel unprotected, as on almost every WPA2 network.
+ajuste-wifi-red_5_avanzado-pmf-motivo = The panel does not change it yet: it still has to check which values this router accepts.
+ajuste-wifi-red_5_avanzado-wps_bloqueo = WPS locked
+ajuste-wifi-red_5_avanzado-wps_bloqueo-desc = If on, the router does not accept the WPS PIN code of this network. Routers usually lock it on their own after several failed attempts.
+ajuste-wifi-red_5_avanzado-wps_bloqueo-motivo = The router decides it: the panel only shows it.
+ajuste-wifi-red_5_avanzado-renovacion_clave = Group key renewal
+ajuste-wifi-red_5_avanzado-renovacion_clave-desc = How often the router changes the key that all devices on the network share for messages sent to everyone at once. Devices get the new one on their own, without disconnecting.
+ajuste-wifi-red_5_avanzado-renovacion_clave-nunca = Never
+ajuste-wifi-red_5_avanzado-renovacion_clave-nunca-desc = The same key lasts as long as the network stays on.
+ajuste-wifi-red_5_avanzado-renovacion_clave-hora = Every hour
+ajuste-wifi-red_5_avanzado-renovacion_clave-hora-desc = The router changes it every hour: if someone managed to get it, it would be useful only for a short time.
+ajuste-wifi-red_5_avanzado-renovacion_clave-dia = Every day
+ajuste-wifi-red_5_avanzado-renovacion_clave-dia-desc = The router changes it once a day.
 
 ## Guest network
 ajuste-wifi-invitados-titulo = Guest network
@@ -112,7 +150,7 @@ ajuste-wifi-invitados-wps-recomendado = Recommended if you connect your devices 
 
 ## Guest network: more options
 ajuste-wifi-invitados_avanzado-titulo = Guest network: more options
-ajuste-wifi-invitados_avanzado-desc = Less common options of the guest network: whether it is separated from the home network, isolation between devices, traffic priority and device limit.
+ajuste-wifi-invitados_avanzado-desc = Less common options of the guest network: isolation between devices, traffic priority, device limit and group key renewal. It also shows, without changing them, whether it is separated from the home network, management frame protection and the WPS lock.
 ajuste-wifi-invitados_avanzado-ayuda = The factory values work well in almost every home. Only change them if you know why: a change here can stop some devices from connecting or from doing things like casting to the TV.
 ajuste-wifi-invitados_avanzado-separada = Separated from the home network
 ajuste-wifi-invitados_avanzado-separada-desc = If on, devices on the guest network reach the internet but not the devices on your home network.
@@ -125,6 +163,22 @@ ajuste-wifi-invitados_avanzado-wmm-desc = Gives calls and video priority over do
 ajuste-wifi-invitados_avanzado-wmm-recomendado = Recommended if you want the WiFi to run at full speed, as in almost every home. Pros: current devices reach their speed (without WMM they are stuck at 54 Mbit/s at most), and calls and video go ahead of downloads. Cons: none significant for most people.
 ajuste-wifi-invitados_avanzado-max_clientes = Maximum devices
 ajuste-wifi-invitados_avanzado-max_clientes-desc = How many devices can be connected to this network at once, from 1 to 64. Once the limit is reached, the next ones cannot connect.
+ajuste-wifi-invitados_avanzado-pmf = Management frame protection (PMF)
+ajuste-wifi-invitados_avanzado-pmf-desc = Protects the WiFi control messages, such as the order to disconnect, so that no one outside can kick your devices off the network. Some old devices do not connect if it is mandatory.
+ajuste-wifi-invitados_avanzado-pmf-desactivada = Off
+ajuste-wifi-invitados_avanzado-pmf-desactivada-desc = WiFi control messages travel unprotected, as on almost every WPA2 network.
+ajuste-wifi-invitados_avanzado-pmf-motivo = The panel does not change it yet: it still has to check which values this router accepts.
+ajuste-wifi-invitados_avanzado-wps_bloqueo = WPS locked
+ajuste-wifi-invitados_avanzado-wps_bloqueo-desc = If on, the router does not accept the WPS PIN code of this network. Routers usually lock it on their own after several failed attempts.
+ajuste-wifi-invitados_avanzado-wps_bloqueo-motivo = The router decides it: the panel only shows it.
+ajuste-wifi-invitados_avanzado-renovacion_clave = Group key renewal
+ajuste-wifi-invitados_avanzado-renovacion_clave-desc = How often the router changes the key that all devices on the network share for messages sent to everyone at once. Devices get the new one on their own, without disconnecting.
+ajuste-wifi-invitados_avanzado-renovacion_clave-nunca = Never
+ajuste-wifi-invitados_avanzado-renovacion_clave-nunca-desc = The same key lasts as long as the network stays on.
+ajuste-wifi-invitados_avanzado-renovacion_clave-hora = Every hour
+ajuste-wifi-invitados_avanzado-renovacion_clave-hora-desc = The router changes it every hour: if someone managed to get it, it would be useful only for a short time.
+ajuste-wifi-invitados_avanzado-renovacion_clave-dia = Every day
+ajuste-wifi-invitados_avanzado-renovacion_clave-dia-desc = The router changes it once a day.
 
 ## 2.4 GHz radio
 ajuste-wifi-radio_24-titulo = 2.4 GHz radio

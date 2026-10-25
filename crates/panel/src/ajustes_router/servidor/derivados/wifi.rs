@@ -1,5 +1,6 @@
 //! Derivados de la WiFi: si emite cada red y cada radio, canal y ancho,
-//! conectados, la nota de la radio y la franja de resumen.
+//! conectados, la nota de la radio, las otras redes de invitados y la
+//! franja de resumen.
 //!
 //! El estado viene de la Tarea W1: la insignia de cada red y la nota de la
 //! radio encendida que no emite ninguna o que emite redes que el panel no
@@ -14,8 +15,10 @@ use super::*;
 
 mod conectados;
 mod historial;
+mod invitadas;
 
 pub(super) use conectados::{conectados, dispositivos};
+pub(super) use invitadas::{invitada_sin_separar, otras_invitadas};
 
 pub(super) use historial::apagada_desde;
 pub(in crate::ajustes_router) use historial::apagadas_desde;

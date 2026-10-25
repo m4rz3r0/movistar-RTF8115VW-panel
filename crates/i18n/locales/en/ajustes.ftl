@@ -328,6 +328,15 @@ ajustes-dato-nombres_ddns = Names
 ajustes-dato-nombres_ddns-ninguno = None
 ajustes-dato-cuentas = Accounts
 ajustes-dato-abierto_redes = Open only from specific networks
+ajustes-dato-otras_invitadas = Other guest networks
+ajustes-dato-otras_invitadas-valor = { $n } of { $total } separated
+ajustes-wifi-invitada-nombre = “{ $nombre }” (network { $id })
+ajustes-wifi-invitada-numero = network { $id }
+ajustes-problema-wifi-invitada-sin-separar = { $n ->
+    [one] The guest network { $redes } is on and not separated from the home network: anyone who connects to it reaches your devices.
+   *[other] The guest networks { $redes } are on and not separated from the home network: anyone who connects to them reaches your devices.
+}
+ajustes-wifi-invitada-sin-separar-recomendado = Recommended if that network is for visitors: separate it from the home network in the router's web page, or turn it off there if you do not use it; the panel cannot do it yet. Pros: whoever connects to it reaches the internet but not your devices. Cons: the printer and the TV at home cannot be seen from it.
 
 ## Security and System actions
 ajustes-accion-apagar_gestion_remota = Turn off remote management

@@ -328,6 +328,15 @@ ajustes-dato-nombres_ddns = Nombres
 ajustes-dato-nombres_ddns-ninguno = Ninguno
 ajustes-dato-cuentas = Cuentas
 ajustes-dato-abierto_redes = Abierto solo desde redes concretas
+ajustes-dato-otras_invitadas = Otras redes de invitados
+ajustes-dato-otras_invitadas-valor = { $n } de { $total } separadas
+ajustes-wifi-invitada-nombre = «{ $nombre }» (red { $id })
+ajustes-wifi-invitada-numero = red { $id }
+ajustes-problema-wifi-invitada-sin-separar = { $n ->
+    [one] La red de invitados { $redes } está encendida y no está separada de la red de casa: quien se conecte a ella llega a tus dispositivos.
+   *[other] Las redes de invitados { $redes } están encendidas y no están separadas de la red de casa: quien se conecte a ellas llega a tus dispositivos.
+}
+ajustes-wifi-invitada-sin-separar-recomendado = Recomendado si esa red es para visitas: sepárala de la red de casa desde la web del router, o apágala allí si no la usas; el panel todavía no sabe hacerlo. A favor: quien se conecte a ella llega a internet, pero no a tus dispositivos. En contra: desde ella no se ven la impresora ni la tele de casa.
 
 ## Acciones de Seguridad y Sistema
 ajustes-accion-apagar_gestion_remota = Apagar la gestión remota

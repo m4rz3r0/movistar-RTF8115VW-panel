@@ -612,8 +612,8 @@ fn forma(
 /// Las tres redes WiFi tienen los mismos campos, parámetros, validaciones y
 /// opciones; solo difieren la recomendación del aislamiento (sí en
 /// invitados, donde además es de seguridad), la de encender la red
-/// (apagada en invitados) y si está separada de la red de casa (solo en
-/// invitados, y solo se lee). Las dos radios, igual, salvo canales, anchos y modos (propios
+/// (apagada en invitados) y el motivo de lo que solo se lee, con el
+/// prefijo de su ajuste. Las dos radios, igual, salvo canales, anchos y modos (propios
 /// de cada banda) y la señal dirigida, que solo está en 5 GHz.
 #[test]
 fn redes_y_radios_wifi_iguales_salvo_lo_previsto() {
@@ -623,20 +623,20 @@ fn redes_y_radios_wifi_iguales_salvo_lo_previsto() {
         for otra in ["red_5", "invitados"] {
             let a = c.ajuste(&format!("wifi.{otra}{sufijo}")).unwrap();
             assert_eq!(forma(a), forma(base), "{}", a.id);
-            let quita = |x: &Campo| {
+            // El motivo de un campo de solo lectura lleva el prefijo de su
+            // ajuste: se compara sin él.
+            let quita = |a: &Ajuste, x: &Campo| {
                 let mut x = sin(x, matches!(x.id.as_str(), "aislamiento" | "activa"), false);
                 if x.id == "aislamiento" {
                     x.seguridad = false;
                 }
+                x.solo_lectura = x
+                    .solo_lectura
+                    .map(|m| m.replace(&prefijo_i18n(a), "<ajuste>"));
                 x
             };
-            let campos: Vec<Campo> = a
-                .campos
-                .iter()
-                .filter(|x| !(otra == "invitados" && x.id == "separada"))
-                .map(quita)
-                .collect();
-            let esperados: Vec<Campo> = base.campos.iter().map(quita).collect();
+            let campos: Vec<Campo> = a.campos.iter().map(|x| quita(a, x)).collect();
+            let esperados: Vec<Campo> = base.campos.iter().map(|x| quita(base, x)).collect();
             assert_eq!(campos, esperados, "{}", a.id);
         }
     }
@@ -654,5 +654,59 @@ fn redes_y_radios_wifi_iguales_salvo_lo_previsto() {
             .collect();
         let en_24: Vec<Campo> = r24.campos.iter().map(quita).collect();
         assert_eq!(en_24, comunes, "{}", r24.id);
+    }
+}
+
+/// WiFi avanzado (Tarea 5 de la fase 3): las tres redes leen el PMF, el
+/// bloqueo del WPS y si están separadas de la red de casa, sin escribirlos,
+/// y escriben la renovación de la clave de grupo.
+#[test]
+fn wifi_avanzado_lee_pmf_wps_y_separada() {
+    let c = cargar();
+    for red in ["red_24", "red_5", "invitados"] {
+        let a = c.ajuste(&format!("wifi.{red}_avanzado")).unwrap();
+        let campo = |id: &str| a.campo(id).unwrap_or_else(|| panic!("{}: sin {id}", a.id));
+        for (id, lee) in [
+            ("separada", "guest_networking"),
+            ("pmf", "wifi_pmf"),
+            ("wps_bloqueo", "wps_setup_lock"),
+        ] {
+            let x = campo(id);
+            assert_eq!(x.lee, lee, "{}.{id}", a.id);
+            assert!(
+                x.escribe.is_none() && x.solo_lectura.is_some(),
+                "{}.{id}",
+                a.id
+            );
+        }
+        let pmf: Vec<(&str, &str)> = campo("pmf")
+            .opciones
+            .iter()
+            .map(|o| (o.valor.as_str(), o.clave.as_str()))
+            .collect();
+        assert_eq!(pmf, [("0", "desactivada")], "{}", a.id);
+        assert_eq!(campo("wps_bloqueo").tipo, ajustes::TipoCampo::Booleano);
+        let renovacion = campo("renovacion_clave");
+        let e = renovacion
+            .escribe
+            .as_ref()
+            .expect("renovacion_clave escribe");
+        assert_eq!(
+            (e.funcion.as_str(), e.parametro.as_str()),
+            ("cbSetWifiAccPt", "regen_key_interval"),
+            "{}",
+            a.id
+        );
+        let opciones: Vec<(&str, &str)> = renovacion
+            .opciones
+            .iter()
+            .map(|o| (o.valor.as_str(), o.clave.as_str()))
+            .collect();
+        assert_eq!(
+            opciones,
+            [("0", "nunca"), ("3600", "hora"), ("86400", "dia")],
+            "{}",
+            a.id
+        );
     }
 }

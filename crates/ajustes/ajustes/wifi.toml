@@ -91,6 +91,15 @@ efecto = "wifi_corte"
 leer = { funcion = "cbGetWifiAccPt", params = { dpm_cfg_wifi_acc_pt_id = "0" } }
 fijos = { dpm_cfg_wifi_acc_pt_id = "0" }
 
+# Si la red está separada de la red de casa. Solo se lee: la escritura de
+# los puntos de acceso de la web avanzada no tiene este parámetro, y el
+# panel no inventa uno.
+[[ajuste.campo]]
+id = "separada"
+lee = "guest_networking"
+tipo = "booleano"
+solo_lectura = "ajuste-wifi-red_24_avanzado-separada-motivo"
+
 [[ajuste.campo]]
 id = "aislamiento"
 escribe = { funcion = "cbSetWifiAccPt", parametro = "isolation" }
@@ -111,6 +120,41 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "max_clt_count" }
 lee = "max_clt_count"
 tipo = "numero"
 validar = { min = 1, max = 64 }
+
+# Protección de las tramas de gestión. Solo se lee hasta que una escritura
+# con `validation_only = 1` sobre una red apagada confirme qué valores
+# acepta (validación E2 del controlador): no entra en el catálogo de
+# escritura, porque viajaría en toda escritura de la red.
+[[ajuste.campo]]
+id = "pmf"
+lee = "wifi_pmf"
+tipo = "opcion"
+opciones = [{ valor = "0", clave = "desactivada" }]
+solo_lectura = "ajuste-wifi-red_24_avanzado-pmf-motivo"
+
+# Bloqueo del WPS: lo pone el router; el panel solo lo enseña. El método
+# (`wps_method`) no es campo: su significado está sin validar y queda en
+# «Detalles técnicos».
+[[ajuste.campo]]
+id = "wps_bloqueo"
+lee = "wps_setup_lock"
+tipo = "booleano"
+solo_lectura = "ajuste-wifi-red_24_avanzado-wps_bloqueo-motivo"
+
+# Cada cuánto renueva el router la clave de grupo, en segundos. Ya viajaba
+# en toda escritura de la red con su valor leído; aquí se puede elegir.
+# Pendiente de la validación E1 del controlador: si falla, pasa a
+# `solo_lectura` con su motivo.
+[[ajuste.campo]]
+id = "renovacion_clave"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "regen_key_interval" }
+lee = "regen_key_interval"
+tipo = "opcion"
+opciones = [
+  { valor = "0", clave = "nunca" },
+  { valor = "3600", clave = "hora" },
+  { valor = "86400", clave = "dia" },
+]
 
 [[ajuste]]
 id = "wifi.red_5"
@@ -182,6 +226,15 @@ efecto = "wifi_corte"
 leer = { funcion = "cbGetWifiAccPt", params = { dpm_cfg_wifi_acc_pt_id = "1" } }
 fijos = { dpm_cfg_wifi_acc_pt_id = "1" }
 
+# Si la red está separada de la red de casa. Solo se lee: la escritura de
+# los puntos de acceso de la web avanzada no tiene este parámetro, y el
+# panel no inventa uno.
+[[ajuste.campo]]
+id = "separada"
+lee = "guest_networking"
+tipo = "booleano"
+solo_lectura = "ajuste-wifi-red_5_avanzado-separada-motivo"
+
 [[ajuste.campo]]
 id = "aislamiento"
 escribe = { funcion = "cbSetWifiAccPt", parametro = "isolation" }
@@ -202,6 +255,41 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "max_clt_count" }
 lee = "max_clt_count"
 tipo = "numero"
 validar = { min = 1, max = 64 }
+
+# Protección de las tramas de gestión. Solo se lee hasta que una escritura
+# con `validation_only = 1` sobre una red apagada confirme qué valores
+# acepta (validación E2 del controlador): no entra en el catálogo de
+# escritura, porque viajaría en toda escritura de la red.
+[[ajuste.campo]]
+id = "pmf"
+lee = "wifi_pmf"
+tipo = "opcion"
+opciones = [{ valor = "0", clave = "desactivada" }]
+solo_lectura = "ajuste-wifi-red_5_avanzado-pmf-motivo"
+
+# Bloqueo del WPS: lo pone el router; el panel solo lo enseña. El método
+# (`wps_method`) no es campo: su significado está sin validar y queda en
+# «Detalles técnicos».
+[[ajuste.campo]]
+id = "wps_bloqueo"
+lee = "wps_setup_lock"
+tipo = "booleano"
+solo_lectura = "ajuste-wifi-red_5_avanzado-wps_bloqueo-motivo"
+
+# Cada cuánto renueva el router la clave de grupo, en segundos. Ya viajaba
+# en toda escritura de la red con su valor leído; aquí se puede elegir.
+# Pendiente de la validación E1 del controlador: si falla, pasa a
+# `solo_lectura` con su motivo.
+[[ajuste.campo]]
+id = "renovacion_clave"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "regen_key_interval" }
+lee = "regen_key_interval"
+tipo = "opcion"
+opciones = [
+  { valor = "0", clave = "nunca" },
+  { valor = "3600", clave = "hora" },
+  { valor = "86400", clave = "dia" },
+]
 
 [[ajuste]]
 id = "wifi.invitados"
@@ -305,6 +393,41 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "max_clt_count" }
 lee = "max_clt_count"
 tipo = "numero"
 validar = { min = 1, max = 64 }
+
+# Protección de las tramas de gestión. Solo se lee hasta que una escritura
+# con `validation_only = 1` sobre una red apagada confirme qué valores
+# acepta (validación E2 del controlador): no entra en el catálogo de
+# escritura, porque viajaría en toda escritura de la red.
+[[ajuste.campo]]
+id = "pmf"
+lee = "wifi_pmf"
+tipo = "opcion"
+opciones = [{ valor = "0", clave = "desactivada" }]
+solo_lectura = "ajuste-wifi-invitados_avanzado-pmf-motivo"
+
+# Bloqueo del WPS: lo pone el router; el panel solo lo enseña. El método
+# (`wps_method`) no es campo: su significado está sin validar y queda en
+# «Detalles técnicos».
+[[ajuste.campo]]
+id = "wps_bloqueo"
+lee = "wps_setup_lock"
+tipo = "booleano"
+solo_lectura = "ajuste-wifi-invitados_avanzado-wps_bloqueo-motivo"
+
+# Cada cuánto renueva el router la clave de grupo, en segundos. Ya viajaba
+# en toda escritura de la red con su valor leído; aquí se puede elegir.
+# Pendiente de la validación E1 del controlador: si falla, pasa a
+# `solo_lectura` con su motivo.
+[[ajuste.campo]]
+id = "renovacion_clave"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "regen_key_interval" }
+lee = "regen_key_interval"
+tipo = "opcion"
+opciones = [
+  { valor = "0", clave = "nunca" },
+  { valor = "3600", clave = "hora" },
+  { valor = "86400", clave = "dia" },
+]
 
 [[ajuste]]
 id = "wifi.radio_24"
@@ -478,7 +601,7 @@ ajustes = ["wifi.invitados", "wifi.invitados_avanzado"]
 papel = "invitados"
 interruptor = "wifi.invitados.activa"
 datos = ["wifi.invitados.seguridad", "wifi.invitados.contrasena", "wifi.invitados.visible",
-         "derivado:canal_y_ancho", "wifi.invitados_avanzado.aislamiento", "derivado:conectados"]
+         "derivado:otras_invitadas", "wifi.invitados_avanzado.aislamiento", "derivado:conectados"]
 estado = "derivado:estado_red"
 
 [[elemento]]

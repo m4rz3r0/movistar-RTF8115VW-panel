@@ -32,8 +32,11 @@ ajuste-wifi-red_24-wps-recomendado = Recomendado si conectas tus dispositivos es
 
 ## Red WiFi 2,4 GHz: más opciones
 ajuste-wifi-red_24_avanzado-titulo = Red WiFi 2,4 GHz: más opciones
-ajuste-wifi-red_24_avanzado-desc = Opciones menos habituales de la red de 2,4 GHz: aislamiento entre dispositivos, prioridad del tráfico y límite de dispositivos.
+ajuste-wifi-red_24_avanzado-desc = Opciones menos habituales de la red de 2,4 GHz: aislamiento entre dispositivos, prioridad del tráfico, límite de dispositivos y renovación de la clave de grupo. También enseña, sin cambiarlos, si está separada de la red de casa, la protección de las tramas de gestión y el bloqueo del WPS.
 ajuste-wifi-red_24_avanzado-ayuda = Los valores de fábrica funcionan bien en casi todas las casas. Cámbialos solo si sabes para qué: un cambio aquí puede impedir que algunos dispositivos se conecten o hagan cosas como enviar contenido a la tele.
+ajuste-wifi-red_24_avanzado-separada = Separada de la red de casa
+ajuste-wifi-red_24_avanzado-separada-desc = Si está activado, los dispositivos de esta red llegan a internet, pero no a los de tu red de casa. En una red principal lo normal es que esté desactivado: es tu red de casa.
+ajuste-wifi-red_24_avanzado-separada-motivo = El panel todavía no sabe cambiarlo: solo lo enseña.
 ajuste-wifi-red_24_avanzado-aislamiento = Aislar los dispositivos entre sí
 ajuste-wifi-red_24_avanzado-aislamiento-desc = Los dispositivos conectados por WiFi a esta red no se ven entre ellos: por ejemplo, no podrás enviar contenido a una tele que esté en la misma WiFi. Normalmente siguen llegando a internet y a los dispositivos conectados por cable.
 ajuste-wifi-red_24_avanzado-aislamiento-recomendado = Recomendado si es tu red de casa y tus dispositivos tienen que verse entre ellos. A favor: puedes imprimir, enviar contenido a la tele o usar altavoces por WiFi. En contra: si un dispositivo de esta red queda infectado, puede llegar a los demás.
@@ -42,6 +45,22 @@ ajuste-wifi-red_24_avanzado-wmm-desc = Da prioridad a las llamadas y al vídeo s
 ajuste-wifi-red_24_avanzado-wmm-recomendado = Recomendado si quieres que la WiFi vaya a su velocidad, lo normal en casi todas las casas. A favor: los dispositivos actuales alcanzan su velocidad (sin WMM se quedan en 54 Mbit/s como mucho) y las llamadas y el vídeo van por delante de las descargas. En contra: ninguno importante para la mayoría.
 ajuste-wifi-red_24_avanzado-max_clientes = Máximo de dispositivos
 ajuste-wifi-red_24_avanzado-max_clientes-desc = Cuántos dispositivos pueden estar conectados a la vez a esta red, de 1 a 64. Cuando se llega al límite, los siguientes no pueden conectarse.
+ajuste-wifi-red_24_avanzado-pmf = Protección de las tramas de gestión (PMF)
+ajuste-wifi-red_24_avanzado-pmf-desc = Protege los avisos de control de la WiFi, como la orden de desconectarse, para que nadie de fuera pueda echar a tus dispositivos de la red. Algunos dispositivos antiguos no se conectan si es obligatoria.
+ajuste-wifi-red_24_avanzado-pmf-desactivada = Desactivada
+ajuste-wifi-red_24_avanzado-pmf-desactivada-desc = Los avisos de control de la WiFi van sin proteger, como en casi todas las redes WPA2.
+ajuste-wifi-red_24_avanzado-pmf-motivo = El panel aún no lo cambia: falta comprobar qué valores acepta este router.
+ajuste-wifi-red_24_avanzado-wps_bloqueo = WPS bloqueado
+ajuste-wifi-red_24_avanzado-wps_bloqueo-desc = Si está activado, el router no acepta el código PIN del WPS de esta red. Los routers suelen bloquearlo solos tras varios intentos fallidos.
+ajuste-wifi-red_24_avanzado-wps_bloqueo-motivo = Lo decide el router: el panel solo lo enseña.
+ajuste-wifi-red_24_avanzado-renovacion_clave = Renovación de la clave de grupo
+ajuste-wifi-red_24_avanzado-renovacion_clave-desc = Cada cuánto cambia el router la clave que comparten todos los dispositivos de la red para los mensajes que van a todos a la vez. Los dispositivos reciben la nueva solos, sin desconectarse.
+ajuste-wifi-red_24_avanzado-renovacion_clave-nunca = Nunca
+ajuste-wifi-red_24_avanzado-renovacion_clave-nunca-desc = La misma clave dura mientras la red siga encendida.
+ajuste-wifi-red_24_avanzado-renovacion_clave-hora = Cada hora
+ajuste-wifi-red_24_avanzado-renovacion_clave-hora-desc = El router la cambia cada hora: si alguien llegara a sacarla, le serviría poco tiempo.
+ajuste-wifi-red_24_avanzado-renovacion_clave-dia = Cada día
+ajuste-wifi-red_24_avanzado-renovacion_clave-dia-desc = El router la cambia una vez al día.
 
 ## Red WiFi 5 GHz
 ajuste-wifi-red_5-titulo = Red WiFi 5 GHz
@@ -72,8 +91,11 @@ ajuste-wifi-red_5-wps-recomendado = Recomendado si conectas tus dispositivos esc
 
 ## Red WiFi 5 GHz: más opciones
 ajuste-wifi-red_5_avanzado-titulo = Red WiFi 5 GHz: más opciones
-ajuste-wifi-red_5_avanzado-desc = Opciones menos habituales de la red de 5 GHz: aislamiento entre dispositivos, prioridad del tráfico y límite de dispositivos.
+ajuste-wifi-red_5_avanzado-desc = Opciones menos habituales de la red de 5 GHz: aislamiento entre dispositivos, prioridad del tráfico, límite de dispositivos y renovación de la clave de grupo. También enseña, sin cambiarlos, si está separada de la red de casa, la protección de las tramas de gestión y el bloqueo del WPS.
 ajuste-wifi-red_5_avanzado-ayuda = Los valores de fábrica funcionan bien en casi todas las casas. Cámbialos solo si sabes para qué: un cambio aquí puede impedir que algunos dispositivos se conecten o hagan cosas como enviar contenido a la tele.
+ajuste-wifi-red_5_avanzado-separada = Separada de la red de casa
+ajuste-wifi-red_5_avanzado-separada-desc = Si está activado, los dispositivos de esta red llegan a internet, pero no a los de tu red de casa. En una red principal lo normal es que esté desactivado: es tu red de casa.
+ajuste-wifi-red_5_avanzado-separada-motivo = El panel todavía no sabe cambiarlo: solo lo enseña.
 ajuste-wifi-red_5_avanzado-aislamiento = Aislar los dispositivos entre sí
 ajuste-wifi-red_5_avanzado-aislamiento-desc = Los dispositivos conectados por WiFi a esta red no se ven entre ellos: por ejemplo, no podrás enviar contenido a una tele que esté en la misma WiFi. Normalmente siguen llegando a internet y a los dispositivos conectados por cable.
 ajuste-wifi-red_5_avanzado-aislamiento-recomendado = Recomendado si es tu red de casa y tus dispositivos tienen que verse entre ellos. A favor: puedes imprimir, enviar contenido a la tele o usar altavoces por WiFi. En contra: si un dispositivo de esta red queda infectado, puede llegar a los demás.
@@ -82,6 +104,22 @@ ajuste-wifi-red_5_avanzado-wmm-desc = Da prioridad a las llamadas y al vídeo so
 ajuste-wifi-red_5_avanzado-wmm-recomendado = Recomendado si quieres que la WiFi vaya a su velocidad, lo normal en casi todas las casas. A favor: los dispositivos actuales alcanzan su velocidad (sin WMM se quedan en 54 Mbit/s como mucho) y las llamadas y el vídeo van por delante de las descargas. En contra: ninguno importante para la mayoría.
 ajuste-wifi-red_5_avanzado-max_clientes = Máximo de dispositivos
 ajuste-wifi-red_5_avanzado-max_clientes-desc = Cuántos dispositivos pueden estar conectados a la vez a esta red, de 1 a 64. Cuando se llega al límite, los siguientes no pueden conectarse.
+ajuste-wifi-red_5_avanzado-pmf = Protección de las tramas de gestión (PMF)
+ajuste-wifi-red_5_avanzado-pmf-desc = Protege los avisos de control de la WiFi, como la orden de desconectarse, para que nadie de fuera pueda echar a tus dispositivos de la red. Algunos dispositivos antiguos no se conectan si es obligatoria.
+ajuste-wifi-red_5_avanzado-pmf-desactivada = Desactivada
+ajuste-wifi-red_5_avanzado-pmf-desactivada-desc = Los avisos de control de la WiFi van sin proteger, como en casi todas las redes WPA2.
+ajuste-wifi-red_5_avanzado-pmf-motivo = El panel aún no lo cambia: falta comprobar qué valores acepta este router.
+ajuste-wifi-red_5_avanzado-wps_bloqueo = WPS bloqueado
+ajuste-wifi-red_5_avanzado-wps_bloqueo-desc = Si está activado, el router no acepta el código PIN del WPS de esta red. Los routers suelen bloquearlo solos tras varios intentos fallidos.
+ajuste-wifi-red_5_avanzado-wps_bloqueo-motivo = Lo decide el router: el panel solo lo enseña.
+ajuste-wifi-red_5_avanzado-renovacion_clave = Renovación de la clave de grupo
+ajuste-wifi-red_5_avanzado-renovacion_clave-desc = Cada cuánto cambia el router la clave que comparten todos los dispositivos de la red para los mensajes que van a todos a la vez. Los dispositivos reciben la nueva solos, sin desconectarse.
+ajuste-wifi-red_5_avanzado-renovacion_clave-nunca = Nunca
+ajuste-wifi-red_5_avanzado-renovacion_clave-nunca-desc = La misma clave dura mientras la red siga encendida.
+ajuste-wifi-red_5_avanzado-renovacion_clave-hora = Cada hora
+ajuste-wifi-red_5_avanzado-renovacion_clave-hora-desc = El router la cambia cada hora: si alguien llegara a sacarla, le serviría poco tiempo.
+ajuste-wifi-red_5_avanzado-renovacion_clave-dia = Cada día
+ajuste-wifi-red_5_avanzado-renovacion_clave-dia-desc = El router la cambia una vez al día.
 
 ## Red de invitados
 ajuste-wifi-invitados-titulo = Red de invitados
@@ -112,7 +150,7 @@ ajuste-wifi-invitados-wps-recomendado = Recomendado si conectas tus dispositivos
 
 ## Red de invitados: más opciones
 ajuste-wifi-invitados_avanzado-titulo = Red de invitados: más opciones
-ajuste-wifi-invitados_avanzado-desc = Opciones menos habituales de la red de invitados: si está separada de la red de casa, aislamiento entre dispositivos, prioridad del tráfico y límite de dispositivos.
+ajuste-wifi-invitados_avanzado-desc = Opciones menos habituales de la red de invitados: aislamiento entre dispositivos, prioridad del tráfico, límite de dispositivos y renovación de la clave de grupo. También enseña, sin cambiarlos, si está separada de la red de casa, la protección de las tramas de gestión y el bloqueo del WPS.
 ajuste-wifi-invitados_avanzado-ayuda = Los valores de fábrica funcionan bien en casi todas las casas. Cámbialos solo si sabes para qué: un cambio aquí puede impedir que algunos dispositivos se conecten o hagan cosas como enviar contenido a la tele.
 ajuste-wifi-invitados_avanzado-separada = Separada de la red de casa
 ajuste-wifi-invitados_avanzado-separada-desc = Si está activado, los dispositivos de la red de invitados llegan a internet, pero no a los de tu red de casa.
@@ -125,6 +163,22 @@ ajuste-wifi-invitados_avanzado-wmm-desc = Da prioridad a las llamadas y al víde
 ajuste-wifi-invitados_avanzado-wmm-recomendado = Recomendado si quieres que la WiFi vaya a su velocidad, lo normal en casi todas las casas. A favor: los dispositivos actuales alcanzan su velocidad (sin WMM se quedan en 54 Mbit/s como mucho) y las llamadas y el vídeo van por delante de las descargas. En contra: ninguno importante para la mayoría.
 ajuste-wifi-invitados_avanzado-max_clientes = Máximo de dispositivos
 ajuste-wifi-invitados_avanzado-max_clientes-desc = Cuántos dispositivos pueden estar conectados a la vez a esta red, de 1 a 64. Cuando se llega al límite, los siguientes no pueden conectarse.
+ajuste-wifi-invitados_avanzado-pmf = Protección de las tramas de gestión (PMF)
+ajuste-wifi-invitados_avanzado-pmf-desc = Protege los avisos de control de la WiFi, como la orden de desconectarse, para que nadie de fuera pueda echar a tus dispositivos de la red. Algunos dispositivos antiguos no se conectan si es obligatoria.
+ajuste-wifi-invitados_avanzado-pmf-desactivada = Desactivada
+ajuste-wifi-invitados_avanzado-pmf-desactivada-desc = Los avisos de control de la WiFi van sin proteger, como en casi todas las redes WPA2.
+ajuste-wifi-invitados_avanzado-pmf-motivo = El panel aún no lo cambia: falta comprobar qué valores acepta este router.
+ajuste-wifi-invitados_avanzado-wps_bloqueo = WPS bloqueado
+ajuste-wifi-invitados_avanzado-wps_bloqueo-desc = Si está activado, el router no acepta el código PIN del WPS de esta red. Los routers suelen bloquearlo solos tras varios intentos fallidos.
+ajuste-wifi-invitados_avanzado-wps_bloqueo-motivo = Lo decide el router: el panel solo lo enseña.
+ajuste-wifi-invitados_avanzado-renovacion_clave = Renovación de la clave de grupo
+ajuste-wifi-invitados_avanzado-renovacion_clave-desc = Cada cuánto cambia el router la clave que comparten todos los dispositivos de la red para los mensajes que van a todos a la vez. Los dispositivos reciben la nueva solos, sin desconectarse.
+ajuste-wifi-invitados_avanzado-renovacion_clave-nunca = Nunca
+ajuste-wifi-invitados_avanzado-renovacion_clave-nunca-desc = La misma clave dura mientras la red siga encendida.
+ajuste-wifi-invitados_avanzado-renovacion_clave-hora = Cada hora
+ajuste-wifi-invitados_avanzado-renovacion_clave-hora-desc = El router la cambia cada hora: si alguien llegara a sacarla, le serviría poco tiempo.
+ajuste-wifi-invitados_avanzado-renovacion_clave-dia = Cada día
+ajuste-wifi-invitados_avanzado-renovacion_clave-dia-desc = El router la cambia una vez al día.
 
 ## Radio de 2,4 GHz
 ajuste-wifi-radio_24-titulo = Radio de 2,4 GHz

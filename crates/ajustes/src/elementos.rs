@@ -14,6 +14,7 @@ pub const DERIVADOS_DATO: &[&str] = &[
     "nombres_ddns",
     "cuentas",
     "abierto_redes",
+    "otras_invitadas",
 ];
 
 /// Reglas de estado que puede pedir un elemento (`derivado:<nombre>` en

@@ -17,6 +17,7 @@ pub(super) mod wifi;
 pub(super) use internet::{conexiones, marcar_conexiones};
 
 use super::*;
+use crate::ajustes_router::RecomendacionVista;
 use crate::ui::comun::EstadoVisual;
 use ajustes::Elemento;
 
@@ -226,6 +227,15 @@ pub(super) fn dispositivos(ctx: &Contexto, e: &Elemento) -> Vec<Option<String>> 
     wifi::dispositivos(ctx, e)
 }
 
+/// Recomendación que no sale de un campo del elemento: en la red de
+/// invitados, si alguna red de invitados encendida no está separada de la
+/// red de casa (solo informa).
+pub(super) fn recomendacion_propia(ctx: &Contexto, e: &Elemento) -> Option<RecomendacionVista> {
+    (e.papel.as_deref() == Some("invitados"))
+        .then(|| wifi::invitada_sin_separar(ctx))
+        .flatten()
+}
+
 /// Nota del pie de un elemento, ya traducida.
 pub(super) fn nota(ctx: &Contexto, e: &Elemento) -> Option<String> {
     wifi::nota(ctx, e)
@@ -260,6 +270,7 @@ pub(super) fn dato(
         "nombres_ddns" => Ok(internet::nombres_ddns(ctx)),
         "cuentas" => Ok(seguridad::cuentas(ctx)),
         "abierto_redes" => Ok(super::cortafuegos::abierto_redes(ctx)),
+        "otras_invitadas" => Ok(wifi::otras_invitadas(ctx)),
         otro => Err(Desconocido(otro.to_owned())),
     }
 }

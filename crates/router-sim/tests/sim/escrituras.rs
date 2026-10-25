@@ -248,3 +248,30 @@ async fn escritura_del_registro_se_lee() {
     assert_eq!(valor(&n, "syslog_mode").as_deref(), Some("2"));
     assert_eq!(valor(&n, "remote_ip").as_deref(), Some("192.0.2.5"));
 }
+
+/// La renovación de la clave de grupo de un punto de acceso (Tarea 5 de la
+/// fase 3): lo escrito se lee tal cual.
+#[tokio::test]
+async fn escritura_de_la_renovacion_de_clave_se_lee() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    let get = [("dpm_cfg_wifi_acc_pt_id", "0")];
+    let leer = async || {
+        c.call("cbGetWifiAccPt", &get)
+            .await
+            .unwrap()
+            .get("dpm_cfg_wifi_acc_pt")
+            .unwrap()
+            .text_of("regen_key_interval")
+            .map(str::to_owned)
+    };
+    assert_eq!(leer().await.as_deref(), Some("0"));
+    let params = [
+        ("dpm_cfg_wifi_acc_pt_id", "0"),
+        ("regen_key_interval", "3600"),
+    ];
+    c.write("wifi.asp", "cbSetWifiAccPt", &params)
+        .await
+        .unwrap();
+    assert_eq!(leer().await.as_deref(), Some("3600"));
+}
