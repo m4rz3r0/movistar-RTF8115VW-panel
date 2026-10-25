@@ -318,6 +318,8 @@ ajustes-estado-linea-si = Active
 ajustes-estado-linea-no = Off
 ajustes-estado-voz-si = On
 ajustes-estado-voz-no = Off
+ajustes-estado-voz-registrada = Signed up
+ajustes-estado-voz-sin-registrar = Not signed up
 ajustes-estado-paso-directo-si = On
 ajustes-estado-paso-directo-no = Off
 ajustes-estado-hora-si = Automatic
@@ -359,7 +361,7 @@ ajustes-problema-sistema-envio-true = The router sends its log to another comput
 ajustes-problema-red_local-principal = Your devices ask { $valor } for website names: if it is the router itself, your lookups are answered by the operator.
 ajustes-problema-telefono-tonos-en_la_voz = The keys you press during a call are mixed into the voice: if the call sounds bad, a phone menu may not recognise them.
 ajustes-problema-telefono-tonos-mensajes = The keys you press during a call go as separate messages: if the operator does not support it, phone menus do not get them.
-ajustes-problema-telefono-activo-false = Internet phone is off: the landline cannot make or receive calls.
+ajustes-problema-telefono-activo-true = Internet phone is on: the router stays registered with the operator's voice server, even if you have no landline phone plugged in.
 
 ## Summary strip of Internet, Security, Phone and System
 ajustes-resumen-internet-conexion = Internet connection

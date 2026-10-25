@@ -318,6 +318,8 @@ ajustes-estado-linea-si = Activa
 ajustes-estado-linea-no = Apagada
 ajustes-estado-voz-si = Encendido
 ajustes-estado-voz-no = Apagado
+ajustes-estado-voz-registrada = Registrada
+ajustes-estado-voz-sin-registrar = Sin registrar
 ajustes-estado-paso-directo-si = Activado
 ajustes-estado-paso-directo-no = Desactivado
 ajustes-estado-hora-si = Automática
@@ -359,7 +361,7 @@ ajustes-problema-sistema-envio-true = El router envía su registro a otro equipo
 ajustes-problema-red_local-principal = Tus dispositivos preguntan los nombres de las webs a { $valor }: si es el propio router, tus consultas se resuelven en el operador.
 ajustes-problema-telefono-tonos-en_la_voz = Las teclas que pulsas en una llamada van mezcladas con la voz: si la llamada se oye mal, un menú por teléfono puede no reconocerlas.
 ajustes-problema-telefono-tonos-mensajes = Las teclas que pulsas en una llamada van como mensajes aparte: si el operador no lo admite, los menús por teléfono no las reciben.
-ajustes-problema-telefono-activo-false = El teléfono por internet está apagado: el teléfono fijo no puede llamar ni recibir llamadas.
+ajustes-problema-telefono-activo-true = El teléfono por internet está encendido: el router sigue registrado en el servidor de voz del operador, aunque no tengas un teléfono fijo conectado.
 
 ## Franja de resumen de Internet, Seguridad, Teléfono y Sistema
 ajustes-resumen-internet-conexion = Conexión a internet

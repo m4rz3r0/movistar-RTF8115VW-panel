@@ -48,4 +48,5 @@ mod sensibles;
 mod tema;
 mod usuarios_router;
 mod vista;
+mod voz;
 mod wifi_avanzado;

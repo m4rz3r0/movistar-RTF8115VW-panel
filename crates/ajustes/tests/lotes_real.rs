@@ -127,6 +127,14 @@ fn lotes_del_catalogo_real() {
     assert!(c.paso("hora_neutra").unwrap().opcional);
 }
 
+/// «Apagar la línea de voz» va suelta, con su aviso: ningún lote apaga el
+/// teléfono por internet (dejaría sin fijo a quien lo usa).
+#[test]
+fn apagar_voz_fuera_de_los_lotes() {
+    let c = cargar();
+    assert!(lotes_del_campo(&c, "telefono.sip_oculto", "activo").is_empty());
+}
+
 /// La primera marca tiene que ser una palabra entera: «Recomendado
 /// siempre» no dice para quién es.
 #[test]
