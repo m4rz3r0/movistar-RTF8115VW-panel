@@ -137,7 +137,7 @@ fn claves_de_elementos_en_los_dos_idiomas() {
 fn ajustes_minimos_presentes() {
     use Nivel::{Avanzado, Basico, Oculto};
     let c = cargar();
-    let filas: [(&str, Nivel, bool, Option<Componente>); 34] = [
+    let filas: [(&str, Nivel, bool, Option<Componente>); 36] = [
         ("wifi.red_24", Basico, false, None),
         ("wifi.red_24_avanzado", Avanzado, false, None),
         ("wifi.red_5", Basico, false, None),
@@ -167,6 +167,13 @@ fn ajustes_minimos_presentes() {
         ("puertos.alg", Oculto, false, None),
         ("internet.dns", Avanzado, false, None),
         ("internet.ddns", Oculto, true, None),
+        (
+            "internet.conexion",
+            Basico,
+            true,
+            Some(Componente::Conexion),
+        ),
+        ("internet.fibra", Avanzado, false, None),
         ("seguridad.gestion_remota", Basico, false, None),
         ("seguridad.gestion_remota_avanzado", Avanzado, false, None),
         ("seguridad.gestion_remota_oculto", Oculto, false, None),
@@ -231,6 +238,16 @@ fn ajustes_minimos_presentes() {
         "{:#?}",
         usuarios.campos
     );
+    // La conexión a internet y la fibra solo se leen.
+    for id in ["internet.conexion", "internet.fibra"] {
+        let a = c.ajuste(id).unwrap();
+        assert!(
+            a.campos
+                .iter()
+                .all(|x| x.escribe.is_none() && x.solo_lectura.is_some()),
+            "{id}"
+        );
+    }
     // La gestión remota se activa en la parte básica, con su lectura.
     let tr69 = c.ajuste("seguridad.gestion_remota").unwrap();
     let activa = tr69.campo("activa").unwrap();
@@ -351,8 +368,10 @@ fn valores_del_fichero(ruta: &PathBuf) -> Vec<(String, String)> {
 /// - «WMM»: el nombre del estándar de la WiFi, en mayúsculas como se escribe;
 /// - «name», «Name», «protocol», «Protocol», «version» y «action»: palabras
 ///   inglesas de uso diario («Network name», «Protocol») que el cortafuegos
-///   lee con ese nombre (`Name`, `Protocol`, `Version`, `Action`).
-const FORMAS_CORRIENTES: [&str; 15] = [
+///   lee con ese nombre (`Name`, `Protocol`, `Version`, `Action`);
+/// - «MTU»: el nombre del dato, en mayúsculas como se escribe (la conexión a
+///   internet lo lee como `mtu`).
+const FORMAS_CORRIENTES: [&str; 16] = [
     "account",
     "Account",
     "action",
@@ -360,6 +379,7 @@ const FORMAS_CORRIENTES: [&str; 15] = [
     "All",
     "beamforming",
     "isolation",
+    "MTU",
     "name",
     "Name",
     "password",

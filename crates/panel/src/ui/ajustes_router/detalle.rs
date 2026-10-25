@@ -68,8 +68,8 @@ fn se_edita(a: &AjusteVista) -> bool {
 
 /// La columna de un ajuste que no se edita aquí: una lista en una tabla, el
 /// enlace a donde se cambia la contraseña del router, los usuarios del
-/// router con sus acciones o las reglas del cortafuegos con «No responder
-/// al ping» (del elemento `e`).
+/// router con sus acciones, las reglas del cortafuegos con «No responder
+/// al ping» (del elemento `e`) o las conexiones a internet.
 fn columna_de_consulta(a: &AjusteVista, unica: bool, e: &ElementoVista) -> impl IntoView + use<> {
     let elemento = e.id.as_str();
     let col = format!("{}-columna", dom(a));
@@ -87,6 +87,8 @@ fn columna_de_consulta(a: &AjusteVista, unica: bool, e: &ElementoVista) -> impl 
             />
         }
         .into_any()
+    } else if a.componente.as_deref() == Some(super::conexion::CONEXION) {
+        view! { <super::conexion::Conexion a=a.clone() /> }.into_any()
     } else if a.lista {
         consulta::lista(a).into_any()
     } else {

@@ -14,6 +14,8 @@ mod sistema;
 mod telefono;
 pub(super) mod wifi;
 
+pub(super) use internet::marcar_conexiones;
+
 use super::*;
 use crate::ui::comun::EstadoVisual;
 use ajustes::Elemento;
@@ -269,6 +271,7 @@ pub(super) fn estado(
         "estado_red" => Ok(wifi::estado(ctx, e)),
         "estado_dns" => Ok(internet::estado_dns(ctx)),
         "estado_ddns" => Ok(internet::estado_ddns(ctx)),
+        "estado_conexion" => Ok(internet::estado_conexion(ctx)),
         "estado_gestion_remota" => Ok(seguridad::estado_gestion_remota(ctx)),
         "estado_cortafuegos" => Ok(seguridad::estado_cortafuegos(ctx)),
         "estado_linea" => Ok(telefono::estado_linea(ctx)),

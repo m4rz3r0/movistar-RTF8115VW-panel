@@ -58,7 +58,7 @@ const casos: Caso[] = [
   {
     tema: "internet",
     nombre: "Internet",
-    tarjetas: 2,
+    tarjetas: 3,
     elemento: "Relé DNS",
     id: "dns",
     editar: pulsar("Relé DNS activado"),

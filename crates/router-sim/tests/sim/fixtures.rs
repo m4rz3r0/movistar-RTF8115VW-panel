@@ -23,6 +23,11 @@ fn real_secrets() -> HashSet<String> {
     }
 }
 
+/// Valores inventados que una variante pone a propósito en un secreto, para
+/// probar que no salen del sitio (`fixtures-variantes/conexion-secretos`):
+/// valen en lugar de [`sanitize::REDACTED`].
+const VALORES_DE_PRUEBA: [&str; 2] = ["clave-ppp-de-prueba", "SERIE-DE-PRUEBA"];
+
 /// Comprueba un valor de la fixture `file` (de un elemento o de un parámetro
 /// del nombre del fichero).
 fn check_value(file: &str, tag: &str, value: &str, secrets: &HashSet<String>) {
@@ -48,6 +53,7 @@ fn check_value(file: &str, tag: &str, value: &str, secrets: &HashSet<String>) {
             .is_some_and(|n| n.parse::<u32>().is_ok())
     };
     match class {
+        TagClass::Redact if VALORES_DE_PRUEBA.contains(&value) => {}
         TagClass::Redact => assert_eq!(value, sanitize::REDACTED, "{file}: <{tag}> sin sanear"),
         TagClass::Ssid => assert!(pseudo("RED-"), "{file}: <{tag}> sin sanear"),
         TagClass::Host => assert!(pseudo("host-"), "{file}: <{tag}> sin sanear"),

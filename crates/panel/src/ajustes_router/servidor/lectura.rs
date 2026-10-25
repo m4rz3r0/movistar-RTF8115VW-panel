@@ -349,6 +349,11 @@ fn id_instancia<'f>(f: &'f Catalogo, a: &Ajuste) -> Option<&'f str> {
     if a.componente == Some(Componente::Cortafuegos) {
         return Some("RID");
     }
+    // Las conexiones a internet, su `ip_intf_id` (el de las rutas y la
+    // detección de la conexión de internet), no su posición.
+    if a.componente == Some(Componente::Conexion) {
+        return Some("ip_intf_id");
+    }
     a.campos
         .iter()
         .filter_map(|c| c.escribe.as_ref())

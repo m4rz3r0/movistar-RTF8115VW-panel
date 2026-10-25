@@ -12,6 +12,7 @@ pub enum Componente {
     ContrasenaRouter,
     UsuariosRouter,
     Cortafuegos,
+    Conexion,
 }
 
 impl Componente {
@@ -24,6 +25,7 @@ impl Componente {
             Componente::ContrasenaRouter => "contrasena_router",
             Componente::UsuariosRouter => "usuarios_router",
             Componente::Cortafuegos => "cortafuegos",
+            Componente::Conexion => "conexion",
         }
     }
 
@@ -133,6 +135,13 @@ impl Componente {
                 "servicio-ssh",
                 "servicio-gestion",
                 "y",
+            ],
+            Componente::Conexion => &[
+                "del-operador",
+                "internet",
+                "monopuesto-titulo",
+                "monopuesto-pasos",
+                "monopuesto-avisos",
             ],
         }
     }

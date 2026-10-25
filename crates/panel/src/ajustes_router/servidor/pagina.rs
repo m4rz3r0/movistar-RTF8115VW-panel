@@ -48,6 +48,7 @@ pub(in crate::ajustes_router) async fn leer_tema(
         .collect();
     derivados::marcar(&del_tema, &mut vistas, &nodos, &leidas);
     marcar_protegidos(&state, &mut vistas).await;
+    derivados::marcar_conexiones(&mut vistas, &leidas);
     super::dns_propios::aceptar(
         &state.ajustes,
         &mut vistas,

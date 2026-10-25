@@ -17,6 +17,7 @@
 
 mod aviso;
 mod campo;
+mod conexion;
 mod consulta;
 mod cortafuegos;
 mod detalle;
