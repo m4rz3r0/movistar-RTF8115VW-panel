@@ -37,6 +37,17 @@ fn dato<'e>(e: &'e Value, clave: &str) -> &'e Value {
         .map_or_else(|| panic!("sin el dato {clave}: {e}"), |d| &d["valor"])
 }
 
+/// Los campos del ajuste `ajuste` en el detalle del elemento, buscado por id.
+fn campos<'e>(e: &'e Value, ajuste: &str) -> &'e Vec<Value> {
+    e["ajustes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| a["id"] == ajuste)
+        .and_then(|a| a["campos"].as_array())
+        .unwrap_or_else(|| panic!("sin {ajuste}: {e}"))
+}
+
 /// `adm_state` del teléfono por internet en el simulador.
 async fn sip_encendido(p: &Panel) -> String {
     let n = p.state.hgu.call("cbGetVoiceSip", &[]).await.unwrap();
@@ -47,7 +58,7 @@ async fn sip_encendido(p: &Panel) -> String {
 async fn voz_estado_leido() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let servidores = de_telefono(&p, &cookie, "servidores").await;
-    assert_eq!(servidores["texto_estado"], "Registrada", "{servidores}");
+    assert_eq!(servidores["texto_estado"], "Registrado", "{servidores}");
     assert_eq!(servidores["estado"], "emite", "{servidores}");
     assert_eq!(
         dato(&servidores, "ajuste-telefono-sip_oculto-estado_registro"),
@@ -93,6 +104,27 @@ async fn voz_sin_registrar_en_ambar() {
         dato(&servidores, "ajuste-telefono-sip_oculto-estado_registro"),
         &json!({ "Opcion": "sin_registrar" })
     );
+    // La recomendación no afirma un registro que la tarjeta niega.
+    let problema = servidores["recomendacion"]["problema"]
+        .as_str()
+        .unwrap_or_default();
+    assert!(
+        !problema.is_empty() && !problema.contains("registrado"),
+        "{servidores}"
+    );
+}
+
+/// Encendida con un registro que el panel no reconoce (`net_status=2`):
+/// solo «Encendido», nunca «Registrado».
+#[tokio::test]
+async fn voz_registro_desconocido_solo_encendido() {
+    let (p, cookie) = PanelPrueba::nuevo()
+        .capa(&variante("voz-registro-desconocido"))
+        .arrancar_con_gestor()
+        .await;
+    let servidores = de_telefono(&p, &cookie, "servidores").await;
+    assert_eq!(servidores["texto_estado"], "Encendido", "{servidores}");
+    assert_eq!(servidores["estado"], "emite", "{servidores}");
 }
 
 #[tokio::test]
@@ -106,15 +138,14 @@ async fn apagar_voz_recomendado_con_aviso() {
         r["texto"].as_str().is_some_and(|t| t
             .starts_with("Recomendado si no tienes teléfono fijo conectado")
             && t.contains("A favor:")
-            && t.contains("En contra:")),
+            && t.contains("En contra:")
+            && t.contains("volver a encenderlo")),
         "{r}"
     );
     assert!(r["lotes"].as_array().is_none_or(Vec::is_empty), "{r}");
     // La línea ya no recomienda estar encendida.
     let linea = de_telefono(&p, &cookie, "linea").await;
-    let activa = linea["ajustes"][0]["campos"]
-        .as_array()
-        .unwrap()
+    let activa = campos(&linea, "telefono.linea")
         .iter()
         .find(|c| c["id"] == "activa")
         .unwrap();
@@ -130,6 +161,18 @@ async fn apagar_voz_recomendado_con_aviso() {
     assert_eq!(status, 200, "{body}");
     let g: Value = serde_json::from_str(&body).unwrap();
     assert_eq!(g["efecto"], "efecto-telefono_corte", "{g}");
+    // El botón de la recomendación prepara el ajuste: mismo aviso.
+    let (status, body) = llamar(
+        &p,
+        "preparar_ajuste",
+        json!({ "p": { "ajuste": "telefono.sip_oculto", "instancia": null, "borrar": false,
+                       "valores": { "activo": "false" } } }),
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    let b: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(b["efecto"], "efecto-telefono_corte", "{b}");
     let id = aplicar_ajuste(&p, &cookie, &g).await;
     assert_eq!(sip_encendido(&p).await, "0");
     let inverso = ok(&p, "deshacer_ajuste", json!({ "cambio": id }), &cookie).await;

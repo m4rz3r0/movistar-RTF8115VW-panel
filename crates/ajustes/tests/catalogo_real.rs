@@ -793,3 +793,52 @@ fn fuentes_del_catalogo_real() {
         assert!(faltan.is_empty(), "{idioma:?}: {faltan:?}");
     }
 }
+
+/// Los estados habituales de TR-104 de la línea y de la llamada tienen su
+/// texto: tras apagar la voz o durante una llamada no sale inglés crudo.
+#[test]
+fn estados_de_voz_traducidos() {
+    let c = cargar();
+    let valores = |campo: &str| -> BTreeSet<String> {
+        c.ajuste("telefono.linea")
+            .and_then(|a| a.campo(campo))
+            .unwrap_or_else(|| panic!("falta telefono.linea.{campo}"))
+            .opciones
+            .iter()
+            .map(|o| o.valor.clone())
+            .collect()
+    };
+    let linea = valores("en_servicio");
+    for v in [
+        "Up",
+        "Disabled",
+        "Initializing",
+        "Registering",
+        "Unregistering",
+        "Error",
+        "Testing",
+        "Quiescent",
+    ] {
+        assert!(linea.contains(v), "en_servicio sin {v}: {linea:?}");
+    }
+    let llamada = valores("llamada");
+    for v in [
+        "Idle",
+        "Calling",
+        "Ringing",
+        "Connecting",
+        "InCall",
+        "Hold",
+        "Disconnecting",
+    ] {
+        assert!(llamada.contains(v), "llamada sin {v}: {llamada:?}");
+    }
+    // En inglés, «registration», no «sign-up», para el registro de la voz.
+    for ruta in ficheros_ftl("en", |s| s == "ajustes" || s == "ajustes-telefono") {
+        for (k, v) in valores_del_fichero(&ruta) {
+            if k.contains("estado_registro") || k.starts_with("ajustes-estado-voz") {
+                assert!(!v.to_lowercase().contains("sign"), "{k}: {v}");
+            }
+        }
+    }
+}

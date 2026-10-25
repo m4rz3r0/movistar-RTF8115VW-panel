@@ -35,21 +35,39 @@ tipo = "secreto"
 validar = { min = 1 }
 
 # Estado de la línea, solo de lectura. Con el router real (fase 3): `Up` y
-# `Idle` con la línea activa y sin llamada. Cualquier otro valor se enseña
-# tal cual (sin traducir), porque no se ha visto.
+# `Idle` con la línea activa y sin llamada. Los demás son los estados
+# habituales de TR-104 (sin ver aún en este router); uno que no esté aquí se
+# enseña tal cual.
 [[ajuste.campo]]
 id = "en_servicio"
 lee = "clt_status"
 tipo = "opcion"
 solo_lectura = "ajuste-telefono-linea-motivo"
-opciones = [{ valor = "Up", clave = "activa" }]
+opciones = [
+  { valor = "Up", clave = "activa" },
+  { valor = "Disabled", clave = "desactivada" },
+  { valor = "Initializing", clave = "arrancando" },
+  { valor = "Registering", clave = "registrandose" },
+  { valor = "Unregistering", clave = "dandose_de_baja" },
+  { valor = "Error", clave = "con_error" },
+  { valor = "Testing", clave = "en_pruebas" },
+  { valor = "Quiescent", clave = "sin_llamadas_nuevas" },
+]
 
 [[ajuste.campo]]
 id = "llamada"
 lee = "call_status"
 tipo = "opcion"
 solo_lectura = "ajuste-telefono-linea-motivo"
-opciones = [{ valor = "Idle", clave = "sin_llamada" }]
+opciones = [
+  { valor = "Idle", clave = "sin_llamada" },
+  { valor = "Calling", clave = "llamando" },
+  { valor = "Ringing", clave = "sonando" },
+  { valor = "Connecting", clave = "conectando" },
+  { valor = "InCall", clave = "en_llamada" },
+  { valor = "Hold", clave = "en_espera" },
+  { valor = "Disconnecting", clave = "colgando" },
+]
 
 # Como en `telefono.linea`, la contraseña de la línea (tapada al leerla) va
 # también aquí: cualquier guardado de estos datos la reenvía.
