@@ -127,6 +127,7 @@ impl Componente {
                 "sin-ping-ayuda",
                 "sin-ping-recomendado",
                 "ya-puesta",
+                "desactivada",
                 "sin-leer",
                 "sin-filtro",
                 "revisar-recomendado",
@@ -134,6 +135,8 @@ impl Componente {
                 "servicio-web",
                 "servicio-ssh",
                 "servicio-gestion",
+                "servicio-ping-ipv4",
+                "servicio-ping-ipv6",
                 "y",
             ],
             Componente::Conexion => &[

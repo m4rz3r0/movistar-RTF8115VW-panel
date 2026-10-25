@@ -327,6 +327,7 @@ ajustes-estado-diagnostico-no = Off
 ajustes-dato-nombres_ddns = Names
 ajustes-dato-nombres_ddns-ninguno = None
 ajustes-dato-cuentas = Accounts
+ajustes-dato-abierto_redes = Open only from specific networks
 
 ## Security and System actions
 ajustes-accion-apagar_gestion_remota = Turn off remote management
@@ -340,7 +341,6 @@ ajustes-problema-seguridad-cortafuegos-ping = The router answers ping from the i
 ajustes-problema-seguridad-cortafuegos-ping-ipv4 = The router answers ping coming from the internet over IPv4: anyone can tell that your connection is on.
 ajustes-problema-seguridad-cortafuegos-ping-ipv6 = The router answers ping coming from the internet over IPv6: anyone can tell that your connection is on, and the panel's rule is for IPv4 only.
 ajustes-problema-seguridad-cortafuegos-servicios-cualquiera = Open from anywhere on the internet: { $servicios }.
-ajustes-problema-seguridad-cortafuegos-servicios-redes = Open only from specific networks: { $servicios }.
 ajustes-problema-sistema-activa-false = The router does not set its clock over the internet: it drifts, and after a power cut it can end up with a very different time.
 ajustes-problema-sistema-servidor_1 = The router sets its clock from { $valor }: it depends on whoever runs that server.
 ajustes-problema-sistema-espejo-true = The traffic copy is on: anyone who plugs into that socket can see everything your home does on the internet.

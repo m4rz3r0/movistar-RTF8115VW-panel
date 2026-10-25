@@ -327,6 +327,7 @@ ajustes-estado-diagnostico-no = Apagada
 ajustes-dato-nombres_ddns = Nombres
 ajustes-dato-nombres_ddns-ninguno = Ninguno
 ajustes-dato-cuentas = Cuentas
+ajustes-dato-abierto_redes = Abierto solo desde redes concretas
 
 ## Acciones de Seguridad y Sistema
 ajustes-accion-apagar_gestion_remota = Apagar la gestión remota
@@ -340,7 +341,6 @@ ajustes-problema-seguridad-cortafuegos-ping = El router responde al ping desde i
 ajustes-problema-seguridad-cortafuegos-ping-ipv4 = El router responde al ping que llega de internet por IPv4: cualquiera puede saber que tu conexión está encendida.
 ajustes-problema-seguridad-cortafuegos-ping-ipv6 = El router responde al ping que llega de internet por IPv6: cualquiera puede saber que tu conexión está encendida, y la regla del panel es solo para IPv4.
 ajustes-problema-seguridad-cortafuegos-servicios-cualquiera = Abierto desde cualquier sitio de internet: { $servicios }.
-ajustes-problema-seguridad-cortafuegos-servicios-redes = Abierto solo desde redes concretas: { $servicios }.
 ajustes-problema-sistema-activa-false = El router no se pone en hora por internet: su reloj se va desajustando, y tras un corte de luz puede quedarse con una hora muy distinta.
 ajustes-problema-sistema-servidor_1 = El router se pone en hora con { $valor }: depende de quien gestione ese servidor.
 ajustes-problema-sistema-espejo-true = La copia del tráfico está encendida: quien se enchufe a esa toma puede ver todo lo que hace tu casa en internet.

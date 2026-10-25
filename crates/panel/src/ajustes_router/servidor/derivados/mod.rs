@@ -256,6 +256,7 @@ pub(super) fn dato(
         "conectados" => Ok(wifi::conectados(ctx, e).map(|n| ValorLegible::Texto(n.to_string()))),
         "nombres_ddns" => Ok(internet::nombres_ddns(ctx)),
         "cuentas" => Ok(seguridad::cuentas(ctx)),
+        "abierto_redes" => Ok(super::cortafuegos::abierto_redes(ctx)),
         otro => Err(Desconocido(otro.to_owned())),
     }
 }

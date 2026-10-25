@@ -124,10 +124,10 @@ fn enumerar(nombres: &[String]) -> String {
     }
 }
 
-/// Qué pasa ahora: el ping abierto a cualquiera, por versión, y los
-/// servicios abiertos (la web, el SSH, la gestión remota del operador o el
-/// ping solo desde redes concretas) desde cualquier sitio o solo desde
-/// redes concretas. Vacío si nada está abierto.
+/// Lo pendiente (Ruling J): el ping abierto a cualquiera, por versión, y
+/// los demás servicios (la web, el SSH o la gestión remota del operador)
+/// abiertos desde cualquier sitio. Lo abierto solo desde redes concretas no
+/// cuenta: va en el dato [`abierto_redes`]. Vacío si no hay nada pendiente.
 fn problema(f: &[Filtro], p: Ping) -> Vec<String> {
     let mut out = Vec::new();
     match (p.v4, p.v6) {
@@ -136,35 +136,83 @@ fn problema(f: &[Filtro], p: Ping) -> Vec<String> {
         (false, true) => out.push(t!("ajustes-problema-seguridad-cortafuegos-ping-ipv6")),
         (false, false) => {}
     }
-    // El ping abierto a cualquiera ya va arriba; solo desde redes
-    // concretas, con los demás.
-    let servicios: Vec<Abierto> = cf::abiertos(f)
+    let cualquiera: Vec<String> = cf::abiertos(f)
         .into_iter()
-        .filter(|a| a.servicio != Servicio::Ping || !a.desde_cualquiera)
+        .filter(|a| a.servicio != Servicio::Ping && a.desde_cualquiera)
+        .map(|a| nombre(a.servicio))
         .collect();
-    let de = |cualquiera: bool| -> String {
-        let n: Vec<String> = servicios
-            .iter()
-            .filter(|a| a.desde_cualquiera == cualquiera)
-            .map(|a| nombre(a.servicio))
-            .collect();
-        enumerar(&n)
-    };
-    let cualquiera = de(true);
     if !cualquiera.is_empty() {
         out.push(t!(
             "ajustes-problema-seguridad-cortafuegos-servicios-cualquiera",
-            servicios = cualquiera
-        ));
-    }
-    let redes = de(false);
-    if !redes.is_empty() {
-        out.push(t!(
-            "ajustes-problema-seguridad-cortafuegos-servicios-redes",
-            servicios = redes
+            servicios = enumerar(&cualquiera)
         ));
     }
     out
+}
+
+/// ¿Abre `a` el ping solo desde redes concretas?
+fn ping_restringido(a: &[Abierto]) -> bool {
+    a.iter()
+        .any(|a| a.servicio == Servicio::Ping && !a.desde_cualquiera)
+}
+
+/// Lo abierto solo desde redes concretas: el ping, por versión (en una
+/// versión no se pierde por estar abierto a cualquiera en la otra), y los
+/// demás servicios.
+fn restringidos(f: &[Filtro]) -> Vec<String> {
+    let v4 = ping_restringido(&abiertos_en(f, "0"));
+    let v6 = ping_restringido(&abiertos_en(f, "1"));
+    let mut out = match (v4, v6) {
+        (true, true) => vec![nombre(Servicio::Ping)],
+        (true, false) => vec![t!("ajuste-seguridad-cortafuegos-servicio-ping-ipv4")],
+        (false, true) => vec![t!("ajuste-seguridad-cortafuegos-servicio-ping-ipv6")],
+        (false, false) => Vec::new(),
+    };
+    out.extend(
+        cf::abiertos(f)
+            .into_iter()
+            .filter(|a| a.servicio != Servicio::Ping && !a.desde_cualquiera)
+            .map(|a| nombre(a.servicio)),
+    );
+    out
+}
+
+/// `derivado:abierto_redes`: lo abierto solo desde redes concretas, como
+/// dato de la tarjeta (solo informa; no es una recomendación pendiente).
+pub(super) fn abierto_redes(ctx: &Contexto) -> Option<ValorLegible> {
+    let n = restringidos(&filtros(ctx)?);
+    let texto = enumerar(&n);
+    let mut letras = texto.chars();
+    let primera = letras.next()?;
+    Some(ValorLegible::Texto(
+        primera.to_uppercase().chain(letras).collect(),
+    ))
+}
+
+/// Por qué no se ofrece el alta, sin contar la validación: la regla del
+/// panel ya está, desactivada (no descarta nada) o activa.
+fn motivo_regla(f: &[Filtro]) -> Option<String> {
+    if !hay_regla(f) {
+        None
+    } else if puesta(f) {
+        Some(t!("ajuste-seguridad-cortafuegos-ya-puesta"))
+    } else {
+        Some(t!("ajuste-seguridad-cortafuegos-desactivada"))
+    }
+}
+
+/// El texto de la recomendación: «sin ping» si el ping de IPv4 está abierto
+/// y el panel puede poner su regla (con ella desactivada no la ofrece); y
+/// «revisar» si queda algo que la regla no arregla.
+fn texto(f: &[Filtro], p: Ping, problema: &[String]) -> String {
+    let mut texto = Vec::new();
+    if p.v4 && !hay_regla(f) {
+        texto.push(t!("ajuste-seguridad-cortafuegos-sin-ping-recomendado"));
+    }
+    if p.v6 || problema.len() > usize::from(p.v4) {
+        texto.push(t!("ajuste-seguridad-cortafuegos-revisar-recomendado"));
+    }
+    texto.join(" ")
 }
 
 /// Los filtros de la lectura del cortafuegos de la página (`None` si no se
@@ -197,22 +245,13 @@ pub(super) fn del_elemento(
     };
     let motivo = match sin_validar(Funcion3::SinPing) {
         Some(m) => Some(traducir(m, None)),
-        None if hay_regla(&f) => Some(t!("ajuste-seguridad-cortafuegos-ya-puesta")),
-        None => None,
+        None => motivo_regla(&f),
     };
     let p = ping(&f);
     let problema = problema(&f, p);
-    // La regla del panel solo arregla el ping de IPv4; lo demás, a revisar.
-    let mut texto = Vec::new();
-    if p.v4 {
-        texto.push(t!("ajuste-seguridad-cortafuegos-sin-ping-recomendado"));
-    }
-    if p.v6 || problema.len() > usize::from(p.v4) {
-        texto.push(t!("ajuste-seguridad-cortafuegos-revisar-recomendado"));
-    }
     let recomendacion = (!problema.is_empty()).then(|| RecomendacionVista {
+        texto: texto(&f, p, &problema),
         problema: problema.join(" "),
-        texto: texto.join(" "),
         riesgo: false,
         boton: String::new(),
         ajuste: AJUSTE.to_owned(),
@@ -314,50 +353,4 @@ pub(in crate::ajustes_router) async fn preparar_sin_ping() -> Result<GrupoVista,
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn filtros() -> Vec<Filtro> {
-        cf::analizar(include_str!(
-            "../../../../hgu/fixtures/paginas/scbidirectionalflt_ls.asp"
-        ))
-        .unwrap()
-    }
-
-    /// La regla del panel en el filtro IPv4 de la copia saneada.
-    fn con_regla(mut f: Vec<Filtro>) -> Vec<Filtro> {
-        let mut r = f[0].reglas[8].clone();
-        (r.rid, r.action, r.icmp_type) = ("16".into(), "0".into(), "25".into());
-        f[0].reglas.push(r);
-        f
-    }
-
-    #[test]
-    fn el_ping_por_version() {
-        let f = filtros();
-        let p = ping(&f);
-        assert_eq!((p.v4, p.v6, p.regla), (true, true, false));
-        assert_eq!(estado(p).1, "ajustes-estado-cortafuegos-ping");
-        // Con la regla, IPv6 sigue abierto: no se dice que no responda.
-        let p = ping(&con_regla(f.clone()));
-        assert_eq!((p.v4, p.v6, p.regla), (false, true, true));
-        assert_eq!(estado(p).1, "ajustes-estado-cortafuegos-ping-ipv6");
-        // Sin el ping de IPv6, solo «regla puesta», sin afirmar su efecto.
-        let mut sin_v6 = con_regla(f);
-        sin_v6[1].reglas.retain(|r| r.icmp_type != "55");
-        let p = ping(&sin_v6);
-        assert_eq!((p.v4, p.v6, p.regla), (false, false, true));
-        assert_eq!(estado(p).1, "ajustes-estado-cortafuegos-regla-puesta");
-    }
-
-    /// Una regla con la huella pero desactivada no cuenta para el estado
-    /// (el ping de IPv4 sigue abierto), aunque sí impide otra alta.
-    #[test]
-    fn la_regla_desactivada_no_cuenta() {
-        let mut f = con_regla(filtros());
-        f[0].reglas.last_mut().unwrap().enable = "0".into();
-        let p = ping(&f);
-        assert_eq!((p.v4, p.regla), (true, false));
-        assert!(hay_regla(&f));
-    }
-}
+mod tests;

@@ -128,6 +128,11 @@ test.describe("cortafuegos", () => {
       await page.setViewportSize({ width: ancho, height: 900 });
       const errores = recogerErrores(page);
       await entrarEnSuPanel(page);
+      // La tarjeta: lo abierto solo desde redes concretas es un dato, no
+      // una recomendación pendiente.
+      await page.goto("/ajustes/seguridad");
+      await asentar(page);
+      await expect(page.getByText("Abierto solo desde redes concretas")).toBeVisible();
       await page.goto("/ajustes/seguridad/cortafuegos");
       await asentar(page);
       const filas = page.locator(".cortafuegos-reglas .tabla-scroll tbody tr");

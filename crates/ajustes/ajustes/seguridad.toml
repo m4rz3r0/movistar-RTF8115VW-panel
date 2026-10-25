@@ -251,13 +251,15 @@ icono = "personas"
 datos = ["derivado:cuentas"]
 
 # El estado dice si el router responde al ping desde internet (o si ya
-# tiene la regla del panel).
+# tiene la regla del panel); el dato, lo abierto solo desde redes concretas
+# (solo informa: no es una recomendación pendiente).
 [[elemento]]
 id = "cortafuegos"
 tema = "seguridad"
 ajustes = ["seguridad.cortafuegos"]
 icono = "escudo"
 estado = "derivado:estado_cortafuegos"
+datos = ["derivado:abierto_redes"]
 
 # Acciones (spec §5.5).
 [[accion]]

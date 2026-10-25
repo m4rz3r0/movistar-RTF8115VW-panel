@@ -250,21 +250,32 @@ async fn sin_regla_responde_al_ping_por_las_dos() {
     assert_eq!(e["texto_estado"], "Responde al ping", "{e}");
 }
 
-/// La recomendación informativa nombra la web, el SSH y la gestión remota
-/// del operador abiertos solo desde redes concretas y, si una regla los
-/// abre a cualquiera, desde cualquier sitio.
+/// El dato «Abierto solo desde redes concretas» del elemento (`None` si no
+/// sale).
+fn abierto_redes(e: &Value) -> Option<String> {
+    e["datos"]
+        .as_array()?
+        .iter()
+        .find(|d| d["clave"] == "ajustes-dato-abierto_redes")
+        .and_then(|d| d["valor"]["Texto"].as_str())
+        .map(str::to_owned)
+}
+
+/// Ruling J: la web, el SSH y la gestión remota del operador abiertos solo
+/// desde redes concretas (el estado de serie) son un dato de la tarjeta, no
+/// algo pendiente; si una regla los abre a cualquiera, sí lo son.
 #[tokio::test]
 async fn recomendacion_con_la_web_y_el_ssh_abiertos() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let e = elemento(&p, &cookie, "cortafuegos").await;
     let problema = e["recomendacion"]["problema"].as_str().unwrap_or_default();
-    assert!(
-        problema.contains(
-            "Abierto solo desde redes concretas: la web del router, el SSH y la gestión remota del operador."
-        ),
+    assert!(!problema.contains("redes concretas"), "{e}");
+    assert!(!problema.contains("Abierto desde cualquier sitio"), "{e}");
+    assert_eq!(
+        abierto_redes(&e).as_deref(),
+        Some("La web del router, el SSH y la gestión remota del operador"),
         "{e}"
     );
-    assert!(!problema.contains("Abierto desde cualquier sitio"), "{e}");
     // El SSH de la regla 0, abierto a cualquiera.
     let mut ssh = p.sim.control.cortafuegos()[0].reglas[0].clone();
     assert_eq!(ssh.rid, "0");
@@ -277,12 +288,80 @@ async fn recomendacion_con_la_web_y_el_ssh_abiertos() {
         problema.contains("Abierto desde cualquier sitio de internet: el SSH."),
         "{e}"
     );
-    assert!(
-        problema.contains(
-            "Abierto solo desde redes concretas: la web del router y la gestión remota del operador."
-        ),
+    assert_eq!(
+        abierto_redes(&e).as_deref(),
+        Some("La web del router y la gestión remota del operador"),
         "{e}"
     );
     let texto = e["recomendacion"]["texto"].as_str().unwrap_or_default();
     assert!(texto.contains("pedir al operador"), "{e}");
+}
+
+/// Con todo abierto solo desde redes concretas (también el ping, por las
+/// dos versiones), no hay recomendación pendiente: solo el dato.
+#[tokio::test]
+async fn solo_desde_redes_concretas_no_es_pendiente() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    let mut v4 = p.sim.control.cortafuegos()[0].reglas[8].clone();
+    v4.orig_addr = "192.0.2.1".into();
+    p.sim.control.cortafuegos_sustituir("0", "8", v4);
+    let mut v6 = p.sim.control.cortafuegos()[1]
+        .reglas
+        .iter()
+        .find(|r| r.icmp_type == "55")
+        .cloned()
+        .unwrap();
+    v6.orig_addr = "2001:db8::1".into();
+    let rid = v6.rid.clone();
+    p.sim.control.cortafuegos_sustituir("1", &rid, v6);
+    p.state.lecturas.invalidar();
+    let e = elemento(&p, &cookie, "cortafuegos").await;
+    assert!(e["recomendacion"].is_null(), "{e}");
+    assert_eq!(
+        abierto_redes(&e).as_deref(),
+        Some("El ping, la web del router, el SSH y la gestión remota del operador"),
+        "{e}"
+    );
+}
+
+/// La regla del panel en el router pero desactivada: motivo propio y sin
+/// ofrecer ponerla.
+#[tokio::test]
+async fn regla_del_panel_desactivada() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    aplicar_sin_ping(&p, &cookie).await;
+    let mut r = regla_16(&p).unwrap();
+    r.enable = "0".into();
+    p.sim.control.cortafuegos_sustituir("0", "16", r);
+    p.state.lecturas.invalidar();
+    let e = elemento(&p, &cookie, "cortafuegos").await;
+    let motivo = e["accion_propia"]["motivo"].as_str().unwrap_or_default();
+    assert!(motivo.contains("desactivada"), "{e}");
+    let texto = e["recomendacion"]["texto"].as_str().unwrap_or_default();
+    assert!(!texto.contains("pase más desapercibido"), "{e}");
+}
+
+/// El ping de IPv6 solo desde redes concretas no se pierde porque el de
+/// IPv4 esté abierto a cualquiera: el de IPv4 es lo pendiente y el de IPv6,
+/// el dato.
+#[tokio::test]
+async fn ping_de_ipv6_restringido_con_el_de_ipv4_abierto() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    let mut v6 = p.sim.control.cortafuegos()[1]
+        .reglas
+        .iter()
+        .find(|r| r.icmp_type == "55")
+        .cloned()
+        .unwrap();
+    v6.orig_addr = "2001:db8::1".into();
+    let rid = v6.rid.clone();
+    p.sim.control.cortafuegos_sustituir("1", &rid, v6);
+    p.state.lecturas.invalidar();
+    let e = elemento(&p, &cookie, "cortafuegos").await;
+    let problema = e["recomendacion"]["problema"].as_str().unwrap_or_default();
+    assert!(problema.contains("por IPv4"), "{e}");
+    assert!(
+        abierto_redes(&e).is_some_and(|d| d.starts_with("El ping por IPv6, la web")),
+        "{e}"
+    );
 }
