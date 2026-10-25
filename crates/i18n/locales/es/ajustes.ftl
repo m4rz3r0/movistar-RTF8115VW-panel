@@ -338,7 +338,7 @@ ajustes-problema-wifi-invitada-sin-separar = { $n ->
     [one] La red de invitados { $redes } está encendida y no está separada de la red de casa: quien se conecte a ella llega a tus dispositivos.
    *[other] Las redes de invitados { $redes } están encendidas y no están separadas de la red de casa: quien se conecte a ellas llega a tus dispositivos.
 }
-ajustes-wifi-invitada-sin-separar-recomendado = Recomendado si esa red es para visitas: sepárala de la red de casa desde la web del router, o apágala allí si no la usas; el panel todavía no sabe hacerlo. A favor: quien se conecte a ella llega a internet, pero no a tus dispositivos. En contra: desde ella no se ven la impresora ni la tele de casa.
+ajustes-wifi-invitada-sin-separar-recomendado = Recomendado si esa red es para visitas: el panel todavía no sabe separarla ni apagarla; si la web del router lo permite, sepárala de la red de casa desde allí, o apágala si no la usas. A favor: quien se conecte a ella llega a internet, pero no a tus dispositivos. En contra: desde ella no se ven la impresora ni la tele de casa.
 
 ## Acciones de Seguridad y Sistema
 ajustes-accion-apagar_gestion_remota = Apagar la gestión remota

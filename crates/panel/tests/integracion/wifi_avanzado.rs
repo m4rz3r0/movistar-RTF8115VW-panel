@@ -44,6 +44,21 @@ async fn renovacion_en_el_sim(p: &Panel) -> String {
         .to_owned()
 }
 
+/// La lectura del punto de acceso 0 en el simulador, campo a campo.
+async fn punto_0_en_el_sim(p: &Panel) -> Vec<(String, String)> {
+    let n = p
+        .state
+        .hgu
+        .call("cbGetWifiAccPt", &[("dpm_cfg_wifi_acc_pt_id", "0")])
+        .await
+        .unwrap();
+    let ap = n.get("dpm_cfg_wifi_acc_pt").unwrap();
+    ap.children
+        .iter()
+        .map(|c| (c.tag.clone(), c.text.clone()))
+        .collect()
+}
+
 /// Escrituras de los puntos de acceso recibidas por el simulador.
 fn escrituras_wifi(p: &Panel) -> Vec<Vec<(String, String)>> {
     p.sim
@@ -69,6 +84,7 @@ async fn preparar(p: &Panel, cookie: &str, ajuste: &str, valores: Value) -> (u16
 async fn renovacion_de_clave_ida_y_vuelta() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     assert_eq!(renovacion_en_el_sim(&p).await, "0");
+    let antes = punto_0_en_el_sim(&p).await;
     let (status, body) = preparar(
         &p,
         &cookie,
@@ -86,6 +102,19 @@ async fn renovacion_de_clave_ida_y_vuelta() {
     assert!(claves.contains(&"regen_key_interval"), "{claves:?}");
     for no in ["wifi_pmf", "guest_networking"] {
         assert!(!claves.contains(&no), "la escritura lleva {no}: {claves:?}");
+    }
+    // La clave y el nombre de la red viajan con el valor que tenían, y el
+    // resto de lo que no se ha tocado, también.
+    for k in ["key_phrase", "ssid"] {
+        assert!(claves.contains(&k), "la escritura no lleva {k}: {claves:?}");
+    }
+    for (k, v) in &w[0] {
+        if k == "regen_key_interval" {
+            continue;
+        }
+        if let Some((_, previo)) = antes.iter().find(|(a, _)| a == k) {
+            assert_eq!(v, previo, "{k} cambia en la escritura");
+        }
     }
     let tema = leer(&p, &cookie, "wifi").await;
     assert_eq!(
@@ -115,14 +144,15 @@ async fn pmf_y_separada_solo_lectura() {
     assert!(wps["solo_lectura"].is_string(), "{wps}");
     let separada = campo(&tema, "wifi.invitados_avanzado", "separada");
     assert_eq!(separada["valor"], json!({ "Booleano": true }), "{separada}");
-    let (status, body) = preparar(
-        &p,
-        &cookie,
-        "wifi.red_24_avanzado",
-        json!({ "pmf": "desactivada" }),
-    )
-    .await;
-    assert_eq!(status, 400, "{body}");
+    for (ajuste, valores) in [
+        ("wifi.red_24_avanzado", json!({ "pmf": "desactivada" })),
+        ("wifi.red_5_avanzado", json!({ "wps_bloqueo": "true" })),
+        ("wifi.red_24_avanzado", json!({ "separada": "true" })),
+        ("wifi.invitados_avanzado", json!({ "separada": "false" })),
+    ] {
+        let (status, body) = preparar(&p, &cookie, ajuste, valores.clone()).await;
+        assert_eq!(status, 400, "{ajuste} {valores}: {body}");
+    }
     assert!(escrituras_wifi(&p).is_empty());
 }
 
@@ -162,11 +192,78 @@ async fn otras_invitadas_en_la_tarjeta() {
     assert_eq!(r["informativa"], true, "{e}");
     let problema = r["problema"].as_str().unwrap();
     assert!(problema.contains("RED-2"), "{problema}");
-    assert!(problema.contains('3'), "{problema}");
+    assert!(problema.contains("(red 3)"), "{problema}");
     assert!(
         r["texto"]
             .as_str()
-            .is_some_and(|t| t.starts_with("Recomendado si")),
+            .is_some_and(|t| t.starts_with("Recomendado si")
+                && t.contains("si la web del router lo permite")),
         "{r}"
     );
+}
+
+/// Si falla la lista de puntos de acceso de una radio, faltan sus redes de
+/// invitados: el dato no sale con una cifra parcial y la recomendación solo
+/// nombra las redes que se ven.
+#[tokio::test]
+async fn otras_invitadas_con_una_lista_sin_leer() {
+    // Falla la de 5 GHz, la de la red 3 sin separar: ni cifra ni aviso.
+    let (p, cookie) = PanelPrueba::nuevo()
+        .capa(&variante("invitada-sin-separar"))
+        .arrancar_con_gestor()
+        .await;
+    p.sim
+        .control
+        .fail_reads_con("cbListWifiAccPt", "dpm_cfg_wifi_id", "1", true);
+    let e = elemento(&p, &cookie, "invitados").await;
+    assert!(
+        !e["datos"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|d| d["clave"] == "ajustes-dato-otras_invitadas"),
+        "{e}"
+    );
+    assert_ne!(e["recomendacion"]["informativa"], true, "{e}");
+
+    // Falla la de 2,4 GHz: la red 3 se ve y se avisa de ella, pero sin cifra.
+    let (p, cookie) = PanelPrueba::nuevo()
+        .capa(&variante("invitada-sin-separar"))
+        .arrancar_con_gestor()
+        .await;
+    p.sim
+        .control
+        .fail_reads_con("cbListWifiAccPt", "dpm_cfg_wifi_id", "0", true);
+    let e = elemento(&p, &cookie, "invitados").await;
+    assert!(
+        !e["datos"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|d| d["clave"] == "ajustes-dato-otras_invitadas"),
+        "{e}"
+    );
+    let r = &e["recomendacion"];
+    assert_eq!(r["informativa"], true, "{e}");
+    assert!(r["problema"].as_str().unwrap().contains("(red 3)"), "{r}");
+}
+
+/// Una red de la que no se sabe si está separada no cuenta como «no
+/// separada»: el dato no sale.
+#[tokio::test]
+async fn otras_invitadas_con_separacion_ilegible() {
+    let (p, cookie) = PanelPrueba::nuevo()
+        .capa(&variante("invitada-separacion-ilegible"))
+        .arrancar_con_gestor()
+        .await;
+    let e = elemento(&p, &cookie, "invitados").await;
+    assert!(
+        !e["datos"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|d| d["clave"] == "ajustes-dato-otras_invitadas"),
+        "{e}"
+    );
+    assert_ne!(e["recomendacion"]["informativa"], true, "{e}");
 }

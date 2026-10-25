@@ -27,15 +27,16 @@ struct Invitada {
 }
 
 /// Los puntos de acceso de invitados (ids 2 a 7) de las listas de las dos
-/// radios, por id. `None` si no se pudo leer ninguna lista.
-fn invitadas(ctx: &Contexto) -> Option<Vec<Invitada>> {
-    let listas: Vec<&XmlNode> = claves_de_listas(ctx.del_tema)
-        .iter()
-        .filter_map(|(_, c)| ctx.leida(c))
-        .collect();
+/// radios, por id, y si se leyeron todas las listas (cada radio trae la
+/// mitad de las redes: si falta una, faltan las suyas). `None` si no se
+/// pudo leer ninguna lista.
+fn invitadas(ctx: &Contexto) -> Option<(Vec<Invitada>, bool)> {
+    let claves = claves_de_listas(ctx.del_tema);
+    let listas: Vec<&XmlNode> = claves.iter().filter_map(|(_, c)| ctx.leida(c)).collect();
     if listas.is_empty() {
         return None;
     }
+    let completas = listas.len() == claves.len();
     let elementos = [ID_PUNTO, "ssid", "adm_state", "guest_networking"];
     let mut out: Vec<Invitada> = listas
         .into_iter()
@@ -57,18 +58,21 @@ fn invitadas(ctx: &Contexto) -> Option<Vec<Invitada>> {
         .collect();
     out.sort_by_key(|i| i.id);
     out.dedup_by_key(|i| i.id);
-    Some(out)
+    Some((out, completas))
 }
 
 /// `derivado:otras_invitadas`: cuántas de las otras redes de invitados
 /// (ids 3 a 7) están separadas de la red de casa («5 de 5 separadas»).
-/// `None` si las listas no se pudieron leer o no traen ninguna.
+/// `None` si falta alguna de las listas, si no traen ninguna o si de
+/// alguna no se sabe si está separada: una cifra parcial parecería
+/// completa.
 pub(in super::super) fn otras_invitadas(ctx: &Contexto) -> Option<ValorLegible> {
-    let otras: Vec<Invitada> = invitadas(ctx)?
+    let (todas, completas) = invitadas(ctx)?;
+    let otras: Vec<Invitada> = todas
         .into_iter()
         .filter(|i| i.id > PRIMERA_INVITADA)
         .collect();
-    if otras.is_empty() {
+    if !completas || otras.is_empty() || otras.iter().any(|i| i.separada.is_none()) {
         return None;
     }
     let separadas = otras.iter().filter(|i| i.separada == Some(true)).count();
@@ -96,9 +100,12 @@ fn nombre(i: &Invitada) -> String {
 /// Recomendación (solo informa: el panel no puede cambiarlo) si alguna red
 /// de invitados (id 2 o más) está encendida y no está separada de la red de
 /// casa. Es un riesgo: quien se conecte a ella llega a los dispositivos de
-/// casa.
+/// casa. Si falta la lista de una radio, avisa solo de las redes que se
+/// ven: las de la otra radio no se dan por separadas, solo no se nombran (y
+/// el dato `otras_invitadas` sale sin cifra).
 pub(in super::super) fn invitada_sin_separar(ctx: &Contexto) -> Option<RecomendacionVista> {
-    let sin_separar: Vec<String> = invitadas(ctx)?
+    let (todas, _) = invitadas(ctx)?;
+    let sin_separar: Vec<String> = todas
         .iter()
         .filter(|i| i.encendida && i.separada == Some(false))
         .map(nombre)
