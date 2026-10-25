@@ -69,19 +69,20 @@ ajuste-internet-conexion-contrasena = Contraseña
 ajuste-internet-conexion-contrasena-desc = La contraseña de ese usuario. Hace falta si pones un router tuyo en su lugar.
 ajuste-internet-conexion-del-operador = Del operador (no es tu internet)
 ajuste-internet-conexion-internet = Tu conexión a internet
+ajuste-internet-conexion-sin-identificar = Conexión { $id }: no se sabe si es la de internet
 ajuste-internet-conexion-monopuesto-titulo = Cómo pasar a monopuesto
 ajuste-internet-conexion-monopuesto-pasos =
     Apunta el usuario y la contraseña de tu conexión a internet (arriba, con el ojo).
-    Conecta tu router propio por cable a un puerto de este router.
-    En la web de este router, pon la conexión a internet en modo monopuesto y guarda. El router se reinicia.
-    En tu router, configura la conexión a internet por PPPoE con ese usuario y esa contraseña.
+    Pon la conexión a internet de este router en monopuesto (puente). Cómo se hace depende del modelo y del operador: si no lo tienes claro, pregunta a tu operador.
+    Conecta tu router propio por cable a este router.
+    En tu router, configura la conexión a internet por PPPoE con ese usuario y esa contraseña. Va en su propia VLAN: pon la que use tu operador para internet (en Movistar suele ser la 6).
     Comprueba que tu router tiene internet y conecta tus dispositivos a él.
 ajuste-internet-conexion-monopuesto-avisos =
     Es para quien tiene un router propio detrás de este. Si no lo tienes, no lo hagas.
-    Mientras lo cambias, te quedas sin internet unos minutos.
-    La WiFi, las direcciones de tu red y los puertos pasan a tu router: los de este dejan de servir y el panel ya no los verá.
+    Mientras lo cambias, te quedas sin internet hasta que tu router conecte.
+    La WiFi, las direcciones de tu red y los puertos pasan a tu router: los de este dejan de servir y puede que el panel ya no pueda entrar en él.
     La televisión y el teléfono del operador pueden dejar de funcionar si dependen de este router.
-    El panel no lo hace por ti. Para volver atrás, deshaz el cambio en la web del router o restablécelo de fábrica.
+    El panel no lo hace por ti ni sabe deshacerlo. Si algo sale mal y no hay otra forma de volver atrás, el último recurso es restablecer este router de fábrica y configurarlo de nuevo.
 
 ## Fibra
 ajuste-internet-fibra-titulo = Fibra

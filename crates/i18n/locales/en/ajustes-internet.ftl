@@ -69,19 +69,20 @@ ajuste-internet-conexion-contrasena = Password
 ajuste-internet-conexion-contrasena-desc = That user's password. You need it if you put your own router in its place.
 ajuste-internet-conexion-del-operador = From the operator (not your internet)
 ajuste-internet-conexion-internet = Your internet connection
+ajuste-internet-conexion-sin-identificar = Connection { $id }: not known whether it is the internet one
 ajuste-internet-conexion-monopuesto-titulo = How to switch to bridge mode (monopuesto)
 ajuste-internet-conexion-monopuesto-pasos =
     Write down the user and password of your internet connection (above, with the eye).
-    Connect your own router by cable to a port on this router.
-    In this router's web, set the internet connection to bridge mode (monopuesto) and save. The router restarts.
-    On your router, set up the internet connection as PPPoE with that user and password.
+    Put this router's internet connection in bridge mode (monopuesto). How depends on the model and the operator: if you are not sure, ask your operator.
+    Connect your own router by cable to this router.
+    On your router, set up the internet connection as PPPoE with that user and password. It goes on its own VLAN: use the one your operator uses for internet (with Movistar it is usually 6).
     Check that your router has internet and connect your devices to it.
 ajuste-internet-conexion-monopuesto-avisos =
     It is for people who have their own router behind this one. If you don't, don't do it.
-    While you switch, you are without internet for a few minutes.
-    WiFi, your network's addresses and ports move to your router: this one's stop working and the panel will no longer see them.
+    While you change it, you have no internet until your router connects.
+    The WiFi, your network's addresses and the ports move to your router: this one's stop working and the panel may no longer be able to sign in to it.
     The operator's TV and phone may stop working if they depend on this router.
-    The panel does not do it for you. To go back, undo the change in the router's web or reset it to factory settings.
+    The panel does not do it for you and cannot undo it. If something goes wrong and there is no other way back, the last resort is to factory reset this router and set it up again.
 
 ## Fibre
 ajuste-internet-fibra-titulo = Fibre

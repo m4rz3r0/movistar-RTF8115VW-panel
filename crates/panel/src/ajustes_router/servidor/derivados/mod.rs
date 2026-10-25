@@ -14,7 +14,7 @@ mod sistema;
 mod telefono;
 pub(super) mod wifi;
 
-pub(super) use internet::marcar_conexiones;
+pub(super) use internet::{conexiones, marcar_conexiones};
 
 use super::*;
 use crate::ui::comun::EstadoVisual;
@@ -33,6 +33,9 @@ pub(super) struct Contexto<'a> {
     /// Desde cuándo está apagado cada punto de acceso que se apagó desde
     /// el panel (su id → segundos Unix), del Historial.
     pub apagadas: &'a HashMap<String, i64>,
+    /// La conexión a internet del panel entre las leídas (la elegida a mano
+    /// o la detectada), si hay.
+    pub wan: Option<&'a str>,
 }
 
 impl<'a> Contexto<'a> {
@@ -304,6 +307,7 @@ mod tests {
             vistas: &[],
             leidas: &leidas,
             apagadas: &apagadas,
+            wan: None,
         };
         for n in DERIVADOS_DATO {
             assert!(dato(n, &ctx, &e).is_ok(), "{n}");

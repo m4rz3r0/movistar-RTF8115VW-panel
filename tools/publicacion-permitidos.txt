@@ -71,7 +71,8 @@ ruta crates/hgu/fixtures/paginas/*.asp fixture — páginas HTML del router sane
 
 # Secretos inventados que una variante pone para probar que no salen del
 # sitio (Tarea 4 de la fase 3: la contraseña PPP y la serie GPON).
-ruta crates/hgu/fixtures-variantes/conexion-secretos/*.xml fixture — la contraseña PPP (clave-ppp-de-prueba) y la serie GPON (SERIE-DE-PRUEBA) son inventadas a propósito; el resto de cada hoja lo sigue comprobando fixtures_have_no_secrets (router-sim), que solo admite esos dos valores en un secreto
+valor clave-ppp-de-prueba — contraseña PPP inventada a propósito en fixtures-variantes/conexion-secretos para probar que no sale del sitio; fixtures_have_no_secrets (router-sim) solo la admite en esa fixture y en su etiqueta
+valor SERIE-DE-PRUEBA — número de serie GPON inventado a propósito en fixtures-variantes/conexion-secretos para probar que no sale del sitio; fixtures_have_no_secrets (router-sim) solo lo admite en esa fixture y en su etiqueta
 
 # Direcciones neutras de las fixtures y las pruebas (Neutralizador del saneador).
 red 192.168.1.60/30 — equipos de la LAN renumerados en las fixtures (.60–.99) y en las pruebas

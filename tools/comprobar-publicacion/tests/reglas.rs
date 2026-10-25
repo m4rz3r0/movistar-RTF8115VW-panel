@@ -229,6 +229,26 @@ fn fixture_con_secreto() {
     assert!(reglas("docs/api.md", xml).is_empty());
 }
 
+/// Un `valor` permitido vale en un secreto de una fixture; los demás
+/// secretos de esa fixture se siguen comprobando.
+#[test]
+fn fixture_con_valor_de_prueba_permitido() {
+    let p = Permitidos::leer("valor clave-de-prueba-1 — inventado para una prueba").unwrap();
+    let r = |xml: &str| -> Vec<Regla> {
+        revisar_texto(
+            "crates/hgu/fixtures-v2/a.xml",
+            xml,
+            &p,
+            &ListasLocales::vacia(),
+        )
+        .into_iter()
+        .map(|h| h.regla)
+        .collect()
+    };
+    assert!(r("<R><password>clave-de-prueba-1</password></R>").is_empty());
+    assert_eq!(r("<R><password>otra</password></R>"), [Regla::Fixture]);
+}
+
 #[test]
 fn permitido_sin_motivo_es_error() {
     assert!(Permitidos::leer("valor 9.9.9.9").is_err());

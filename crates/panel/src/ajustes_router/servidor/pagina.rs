@@ -48,7 +48,8 @@ pub(in crate::ajustes_router) async fn leer_tema(
         .collect();
     derivados::marcar(&del_tema, &mut vistas, &nodos, &leidas);
     marcar_protegidos(&state, &mut vistas).await;
-    derivados::marcar_conexiones(&mut vistas, &leidas);
+    let wan = state.wan_en(&derivados::conexiones(&leidas));
+    derivados::marcar_conexiones(&mut vistas, &leidas, wan.as_deref());
     super::dns_propios::aceptar(
         &state.ajustes,
         &mut vistas,
@@ -60,6 +61,7 @@ pub(in crate::ajustes_router) async fn leer_tema(
         vistas: &vistas,
         leidas: &leidas,
         apagadas: &apagadas,
+        wan: wan.as_deref(),
     };
     let (resumen, elementos, acciones) = montar(&state.catalogo, &state.ajustes, tema, &ctx);
     let red =

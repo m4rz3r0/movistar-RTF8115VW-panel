@@ -136,6 +136,7 @@ async fn conexion_sin_leer_con_motivo() {
         .as_str()
         .unwrap_or_else(|| panic!("leído: {e}"));
     assert!(!motivo.is_empty());
+    assert_eq!(e["texto_estado"], "Sin leer", "{e}");
     let api = regex::Regex::new(r"cb[A-Z]").unwrap();
     // Ni en el motivo ni en lo que se ve de la tarjeta (los detalles
     // técnicos plegados aparte).
@@ -151,4 +152,103 @@ async fn conexion_sin_leer_con_motivo() {
     // La fibra y el resto de Internet se leen.
     assert_eq!(ajuste(&tema, "internet.fibra")["estado"], "Leido");
     assert_eq!(elemento(&tema, "dns")["lectura"], "Leido");
+}
+
+/// Fixtures de serie del simulador.
+const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../hgu/fixtures");
+
+/// Capa con `cbGetWanIPIntf` de serie cambiado por `cambiar`.
+fn capa_wan(dir: &std::path::Path, cambiar: impl Fn(String) -> String) {
+    let wan = std::fs::read_to_string(format!("{FIXTURES}/cbGetWanIPIntf.xml")).unwrap();
+    std::fs::write(dir.join("cbGetWanIPIntf.xml"), cambiar(wan)).unwrap();
+}
+
+/// Las notas de las instancias de las conexiones, en su orden.
+fn notas(tema: &Value) -> Vec<Value> {
+    ajuste(tema, "internet.conexion")["instancias"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| i["nota"].clone())
+        .collect()
+}
+
+/// La PPP caída pierde su dirección: la conexión de internet sigue siendo
+/// la del panel (la detectada al instalar), que sale «Sin conexión», y las
+/// demás siguen siendo del operador.
+#[tokio::test]
+async fn conexion_ppp_caida_sin_conexion() {
+    let capa = tempfile::tempdir().unwrap();
+    capa_wan(capa.path(), |wan| {
+        wan.replacen(
+            "<opr_status>1</opr_status>",
+            "<opr_status>0</opr_status>",
+            1,
+        )
+        .replacen(
+            "<dis_ipv4_addr>203.0.113.6</dis_ipv4_addr>",
+            "<dis_ipv4_addr></dis_ipv4_addr>",
+            1,
+        )
+    });
+    let (p, cookie) = PanelPrueba::nuevo()
+        .capa(capa.path())
+        .arrancar_con_gestor()
+        .await;
+    assert_eq!(
+        p.state.wan().as_deref(),
+        Some("ip2"),
+        "detectada al instalar"
+    );
+    let tema = leer(&p, &cookie, "internet").await;
+    let del_operador = json!("ajuste-internet-conexion-del-operador");
+    assert_eq!(
+        notas(&tema),
+        [Value::Null, del_operador.clone(), del_operador]
+    );
+    assert_eq!(
+        ajuste(&tema, "internet.conexion")["instancias"][0]["id"],
+        "2"
+    );
+    let e = elemento(&tema, "conexion");
+    assert_eq!(e["estado"], "atencion", "{e}");
+    assert_eq!(e["texto_estado"], "Sin conexión", "{e}");
+}
+
+/// La conexión elegida a mano en el panel manda, como en el gestor.
+#[tokio::test]
+async fn conexion_sigue_la_elegida_a_mano() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    p.state.fijar_red(p.state.red(), Some("ip4".into()));
+    let tema = leer(&p, &cookie, "internet").await;
+    let i = &ajuste(&tema, "internet.conexion")["instancias"];
+    assert_eq!(i[0]["id"], "4", "{i}");
+    assert_eq!(i[0]["nota"], Value::Null, "{i}");
+    assert_eq!(i[1]["nota"], "ajuste-internet-conexion-del-operador", "{i}");
+}
+
+/// Sin conexión del panel y con dos conexiones de datos con dirección de
+/// internet, no se sabe cuál es: ninguna se titula «Tu conexión a
+/// internet» y la tarjeta dice «Sin datos» (la lectura sí funcionó).
+#[tokio::test]
+async fn conexion_sin_identificar_sin_datos() {
+    let capa = tempfile::tempdir().unwrap();
+    capa_wan(capa.path(), |wan| {
+        wan.replace(
+            "<opr_app_mask>4</opr_app_mask>",
+            "<opr_app_mask>1</opr_app_mask>",
+        )
+    });
+    let (p, cookie) = PanelPrueba::nuevo()
+        .capa(capa.path())
+        .arrancar_con_gestor()
+        .await;
+    p.state.fijar_red(None, None);
+    let tema = leer(&p, &cookie, "internet").await;
+    let sin = json!("ajuste-internet-conexion-sin-identificar");
+    assert_eq!(notas(&tema), [sin.clone(), sin.clone(), sin]);
+    let e = elemento(&tema, "conexion");
+    assert_eq!(e["lectura"], "Leido", "{e}");
+    assert_eq!(e["estado"], "atencion", "{e}");
+    assert_eq!(e["texto_estado"], "Sin datos", "{e}");
 }

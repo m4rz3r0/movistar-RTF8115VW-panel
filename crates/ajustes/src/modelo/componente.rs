@@ -142,6 +142,7 @@ impl Componente {
             Componente::Conexion => &[
                 "del-operador",
                 "internet",
+                "sin-identificar",
                 "monopuesto-titulo",
                 "monopuesto-pasos",
                 "monopuesto-avisos",

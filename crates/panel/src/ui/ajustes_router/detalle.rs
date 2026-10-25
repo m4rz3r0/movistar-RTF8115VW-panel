@@ -66,10 +66,22 @@ fn se_edita(a: &AjusteVista) -> bool {
     !a.lista && a.componente.is_none()
 }
 
+/// ¿Se pinta `a` dentro de las conexiones a internet de `e` (la fibra)? Sí
+/// si es un ajuste suelto sin componente y las conexiones se leyeron; si
+/// no, va en su propia columna.
+fn junto_a_conexion(a: &AjusteVista, e: &ElementoVista) -> bool {
+    a.componente.is_none()
+        && !a.lista
+        && e.ajustes.iter().any(|x| {
+            x.componente.as_deref() == Some(super::conexion::CONEXION)
+                && x.estado == EstadoLectura::Leido
+        })
+}
+
 /// La columna de un ajuste que no se edita aquí: una lista en una tabla, el
 /// enlace a donde se cambia la contraseña del router, los usuarios del
 /// router con sus acciones, las reglas del cortafuegos con «No responder
-/// al ping» (del elemento `e`) o las conexiones a internet.
+/// al ping» (del elemento `e`) o las conexiones a internet con la fibra.
 fn columna_de_consulta(a: &AjusteVista, unica: bool, e: &ElementoVista) -> impl IntoView + use<> {
     let elemento = e.id.as_str();
     let col = format!("{}-columna", dom(a));
@@ -88,7 +100,13 @@ fn columna_de_consulta(a: &AjusteVista, unica: bool, e: &ElementoVista) -> impl 
         }
         .into_any()
     } else if a.componente.as_deref() == Some(super::conexion::CONEXION) {
-        view! { <super::conexion::Conexion a=a.clone() /> }.into_any()
+        let anexos: Vec<AjusteVista> = e
+            .ajustes
+            .iter()
+            .filter(|x| x.estado == EstadoLectura::Leido && junto_a_conexion(x, e))
+            .cloned()
+            .collect();
+        view! { <super::conexion::Conexion a=a.clone() anexos /> }.into_any()
     } else if a.lista {
         consulta::lista(a).into_any()
     } else {
@@ -243,7 +261,7 @@ pub(crate) fn Detalle(e: ElementoVista, registro: Registro) -> impl IntoView {
     let leidos: Vec<&AjusteVista> = e
         .ajustes
         .iter()
-        .filter(|a| a.estado == EstadoLectura::Leido)
+        .filter(|a| a.estado == EstadoLectura::Leido && !junto_a_conexion(a, &e))
         .collect();
     // Sin nada que se pueda cambiar (la contraseña del router, una lista de
     // consulta), sin «Guardar cambios».

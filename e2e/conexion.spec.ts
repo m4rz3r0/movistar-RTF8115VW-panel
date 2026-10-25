@@ -5,8 +5,9 @@ import { asentar, entrar, recogerErrores, sinDesbordamiento, violacionesGraves }
 // 1440 px, contra router-sim y solo de lectura: la tarjeta en la rejilla con
 // su estado; en el detalle, la conexión de internet primero y las del
 // operador marcadas, la contraseña PPP censurada que el ojo muestra, la
-// fibra «Operativa» y «Cómo pasar a monopuesto», que se abre (pasos y
-// avisos, sin botón). Axe sin violaciones serias ni críticas y sin scroll
+// fibra «Operativa» dentro de la misma columna (bloque «Fibra», con su
+// número de serie censurado que el ojo muestra) y «Cómo pasar a
+// monopuesto», que se abre (pasos y avisos, sin botón). Axe sin violaciones serias ni críticas y sin scroll
 // horizontal.
 
 const t = {
@@ -16,6 +17,8 @@ const t = {
   operador: "Del operador (no es tu internet)",
   ojo: "Mostrar Contraseña",
   operativa: "Operativa (O5)",
+  fibra: "Fibra",
+  ojoSerie: "Mostrar Número de serie de la fibra",
   monopuesto: "Cómo pasar a monopuesto",
   // Las fixtures saneadas.
   clave: "X-REDACTED-X",
@@ -42,7 +45,11 @@ test.describe("conexión a internet", () => {
       await expect(bloques).toHaveCount(3);
       await expect(bloques.first().getByRole("heading", { level: 4 })).toHaveText(t.internet);
       await expect(page.locator(".conexion-operador h4")).toHaveText([t.operador, t.operador]);
-      await expect(page.locator(".detalle")).toContainText(t.operativa);
+      // La fibra, en un bloque «Fibra» de la misma columna (no «Avanzado»).
+      const fibra = page.locator(".conexion-anexo");
+      await expect(fibra.getByRole("heading", { level: 4 })).toHaveText(t.fibra);
+      await expect(fibra).toContainText(t.operativa);
+      await expect(page.locator(".detalle-columna")).toHaveCount(1);
       await sinDesbordamiento(page, `conexión ${ancho}`);
       expect(await violacionesGraves(page), `conexión ${ancho}`).toEqual([]);
 
@@ -53,6 +60,13 @@ test.describe("conexión a internet", () => {
       await expect(campo).toHaveValue(t.clave);
       await internet.getByRole("button", { name: t.ojo, exact: true }).click();
       await expect(campo).toHaveAttribute("type", "text");
+      // El número de serie de la fibra: otro camino, el mismo ojo.
+      const serie = fibra.locator("input.secreto-valor").first();
+      await expect(serie).toHaveAttribute("type", "password");
+      await expect(serie).toHaveValue(t.clave);
+      await fibra.getByRole("button", { name: t.ojoSerie, exact: true }).click();
+      await expect(serie).toHaveAttribute("type", "text");
+      await expect(serie).toHaveValue(t.clave);
 
       // «Cómo pasar a monopuesto» se abre: pasos y avisos, sin botón.
       const monopuesto = page.locator("details.conexion-monopuesto");

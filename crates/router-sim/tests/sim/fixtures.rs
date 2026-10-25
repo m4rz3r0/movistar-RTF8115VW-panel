@@ -24,12 +24,24 @@ fn real_secrets() -> HashSet<String> {
 }
 
 /// Valores inventados que una variante pone a propósito en un secreto, para
-/// probar que no salen del sitio (`fixtures-variantes/conexion-secretos`):
-/// valen en lugar de [`sanitize::REDACTED`].
-const VALORES_DE_PRUEBA: [&str; 2] = ["clave-ppp-de-prueba", "SERIE-DE-PRUEBA"];
+/// probar que no salen del sitio: (fixture, etiqueta, valor). Valen en lugar
+/// de [`sanitize::REDACTED`] solo en esa fixture de
+/// `fixtures-variantes/conexion-secretos` y en esa etiqueta.
+const VALORES_DE_PRUEBA: [(&str, &str, &str); 2] = [
+    (
+        "conexion-secretos/cbGetWanIPIntf.xml",
+        "password",
+        "clave-ppp-de-prueba",
+    ),
+    (
+        "conexion-secretos/cbGetGPONInfo.xml",
+        "GponSerialNumber",
+        "SERIE-DE-PRUEBA",
+    ),
+];
 
 /// Comprueba un valor de la fixture `file` (de un elemento o de un parámetro
-/// del nombre del fichero).
+/// del nombre del fichero; `<variante>/<fichero>` en una variante).
 fn check_value(file: &str, tag: &str, value: &str, secrets: &HashSet<String>) {
     use sanitize::TagClass;
     let class = sanitize::tag_class(tag)
@@ -53,7 +65,7 @@ fn check_value(file: &str, tag: &str, value: &str, secrets: &HashSet<String>) {
             .is_some_and(|n| n.parse::<u32>().is_ok())
     };
     match class {
-        TagClass::Redact if VALORES_DE_PRUEBA.contains(&value) => {}
+        TagClass::Redact if VALORES_DE_PRUEBA.contains(&(file, tag, value)) => {}
         TagClass::Redact => assert_eq!(value, sanitize::REDACTED, "{file}: <{tag}> sin sanear"),
         TagClass::Ssid => assert!(pseudo("RED-"), "{file}: <{tag}> sin sanear"),
         TagClass::Host => assert!(pseudo("host-"), "{file}: <{tag}> sin sanear"),
@@ -101,11 +113,19 @@ fn fixtures_have_no_secrets() {
     assert!(dirs.len() > 1, "faltan las variantes");
     let mut files = 0;
     for dir in dirs {
+        let variante = dir
+            .strip_prefix(&variantes)
+            .ok()
+            .map(|d| d.to_string_lossy().into_owned());
         for entry in std::fs::read_dir(&dir).expect("directorio de fixtures") {
             let path = entry.unwrap().path();
-            let name = path.file_name().unwrap().to_string_lossy().into_owned();
-            let Some(stem) = name.strip_suffix(".xml") else {
+            let file = path.file_name().unwrap().to_string_lossy().into_owned();
+            let Some(stem) = file.strip_suffix(".xml") else {
                 continue;
+            };
+            let name = match &variante {
+                Some(v) => format!("{v}/{file}"),
+                None => file.clone(),
             };
             files += 1;
             for (k, v) in sanitize::split_fixture_name(stem).1 {
@@ -118,6 +138,22 @@ fn fixtures_have_no_secrets() {
         }
     }
     assert!(files > 50, "faltan fixtures ({files})");
+}
+
+/// Los valores de prueba valen solo en su fixture y su etiqueta.
+#[test]
+fn valores_de_prueba_solo_en_su_sitio() {
+    let ninguno = HashSet::new();
+    let (file, tag, value) = VALORES_DE_PRUEBA[0];
+    check_value(file, tag, value, &ninguno);
+    for (f, t) in [
+        ("cbGetWanIPIntf.xml", tag),
+        ("dhcp-sin-voip/cbGetWanIPIntf.xml", tag),
+        (file, "username"),
+    ] {
+        let r = std::panic::catch_unwind(|| check_value(f, t, value, &ninguno));
+        assert!(r.is_err(), "{f} <{t}> admite el valor de prueba");
+    }
 }
 
 /// Cada entrada de la caché ARP tiene su MAC: una MAC repetida en varias IP
