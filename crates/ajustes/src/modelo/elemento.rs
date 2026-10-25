@@ -1,6 +1,7 @@
 //! Formato de los elementos y las acciones de una pestaña (`[[elemento]]` y `[[accion]]`).
 
 use super::Tema;
+use crate::fuentes::Respaldo;
 use serde::Deserialize;
 
 /// Un elemento de una pestaña: lo que la persona ve como una cosa (una
@@ -31,6 +32,13 @@ pub struct Elemento {
     /// la WiFi; ver [`ICONOS`](crate::ICONOS).
     #[serde(default)]
     pub icono: Option<String>,
+    /// Fuentes de una recomendación de su tarjeta que no sale de un campo
+    /// (la del cortafuegos, que solo informa).
+    #[serde(default)]
+    pub fuentes: Vec<String>,
+    /// En qué se apoya esa recomendación.
+    #[serde(default)]
+    pub respaldo: Option<Respaldo>,
 }
 
 /// Una acción que se aplica a varios elementos de una pestaña a la vez

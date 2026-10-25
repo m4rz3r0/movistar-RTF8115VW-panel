@@ -10,7 +10,7 @@
 //! Sin features, la crate solo trae los tipos que usan las vistas del panel,
 //! que también se compilan para el navegador. La feature `catalogo` (servidor)
 //! añade la carga de `ajustes/*.toml` (con los lotes de mejoras de
-//! `ajustes/lotes.toml`) y `excluidas.toml`, su comprobación
+//! `ajustes/lotes.toml`), `excluidas.toml` y `fuentes.toml`, su comprobación
 //! contra `funciones.toml`/`secretos.toml` y la traducción de valores entre el
 //! formato del router y el legible.
 
@@ -38,6 +38,8 @@ mod carga;
 #[cfg(feature = "catalogo")]
 mod elementos;
 #[cfg(feature = "catalogo")]
+mod fuentes;
+#[cfg(feature = "catalogo")]
 mod lotes;
 #[cfg(feature = "catalogo")]
 mod propios;
@@ -53,6 +55,8 @@ pub use elementos::{
     DERIVADOS_DATO, DERIVADOS_ESTADO, MAX_DATOS, PREFIJO_DERIVADO, clave_accion, clave_papel,
     claves_de_elementos, partir_referencia, titulo_accion,
 };
+#[cfg(feature = "catalogo")]
+pub use fuentes::{ClaseFuente, Fuente, Respaldo};
 #[cfg(feature = "catalogo")]
 pub use lotes::{
     Condicion, Destino, ELECCION_DNS, Eleccion, Lote, OpcionEleccion, ParaCada, PasoExpandido,

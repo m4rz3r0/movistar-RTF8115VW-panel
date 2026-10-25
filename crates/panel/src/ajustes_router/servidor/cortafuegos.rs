@@ -259,6 +259,9 @@ pub(super) fn del_elemento(
         valor: String::new(),
         lotes: Vec::new(),
         informativa: true,
+        // Las pone `fuentes::en_recomendacion`.
+        fuentes: Vec::new(),
+        respaldo: None,
     });
     Some((recomendacion, accion(motivo)))
 }

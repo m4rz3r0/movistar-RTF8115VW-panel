@@ -141,7 +141,7 @@ escribe = { funcion = "cbSetX", parametro = "seguridad" }
 lee = "seguridad"
 tipo = "opcion"
 opciones = [
-  { valor = "11", clave = "wpa2_wpa3", recomendada = true },
+  { valor = "11", clave = "wpa2_wpa3", recomendada = true, respaldo = "criterio" },
   { valor = "3", clave = "wpa2" },
   { valor = "0", clave = "abierta", aviso = "inseguro" },
 ]
@@ -153,6 +153,7 @@ lee = "oculta"
 tipo = "booleano"
 invertido = true
 recomendado = "true"
+respaldo = "criterio"
 
 [[ajuste.campo]]
 id = "clave"

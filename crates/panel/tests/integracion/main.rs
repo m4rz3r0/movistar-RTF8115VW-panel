@@ -25,6 +25,7 @@ mod dmz;
 mod estado;
 mod estaticos;
 mod explorador;
+mod fuentes;
 mod grupos;
 mod historial;
 mod historial_idioma;

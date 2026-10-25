@@ -46,6 +46,9 @@ pub(in crate::ajustes_router) async fn leer_tema(
         .zip(&claves)
         .map(|(a, c)| vista_leida(&state.catalogo, a, leidas.get(c)))
         .collect();
+    for (a, v) in del_tema.iter().zip(&mut vistas) {
+        super::fuentes::en_ajuste(&state.ajustes, a, v);
+    }
     derivados::marcar(&del_tema, &mut vistas, &nodos, &leidas);
     marcar_protegidos(&state, &mut vistas).await;
     let wan = state.wan_en(&derivados::conexiones(&leidas));
@@ -136,6 +139,8 @@ pub(super) fn montar(
             datos: Vec::new(),
             estado: None,
             icono: None,
+            fuentes: Vec::new(),
+            respaldo: None,
         })
         .collect();
     del_catalogo.extend(sueltos);
@@ -226,6 +231,9 @@ fn elemento(
     // el panel no puede cambiarlo): solo informa.
     if let Some(r) = derivados::recomendacion_propia(ctx, e).filter(|_| leido) {
         recomendacion = Some(r);
+    }
+    if let Some(r) = recomendacion.as_mut() {
+        super::fuentes::en_recomendacion(cat, e, r);
     }
     let aplicables = acciones
         .iter()

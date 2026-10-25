@@ -157,6 +157,8 @@ impl Lecturas {
             id: MANTENER_DNS.to_owned(),
             defecto: false,
             valores,
+            fuentes: Vec::new(),
+            respaldo: None,
         })
     }
 }
@@ -203,6 +205,7 @@ pub(crate) async fn calcular(state: &AppState, fresca: bool) -> (Vec<LoteVista>,
                 .iter()
                 .map(|(p, e)| {
                     let (nota, nota_proveedor) = nota(p, e);
+                    let (fuentes, respaldo) = super::fuentes::del_paso(&state.ajustes, p);
                     PasoLoteVista {
                         clave: p.clave(),
                         texto: clave_paso(&p.paso),
@@ -211,6 +214,8 @@ pub(crate) async fn calcular(state: &AppState, fresca: bool) -> (Vec<LoteVista>,
                         nota,
                         nota_proveedor,
                         opcional: p.opcional,
+                        fuentes,
+                        respaldo,
                     }
                 })
                 .collect(),

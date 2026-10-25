@@ -3,8 +3,8 @@
 //! usan las páginas por tema.
 
 use ajustes::{
-    Ajuste, Campo, CatalogoAjustes, Componente, Nivel, claves_de_elementos, claves_requeridas,
-    comprobar, prefijo_i18n,
+    Ajuste, Campo, CatalogoAjustes, ClaseFuente, Componente, Nivel, Respaldo, claves_de_elementos,
+    claves_requeridas, comprobar, prefijo_i18n,
 };
 use catalogo::{Catalogo, Tipo, mask::Mascara};
 use i18n::Idioma;
@@ -585,6 +585,9 @@ fn sin(c: &Campo, recomendado: bool, opciones: bool) -> Campo {
     let mut c = c.clone();
     if recomendado {
         c.recomendado = None;
+        // Las fuentes son de la recomendación.
+        c.fuentes.clear();
+        c.respaldo = None;
     }
     if opciones {
         c.opciones.clear();
@@ -617,8 +620,9 @@ fn forma(
 /// Las tres redes WiFi tienen los mismos campos, parámetros, validaciones y
 /// opciones; solo difieren la recomendación del aislamiento (sí en
 /// invitados, donde además es de seguridad), la de encender la red
-/// (apagada en invitados) y el motivo de lo que solo se lee, con el
-/// prefijo de su ajuste. Las dos radios, igual, salvo canales, anchos y modos (propios
+/// (apagada en invitados), con sus fuentes, las fuentes de `separada` (las
+/// del aviso de la red de invitados sin separar) y el motivo de lo que
+/// solo se lee, con el prefijo de su ajuste. Las dos radios, igual, salvo canales, anchos y modos (propios
 /// de cada banda) y la señal dirigida, que solo está en 5 GHz.
 #[test]
 fn redes_y_radios_wifi_iguales_salvo_lo_previsto() {
@@ -634,6 +638,10 @@ fn redes_y_radios_wifi_iguales_salvo_lo_previsto() {
                 let mut x = sin(x, matches!(x.id.as_str(), "aislamiento" | "activa"), false);
                 if x.id == "aislamiento" {
                     x.seguridad = false;
+                }
+                // Las fuentes del aviso de una red de invitados sin separar.
+                if x.id == "separada" {
+                    x.fuentes.clear();
                 }
                 x.solo_lectura = x
                     .solo_lectura
@@ -713,5 +721,75 @@ fn wifi_avanzado_lee_pmf_wps_y_separada() {
             "{}",
             a.id
         );
+    }
+}
+
+/// Las fuentes de las recomendaciones: las de la investigación, todas por
+/// https, y cada recomendación con las suyas o como criterio del panel
+/// (también las que solo informan: la DMZ, la red de invitados sin separar y
+/// el cortafuegos; y cada proveedor de DNS, el familiar incluido).
+#[test]
+fn fuentes_del_catalogo_real() {
+    let c = cargar();
+    assert!(c.fuentes().len() >= 30, "{}", c.fuentes().len());
+    for f in c.fuentes() {
+        assert!(f.url.starts_with("https://"), "{}: {}", f.id, f.url);
+    }
+    assert_eq!(
+        c.fuente("nsa-red-casa").map(|f| f.clase),
+        Some(ClaseFuente::Guia)
+    );
+    let campo = |ajuste: &str, campo: &str| -> Campo {
+        c.ajuste(ajuste)
+            .and_then(|a| a.campo(campo))
+            .cloned()
+            .unwrap_or_else(|| panic!("falta {ajuste}.{campo}"))
+    };
+    assert!(
+        campo("wifi.red_24", "wps")
+            .fuentes
+            .iter()
+            .any(|f| f == "cert-wps")
+    );
+    // Lo que solo informa también dice de dónde sale.
+    assert!(!campo("puertos.dmz", "equipo").fuentes.is_empty());
+    assert!(
+        !campo("wifi.invitados_avanzado", "separada")
+            .fuentes
+            .is_empty()
+    );
+    let cortafuegos = c
+        .elementos()
+        .iter()
+        .find(|e| e.id == "cortafuegos")
+        .unwrap();
+    assert!(!cortafuegos.fuentes.is_empty());
+    assert_eq!(
+        campo("telefono.sip_oculto", "activo").respaldo,
+        Some(Respaldo::Criterio)
+    );
+    // Cada proveedor de DNS, con la página del suyo.
+    let dns = c.eleccion("proveedor_dns").unwrap();
+    for o in &dns.opciones {
+        assert!(!o.fuentes.is_empty(), "{} sin fuentes", o.id);
+    }
+    let familiar = dns
+        .opciones
+        .iter()
+        .find(|o| o.id == "cloudflare_familiar")
+        .unwrap();
+    assert_eq!(familiar.fuentes, ["cloudflare-familias"]);
+    let fallos = comprobar(&c, &Catalogo::load().unwrap(), &Mascara::load().unwrap());
+    assert!(fallos.is_empty(), "{fallos:#?}");
+    // Los textos de cada clase y cada respaldo, en los dos idiomas.
+    let claves: Vec<String> = ClaseFuente::TODAS
+        .iter()
+        .map(|c| c.clave())
+        .chain(Respaldo::TODOS.iter().map(|r| r.clave()))
+        .chain(["fuentes-titulo".to_owned(), "fuentes-consultada".to_owned()])
+        .collect();
+    for idioma in Idioma::TODOS {
+        let faltan: Vec<&String> = claves.iter().filter(|k| !i18n::existe(idioma, k)).collect();
+        assert!(faltan.is_empty(), "{idioma:?}: {faltan:?}");
     }
 }

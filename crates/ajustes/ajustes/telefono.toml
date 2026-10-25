@@ -22,6 +22,7 @@ escribe = { funcion = "cbSetVoiceLine", parametro = "vad_state" }
 lee = "vad_state"
 tipo = "booleano"
 recomendado = "false"
+respaldo = "criterio"
 
 # El router la da vacía al leerla (`tapado` en el catálogo de funciones):
 # cualquier guardado de la línea la reenvía, así que la página la pide al
@@ -98,7 +99,7 @@ escribe = { funcion = "cbSetVoiceSip", parametro = "dtmf_method" }
 lee = "dtmf_method"
 tipo = "opcion"
 opciones = [
-  { valor = "2", clave = "aparte", recomendada = true },
+  { valor = "2", clave = "aparte", recomendada = true, respaldo = "criterio" },
   { valor = "1", clave = "en_la_voz" },
   { valor = "3", clave = "mensajes" },
 ]
@@ -127,6 +128,7 @@ escribe = { funcion = "cbSetVoiceSip", parametro = "adm_state" }
 lee = "adm_state"
 tipo = "booleano"
 recomendado = "false"
+respaldo = "criterio"
 
 # Si el router está registrado en el servidor de voz del operador (solo de
 # lectura; con el router real, 1 aunque no haya teléfono conectado).

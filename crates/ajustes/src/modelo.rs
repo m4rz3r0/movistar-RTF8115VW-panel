@@ -162,6 +162,7 @@ mod catalogo_toml {
     pub use super::componente::Componente;
     pub use super::elemento::{Accion, Elemento};
     use super::{Nivel, Requiere, Tema, TipoCampo};
+    use crate::fuentes::Respaldo;
     use serde::{Deserialize, Deserializer};
     use std::collections::BTreeMap;
 
@@ -322,6 +323,12 @@ mod catalogo_toml {
         /// `<p>-<campo>-false`, en el resumen de un cambio y en su valor.
         #[serde(default)]
         pub textos_valor: bool,
+        /// Ids de las fuentes de su recomendación (`fuentes.toml`).
+        #[serde(default)]
+        pub fuentes: Vec<String>,
+        /// En qué se apoya su recomendación (`criterio`: sin fuente real).
+        #[serde(default)]
+        pub respaldo: Option<Respaldo>,
     }
 
     impl Campo {
@@ -391,6 +398,12 @@ mod catalogo_toml {
         /// (`ademas = { encryption = "4" }`).
         #[serde(default)]
         pub ademas: BTreeMap<String, String>,
+        /// Ids de las fuentes de su recomendación (`fuentes.toml`).
+        #[serde(default)]
+        pub fuentes: Vec<String>,
+        /// En qué se apoya su recomendación (`criterio`: sin fuente real).
+        #[serde(default)]
+        pub respaldo: Option<Respaldo>,
     }
 
     /// Valores del router para sí y no.

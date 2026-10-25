@@ -17,7 +17,7 @@ lee = "seguridad"
 tipo = "opcion"
 ademas = [{ parametro = "cifrado", lee = "cifrado" }]
 opciones = [
-  { valor = "11", clave = "wpa2_wpa3", recomendada = true, ademas = { cifrado = "4" } },
+  { valor = "11", clave = "wpa2_wpa3", recomendada = true, respaldo = "criterio", ademas = { cifrado = "4" } },
   { valor = "3", clave = "wpa2", ademas = { cifrado = "4" } },
   { valor = "3", clave = "wpa2_tkip", aviso = "inseguro", ademas = { cifrado = "2" } },
   { valor = "0", clave = "abierta", aviso = "inseguro", ademas = { cifrado = "0" } },
@@ -428,8 +428,9 @@ fn aceptados_en_un_texto_con_recomendado() {
             1,
         )
     };
-    let bien =
-        con("recomendado = \"hora.example\"\naceptados = [\"*.pool.example\", \"otra.example\"]");
+    let bien = con(
+        "recomendado = \"hora.example\"\nrespaldo = \"criterio\"\naceptados = [\"*.pool.example\", \"otra.example\"]",
+    );
     let f = fallos(&bien, "");
     assert!(f.is_empty(), "{f:#?}");
     falla_con(
@@ -478,7 +479,9 @@ tipo = \"ip\"
 #[test]
 fn aceptados_en_un_campo_ip() {
     let f = fallos(
-        &con_ip("recomendado = \"192.0.2.1\"\naceptados = [\"192.0.2.2\", \"192.0.2.3\"]"),
+        &con_ip(
+            "recomendado = \"192.0.2.1\"\nrespaldo = \"criterio\"\naceptados = [\"192.0.2.2\", \"192.0.2.3\"]",
+        ),
         "",
     );
     assert!(f.is_empty(), "{f:#?}");
@@ -489,7 +492,9 @@ fn aceptados_en_un_campo_ip() {
     );
     falla_con(
         &fallos(
-            &con_ip("recomendado = \"192.0.2.1\"\naceptados = [\"*.example\"]"),
+            &con_ip(
+                "recomendado = \"192.0.2.1\"\nrespaldo = \"criterio\"\naceptados = [\"*.example\"]",
+            ),
             "",
         ),
         "wifi.puerta.puerta",

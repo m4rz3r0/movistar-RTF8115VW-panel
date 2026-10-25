@@ -274,6 +274,9 @@ pub(super) fn campo(
         requiere: c.requiere.clone(),
         sin_eleccion: c.sin_eleccion.is_some(),
         clave,
+        // Las pone `fuentes::en_ajuste`, solo en la página del tema.
+        fuentes: Vec::new(),
+        respaldo: None,
     }
 }
 

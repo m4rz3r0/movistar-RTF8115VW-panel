@@ -137,6 +137,9 @@ pub(super) fn recomendacion(
             .map(ajustes::clave_lote)
             .collect(),
         informativa: false,
+        // Las pone `fuentes::en_recomendacion`.
+        fuentes: Vec::new(),
+        respaldo: None,
         ajuste: v.id.clone(),
         campo: c.id.clone(),
         valor,
@@ -166,6 +169,8 @@ mod tests {
             aceptados: Vec::new(),
             requiere: None,
             sin_eleccion: false,
+            fuentes: Vec::new(),
+            respaldo: None,
         }
     }
 

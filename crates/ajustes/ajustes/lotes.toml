@@ -5,13 +5,17 @@
 # formato está en `src/lotes/mod.rs`; los textos, en `mejoras.ftl`:
 # `mejoras-lote-<id>`, `-desc` y `-titulo`; `mejoras-paso-<id>` y `-desc`;
 # `mejoras-aviso-<id>` y `mejoras-consejo-<id>`; cada proveedor de DNS,
-# `mejoras-dns-<opción>` y su `-desc` (la nota).
+# `mejoras-dns-<opción>` y su `-desc` (la nota). Cada paso y cada proveedor
+# citan sus fuentes (`fuentes.toml`), o `respaldo = "criterio"` si no hay
+# una fuente real detrás.
 
 # Gestión remota del operador (TR-069) apagada.
 [[paso]]
 id = "gestion_remota"
 tema = "seguridad"
 accion = "apagar_gestion_remota"
+fuentes = ["ba-tr069-control", "ba-tr069-reset", "cw-tr069"]
+respaldo = "foro"
 
 # Aviso periódico al operador apagado.
 [[paso]]
@@ -19,6 +23,8 @@ id = "aviso_operador"
 tema = "seguridad"
 campo = "seguridad.gestion_remota_avanzado.aviso"
 valor = "false"
+fuentes = ["ba-tr069-control", "ba-tr069-reset", "cw-tr069"]
+respaldo = "foro"
 
 # WPS fuera, en cada red WiFi.
 [[paso]]
@@ -26,6 +32,8 @@ id = "wps"
 tema = "wifi"
 accion = "quitar_wps"
 para_cada = "red_wifi"
+fuentes = ["cert-wps", "nsa-red-casa", "cisa-red-casa", "bsi-wlan"]
+respaldo = "consenso"
 
 # UPnP apagado.
 [[paso]]
@@ -33,6 +41,8 @@ id = "upnp"
 tema = "puertos"
 campo = "puertos.upnp.activo"
 valor = "false"
+fuentes = ["nsa-red-casa", "cisa-red-casa"]
+respaldo = "consenso"
 
 # WPA2-AES sin modo mixto, en cada red WiFi.
 [[paso]]
@@ -41,6 +51,8 @@ tema = "wifi"
 campo = "seguridad"
 valor = "wpa2"
 para_cada = "red_wifi"
+fuentes = ["nsa-red-casa", "bsi-wlan", "incibe-wifi"]
+respaldo = "consenso"
 
 # Aislar la red de invitados, solo si está encendida. Es un paso de campo y
 # no la acción `aislar`, que vale para cualquier red marcada.
@@ -50,6 +62,7 @@ tema = "wifi"
 campo = "wifi.invitados_avanzado.aislamiento"
 valor = "true"
 si = { campo = "wifi.invitados.activa", valor = "true" }
+fuentes = ["incibe-wifi", "bsi-wlan"]
 
 # Espejo del tráfico de internet apagado.
 [[paso]]
@@ -57,6 +70,7 @@ id = "espejo"
 tema = "sistema"
 campo = "sistema.diagnostico.espejo"
 valor = "false"
+respaldo = "criterio"
 
 # Registro del sistema sin envío a otro equipo.
 [[paso]]
@@ -64,6 +78,7 @@ id = "registro"
 tema = "sistema"
 campo = "sistema.registro.envio"
 valor = "false"
+respaldo = "criterio"
 
 # DNS que el router reparte a la red de casa: los del proveedor elegido.
 [[paso]]
@@ -71,6 +86,7 @@ id = "dns_casa"
 tema = "red_local"
 ajuste = "red_local.dns_casa"
 elegir = "proveedor_dns"
+fuentes = ["pg-dns", "pg-dns-vision"]
 
 # Proveedores de DNS neutros (spec §4.3). Mullvad no está: solo funciona
 # cifrado, y el router no cifra.
@@ -81,22 +97,27 @@ id = "proveedor_dns"
 id = "quad9"
 defecto = true
 valores = { principal = "9.9.9.9", secundario = "149.112.112.112" }
+fuentes = ["quad9-servicio", "quad9-privacidad"]
 
 [[eleccion.opcion]]
 id = "quad9_sin_filtro"
 valores = { principal = "9.9.9.10", secundario = "149.112.112.10" }
+fuentes = ["quad9-servicio"]
 
 [[eleccion.opcion]]
 id = "dns4eu"
 valores = { principal = "86.54.11.100", secundario = "86.54.11.200" }
+fuentes = ["dns4eu"]
 
 [[eleccion.opcion]]
 id = "cloudflare"
 valores = { principal = "1.1.1.1", secundario = "1.0.0.1" }
+fuentes = ["cloudflare-resolver"]
 
 [[eleccion.opcion]]
 id = "adguard"
 valores = { principal = "94.140.14.14", secundario = "94.140.15.15" }
+fuentes = ["adguard-dns"]
 
 # DNS familiar: Cloudflare for Families, la variante que bloquea malware y
 # contenido para adultos (1.1.1.3 y 1.0.0.3). Fuentes oficiales de
@@ -106,6 +127,7 @@ valores = { principal = "94.140.14.14", secundario = "94.140.15.15" }
 [[eleccion.opcion]]
 id = "cloudflare_familiar"
 valores = { principal = "1.1.1.3", secundario = "1.0.0.3" }
+fuentes = ["cloudflare-familias"]
 
 # Hora por un servidor neutro: opcional, sale desmarcado.
 [[paso]]
@@ -113,6 +135,7 @@ id = "hora_neutra"
 tema = "sistema"
 accion = "usar_hora_neutra"
 opcional = true
+respaldo = "criterio"
 
 [[lote]]
 id = "seguridad"

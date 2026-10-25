@@ -1,0 +1,281 @@
+# Fuentes de las recomendaciones del panel (spec de la fase 3, §7 de la
+# investigación de los lotes). Cada recomendación de `ajustes/*.toml` y de
+# `ajustes/lotes.toml` cita las suyas por id en `fuentes`, o lleva
+# `respaldo = "criterio"` si no hay una fuente real detrás.
+#
+# Los títulos van en el idioma del documento y no se traducen: son
+# descriptivos cuando el documento no se pudo abrir (el PDF de la NSA dio
+# 403: se comprobó con dos resúmenes, `verificada_con`).
+#
+# Clases: `guia` (organismos y referencias independientes), `proveedor`
+# (documentación del propio servicio), `foro` y `prensa`.
+
+# Guías oficiales.
+
+[[fuente]]
+id = "nsa-red-casa"
+titulo = "Best Practices for Securing Your Home Network"
+organismo = "NSA"
+url = "https://media.defense.gov/2023/Feb/22/2003165170/-1/-1/0/CSI_BEST_PRACTICS_FOR_SECURING_YOUR_HOME_NETWORK.PDF"
+consultada = "2026-10-22"
+clase = "guia"
+verificada_con = ["ikarus-nsa", "csiac-nsa"]
+
+[[fuente]]
+id = "ikarus-nsa"
+titulo = "NSA: Best Practices for Securing Your Home Network (resumen)"
+organismo = "IKARUS Security Software"
+url = "https://www.ikarussecurity.com/en/?p=27492"
+consultada = "2026-10-22"
+clase = "prensa"
+
+[[fuente]]
+id = "csiac-nsa"
+titulo = "NSA Releases Best Practices for Securing Your Home Network"
+organismo = "CSIAC (DTIC)"
+url = "https://csiac.dtic.mil/articles/nsa-releases-best-practices-for-securing-your-home-network/"
+consultada = "2026-10-22"
+clase = "prensa"
+
+[[fuente]]
+id = "cisa-red-casa"
+titulo = "Home Network Security"
+organismo = "CISA"
+url = "https://www.cisa.gov/news-events/news/home-network-security"
+consultada = "2026-10-22"
+clase = "guia"
+
+[[fuente]]
+id = "cert-wps"
+titulo = "Wi-Fi Protected Setup (WPS) PIN brute force vulnerability (VU#723755)"
+organismo = "CERT/CC"
+url = "https://kb.cert.org/vuls/id/723755"
+consultada = "2026-10-22"
+clase = "guia"
+
+[[fuente]]
+id = "bsi-wlan"
+titulo = "Sicherheitstipps für privates und öffentliches WLAN"
+organismo = "BSI"
+url = "https://www.bsi.bund.de/EN/Themen/Verbraucherinnen-und-Verbraucher/Informationen-und-Empfehlungen/Cyber-Sicherheitsempfehlungen/Router-WLAN-VPN/Sicherheitstipps-fuer-privates-und-oeffentliches-WLAN/sicherheitstipps-fuer-privates-und-oeffentliches-wlan_node.html"
+consultada = "2026-10-22"
+clase = "guia"
+
+[[fuente]]
+id = "incibe-wifi"
+titulo = "Te refrescamos cómo proteger la red wifi de casa"
+organismo = "INCIBE"
+url = "https://www.incibe.es/ciudadania/blog/te-refrescamos-como-proteger-la-red-wifi-de-casa"
+consultada = "2026-10-22"
+clase = "guia"
+
+[[fuente]]
+id = "incibe-router"
+titulo = "INCIBE publica una guía para enseñar a los usuarios a configurar su router correctamente"
+organismo = "INCIBE (OSI)"
+url = "https://www.incibe.es/incibe/sala-de-prensa/incibe-publica-guia-ensenar-los-usuarios-configurar-su-router-correctamente"
+consultada = "2026-10-22"
+clase = "guia"
+
+# Privacy Guides.
+
+[[fuente]]
+id = "pg-routers"
+titulo = "Router Firmware"
+organismo = "Privacy Guides"
+url = "https://www.privacyguides.org/en/router/"
+consultada = "2026-10-22"
+clase = "guia"
+
+[[fuente]]
+id = "pg-dns"
+titulo = "DNS Resolvers"
+organismo = "Privacy Guides"
+url = "https://www.privacyguides.org/en/dns/"
+consultada = "2026-10-22"
+clase = "guia"
+
+[[fuente]]
+id = "pg-dns-vision"
+titulo = "DNS Overview"
+organismo = "Privacy Guides"
+url = "https://www.privacyguides.org/en/advanced/dns-overview/"
+consultada = "2026-10-22"
+clase = "guia"
+
+[[fuente]]
+id = "pg-foro-firmware"
+titulo = "ISP router firmware privacy"
+organismo = "Privacy Guides Community"
+url = "https://discuss.privacyguides.net/t/isp-router-firmware-privacy/13949"
+consultada = "2026-10-22"
+clase = "foro"
+
+# Proveedores de DNS.
+
+[[fuente]]
+id = "quad9-servicio"
+titulo = "Service Addresses & Features"
+organismo = "Quad9"
+url = "https://quad9.net/service/service-addresses-and-features/"
+consultada = "2026-10-22"
+clase = "proveedor"
+
+[[fuente]]
+id = "quad9-privacidad"
+titulo = "Compliance and Applicable Law"
+organismo = "Quad9"
+url = "https://quad9.net/privacy/compliance-and-applicable-law/"
+consultada = "2026-10-22"
+clase = "proveedor"
+
+[[fuente]]
+id = "dns4eu"
+titulo = "DNS4EU for Public"
+organismo = "DNS4EU"
+url = "https://www.joindns4.eu/for-public"
+consultada = "2026-10-22"
+clase = "proveedor"
+
+[[fuente]]
+id = "cloudflare-resolver"
+titulo = "1.1.1.1 Public DNS Resolver: privacy"
+organismo = "Cloudflare"
+url = "https://developers.cloudflare.com/1.1.1.1/privacy/public-dns-resolver/"
+consultada = "2026-10-22"
+clase = "proveedor"
+
+[[fuente]]
+id = "adguard-dns"
+titulo = "AdGuard DNS: public servers"
+organismo = "AdGuard"
+url = "https://adguard-dns.io/en/public-dns.html"
+consultada = "2026-10-22"
+clase = "proveedor"
+
+[[fuente]]
+id = "mullvad-dns"
+titulo = "DNS over HTTPS and DNS over TLS"
+organismo = "Mullvad"
+url = "https://mullvad.net/en/help/dns-over-https-and-dns-over-tls"
+consultada = "2026-10-22"
+clase = "proveedor"
+
+# WiFi.
+
+[[fuente]]
+id = "ssid-oculto"
+titulo = "Hidden Wi-Fi networks"
+organismo = "Intuitibits"
+url = "https://www.intuitibits.com/5ljs"
+consultada = "2026-10-22"
+clase = "prensa"
+
+# Foros y prensa sobre Movistar/O2 y las HGU Askey.
+
+[[fuente]]
+id = "ba-tr069-control"
+titulo = "Desactivar el control remoto de la operadora"
+organismo = "Foros de Bandaancha"
+url = "https://bandaancha.eu/foros/desactivar-control-remoto-operadora-1749611"
+consultada = "2026-10-22"
+clase = "foro"
+
+[[fuente]]
+id = "ba-tr069-reset"
+titulo = "Cómo evitar que Movistar me resetee el router"
+organismo = "Foros de Bandaancha"
+url = "https://bandaancha.eu/foros/como-evitar-movistar-me-resetee-router-1715428"
+consultada = "2026-10-22"
+clase = "foro"
+
+[[fuente]]
+id = "movistar-firmware"
+titulo = "RTF8115VW: el firmware no se actualiza automáticamente"
+organismo = "Comunidad Movistar"
+url = "https://comunidad.movistar.es/discussions/soporte-fibra-optica/rtf8115vw-el-firmware-no-se-actualiza-autom%C3%A1ticamente/5267586"
+consultada = "2026-10-22"
+clase = "foro"
+
+[[fuente]]
+id = "ba-provision"
+titulo = "Router antiguo no provisiona"
+organismo = "Foros de Bandaancha"
+url = "https://bandaancha.eu/foros/router-antiguo-no-provisiona-1750789"
+consultada = "2026-10-22"
+clase = "foro"
+
+[[fuente]]
+id = "cw-tr069"
+titulo = "TR-069 and remote management of home routers"
+organismo = "Computerworld"
+url = "https://www.computerworld.com/?p=1525268"
+consultada = "2026-10-22"
+clase = "prensa"
+
+[[fuente]]
+id = "movistar-dhcp"
+titulo = "HGU RTF8115VW: ¿para qué sirven los servers DHCP 0, 1, 2?"
+organismo = "Comunidad Movistar"
+url = "https://comunidad.movistar.es/discussions/soporte-fibra-optica/hgu-rtf8115vw-%C2%BFpara-qu%C3%A9-sirven-los-servers-dhcp-0-1-2/4631406/replies/4631462"
+consultada = "2026-10-22"
+clase = "foro"
+
+[[fuente]]
+id = "ba-1111"
+titulo = "Nuevos firmwares de las HGU Mitrastar y Askey"
+organismo = "Foros de Bandaancha"
+url = "https://bandaancha.eu/foros/nuevos-firmwares-hgu-mitrastar-askey-no-1743820"
+consultada = "2026-10-22"
+clase = "foro"
+
+[[fuente]]
+id = "movistar-bridge"
+titulo = "HGU Askey RTF8115VW: modo bridge"
+organismo = "Comunidad Movistar"
+url = "https://comunidad.movistar.es/discussions/soporte-fibra-optica/hgu-askey-rtf8115vw-modo-bridge/4261991"
+consultada = "2026-10-22"
+clase = "foro"
+
+[[fuente]]
+id = "ba-bridge"
+titulo = "Modo bridge en la HGU Askey RTF8115VW según el firmware"
+organismo = "Foros de Bandaancha"
+url = "https://bandaancha.eu/foros/modo-bridge-hgu-askey-rtf8115vw-firmware-1742523"
+consultada = "2026-10-22"
+clase = "foro"
+
+[[fuente]]
+id = "movistar-ipv6"
+titulo = "IPv6 (beta)"
+organismo = "Comunidad Movistar"
+url = "https://comunidad.movistar.es/discussions/hogar/ipv6-beta/5353706"
+consultada = "2026-10-22"
+clase = "foro"
+
+[[fuente]]
+id = "ba-laliga-francia"
+titulo = "LaLiga consigue en Francia bloqueos por DNS"
+organismo = "Bandaancha"
+url = "https://bandaancha.eu/articulos/laliga-consigue-francia-bloqueos-dns-11708"
+consultada = "2026-10-22"
+clase = "prensa"
+
+[[fuente]]
+id = "ba-cloudflare-tc"
+titulo = "Cloudflare lleva los bloqueos al Tribunal Constitucional"
+organismo = "Bandaancha"
+url = "https://bandaancha.eu/articulos/cloudflare-lleva-tribunal-constitucional-11388"
+consultada = "2026-10-22"
+clase = "prensa"
+
+# DNS familiar (Ruling N de la fase 3): la variante de Cloudflare que filtra
+# malware y contenido para adultos.
+
+[[fuente]]
+id = "cloudflare-familias"
+titulo = "Set up 1.1.1.1: 1.1.1.1 for Families"
+organismo = "Cloudflare"
+url = "https://developers.cloudflare.com/1.1.1.1/setup/#1111-for-families"
+consultada = "2026-10-25"
+clase = "proveedor"

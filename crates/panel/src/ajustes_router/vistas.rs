@@ -128,6 +128,28 @@ pub struct CampoVista {
     /// la toma del espejo apagado): se ve como una opción más, pero no se
     /// escribe ni cuenta como elegida.
     pub sin_eleccion: bool,
+    /// De dónde sale su recomendación (las de su opción recomendada
+    /// incluidas); vacío si no tiene o es criterio del panel.
+    #[serde(default)]
+    pub fuentes: Vec<FuenteVista>,
+    /// Clave de traducción del respaldo de su recomendación
+    /// (`fuentes-respaldo-criterio`).
+    #[serde(default)]
+    pub respaldo: Option<String>,
+}
+
+/// Una fuente de una recomendación. El título va en el idioma del
+/// documento: no se traduce.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FuenteVista {
+    pub titulo: String,
+    pub organismo: String,
+    /// Siempre `https://`.
+    pub url: String,
+    /// Clave de traducción de su clase (`fuentes-clase-guia`).
+    pub clase: String,
+    /// Día de la consulta, `AAAA-MM-DD`.
+    pub consultada: String,
 }
 
 impl std::fmt::Debug for CampoVista {
@@ -152,6 +174,8 @@ impl std::fmt::Debug for CampoVista {
             .field("motivo_recomendado", &self.motivo_recomendado)
             .field("requiere", &self.requiere)
             .field("sin_eleccion", &self.sin_eleccion)
+            .field("fuentes", &self.fuentes)
+            .field("respaldo", &self.respaldo)
             .finish()
     }
 }

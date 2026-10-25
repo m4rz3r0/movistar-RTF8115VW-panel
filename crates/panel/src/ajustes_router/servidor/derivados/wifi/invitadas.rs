@@ -127,5 +127,8 @@ pub(in super::super) fn invitada_sin_separar(ctx: &Contexto) -> Option<Recomenda
         valor: String::new(),
         lotes: Vec::new(),
         informativa: true,
+        // Las pone `fuentes::en_recomendacion`.
+        fuentes: Vec::new(),
+        respaldo: None,
     })
 }

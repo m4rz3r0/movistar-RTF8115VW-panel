@@ -1,4 +1,4 @@
-//! Carga de `ajustes/*.toml`, `ajustes/lotes.toml` y `excluidas.toml`.
+//! Carga de `ajustes/*.toml`, `ajustes/lotes.toml`, `excluidas.toml` y `fuentes.toml`.
 //!
 //! Los ficheros se compilan dentro del binario. Cargar solo comprueba el
 //! formato; las reglas contra el catálogo de funciones están en
@@ -7,6 +7,7 @@
 use serde::Deserialize;
 use thiserror::Error;
 
+use crate::fuentes::{FicheroFuentes, Fuente};
 use crate::lotes::{Eleccion, Lote, PasoLote};
 use crate::modelo::{Accion, Ajuste, Elemento, Excluida, Tema};
 
@@ -34,6 +35,9 @@ const EXCLUIDAS: &str = include_str!("../excluidas.toml");
 
 /// Texto de `ajustes/lotes.toml`.
 const LOTES: &str = include_str!("../ajustes/lotes.toml");
+
+/// Texto de `fuentes.toml`.
+const FUENTES: &str = include_str!("../fuentes.toml");
 
 /// Errores al cargar los ficheros del catálogo de ajustes.
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -83,16 +87,21 @@ pub struct CatalogoAjustes {
     lotes: Vec<Lote>,
     pasos: Vec<PasoLote>,
     elecciones: Vec<Eleccion>,
+    fuentes: Vec<Fuente>,
 }
 
 impl CatalogoAjustes {
-    /// Carga los ficheros compilados en el binario, lotes incluidos.
+    /// Carga los ficheros compilados en el binario, lotes y fuentes
+    /// incluidos.
     pub fn load() -> Result<CatalogoAjustes, ErrorAjustes> {
-        Self::from_toml(FICHEROS, EXCLUIDAS)?.con_lotes(LOTES)
+        Self::from_toml(FICHEROS, EXCLUIDAS)?
+            .con_lotes(LOTES)?
+            .con_fuentes(FUENTES)
     }
 
     /// Carga desde texto: `(nombre, texto)` de cada fichero de ajustes y el
-    /// texto de `excluidas.toml`. Queda sin lotes (ver [`Self::con_lotes`]).
+    /// texto de `excluidas.toml`. Queda sin lotes ni fuentes (ver
+    /// [`Self::con_lotes`] y [`Self::con_fuentes`]).
     pub fn from_toml(
         ficheros: &[(&str, &str)],
         excluidas: &str,
@@ -117,6 +126,7 @@ impl CatalogoAjustes {
             lotes: Vec::new(),
             pasos: Vec::new(),
             elecciones: Vec::new(),
+            fuentes: Vec::new(),
         })
     }
 
@@ -131,6 +141,27 @@ impl CatalogoAjustes {
         self.pasos = f.paso;
         self.elecciones = f.eleccion;
         Ok(self)
+    }
+
+    /// El catálogo con las fuentes del texto de `fuentes.toml` (en lugar
+    /// de las que tuviera).
+    pub fn con_fuentes(mut self, texto: &str) -> Result<CatalogoAjustes, ErrorAjustes> {
+        let f: FicheroFuentes = toml::from_str(texto).map_err(|e| ErrorAjustes::Toml {
+            fichero: "fuentes".to_owned(),
+            mensaje: e.to_string(),
+        })?;
+        self.fuentes = f.fuente;
+        Ok(self)
+    }
+
+    /// Fuentes de las recomendaciones, en el orden del fichero.
+    pub fn fuentes(&self) -> &[Fuente] {
+        &self.fuentes
+    }
+
+    /// Fuente por id.
+    pub fn fuente(&self, id: &str) -> Option<&Fuente> {
+        self.fuentes.iter().find(|f| f.id == id)
     }
 
     /// Todos los ajustes, en el orden de los ficheros.

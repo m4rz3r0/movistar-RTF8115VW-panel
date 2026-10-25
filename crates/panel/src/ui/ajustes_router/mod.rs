@@ -24,6 +24,7 @@ mod detalle;
 mod dispositivos;
 mod edicion;
 mod foto;
+mod fuentes;
 mod lista;
 mod nota_tema;
 mod piezas;
@@ -56,6 +57,7 @@ pub(crate) use aviso::{AvisoCambio, ExtraRevision, Seguimiento};
 pub(crate) use campo::partir_motivo;
 pub(crate) use detalle::Borradores;
 pub use foto::{PaginaFoto, RUTA_FOTO};
+pub(crate) use fuentes::de_donde;
 pub(crate) use seleccion::Seleccion;
 
 /// Espera antes de enseñar «Actualizando…»: una lectura más rápida (de la

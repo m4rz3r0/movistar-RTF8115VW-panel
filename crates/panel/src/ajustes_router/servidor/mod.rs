@@ -7,6 +7,7 @@ mod cortafuegos;
 mod derivados;
 mod dns_propios;
 mod foto;
+mod fuentes;
 mod guardar;
 mod historial;
 mod lectura;

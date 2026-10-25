@@ -2,7 +2,7 @@
 
 use crate::ajustes_router::{EstadoLote, EstadoPaso, LoteVista, PasoLoteVista};
 use crate::t;
-use crate::ui::ajustes_router::partir_motivo;
+use crate::ui::ajustes_router::{de_donde, partir_motivo};
 use crate::ui::comun::{EstadoVisual, Glifo, Insignia};
 use crate::ui::i18n::traducir;
 use crate::ui::{Estado, IconoEstado};
@@ -47,7 +47,7 @@ fn estado_paso(estado: &EstadoPaso) -> (Estado, &'static str, String) {
 }
 
 /// Un paso de la lista: qué hace, de qué elemento (una red WiFi), si es
-/// opcional y, si no se pudo leer, por qué. Su nota («DNS propios», o el
+/// opcional, si no se pudo leer, por qué, y de dónde sale (plegado). Su nota («DNS propios», o el
 /// proveedor con solo su principal), en vez del texto del estado.
 fn paso(p: PasoLoteVista) -> impl IntoView {
     let (icono, clase, texto) = estado_paso(&p.estado);
@@ -66,12 +66,13 @@ fn paso(p: PasoLoteVista) -> impl IntoView {
     view! {
         <li class=format!("paso paso-{clase}")>
             <IconoEstado estado=icono />
-            <span class="paso-texto">
+            <div class="paso-texto">
                 <span class="paso-nombre">{traducir(&p.texto, None)}</span>
                 {p.detalle.map(|d| view! { <span class="paso-detalle">{traducir(&d, None)}</span> })}
                 {p.opcional.then(|| view! { <span class="paso-opcional">{t!("mejoras-opcional")}</span> })}
                 {motivo.map(|m| view! { <span class="paso-motivo">{m}</span> })}
-            </span>
+                {de_donde(p.fuentes, p.respaldo)}
+            </div>
             <span class="paso-estado">{texto}</span>
         </li>
     }

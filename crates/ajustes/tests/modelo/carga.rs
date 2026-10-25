@@ -104,7 +104,7 @@ lee = "seguridad"
 tipo = "opcion"
 solo_lectura = "ajustes-solo-lectura-basica"
 opciones = [
-  { valor = "11", clave = "wpa2_wpa3", recomendada = true },
+  { valor = "11", clave = "wpa2_wpa3", recomendada = true, respaldo = "criterio" },
   { valor = "0", clave = "abierta", aviso = "inseguro" },
 ]
 "#;

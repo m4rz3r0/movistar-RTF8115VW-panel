@@ -127,8 +127,8 @@ pub(crate) fn partir_motivo(motivo: &str, marca: &str) -> (String, Option<String
     }
 }
 
-/// Recomendación de un campo: el valor recomendado, para quién es y, plegado,
-/// a favor y en contra. El usuario decide: nada se aplica solo.
+/// Recomendación de un campo: el valor recomendado, para quién es y, plegados,
+/// a favor y en contra y de dónde sale. El usuario decide: nada se aplica solo.
 fn recomendacion(c: &CampoVista, id: &str) -> Option<AnyView> {
     let r = c.recomendado.clone()?;
     let valor = texto_legible(c, &r);
@@ -155,6 +155,7 @@ fn recomendacion(c: &CampoVista, id: &str) -> Option<AnyView> {
                         </details>
                     }
                 })}
+                {super::de_donde(c.fuentes.clone(), c.respaldo.clone())}
             </div>
         }
         .into_any(),
@@ -463,6 +464,8 @@ mod tests {
             aceptados: Vec::new(),
             requiere: None,
             sin_eleccion: false,
+            fuentes: Vec::new(),
+            respaldo: None,
         }
     }
 

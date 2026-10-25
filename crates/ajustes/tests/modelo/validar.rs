@@ -226,7 +226,7 @@ fn excluida_y_cubierta_a_la_vez() {
 fn opciones_y_recomendaciones_coherentes() {
     let dos_recomendadas = WIFI.replace(
         "{ valor = \"3\", clave = \"wpa2\" }",
-        "{ valor = \"3\", clave = \"wpa2\", recomendada = true }",
+        "{ valor = \"3\", clave = \"wpa2\", recomendada = true, respaldo = \"criterio\" }",
     );
     falla_con(&fallos(&dos_recomendadas, ""), "wifi.red", "recomendada");
     let recomendado_invalido = WIFI.replace("recomendado = \"true\"", "recomendado = \"quizá\"");

@@ -68,6 +68,7 @@ lee = "adm_state"
 tipo = "booleano"
 # Una regla nueva nace activa (decisión del controlador, Tarea 10).
 recomendado = "true"
+respaldo = "criterio"
 
 [[ajuste]]
 id = "puertos.upnp"
@@ -81,6 +82,8 @@ escribe = { funcion = "cbSetUpnpCfg", parametro = "adm_state" }
 lee = "adm_state"
 tipo = "booleano"
 recomendado = "false"
+fuentes = ["nsa-red-casa", "cisa-red-casa"]
+respaldo = "consenso"
 
 # Solo lectura: al escribir, el router necesita un dato que no devuelve al
 # leer, así que el panel no podría deshacer el cambio (`cbSetNatConfig` está
@@ -130,6 +133,7 @@ leer = { funcion = "cbGetNatPortMapping", params = { dmz = "1" } }
 id = "equipo"
 lee = "int_ip_addr"
 tipo = "ip"
+fuentes = ["nsa-red-casa", "incibe-router"]
 solo_lectura = "ajuste-puertos-dmz-motivo"
 
 [[ajuste.campo]]

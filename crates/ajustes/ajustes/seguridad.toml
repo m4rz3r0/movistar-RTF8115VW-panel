@@ -20,7 +20,7 @@ tipo = "opcion"
 # quién es y qué se gana y qué se pierde.
 opciones = [
   { valor = "1", clave = "encendida" },
-  { valor = "0", clave = "apagada", recomendada = true },
+  { valor = "0", clave = "apagada", recomendada = true, fuentes = ["ba-tr069-control", "ba-tr069-reset", "cw-tr069"], respaldo = "foro" },
 ]
 # Es una puerta de entrada desde internet: su recomendación va antes que
 # las demás, como riesgo.
@@ -260,6 +260,8 @@ ajustes = ["seguridad.cortafuegos"]
 icono = "escudo"
 estado = "derivado:estado_cortafuegos"
 datos = ["derivado:abierto_redes"]
+# Su recomendación (solo informa) no sale de un campo: sus fuentes van aquí.
+fuentes = ["nsa-red-casa", "cisa-red-casa", "incibe-router"]
 
 # Acciones (spec §5.5).
 [[accion]]

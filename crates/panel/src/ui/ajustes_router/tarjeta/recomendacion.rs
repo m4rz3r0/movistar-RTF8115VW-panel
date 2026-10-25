@@ -34,6 +34,7 @@ fn texto_lotes(lotes: &[String]) -> Option<String> {
 /// Fondo ámbar si es un riesgo de seguridad; neutro, si no. En solo
 /// lectura, el botón se ve desactivado y dice por qué. Una recomendación
 /// informativa no tiene botón (se aplica desde el detalle del elemento).
+/// Debajo, plegado, de dónde sale.
 pub(super) fn recomendacion(
     e: &ElementoVista,
     solo_lectura: bool,
@@ -98,6 +99,7 @@ pub(super) fn recomendacion(
                 {lotes}
             </p>
             {boton}
+            {super::super::de_donde(r.fuentes, r.respaldo)}
         </div>
     })
 }

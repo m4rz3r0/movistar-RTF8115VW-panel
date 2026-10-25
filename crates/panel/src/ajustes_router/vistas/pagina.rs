@@ -161,6 +161,13 @@ pub struct RecomendacionVista {
     /// acción propia del elemento, desde su detalle).
     #[serde(default)]
     pub informativa: bool,
+    /// De dónde sale: las del campo al que apunta o, si no sale de un
+    /// campo, las del elemento.
+    #[serde(default)]
+    pub fuentes: Vec<super::FuenteVista>,
+    /// Clave de traducción de su respaldo (`fuentes-respaldo-criterio`).
+    #[serde(default)]
+    pub respaldo: Option<String>,
 }
 
 /// El pie de la tarjeta: información viva.

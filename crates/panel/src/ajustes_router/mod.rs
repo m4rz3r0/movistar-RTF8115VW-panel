@@ -170,6 +170,8 @@ mod tests {
             aceptados: Vec::new(),
             requiere: None,
             sin_eleccion: false,
+            fuentes: Vec::new(),
+            respaldo: None,
         };
         let d = Diferencia::Valor {
             partida: Box::new(c.clone()),

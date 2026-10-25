@@ -37,6 +37,7 @@ lee = "adm_state"
 tipo = "booleano"
 textos_valor = true
 recomendado = "true"
+respaldo = "criterio"
 
 [[ajuste.campo]]
 id = "nombre"
@@ -62,7 +63,7 @@ lee = "authentication"
 tipo = "opcion"
 ademas = [{ parametro = "encryption", lee = "encryption" }]
 opciones = [
-  { valor = "3", clave = "wpa2", recomendada = true, ademas = { encryption = "4" } },
+  { valor = "3", clave = "wpa2", recomendada = true, ademas = { encryption = "4" }, fuentes = ["nsa-red-casa", "bsi-wlan", "incibe-wifi"], respaldo = "consenso" },
   { valor = "0", clave = "abierta", aviso = "wifi_abierta", ademas = { encryption = "0" } },
 ]
 seguridad = true
@@ -74,6 +75,7 @@ lee = "ssid_hide"
 tipo = "booleano"
 invertido = true
 recomendado = "true"
+fuentes = ["ssid-oculto"]
 
 [[ajuste.campo]]
 id = "wps"
@@ -81,6 +83,8 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "wps_adm_state" }
 lee = "wps_adm_state"
 tipo = "booleano"
 recomendado = "false"
+fuentes = ["cert-wps", "nsa-red-casa", "cisa-red-casa", "bsi-wlan"]
+respaldo = "consenso"
 seguridad = true
 
 [[ajuste]]
@@ -106,6 +110,7 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "isolation" }
 lee = "isolation"
 tipo = "booleano"
 recomendado = "false"
+respaldo = "criterio"
 
 [[ajuste.campo]]
 id = "wmm"
@@ -113,6 +118,7 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "wmm" }
 lee = "wmm"
 tipo = "booleano"
 recomendado = "true"
+respaldo = "criterio"
 
 [[ajuste.campo]]
 id = "max_clientes"
@@ -172,6 +178,7 @@ lee = "adm_state"
 tipo = "booleano"
 textos_valor = true
 recomendado = "true"
+respaldo = "criterio"
 
 [[ajuste.campo]]
 id = "nombre"
@@ -197,7 +204,7 @@ lee = "authentication"
 tipo = "opcion"
 ademas = [{ parametro = "encryption", lee = "encryption" }]
 opciones = [
-  { valor = "3", clave = "wpa2", recomendada = true, ademas = { encryption = "4" } },
+  { valor = "3", clave = "wpa2", recomendada = true, ademas = { encryption = "4" }, fuentes = ["nsa-red-casa", "bsi-wlan", "incibe-wifi"], respaldo = "consenso" },
   { valor = "0", clave = "abierta", aviso = "wifi_abierta", ademas = { encryption = "0" } },
 ]
 seguridad = true
@@ -209,6 +216,7 @@ lee = "ssid_hide"
 tipo = "booleano"
 invertido = true
 recomendado = "true"
+fuentes = ["ssid-oculto"]
 
 [[ajuste.campo]]
 id = "wps"
@@ -216,6 +224,8 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "wps_adm_state" }
 lee = "wps_adm_state"
 tipo = "booleano"
 recomendado = "false"
+fuentes = ["cert-wps", "nsa-red-casa", "cisa-red-casa", "bsi-wlan"]
+respaldo = "consenso"
 seguridad = true
 
 [[ajuste]]
@@ -241,6 +251,7 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "isolation" }
 lee = "isolation"
 tipo = "booleano"
 recomendado = "false"
+respaldo = "criterio"
 
 [[ajuste.campo]]
 id = "wmm"
@@ -248,6 +259,7 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "wmm" }
 lee = "wmm"
 tipo = "booleano"
 recomendado = "true"
+respaldo = "criterio"
 
 [[ajuste.campo]]
 id = "max_clientes"
@@ -307,6 +319,7 @@ lee = "adm_state"
 tipo = "booleano"
 textos_valor = true
 recomendado = "false"
+respaldo = "criterio"
 
 [[ajuste.campo]]
 id = "nombre"
@@ -332,7 +345,7 @@ lee = "authentication"
 tipo = "opcion"
 ademas = [{ parametro = "encryption", lee = "encryption" }]
 opciones = [
-  { valor = "3", clave = "wpa2", recomendada = true, ademas = { encryption = "4" } },
+  { valor = "3", clave = "wpa2", recomendada = true, ademas = { encryption = "4" }, fuentes = ["nsa-red-casa", "bsi-wlan", "incibe-wifi"], respaldo = "consenso" },
   { valor = "0", clave = "abierta", aviso = "wifi_abierta", ademas = { encryption = "0" } },
 ]
 seguridad = true
@@ -344,6 +357,7 @@ lee = "ssid_hide"
 tipo = "booleano"
 invertido = true
 recomendado = "true"
+fuentes = ["ssid-oculto"]
 
 [[ajuste.campo]]
 id = "wps"
@@ -351,6 +365,8 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "wps_adm_state" }
 lee = "wps_adm_state"
 tipo = "booleano"
 recomendado = "false"
+fuentes = ["cert-wps", "nsa-red-casa", "cisa-red-casa", "bsi-wlan"]
+respaldo = "consenso"
 seguridad = true
 
 [[ajuste]]
@@ -368,6 +384,7 @@ fijos = { dpm_cfg_wifi_acc_pt_id = "2" }
 id = "separada"
 lee = "guest_networking"
 tipo = "booleano"
+fuentes = ["nsa-red-casa", "cisa-red-casa"]
 solo_lectura = "ajuste-wifi-invitados_avanzado-separada-motivo"
 
 # Aísla entre sí los dispositivos de la red de invitados (no la separa de la
@@ -378,6 +395,7 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "isolation" }
 lee = "isolation"
 tipo = "booleano"
 recomendado = "true"
+fuentes = ["incibe-wifi", "bsi-wlan"]
 seguridad = true
 
 [[ajuste.campo]]
@@ -386,6 +404,7 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "wmm" }
 lee = "wmm"
 tipo = "booleano"
 recomendado = "true"
+respaldo = "criterio"
 
 [[ajuste.campo]]
 id = "max_clientes"
@@ -444,6 +463,7 @@ lee = "radio_adm_state"
 tipo = "booleano"
 textos_valor = true
 recomendado = "true"
+respaldo = "criterio"
 
 [[ajuste.campo]]
 id = "canal"
@@ -451,7 +471,7 @@ escribe = { funcion = "cbSetWifi", parametro = "adm_channel" }
 lee = "adm_channel"
 tipo = "opcion"
 opciones = [
-  { valor = "0", clave = "automatico", recomendada = true },
+  { valor = "0", clave = "automatico", recomendada = true, respaldo = "criterio" },
   { valor = "1", clave = "canal_1" },
   { valor = "6", clave = "canal_6" },
   { valor = "11", clave = "canal_11" },
@@ -463,7 +483,7 @@ escribe = { funcion = "cbSetWifi", parametro = "adm_bandwidth" }
 lee = "adm_bandwidth"
 tipo = "opcion"
 opciones = [
-  { valor = "1", clave = "mhz_20", recomendada = true },
+  { valor = "1", clave = "mhz_20", recomendada = true, respaldo = "criterio" },
   { valor = "2", clave = "mhz_40" },
 ]
 
@@ -481,7 +501,7 @@ escribe = { funcion = "cbSetWifi", parametro = "adm_tx_pwr_ratio" }
 lee = "adm_tx_pwr_ratio"
 tipo = "opcion"
 opciones = [
-  { valor = "255", clave = "automatica", recomendada = true },
+  { valor = "255", clave = "automatica", recomendada = true, respaldo = "criterio" },
   { valor = "100", clave = "maxima" },
   { valor = "50", clave = "media" },
   { valor = "20", clave = "baja" },
@@ -493,7 +513,7 @@ escribe = { funcion = "cbSetWifi", parametro = "standard" }
 lee = "standard"
 tipo = "opcion"
 opciones = [
-  { valor = "14", clave = "bgn", recomendada = true },
+  { valor = "14", clave = "bgn", recomendada = true, respaldo = "criterio" },
   { valor = "12", clave = "gn" },
 ]
 
@@ -512,6 +532,7 @@ lee = "radio_adm_state"
 tipo = "booleano"
 textos_valor = true
 recomendado = "true"
+respaldo = "criterio"
 
 [[ajuste.campo]]
 id = "canal"
@@ -519,7 +540,7 @@ escribe = { funcion = "cbSetWifi", parametro = "adm_channel" }
 lee = "adm_channel"
 tipo = "opcion"
 opciones = [
-  { valor = "0", clave = "automatico", recomendada = true },
+  { valor = "0", clave = "automatico", recomendada = true, respaldo = "criterio" },
   { valor = "36", clave = "canal_36" },
   { valor = "100", clave = "canal_100" },
 ]
@@ -532,7 +553,7 @@ tipo = "opcion"
 opciones = [
   { valor = "1", clave = "mhz_20" },
   { valor = "2", clave = "mhz_40" },
-  { valor = "3", clave = "mhz_80", recomendada = true },
+  { valor = "3", clave = "mhz_80", recomendada = true, respaldo = "criterio" },
 ]
 
 [[ajuste]]
@@ -549,7 +570,7 @@ escribe = { funcion = "cbSetWifi", parametro = "adm_tx_pwr_ratio" }
 lee = "adm_tx_pwr_ratio"
 tipo = "opcion"
 opciones = [
-  { valor = "255", clave = "automatica", recomendada = true },
+  { valor = "255", clave = "automatica", recomendada = true, respaldo = "criterio" },
   { valor = "100", clave = "maxima" },
   { valor = "50", clave = "media" },
   { valor = "20", clave = "baja" },
@@ -561,7 +582,7 @@ escribe = { funcion = "cbSetWifi", parametro = "standard" }
 lee = "standard"
 tipo = "opcion"
 opciones = [
-  { valor = "25", clave = "anac", recomendada = true },
+  { valor = "25", clave = "anac", recomendada = true, respaldo = "criterio" },
   { valor = "9", clave = "an" },
 ]
 
@@ -571,6 +592,7 @@ escribe = { funcion = "cbSetWifi", parametro = "beamforming" }
 lee = "beamforming"
 tipo = "booleano"
 recomendado = "true"
+respaldo = "criterio"
 
 # Elementos de la pestaña: cada red junta su tarjeta básica y la avanzada;
 # cada radio, igual. Los datos son los seis de la tarjeta (spec §5.1).
