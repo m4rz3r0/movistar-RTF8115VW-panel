@@ -137,6 +137,10 @@ test.describe("cortafuegos", () => {
       await asentar(page);
       const filas = page.locator(".cortafuegos-reglas .tabla-scroll tbody tr");
       await expect(filas).toHaveCount(16);
+      // La caja desplazable recibe el foco: es una región con nombre.
+      await expect(
+        page.locator('.cortafuegos-reglas .tabla-scroll[role="region"][aria-label="Cortafuegos"]'),
+      ).toBeVisible();
       await sinDesbordamiento(page, `cortafuegos ${ancho}`);
       expect(await violacionesGraves(page), `cortafuegos ${ancho}`).toEqual([]);
 

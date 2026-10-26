@@ -157,10 +157,11 @@ fn ping_restringido(a: &[Abierto]) -> bool {
 }
 
 /// Lo abierto solo desde redes concretas: el ping, por versión (en una
-/// versión no se pierde por estar abierto a cualquiera en la otra), y los
+/// versión no se pierde por estar abierto a cualquiera en la otra; el de
+/// IPv4 no cuenta con la regla del panel puesta, como en [`ping`]), y los
 /// demás servicios.
 fn restringidos(f: &[Filtro]) -> Vec<String> {
-    let v4 = ping_restringido(&abiertos_en(f, "0"));
+    let v4 = !puesta(f) && ping_restringido(&abiertos_en(f, "0"));
     let v6 = ping_restringido(&abiertos_en(f, "1"));
     let mut out = match (v4, v6) {
         (true, true) => vec![nombre(Servicio::Ping)],
@@ -202,12 +203,15 @@ fn motivo_regla(f: &[Filtro]) -> Option<String> {
 }
 
 /// El texto de la recomendación: «sin ping» si el ping de IPv4 está abierto
-/// y el panel puede poner su regla (con ella desactivada no la ofrece); y
-/// «revisar» si queda algo que la regla no arregla.
+/// y el panel puede poner su regla; con ella desactivada no la ofrece, sino
+/// activarla desde la web del router; y «revisar» si queda algo que la
+/// regla no arregla.
 fn texto(f: &[Filtro], p: Ping, problema: &[String]) -> String {
     let mut texto = Vec::new();
-    if p.v4 && !hay_regla(f) {
-        texto.push(t!("ajuste-seguridad-cortafuegos-sin-ping-recomendado"));
+    match (p.v4, hay_regla(f)) {
+        (true, false) => texto.push(t!("ajuste-seguridad-cortafuegos-sin-ping-recomendado")),
+        (true, true) => texto.push(t!("ajuste-seguridad-cortafuegos-activar-recomendado")),
+        (false, _) => {}
     }
     if p.v6 || problema.len() > usize::from(p.v4) {
         texto.push(t!("ajuste-seguridad-cortafuegos-revisar-recomendado"));
@@ -224,7 +228,7 @@ pub(super) fn filtros(ctx: &Contexto) -> Option<Vec<Filtro>> {
 /// Si `e` es el elemento del cortafuegos, su recomendación (solo informa:
 /// se aplica con la acción propia) y «No responder al ping desde internet»
 /// con el motivo si no está disponible (sin leer, sin validar en el router
-/// real o ya puesta).
+/// real, ya puesta o puesta pero desactivada).
 pub(super) fn del_elemento(
     ctx: &Contexto,
     e: &ajustes::Elemento,

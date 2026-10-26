@@ -107,3 +107,33 @@ fn la_regla_desactivada_tiene_su_motivo() {
     assert!(motivo_regla(&f).unwrap().contains("ya puesta"));
     assert!(motivo_regla(&filtros()).is_none());
 }
+
+/// Con la regla del panel desactivada y solo el ping de IPv4 pendiente, la
+/// recomendación no sale vacía: dice que se active, con sus pros y
+/// contras.
+#[test]
+fn regla_desactivada_y_solo_ping_ipv4_con_texto() {
+    let mut f = con_regla(filtros());
+    f[0].reglas.last_mut().unwrap().enable = "0".into();
+    f[1].reglas.retain(|r| r.icmp_type != "55");
+    let p = ping(&f);
+    assert_eq!((p.v4, p.v6), (true, false));
+    let pr = problema(&f, p);
+    assert_eq!(pr.len(), 1, "{pr:?}");
+    let t = texto(&f, p, &pr);
+    assert!(t.starts_with("Recomendado si"), "{t}");
+    assert!(t.contains("desactivada"), "{t}");
+    assert!(t.contains("A favor:") && t.contains("En contra:"), "{t}");
+}
+
+/// Con la regla del panel puesta, el ping de IPv4 desde redes concretas no
+/// sale como abierto: la regla lo descarta antes (no se afirma su efecto,
+/// pero tampoco lo contrario).
+#[test]
+fn con_la_regla_puesta_no_se_lista_el_ping_ipv4_restringido() {
+    let mut f = con_regla(filtros());
+    ping_de_redes(&mut f, true, false);
+    assert!(puesta(&f));
+    let r = restringidos(&f);
+    assert!(!r.iter().any(|s| s.contains("ping")), "{r:?}");
+}
