@@ -151,7 +151,7 @@ fn recomendacion(c: &CampoVista, id: &str) -> Option<AnyView> {
                     view! {
                         <details class="recomendacion-pros">
                             <summary>{t!("ajustes-recomendado-pros")}</summary>
-                            <p>{p}</p>
+                            <crate::ui::comun::ProsContras texto=p />
                         </details>
                     }
                 })}

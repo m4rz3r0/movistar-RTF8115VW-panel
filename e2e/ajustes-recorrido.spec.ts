@@ -50,7 +50,8 @@ const textos = {
     gestionCampo: "Gestión remota",
     apagada: "Apagada",
     recomendada: /^Recomendado: Apagada Recomendado si [^.]+\.$/,
-    pros: /^A favor: .+\. En contra: .+\.$/,
+    favor: "A favor",
+    contra: "En contra",
     historial: "/historial",
   },
   en: {
@@ -87,7 +88,8 @@ const textos = {
     gestionCampo: "Remote management",
     apagada: "Off",
     recomendada: /^Recommended: Off Recommended if [^.]+\.$/,
-    pros: /^Pros: .+\. Cons: .+\.$/,
+    favor: "Pros",
+    contra: "Cons",
     historial: "/historial",
   },
 } as const;
@@ -265,7 +267,12 @@ for (const { idioma, locale, ancho } of pasadas) {
       const reco = detalle.locator(".recomendacion").first();
       await expect(reco.locator(":scope > p")).toHaveText(t.recomendada);
       await reco.locator("details.recomendacion-pros > summary").click();
-      await expect(reco.locator("details.recomendacion-pros > p")).toHaveText(t.pros);
+      // A favor y en contra, cada uno en su bloque con su encabezado.
+      const pros = reco.locator("details.recomendacion-pros .pros-contras");
+      await expect(pros.locator(".pros-contras-favor dt")).toHaveText(t.favor);
+      await expect(pros.locator(".pros-contras-favor dd")).toHaveText(/^\S.+\.$/);
+      await expect(pros.locator(".pros-contras-contra dt")).toHaveText(t.contra);
+      await expect(pros.locator(".pros-contras-contra dd")).toHaveText(/^\S.+\.$/);
       await sinDesbordamiento(page, "gestión remota");
       await detalle.getByRole("button", { name: t.guardarCambios }).click();
       await expect(dialogo.locator("tbody td").nth(1)).toHaveText(t.apagada);

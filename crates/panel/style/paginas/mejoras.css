@@ -42,13 +42,6 @@
   line-height: 1.5;
 }
 
-.lote-pros {
-  margin: 0;
-  color: var(--suave);
-  font-size: 13.5px;
-  line-height: 1.55;
-}
-
 /* El motivo del lote, si no se leyó, y «Volver a leer» a la derecha. */
 .lote-sin-leer {
   display: flex;

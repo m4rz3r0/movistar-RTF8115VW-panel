@@ -1,5 +1,5 @@
 //! Componentes comunes del sistema visual: [`Insignia`], [`Interruptor`],
-//! [`IconoEmision`] y [`Glifo`], y el [`EstadoVisual`] que comparten.
+//! [`IconoEmision`], [`Glifo`] y [`ProsContras`], y el [`EstadoVisual`] que comparten.
 //!
 //! Cada color tiene un único significado (spec del rediseño, §3.1): verde,
 //! encendida y emite; gris, apagada; ámbar, requiere atención; rojo, errores
@@ -9,11 +9,13 @@ mod emision;
 mod glifo;
 mod insignia;
 mod interruptor;
+mod pros_contras;
 
 pub use emision::IconoEmision;
 pub use glifo::Glifo;
 pub use insignia::Insignia;
 pub use interruptor::Interruptor;
+pub use pros_contras::ProsContras;
 
 use serde::{Deserialize, Serialize};
 

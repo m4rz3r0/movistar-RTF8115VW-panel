@@ -180,7 +180,7 @@ pub(super) fn TarjetaLote(
                 <Insignia estado texto />
             </div>
             <p class="lote-para">{para_quien}</p>
-            {pros.map(|p| view! { <p class="lote-pros">{p}</p> })}
+            {pros.map(|p| view! { <crate::ui::comun::ProsContras texto=p /> })}
             {sin_leer}
             <ul class="lote-pasos" aria-label=t!("mejoras-pasos")>
                 {pasos}
