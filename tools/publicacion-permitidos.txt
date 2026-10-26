@@ -5,6 +5,7 @@
 #   dominio <d> — <motivo>            (también sus subdominios)
 #   ruta <glob> <regla> — <motivo>
 #   binario <ruta> <sha256> — <motivo>
+#   prueba <ruta> <etiqueta> <valor> — <motivo>   (solo en esa fixture y esa etiqueta)
 
 # DNS públicos: los de los proveedores del lote Privacidad máxima y algunos de ejemplo en las pruebas.
 valor 9.9.9.9 — DNS público (Quad9): proveedor del lote Privacidad máxima
@@ -89,8 +90,8 @@ ruta crates/hgu/fixtures/paginas/*.asp fixture — páginas HTML del router sane
 
 # Secretos inventados que una variante pone para probar que no salen del
 # sitio (Tarea 4 de la fase 3: la contraseña PPP y la serie GPON).
-valor clave-ppp-de-prueba — contraseña PPP inventada a propósito en fixtures-variantes/conexion-secretos para probar que no sale del sitio; fixtures_have_no_secrets (router-sim) solo la admite en esa fixture y en su etiqueta
-valor SERIE-DE-PRUEBA — número de serie GPON inventado a propósito en fixtures-variantes/conexion-secretos para probar que no sale del sitio; fixtures_have_no_secrets (router-sim) solo lo admite en esa fixture y en su etiqueta
+prueba crates/hgu/fixtures-variantes/conexion-secretos/cbGetWanIPIntf.xml password clave-ppp-de-prueba — contraseña PPP inventada a propósito para probar que no sale del sitio; fixtures_have_no_secrets (router-sim) solo la admite en esa fixture y en su etiqueta
+prueba crates/hgu/fixtures-variantes/conexion-secretos/cbGetGPONInfo.xml GponSerialNumber SERIE-DE-PRUEBA — número de serie GPON inventado a propósito para probar que no sale del sitio; fixtures_have_no_secrets (router-sim) solo lo admite en esa fixture y en su etiqueta
 
 # Direcciones neutras de las fixtures y las pruebas (Neutralizador del saneador).
 red 192.168.1.60/30 — equipos de la LAN renumerados en las fixtures (.60–.99) y en las pruebas

@@ -10,7 +10,10 @@
 //! - `ruta <glob> <regla> — <motivo>`: la regla no se aplica a esas rutas
 //!   (`*` no cruza `/`, `**` sí);
 //! - `binario <ruta> <sha256> — <motivo>`: un binario revisado (puede haber
-//!   varias líneas para la misma ruta: cada versión revisada).
+//!   varias líneas para la misma ruta: cada versión revisada);
+//! - `prueba <ruta> <etiqueta> <valor> — <motivo>`: un valor inventado que una
+//!   fixture pone a propósito en un secreto; vale solo en esa fixture, en esa
+//!   etiqueta y tal cual (un `valor` no basta en un secreto).
 
 use crate::Regla;
 use std::{
@@ -35,6 +38,7 @@ pub struct Permitidos {
     dominios: Vec<String>,
     rutas: Vec<(String, Regla)>,
     binarios: HashMap<String, Vec<String>>,
+    pruebas: HashSet<(String, String, String)>,
 }
 
 impl Permitidos {
@@ -86,9 +90,16 @@ impl Permitidos {
                         .or_default()
                         .push(sha.to_ascii_lowercase());
                 }
+                ["prueba", ruta, etiqueta, valor] => {
+                    p.pruebas.insert((
+                        (*ruta).to_owned(),
+                        (*etiqueta).to_owned(),
+                        (*valor).to_owned(),
+                    ));
+                }
                 _ => {
                     return Err(format!(
-                        "línea {n}: se espera `valor`, `red`, `dominio`, `ruta` o `binario` con sus campos"
+                        "línea {n}: se espera `valor`, `red`, `dominio`, `ruta`, `binario` o `prueba` con sus campos"
                     ));
                 }
             }
@@ -131,6 +142,13 @@ impl Permitidos {
         self.rutas
             .iter()
             .any(|(glob, r)| *r == regla && glob_coincide(glob, ruta))
+    }
+
+    /// `true` si `valor` es un valor de prueba declarado para esa etiqueta de
+    /// la fixture en `ruta` (exacto, distinguiendo mayúsculas).
+    pub fn valor_de_prueba(&self, ruta: &str, etiqueta: &str, valor: &str) -> bool {
+        self.pruebas
+            .contains(&(ruta.to_owned(), etiqueta.to_owned(), valor.to_owned()))
     }
 
     /// Los sha256 revisados del binario en esa ruta (vacío si ninguno).

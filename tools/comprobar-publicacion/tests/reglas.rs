@@ -229,24 +229,82 @@ fn fixture_con_secreto() {
     assert!(reglas("docs/api.md", xml).is_empty());
 }
 
-/// Un `valor` permitido vale en un secreto de una fixture; los demás
-/// secretos de esa fixture se siguen comprobando.
+/// En un secreto de una fixture solo vale un valor de prueba declarado con
+/// `prueba <ruta> <etiqueta> <valor>`, y solo en esa fixture y esa etiqueta;
+/// un `valor` permitido (como una credencial de fábrica) no vale.
 #[test]
-fn fixture_con_valor_de_prueba_permitido() {
-    let p = Permitidos::leer("valor clave-de-prueba-1 — inventado para una prueba").unwrap();
-    let r = |xml: &str| -> Vec<Regla> {
-        revisar_texto(
-            "crates/hgu/fixtures-v2/a.xml",
-            xml,
-            &p,
-            &ListasLocales::vacia(),
-        )
-        .into_iter()
-        .map(|h| h.regla)
-        .collect()
+fn fixture_solo_admite_valores_de_prueba_en_su_sitio() {
+    let p = Permitidos::leer(
+        "prueba crates/hgu/fixtures-v2/a.xml password clave-de-prueba-1 — inventada\n\
+         valor otra-clave — permitida en el resto del árbol",
+    )
+    .unwrap();
+    let r = |ruta: &str, xml: &str| -> Vec<Regla> {
+        revisar_texto(ruta, xml, &p, &ListasLocales::vacia())
+            .into_iter()
+            .map(|h| h.regla)
+            .collect()
     };
-    assert!(r("<R><password>clave-de-prueba-1</password></R>").is_empty());
-    assert_eq!(r("<R><password>otra</password></R>"), [Regla::Fixture]);
+    let a = "crates/hgu/fixtures-v2/a.xml";
+    assert!(r(a, "<R><password>clave-de-prueba-1</password></R>").is_empty());
+    // En otra fixture, en otra etiqueta o con otro valor, es hallazgo.
+    let b = "crates/hgu/fixtures-v2/b.xml";
+    assert_eq!(
+        r(b, "<R><password>clave-de-prueba-1</password></R>"),
+        [Regla::Fixture]
+    );
+    assert_eq!(
+        r(a, "<R><Password>clave-de-prueba-1</Password></R>"),
+        [Regla::Fixture]
+    );
+    assert_eq!(r(a, "<R><password>otra</password></R>"), [Regla::Fixture]);
+    // Un `valor` permitido no basta en un secreto.
+    assert_eq!(
+        r(a, "<R><password>otra-clave</password></R>"),
+        [Regla::Fixture]
+    );
+}
+
+/// Con la lista real: una credencial de fábrica permitida como `valor` en el
+/// resto del árbol es hallazgo en un secreto de una fixture, y los valores de
+/// prueba de `conexion-secretos` solo valen en su fixture.
+#[test]
+fn fixture_con_credencial_de_fabrica_es_hallazgo() {
+    let raiz = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
+    let p = Permitidos::leer(
+        &std::fs::read_to_string(raiz.join("tools/publicacion-permitidos.txt")).unwrap(),
+    )
+    .unwrap();
+    let r = |ruta: &str, xml: &str| -> Vec<Regla> {
+        revisar_texto(ruta, xml, &p, &ListasLocales::vacia())
+            .into_iter()
+            .map(|h| h.regla)
+            .collect()
+    };
+    let gpon = "crates/hgu/fixtures-variantes/conexion-secretos/cbGetGPONInfo.xml";
+    for xml in [
+        "<R><Password>telefonica</Password></R>",
+        "<R><Password>1234</Password></R>",
+    ] {
+        assert_eq!(r(gpon, xml), [Regla::Fixture], "{xml}");
+        assert_eq!(
+            r("crates/hgu/fixtures/cbX.xml", xml),
+            [Regla::Fixture],
+            "{xml}"
+        );
+    }
+    let serie = "<R><GponSerialNumber>SERIE-DE-PRUEBA</GponSerialNumber></R>";
+    assert!(r(gpon, serie).is_empty());
+    assert_eq!(
+        r("crates/hgu/fixtures/cbGetGPONInfo.xml", serie),
+        [Regla::Fixture]
+    );
+    for f in ["cbGetGPONInfo.xml", "cbGetWanIPIntf.xml"] {
+        let ruta = format!("crates/hgu/fixtures-variantes/conexion-secretos/{f}");
+        let texto = std::fs::read_to_string(raiz.join(&ruta)).unwrap();
+        let h = revisar_texto(&ruta, &texto, &p, &ListasLocales::vacia());
+        assert!(h.is_empty(), "{h:?}");
+    }
 }
 
 #[test]
@@ -257,6 +315,7 @@ fn permitido_sin_motivo_es_error() {
     assert!(Permitidos::leer("ruta docs/** inventada — mal").is_err());
     assert!(Permitidos::leer("binario a.png 1234 — sha corto").is_err());
     assert!(Permitidos::leer("otro x — tipo desconocido").is_err());
+    assert!(Permitidos::leer("prueba a.xml password — falta el valor").is_err());
     assert!(Permitidos::leer("valor 9.9.9.9 — DNS público").is_ok());
 }
 
