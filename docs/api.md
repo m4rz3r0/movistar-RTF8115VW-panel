@@ -1056,7 +1056,7 @@ Lectura pareada: `cbGetNatIntf` con `nat_intf_0i={nat_intf_id}`
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
 | `adm_state` | Activado | enum | `1` Activado, `0` Desactivado |
-| `type` | Tipo | text |  |
+| `type` | Tipo | enum | `0` Simétrica, `1` Cono completo |
 | `nat_intf_id` | Interfaz NAT (id) | int |  |
 
 ### `cbGetNatPortMapping`
@@ -1619,7 +1619,7 @@ Lectura pareada: `cbGetMcastIntf` con `rtm_ip_mcast_intf_0i={rtm_ip_mcast_intf_i
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
 | `adm_state` | Activado | enum | `1` Activado, `0` Desactivado |
-| `version` | Versión de IGMP | int |  |
+| `version` | Versión de IGMP | enum | `0` Automática, `1` IGMPv1, `2` IGMPv2, `3` IGMPv3 |
 | `rtm_ip_mcast_intf_id` | Interfaz multicast (id) | int |  |
 
 ## QoS

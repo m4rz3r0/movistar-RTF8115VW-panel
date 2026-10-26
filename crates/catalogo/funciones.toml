@@ -2241,7 +2241,8 @@ opciones = [["1", "Activado"], ["0", "Desactivado"]]
 [[funcion.parametro]]
 nombre = "type"
 etiqueta = "Tipo"
-tipo = "text"
+tipo = "enum"
+opciones = [["0", "Simétrica"], ["1", "Cono completo"]]
 
 [[funcion.parametro]]
 nombre = "nat_intf_id"
@@ -3331,7 +3332,8 @@ opciones = [["1", "Activado"], ["0", "Desactivado"]]
 [[funcion.parametro]]
 nombre = "version"
 etiqueta = "Versión de IGMP"
-tipo = "int"
+tipo = "enum"
+opciones = [["0", "Automática"], ["1", "IGMPv1"], ["2", "IGMPv2"], ["3", "IGMPv3"]]
 
 [[funcion.parametro]]
 nombre = "rtm_ip_mcast_intf_id"
