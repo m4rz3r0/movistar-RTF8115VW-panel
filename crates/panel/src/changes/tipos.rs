@@ -287,6 +287,9 @@ pub(super) struct Pendiente {
     pub(super) explicito: bool,
     /// Cambio que deshace, si es un deshacer.
     pub(super) deshace: Option<i64>,
+    /// Usuario del panel que lo preparó ([`ChangeManager::ligar`]): solo él
+    /// lo confirma. `None`: sin ligar (el gestor usado directamente).
+    pub(super) usuario: Option<String>,
 }
 
 /// Lo que el gestor usa del estado del servidor (sin el propio gestor, para

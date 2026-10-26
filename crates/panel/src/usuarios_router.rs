@@ -144,7 +144,7 @@ pub fn nota_de_fila(
 /// valen; 409 con un nombre que ya existe o con otro cambio en curso.
 #[server(endpoint = "preparar_usuario_router", input = Json)]
 pub async fn preparar_usuario_router(op: OperacionUsuario) -> Result<GrupoVista, ServerFnError> {
-    servidor::preparar(op).await
+    crate::ajustes_router::servidor::ligada(servidor::preparar(op).await?).await
 }
 
 /// Deja a `usuario` con la contraseña `nueva` y el grupo `grupo`, y

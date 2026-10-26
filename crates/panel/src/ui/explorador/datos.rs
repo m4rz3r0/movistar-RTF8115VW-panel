@@ -571,7 +571,9 @@ pub async fn preparar_cambio(peticion: Peticion) -> Result<PreparadoVista, Serve
         crate::auth::require_user().await?;
     }
     let state = super::servidor::app_state()?;
-    super::servidor::preparar(&state, peticion).await
+    let v = super::servidor::preparar(&state, peticion).await?;
+    super::servidor::ligar_a_la_sesion(&v.token).await?;
+    Ok(v)
 }
 
 /// Paso 2: aplica el cambio preparado. Devuelve su id para seguirlo.

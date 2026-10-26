@@ -33,7 +33,7 @@ pub const CADUCIDAD_LECTURAS: std::time::Duration = std::time::Duration::from_se
 /// lectura, 400 si un valor no vale. Exige sesión.
 #[server(endpoint = "preparar_ajuste", input = Json)]
 pub async fn preparar_ajuste(p: PeticionAjuste) -> Result<GrupoVista, ServerFnError> {
-    servidor::preparar_ajuste(p).await
+    servidor::ligada(servidor::preparar_ajuste(p).await?).await
 }
 
 /// Prepara una acción sobre varios elementos del tema (`quitar_wps` en dos
@@ -50,7 +50,7 @@ pub async fn preparar_accion(
     accion: String,
     elementos: Vec<String>,
 ) -> Result<GrupoVista, ServerFnError> {
-    servidor::preparar_accion(tema, accion, elementos).await
+    servidor::ligada(servidor::preparar_accion(tema, accion, elementos).await?).await
 }
 
 /// Prepara el guardado del detalle de un elemento: los cambios de varios
@@ -62,7 +62,7 @@ pub async fn preparar_accion(
 pub async fn preparar_elemento(
     peticiones: Vec<PeticionAjuste>,
 ) -> Result<GrupoVista, ServerFnError> {
-    servidor::preparar_elemento(peticiones).await
+    servidor::ligada(servidor::preparar_elemento(peticiones).await?).await
 }
 
 /// Prepara «No responder al ping desde internet»: la regla propia del panel
@@ -74,7 +74,7 @@ pub async fn preparar_elemento(
 /// curso; 403 en solo lectura. Exige sesión.
 #[server(endpoint = "preparar_sin_ping", input = Json)]
 pub async fn preparar_sin_ping() -> Result<GrupoVista, ServerFnError> {
-    servidor::preparar_sin_ping().await
+    servidor::ligada(servidor::preparar_sin_ping().await?).await
 }
 
 /// Como mucho, elementos en una acción sobre varios.
@@ -95,7 +95,7 @@ pub async fn confirmar_ajuste(
 /// devuelve su resumen, que se confirma con [`confirmar_ajuste`].
 #[server(endpoint = "deshacer_ajuste", input = Json)]
 pub async fn deshacer_ajuste(cambio: i64) -> Result<GrupoVista, ServerFnError> {
-    servidor::deshacer_ajuste(cambio).await
+    servidor::ligada(servidor::deshacer_ajuste(cambio).await?).await
 }
 
 /// La página del tema `tema` (`wifi`, `puertos`…) entera: el resumen, los
@@ -140,7 +140,8 @@ pub async fn preparar_volver_a_partida(
     instancia: Option<String>,
     clave: Option<String>,
 ) -> Result<GrupoVista, ServerFnError> {
-    servidor::preparar_volver_a_partida(ajuste, campo, instancia, clave).await
+    servidor::ligada(servidor::preparar_volver_a_partida(ajuste, campo, instancia, clave).await?)
+        .await
 }
 
 #[cfg(test)]

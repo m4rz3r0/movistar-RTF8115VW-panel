@@ -271,7 +271,9 @@ pub async fn deshacer(change_id: i64) -> Result<PreparadoVista, ServerFnError> {
     crate::ui::explorador::servidor::sin_guardar();
     crate::auth::require_user().await?;
     let state = crate::ui::explorador::servidor::app_state()?;
-    servidor::deshacer(&state, change_id).await
+    let v = servidor::deshacer(&state, change_id).await?;
+    crate::ui::explorador::servidor::ligar_a_la_sesion(&v.token).await?;
+    Ok(v)
 }
 
 /// Los secretos del cambio `cambio` con su valor anterior y el nuevo, para

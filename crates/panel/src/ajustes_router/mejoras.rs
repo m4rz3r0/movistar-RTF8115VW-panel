@@ -149,5 +149,5 @@ pub async fn preparar_lote(
     id: String,
     opciones: OpcionesLote,
 ) -> Result<GrupoVista, ServerFnError> {
-    super::servidor::preparar_lote(id, opciones).await
+    super::servidor::ligada(super::servidor::preparar_lote(id, opciones).await?).await
 }

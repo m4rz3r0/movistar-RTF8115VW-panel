@@ -47,6 +47,7 @@ mod red;
 mod registro_y_dns;
 mod sensibles;
 mod tema;
+mod token_usuario;
 mod usuarios_router;
 mod usuarios_router_guardas;
 mod vista;

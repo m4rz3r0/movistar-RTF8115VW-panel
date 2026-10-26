@@ -27,6 +27,13 @@ pub(crate) use historial::etiquetas_de_campos;
 pub(super) use mejoras::{contar_mejoras, leer_mejoras, preparar_lote};
 pub(super) use pagina::leer_tema;
 
+/// `v` con su token ligado al usuario de la sesión
+/// ([`crate::ui::explorador::servidor::ligar_a_la_sesion`]).
+pub(crate) async fn ligada(v: GrupoVista) -> Result<GrupoVista, ServerFnError> {
+    crate::ui::explorador::servidor::ligar_a_la_sesion(&v.token).await?;
+    Ok(v)
+}
+
 use super::*;
 use crate::{
     changes::{

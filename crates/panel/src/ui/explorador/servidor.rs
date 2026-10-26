@@ -77,6 +77,15 @@ pub(crate) fn gestor(state: &AppState) -> Result<Arc<ChangeManager>, ServerFnErr
         .ok_or_else(|| interno("el gestor de cambios no está instalado"))
 }
 
+/// Liga el cambio preparado con `token` al usuario de la sesión
+/// ([`ChangeManager::ligar`]): solo él lo confirma. Lo llaman las server
+/// functions que preparan un cambio.
+pub(crate) async fn ligar_a_la_sesion(token: &str) -> Result<(), ServerFnError> {
+    let yo = crate::auth::require_user().await?;
+    gestor(&app_state()?)?.ligar(token, &yo.username);
+    Ok(())
+}
+
 /// El error de un motivo del gestor con texto propio
 /// ([`crate::changes::motivo_con_texto`]), en el idioma de la petición.
 pub(crate) fn error_con_texto(e: &CambioError) -> Option<ServerFnError> {
