@@ -980,6 +980,7 @@ pub fn extraer(dir: &Path) -> Result<Vec<Funcion>, String> {
             riesgo: Riesgo::Bajo,
             acceso: None,
             bloqueada: None,
+            comprobada: None,
         };
         f.riesgo = riesgo_de(&f);
         f.acceso = acceso_de(&f);
@@ -1022,6 +1023,7 @@ pub fn extraer(dir: &Path) -> Result<Vec<Funcion>, String> {
             riesgo: Riesgo::Bajo,
             acceso: None,
             bloqueada: None,
+            comprobada: None,
         };
         f.riesgo = riesgo_de(&f);
         f.acceso = acceso_de(&f);
@@ -1063,6 +1065,7 @@ pub fn extraer(dir: &Path) -> Result<Vec<Funcion>, String> {
             riesgo: Riesgo::Bajo,
             acceso: None,
             bloqueada: peligrosa.map(|(_, m)| m.to_string()),
+            comprobada: None,
         };
         func.riesgo = riesgo_de(&func);
         func.acceso = acceso_de(&func);

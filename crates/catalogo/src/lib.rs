@@ -4,12 +4,13 @@
 //! partir del análisis del router y revisado a mano). Se compila dentro del
 //! binario y se valida al cargar: un catálogo inválido impide arrancar.
 
+mod comprobadas;
 pub mod mask;
 mod model;
 
 pub use model::{
-    Acceso, Area, Funcion, LecturaPareada, Lista, Origen, Parametro, Partido, Riesgo, Tipo,
-    TipoParam,
+    Acceso, Area, Comprobacion, Funcion, LecturaPareada, Lista, Origen, Parametro, Partido, Riesgo,
+    Tipo, TipoParam,
 };
 
 use serde::Deserialize;
@@ -108,6 +109,7 @@ impl Catalogo {
                 }
                 _ => {}
             }
+            comprobadas::validar(f).map_err(|m| mal(f, m.into()))?;
             let mut params = HashSet::new();
             for p in &f.parametros {
                 if !params.insert(p.nombre.as_str()) {

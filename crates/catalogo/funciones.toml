@@ -64,6 +64,7 @@ descripcion = "Activa RIP y el envío/recepción de anuncios en una interfaz."
 riesgo = "alto"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetRipIntf", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -122,6 +123,7 @@ riesgo = "alto"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetRoutingV4Rule", params = [["rtm_rulev4_0i", "{rtm_rulev4_id}"]] }
 lista = { id_param = "rtm_rulev4_id", all = false, del = true }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "ip_intf_id"
@@ -203,6 +205,7 @@ riesgo = "alto"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetRoutingV6Rule", params = [["rtm_rulev6_0i", "{rtm_rulev6_id}"]] }
 lista = { id_param = "rtm_rulev6_id", all = false, del = true }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "ip_intf_id"
@@ -280,6 +283,7 @@ riesgo = "alto"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetWanIPIntf", params = [["ip_intf_0i", "{ip_intf_id}"]] }
 lista = { id_param = "ip_intf_id", all = false, del = true }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -423,6 +427,7 @@ descripcion = "Cambia entre multipuesto (router) y monopuesto (puente) con usuar
 riesgo = "alto"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "te_multipuesto_monopuesto.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "userselection"
@@ -454,6 +459,7 @@ descripcion = "Cambia el modo WAN (multipuesto/monopuesto) y las credenciales PP
 riesgo = "alto"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "te_mapa_red_local.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "userselection"
@@ -542,6 +548,7 @@ riesgo = "bajo"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbDhcpV4SvrPoolGetOpt", params = [["rtm_cfg_dhcpv4_svr_pool_id", "{rtm_cfg_dhcpv4_svr_pool_id}"], ["rtm_dhcpv4_svr_pool_opt_id", "{rtm_dhcpv4_svr_pool_opt_id}"]] }
 lista = { id_param = "rtm_dhcpv4_svr_pool_opt_id", all = false, del = true }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -610,6 +617,7 @@ riesgo = "bajo"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbDhcpV4SvrPoolGetStatic", params = [["rtm_cfg_dhcpv4_svr_pool_id", "{rtm_cfg_dhcpv4_svr_pool_id}"], ["rtm_dhcpv4_svr_pool_static_id", "{rtm_dhcpv4_svr_pool_static_id}"]] }
 lista = { id_param = "rtm_dhcpv4_svr_pool_static_id", all = false, del = true }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -674,6 +682,7 @@ riesgo = "medio"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetDhcpv4ServerPool", params = [["rtm_cfg_dhcpv4_svr_pool_0i", "{rtm_cfg_dhcpv4_svr_pool_id}"]] }
 lista = { id_param = "rtm_cfg_dhcpv4_svr_pool_id", all = false, del = true }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "rtm_cfg_dhcpv4_svr_pool_id"
@@ -877,6 +886,7 @@ riesgo = "alto"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetLanIPv4Addr", params = [["ip_intf_id", "{ip_intf_id}"], ["ipv4_addr_id", "{ipv4_addr_id}"]] }
 lista = { id_param = "ipv4_addr_id", all = false, del = true }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -925,6 +935,7 @@ descripcion = "Activa una interfaz LAN y su IGMP snooping. Puede dejar sin acces
 riesgo = "alto"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetLanIPv4Intf", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -984,6 +995,7 @@ riesgo = "alto"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetTR98L2Bridge", params = [["mll_bridge_0i", "{mll_bridge_id}"]] }
 lista = { id_param = "mll_bridge_id", all = false, del = true }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "name"
@@ -1037,6 +1049,7 @@ riesgo = "alto"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetTR98L2Filtering", params = [["mll_br_filter_0i", "{mll_br_filter_id}"]] }
 lista = { id_param = "mll_br_filter_id", all = false, del = true }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -1140,6 +1153,7 @@ descripcion = "Igual que te_red_local.cgi, desde el mapa de red de la UI básica
 riesgo = "alto"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "te_mapa_red_local.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "ethIpAddress"
@@ -1191,6 +1205,7 @@ descripcion = "Pone nombre y tipo a un equipo del mapa de red de la UI básica."
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "te_mapa_red_local.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "hostName"
@@ -1236,6 +1251,7 @@ descripcion = "Cambia desde la UI básica la IP y máscara del router, el servid
 riesgo = "alto"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "te_red_local.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "ethIpAddress"
@@ -1300,6 +1316,7 @@ descripcion = "Configura una radio WiFi: activación, país, estándar, canal, a
 riesgo = "medio"
 acceso = "wifi"
 lectura_pareada = { funcion = "cbGetWifi", params = [["dpm_cfg_wifi_0i", "{dpm_cfg_wifi_id}"]] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "radio_adm_state"
@@ -1473,6 +1490,7 @@ descripcion = "Configura un punto de acceso: SSID, ocultación, seguridad y clav
 riesgo = "medio"
 acceso = "wifi"
 lectura_pareada = { funcion = "cbGetWifiAccPt", params = [["dpm_cfg_wifi_acc_pt_id", "{dpm_cfg_wifi_acc_pt_id}"]] }
+comprobada = "fase 3, cambios 6 y 7 (clave) y E1, cambios 9 y 10"
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -1620,6 +1638,7 @@ riesgo = "medio"
 acceso = "wifi"
 lectura_pareada = { funcion = "cbGetWifiWds", params = [["dpm_cfg_wifi_wds_0i", "{dpm_cfg_wifi_wds_id}"]] }
 lista = { id_param = "dpm_cfg_wifi_wds_id", all = false, del = true }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "dpm_cfg_wifi_wds_id"
@@ -1651,6 +1670,7 @@ pagina = "wifi.asp"
 descripcion = "Arranca un emparejamiento WPS (formulario WiFiWPSStartForm, que no aparece en las páginas capturadas: sus campos no se conocen)."
 riesgo = "medio"
 acceso = "no_corta"
+comprobada = false
 
 [[funcion]]
 name = "te_wifi.asp"
@@ -1671,6 +1691,7 @@ descripcion = "Guarda la lista del filtro MAC de la WiFi 2,4 GHz (UI básica)."
 riesgo = "medio"
 acceso = "wifi"
 lectura_pareada = { funcion = "te_wifi.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "wlMACaddr"
@@ -1697,6 +1718,7 @@ descripcion = "Configura la WiFi 2,4 GHz desde la UI básica: SSID, ocultación,
 riesgo = "medio"
 acceso = "wifi"
 lectura_pareada = { funcion = "te_wifi.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "wlSsidIdx"
@@ -1813,6 +1835,7 @@ descripcion = "Guarda la lista del filtro MAC de la WiFi 5 GHz (UI básica)."
 riesgo = "medio"
 acceso = "wifi"
 lectura_pareada = { funcion = "te_wifi_5ghz.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "wlMACaddr"
@@ -1839,6 +1862,7 @@ descripcion = "Configura la WiFi 5 GHz desde la UI básica (mismos campos que te
 riesgo = "medio"
 acceso = "wifi"
 lectura_pareada = { funcion = "te_wifi_5ghz.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "wlSsidIdx"
@@ -1955,6 +1979,7 @@ descripcion = "Configura la red de invitados desde la UI básica: SSID, segurida
 riesgo = "medio"
 acceso = "wifi"
 lectura_pareada = { funcion = "te_wifi_guest.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "wlSsidIdx"
@@ -2101,6 +2126,7 @@ descripcion = "Activa o desactiva los ALG o el NAT loopback (formularios NatAlgF
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetNatConfig", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "ftp_enable"
@@ -2156,6 +2182,7 @@ descripcion = "Activa o cambia el NAT de una interfaz."
 riesgo = "alto"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetNatIntf", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -2204,6 +2231,7 @@ riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetNatPortMapping", params = [["nat_port_mapping_0i", "{nat_port_mapping_id}"]] }
 lista = { id_param = "nat_port_mapping_id", all = false, del = true }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -2282,6 +2310,7 @@ descripcion = "Activa o desactiva UPnP."
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetUpnpCfg", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -2318,6 +2347,7 @@ descripcion = "Crea una redirección de puertos desde la UI básica (campos de l
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "te_ppp_pm.cmd?action=retrieve", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "inst"
@@ -2334,6 +2364,7 @@ descripcion = "Borra una redirección de puertos desde la UI básica."
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "te_ppp_pm.cmd?action=retrieve", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "id"
@@ -2355,6 +2386,7 @@ descripcion = "Modifica una redirección de puertos desde la UI básica."
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "te_ppp_pm.cmd?action=retrieve", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "inst"
@@ -2380,6 +2412,7 @@ descripcion = "Activa o desactiva una regla de puertos con el formato antiguo de
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "te_puertos.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "portName"
@@ -2421,6 +2454,7 @@ descripcion = "Borra una regla de puertos con el formato antiguo de la UI básic
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "te_puertos.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "portName"
@@ -2457,6 +2491,7 @@ descripcion = "Activa o desactiva UPnP desde la UI básica."
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetUpnpCfg", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "enblUpnp"
@@ -2495,8 +2530,9 @@ pagina = "scbidirectionalflt_ed.asp"
 descripcion = "Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Añade una entrada (interfaz, versión, acción por defecto) o una regla (protocolo, origen, destino, puertos, acción)."
 riesgo = "alto"
 acceso = "puede_cortar"
-bloqueada = "cortafuegos sin lectura comprobable: la Biblioteca no lo escribe; el panel solo pone y quita su propia regla desde Seguridad"
+bloqueada = "cortafuegos sin lectura comprobable: la Biblioteca no lo escribe"
 lectura_pareada = { funcion = "scbidirectionalflt_ls.asp", params = [] }
+comprobada = "E5, cambio 11 (la regla se pone; «sin ping» no basta en este router)"
 
 [[funcion.parametro]]
 nombre = "id"
@@ -2617,8 +2653,9 @@ pagina = "scbidirectionalflt_ed.asp"
 descripcion = "Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Modifica una entrada o regla."
 riesgo = "alto"
 acceso = "puede_cortar"
-bloqueada = "cortafuegos sin lectura comprobable: la Biblioteca no lo escribe; el panel solo pone y quita su propia regla desde Seguridad"
+bloqueada = "cortafuegos sin lectura comprobable: la Biblioteca no lo escribe"
 lectura_pareada = { funcion = "scbidirectionalflt.cmd?action=view", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "id"
@@ -2739,8 +2776,9 @@ pagina = "scbidirectionalflt_ls.asp"
 descripcion = "Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Borra una entrada o regla."
 riesgo = "alto"
 acceso = "puede_cortar"
-bloqueada = "cortafuegos sin lectura comprobable: la Biblioteca no lo escribe; el panel solo pone y quita su propia regla desde Seguridad"
+bloqueada = "cortafuegos sin lectura comprobable: la Biblioteca no lo escribe"
 lectura_pareada = { funcion = "scbidirectionalflt_ls.asp", params = [] }
+comprobada = "E5, cambio 12"
 
 [[funcion.parametro]]
 nombre = "item"
@@ -2786,6 +2824,7 @@ riesgo = "medio"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetDdns", params = [["rtm_ddns_0i", "{rtm_ddns_id}"]] }
 lista = { id_param = "rtm_ddns_id", all = false, del = true }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -2843,6 +2882,7 @@ descripcion = "Activa o desactiva el relé DNS."
 riesgo = "medio"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetDnsRelay", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "dns_relay_adm_state"
@@ -2876,6 +2916,7 @@ riesgo = "medio"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetDnsRelayServer", params = [["rtm_cfg_dns_relay_id", "{rtm_cfg_dns_relay_id}"]] }
 lista = { id_param = "rtm_cfg_dns_relay_id", all = false, del = true }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -2921,6 +2962,7 @@ descripcion = "Configura IPv6 en la LAN: activación, prefijo delegado, ULA, RA 
 riesgo = "bajo"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetLanIPv6Config", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "ipv6_adm_state"
@@ -3024,8 +3066,9 @@ pagina = "te_ipv6.asp"
 descripcion = "Abre puertos IPv6 hacia un equipo de la LAN (UI básica)."
 riesgo = "alto"
 acceso = "puede_cortar"
-bloqueada = "cortafuegos sin lectura comprobable: la Biblioteca no lo escribe; el panel solo pone y quita su propia regla desde Seguridad"
+bloqueada = "cortafuegos sin lectura comprobable: la Biblioteca no lo escribe"
 lectura_pareada = { funcion = "te_ipv6.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "newinst"
@@ -3046,8 +3089,9 @@ pagina = "te_ipv6.asp"
 descripcion = "Borra una apertura de puertos IPv6 (UI básica)."
 riesgo = "alto"
 acceso = "puede_cortar"
-bloqueada = "cortafuegos sin lectura comprobable: la Biblioteca no lo escribe; el panel solo pone y quita su propia regla desde Seguridad"
+bloqueada = "cortafuegos sin lectura comprobable: la Biblioteca no lo escribe"
 lectura_pareada = { funcion = "te_ipv6.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "oldinst"
@@ -3068,8 +3112,9 @@ pagina = "te_ipv6.asp"
 descripcion = "Guarda la lista de aperturas de puertos IPv6 (UI básica)."
 riesgo = "alto"
 acceso = "puede_cortar"
-bloqueada = "cortafuegos sin lectura comprobable: la Biblioteca no lo escribe; el panel solo pone y quita su propia regla desde Seguridad"
+bloqueada = "cortafuegos sin lectura comprobable: la Biblioteca no lo escribe"
 lectura_pareada = { funcion = "te_ipv6.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "inst"
@@ -3100,6 +3145,7 @@ descripcion = "Configura DHCPv6 (modo y rango) desde la UI básica."
 riesgo = "bajo"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "te_ipv6.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "IPv6DHCPMode"
@@ -3131,6 +3177,7 @@ descripcion = "Cambia el prefijo IPv6 de la LAN desde la UI básica."
 riesgo = "bajo"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "te_ipv6.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "globalIPv6Address"
@@ -3178,6 +3225,7 @@ descripcion = "Configura los parámetros de IGMP."
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetMcastIgmpSetting", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "igmp_max_group"
@@ -3223,6 +3271,7 @@ descripcion = "Activa multicast y la versión de IGMP en una interfaz."
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetMcastIntf", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -3288,6 +3337,7 @@ riesgo = "bajo"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetClassification", params = [["rtm_cfg_qos_cls_0i", "{rtm_cfg_qos_cls_id}"]] }
 lista = { id_param = "rtm_cfg_qos_cls_id", all = false, del = true }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "order_p"
@@ -3500,6 +3550,7 @@ descripcion = "Configura una cola de QoS."
 riesgo = "bajo"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetQueue", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "dpm_cfg_queue_id"
@@ -3548,6 +3599,7 @@ riesgo = "bajo"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetTR98L2Marking", params = [["mll_br_marking_0i", "{mll_br_marking_id}"]] }
 lista = { id_param = "mll_br_marking_id", all = false, del = true }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -3633,6 +3685,7 @@ descripcion = "Configura una línea de voz: credenciales SIP, línea directa y V
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetVoiceLine", params = [["interwork_id", "{interwork_id}"]] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -3708,6 +3761,7 @@ descripcion = "Configura un puerto de teléfono (ganancias, fax y módem)."
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetVoicePhysical", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "fax_passthrough_adm_state"
@@ -3753,6 +3807,7 @@ descripcion = "Configura SIP (servidores, puertos, tiempos, DTMF, T.38). Puede d
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetVoiceSip", params = [] }
+comprobada = "E6, cambio 13"
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -3913,6 +3968,7 @@ descripcion = "Configura TR-069 (ACS, credenciales, Inform). Desde cwmp.asp (ocu
 riesgo = "alto"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetTr69Config", params = [] }
+comprobada = "antes de la fase 3 (referencia de la prueba por confirmar)"
 
 [[funcion.parametro]]
 nombre = "enableCWMP"
@@ -3971,6 +4027,7 @@ descripcion = "Crea un usuario de la interfaz web con su grupo (user, admin; sys
 riesgo = "medio"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetUserList", params = [] }
+comprobada = "E3, cambio 14"
 
 [[funcion.parametro]]
 nombre = "rqUser"
@@ -3997,6 +4054,7 @@ descripcion = "Inicio de sesión en la UI avanzada: devuelve SessionID. Usuario 
 riesgo = "bajo"
 acceso = "no_corta"
 bloqueada = "la usa hgu::Client para su propia sesión; invocarla desde el explorador rompería la sesión compartida del panel"
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "rqUsername"
@@ -4023,6 +4081,7 @@ descripcion = "Cierra la sesión de la UI avanzada."
 riesgo = "bajo"
 acceso = "no_corta"
 bloqueada = "la usa hgu::Client para su propia sesión; invocarla desde el explorador rompería la sesión compartida del panel"
+comprobada = false
 
 [[funcion]]
 name = "cbCheckSession"
@@ -4045,6 +4104,7 @@ descripcion = "Borra usuarios de la interfaz web (lista de nombres, cada uno seg
 riesgo = "medio"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetUserList", params = [] }
+comprobada = "E3, cambio 16"
 
 [[funcion.parametro]]
 nombre = "rqDelList"
@@ -4071,6 +4131,11 @@ descripcion = "Cambia la contraseña del usuario con sesión iniciada (contrase�
 riesgo = "medio"
 acceso = "puede_cortar"
 bloqueada = "cambia la contraseña con la que el propio panel inicia sesión: la vigilancia no podría volver a entrar ni revertir; se cambia desde el router"
+# TODO(E4): la contraseña del propio router sigue activa sin comprobar: su
+# flujo (Configuración del router) no pasa por el gestor, está protegido
+# (comprueba, restaura y avisa) y la E4 se hace con él. Tras la E4, la
+# referencia de la prueba aquí, o el flujo se desactiva si falla.
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "rqUser"
@@ -4096,7 +4161,8 @@ pagina = "user_profile.asp"
 descripcion = "Cambia la contraseña y el grupo de otro usuario (ventana user_profile_modifyOthers.asp). No se puede comprobar después: acción."
 riesgo = "medio"
 acceso = "puede_cortar"
-bloqueada = "puede cambiar la contraseña del usuario con el que el propio panel inicia sesión (RP_ROUTER_USER): la vigilancia no podría volver a entrar ni revertir; se cambia en Ajustes → Seguridad → Usuarios, con guardas y comprobando que entra con la nueva"
+bloqueada = "puede cambiar la contraseña del usuario con el que el propio panel inicia sesión (RP_ROUTER_USER): la vigilancia no podría volver a entrar ni revertir; además, en este router no se puede comprobar: solo la cuenta 1234 entra en su web"
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "rqUser"
@@ -4123,6 +4189,7 @@ descripcion = "Inicio de sesión en la UI básica (formulario de te_acceso_route
 riesgo = "bajo"
 acceso = "no_corta"
 bloqueada = "la usa hgu::Client para su propia sesión; invocarla desde el explorador rompería la sesión compartida del panel"
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "curWebPage"
@@ -4149,6 +4216,7 @@ descripcion = "Cambia la contraseña de acceso desde la UI básica (actual y nue
 riesgo = "bajo"
 acceso = "puede_cortar"
 bloqueada = "cambia la contraseña con la que el propio panel inicia sesión: la vigilancia no podría volver a entrar ni revertir; se cambia desde el router"
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "inOrgPassword"
@@ -4173,6 +4241,7 @@ bloqueada = "la usa hgu::Client para su propia sesión; invocarla desde el explo
 
 # ======================================================================
 # Área: sistema
+comprobada = false
 
 [[funcion]]
 name = "backup_restore.asp"
@@ -4184,6 +4253,7 @@ descripcion = "Página de copia y restauración de la configuración."
 riesgo = "bajo"
 acceso = "no_corta"
 bloqueada = "al cargarse llama a cbSaveConfig con backup=1 (genera la copia con secretos)"
+comprobada = false
 
 [[funcion]]
 name = "cbDownloadConfig"
@@ -4195,6 +4265,7 @@ descripcion = "Descarga el fichero de copia generado por cbSaveConfig (backup=1)
 riesgo = "bajo"
 acceso = "no_corta"
 bloqueada = "descarga la configuración completa con todas las contraseñas y claves en claro"
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "fileName"
@@ -4211,6 +4282,7 @@ descripcion = "Descarga un firmware de un servidor FTP/TFTP y lo graba."
 riesgo = "alto"
 acceso = "puede_cortar"
 bloqueada = "graba un firmware: un fallo deja el router inservible"
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "rqProtocol"
@@ -4251,6 +4323,7 @@ descripcion = "Activa o desactiva el espejo de la WAN hacia un puerto LAN."
 riesgo = "bajo"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetDiagConfig", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "wan_mirror"
@@ -4301,6 +4374,7 @@ descripcion = "Configura el registro del sistema (destino local o remoto, servid
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetSyslog", params = [] }
+comprobada = "fase 3, cambios 4 y 5"
 
 [[funcion.parametro]]
 nombre = "syslog_enable"
@@ -4344,6 +4418,7 @@ pagina = "reboot.asp"
 descripcion = "Reinicia el router. El panel vigila su vuelta hasta 5 minutos."
 riesgo = "alto"
 acceso = "puede_cortar"
+comprobada = false
 
 [[funcion]]
 name = "cbRestoreConfig"
@@ -4355,6 +4430,7 @@ descripcion = "Restaura un perfil de configuración guardado y reinicia el route
 riesgo = "alto"
 acceso = "puede_cortar"
 bloqueada = "sustituye toda la configuración y reinicia; no hay forma de comprobarla ni de deshacerla desde el panel"
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "file"
@@ -4370,6 +4446,7 @@ pagina = "save.asp"
 descripcion = "Con `save=1` graba la configuración en flash; con `backup=1` genera el fichero de copia (lo que hace backup_restore.asp al cargarse)."
 riesgo = "bajo"
 acceso = "no_corta"
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "backup"
@@ -4391,6 +4468,7 @@ descripcion = "Página del registro del sistema."
 riesgo = "bajo"
 acceso = "no_corta"
 bloqueada = "al cargarse llama a cbSetSyslog con export=EXPORT (exportación del registro)"
+comprobada = false
 
 [[funcion]]
 name = "upload/cfgupload.asp"
@@ -4402,6 +4480,7 @@ descripcion = "Recibe un fichero de configuración y lo aplica."
 riesgo = "alto"
 acceso = "puede_cortar"
 bloqueada = "sube y aplica una configuración completa; no se puede comprobar ni deshacer"
+comprobada = false
 
 [[funcion]]
 name = "upload/imgupgrade.asp"
@@ -4413,6 +4492,7 @@ descripcion = "Recibe un firmware y lo graba."
 riesgo = "alto"
 acceso = "puede_cortar"
 bloqueada = "graba un firmware: un fallo deja el router inservible"
+comprobada = false
 
 [[funcion]]
 name = "restoreinfo.cgi"
@@ -4424,6 +4504,7 @@ descripcion = "Restablece los valores de fábrica (enlace de te_otras_funcionali
 riesgo = "alto"
 acceso = "puede_cortar"
 bloqueada = "reset de fábrica: borra la configuración, incluidas las credenciales PPP y WiFi"
+comprobada = false
 
 [[funcion]]
 name = "te_acerca_de___.asp"
@@ -4453,6 +4534,7 @@ descripcion = "Recibe un firmware desde la UI básica y lo graba."
 riesgo = "alto"
 acceso = "puede_cortar"
 bloqueada = "graba un firmware: un fallo deja el router inservible"
+comprobada = false
 
 [[funcion]]
 name = "te_uploadsettings.asp"
@@ -4464,6 +4546,7 @@ descripcion = "Recibe un fichero de configuración desde la UI básica y lo apli
 riesgo = "alto"
 acceso = "puede_cortar"
 bloqueada = "sube y aplica una configuración completa; no se puede comprobar ni deshacer"
+comprobada = false
 
 [[funcion]]
 name = "cbSetLocalTime"
@@ -4474,6 +4557,7 @@ pagina = "ntp.asp"
 descripcion = "Fija la hora local del router a mano (ntp.asp, oculta). Sin lectura que la compruebe: acción."
 riesgo = "bajo"
 acceso = "no_corta"
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "SysTime"
@@ -4499,6 +4583,7 @@ descripcion = "Configura NTP: activación, interfaz y servidores. Desde ntp.asp 
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetTimeNtp", params = [] }
+comprobada = "antes de la fase 3 (referencia de la prueba por confirmar)"
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -4555,6 +4640,7 @@ descripcion = "Configura NTP según system.asp. Restos de system.asp: la página
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetNTPInfo", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "rqNTPOnOff"
@@ -4604,6 +4690,7 @@ pagina = "system.asp"
 descripcion = "Fija la hora del sistema según system.asp. Restos de system.asp: la página existe pero el router responde 404 a sus llamadas."
 riesgo = "bajo"
 acceso = "no_corta"
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "rqUTCSec"
@@ -4629,6 +4716,7 @@ descripcion = "Configura la zona horaria según system.asp. Restos de system.asp
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetSystemTimeZone", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "rqOffset"
@@ -4692,6 +4780,7 @@ acceso = "no_corta"
 
 # ======================================================================
 # Área: ocultas
+comprobada = false
 
 [[funcion]]
 name = "cwmp.asp"

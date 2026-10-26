@@ -99,6 +99,19 @@ fn funcion(md: &mut String, f: &Funcion, m: &Mascara, fixtures: &Path) {
     if let Some(b) = &f.bloqueada {
         let _ = writeln!(md, "**Bloqueada:** {b}\n");
     }
+    if f.tipo != Tipo::Lectura {
+        match &f.comprobada {
+            Some(catalogo::Comprobacion::Referencia(r)) => {
+                let _ = writeln!(md, "**Comprobada en el router real:** {r}\n");
+            }
+            _ => {
+                let _ = writeln!(
+                    md,
+                    "**Sin comprobar en el router real:** el panel no la escribe.\n"
+                );
+            }
+        }
+    }
     if let Some(lp) = &f.lectura_pareada {
         let params: Vec<String> = lp
             .params
@@ -195,6 +208,8 @@ pub fn generar(cat: &Catalogo, fixtures: &Path) -> Result<String, String> {
          - Riesgo: vigilancia tras el cambio de 30 s (bajo), 2 min (medio) o 5 min\n  \
            (alto). Las lecturas no tienen riesgo. Las funciones **bloqueadas** no se\n  \
            invocan nunca desde el panel.\n\
+         - Lista blanca: el panel solo escribe con las escrituras y acciones\n  \
+           **comprobadas en el router real** (`comprobada` en `funciones.toml`).\n\
          - Vigilancia: solo se vigila lo que puede cortar el acceso del panel al\n  \
            router o la conexión a internet («se vigila»); lo demás se da por\n  \
            aplicado en cuanto la relectura muestra lo nuevo («sin vigilancia»).\n  \

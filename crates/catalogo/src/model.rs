@@ -41,9 +41,32 @@ pub struct Funcion {
     /// Motivo por el que el panel no la invoca nunca.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bloqueada: Option<String>,
+    /// Si se ha comprobado en el router real (solo escrituras y acciones):
+    /// la referencia de la prueba (`"E3, cambio 14"`) o `false`. Sin el
+    /// campo, como `false`: el panel no la usa (ver
+    /// [`Funcion::comprobada`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comprobada: Option<Comprobacion>,
+}
+
+/// El campo `comprobada` de una escritura o acción.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Comprobacion {
+    /// Comprobada en el router real: la referencia de la prueba.
+    Referencia(String),
+    /// `false`: sin comprobar. `true` no vale (falta la referencia).
+    Valor(bool),
 }
 
 impl Funcion {
+    /// ¿Se ha comprobado en el router real? Es la lista blanca de lo que el
+    /// panel escribe: falla cerrada, así que sin el campo (o con `false`),
+    /// no. Una lectura no escribe: no cuenta.
+    pub fn comprobada(&self) -> bool {
+        matches!(self.comprobada, Some(Comprobacion::Referencia(_)))
+    }
+
     /// Parámetro por nombre.
     pub fn parametro(&self, nombre: &str) -> Option<&Parametro> {
         self.parametros.iter().find(|p| p.nombre == nombre)
