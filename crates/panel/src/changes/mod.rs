@@ -143,7 +143,7 @@ pub struct ChangeManager {
     /// `reanudar_pendientes` ya empezó (solo se hace una vez).
     reanudando: std::sync::atomic::AtomicBool,
     /// Interruptores de la validación real forzados por una prueba
-    /// ([`ChangeManager::forzar_interruptores`]); sin ellos, los de
+    /// ([`ChangeManager::forzar_interruptores`]), que se suman a los de
     /// [`crate::validacion_real::sin_validar`].
     interruptores: OnceLock<fn(Funcion3) -> Option<&'static str>>,
 }
@@ -179,7 +179,8 @@ impl ChangeManager {
 
     /// Fuerza los interruptores de la validación real de este gestor. Solo
     /// para las pruebas, que no pueden cambiar la constante: el servidor usa
-    /// siempre [`crate::validacion_real::sin_validar`]. Vale la primera vez.
+    /// siempre [`crate::validacion_real::sin_validar`]. Solo desactiva: lo
+    /// que la constante desactiva sigue así. Vale la primera vez.
     #[doc(hidden)]
     pub fn forzar_interruptores(&self, f: fn(Funcion3) -> Option<&'static str>) {
         let _ = self.interruptores.set(f);
@@ -188,10 +189,11 @@ impl ChangeManager {
     /// Clave del motivo por el que `f` sigue desactivada, o `None` (ver
     /// [`crate::validacion_real::sin_validar`]).
     pub(crate) fn sin_validar(&self, f: Funcion3) -> Option<&'static str> {
-        match self.interruptores.get() {
-            Some(forzados) => forzados(f),
-            None => crate::validacion_real::sin_validar(f),
-        }
+        combinar_interruptores(
+            crate::validacion_real::sin_validar,
+            self.interruptores.get().copied(),
+            f,
+        )
     }
 
     /// El gestor del servidor: lo crea y lo guarda en `state` la primera vez;
@@ -272,5 +274,43 @@ impl ChangeManager {
         }
         *a = Some(None);
         Ok(Reserva { m: self.clone() })
+    }
+}
+
+/// Interruptor efectivo de `f`: la constante manda y lo forzado por una
+/// prueba solo puede desactivar más, nunca habilitar lo que ella desactiva.
+fn combinar_interruptores(
+    constante: fn(Funcion3) -> Option<&'static str>,
+    forzados: Option<fn(Funcion3) -> Option<&'static str>>,
+    f: Funcion3,
+) -> Option<&'static str> {
+    constante(f).or_else(|| forzados.and_then(|forzados| forzados(f)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validacion_real::motivo;
+
+    /// Forzar `None` no habilita una función que la constante desactiva;
+    /// forzar `Some` sí desactiva una que la constante habilita.
+    #[test]
+    fn forzar_solo_desactiva() {
+        let desactivada: fn(Funcion3) -> Option<&'static str> = |f| Some(motivo(f));
+        let habilitada: fn(Funcion3) -> Option<&'static str> = |_| None;
+        let f = Funcion3::Usuarios;
+        assert_eq!(
+            combinar_interruptores(desactivada, Some(habilitada), f),
+            Some(motivo(f))
+        );
+        assert_eq!(
+            combinar_interruptores(habilitada, Some(desactivada), f),
+            Some(motivo(f))
+        );
+        assert_eq!(combinar_interruptores(habilitada, None, f), None);
+        assert_eq!(
+            combinar_interruptores(desactivada, None, f),
+            Some(motivo(f))
+        );
     }
 }
