@@ -86,7 +86,7 @@ for (const ancho of [360, 1440]) {
         if (ancho <= 860) {
           await page.locator("button.menu-boton").click();
         }
-        const cuenta = page.locator("nav .cuenta");
+        const cuenta = page.locator("nav.nav .cuenta");
         await expect(cuenta).toHaveText("6");
         await expect(cuenta).toHaveAttribute("aria-label", "6 pasos pendientes");
         await expect(cuenta).toBeVisible();
@@ -204,7 +204,7 @@ test.describe("contador sin consultas de más", () => {
     const errores = recogerErrores(page);
     await entrarEnSuPanel(page);
     await asentar(page);
-    const cuenta = page.locator("nav .cuenta");
+    const cuenta = page.locator("nav.nav .cuenta");
     await expect(cuenta).toHaveText("6");
     const consultas: string[] = [];
     page.on("request", (r) => {
@@ -233,7 +233,7 @@ const HECHO = "Hecho: el router tiene ya el cambio.";
 /** El contador de la barra lateral (en el móvil, abriendo el menú). */
 async function esperarContador(page: Page, ancho: number, valor: string) {
   if (ancho <= 860) await page.locator("button.menu-boton").click();
-  await expect(page.locator("nav .cuenta")).toHaveText(valor);
+  await expect(page.locator("nav.nav .cuenta")).toHaveText(valor);
   if (ancho <= 860) await page.locator("button.menu-boton").click();
 }
 
@@ -441,7 +441,7 @@ test.describe("contador tras un cambio en Ajustes", () => {
     await entrarEnSuPanel(page);
     await page.goto("/ajustes/wifi");
     await asentar(page);
-    const cuenta = page.locator("nav .cuenta");
+    const cuenta = page.locator("nav.nav .cuenta");
     await expect(cuenta).toHaveText("6");
     const rec = tarjetaDeAjustes(page, "Red WiFi 2,4 GHz").locator(".tarjeta-rec");
     await rec.getByRole("button", { name: "Quitar WPS" }).click();
