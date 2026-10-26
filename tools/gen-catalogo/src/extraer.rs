@@ -845,7 +845,6 @@ fn parametro(c: &Campo) -> Parametro {
         partido: c.partido,
         tapado: false,
         casilla: None,
-        solo_lectura: false,
     }
 }
 
@@ -919,7 +918,6 @@ pub fn extraer(dir: &Path) -> Result<Vec<Funcion>, String> {
                         partido: None,
                         tapado: false,
                         casilla: None,
-                        solo_lectura: false,
                     },
                     &mut params,
                 );
@@ -964,7 +962,6 @@ pub fn extraer(dir: &Path) -> Result<Vec<Funcion>, String> {
                 id_param: id.clone(),
                 all,
                 del,
-                editables: Vec::new(),
             }),
             _ => None,
         };
@@ -1006,7 +1003,6 @@ pub fn extraer(dir: &Path) -> Result<Vec<Funcion>, String> {
                 partido: None,
                 tapado: false,
                 casilla: None,
-                solo_lectura: false,
             })
             .collect();
         if let Some(&i) = vistas.get(&u.nombre) {

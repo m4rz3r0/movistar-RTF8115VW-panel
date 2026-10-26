@@ -4,7 +4,9 @@
 //! si el campo llega, valga lo que valga (el simulador hace lo mismo). Una
 //! condición activa con valor vacío deja sin IP nueva a todos.
 
-use crate::comun::{Panel, PanelPrueba, aplicar_ajuste, campo, fijar, llamar, ok, valores_de};
+use crate::comun::{
+    Panel, PanelPrueba, aplicar_ajuste, campo, esperar_final, fijar, llamar, ok, valores_de,
+};
 use crate::pool_por_id::{CASA, OTRO, del_pool, pool, preparar};
 use serde_json::json;
 
@@ -81,7 +83,7 @@ async fn el_resto_del_pool_se_mantiene() {
 
 /// Una condición puesta en la web del router, con su valor: el panel lee
 /// el `1` como marcada y, al cambiar otra cosa, la reenvía marcada (`on`)
-/// con su valor, aunque no salga en el formulario.
+/// con su valor.
 #[tokio::test]
 async fn una_condicion_con_valor_se_lee_marcada_y_se_conserva() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
@@ -95,10 +97,8 @@ async fn una_condicion_con_valor_se_lee_marcada_y_se_conserva() {
         &cookie,
     )
     .await;
-    // Las condiciones no salen en el formulario: solo se leen.
-    assert!(campo(&f, "dhcpv4_opt60").is_none(), "{f}");
-    assert!(campo(&f, "dhcpv4_opt60_value").is_none(), "{f}");
-    assert!(campo(&f, "lease_time").is_some(), "{f}");
+    assert_eq!(campo(&f, "dhcpv4_opt60").unwrap()["valor"], "1", "{f}");
+    assert_eq!(campo(&f, "dhcpv4_opt61").unwrap()["valor"], "0", "{f}");
 
     cambiar_concesion(&p, &cookie).await;
     let ps = escritura_del_pool(&p);
@@ -164,41 +164,72 @@ async fn una_condicion_activa_sin_valor_se_desactiva() {
     }
 }
 
-/// El pool del operador (id 1) y las condiciones son solo de lectura.
+/// Prepara en la Biblioteca el pool `inst` con `cambios` sobre lo que lee.
+async fn preparar_en(
+    p: &Panel,
+    cookie: &str,
+    inst: &str,
+    cambios: &[(&str, &str)],
+) -> (u16, String) {
+    let f = ok(
+        p,
+        "formulario",
+        json!({ "funcion": FUNCION, "instancia": inst, "claves": [] }),
+        cookie,
+    )
+    .await;
+    let mut valores = valores_de(&f);
+    for (k, v) in cambios {
+        fijar(&mut valores, k, v);
+    }
+    llamar(
+        p,
+        "preparar_cambio",
+        json!({ "peticion": { "funcion": FUNCION, "instancia": inst,
+                              "valores": valores, "borrar": false } }),
+        Some(cookie),
+    )
+    .await
+}
+
+/// Las condiciones se cambian como en la web oficial, pero activar una con
+/// el valor vacío da error: dejaría sin IP nueva a todos.
 #[tokio::test]
-async fn el_pool_del_operador_y_las_condiciones_no_se_escriben() {
+async fn activar_una_condicion_pide_su_valor() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
-    let preparar_en = |inst: &'static str, k: &'static str, v: &'static str| {
-        let p = &p;
-        let cookie = cookie.clone();
-        async move {
-            let f = ok(
-                p,
-                "formulario",
-                json!({ "funcion": FUNCION, "instancia": inst, "claves": [] }),
-                &cookie,
-            )
-            .await;
-            // Lo que no sale en el formulario se añade a mano, como lo
-            // haría alguien que llama a la API.
-            let mut valores = valores_de(&f);
-            valores.retain(|(n, _)| n != k);
-            valores.push((k.to_owned(), v.to_owned()));
-            llamar(
-                p,
-                "preparar_cambio",
-                json!({ "peticion": { "funcion": FUNCION, "instancia": inst,
-                                      "valores": valores, "borrar": false } }),
-                Some(&cookie),
-            )
-            .await
-        }
-    };
-    let (status, body) = preparar_en("1", "lease_time", "86400").await;
+    let (status, body) = preparar_en(&p, &cookie, "0", &[("dhcpv4_opt61", "1")]).await;
     assert_eq!(status, 400, "{body}");
-    let (status, body) = preparar_en("0", "dhcpv4_opt60_value", "MSFT 5.0").await;
-    assert_eq!(status, 400, "{body}");
-    let (status, body) = preparar_en("0", "dhcpv4_opt61", "1").await;
-    assert_eq!(status, 400, "{body}");
-    assert!(p.sim.control.writes().is_empty());
+    assert!(body.contains("dhcpv4_opt61"), "{body}");
+
+    let (status, body) = preparar_en(
+        &p,
+        &cookie,
+        "0",
+        &[("dhcpv4_opt60", "1"), ("dhcpv4_opt60_value", "MSFT 5.0")],
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    let prep: serde_json::Value = serde_json::from_str(&body).unwrap();
+    let id = ok(
+        &p,
+        "confirmar_cambio",
+        json!({ "token": prep["token"], "palabra": null }),
+        &cookie,
+    )
+    .await
+    .as_i64()
+    .unwrap();
+    let c = esperar_final(&p, &cookie, id).await;
+    assert_eq!(c["estado"], "Aplicado", "{c}");
+    let ps = escritura_del_pool(&p);
+    assert_eq!(enviado(&ps, "dhcpv4_opt60"), Some("on"), "{ps:?}");
+    assert_eq!(del_pool(&p, CASA, "dhcpv4_opt60").await, "1");
+}
+
+/// El pool del operador (id 1) también se edita, como en la web oficial.
+#[tokio::test]
+async fn el_pool_del_operador_tambien_se_edita() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    let (status, body) = preparar_en(&p, &cookie, "1", &[("lease_time", "86400")]).await;
+    assert_eq!(status, 200, "{body}");
 }

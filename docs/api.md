@@ -402,7 +402,7 @@ Configura un pool DHCPv4 (rango, máscara, puerta de enlace, DNS, concesión, IP
 
 Lectura pareada: `cbGetDhcpv4ServerPool` con `rtm_cfg_dhcpv4_svr_pool_0i={rtm_cfg_dhcpv4_svr_pool_id}`
 
-Lista: instancia por `rtm_cfg_dhcpv4_svr_pool_id`
+Lista: instancia por `rtm_cfg_dhcpv4_svr_pool_id`; `del=DEL` borra
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|

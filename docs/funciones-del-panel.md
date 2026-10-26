@@ -80,10 +80,9 @@ Arreglada y pendiente de comprobar otra vez:
   (captura del 2026-10-26). El panel mandaba `dhcpv4_opt60=0`, y así con
   las cuatro. Ahora el catálogo las marca como `casilla`: el panel manda
   `on` o nada, como la web, y nunca deja activa una condición con el valor
-  vacío (o una MAC todo ceros): la desactiva, y el diff lo dice. Las
-  condiciones son `solo_lectura` (no salen en el formulario y una petición
-  que las cambie se rechaza) y solo se escribe el grupo de casa, id 0
-  (`editables = ["0"]`): el de id 1 (TEF_IOT) es del operador. Hasta que
+  vacío (o una MAC todo ceros): si ya lo estaba, la desactiva, y el diff
+  lo dice; activar una sin valor da error. Todo lo demás se cambia como en
+  la web oficial, también el grupo del operador (id 1, TEF_IOT). Hasta que
   la prueba en el router real (cambiar y deshacer la concesión, también
   tras reiniciar, y comprobar que el router da IP nueva) pase, sigue con
   `comprobada = false`, y con ella los ajustes de DHCP y DNS de la red de

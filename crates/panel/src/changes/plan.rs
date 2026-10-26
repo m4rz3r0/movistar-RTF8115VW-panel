@@ -273,14 +273,46 @@ fn desactivar_condiciones_vacias(
         if !valor(efectivos, &p.nombre).is_some_and(|v| marcada(&v)) {
             continue;
         }
-        let v = valor(efectivos, vn).unwrap_or_default();
-        let es_mac = f.parametro(vn).is_some_and(|x| x.tipo == TipoParam::Mac);
-        let vacio = v.trim().is_empty()
-            || (es_mac && v.chars().all(|c| matches!(c, '0' | ':' | '-' | ' ')));
-        if vacio {
+        if valor_vacio(f, vn, &valor(efectivos, vn).unwrap_or_default()) {
             efectivos.insert(p.nombre.clone(), "0".to_owned());
         }
     }
+}
+
+/// ¿Vacío el valor `v` de la condición `vn`? Sin texto, o una MAC todo
+/// ceros (la que la web pone por defecto).
+fn valor_vacio(f: &Funcion, vn: &str, v: &str) -> bool {
+    let es_mac = f.parametro(vn).is_some_and(|x| x.tipo == TipoParam::Mac);
+    v.trim().is_empty() || (es_mac && v.chars().all(|c| matches!(c, '0' | ':' | '-' | ' ')))
+}
+
+/// Error si la petición activa una condición (una casilla con valor) que
+/// no estaba activa y deja su valor vacío.
+pub(super) fn condicion_vacia(
+    f: &Funcion,
+    actual: &BTreeMap<String, String>,
+    valores: &BTreeMap<String, String>,
+) -> Result<(), String> {
+    for p in &f.parametros {
+        let Some(vn) = p.casilla.as_ref().and_then(|c| c.valor.as_deref()) else {
+            continue;
+        };
+        let activa = valores.get(&p.nombre).is_some_and(|v| marcada(v));
+        let ya_activa = buscar(actual, &p.nombre).is_some_and(marcada);
+        let v = valores
+            .get(vn)
+            .map(String::as_str)
+            .or_else(|| buscar(actual, vn))
+            .unwrap_or_default();
+        if activa && !ya_activa && valor_vacio(f, vn, v) {
+            return Err(format!(
+                "{}: no se puede activar con {vn} vacío; ningún dispositivo encajaría \
+                 y el router dejaría de dar IP nueva",
+                p.nombre
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// Une valores de la petición y valores actuales. No hace peticiones.

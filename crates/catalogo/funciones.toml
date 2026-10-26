@@ -681,9 +681,7 @@ descripcion = "Configura un pool DHCPv4 (rango, máscara, puerta de enlace, DNS,
 riesgo = "medio"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetDhcpv4ServerPool", params = [["rtm_cfg_dhcpv4_svr_pool_0i", "{rtm_cfg_dhcpv4_svr_pool_id}"]] }
-# Solo el grupo de casa (id 0), sin borrarlo: el otro (id 1, TEF_IOT) es del
-# operador.
-lista = { id_param = "rtm_cfg_dhcpv4_svr_pool_id", all = false, del = false, editables = ["0"] }
+lista = { id_param = "rtm_cfg_dhcpv4_svr_pool_id", all = false, del = true }
 # NO COMPROBADA: el cambio 39 (solo lease_time) dejó activas con valor vacío
 # las cuatro condiciones del grupo (opción 60, 61, 77 y MAC), y tras el
 # reinicio del cambio 57 el router dejó de dar IP nueva. Las casillas de
@@ -746,81 +744,69 @@ nombre = "dhcpv4_opt60"
 etiqueta = "Condición por opción 60 (vendor ID)"
 tipo = "bool"
 casilla = { valor = "dhcpv4_opt60_value" }
-solo_lectura = true
 
 [[funcion.parametro]]
 nombre = "dhcpv4_opt60_value"
 etiqueta = "Valor de la opción 60"
 tipo = "text"
-solo_lectura = true
 
 [[funcion.parametro]]
 nombre = "dhcpv4_opt60_ex"
 etiqueta = "Opción 60: incluir/excluir"
 tipo = "enum"
 opciones = [["0", "Incluir"], ["1", "Excluir"]]
-solo_lectura = true
 
 [[funcion.parametro]]
 nombre = "dhcpv4_opt60_matching_mode"
 etiqueta = "Opción 60: comparación"
 tipo = "enum"
 opciones = [["0", "Exacta"], ["1", "Prefijo"], ["2", "Sufijo"], ["3", "Subcadena"]]
-solo_lectura = true
 
 [[funcion.parametro]]
 nombre = "dhcpv4_opt61"
 etiqueta = "Condición por opción 61 (client ID)"
 tipo = "bool"
 casilla = { valor = "dhcpv4_opt61_value" }
-solo_lectura = true
 
 [[funcion.parametro]]
 nombre = "dhcpv4_opt61_value"
 etiqueta = "Valor de la opción 61 (hex)"
 tipo = "text"
-solo_lectura = true
 
 [[funcion.parametro]]
 nombre = "dhcpv4_opt61_ex"
 etiqueta = "Opción 61: incluir/excluir"
 tipo = "enum"
 opciones = [["0", "Incluir"], ["1", "Excluir"]]
-solo_lectura = true
 
 [[funcion.parametro]]
 nombre = "dhcpv4_opt77"
 etiqueta = "Condición por opción 77 (user class)"
 tipo = "bool"
 casilla = { valor = "dhcpv4_opt77_value" }
-solo_lectura = true
 
 [[funcion.parametro]]
 nombre = "dhcpv4_opt77_value"
 etiqueta = "Valor de la opción 77 (hex)"
 tipo = "text"
-solo_lectura = true
 
 [[funcion.parametro]]
 nombre = "dhcpv4_opt77_ex"
 etiqueta = "Opción 77: incluir/excluir"
 tipo = "enum"
 opciones = [["0", "Incluir"], ["1", "Excluir"]]
-solo_lectura = true
 
 [[funcion.parametro]]
 nombre = "mac_addr"
 etiqueta = "Dirección MAC"
 tipo = "bool"
 casilla = { valor = "mac_addr_value" }
-solo_lectura = true
 
 [[funcion.parametro]]
 nombre = "mac_addr_ex"
 etiqueta = "MAC: incluir/excluir"
 tipo = "enum"
 opciones = [["0", "Incluir"], ["1", "Excluir"]]
-solo_lectura = true
 
 [[funcion.parametro]]
 nombre = "ipv4_addr_max"
@@ -863,14 +849,12 @@ nombre = "mac_addr_mask"
 etiqueta = "Máscara de MAC"
 tipo = "mac"
 partido = "mac6"
-solo_lectura = true
 
 [[funcion.parametro]]
 nombre = "mac_addr_value"
 etiqueta = "MAC de la condición"
 tipo = "mac"
 partido = "mac6"
-solo_lectura = true
 
 [[funcion]]
 name = "cbGetLanHostList"

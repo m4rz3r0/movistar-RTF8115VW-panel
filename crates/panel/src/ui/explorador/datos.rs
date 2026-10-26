@@ -177,17 +177,6 @@ pub struct ListaVista {
     pub id_param: String,
     /// Admite borrar instancias.
     pub borrar: bool,
-    /// Ids de las únicas instancias que se escriben; vacío: todas (y se
-    /// pueden añadir).
-    #[serde(default)]
-    pub editables: Vec<String>,
-}
-
-impl ListaVista {
-    /// ¿Se puede editar (o borrar) la instancia `id`?
-    pub fn editable(&self, id: &str) -> bool {
-        self.editables.is_empty() || self.editables.iter().any(|e| e == id)
-    }
 }
 
 /// Todo lo que hace falta para pintar la página de una función.
