@@ -3,9 +3,10 @@
 use crate::estado::{Aplazada, Edicion, HangAfterWrite, Inner, ListaViva, Params, SimState};
 use crate::http::param;
 use crate::lecturas::{all_instances, aplicar_campos};
+use crate::ofuscado;
 use crate::xml::{failure, leaf, ok, response, result_node, set_child};
 use catalogo::Lista;
-use hgu::{fmt::codificar_cambio_contrasena, xml::XmlNode};
+use hgu::xml::XmlNode;
 use std::{collections::BTreeMap, time::Instant};
 
 pub(crate) fn write(
@@ -82,12 +83,12 @@ pub(crate) fn write(
 }
 
 /// Cambia la contraseña del usuario del sim (`rqUser`, `rqOPwd`, `rqNPwd`,
-/// leídos con la misma codificación con la que los manda el panel:
-/// [`codificar_cambio_contrasena`]). Las sesiones abiertas siguen valiendo,
+/// leídos con la copia propia del `mess_userpass` del router:
+/// [`ofuscado::deshacer`]). Las sesiones abiertas siguen valiendo,
 /// como en el router. Con `modify_pwd_con_retraso` o
 /// `modify_pwd_tras_inicios`, la nueva queda pendiente hasta que toca.
 fn modify_pwd(s: &Inner, st: &mut SimState, p: &[(String, String)]) -> Result<(), String> {
-    let leer = |k: &str| param(p, k).map(codificar_cambio_contrasena);
+    let leer = |k: &str| param(p, k).map(ofuscado::deshacer);
     let nueva = leer("rqNPwd").ok_or("falta rqNPwd")?;
     let actual = s.password();
     if leer("rqUser").as_deref() != Some(s.user.as_str())

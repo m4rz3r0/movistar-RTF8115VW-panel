@@ -21,14 +21,13 @@ pub const PAGINA_CAMBIO_CONTRASENA: &str = "user_profile.asp";
 pub const CAMBIO_CONTRASENA: &str = "cbModifyPwd";
 
 /// Codifica un valor de [`CAMBIO_CONTRASENA`] (`rqUser`, `rqOPwd` y `rqNPwd`).
-/// Es el único sitio que decide cómo viajan: lo usan el panel al escribir y
-/// el simulador al leer lo recibido.
+/// Es el único sitio del panel que decide cómo viajan; el simulador los lee
+/// con su propia copia del JavaScript del router, para no darse la razón.
 ///
 /// Es [`mess_userpass`] (XOR 0x1f por carácter), como en `js/user_profile.js`
 /// de la web oficial, que pasa los tres valores por `mess_userpass`. Del
 /// router real solo se sabe que en claro lo rechaza; que acepte el XOR está
-/// pendiente de la E4 de la fase 3. Es involutiva: el simulador la usa
-/// también para leer.
+/// pendiente de la E4 de la fase 3. Es involutiva.
 pub fn codificar_cambio_contrasena(valor: &str) -> String {
     mess_userpass(valor)
 }

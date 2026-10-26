@@ -15,6 +15,7 @@ mod estado;
 mod fixtures;
 mod http;
 mod lecturas;
+mod ofuscado;
 pub mod sanitize;
 #[cfg(test)]
 mod tests;

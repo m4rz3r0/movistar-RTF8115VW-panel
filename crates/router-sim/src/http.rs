@@ -5,6 +5,7 @@ use crate::cortafuegos;
 use crate::escrituras::write;
 use crate::estado::{HangAfterWrite, Inner, Params, SimState};
 use crate::lecturas::read;
+use crate::ofuscado::deshacer as mess_userpass;
 use crate::usuarios;
 use crate::xml::{failure, leaf, response, result_node};
 use axum::{
@@ -14,7 +15,6 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Response},
 };
-use hgu::fmt::mess_userpass;
 use std::{
     collections::HashMap,
     sync::{Arc, atomic::Ordering},
