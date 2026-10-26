@@ -449,6 +449,10 @@ pub struct CambioVista {
     pub nota: Option<String>,
     /// Segundos que quedan de vigilancia (solo `vigilando`).
     pub restante_s: Option<i64>,
+    /// Quien pregunta puede terminar ya la vigilancia («Todo bien,
+    /// terminar»): la está vigilando el gestor y la hizo él.
+    #[serde(default)]
+    pub terminable: bool,
 }
 
 // ------------------------------------------------------------ validación
@@ -590,9 +594,9 @@ pub async fn confirmar_cambio(
 /// Estado de un cambio.
 #[server(endpoint = "estado_cambio", input = Json)]
 pub async fn estado_cambio(id: i64) -> Result<CambioVista, ServerFnError> {
-    crate::auth::require_user().await?;
+    let user = crate::auth::require_user().await?;
     let state = super::servidor::app_state()?;
-    super::servidor::estado_cambio(&state, id).await
+    super::servidor::estado_cambio(&state, id, &user.username).await
 }
 
 #[cfg(test)]

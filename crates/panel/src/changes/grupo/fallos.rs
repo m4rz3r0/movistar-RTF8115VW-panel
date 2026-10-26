@@ -216,8 +216,15 @@ impl ChangeManager {
                     })
                 };
                 let dur = self.tiempos.vigilancia(ej.riesgo);
-                match self.vigilar(dur, wan).await {
-                    Ok(()) => self.marcar(id, Estado::Aplicado, None, nota.as_ref()).await,
+                match self.vigilar(id, dur, wan).await {
+                    Ok(None) => self.marcar(id, Estado::Aplicado, None, nota.as_ref()).await,
+                    Ok(Some((usuario, responder))) => {
+                        tracing::info!(cambio = id, usuario, "vigilancia terminada a mano");
+                        let fin = Nota::con(nota::VIGILANCIA_TERMINADA, &[("usuario", usuario)]);
+                        let nota = Nota::juntar(nota.into_iter().chain([fin]));
+                        self.marcar(id, Estado::Aplicado, None, nota.as_ref()).await;
+                        let _ = responder.send(Ok(()));
+                    }
                     Err(motivo)
                         if ej
                             .pasos

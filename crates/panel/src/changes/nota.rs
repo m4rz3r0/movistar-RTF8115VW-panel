@@ -26,6 +26,8 @@ pub(crate) const WAN_CAIDA: &str = "nota-wan-caida";
 pub(crate) const RETOMADA: &str = "nota-retomada";
 /// Aplicado sin vigilancia: no puede cortar el acceso del panel al router.
 pub(crate) const SIN_VIGILANCIA: &str = "nota-sin-vigilancia";
+/// Quien hizo el cambio dio la vigilancia por terminada (`$usuario`).
+pub(crate) const VIGILANCIA_TERMINADA: &str = "nota-vigilancia-terminada";
 /// La reversión automática volvió a crear un usuario borrado con una
 /// contraseña nueva que no se guarda.
 pub(crate) const USUARIO_REVERTIDO: &str = "usuarios-router-nota-revertido";

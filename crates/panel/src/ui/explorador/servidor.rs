@@ -924,7 +924,13 @@ pub(crate) fn estado(e: Estado) -> EstadoDeCambio {
     }
 }
 
-pub async fn estado_cambio(state: &AppState, id: i64) -> Result<CambioVista, ServerFnError> {
+/// El estado del cambio `id` para `usuario` (que es quien puede terminar su
+/// vigilancia, si la hizo él).
+pub async fn estado_cambio(
+    state: &AppState,
+    id: i64,
+    usuario: &str,
+) -> Result<CambioVista, ServerFnError> {
     let g = gestor(state)?;
     let c = g.cambio(id).await.ok_or_else(|| {
         con_estado(
@@ -942,6 +948,7 @@ pub async fn estado_cambio(state: &AppState, id: i64) -> Result<CambioVista, Ser
         error: c.error.as_deref().map(nota_legible),
         nota: c.nota.as_deref().map(nota_legible),
         restante_s,
+        terminable: c.estado == Estado::Vigilando && g.terminable(id, usuario).await,
     })
 }
 

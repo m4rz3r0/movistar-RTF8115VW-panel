@@ -25,6 +25,7 @@ pub mod router;
 pub mod secreto;
 pub mod table;
 pub mod tema;
+pub mod vigilancia;
 pub mod vista;
 
 use crate::t;

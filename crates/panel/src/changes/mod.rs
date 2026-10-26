@@ -55,6 +55,7 @@ pub mod plan;
 mod preparar;
 mod reanudar;
 mod router;
+mod terminar;
 mod tipos;
 mod vigilancia;
 
@@ -74,6 +75,7 @@ pub use plan::{PALABRA_ACCION, PALABRA_REINICIO};
 /// Reglas del gestor que comparte el explorador (qué identifica una
 /// instancia y cómo se busca un campo en una lectura): una sola copia.
 pub(crate) use plan::{buscar, identidad};
+pub use terminar::ErrorTerminar;
 pub use tipos::*;
 
 use crate::{
@@ -153,6 +155,9 @@ pub struct ChangeManager {
     enlace: Mutex<Option<(Instant, Enlace)>>,
     /// Vigilar todos los cambios ([`ChangeManager::vigilar_siempre`]).
     siempre: std::sync::atomic::AtomicBool,
+    /// La vigilancia en curso, para terminarla a mano
+    /// ([`ChangeManager::terminar`]).
+    vigilancia: Mutex<Option<terminar::EnVigilancia>>,
 }
 
 /// Hueco de `AppState` para el gestor del servidor.
@@ -183,6 +188,7 @@ impl ChangeManager {
             interruptores: OnceLock::new(),
             enlace: Mutex::new(None),
             siempre: std::sync::atomic::AtomicBool::new(false),
+            vigilancia: Mutex::new(None),
         })
     }
 
