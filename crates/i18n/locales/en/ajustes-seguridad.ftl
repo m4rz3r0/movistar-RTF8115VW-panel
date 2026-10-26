@@ -50,11 +50,11 @@ ajuste-seguridad-contrasena_router-ayuda = If it is still the one on the router'
 
 ## Router users
 ajuste-seguridad-usuarios_router-titulo = Router web accounts
-ajuste-seguridad-usuarios_router-desc = The accounts that can get into the router's web pages and what each one can do.
-ajuste-seguridad-usuarios_router-ayuda = There is an operator account that the router's web pages do not show: its technical support uses it to get into the router. That is why there may be one more account here than you see there. Neither that account nor the one this panel uses to get in can be deleted or changed from here.
+ajuste-seguridad-usuarios_router-desc = The router's web accounts and what each one can do.
+ajuste-seguridad-usuarios_router-ayuda = On this router, the web pages only let the 1234 account in: the other accounts exist, but they cannot log in to the web. There is also an operator account that the router's web pages do not show: its technical support uses it to get into the router. That is why there may be one more account here than you see there. Neither that account nor the one this panel uses to get in can be deleted or changed from here.
 ajuste-seguridad-usuarios_router-motivo = It is changed with each account's buttons, not here.
 ajuste-seguridad-usuarios_router-nombre = Account name
-ajuste-seguridad-usuarios_router-nombre-desc = The name used to sign in to the router's web pages.
+ajuste-seguridad-usuarios_router-nombre-desc = The account's name in the router's web pages.
 ajuste-seguridad-usuarios_router-papel = Account type
 ajuste-seguridad-usuarios_router-papel-desc = What the account can do in the router's web pages.
 ajuste-seguridad-usuarios_router-papel-operador = Operator
@@ -83,7 +83,7 @@ ajuste-seguridad-usuarios_router-vacia = The router has no users in its web page
 
 ajuste-seguridad-cortafuegos-titulo = Firewall
 ajuste-seguridad-cortafuegos-desc = The rules that decide what can reach the router from the internet.
-ajuste-seguridad-cortafuegos-ayuda = The router comes with the operator's rules, which decide what gets in from the internet and from where; the list of rules shows them. The panel does not change them; it can only add a rule of its own so the router does not answer ping coming from the internet over IPv4, and remove it with "Undo".
+ajuste-seguridad-cortafuegos-ayuda = The router comes with the operator's rules, which decide what gets in from the internet and from where; the list of rules shows them. The panel does not change them.
 ajuste-seguridad-cortafuegos-motivo = The operator's rules are not changed from the panel.
 ajuste-seguridad-cortafuegos-filtro = Filter
 ajuste-seguridad-cortafuegos-filtro-desc = The group of rules it belongs to, by connection and address type.

@@ -65,6 +65,7 @@ pub(in crate::ajustes_router) async fn leer_tema(
         leidas: &leidas,
         apagadas: &apagadas,
         wan: wan.as_deref(),
+        desactivadas: crate::validacion_real::del_servidor(&state),
     };
     let (resumen, elementos, acciones) = montar(&state.catalogo, &state.ajustes, tema, &ctx);
     let red =
@@ -198,6 +199,9 @@ fn elemento(
         .as_deref()
         .filter(|_| leido)
         .and_then(campo)
+        // Sin interruptor si no se puede escribir (p. ej. sin comprobar en
+        // el router real): solo se ve el estado.
+        .filter(|(_, c)| c.solo_lectura.is_none())
         .and_then(|(v, c)| match c.valor {
             // Apagar corta lo que emite: pregunta antes (con el efecto del
             // ajuste). Encender no corta nada: se aplica sin preguntar.
@@ -223,7 +227,7 @@ fn elemento(
         .flatten();
     // El cortafuegos: su recomendación solo informa y «No responder al
     // ping» es una acción propia.
-    let accion_propia = super::cortafuegos::del_elemento(ctx, e, leido).map(|(r, a)| {
+    let accion_propia = super::cortafuegos::del_elemento(ctx, e, leido).and_then(|(r, a)| {
         recomendacion = r;
         a
     });
@@ -263,12 +267,13 @@ fn elemento(
         lectura,
         acciones: aplicables,
         accion_propia,
+        desactivadas: ctx.desactivadas,
     }
 }
 
 /// ¿Se aplica la acción `a` al elemento con los ajustes `ajustes`? La de una
 /// lista, a las instancias de esa lista (si escribe un campo, que se pueda
-/// escribir); la demás, si alguno de sus ajustes que no es lista tiene el
+/// escribir; si borra, que la lista se escriba); la demás, si alguno de sus ajustes que no es lista tiene el
 /// campo y se puede escribir.
 fn se_aplica(a: &ajustes::Accion, ajustes: &[AjusteVista]) -> bool {
     let escribible = |v: &AjusteVista, id: &str| {
@@ -278,7 +283,13 @@ fn se_aplica(a: &ajustes::Accion, ajustes: &[AjusteVista]) -> bool {
     };
     match &a.lista {
         Some(l) => ajustes.iter().any(|v| {
-            v.id == *l && (a.borrar || a.campo.as_deref().is_some_and(|c| escribible(v, c)))
+            v.id == *l
+                && if a.borrar {
+                    // Borra con la misma función que escribe la lista.
+                    crate::validacion_real::escribible(v)
+                } else {
+                    a.campo.as_deref().is_some_and(|c| escribible(v, c))
+                }
         }),
         None => a.campo.as_deref().is_some_and(|c| {
             ajustes

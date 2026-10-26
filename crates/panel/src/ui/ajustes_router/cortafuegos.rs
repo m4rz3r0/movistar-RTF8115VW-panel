@@ -3,9 +3,11 @@
 //! Las reglas solo se consultan. La acción propia del elemento prepara la
 //! regla del panel y la abre en el diálogo de revisión; se deshace desde el
 //! aviso del cambio o el Historial. Si no está disponible (el cortafuegos
-//! sin leer, la regla ya puesta, la función sin validar en el router real
-//! o el panel en solo lectura), el botón sale desactivado con el motivo.
-//! Va dentro del formulario del detalle: botón `type="button"`.
+//! sin leer, la regla ya puesta o el panel en solo lectura), el botón sale
+//! desactivado con el motivo. Si el servidor tiene la función desactivada
+//! en este router ([`crate::validacion_real`]), no sale: solo las reglas y
+//! una nota de una línea con el motivo. Va dentro del formulario del
+//! detalle: botón `type="button"`.
 
 use super::ID_SOLO_LECTURA;
 use super::aviso::Seguimiento;
@@ -14,6 +16,8 @@ use super::rejilla::Pagina;
 use crate::ajustes_router::{AccionPropia, AjusteVista, preparar_sin_ping};
 use crate::t;
 use crate::ui::explorador::texto_error;
+use crate::ui::i18n::traducir;
+use crate::validacion_real::{Desactivadas, Funcion3};
 use leptos::{prelude::*, task::spawn_local};
 
 /// Componente del ajuste de las reglas.
@@ -29,13 +33,22 @@ fn bloqueo(accion: Option<&AccionPropia>, solo_lectura: bool) -> (bool, Option<S
 }
 
 /// Las reglas de `a` y «No responder al ping desde internet» (`accion`, la
-/// acción propia de su elemento `elemento`).
+/// acción propia de su elemento `elemento`), si el servidor no la tiene
+/// entre las `desactivadas`.
 #[component]
 pub(crate) fn Cortafuegos(
     a: AjusteVista,
     accion: Option<AccionPropia>,
     elemento: String,
+    desactivadas: Desactivadas,
 ) -> impl IntoView {
+    if let Some(m) = desactivadas.motivo(Funcion3::SinPing) {
+        return view! {
+            <div class="cortafuegos-reglas">{consulta::lista(&a)}</div>
+            <p class="nota">{traducir(m, None)}</p>
+        }
+        .into_any();
+    }
     let pagina = expect_context::<Pagina>();
     let s = expect_context::<Seguimiento>();
     let ocupado = RwSignal::new(false);
@@ -85,6 +98,7 @@ pub(crate) fn Cortafuegos(
             </div>
         </section>
     }
+    .into_any()
 }
 
 #[cfg(test)]

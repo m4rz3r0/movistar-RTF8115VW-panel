@@ -38,6 +38,8 @@ pub(super) struct Contexto<'a> {
     /// La conexión a internet del panel entre las leídas (la elegida a mano
     /// o la detectada), si hay.
     pub wan: Option<&'a str>,
+    /// Las funciones de la fase 3 que el servidor tiene desactivadas.
+    pub desactivadas: crate::validacion_real::Desactivadas,
 }
 
 impl<'a> Contexto<'a> {
@@ -325,6 +327,7 @@ mod tests {
             leidas: &leidas,
             apagadas: &apagadas,
             wan: None,
+            desactivadas: Default::default(),
         };
         for n in DERIVADOS_DATO {
             assert!(dato(n, &ctx, &e).is_ok(), "{n}");

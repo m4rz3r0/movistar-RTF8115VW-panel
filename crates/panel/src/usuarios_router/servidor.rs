@@ -13,7 +13,7 @@ use crate::state::AppState;
 use crate::t;
 use crate::ui::explorador::MASCARA;
 use crate::ui::explorador::servidor::{gestor, riesgo};
-use crate::validacion_real::{Funcion3, sin_validar};
+use crate::validacion_real::{Funcion3, del_servidor};
 use ::i18n::Idioma;
 use ajustes::TipoCampo;
 use axum::http::StatusCode;
@@ -29,9 +29,10 @@ pub(crate) const TITULO: &str = "ajuste-seguridad-usuarios_router-titulo";
 /// Prefijo de las claves de los campos del ajuste.
 const PREFIJO: &str = "ajuste-seguridad-usuarios_router";
 
-/// 409 si la validación real aún no ha confirmado `f`, con su motivo.
-fn exigir_validada(f: Funcion3) -> Result<(), ServerFnError> {
-    match sin_validar(f) {
+/// 409 con su motivo si el servidor tiene `f` desactivada (ver
+/// [`crate::validacion_real`]).
+fn exigir_validada(state: &AppState, f: Funcion3) -> Result<(), ServerFnError> {
+    match del_servidor(state).motivo(f) {
         Some(motivo) => Err(fallo(
             StatusCode::CONFLICT,
             crate::ui::i18n::traducir(motivo, None),
@@ -45,7 +46,7 @@ pub(super) async fn preparar(op: OperacionUsuario) -> Result<GrupoVista, ServerF
     crate::ui::explorador::servidor::sin_guardar();
     // Crear o borrar un usuario del router es delicado: reautenticación.
     let (state, _) = preparar_delicada().await?;
-    exigir_validada(Funcion3::Usuarios)?;
+    exigir_validada(&state, Funcion3::Usuarios)?;
     if let OperacionUsuario::Crear {
         usuario,
         contrasena,
@@ -235,7 +236,7 @@ pub(super) async fn cambiar(
     grupo: GrupoUsuario,
 ) -> Result<(), ServerFnError> {
     let (state, yo) = preparar_delicada().await?;
-    exigir_validada(Funcion3::ContrasenaOtro)?;
+    exigir_validada(&state, Funcion3::ContrasenaOtro)?;
     let idioma = crate::ui::i18n::idioma_actual();
     // En su propia tarea: si quien lo pidió se va, el cambio acaba igual
     // (y se apunta).

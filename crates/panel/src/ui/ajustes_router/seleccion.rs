@@ -253,6 +253,7 @@ mod tests {
             },
             acciones: acciones.iter().map(|a| (*a).to_owned()).collect(),
             accion_propia: None,
+            desactivadas: Default::default(),
         }
     }
 

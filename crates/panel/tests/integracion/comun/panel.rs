@@ -193,6 +193,9 @@ pub fn config_en(dir: &Path) -> Config {
         install_nets: Vec::new(),
         router_min_gap: Duration::from_millis(1),
         espera_deteccion: Duration::from_millis(200),
+        // Contra router-sim se prueba todo, también lo no comprobado en el
+        // router real; las pruebas de lo que hace la 1.0 lo apagan.
+        habilitar_todo: true,
     }
 }
 

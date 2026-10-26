@@ -91,6 +91,12 @@ fn ahora(c: &CampoVista, actual: String) -> String {
 /// que el botón puede cambiar solos: ni los de una lista (sus campos son la
 /// plantilla de una instancia nueva) ni los de un ajuste con una clave que
 /// el router no deja leer (guardarlo la exige; se cambia desde el detalle).
+///
+/// Un campo que el panel no escribe por no estar comprobado en el router
+/// real ([`crate::validacion_real::SIN_COMPROBAR`]) se queda como
+/// información, sin botón ni lotes, detrás de las que se pueden aplicar:
+/// saber que el UPnP está encendido, y por qué conviene apagarlo, sigue
+/// sirviendo aunque se cambie desde la web del router.
 pub(super) fn recomendacion(
     f: &Catalogo,
     cat: &CatalogoAjustes,
@@ -101,28 +107,38 @@ pub(super) fn recomendacion(
         .iter()
         .filter(|v| !v.lista && !v.campos.iter().any(|c| c.tapado))
         .flat_map(|v| v.campos.iter().map(move |c| (v, c)))
-        .filter(|(_, c)| c.solo_lectura.is_none() && pendiente(c))
-        .map(|(v, c)| {
+        .filter(|(_, c)| pendiente(c))
+        .filter_map(|(v, c)| {
             let del_catalogo = cat.ajuste(&v.id).and_then(|a| a.campo(&c.id));
             let alto = del_catalogo
                 .and_then(Campo::escribible)
                 .and_then(|w| f.funcion(&w.funcion))
                 .is_some_and(|func| func.riesgo == Riesgo::Alto);
-            (v, c, alto || del_catalogo.is_some_and(|x| x.seguridad))
+            let riesgo = alto || del_catalogo.is_some_and(|x| x.seguridad);
+            let sin_comprobar =
+                c.solo_lectura.as_deref() == Some(crate::validacion_real::SIN_COMPROBAR);
+            (c.solo_lectura.is_none() || sin_comprobar).then_some((v, c, riesgo))
         })
         .collect();
+    let aplicable = |c: &CampoVista| c.solo_lectura.is_none();
     let (v, c, riesgo) = candidatas
         .iter()
-        .find(|(_, _, riesgo)| *riesgo)
+        .find(|(_, c, riesgo)| *riesgo && aplicable(c))
+        .or_else(|| candidatas.iter().find(|(_, c, _)| aplicable(c)))
         .or_else(|| candidatas.first())?;
+    let informativa = !aplicable(c);
     let valor = c.recomendado.clone()?;
-    let boton = acciones
-        .iter()
-        .find(|a| a.campo.as_ref() == Some(&c.id) && a.valor.as_ref() == Some(&valor))
-        .map_or_else(
-            || t!("ajustes-recomendacion-aplicar"),
-            |a| traducir(&clave_accion(&a.id), None),
-        );
+    let boton = if informativa {
+        String::new()
+    } else {
+        acciones
+            .iter()
+            .find(|a| a.campo.as_ref() == Some(&c.id) && a.valor.as_ref() == Some(&valor))
+            .map_or_else(
+                || t!("ajustes-recomendacion-aplicar"),
+                |a| traducir(&clave_accion(&a.id), None),
+            )
+    };
     Some(RecomendacionVista {
         problema: problema(&v.id, c),
         texto: c
@@ -132,11 +148,15 @@ pub(super) fn recomendacion(
             .unwrap_or_default(),
         riesgo: *riesgo,
         boton,
-        lotes: ajustes::lotes_del_campo(cat, &v.id, &c.id)
-            .into_iter()
-            .map(ajustes::clave_lote)
-            .collect(),
-        informativa: false,
+        lotes: if informativa {
+            Vec::new()
+        } else {
+            ajustes::lotes_del_campo(cat, &v.id, &c.id)
+                .into_iter()
+                .map(ajustes::clave_lote)
+                .collect()
+        },
+        informativa,
         // Las pone `fuentes::en_recomendacion`.
         fuentes: Vec::new(),
         respaldo: None,

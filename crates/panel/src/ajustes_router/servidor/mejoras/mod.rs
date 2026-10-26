@@ -37,7 +37,7 @@ impl Lecturas {
     async fn de(state: &AppState, lotes: &[&Lote], fresca: bool) -> Lecturas {
         let cat = &state.ajustes;
         let expandidos: Vec<Vec<PasoExpandido>> =
-            lotes.iter().map(|l| pasos_del_lote(cat, l)).collect();
+            lotes.iter().map(|l| pasos_que_escribe(state, l)).collect();
         let mut a_leer: Vec<&Ajuste> = Vec::new();
         for p in expandidos.iter().flatten() {
             let de_si =
@@ -163,6 +163,25 @@ impl Lecturas {
     }
 }
 
+/// Los pasos de `l` que el panel escribe: sin los que tocan un campo cuya
+/// función no está comprobada en el router real (la lista blanca del
+/// catálogo), que no salen en Mejoras.
+fn pasos_que_escribe(state: &AppState, l: &Lote) -> Vec<PasoExpandido> {
+    let comprobado = |d: &ajustes::Destino| {
+        state
+            .ajustes
+            .ajuste(&d.ajuste)
+            .and_then(|a| a.campo(&d.campo))
+            .and_then(|c| c.escribe.as_ref())
+            .and_then(|e| state.catalogo.funcion(&e.funcion))
+            .is_some_and(|f| f.comprobada())
+    };
+    pasos_del_lote(&state.ajustes, l)
+        .into_iter()
+        .filter(|p| p.destinos.iter().all(comprobado))
+        .collect()
+}
+
 /// Clave del título del ajuste del elemento de un paso repetido por
 /// elemento (`ajuste-wifi-red_24-titulo`).
 fn detalle(cat: &CatalogoAjustes, p: &PasoExpandido) -> Option<String> {
@@ -176,7 +195,13 @@ fn detalle(cat: &CatalogoAjustes, p: &PasoExpandido) -> Option<String> {
 /// pendientes sin repetir de todos (el contador de la barra; `None` si no
 /// se pudo leer nada).
 pub(crate) async fn calcular(state: &AppState, fresca: bool) -> (Vec<LoteVista>, Option<u32>) {
-    let lotes: Vec<&Lote> = state.ajustes.lotes().iter().collect();
+    // Un lote sin ningún paso que el panel escriba no sale.
+    let lotes: Vec<&Lote> = state
+        .ajustes
+        .lotes()
+        .iter()
+        .filter(|l| !pasos_que_escribe(state, l).is_empty())
+        .collect();
     let lecturas = Lecturas::de(state, &lotes, fresca).await;
     let estados = lecturas.estados(&state.ajustes);
     // El paso de los DNS hecho con el principal de un proveedor (sin su

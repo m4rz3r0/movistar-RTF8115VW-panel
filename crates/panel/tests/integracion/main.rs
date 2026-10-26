@@ -36,6 +36,7 @@ mod instalar;
 mod instancia;
 mod lecturas;
 mod lista;
+mod lista_blanca;
 mod mejoras;
 mod menu;
 mod pagina_tema;

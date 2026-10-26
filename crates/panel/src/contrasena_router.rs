@@ -17,6 +17,12 @@
 //!
 //! Exige reautenticación. Las contraseñas no salen nunca en el registro, en
 //! los errores ni en el Historial; las respuestas van con `no-store`.
+//!
+//! TODO(E4): `cbModifyPwd` no está comprobada en el router real
+//! (`comprobada = false` en el catálogo) y, aun así, este flujo sigue
+//! activo: no pasa por la lista blanca del gestor, está protegido (prueba la
+//! nueva, restaura la anterior y avisa) y la E4 se hace con él. Tras la E4,
+//! su referencia en el catálogo o, si falla, desactivar el flujo.
 
 use leptos::prelude::*;
 use leptos::server_fn::codec::Json;

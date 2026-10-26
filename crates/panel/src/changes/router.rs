@@ -23,6 +23,14 @@ impl ChangeManager {
         explicito: bool,
     ) -> Result<Plan, CambioError> {
         let f = self.funcion_escribible_para(req)?;
+        // La lista blanca: solo lo comprobado en el router real (el
+        // catálogo). El deshacer y la reversión (`explicito`) vuelven a lo
+        // que ya había y siguen.
+        if !explicito && !f.comprobada() {
+            return Err(CambioError::Bloqueada(
+                crate::validacion_real::SIN_COMPROBAR.into(),
+            ));
+        }
         if let Some(e) = Especial::de(f) {
             return self.planificar_especial(e, f, req, explicito).await;
         }

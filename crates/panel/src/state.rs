@@ -209,7 +209,12 @@ impl AppState {
         tokio::task::spawn_blocking(crate::auth::warm_up)
             .await
             .map_err(|e| e.to_string())?;
-        let catalogo = Catalogo::load().map_err(|e| e.to_string())?;
+        let mut catalogo = Catalogo::load().map_err(|e| e.to_string())?;
+        // Solo en las pruebas contra router-sim, en depuración (ver
+        // `Config::habilitar_todo`).
+        if cfg.todo_habilitado() {
+            catalogo.habilitar_todo_para_pruebas();
+        }
         let mascara = Mascara::load().map_err(|e| e.to_string())?;
         let ajustes = comprobar_ajustes(
             CatalogoAjustes::load().map_err(|e| e.to_string())?,

@@ -139,8 +139,15 @@ fn diferencia_de_campo(
         return None;
     }
     let secreto_antes = valor_secreto(f, c, antes);
+    // Solo con lo comprobado en el router real (la lista blanca).
+    let comprobada = c
+        .escribe
+        .as_ref()
+        .and_then(|e| f.funcion(&e.funcion))
+        .is_some_and(|x| x.comprobada());
     let restaurable = !en_lista
         && c.escribible().is_some()
+        && comprobada
         && match &l_antes {
             ValorLegible::Desconocido(_) => false,
             ValorLegible::Secreto => secreto_antes.as_deref().is_some_and(|v| !v.is_empty()),

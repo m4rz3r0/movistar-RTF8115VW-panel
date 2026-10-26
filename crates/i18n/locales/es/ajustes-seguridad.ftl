@@ -50,11 +50,11 @@ ajuste-seguridad-contrasena_router-ayuda = Si sigue siendo la que venía en la p
 
 ## Usuarios del router
 ajuste-seguridad-usuarios_router-titulo = Cuentas de la web del router
-ajuste-seguridad-usuarios_router-desc = Las cuentas que pueden entrar en la web del router y lo que puede hacer cada una.
-ajuste-seguridad-usuarios_router-ayuda = Hay una cuenta del operador que la web del router no enseña: es la que usa su soporte técnico para entrar en el router. Por eso aquí puede aparecer una cuenta más de las que ves allí. Ni esa cuenta ni la que usa este panel para entrar se pueden borrar o cambiar desde aquí.
+ajuste-seguridad-usuarios_router-desc = Las cuentas de la web del router y lo que puede hacer cada una.
+ajuste-seguridad-usuarios_router-ayuda = En este router, la web solo deja entrar a la cuenta 1234: las demás cuentas existen, pero no pueden entrar en la web. Hay además una cuenta del operador que la web del router no enseña: es la que usa su soporte técnico para entrar en el router. Por eso aquí puede aparecer una cuenta más de las que ves allí. Ni esa cuenta ni la que usa este panel para entrar se pueden borrar o cambiar desde aquí.
 ajuste-seguridad-usuarios_router-motivo = Se cambia con los botones de cada cuenta, no aquí.
 ajuste-seguridad-usuarios_router-nombre = Nombre de la cuenta
-ajuste-seguridad-usuarios_router-nombre-desc = El nombre con el que se entra en la web del router.
+ajuste-seguridad-usuarios_router-nombre-desc = El nombre de la cuenta en la web del router.
 ajuste-seguridad-usuarios_router-papel = Tipo de cuenta
 ajuste-seguridad-usuarios_router-papel-desc = Lo que puede hacer la cuenta en la web del router.
 ajuste-seguridad-usuarios_router-papel-operador = Operador
@@ -83,7 +83,7 @@ ajuste-seguridad-usuarios_router-vacia = El router no tiene ningún usuario en s
 
 ajuste-seguridad-cortafuegos-titulo = Cortafuegos
 ajuste-seguridad-cortafuegos-desc = Las reglas que deciden qué puede entrar en el router desde internet.
-ajuste-seguridad-cortafuegos-ayuda = El router trae unas reglas del operador que deciden qué deja entrar desde internet y desde dónde; la lista de reglas las muestra. El panel no las cambia; solo puede añadir una regla suya para que el router no conteste al ping que llega de internet por IPv4, y quitarla con «Deshacer».
+ajuste-seguridad-cortafuegos-ayuda = El router trae unas reglas del operador que deciden qué deja entrar desde internet y desde dónde; la lista de reglas las muestra. El panel no las cambia.
 ajuste-seguridad-cortafuegos-motivo = Las reglas del operador no se cambian desde el panel.
 ajuste-seguridad-cortafuegos-filtro = Filtro
 ajuste-seguridad-cortafuegos-filtro-desc = El grupo de reglas al que pertenece, según la conexión y el tipo de dirección.

@@ -337,8 +337,9 @@ pub(crate) fn ContenidoRejilla(
     let existentes = p
         .ajustes()
         .find(|a| a.componente.as_deref() == Some(super::RESERVAS))
-        .map(|a| super::reservas::existentes(&a.instancias))
-        .unwrap_or_default();
+        // Sin escribir las IP fijas, la IP de un dispositivo no se fija.
+        .filter(|a| crate::validacion_real::escribible(a))
+        .map(|a| super::reservas::existentes(&a.instancias));
     let listas = p
         .elementos
         .iter()

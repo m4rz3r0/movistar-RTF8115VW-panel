@@ -2,6 +2,7 @@
 
 use super::{AjusteVista, DispositivoVista, EstadoLectura};
 use crate::ui::comun::EstadoVisual;
+use crate::validacion_real::Desactivadas;
 use ajustes::ValorLegible;
 use serde::{Deserialize, Serialize};
 use std::net::Ipv4Addr;
@@ -98,6 +99,10 @@ pub struct ElementoVista {
     /// ping desde internet», en el cortafuegos), si la tiene.
     #[serde(default)]
     pub accion_propia: Option<AccionPropia>,
+    /// Las funciones de la fase 3 que el servidor tiene desactivadas
+    /// ([`crate::validacion_real`]): sus controles no salen.
+    #[serde(default)]
+    pub desactivadas: Desactivadas,
 }
 
 /// Una acción propia de un elemento, con su componente

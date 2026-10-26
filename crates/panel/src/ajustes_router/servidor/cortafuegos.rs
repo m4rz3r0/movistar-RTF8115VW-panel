@@ -12,7 +12,7 @@ use crate::ajustes_router::{AccionPropia, CambioLegible, PasoVista, Recomendacio
 use crate::changes::SIN_PING_YA_PUESTA;
 use crate::ui::comun::EstadoVisual;
 use crate::ui::i18n::traducir;
-use crate::validacion_real::{Funcion3, sin_validar};
+use crate::validacion_real::{Funcion3, del_servidor};
 use hgu::cortafuegos::{self as cf, ALTA, Abierto, Filtro, Servicio};
 
 /// El ajuste de las reglas.
@@ -205,15 +205,17 @@ fn motivo_regla(f: &[Filtro]) -> Option<String> {
 /// El texto de la recomendación: «sin ping» si el ping de IPv4 está abierto
 /// y el panel puede poner su regla; con ella desactivada no la ofrece, sino
 /// activarla desde la web del router; y «revisar» si queda algo que la
-/// regla no arregla.
-fn texto(f: &[Filtro], p: Ping, problema: &[String]) -> String {
+/// regla no arregla. Sin «sin ping» en este router (`con_sin_ping` falso),
+/// no ofrece la regla: todo lo pendiente es «revisar».
+fn texto(f: &[Filtro], p: Ping, problema: &[String], con_sin_ping: bool) -> String {
     let mut texto = Vec::new();
-    match (p.v4, hay_regla(f)) {
+    let v4 = p.v4 && con_sin_ping;
+    match (v4, hay_regla(f)) {
         (true, false) => texto.push(t!("ajuste-seguridad-cortafuegos-sin-ping-recomendado")),
         (true, true) => texto.push(t!("ajuste-seguridad-cortafuegos-activar-recomendado")),
         (false, _) => {}
     }
-    if p.v6 || problema.len() > usize::from(p.v4) {
+    if p.v6 || problema.len() > usize::from(v4) {
         texto.push(t!("ajuste-seguridad-cortafuegos-revisar-recomendado"));
     }
     texto.join(" ")
@@ -227,19 +229,23 @@ pub(super) fn filtros(ctx: &Contexto) -> Option<Vec<Filtro>> {
 
 /// Si `e` es el elemento del cortafuegos, su recomendación (solo informa:
 /// se aplica con la acción propia) y «No responder al ping desde internet»
-/// con el motivo si no está disponible (sin leer, sin validar en el router
-/// real, ya puesta o puesta pero desactivada).
+/// con el motivo si no está disponible (sin leer, ya puesta o puesta pero
+/// desactivada). Si el servidor tiene «sin ping» desactivada en este
+/// router, sin acción y sin recomendación que la ofrezca.
 pub(super) fn del_elemento(
     ctx: &Contexto,
     e: &ajustes::Elemento,
     leido: bool,
-) -> Option<(Option<RecomendacionVista>, AccionPropia)> {
+) -> Option<(Option<RecomendacionVista>, Option<AccionPropia>)> {
     if !e.ajustes.iter().any(|a| a == AJUSTE) {
         return None;
     }
-    let accion = |motivo: Option<String>| AccionPropia {
-        id: SIN_PING.to_owned(),
-        motivo,
+    let con_sin_ping = ctx.desactivadas.motivo(Funcion3::SinPing).is_none();
+    let accion = |motivo: Option<String>| {
+        con_sin_ping.then(|| AccionPropia {
+            id: SIN_PING.to_owned(),
+            motivo,
+        })
     };
     let Some(f) = filtros(ctx).filter(|_| leido) else {
         return Some((
@@ -247,14 +253,11 @@ pub(super) fn del_elemento(
             accion(Some(t!("ajuste-seguridad-cortafuegos-sin-leer"))),
         ));
     };
-    let motivo = match sin_validar(Funcion3::SinPing) {
-        Some(m) => Some(traducir(m, None)),
-        None => motivo_regla(&f),
-    };
+    let motivo = motivo_regla(&f);
     let p = ping(&f);
     let problema = problema(&f, p);
     let recomendacion = (!problema.is_empty()).then(|| RecomendacionVista {
-        texto: texto(&f, p, &problema),
+        texto: texto(&f, p, &problema, con_sin_ping),
         problema: problema.join(" "),
         riesgo: false,
         boton: String::new(),
@@ -318,7 +321,7 @@ fn conflicto(clave: &str) -> ServerFnError {
 
 pub(in crate::ajustes_router) async fn preparar_sin_ping() -> Result<GrupoVista, ServerFnError> {
     let (state, _) = preparar().await?;
-    if let Some(m) = sin_validar(Funcion3::SinPing) {
+    if let Some(m) = del_servidor(&state).motivo(Funcion3::SinPing) {
         return Err(conflicto(m));
     }
     let g = gestor(&state)?;

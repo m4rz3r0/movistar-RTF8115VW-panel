@@ -1,4 +1,4 @@
-//! Motivos del gestor con texto propio: los de los usuarios del router, la regla «sin ping» ya puesta y las funciones que esperan su validación real.
+//! Motivos del gestor con texto propio: los de los usuarios del router, la regla «sin ping» ya puesta y las funciones desactivadas en este router.
 
 use super::{BLOQUEO_USUARIO_PROTEGIDO, CambioError, USUARIO_YA_EXISTE};
 
@@ -23,7 +23,8 @@ pub const USUARIO_NOMBRE_BAJA_NO_VALIDO: &str = "usuarios-router-error-nombre-ba
 
 /// Código HTTP y clave i18n de los motivos del gestor que las pantallas
 /// enseñan con su propio texto: los de los usuarios del router, la regla
-/// «sin ping» ya puesta y las funciones que esperan su validación real.
+/// «sin ping» ya puesta, las escrituras sin comprobar en el router real y
+/// las funciones desactivadas en este router ([`crate::validacion_real`]).
 /// `None`: cada pantalla da su texto genérico.
 pub fn motivo_con_texto(e: &CambioError) -> Option<(u16, &'static str)> {
     use crate::validacion_real::{Funcion3, motivo};
@@ -34,18 +35,14 @@ pub fn motivo_con_texto(e: &CambioError) -> Option<(u16, &'static str)> {
         USUARIO_GRUPO_NO_VALIDO,
         USUARIO_NOMBRE_NO_VALIDO,
     ];
-    let pendientes = [
-        Funcion3::Usuarios,
-        Funcion3::ContrasenaOtro,
-        Funcion3::SinPing,
-    ]
-    .map(motivo);
+    let mut desactivadas = vec![crate::validacion_real::SIN_COMPROBAR];
+    desactivadas.extend(Funcion3::TODAS.map(motivo));
     let entre = |m: &str, claves: &[&'static str]| claves.iter().copied().find(|c| *c == m);
     match e {
         CambioError::Bloqueada(m) if m == BLOQUEO_USUARIO_PROTEGIDO => {
             Some((403, BLOQUEO_USUARIO_PROTEGIDO))
         }
-        CambioError::Bloqueada(m) => entre(m, &pendientes).map(|c| (409, c)),
+        CambioError::Bloqueada(m) => entre(m, &desactivadas).map(|c| (409, c)),
         CambioError::InstanciaCambiada(m) => entre(
             m,
             &[

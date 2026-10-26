@@ -115,6 +115,18 @@ pub(super) fn vista(f: &Catalogo, a: &Ajuste, nodo: Option<&XmlNode>) -> AjusteV
     }
 }
 
+/// Por qué no se edita `c`: su motivo del catálogo de ajustes o, si lo
+/// escribe una función que no está comprobada en el router real (la lista
+/// blanca de `funciones.toml`), [`crate::validacion_real::SIN_COMPROBAR`],
+/// que la página no enseña: solo se ve el valor.
+fn solo_lectura(f: &Catalogo, c: &Campo) -> Option<String> {
+    c.solo_lectura.clone().or_else(|| {
+        let e = c.escribe.as_ref()?;
+        let comprobada = f.funcion(&e.funcion).is_some_and(|x| x.comprobada());
+        (!comprobada).then(|| crate::validacion_real::SIN_COMPROBAR.to_owned())
+    })
+}
+
 /// Instancias de una lista con sus valores. El id de cada una es el del
 /// router (el elemento de [`id_instancia`]); solo en una lista que no se
 /// escribe (como los usuarios del router) cae a su posición. En una que
@@ -265,7 +277,7 @@ pub(super) fn campo(
         max: c.validar.and_then(|v| v.max),
         ascii: c.validar.is_some_and(|v| v.ascii),
         opcional: c.opcional,
-        solo_lectura: c.solo_lectura.clone(),
+        solo_lectura: solo_lectura(f, c),
         tapado: tapado(f, c),
         valor_secreto,
         motivo_recomendado: recomendado.as_ref().map(|_| format!("{clave}-recomendado")),

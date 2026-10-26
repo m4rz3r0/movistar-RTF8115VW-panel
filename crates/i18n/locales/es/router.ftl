@@ -94,7 +94,7 @@ usuarios-router-contrasena = Contraseña
 usuarios-router-protegido-panel = Es el usuario con el que entra el panel: no se puede borrar ni cambiar desde aquí.
 usuarios-router-protegido-sistema = Es la cuenta del operador: no se puede borrar ni cambiar desde aquí.
 usuarios-router-sin-credenciales = El panel no sabe con qué usuario entra en el router: desde aquí no se puede tocar ninguna cuenta.
-usuarios-router-aviso-borrar = Si luego deshaces el borrado, el usuario vuelve con una contraseña nueva: la de ahora no se puede recuperar. La nueva solo se verá con el ojo, en el detalle del cambio en el Historial. Si es el panel el que lo devuelve solo (porque el cambio falla), esa contraseña no se guarda: el Historial te avisará para que la cambies.
+usuarios-router-aviso-borrar = Si luego deshaces el borrado, el usuario vuelve con una contraseña nueva: la de ahora no se puede recuperar. La nueva solo se verá con el ojo, en el detalle del cambio en el Historial. Si es el panel el que lo devuelve solo (porque el cambio falla), esa contraseña no se guarda: el Historial te lo dirá.
 usuarios-router-aviso-deshacer = El usuario vuelve con una contraseña nueva: la de antes no se puede recuperar. La verás con el ojo en el detalle de este cambio, en el Historial.
 usuarios-router-error-protegido = Este usuario está protegido: es el que usa el panel para entrar en el router o la cuenta del operador. No se puede borrar ni cambiar desde aquí.
 usuarios-router-error-existe = Ya hay un usuario con ese nombre en el router.
@@ -109,11 +109,12 @@ usuarios-router-error-uno-cada-vez = Los usuarios se borran de uno en uno.
 usuarios-router-error-nombre-baja = Ese nombre no se puede borrar desde el panel: lleva «:» o caracteres de control.
 usuarios-router-error-grupo-sistema = Ese tipo de cuenta es el del operador: elige Administrador o Usuario.
 usuarios-router-error-grupo-no-valido = Elige un tipo de cuenta: Administrador o Usuario.
-usuarios-router-nota-revertido = Se volvió a crear el usuario borrado con una contraseña nueva que el panel no guarda: cámbiala en Ajustes → Seguridad → Cuentas de la web del router para poder usarlo.
-
-## Funciones pendientes de comprobar con el router de verdad
-validacion-real-pendiente-usuarios = Crear y borrar usuarios aún no se ha comprobado con el router de verdad: de momento no se puede.
-validacion-real-pendiente-contrasena-otro = Cambiar la contraseña de otro usuario aún no se ha comprobado con el router de verdad: de momento no se puede.
-validacion-real-pendiente-sin-ping = No responder al ping aún no se ha comprobado con el router de verdad: de momento no se puede.
+usuarios-router-nota-revertido = Se volvió a crear el usuario borrado con una contraseña nueva que el panel no guarda. En este router esa cuenta no puede entrar en la web; si necesitas otra contraseña, bórrala y créala de nuevo.
 usuarios-router-no-panel = No son los usuarios de este panel: esos están en
 usuarios-router-no-panel-enlace = Ajustes del panel → Quién entra en este panel
+
+## Funciones que este router no permite hacer desde el panel
+funcion-sin-comprobar = Esta función no se ha comprobado en este router: el panel no la usa.
+funcion-no-disponible-usuarios = En este router, el panel no crea ni borra cuentas de su web.
+funcion-no-disponible-contrasena-otro = En este router solo la cuenta 1234 puede entrar en la web, así que el panel no puede comprobar que la contraseña nueva funciona. Para cambiarla, borra la cuenta y créala de nuevo.
+funcion-no-disponible-sin-ping = En este router, quitar la respuesta al ping no basta: otra regla del operador lo sigue permitiendo.

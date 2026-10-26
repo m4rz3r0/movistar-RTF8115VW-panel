@@ -100,7 +100,7 @@ fn la_regla_desactivada_tiene_su_motivo() {
     let m = motivo_regla(&f).unwrap();
     assert!(m.contains("desactivada"), "{m}");
     let p = ping(&f);
-    let t = texto(&f, p, &problema(&f, p));
+    let t = texto(&f, p, &problema(&f, p), true);
     assert!(!t.contains("pase más desapercibido"), "{t}");
     // Activa, «ya puesta».
     let f = con_regla(filtros());
@@ -120,7 +120,7 @@ fn regla_desactivada_y_solo_ping_ipv4_con_texto() {
     assert_eq!((p.v4, p.v6), (true, false));
     let pr = problema(&f, p);
     assert_eq!(pr.len(), 1, "{pr:?}");
-    let t = texto(&f, p, &pr);
+    let t = texto(&f, p, &pr, true);
     assert!(t.starts_with("Recomendado si"), "{t}");
     assert!(t.contains("desactivada"), "{t}");
     assert!(t.contains("A favor:") && t.contains("En contra:"), "{t}");
@@ -136,4 +136,23 @@ fn con_la_regla_puesta_no_se_lista_el_ping_ipv4_restringido() {
     assert!(puesta(&f));
     let r = restringidos(&f);
     assert!(!r.iter().any(|s| s.contains("ping")), "{r:?}");
+}
+
+/// Sin «sin ping» en este router, la recomendación no ofrece la regla del
+/// panel: lo pendiente, ping incluido, es pedir al operador que lo cierre.
+#[test]
+fn sin_la_funcion_no_ofrece_la_regla() {
+    let f = filtros();
+    let p = ping(&f);
+    assert!(p.v4);
+    let t = texto(&f, p, &problema(&f, p), false);
+    assert!(!t.contains("pase más desapercibido"), "{t}");
+    assert!(t.contains("operador"), "{t}");
+    let mut f = con_regla(filtros());
+    f[0].reglas.last_mut().unwrap().enable = "0".into();
+    f[1].reglas.retain(|r| r.icmp_type != "55");
+    let p = ping(&f);
+    let t = texto(&f, p, &problema(&f, p), false);
+    assert!(!t.contains("desactivada"), "{t}");
+    assert!(t.contains("operador"), "{t}");
 }

@@ -195,14 +195,23 @@ fn tipo_campo(t: TipoParam) -> TipoCampo {
     }
 }
 
-/// Motivo por el que el panel no escribe con `f` (catálogo o bloqueos de
-/// la v1 del gestor). Las lecturas solo por el catálogo.
+/// Motivo por el que el panel no escribe con `f` (catálogo, sin comprobar
+/// en el router real o bloqueos de la v1 del gestor). Las lecturas solo
+/// por el catálogo.
 fn bloqueo(state: &AppState, f: &Funcion) -> Option<String> {
     if let Some(m) = &f.bloqueada {
         return Some(m.clone());
     }
     if f.tipo == Tipo::Lectura {
         return None;
+    }
+    // La lista blanca: lo no comprobado en el router real no se escribe
+    // (el gestor también lo rechaza).
+    if !f.comprobada() {
+        return Some(crate::ui::i18n::traducir(
+            crate::validacion_real::SIN_COMPROBAR,
+            None,
+        ));
     }
     match state.cambios().map(|g| g.escribible(&f.name)) {
         Some(Err(CambioError::Bloqueada(m))) => Some(m),

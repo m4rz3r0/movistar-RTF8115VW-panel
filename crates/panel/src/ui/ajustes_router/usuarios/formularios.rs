@@ -166,8 +166,8 @@ pub(super) fn CambiarOtro(
 }
 
 /// «Usuario nuevo»: nombre, contraseña con el ojo y tipo de cuenta; «Crear
-/// usuario» prepara el alta (`preparar`). `motivo`: el id del texto que dice
-/// por qué está desactivado, si lo está por la validación real.
+/// usuario» prepara el alta (`preparar`). No sale si el servidor tiene
+/// desactivado crear y borrar usuarios.
 #[component]
 pub(super) fn NuevoUsuario(
     /// Los usuarios que cambia el cambio en curso: si entre ellos está el
@@ -176,7 +176,6 @@ pub(super) fn NuevoUsuario(
     bloqueado: bool,
     ocupado: RwSignal<bool>,
     preparar: Callback<OperacionUsuario>,
-    motivo: Option<&'static str>,
 ) -> impl IntoView {
     let nombre = RwSignal::new(String::new());
     let clave = RwSignal::new(String::new());
@@ -226,7 +225,6 @@ pub(super) fn NuevoUsuario(
                 <button
                     type="button"
                     class="b-pri"
-                    aria-describedby=motivo
                     disabled=move || sin_tocar.get()
                     on:click=crear
                 >

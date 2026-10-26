@@ -72,12 +72,20 @@ fn columna_de_consulta(a: &AjusteVista, unica: bool, e: &ElementoVista) -> impl 
     let cuerpo = if a.componente.as_deref() == Some(super::CONTRASENA_ROUTER) {
         consulta::enlace_contrasena_router().into_any()
     } else if a.componente.as_deref() == Some(super::USUARIOS_ROUTER) {
-        view! { <super::usuarios::Usuarios a=a.clone() elemento=elemento.to_owned() /> }.into_any()
+        view! {
+            <super::usuarios::Usuarios
+                a=a.clone()
+                elemento=elemento.to_owned()
+                desactivadas=e.desactivadas
+            />
+        }
+        .into_any()
     } else if a.componente.as_deref() == Some(super::cortafuegos::CORTAFUEGOS) {
         view! {
             <super::cortafuegos::Cortafuegos
                 a=a.clone()
                 accion=e.accion_propia.clone()
+                desactivadas=e.desactivadas
                 elemento=elemento.to_owned()
             />
         }

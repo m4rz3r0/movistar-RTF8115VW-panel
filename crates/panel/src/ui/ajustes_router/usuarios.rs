@@ -5,8 +5,10 @@
 //! grupo» (un formulario en la propia fila, que pide la contraseña del
 //! panel si hace falta y no se deshace) y «Borrar» (el diálogo de revisión,
 //! con su aviso). «Crear usuario» prepara el alta y la abre en el mismo
-//! diálogo. Va dentro del formulario del detalle: sin formularios propios,
-//! con botones `type="button"`.
+//! diálogo. Lo que el servidor tiene desactivado en este router
+//! ([`crate::validacion_real`]) no sale: ni sus botones ni su formulario,
+//! solo una nota de una línea con el motivo. Va dentro del formulario del
+//! detalle: sin formularios propios, con botones `type="button"`.
 
 use super::aviso::Seguimiento;
 use super::rejilla::Pagina;
@@ -17,7 +19,7 @@ use crate::ui::i18n::traducir;
 use crate::ui::panel_ajustes::{DialogoReautenticar, Reautenticacion};
 use crate::ui::{Estado, IconoEstado};
 use crate::usuarios_router::{OperacionUsuario, preparar_usuario_router};
-use crate::validacion_real::{Funcion3, sin_validar};
+use crate::validacion_real::{Desactivadas, Funcion3};
 use ajustes::ValorLegible;
 use formularios::{CambiarOtro, NuevoUsuario, id_cambio};
 use leptos::{prelude::*, task::spawn_local};
@@ -25,21 +27,15 @@ use leptos_router::components::A;
 
 mod formularios;
 
-/// Ids de los textos que dicen por qué crear o borrar usuarios, o cambiar
-/// otro, está desactivado por la validación real (`aria-describedby` de sus
-/// botones).
-const MOTIVO_USUARIOS: &str = "usuarios-router-motivo-usuarios";
-const MOTIVO_OTRO: &str = "usuarios-router-motivo-otro";
-
-/// Lo que desactiva las acciones de las filas: sin crear ni borrar, sin
-/// cambiar otro, y el id del motivo de cada uno si viene de la validación
-/// real.
+/// Las acciones de las filas: cuáles salen (`borrar`, `cambiar`: las que
+/// el servidor tiene habilitadas) y cuándo esperan (`sin_gestor`: sin
+/// crear ni borrar; `solo_lectura`).
 #[derive(Clone, Copy)]
-struct Bloqueos {
+struct Acciones {
+    borrar: bool,
+    cambiar: bool,
     sin_gestor: bool,
-    sin_otro: bool,
-    motivo_gestor: Option<&'static str>,
-    motivo_otro: Option<&'static str>,
+    solo_lectura: bool,
 }
 
 /// Texto de la opción `clave` del campo «Tipo de cuenta» (`operador`, …).
@@ -74,16 +70,21 @@ fn sin_filas(estado: &EstadoLectura, vacia: bool) -> Option<SinFilas> {
     }
 }
 
-/// Sin crear ni borrar usuarios: el panel en solo lectura, la función sin
-/// validar o la lista sin leer (no se sabe quién hay).
-fn gestor_bloqueado(solo_lectura: bool, sin_validar: bool, estado: &EstadoLectura) -> bool {
-    solo_lectura || sin_validar || *estado != EstadoLectura::Leido
+/// Sin crear ni borrar usuarios: el panel en solo lectura o la lista sin
+/// leer (no se sabe quién hay).
+fn gestor_bloqueado(solo_lectura: bool, estado: &EstadoLectura) -> bool {
+    solo_lectura || *estado != EstadoLectura::Leido
 }
 
 /// Los usuarios de `a` con sus acciones y el formulario de uno nuevo.
-/// `elemento` es el del detalle.
+/// `elemento` es el del detalle; `desactivadas`, lo que el servidor tiene
+/// desactivado (no sale).
 #[component]
-pub(crate) fn Usuarios(a: AjusteVista, elemento: String) -> impl IntoView {
+pub(crate) fn Usuarios(
+    a: AjusteVista,
+    elemento: String,
+    desactivadas: Desactivadas,
+) -> impl IntoView {
     let pagina = expect_context::<Pagina>();
     let s = expect_context::<Seguimiento>();
     let reauth = Reautenticacion::proveer();
@@ -91,15 +92,15 @@ pub(crate) fn Usuarios(a: AjusteVista, elemento: String) -> impl IntoView {
     let ocupado = RwSignal::new(false);
     let editando = RwSignal::new(None::<String>);
     let elemento = StoredValue::new(elemento);
-    // Lo que aún no ha confirmado la validación real, desactivado con su
-    // motivo (el servidor también lo rechaza).
-    let motivo_usuarios = sin_validar(Funcion3::Usuarios);
-    let motivo_otro = sin_validar(Funcion3::ContrasenaOtro);
-    let bloqueos = Bloqueos {
-        sin_gestor: gestor_bloqueado(pagina.solo_lectura, motivo_usuarios.is_some(), &a.estado),
-        sin_otro: pagina.solo_lectura || motivo_otro.is_some(),
-        motivo_gestor: motivo_usuarios.map(|_| MOTIVO_USUARIOS),
-        motivo_otro: motivo_otro.map(|_| MOTIVO_OTRO),
+    // Lo que el servidor tiene desactivado en este router no sale (y él lo
+    // rechaza igual): solo su nota.
+    let motivo_usuarios = desactivadas.motivo(Funcion3::Usuarios);
+    let motivo_otro = desactivadas.motivo(Funcion3::ContrasenaOtro);
+    let acciones = Acciones {
+        borrar: motivo_usuarios.is_none(),
+        cambiar: motivo_otro.is_none(),
+        sin_gestor: gestor_bloqueado(pagina.solo_lectura, &a.estado),
+        solo_lectura: pagina.solo_lectura,
     };
     // Crear o borrar pide la contraseña del panel si hace falta: el
     // diálogo repite la misma operación (`repetir`).
@@ -164,7 +165,7 @@ pub(crate) fn Usuarios(a: AjusteVista, elemento: String) -> impl IntoView {
                     i,
                     format!("{}/{}", elemento.get_value(), i.id),
                     editando,
-                    bloqueos,
+                    acciones,
                     ocupado.into(),
                     Callback::new(move |u: String| {
                         preparar(OperacionUsuario::Borrar { usuario: u })
@@ -174,14 +175,21 @@ pub(crate) fn Usuarios(a: AjusteVista, elemento: String) -> impl IntoView {
             .collect_view()
             .into_any(),
     };
-    let motivos = [
-        (motivo_usuarios, MOTIVO_USUARIOS),
-        (motivo_otro, MOTIVO_OTRO),
-    ]
-    .into_iter()
-    .filter_map(|(m, id)| m.map(|m| (m, id)))
-    .map(|(m, id)| view! { <p class="nota-solo-lectura" id=id>{traducir(m, None)}</p> })
-    .collect_view();
+    let motivos = [motivo_usuarios, motivo_otro]
+        .into_iter()
+        .flatten()
+        .map(|m| view! { <p class="nota">{traducir(m, None)}</p> })
+        .collect_view();
+    let nuevo = acciones.borrar.then(|| {
+        view! {
+            <NuevoUsuario
+                en_curso=en_curso.into()
+                bloqueado=acciones.sin_gestor
+                ocupado
+                preparar=Callback::new(preparar)
+            />
+        }
+    });
     view! {
         // Las dos listas se confundían: esta dice cuál no es y enlaza a la otra.
         <p class="aviso estado-neutro usuarios-router-no-panel">
@@ -194,13 +202,7 @@ pub(crate) fn Usuarios(a: AjusteVista, elemento: String) -> impl IntoView {
         <div class="ajustes-usuarios usuarios-router">{filas} {nuevos}</div>
         <p class="error-formulario" role="alert">{move || error.get()}</p>
         {motivos}
-        <NuevoUsuario
-            en_curso=en_curso.into()
-            bloqueado=bloqueos.sin_gestor
-            ocupado
-            preparar=Callback::new(preparar)
-            motivo=bloqueos.motivo_gestor
-        />
+        {nuevo}
         {move || reauth.abierto().then(|| view! { <DialogoReautenticar /> })}
     }
 }
@@ -225,14 +227,14 @@ fn fila_en_curso(nombre: &str, s: Seguimiento, elemento: &str) -> impl IntoView 
 }
 
 /// La fila de un usuario: su nombre y su tipo de cuenta y, si no está
-/// protegido, sus acciones (ver [`Bloqueos`]). `en_curso_id` es como la
+/// protegido, sus acciones (ver [`Acciones`]). `en_curso_id` es como la
 /// nombra el cambio en curso (`<elemento>/<nombre>`): mientras la cambia,
 /// lo dice su insignia y sus botones esperan.
 fn fila(
     i: &InstanciaVista,
     en_curso_id: String,
     editando: RwSignal<Option<String>>,
-    bloqueos: Bloqueos,
+    acciones: Acciones,
     ocupado: Signal<bool>,
     borrar: Callback<String>,
 ) -> impl IntoView + use<> {
@@ -253,12 +255,12 @@ fn fila(
     let cambiando = move || en_curso_id.with_value(|id| s.insignia(id));
     let insignia = move || cambiando().map(|(estado, texto)| view! { <Insignia estado texto /> });
     let Some(nota) = i.nota.clone() else {
-        let Bloqueos {
+        let Acciones {
+            borrar: con_borrar,
+            cambiar: con_cambiar,
             sin_gestor,
-            sin_otro,
-            motivo_gestor,
-            motivo_otro,
-        } = bloqueos;
+            solo_lectura,
+        } = acciones;
         let controla = id_cambio(&nombre);
         let id_abrir = nombre.clone();
         let id_borrar = nombre.clone();
@@ -278,30 +280,34 @@ fn fila(
                 <div class="ajustes-usuario-fila">
                     {cabeza}
                     {insignia}
-                    <span class="botones">
-                        <button
-                            type="button"
-                            class="b-sec"
-                            aria-expanded=move || abierto_aria().to_string()
-                            aria-controls=controla
-                            aria-describedby=motivo_otro
-                            aria-label=t!("ajuste-seguridad-usuarios_router-cambiar-de", nombre = nombre.clone())
-                            disabled=move || sin_otro || ocupado.get() || cambiando().is_some()
-                            on:click=move |_| editando.set(Some(id_abrir.clone()))
-                        >
-                            {t!("ajuste-seguridad-usuarios_router-cambiar")}
-                        </button>
-                        <button
-                            type="button"
-                            class="b-pel"
-                            aria-label=t!("ajuste-seguridad-usuarios_router-borrar-de", nombre = nombre.clone())
-                            aria-describedby=motivo_gestor
-                            disabled=move || sin_gestor || ocupado.get() || cambiando().is_some()
-                            on:click=move |_| borrar.run(id_borrar.clone())
-                        >
-                            {t!("ajuste-seguridad-usuarios_router-borrar")}
-                        </button>
-                    </span>
+                    {(con_cambiar || con_borrar).then(|| view! {
+                        <span class="botones">
+                            {con_cambiar.then(|| view! {
+                                <button
+                                    type="button"
+                                    class="b-sec"
+                                    aria-expanded=move || abierto_aria().to_string()
+                                    aria-controls=controla
+                                    aria-label=t!("ajuste-seguridad-usuarios_router-cambiar-de", nombre = nombre.clone())
+                                    disabled=move || solo_lectura || ocupado.get() || cambiando().is_some()
+                                    on:click=move |_| editando.set(Some(id_abrir.clone()))
+                                >
+                                    {t!("ajuste-seguridad-usuarios_router-cambiar")}
+                                </button>
+                            })}
+                            {con_borrar.then(|| view! {
+                                <button
+                                    type="button"
+                                    class="b-pel"
+                                    aria-label=t!("ajuste-seguridad-usuarios_router-borrar-de", nombre = nombre.clone())
+                                    disabled=move || sin_gestor || ocupado.get() || cambiando().is_some()
+                                    on:click=move |_| borrar.run(id_borrar.clone())
+                                >
+                                    {t!("ajuste-seguridad-usuarios_router-borrar")}
+                                </button>
+                            })}
+                        </span>
+                    })}
                 </div>
                 {formulario}
             </div>
@@ -342,9 +348,8 @@ mod tests {
     #[test]
     fn sin_leer_la_lista_no_se_crea_usuario() {
         let fallo = EstadoLectura::SinLeer("No se pudo leer".into());
-        assert!(gestor_bloqueado(false, false, &fallo));
-        assert!(!gestor_bloqueado(false, false, &EstadoLectura::Leido));
-        assert!(gestor_bloqueado(true, false, &EstadoLectura::Leido));
-        assert!(gestor_bloqueado(false, true, &EstadoLectura::Leido));
+        assert!(gestor_bloqueado(false, &fallo));
+        assert!(!gestor_bloqueado(false, &EstadoLectura::Leido));
+        assert!(gestor_bloqueado(true, &EstadoLectura::Leido));
     }
 }

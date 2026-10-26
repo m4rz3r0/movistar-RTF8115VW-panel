@@ -94,7 +94,7 @@ usuarios-router-contrasena = Password
 usuarios-router-protegido-panel = It is the user this panel logs in with: it cannot be deleted or changed from here.
 usuarios-router-protegido-sistema = It is the operator's account: it cannot be deleted or changed from here.
 usuarios-router-sin-credenciales = The panel does not know which user it logs in to the router with: no account can be changed from here.
-usuarios-router-aviso-borrar = If you undo the deletion later, the user comes back with a new password: the current one cannot be recovered. The new one will only be visible with the eye, in the change's details in the History. If the panel brings it back by itself (because the change fails), that password is not stored: the History will tell you to change it.
+usuarios-router-aviso-borrar = If you undo the deletion later, the user comes back with a new password: the current one cannot be recovered. The new one will only be visible with the eye, in the change's details in the History. If the panel brings it back by itself (because the change fails), that password is not stored: the History will tell you.
 usuarios-router-aviso-deshacer = The user comes back with a new password: the previous one cannot be recovered. You will see it with the eye in this change's details, in the History.
 usuarios-router-error-protegido = This user is protected: it is the one the panel uses to log in to the router, or the operator's account. It cannot be deleted or changed from here.
 usuarios-router-error-existe = The router already has a user with that name.
@@ -109,11 +109,12 @@ usuarios-router-error-uno-cada-vez = Users are deleted one at a time.
 usuarios-router-error-nombre-baja = That name cannot be deleted from the panel: it contains ":" or control characters.
 usuarios-router-error-grupo-sistema = That account type is the operator's: choose Administrator or User.
 usuarios-router-error-grupo-no-valido = Choose an account type: Administrator or User.
-usuarios-router-nota-revertido = The deleted user was created again with a new password that the panel does not store: change it in Settings → Security → Router web accounts to be able to use it.
-
-## Features still to be checked against a real router
-validacion-real-pendiente-usuarios = Creating and deleting users has not been checked against a real router yet: it is not available for now.
-validacion-real-pendiente-contrasena-otro = Changing another user's password has not been checked against a real router yet: it is not available for now.
-validacion-real-pendiente-sin-ping = Not answering ping has not been checked against a real router yet: it is not available for now.
+usuarios-router-nota-revertido = The deleted user was created again with a new password that the panel does not store. On this router that account cannot log in to the web; if you need another password, delete it and create it again.
 usuarios-router-no-panel = These are not this panel's users: those are in
 usuarios-router-no-panel-enlace = Panel settings → Who can log in to this panel
+
+## Features this router does not allow from the panel
+funcion-sin-comprobar = This feature has not been checked on this router: the panel does not use it.
+funcion-no-disponible-usuarios = On this router, the panel does not create or delete web accounts.
+funcion-no-disponible-contrasena-otro = On this router only the 1234 account can log in to the web, so the panel cannot check that the new password works. To change it, delete the account and create it again.
+funcion-no-disponible-sin-ping = On this router, turning off the ping reply is not enough: another operator rule still allows it.

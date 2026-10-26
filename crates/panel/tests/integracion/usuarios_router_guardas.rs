@@ -59,7 +59,7 @@ async fn interruptor_desactivado_vale_en_el_gestor() {
             Funcion3::ContrasenaOtro => None,
         });
     let escritas = p.sim.control.writes().len();
-    let pendiente = "aún no se ha comprobado con el router de verdad";
+    let sin_usuarios = "el panel no crea ni borra cuentas";
     for (status, body) in [
         biblioteca(
             &p,
@@ -82,7 +82,7 @@ async fn interruptor_desactivado_vale_en_el_gestor() {
         biblioteca(&p, &cookie, "cbAddUser", Some("prueba1"), json!([]), true).await,
     ] {
         assert_eq!(status, 409, "{body}");
-        assert!(body.contains(pendiente), "{body}");
+        assert!(body.contains(sin_usuarios), "{body}");
     }
     // La de «Sin ping», con su regla quitada para que no salga «ya puesta».
     let d = ok(
@@ -97,7 +97,7 @@ async fn interruptor_desactivado_vale_en_el_gestor() {
     assert_eq!(escritas_tras_deshacer, escritas + 1);
     let (status, body) = llamar(&p, "preparar_sin_ping", json!({}), Some(&cookie)).await;
     assert_eq!(status, 409, "{body}");
-    assert!(body.contains(pendiente), "{body}");
+    assert!(body.contains("otra regla del operador"), "{body}");
     assert_eq!(p.sim.control.writes().len(), escritas_tras_deshacer);
     // El deshacer del alta de antes sigue.
     let d = ok(
