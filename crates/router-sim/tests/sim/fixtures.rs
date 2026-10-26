@@ -140,19 +140,30 @@ fn fixtures_have_no_secrets() {
     assert!(files > 50, "faltan fixtures ({files})");
 }
 
-/// Los valores de prueba valen solo en su fixture y su etiqueta.
+/// Los valores de prueba valen solo en su fixture, su etiqueta y tal cual:
+/// ni en otra fixture (de serie o de otra variante), ni en otra etiqueta, ni
+/// cambiados de sitio entre ellos, ni con otras mayúsculas.
 #[test]
 fn valores_de_prueba_solo_en_su_sitio() {
     let ninguno = HashSet::new();
-    let (file, tag, value) = VALORES_DE_PRUEBA[0];
-    check_value(file, tag, value, &ninguno);
-    for (f, t) in [
-        ("cbGetWanIPIntf.xml", tag),
-        ("dhcp-sin-voip/cbGetWanIPIntf.xml", tag),
-        (file, "username"),
-    ] {
-        let r = std::panic::catch_unwind(|| check_value(f, t, value, &ninguno));
-        assert!(r.is_err(), "{f} <{t}> admite el valor de prueba");
+    for (i, &(file, tag, value)) in VALORES_DE_PRUEBA.iter().enumerate() {
+        check_value(file, tag, value, &ninguno);
+        let base = file.rsplit('/').next().unwrap();
+        let otra = format!("dhcp-sin-voip/{base}");
+        let (otro_file, otro_tag, _) = VALORES_DE_PRUEBA[1 - i];
+        let mayus = value.to_uppercase();
+        let minus = value.to_lowercase();
+        let distinto = if mayus == value { &minus } else { &mayus };
+        for (f, t, v) in [
+            (base, tag, value),
+            (otra.as_str(), tag, value),
+            (file, "username", value),
+            (otro_file, otro_tag, value),
+            (file, tag, distinto.as_str()),
+        ] {
+            let r = std::panic::catch_unwind(|| check_value(f, t, v, &ninguno));
+            assert!(r.is_err(), "{f} <{t}> admite {v}");
+        }
     }
 }
 
