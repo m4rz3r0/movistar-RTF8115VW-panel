@@ -1,7 +1,8 @@
 //! ALG de NAT (`cbSetNatConfig`): en natalg.asp son casillas sin `value`
 //! (el router las da por activas si el campo llega) y la web manda siempre
 //! `set_nf_conntrack=1`, que la lectura no da. Sin eso, el router aceptaba
-//! la escritura y no cambiaba nada.
+//! la escritura y no cambiaba nada. El NAT loopback va por la misma CGI
+//! con otros campos: es otra función (`cbSetNatConfig.loopback`).
 
 use crate::comun::{PanelPrueba, campo, esperar_final, fijar, ok, valores_de};
 use serde_json::json;
@@ -57,6 +58,16 @@ async fn apagar_y_encender_una_alg_como_la_web() {
         .unwrap();
     let enviado = |k: &str| ps.iter().find(|(n, _)| n == k).map(|(_, v)| v.as_str());
     assert_eq!(enviado("set_nf_conntrack"), Some("1"), "{ps:?}");
+    // Como el formulario NatAlgForm: solo las casillas y set_nf_conntrack,
+    // nunca los campos del NAT loopback.
+    let alg = [
+        "ftp_enable",
+        "h323_enable",
+        "pptp_enable",
+        "sip_enable",
+        "set_nf_conntrack",
+    ];
+    assert!(ps.iter().all(|(k, _)| alg.contains(&k.as_str())), "{ps:?}");
     let esperado = if nuevo == "1" { Some("on") } else { None };
     assert_eq!(enviado("h323_enable"), esperado, "{ps:?}");
     assert_eq!(campo(&form().await, "h323_enable").unwrap()["valor"], nuevo);

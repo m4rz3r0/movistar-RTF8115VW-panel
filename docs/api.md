@@ -44,7 +44,7 @@ Las funciones del propio panel (`/api/…`) están en
 | [WAN](#wan) | 14 | 8 | 6 | 0 | 0 |
 | [LAN/DHCP](#landhcp) | 22 | 12 | 10 | 0 | 0 |
 | [WiFi](#wifi) | 20 | 11 | 8 | 1 | 0 |
-| [NAT](#nat) | 16 | 6 | 10 | 0 | 0 |
+| [NAT](#nat) | 17 | 6 | 11 | 0 | 0 |
 | [Cortafuegos](#cortafuegos) | 4 | 1 | 3 | 0 | 4 |
 | [DNS](#dns) | 6 | 3 | 3 | 0 | 0 |
 | [IPv6](#ipv6) | 8 | 2 | 6 | 0 | 3 |
@@ -1006,7 +1006,7 @@ Elementos de la respuesta: `adm_state`, `ftp_enable`, `h323_enable`, `ip_intf_id
 
 *escritura* · UI avanzada · riesgo bajo · sin vigilancia · página `natalg.asp`
 
-Activa o desactiva los ALG o el NAT loopback (formularios NatAlgForm y NatLoopbackForm). El de los ALG manda siempre `set_nf_conntrack = 1`, que la lectura no devuelve, así que el panel no lo envía: sin él, un cambio de `h323_enable` no tuvo efecto en el router real.
+Activa o desactiva los ALG de FTP, H.323, PPTP y SIP (formulario NatAlgForm de natalg.asp): son casillas que van por presencia, y la web manda siempre `set_nf_conntrack=1`, que la lectura no devuelve.
 
 **Sin comprobar en el router real:** el panel no la escribe.
 
@@ -1019,6 +1019,19 @@ Lectura pareada: `cbGetNatConfig`
 | `pptp_enable` | ALG de PPTP | bool |  |
 | `sip_enable` | ALG de SIP | bool |  |
 | `set_nf_conntrack` | Aplicar ALG (siempre 1) | int |  |
+
+### `cbSetNatConfig.loopback`
+
+*escritura* · UI avanzada · riesgo bajo · sin vigilancia · página `natalg.asp` · se manda a `cbSetNatConfig`
+
+Activa o desactiva el NAT loopback. Más que la web: js/natcfg.js envía el formulario NatLoopbackForm, pero este firmware no lo tiene en natalg.asp; los campos salen de esa función y de la lectura.
+
+**Sin comprobar en el router real:** el panel no la escribe.
+
+Lectura pareada: `cbGetNatConfig`
+
+| Parámetro | Etiqueta | Tipo | Opciones |
+|---|---|---|---|
 | `adm_state` | Activado | bool |  |
 | `rtm_cfg_nat_lb_intf_id` | Interfaz de loopback (id) | int |  |
 

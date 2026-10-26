@@ -2149,7 +2149,7 @@ area = "nat"
 origen = "avanzada"
 tipo = "escritura"
 pagina = "natalg.asp"
-descripcion = "Activa o desactiva los ALG o el NAT loopback (formularios NatAlgForm y NatLoopbackForm). El de los ALG manda siempre `set_nf_conntrack = 1`, que la lectura no devuelve, así que el panel no lo envía: sin él, un cambio de `h323_enable` no tuvo efecto en el router real."
+descripcion = "Activa o desactiva los ALG de FTP, H.323, PPTP y SIP (formulario NatAlgForm de natalg.asp): son casillas que van por presencia, y la web manda siempre `set_nf_conntrack=1`, que la lectura no devuelve."
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetNatConfig", params = [] }
@@ -2187,6 +2187,19 @@ nombre = "set_nf_conntrack"
 etiqueta = "Aplicar ALG (siempre 1)"
 tipo = "int"
 fijo = "1"
+
+[[funcion]]
+name = "cbSetNatConfig.loopback"
+cgi = "cbSetNatConfig"
+area = "nat"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "natalg.asp"
+descripcion = "Activa o desactiva el NAT loopback. Más que la web: js/natcfg.js envía el formulario NatLoopbackForm, pero este firmware no lo tiene en natalg.asp; los campos salen de esa función y de la lectura."
+riesgo = "bajo"
+acceso = "no_corta"
+lectura_pareada = { funcion = "cbGetNatConfig", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "adm_state"

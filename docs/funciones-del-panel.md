@@ -63,7 +63,9 @@ Probadas y descartadas (2026-10-26):
   reiniciarlo. No se vuelve a probar.
 - `cbSetNatConfig`: los ALG no cambian. Causa encontrada después (ver
   abajo): son casillas que van por presencia, y la web manda siempre
-  `set_nf_conntrack=1`. Arreglada; falta volver a probarla.
+  `set_nf_conntrack=1`. Además mandaba los campos del NAT loopback, que
+  la web de este firmware no ofrece; ahora son otra función,
+  `cbSetNatConfig.loopback`. Arreglada; falta volver a probarla.
 - `cbSetQueue`: estaba mal modelada. La web la usa de dos formas: el
   estado de cada cola (solo el id y `adm_state`) y la cola por defecto (el
   id y `default_traffic_class=-1`; después la web cierra la sesión). El
