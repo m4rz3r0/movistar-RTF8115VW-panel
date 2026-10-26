@@ -27,6 +27,7 @@ use hgu::fmt::{ALTA_USUARIO, BAJA_USUARIO, lista_de_baja, nombres_de_baja, usuar
 use hgu::xml::XmlNode;
 
 mod cortafuegos;
+pub(super) use cortafuegos::BELONG as BELONG_CORTAFUEGOS;
 pub(crate) use cortafuegos::{SIN_PING_YA_PUESTA, filas_del_cortafuegos};
 
 /// Lectura de la lista de usuarios ([`Lectura::Usuarios`]).

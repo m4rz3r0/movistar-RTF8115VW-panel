@@ -11,8 +11,9 @@
 //!   ([`SIN_PING_YA_PUESTA`]);
 //! - su baja (el deshacer o la reversión): la misma función con `borrar` y
 //!   el RID como instancia, sin valores. Solo si esa regla existe, tiene la
-//!   huella ([`cf::es_sin_ping`]) y está en un filtro de entrada IPv4; si
-//!   no, `InstanciaCambiada` (409) sin escribir. Se escribe
+//!   huella ([`cf::es_sin_ping`]) y está en un filtro de entrada IPv4, con
+//!   un FID numérico y el mismo en el que se creó (la identidad `belong`
+//!   que pone el deshacer); si no, `InstanciaCambiada` (409) sin escribir. Se escribe
 //!   `scbidirectionalflt.cmd?action=remove` con `item=<FID>|<RID>` y
 //!   `escape=true`: nunca un FID suelto, que borraría el filtro entero.
 //!
@@ -98,6 +99,39 @@ fn filtro_de_la_regla<'a>(filtros: &'a [Filtro], rid: &str) -> Option<&'a Filtro
             && x.reglas.iter().any(|r| r.rid == rid && cf::es_sin_ping(r))
     })
 }
+
+/// El filtro de la baja que pide `req` (la regla `req.instancia`): el de
+/// la regla del panel ([`filtro_de_la_regla`]), que tiene que ser el mismo
+/// en el que se creó (`req.identidad["belong"]`, que pone el deshacer del
+/// alta) y tener un FID numérico (con un `|` el `item` borraría otra cosa).
+fn filtro_para_la_baja<'a>(
+    filtros: &'a [Filtro],
+    req: &ChangeRequest,
+) -> Result<&'a Filtro, CambioError> {
+    let rid = req.instancia.as_deref().unwrap_or_default();
+    let filtro = filtro_de_la_regla(filtros, rid).ok_or_else(|| {
+        CambioError::InstanciaCambiada(format!(
+            "la regla {rid} ya no es la del panel (no está o tiene otra huella): \
+             no se borra, para no tocar otra"
+        ))
+    })?;
+    if !es_numero(&filtro.fid) {
+        return Err(CambioError::Invalida(
+            "el filtro de la regla no tiene un identificador numérico: no se borra".into(),
+        ));
+    }
+    if req.identidad.get(BELONG) != Some(&filtro.fid) {
+        return Err(CambioError::InstanciaCambiada(format!(
+            "la regla {rid} ya no está en el filtro donde se creó: no se borra, para no \
+             tocar otra"
+        )));
+    }
+    Ok(filtro)
+}
+
+/// Parámetro del filtro de la regla en el alta; en el deshacer, la
+/// identidad que ata la baja a ese filtro.
+pub(in crate::changes) const BELONG: &str = "belong";
 
 /// Cada regla como la ve el gestor, `{RID, belong, version, enabled,
 /// protocol, specificAction, icmpType}` (los parámetros del alta), y si
@@ -237,12 +271,7 @@ impl ChangeManager {
         if req.borrar {
             let rid = req.instancia.clone().unwrap_or_default();
             let filtros = self.filtros().await?;
-            let filtro = filtro_de_la_regla(&filtros, &rid).ok_or_else(|| {
-                CambioError::InstanciaCambiada(format!(
-                    "la regla {rid} ya no es la del panel (no está o tiene otra huella): \
-                         no se borra, para no tocar otra"
-                ))
-            })?;
+            let filtro = filtro_para_la_baja(&filtros, req)?;
             let valores: BTreeMap<String, String> =
                 [("belong".to_owned(), filtro.fid.clone())].into();
             return Ok(Plan {

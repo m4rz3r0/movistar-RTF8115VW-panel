@@ -401,12 +401,24 @@ pub(super) fn inversa(plan: &Plan) -> Option<ChangeRequest> {
         Operacion::Borrar if plan.lectura == Lectura::Usuarios => hgu::fmt::ALTA_USUARIO.to_owned(),
         _ => f.name.clone(),
     };
+    // La baja de la regla «sin ping» va atada al filtro donde se creó.
+    let identidad = match (plan.operacion, &plan.lectura) {
+        (Operacion::Crear, Lectura::Cortafuegos) => {
+            let belong = super::especiales::BELONG_CORTAFUEGOS;
+            plan.valores
+                .get(belong)
+                .map(|fid| (belong.to_owned(), fid.clone()))
+                .into_iter()
+                .collect()
+        }
+        _ => BTreeMap::new(),
+    };
     Some(ChangeRequest {
         funcion,
         instancia,
         valores,
         borrar,
-        identidad: Default::default(),
+        identidad,
     })
 }
 
