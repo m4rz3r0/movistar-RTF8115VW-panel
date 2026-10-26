@@ -558,20 +558,24 @@ etiqueta = "Activado"
 tipo = "enum"
 opciones = [["1", "Activado"], ["0", "Desactivado"]]
 
+# Como la web: el código por debajo de 255, el valor en hexadecimal sin
+# espacios y, sin longitud, la de los bytes del valor. Para los códigos
+# 224 a 254 la web convierte el texto a hexadecimal; el panel lo pide ya
+# convertido (es lo que guarda y devuelve el router).
 [[funcion.parametro]]
 nombre = "opt_code"
-etiqueta = "Código de opción"
+etiqueta = "Código de opción (0 a 254)"
 tipo = "int"
 
 [[funcion.parametro]]
 nombre = "opt_len"
-etiqueta = "Longitud"
+etiqueta = "Longitud en bytes (vacía: la del valor)"
 tipo = "int"
 
 [[funcion.parametro]]
 nombre = "opt_value"
-etiqueta = "Valor (hexadecimal)"
-tipo = "text"
+etiqueta = "Valor en hexadecimal (también de 224 a 254)"
+tipo = "hex"
 
 [[funcion.parametro]]
 nombre = "rtm_dhcpv4_svr_pool_opt_id"
@@ -696,17 +700,25 @@ nombre = "rtm_cfg_dhcpv4_svr_pool_id"
 etiqueta = "Pool DHCP"
 tipo = "int"
 
+# IP reservadas (el pool no las reparte): el router las guarda en 32
+# ranuras `reserved_ipv4_addr_<i>`/`reserved_ipv4_mask_<i>` dentro de
+# `<reserved_ipv4>`; una libre es 0.0.0.0. La web añade en la ranura
+# siguiente a la última usada y borra con 0.0.0.0/0.0.0.0, cada vez con
+# solo esa ranura y el id del pool. El panel manda además todo el pool,
+# como al editarlo (sin las demás ranuras).
 [[funcion.parametro]]
 nombre = "reserved_ipv4_addr"
 etiqueta = "IP reservada (no se reparte)"
 tipo = "ip"
 partido = "ip4"
+ranuras = 32
 
 [[funcion.parametro]]
 nombre = "reserved_ipv4_mask"
-etiqueta = "Máscara de la reservada"
+etiqueta = "Máscara de la IP reservada"
 tipo = "ip"
 partido = "ip4"
+ranuras = 32
 
 [[funcion.parametro]]
 nombre = "adm_state"

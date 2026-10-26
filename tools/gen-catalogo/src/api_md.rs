@@ -48,6 +48,7 @@ fn tipo_param(t: TipoParam) -> &'static str {
         TipoParam::Enum => "enum",
         TipoParam::Int => "int",
         TipoParam::Text => "text",
+        TipoParam::Hex => "hex",
         TipoParam::Secret => "secret",
     }
 }
@@ -145,6 +146,9 @@ fn funcion(md: &mut String, f: &Funcion, m: &Mascara, fixtures: &Path) {
             let mut t = tipo_param(p.tipo).to_owned();
             if let Some(pt) = p.partido {
                 let _ = write!(t, " ({:?})", pt);
+            }
+            if let Some(n) = p.ranuras {
+                let _ = write!(t, ", {n} ranuras `{}_0…{}`", p.nombre, n - 1);
             }
             if p.tipo != TipoParam::Secret && m.es_secreto(&p.nombre) {
                 t.push_str(" ⚠");

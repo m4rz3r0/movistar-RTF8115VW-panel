@@ -48,9 +48,24 @@ pub(crate) fn for_each_node(n: &mut XmlNode, f: &mut impl FnMut(&mut XmlNode)) {
     }
 }
 
-/// Cambia el texto del hijo `tag`, si existe.
+/// Cambia el texto del hijo `tag`, si existe; si no, el de la hoja `tag` de
+/// un elemento anidado (las ranuras de las IP reservadas del pool DHCP van
+/// dentro de `<reserved_ipv4>`, como en el router).
 pub(crate) fn set_child(n: &mut XmlNode, tag: &str, text: &str) {
     if let Some(c) = n.children.iter_mut().find(|c| c.tag == tag) {
+        c.text = text.to_owned();
+        return;
+    }
+    if let Some(c) = n
+        .children
+        .iter_mut()
+        .filter(|c| !c.children.is_empty())
+        .find_map(|a| {
+            a.children
+                .iter_mut()
+                .find(|c| c.tag == tag && c.children.is_empty())
+        })
+    {
         c.text = text.to_owned();
     }
 }

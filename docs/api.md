@@ -328,9 +328,9 @@ Lista: instancia por `rtm_dhcpv4_svr_pool_opt_id`; `del=DEL` borra
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
 | `adm_state` | Activado | enum | `1` Activado, `0` Desactivado |
-| `opt_code` | Código de opción | int |  |
-| `opt_len` | Longitud | int |  |
-| `opt_value` | Valor (hexadecimal) | text |  |
+| `opt_code` | Código de opción (0 a 254) | int |  |
+| `opt_len` | Longitud en bytes (vacía: la del valor) | int |  |
+| `opt_value` | Valor en hexadecimal (también de 224 a 254) | hex |  |
 | `rtm_dhcpv4_svr_pool_opt_id` | Opción (id; -1 = nueva) | int |  |
 | `rtm_cfg_dhcpv4_svr_pool_id` | Pool DHCP | int |  |
 
@@ -407,8 +407,8 @@ Lista: instancia por `rtm_cfg_dhcpv4_svr_pool_id`; `del=DEL` borra
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
 | `rtm_cfg_dhcpv4_svr_pool_id` | Pool DHCP | int |  |
-| `reserved_ipv4_addr` | IP reservada (no se reparte) | ip (Ip4) |  |
-| `reserved_ipv4_mask` | Máscara de la reservada | ip (Ip4) |  |
+| `reserved_ipv4_addr` | IP reservada (no se reparte) | ip (Ip4), 32 ranuras `reserved_ipv4_addr_0…31` |  |
+| `reserved_ipv4_mask` | Máscara de la IP reservada | ip (Ip4), 32 ranuras `reserved_ipv4_mask_0…31` |  |
 | `adm_state` | Activado | enum | `1` Activado, `0` Desactivado |
 | `ip_intf_id` | Interfaz IP | int |  |
 | `order_p` | Posición | enum | `1` Primera, `2` Según el orden, `3` Última |

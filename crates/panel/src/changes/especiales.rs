@@ -31,6 +31,7 @@ use hgu::fmt::{
 use hgu::xml::XmlNode;
 
 mod cortafuegos;
+pub(super) mod opcion_dhcp;
 pub(super) use cortafuegos::BELONG as BELONG_CORTAFUEGOS;
 pub(crate) use cortafuegos::{SIN_PING_YA_PUESTA, filas_del_cortafuegos};
 

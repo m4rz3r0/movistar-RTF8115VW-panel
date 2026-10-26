@@ -17,6 +17,8 @@ use std::{
     sync::Arc,
 };
 
+mod ranuras;
+
 /// Páginas que disparan acciones al cargarse: nunca se cargan, digan lo
 /// que digan el catálogo o la petición.
 const PAGINAS_PROHIBIDAS: &[&str] = &["syslog.asp", "backup_restore.asp"];
@@ -190,7 +192,7 @@ fn tipo_campo(t: TipoParam) -> TipoCampo {
         TipoParam::Bool => TipoCampo::Bool,
         TipoParam::Enum => TipoCampo::Enum,
         TipoParam::Int => TipoCampo::Int,
-        TipoParam::Text => TipoCampo::Text,
+        TipoParam::Text | TipoParam::Hex => TipoCampo::Text,
         TipoParam::Secret => TipoCampo::Secret,
     }
 }
@@ -689,6 +691,14 @@ pub async fn formulario(
     for p in &f.parametros {
         // Un campo fijo no se enseña: el panel lo manda siempre igual.
         if (ident.contains(&p.nombre) && operacion != Operacion::Accion) || p.fijo.is_some() {
+            continue;
+        }
+        // Las ranuras (IP reservadas), solo al editar y todas juntas.
+        if p.ranuras.is_some() {
+            let primera = f.parametros.iter().find(|q| q.ranuras.is_some());
+            if operacion == Operacion::Editar && primera.is_some_and(|q| q.nombre == p.nombre) {
+                campos.extend(ranuras::campos(f, &actual));
+            }
             continue;
         }
         let cur = buscar(&actual, &p.nombre);

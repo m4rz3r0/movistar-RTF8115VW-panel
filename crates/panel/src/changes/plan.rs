@@ -19,6 +19,7 @@ pub const PALABRA_ACCION: &str = "CONFIRMAR";
 pub(super) const REBOOT: &str = "cbReboot";
 
 mod lectura;
+pub(crate) mod ranuras;
 pub(crate) use lectura::identidad;
 pub(super) use lectura::{Lectura, lectura_de};
 
@@ -135,13 +136,20 @@ pub(crate) fn buscar<'a>(m: &'a BTreeMap<String, String>, nombre: &str) -> Optio
 }
 
 /// Iguales una vez normalizados: sin espacios en los extremos; IP y MAC sin
-/// distinguir mayúsculas.
+/// distinguir mayúsculas; los bytes en hexadecimal, además, sin ningún
+/// espacio.
 pub(super) fn iguales(p: Option<&Parametro>, a: &str, b: &str) -> bool {
     let (a, b) = (a.trim(), b.trim());
     match p.map(|p| p.tipo) {
         Some(TipoParam::Ip | TipoParam::Mac) => a.eq_ignore_ascii_case(b),
+        Some(TipoParam::Hex) => sin_espacios(a).eq_ignore_ascii_case(&sin_espacios(b)),
         _ => a == b,
     }
+}
+
+/// `v` sin ningún espacio (los bytes en hexadecimal, como los manda la web).
+pub(super) fn sin_espacios(v: &str) -> String {
+    v.chars().filter(|c| !c.is_whitespace()).collect()
 }
 
 /// ¿El gestor trata `nombre` como secreto? Lo es por el catálogo o por la
@@ -178,6 +186,10 @@ pub(super) fn validar(p: &Parametro, v: &str, protegido: bool) -> Result<(), Str
         TipoParam::Bool => matches!(v.trim(), "0" | "1"),
         TipoParam::Enum => p.opciones.iter().any(|(o, _)| o == v.trim()),
         TipoParam::Int => v.trim().parse::<i64>().is_ok(),
+        TipoParam::Hex => {
+            let h = sin_espacios(v);
+            h.len().is_multiple_of(2) && h.bytes().all(|b| b.is_ascii_hexdigit())
+        }
         TipoParam::Text | TipoParam::Secret => !v.chars().any(char::is_control),
     };
     if ok {
@@ -198,14 +210,25 @@ pub(super) fn hojas(n: &XmlNode) -> BTreeMap<String, String> {
         .collect()
 }
 
-/// Elementos (hijos con hijos) de una respuesta; si no hay, la propia
-/// respuesta.
+/// Elementos (hijos con hijos) de una respuesta, con las hojas de sus
+/// elementos anidados (las ranuras de las IP reservadas de un pool DHCP,
+/// [`catalogo::Parametro::ranuras`]) sin pisar las suyas; si no hay, la
+/// propia respuesta.
 pub(super) fn elementos(n: &XmlNode) -> Vec<BTreeMap<String, String>> {
+    let con_anidadas = |e: &XmlNode| {
+        let mut m = hojas(e);
+        for a in e.children.iter().filter(|c| !c.children.is_empty()) {
+            for (k, v) in hojas(a) {
+                m.entry(k).or_insert(v);
+            }
+        }
+        m
+    };
     let v: Vec<_> = n
         .children
         .iter()
         .filter(|c| !c.children.is_empty())
-        .map(hojas)
+        .map(con_anidadas)
         .collect();
     if v.is_empty() { vec![hojas(n)] } else { v }
 }
@@ -346,6 +369,7 @@ pub(super) fn componer(
         }
         let v = match p.map(|p| p.tipo) {
             Some(TipoParam::Text | TipoParam::Secret) | None => v.clone(),
+            Some(TipoParam::Hex) => sin_espacios(v),
             Some(_) => v.trim().to_owned(),
         };
         efectivos.insert(k.clone(), v);
@@ -356,10 +380,26 @@ pub(super) fn componer(
     // Con `explicito` (reversión o deshacer), un secreto que no sirve para
     // reenviarlo se omite: la vuelta atrás no se bloquea nunca por esto.
     let mut omitidos = BTreeSet::new();
+    let cambiadas = ranuras::cambiadas(f, actual, &efectivos);
     for p in &f.parametros {
         // Un campo fijo va siempre con su valor (no se lee ni se cambia).
         if let Some(fijo) = &p.fijo {
             payload.push((p.nombre.clone(), fijo.clone()));
+            continue;
+        }
+        // De las ranuras, solo las que cambian, enteras (la web manda solo
+        // esa, con la IP y la máscara).
+        if p.ranuras.is_some() {
+            for i in &cambiadas {
+                let k = ranuras::nombre(p, *i);
+                if let Some(v) = efectivos
+                    .get(&k)
+                    .map(String::as_str)
+                    .or_else(|| buscar(actual, &k))
+                {
+                    payload.push((k, v.to_owned()));
+                }
+            }
             continue;
         }
         let (v, leido) = if let Some(v) = efectivos.get(&p.nombre) {
@@ -422,23 +462,35 @@ pub(super) fn componer(
             }
         }
     } else {
-        for p in &f.parametros {
-            let Some(v) = efectivos.get(&p.nombre) else {
+        // Cada parámetro por su nombre; los de ranuras, por las suyas.
+        let nombres = f.parametros.iter().flat_map(|p| {
+            let de_p: Vec<&str> = if p.ranuras.is_some() {
+                ranuras::en(f, p, &efectivos)
+                    .into_iter()
+                    .map(|(k, _)| k)
+                    .collect()
+            } else {
+                vec![p.nombre.as_str()]
+            };
+            de_p.into_iter().map(move |k| (k, p))
+        });
+        for (nombre, p) in nombres {
+            let Some(v) = efectivos.get(nombre) else {
                 continue;
             };
-            if ident.contains(&p.nombre) && op != Operacion::Accion {
+            if ident.contains(nombre) && op != Operacion::Accion {
                 continue;
             }
-            let cur = buscar(actual, &p.nombre);
+            let cur = buscar(actual, nombre);
             let antes = cur.unwrap_or_default();
             if op != Operacion::Accion && iguales(Some(p), antes, v) {
                 continue;
             }
             campos.push(Campo {
-                nombre: p.nombre.clone(),
+                nombre: nombre.to_owned(),
                 antes: antes.to_owned(),
                 despues: v.clone(),
-                secreto: secreto(&p.nombre, antes, v),
+                secreto: secreto(nombre, antes, v),
                 leido: cur.is_some(),
             });
         }

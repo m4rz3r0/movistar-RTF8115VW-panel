@@ -86,6 +86,12 @@ impl ChangeManager {
         if !explicito {
             condicion_vacia(f, &actual, &req.valores).map_err(CambioError::Invalida)?;
         }
+        ranuras::preparar(f, op, explicito, &actual, &mut valores)
+            .map_err(CambioError::Invalida)?;
+        if !explicito {
+            especiales::opcion_dhcp::preparar(f, op, &actual, &mut valores)
+                .map_err(CambioError::Invalida)?;
+        }
         let Compuesto {
             efectivos,
             payload,

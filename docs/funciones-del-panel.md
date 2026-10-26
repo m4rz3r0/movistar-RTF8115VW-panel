@@ -89,6 +89,25 @@ Arreglada y pendiente de comprobar otra vez:
   tras reiniciar, y comprobar que el router da IP nueva) pase, sigue con
   `comprobada = false`, y con ella los ajustes de DHCP y DNS de la red de
   casa.
+- IP reservadas del grupo (las que no reparte), en la Biblioteca
+  (`cbSetDhcpv4ServerPool`). El router las guarda en 32 ranuras
+  (`reserved_ipv4_addr_<i>`/`reserved_ipv4_mask_<i>`, dentro de
+  `<reserved_ipv4>`; una libre vale 0.0.0.0) y el catálogo las declara con
+  `ranuras = 32`. El formulario del grupo enseña las ranuras usadas y una
+  pareja vacía para una nueva. Como la web oficial, una nueva va a la
+  ranura siguiente a la última usada (si esa era la última, a la primera
+  libre; sin máscara, una sola dirección) y quitar una es poner su IP a
+  0.0.0.0, que manda también la máscara a 0.0.0.0. A diferencia de la web,
+  que manda solo la ranura y el id, el panel manda además todo el grupo
+  como al editarlo, para no desmarcar ninguna condición; las demás ranuras
+  no se reenvían nunca, tampoco al cambiar la concesión.
+- Opciones DHCP del grupo (`cbDhcpV4SvrPoolSetOpt`), en la Biblioteca: como
+  la web, el código va de 0 a 254, el valor en hexadecimal sin espacios y,
+  con la longitud vacía, la de los bytes del valor; al crear, el id `-1`, y
+  al borrar, solo los dos ids con `del=DEL`. Para los códigos 224 a 254 la
+  web convierte el texto a hexadecimal; el panel lo pide ya en hexadecimal,
+  que es lo que guarda y devuelve el router y lo que compara la relectura.
+  Las dos siguen con `comprobada = false` hasta probarlas en el router real.
 
 **Casillas y campos fijos (2026-10-27).** En varias páginas de la web del
 router, un sí/no es una casilla sin `value`: la web la manda como `on` si

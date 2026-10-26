@@ -10,7 +10,7 @@ mod model;
 
 pub use model::{
     Acceso, Area, Casilla, Comprobacion, Funcion, LecturaPareada, Lista, Origen, Parametro,
-    Partido, Riesgo, Tipo, TipoParam,
+    Partido, RANURA_LIBRE, Riesgo, Tipo, TipoParam,
 };
 
 use serde::Deserialize;
@@ -127,6 +127,15 @@ impl Catalogo {
                     }
                     _ => {}
                 }
+                // Una ranura libre es `0.0.0.0`: solo hay ranuras de IP.
+                if p.ranuras.is_some_and(|n| n == 0)
+                    || (p.ranuras.is_some() && p.tipo != TipoParam::Ip)
+                {
+                    return Err(mal(
+                        f,
+                        format!("{}: ranuras solo de IP y al menos una", p.nombre),
+                    ));
+                }
                 match (p.partido, p.tipo) {
                     (None, _) | (Some(Partido::Ip4), TipoParam::Ip) => {}
                     (Some(Partido::Mac6), TipoParam::Mac) => {}
@@ -194,6 +203,26 @@ mod tests {
 
     fn cat() -> Catalogo {
         Catalogo::load().expect("funciones.toml válido")
+    }
+
+    #[test]
+    fn las_ranuras_de_las_ip_reservadas_dan_su_parametro() {
+        let c = cat();
+        let f = c.funcion("cbSetDhcpv4ServerPool").unwrap();
+        let (p, i) = f.ranura("reserved_ipv4_addr_31").unwrap();
+        assert_eq!((p.nombre.as_str(), i), ("reserved_ipv4_addr", 31));
+        assert_eq!(
+            f.parametro("reserved_ipv4_mask_0").unwrap().nombre,
+            "reserved_ipv4_mask"
+        );
+        for fuera in [
+            "reserved_ipv4_addr_32",
+            "reserved_ipv4_addr_03",
+            "reserved_ipv4_addr_+1",
+        ] {
+            assert!(f.parametro(fuera).is_none(), "{fuera}");
+        }
+        assert!(f.ranura("lease_time").is_none());
     }
 
     #[test]

@@ -67,9 +67,22 @@ impl Funcion {
         matches!(self.comprobada, Some(Comprobacion::Referencia(_)))
     }
 
-    /// Parámetro por nombre.
+    /// Parámetro por nombre. El de una ranura (`<nombre>_<i>`,
+    /// [`Parametro::ranuras`]) da el parámetro de sus ranuras.
     pub fn parametro(&self, nombre: &str) -> Option<&Parametro> {
-        self.parametros.iter().find(|p| p.nombre == nombre)
+        self.parametros
+            .iter()
+            .find(|p| p.nombre == nombre)
+            .or_else(|| self.ranura(nombre).map(|(p, _)| p))
+    }
+
+    /// El parámetro de ranuras y el índice de `nombre` (`<nombre>_<i>`, con
+    /// `i` por debajo de [`Parametro::ranuras`]); `None` si no es una ranura.
+    pub fn ranura(&self, nombre: &str) -> Option<(&Parametro, u8)> {
+        let (base, i) = nombre.rsplit_once('_')?;
+        let i: u8 = i.parse().ok().filter(|n: &u8| n.to_string() == i)?;
+        let p = self.parametros.iter().find(|p| p.nombre == base)?;
+        (i < p.ranuras?).then_some((p, i))
     }
 }
 
@@ -213,7 +226,17 @@ pub struct Parametro {
     /// el panel lo envía con este valor y no lo enseña.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fijo: Option<String>,
+    /// El router lo guarda en `ranuras` ranuras, `<nombre>_0` a
+    /// `<nombre>_<ranuras - 1>`, dentro de un elemento anidado de la
+    /// lectura (las IP reservadas de un pool DHCP). La web manda solo la
+    /// ranura que cambia: el panel no reenvía las demás desde la lectura.
+    /// Una ranura libre vale [`RANURA_LIBRE`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ranuras: Option<u8>,
 }
+
+/// Valor de una ranura libre ([`Parametro::ranuras`]).
+pub const RANURA_LIBRE: &str = "0.0.0.0";
 
 /// Lo que acompaña a una casilla ([`Parametro::casilla`]).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -242,6 +265,9 @@ pub enum TipoParam {
     Int,
     /// Texto libre.
     Text,
+    /// Bytes en hexadecimal, sin espacios (se quitan al escribir y no
+    /// cuentan al comparar, como tampoco las mayúsculas).
+    Hex,
     /// Secreto: nunca se muestra ni se registra.
     Secret,
 }
