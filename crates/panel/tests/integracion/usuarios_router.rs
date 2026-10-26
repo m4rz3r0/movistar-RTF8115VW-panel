@@ -315,3 +315,29 @@ async fn usuarios_con_su_marca_de_protegidos() {
         "{usuarios}"
     );
 }
+
+/// Si el router rechaza un alta o una baja de usuarios, su texto no llega
+/// a la respuesta ni al Historial: solo el código `Result`.
+#[tokio::test]
+async fn texto_del_router_no_se_anota() {
+    const TEXTO: &str = "texto-del-router-X1";
+    let (p, cookie) = con_reautenticacion().await;
+    for op in [crear("prueba1", CLAVE, "user"), borrar(INVITADO)] {
+        let g = preparado_ok(&p, &cookie, op).await;
+        p.sim.control.fail_next_write(TEXTO);
+        let (status, body) = llamar(
+            &p,
+            "confirmar_ajuste",
+            json!({ "token": g["token"], "desmarcados": [] }),
+            Some(&cookie),
+        )
+        .await;
+        assert!(!body.contains(TEXTO), "{status}: {body}");
+    }
+    let historial = historial_en_texto(&p).await;
+    assert!(historial.contains("Result=1"), "{historial}");
+    assert!(!historial.contains(TEXTO), "{historial}");
+    let html = pagina(&p, &cookie, "/historial").await;
+    assert!(!html.contains(TEXTO), "en el HTML de /historial");
+    assert_eq!(p.sim.control.usuarios(), originales());
+}

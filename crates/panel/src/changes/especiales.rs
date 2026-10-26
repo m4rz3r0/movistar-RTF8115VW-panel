@@ -162,6 +162,25 @@ pub(super) fn con_contrasena_nueva(req: &mut ChangeRequest) -> bool {
     recrea
 }
 
+/// Lo que se anota de un rechazo del router a un alta o una baja de
+/// usuarios en lugar de su texto.
+const TEXTO_NO_ANOTADO: &str = "el texto del router no se anota";
+
+/// Un error de una escritura de usuarios sin el texto del router (su
+/// `ErrorString` o `<Msg>`): no se sabe qué repite (quizá el nombre o la
+/// contraseña). Queda el código `Result`, como en `usuarios_router` y
+/// `contrasena_router`.
+pub(super) fn sin_texto_del_router(e: hgu::Error) -> hgu::Error {
+    match e {
+        hgu::Error::CallFailed { name, result, .. } => hgu::Error::CallFailed {
+            name,
+            result,
+            error: TEXTO_NO_ANOTADO.to_owned(),
+        },
+        otro => otro,
+    }
+}
+
 /// La instancia de `plan` para el registro: el nombre de un usuario es un
 /// dato sensible y no va en él.
 pub(super) fn instancia_en_registro(plan: &Plan) -> &str {
@@ -361,6 +380,17 @@ impl ChangeManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rechazo_de_usuarios_sin_el_texto_del_router() {
+        let e = sin_texto_del_router(hgu::Error::CallFailed {
+            name: ALTA_USUARIO.into(),
+            result: "1".into(),
+            error: "texto-X".into(),
+        });
+        let t = e.to_string();
+        assert!(t.contains("Result=1") && !t.contains("texto-X"), "{t}");
+    }
 
     #[test]
     fn contrasena_aleatoria_de_16_letras_y_cifras() {

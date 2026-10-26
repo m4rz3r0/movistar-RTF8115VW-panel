@@ -243,7 +243,11 @@ impl ChangeManager {
                     .basic_write(hgu::cortafuegos::PAGINA_LISTA, funcion, &p)
                     .await
                     .map(drop),
-                Especial::Usuarios => c.write(pagina, funcion, &p).await.map(drop),
+                Especial::Usuarios => c
+                    .write(pagina, funcion, &p)
+                    .await
+                    .map(drop)
+                    .map_err(super::especiales::sin_texto_del_router),
             };
         }
         let basica = !f.name.starts_with("cb");
@@ -264,10 +268,14 @@ impl ChangeManager {
             .map(|(k, v)| (k.as_str(), v.as_str()))
             .collect();
         let c = &self.state.hgu;
-        if basica {
+        let r = if basica {
             c.basic_write(pagina, &f.name, &p).await.map(drop)
         } else {
             c.write(pagina, &f.name, &p).await.map(drop)
+        };
+        match Especial::de(f) {
+            Some(Especial::Usuarios) => r.map_err(super::especiales::sin_texto_del_router),
+            _ => r,
         }
     }
 
@@ -418,31 +426,4 @@ pub(super) fn guardas(f: &Funcion, exento: bool) -> Result<&Funcion, CambioError
 }
 
 #[cfg(test)]
-mod tests_identidad {
-    use super::identidad_cambiada;
-    use std::collections::BTreeMap;
-
-    fn mapa(pares: &[(&str, &str)]) -> BTreeMap<String, String> {
-        pares
-            .iter()
-            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
-            .collect()
-    }
-
-    /// La misma instancia (aunque cambie el formato de su MAC) pasa; otra
-    /// en su id, o sin el dato, no.
-    #[test]
-    fn identidad_de_la_instancia() {
-        let id = mapa(&[("mac_addr", "02:00:00:00:00:0A")]);
-        assert_eq!(
-            identidad_cambiada(&id, &mapa(&[("mac_addr", " 02:00:00:00:00:0a")])),
-            None
-        );
-        assert_eq!(
-            identidad_cambiada(&id, &mapa(&[("mac_addr", "02:00:00:00:00:0b")])),
-            Some("mac_addr")
-        );
-        assert_eq!(identidad_cambiada(&id, &BTreeMap::new()), Some("mac_addr"));
-        assert_eq!(identidad_cambiada(&BTreeMap::new(), &BTreeMap::new()), None);
-    }
-}
+mod tests_identidad;
