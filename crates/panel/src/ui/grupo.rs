@@ -17,6 +17,7 @@ use crate::ui::explorador::{
 };
 use crate::ui::i18n::{idioma_actual, traducir};
 use crate::ui::panel_ajustes::{DialogoReautenticar, Reautenticacion, repetible};
+use crate::ui::vigilancia::BotonesDelCambio;
 use crate::ui::{Estado, IconoEstado};
 use ajustes::TipoCampo;
 use leptos::{ev::SubmitEvent, html, prelude::*, task::spawn_local};
@@ -369,7 +370,13 @@ pub fn DialogoGrupo(
             EstadoDeCambio::Preparado | EstadoDeCambio::Aplicando => {
                 (EstadoVisual::Proceso, t!("ajustes-grupo-estado-aplicando"))
             }
-            EstadoDeCambio::EnCola => (EstadoVisual::Proceso, t!("ajustes-grupo-estado-en-cola")),
+            EstadoDeCambio::EnCola => (
+                EstadoVisual::Proceso,
+                t!(
+                    "ajustes-grupo-estado-en-cola",
+                    puesto = c.puesto.unwrap_or(1)
+                ),
+            ),
             EstadoDeCambio::Cancelado => {
                 (EstadoVisual::Atencion, t!("ajustes-grupo-estado-cancelado"))
             }
@@ -385,6 +392,7 @@ pub fn DialogoGrupo(
             });
             let preparando = fase.get() == Fase::Preparando;
             view! {
+                <BotonesDelCambio cambio error />
                 {puede_deshacer.then(|| view! {
                     <button
                         class="b-sec"

@@ -119,10 +119,18 @@ pub(crate) fn FilaLista(f: Fila, d: DatosLista) -> impl IntoView {
         .collect_view();
     let interruptor = d.con_interruptor.then(|| {
         let leido = f.activa.unwrap_or(false);
-        let encendido =
-            Signal::derive(move || id.with_value(|id| s.interruptor(id)).unwrap_or(leido));
-        let desactivado =
-            Signal::derive(move || !d.editable || id.with_value(|id| s.insignia(id).is_some()));
+        // `try_`: ver el `Interruptor`.
+        let encendido = Signal::derive(move || {
+            id.try_with_value(|id| s.interruptor(id))
+                .flatten()
+                .unwrap_or(leido)
+        });
+        let desactivado = Signal::derive(move || {
+            !d.editable
+                || id
+                    .try_with_value(|id| s.insignia(id).is_some())
+                    .unwrap_or(true)
+        });
         let etiqueta = etiqueta_interruptor(d.tipo, f.nombre.clone());
         let al_cambiar = Callback::new(move |nuevo: bool| {
             let Some(i) = id.with_value(|id| {
@@ -131,9 +139,7 @@ pub(crate) fn FilaLista(f: Fila, d: DatosLista) -> impl IntoView {
             }) else {
                 return;
             };
-            if !s.ocupado() {
-                s.empieza(&i.id, Some(nuevo), String::new());
-            }
+            s.empieza(&i.id, Some(nuevo), String::new());
             let p = PeticionAjuste {
                 ajuste: d.ajuste.get_value(),
                 instancia: Some(i.id.clone()),

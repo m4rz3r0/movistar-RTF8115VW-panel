@@ -949,9 +949,15 @@ pub async fn estado_cambio(
         (fin - crate::series::now()).max(0)
     });
     let cola = g.puesto_en_cola(id);
+    // Le llegó el turno y se está preparando para escribir (su fila sigue
+    // `en_cola` hasta escribir): para quien lo sigue, ya se aplica.
+    let estado_visto = match c.estado {
+        Estado::EnCola if g.activo() == Some(id) => EstadoDeCambio::Aplicando,
+        e => estado(e),
+    };
     Ok(CambioVista {
         id: c.id,
-        estado: estado(c.estado),
+        estado: estado_visto,
         error: c.error.as_deref().map(nota_legible),
         nota: c.nota.as_deref().map(nota_legible),
         restante_s,

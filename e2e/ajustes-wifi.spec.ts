@@ -52,7 +52,10 @@ const t = {
   encendida: "Encendida",
   apagada: "Apagada",
   motivo: "No se ha podido leer este ajuste del router. Prueba de nuevo en un momento.",
-  enCurso: "Hay otro cambio en curso",
+  enCola: "En cola (puesto 1)",
+  enColaInsignia: "En cola",
+  quitar: "Quitar de la cola",
+  noAplicado: "No se ha aplicado",
 };
 
 /** La tarjeta cuyo título es exactamente `titulo`. */
@@ -351,13 +354,19 @@ for (const ancho of [360, 1024, 1440]) {
         // Mientras su cambio se aplica, no se vuelve a pulsar.
         await expect(interruptor).toHaveAttribute("aria-disabled", "true");
         await expect(insignia(invitados)).toHaveText(t.comprobando, { timeout: 15_000 });
-        // Otro interruptor mientras tanto: «hay otro cambio en curso» y su
+        // Otro interruptor mientras tanto: espera en la cola, con su línea
+        // en el aviso («En cola», «Quitar de la cola»); al quitarlo, su
         // insignia vuelve a como estaba (el que se sigue, no se pierde).
         await red24.getByRole("switch", { name: `${t.red24} apagada` }).click();
-        await expect(page.locator(".avisos-cambio [role=alert]")).toContainText(t.enCurso);
+        const enCola = aviso.filter({ hasText: t.red24 });
+        await expect(enCola).toContainText(t.enCola, { timeout: 15_000 });
+        await expect(insignia(red24)).toHaveText(t.enColaInsignia);
+        await enCola.getByRole("button", { name: t.quitar }).click();
+        await expect(enCola).toContainText(t.noAplicado);
         await expect(insignia(red24)).toHaveText(t.apagada);
         await expect(red24.getByRole("switch")).toHaveAttribute("aria-checked", "false");
         await expect(insignia(invitados)).toHaveText(t.comprobando);
+        aviso = aviso.filter({ hasText: t.invitados });
         await expect(aviso).toContainText(
           `${t.invitados}: Red encendida, ${t.apagada} → ${t.encendida}`,
         );
@@ -387,9 +396,7 @@ for (const ancho of [360, 1024, 1440]) {
           await aplicarYSeguir(page, t.deshacer, [red5]);
           await expect(insignia(red5)).toHaveText(t.apagada);
         }
-        // El 409 de «hay otro cambio en curso» lo provoca la prueba.
-        const otros = errores.filter((e) => !e.includes("status of 409 (Conflict)"));
-        expect(otros, "errores o avisos en la consola").toEqual([]);
+        expect(errores, "errores o avisos en la consola").toEqual([]);
       });
     });
   }

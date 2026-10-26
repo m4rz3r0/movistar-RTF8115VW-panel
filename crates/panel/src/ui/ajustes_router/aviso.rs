@@ -5,8 +5,13 @@
 //! mientras se confirma, la insignia de cada elemento afectado dice
 //! «Aplicando…»; mientras el panel vigila el router, «Comprobando…». Al
 //! terminar, la página vuelve a leer el tema y el aviso dice cómo acabó,
-//! con «Deshacer» si se aplicó. Si falla (otro cambio en curso, el router
-//! no lo hizo), la insignia vuelve a su estado y el aviso da el motivo.
+//! con «Deshacer» si se aplicó. Si falla (el router no lo hizo, la cola
+//! está llena), la insignia vuelve a su estado y el aviso da el motivo.
+//!
+//! Mientras uno se aplica o se vigila, lo siguiente que se aplica espera en
+//! la cola del gestor: el aviso los lista todos, por orden, cada uno con su
+//! estado («En cola», «Comprobando…») y sus botones («Todo bien,
+//! terminar», «Quitar de la cola», «Deshacer»).
 
 use super::detalle::Borradores;
 use super::seleccion::Seleccion;
@@ -21,7 +26,11 @@ use crate::ui::layout::RecargaMarco;
 use leptos::{prelude::*, task::spawn_local};
 use std::time::Duration;
 
+mod consultas;
+mod lista;
 mod vista;
+
+use lista::{CambioActivo, afecta, anadir, filas_de};
 
 pub(crate) use vista::AvisoCambio;
 
@@ -39,34 +48,6 @@ pub(crate) struct ExtraRevision {
 
 /// Cada cuánto se pregunta por el estado del cambio.
 const SONDEO: Duration = Duration::from_secs(2);
-
-/// El cambio que sigue la página.
-#[derive(Clone, Debug, PartialEq)]
-struct CambioActivo {
-    /// `None` mientras se confirma.
-    id: Option<i64>,
-    /// Elementos que cambian (su insignia lo dice).
-    elementos: Vec<String>,
-    /// Lo que cambia, en una línea («Red WiFi 5 GHz: Red encendida,
-    /// Apagada → Encendida»).
-    texto: String,
-    /// El interruptor pulsado y su valor nuevo, que se ve mientras tanto.
-    interruptor: Option<(String, bool)>,
-    /// Claves de los campos que escribe (`ajuste-wifi-red_24-nombre`).
-    campos: Vec<String>,
-    estado: Option<CambioVista>,
-    /// Al aplicarse, sus elementos se cierran (lo borrado ya no existe; lo
-    /// creado desde el detalle de una nueva, ya está en su lista).
-    cerrar: bool,
-    /// Los borra: al aplicarse, se desmarcan y el foco va a su vecina.
-    borra: bool,
-}
-
-impl CambioActivo {
-    fn terminado(&self) -> bool {
-        self.estado.as_ref().is_some_and(|c| c.estado.final_())
-    }
-}
 
 /// Un grupo preparado a la espera de que se revise en el diálogo de la página.
 #[derive(Clone)]
@@ -86,7 +67,11 @@ struct Revision {
 /// fuera de la lectura del tema (sobrevive a la relectura al terminar).
 #[derive(Clone, Copy)]
 pub(crate) struct Seguimiento {
-    activo: RwSignal<Option<CambioActivo>>,
+    /// Los cambios que sigue, por orden: el que se aplica o se vigila, los
+    /// que esperan en la cola y los ya terminados que aún se ven.
+    cambios: RwSignal<Vec<CambioActivo>>,
+    /// La clave del siguiente que se añada.
+    claves: StoredValue<u64>,
     error: RwSignal<Option<String>>,
     /// Grupo preparado a la espera de que se revise en el diálogo.
     dialogo: RwSignal<Option<Revision>>,
@@ -116,7 +101,8 @@ impl Seguimiento {
         let s = Seguimiento {
             seleccion,
             foco: RwSignal::new(None),
-            activo: RwSignal::new(None),
+            cambios: RwSignal::new(Vec::new()),
+            claves: StoredValue::new(0),
             error: RwSignal::new(None),
             dialogo: RwSignal::new(None),
             recargar,
@@ -124,23 +110,33 @@ impl Seguimiento {
             borradores,
             cerrados: RwSignal::new(Vec::new()),
         };
-        let vigilado = Memo::new(move |_| {
-            s.activo
-                .with(|a| a.as_ref().filter(|a| !a.terminado()).and_then(|a| a.id))
+        // Se pregunta por todos los que no han terminado: el que se aplica
+        // o se vigila y los que esperan en la cola (su puesto, y si se
+        // cancelan).
+        let vigilados = Memo::new(move |_| {
+            s.cambios.with(|l| {
+                l.iter()
+                    .filter(|a| !a.terminado())
+                    .filter_map(|a| a.id)
+                    .collect::<Vec<_>>()
+            })
         });
         Effect::new(move |_| {
-            let Some(id) = vigilado.get() else {
+            let ids = vigilados.get();
+            if ids.is_empty() {
                 return;
-            };
+            }
             let consultar = move || {
-                spawn_local(async move {
-                    match estado_cambio(id).await {
-                        Ok(c) => s.al_saber(id, c),
-                        Err(e) => {
-                            s.error.try_set(Some(texto_error(&e)));
+                for id in ids.clone() {
+                    spawn_local(async move {
+                        match estado_cambio(id).await {
+                            Ok(c) => s.al_saber(id, c),
+                            Err(e) => {
+                                s.error.try_set(Some(texto_error(&e)));
+                            }
                         }
-                    }
-                });
+                    });
+                }
             };
             consultar();
             let h = set_interval_with_handle(consultar, SONDEO).ok();
@@ -161,13 +157,13 @@ impl Seguimiento {
     fn al_saber(self, id: i64, c: CambioVista) {
         let terminado = c.estado.final_();
         let aplicado = c.estado == EstadoDeCambio::Aplicado;
-        let mismo = self.activo.try_update(|a| match a {
-            Some(a) if a.id == Some(id) => {
-                a.estado = Some(c);
-                let cerrar = a.cerrar.then(|| (a.elementos.clone(), a.borra));
-                Some((a.campos.clone(), cerrar))
-            }
-            _ => None,
+        let mismo = self.cambios.try_update(|l| {
+            let a = l.iter_mut().find(|a| a.id == Some(id))?;
+            let ya = a.terminado();
+            a.estado = Some(c);
+            let cerrar = a.cerrar.then(|| (a.elementos.clone(), a.borra));
+            // Lo que ya había terminado (y se atendió) no se vuelve a atender.
+            (!ya).then(|| (a.campos.clone(), cerrar))
         });
         if let Some(Some((campos, cerrar))) = mismo
             && terminado
@@ -200,33 +196,35 @@ impl Seguimiento {
     /// insignia ya dice «Aplicando…» y el interruptor, su valor nuevo.
     pub(crate) fn empieza(self, elemento: &str, interruptor: Option<bool>, texto: String) {
         self.error.set(None);
-        self.activo.set(Some(CambioActivo {
-            id: None,
-            elementos: vec![elemento.to_owned()],
-            texto,
-            interruptor: interruptor.map(|v| (elemento.to_owned(), v)),
-            campos: Vec::new(),
-            estado: None,
-            cerrar: false,
-            borra: false,
-        }));
-    }
-
-    /// ¿Hay un cambio aplicado que aún no ha terminado? Entonces otro no
-    /// lo sustituye: el servidor lo rechaza (409) y el aviso lo dice.
-    pub(crate) fn ocupado(self) -> bool {
-        self.activo
-            .with_untracked(|a| a.as_ref().is_some_and(|a| a.id.is_some() && !a.terminado()))
-    }
-
-    /// No se pudo: lo que se estaba confirmando vuelve a como estaba (el
-    /// cambio que ya se sigue, no) y el aviso da el motivo.
-    pub(crate) fn falla(self, motivo: String) {
-        self.activo.update(|a| {
-            if a.as_ref().is_some_and(|a| a.id.is_none()) {
-                *a = None;
-            }
+        let clave = self.nueva_clave();
+        self.cambios.update(|l| {
+            anadir(
+                l,
+                CambioActivo {
+                    clave,
+                    id: None,
+                    confirmando: false,
+                    elementos: vec![elemento.to_owned()],
+                    texto,
+                    interruptor: interruptor.map(|v| (elemento.to_owned(), v)),
+                    campos: Vec::new(),
+                    estado: None,
+                    cerrar: false,
+                    borra: false,
+                },
+            )
         });
+    }
+
+    fn nueva_clave(self) -> u64 {
+        self.claves.update_value(|c| *c += 1);
+        self.claves.get_value()
+    }
+
+    /// No se pudo preparar: lo que se estaba preparando vuelve a como
+    /// estaba (los cambios que ya se siguen, no) y el aviso da el motivo.
+    pub(crate) fn falla(self, motivo: String) {
+        self.cambios.update(|l| l.retain(|a| !a.preparandose()));
         self.error.set(Some(motivo));
     }
 
@@ -242,14 +240,18 @@ impl Seguimiento {
         elementos: Vec<String>,
         cerrar: bool,
     ) {
-        let interruptor = self.activo.with_untracked(|a| {
-            a.as_ref()
-                .filter(|a| a.id.is_none())
+        let interruptor = self.cambios.with_untracked(|l| {
+            l.iter()
+                .rev()
+                .find(|a| a.preparandose())
                 .and_then(|a| a.interruptor.clone())
         });
         self.error.set(None);
         let cerrar = g.borra || cerrar;
-        self.activo.set(Some(CambioActivo {
+        let clave = self.nueva_clave();
+        let nuevo = CambioActivo {
+            clave,
+            confirmando: true,
             cerrar,
             borra: g.borra,
             id: None,
@@ -263,18 +265,23 @@ impl Seguimiento {
                 .flat_map(|p| p.campos.iter().map(|c| c.campo.clone()))
                 .collect(),
             estado: None,
-        }));
+        };
+        self.cambios.update(|l| anadir(l, nuevo));
         let token = g.token.clone();
         spawn_local(async move {
             match confirmar_ajuste(token, desmarcados).await {
                 Ok(id) => {
-                    self.activo.try_update(|a| {
-                        if let Some(a) = a {
+                    self.cambios.try_update(|l| {
+                        if let Some(a) = l.iter_mut().find(|a| a.clave == clave) {
                             a.id = Some(id);
+                            a.confirmando = false;
                         }
                     });
                 }
-                Err(e) => self.falla(texto_error(&e)),
+                Err(e) => {
+                    self.cambios.try_update(|l| l.retain(|a| a.clave != clave));
+                    self.error.try_set(Some(texto_error(&e)));
+                }
             }
         });
     }
@@ -336,65 +343,6 @@ impl Seguimiento {
     pub(crate) fn olvidar_cerrados(self) {
         self.cerrados.set(Vec::new());
     }
-
-    /// Insignia de `elemento` mientras cambia, también si lo que cambia es
-    /// una de sus filas (`<elemento>/<fila>`, un usuario del router): la
-    /// tarjeta y el detalle dicen «Aplicando…» o «Comprobando…». Reactivo.
-    pub(crate) fn insignia(self, elemento: &str) -> Option<(EstadoVisual, String)> {
-        self.activo.with(|a| {
-            let a = a
-                .as_ref()
-                .filter(|a| a.elementos.iter().any(|e| afecta(e, elemento)))?;
-            match a.estado.as_ref().map(|c| c.estado) {
-                None | Some(EstadoDeCambio::Preparado | EstadoDeCambio::Aplicando) => {
-                    Some((EstadoVisual::Proceso, t!("ajustes-insignia-aplicando")))
-                }
-                Some(EstadoDeCambio::Vigilando) => {
-                    Some((EstadoVisual::Proceso, t!("ajustes-insignia-comprobando")))
-                }
-                Some(_) => None,
-            }
-        })
-    }
-
-    /// Las filas de `elemento` (lo que va tras `<elemento>/`) que cambia el
-    /// cambio en curso, mientras no termine: la lista las enseña ya, con su
-    /// insignia, aunque aún no se haya vuelto a leer. Reactivo.
-    pub(crate) fn filas_en_curso(self, elemento: &str) -> Vec<String> {
-        self.activo.with(|a| {
-            a.as_ref()
-                .filter(|a| !a.terminado())
-                .map(|a| filas_de(&a.elementos, elemento))
-                .unwrap_or_default()
-        })
-    }
-
-    /// Valor del interruptor de `elemento` mientras cambia. Reactivo.
-    pub(crate) fn interruptor(self, elemento: &str) -> Option<bool> {
-        self.activo.with(|a| {
-            let a = a.as_ref().filter(|a| !a.terminado())?;
-            let (e, v) = a.interruptor.as_ref()?;
-            (e == elemento).then_some(*v)
-        })
-    }
-}
-
-/// ¿Cambiar `cambia` afecta a `elemento`? Si es él o una de sus filas
-/// (`<elemento>/<fila>`).
-fn afecta(cambia: &str, elemento: &str) -> bool {
-    cambia == elemento
-        || cambia
-            .strip_prefix(elemento)
-            .is_some_and(|resto| resto.starts_with('/'))
-}
-
-/// Las filas de `elemento` entre los `elementos` que cambian.
-fn filas_de(elementos: &[String], elemento: &str) -> Vec<String> {
-    elementos
-        .iter()
-        .filter_map(|e| e.strip_prefix(elemento)?.strip_prefix('/'))
-        .map(str::to_owned)
-        .collect()
 }
 
 /// Lo que cambia un grupo, en una línea: el campo con su antes y después si
@@ -414,28 +362,5 @@ pub(crate) fn resumen(g: &GrupoVista) -> String {
             )
         }
         _ => t!("ajustes-aviso-varios", titulo = titulo, n = pasos.len()),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{afecta, filas_de};
-
-    /// La tarjeta de los usuarios del router dice que cambia cuando cambia
-    /// uno de sus usuarios, no cuando cambia otra tarjeta con un nombre que
-    /// empieza igual.
-    #[test]
-    fn una_fila_afecta_a_su_elemento() {
-        assert!(afecta("usuarios_router", "usuarios_router"));
-        assert!(afecta("usuarios_router/ana", "usuarios_router"));
-        assert!(!afecta("usuarios_router_x", "usuarios_router"));
-        assert!(!afecta("usuarios_router", "usuarios_router/ana"));
-    }
-
-    #[test]
-    fn filas_que_cambian() {
-        let e = vec!["usuarios_router/ana".to_owned(), "wifi".to_owned()];
-        assert_eq!(filas_de(&e, "usuarios_router"), ["ana"]);
-        assert!(filas_de(&e, "wifi").is_empty());
     }
 }

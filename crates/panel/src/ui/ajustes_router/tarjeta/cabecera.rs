@@ -32,7 +32,12 @@ fn interruptor(e: &ElementoVista, i: InterruptorVista, nombre: &str) -> impl Int
     let s = expect_context::<Seguimiento>();
     let id = StoredValue::new(e.id.clone());
     let leido = i.encendido;
-    let encendido = Signal::derive(move || id.with_value(|id| s.interruptor(id)).unwrap_or(leido));
+    // `try_`: ver el `Interruptor`.
+    let encendido = Signal::derive(move || {
+        id.try_with_value(|id| s.interruptor(id))
+            .flatten()
+            .unwrap_or(leido)
+    });
     // Las suyas («Relé DNS activado») o «<nombre> encendida/apagada».
     let (si, no) = i.etiquetas.clone().unwrap_or_else(|| {
         (
@@ -54,7 +59,7 @@ fn interruptor(e: &ElementoVista, i: InterruptorVista, nombre: &str) -> impl Int
             i.with_value(|i| (i.ajuste.clone(), i.campo.clone(), i.efecto.is_some()));
         let id = id.get_value();
         let pregunta = efecto && !nuevo;
-        if !pregunta && !s.ocupado() {
+        if !pregunta {
             s.empieza(&id, Some(nuevo), String::new());
         }
         let p = PeticionAjuste {
@@ -80,8 +85,12 @@ fn interruptor(e: &ElementoVista, i: InterruptorVista, nombre: &str) -> impl Int
     let solo_lectura = pagina.solo_lectura;
     // Mientras su propio cambio se aplica o se comprueba, no se pulsa otra
     // vez (un doble clic prepararía el valor contrario).
-    let desactivado =
-        Signal::derive(move || solo_lectura || id.with_value(|id| s.insignia(id).is_some()));
+    let desactivado = Signal::derive(move || {
+        solo_lectura
+            || id
+                .try_with_value(|id| s.insignia(id).is_some())
+                .unwrap_or(true)
+    });
     view! {
         <Interruptor
             encendido

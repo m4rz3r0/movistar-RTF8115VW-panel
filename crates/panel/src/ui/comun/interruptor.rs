@@ -23,18 +23,22 @@ pub fn Interruptor(
     #[prop(into, optional_no_strip)] descrito: Option<String>,
     al_cambiar: Callback<bool>,
 ) -> impl IntoView {
+    // `try_`: quien lo pinta puede desecharse un instante antes que el
+    // botón (una relectura de la página que llega mientras otra se pinta);
+    // entonces no se toca nada.
     view! {
         <button
             type="button"
             class="int"
             role="switch"
-            aria-checked=move || encendido.get().to_string()
-            aria-label=move || etiqueta.get()
-            aria-disabled=move || desactivado.get().then_some("true")
+            aria-checked=move || encendido.try_get().map(|e| e.to_string())
+            aria-label=move || etiqueta.try_get()
+            aria-disabled=move || desactivado.try_get().unwrap_or(true).then_some("true")
             aria-describedby=descrito
             on:click=move |_| {
-                if let Some(nuevo) =
-                    al_pulsar(encendido.get_untracked(), desactivado.get_untracked())
+                if let (Some(e), Some(d)) =
+                    (encendido.try_get_untracked(), desactivado.try_get_untracked())
+                    && let Some(nuevo) = al_pulsar(e, d)
                 {
                     al_cambiar.run(nuevo);
                 }

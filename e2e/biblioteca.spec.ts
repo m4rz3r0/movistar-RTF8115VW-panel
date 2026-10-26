@@ -51,8 +51,8 @@ test.describe("Biblioteca tras un cambio", () => {
       throw e;
     } finally {
       // Lo deja como estaba, sin tapar el error de arriba si lo hubo: espera
-      // a que el primer cambio termine (con otro en curso, el segundo daría
-      // «hay otro cambio en curso») y solo lo deshace si quedó aplicado.
+      // a que el primer cambio termine (con otro en curso, el segundo
+      // esperaría en la cola) y solo lo deshace si quedó aplicado.
       try {
         await retardo(0);
         await expect

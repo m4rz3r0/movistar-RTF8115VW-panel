@@ -25,6 +25,7 @@ use crate::ui::{
         texto_error,
     },
     panel_ajustes::{DialogoReautenticar, Reautenticacion, repetible},
+    vigilancia::BotonesEnCurso,
 };
 use leptos::prelude::*;
 use leptos::server_fn::codec::Json;
@@ -81,6 +82,12 @@ pub struct CambioFila {
     /// clave que el router no deja leer), ya traducido.
     #[serde(default)]
     pub sin_deshacer: Option<String>,
+    /// Quien mira puede terminar ya su vigilancia (lo hizo él).
+    #[serde(default)]
+    pub terminable: bool,
+    /// Quien mira puede quitarlo de la cola (lo encoló él).
+    #[serde(default)]
+    pub quitable: bool,
     /// Resumen humano del grupo, si lo tiene.
     pub titulo: Option<String>,
     /// Pasos del grupo (vacío si es de un solo paso).
@@ -261,9 +268,9 @@ pub fn fecha_hora(ts: i64, con_segundos: bool) -> String {
 pub async fn historial(pagina: u32) -> Result<PaginaHistorial, ServerFnError> {
     // Lleva los datos sensibles de los cambios en claro.
     crate::ui::explorador::servidor::sin_guardar();
-    crate::auth::require_user().await?;
+    let user = crate::auth::require_user().await?;
     let state = crate::ui::explorador::servidor::app_state()?;
-    servidor::pagina(&state, pagina).await
+    servidor::pagina(&state, pagina, &user.username).await
 }
 
 /// Prepara el cambio inverso de `change_id` (solo uno aplicado que nadie
@@ -498,8 +505,24 @@ fn FilaCambio(
     abiertos: RwSignal<BTreeSet<i64>>,
     ocupado: Signal<bool>,
     #[prop(into)] on_deshacer: Callback<i64>,
+    /// Se terminó su vigilancia o se quitó de la cola: la página se
+    /// vuelve a pedir.
+    #[prop(into)]
+    al_cambiar: Callback<()>,
+    error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let id = c.id;
+    let en_curso = (c.terminable || c.quitable).then(|| {
+        view! {
+            <BotonesEnCurso
+                id
+                terminable=c.terminable
+                quitable=c.quitable
+                al_cambiar=move |_| al_cambiar.run(())
+                error
+            />
+        }
+    });
     let estado = match c.estado {
         EstadoDeCambio::Aplicando | EstadoDeCambio::Vigilando | EstadoDeCambio::Preparado => {
             EstadoVisual::Proceso
@@ -683,7 +706,8 @@ fn FilaCambio(
             </details>
             {nota.map(|n| view! { <p class=nota_clase>{n}</p> })}
             {sin_deshacer}
-            {boton.map(|b| view! { <div class="hist-acciones">{b}</div> })}
+            {(boton.is_some() || en_curso.is_some())
+                .then(|| view! { <div class="hist-acciones">{en_curso}{boton}</div> })}
         </li>
     }
 }
@@ -738,6 +762,8 @@ fn ListaHistorial(
     abiertos: RwSignal<BTreeSet<i64>>,
     ocupado: Signal<bool>,
     #[prop(into)] on_deshacer: Callback<i64>,
+    #[prop(into)] al_cambiar: Callback<()>,
+    error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let forma = Memo::new(move |_| {
         datos.get().map(|r| match r {
@@ -789,7 +815,7 @@ fn ListaHistorial(
                             <For each=entradas key=clave_fila let:e>
                                 {match e {
                                     EntradaVista::Cambio(c) => view! {
-                                        <FilaCambio c=*c abiertos ocupado on_deshacer />
+                                        <FilaCambio c=*c abiertos ocupado on_deshacer al_cambiar error />
                                     }
                                     .into_any(),
                                     EntradaVista::Revelado(r) => view! { <FilaRevelado r /> }.into_any(),
@@ -912,6 +938,8 @@ pub fn PaginaHistorial() -> impl IntoView {
                 abiertos
                 ocupado=preparando.into()
                 on_deshacer=deshacer_cambio
+                al_cambiar=move |_| refrescar()
+                error
             />
         </Transition>
         {dialogo}

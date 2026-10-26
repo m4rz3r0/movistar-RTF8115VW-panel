@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
-import { PLAZO_CAMBIO, cambiarUpnp, esperarFinal, estadoCambio, plazoDeTest } from "./cambios";
+import { PLAZO_CAMBIO, cambiarVigilado, esperarFinal, estadoCambio, plazoDeTest } from "./cambios";
 import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
 
 test.describe.configure({ mode: "parallel" });
@@ -100,7 +100,8 @@ for (const idioma of ["es", "en"] as const) {
       });
 
       test("el ojo en Ajustes, Teléfono, la Biblioteca y el Historial", async ({ page }) => {
-        // La clave de la voz, un cambio; el de UPnP en curso, dos (lo deshace).
+        // La clave de la voz, un cambio; el de la reserva de IP en curso (se
+        // vigila), dos (lo deshace).
         test.setTimeout(plazoDeTest((guardaLaVoz ? 1 : 0) + (conCambioEnCurso ? 2 : 0)));
         const t = textosSecreto[idioma];
         const errores = recogerErrores(page);
@@ -235,7 +236,7 @@ for (const idioma of ["es", "en"] as const) {
         // desplegarlo, el valor anterior y el nuevo con el ojo, sin
         // nombres de la API a la vista.
         let enCurso: number | null = null;
-        if (conCambioEnCurso) enCurso = await cambiarUpnp(page);
+        if (conCambioEnCurso) enCurso = await cambiarVigilado(page);
         await page.goto("/historial");
         await asentar(page);
         // Con las filas plegadas, ningún nombre de la API a la vista (los de
@@ -273,7 +274,7 @@ for (const idioma of ["es", "en"] as const) {
         if (enCurso !== null) {
           // Lo deja como estaba: espera al primero y deshace con otro.
           await esperarFinal(page, enCurso);
-          await esperarFinal(page, await cambiarUpnp(page));
+          await esperarFinal(page, await cambiarVigilado(page));
         }
         expect(errores, "errores o avisos en la consola").toEqual([]);
       });

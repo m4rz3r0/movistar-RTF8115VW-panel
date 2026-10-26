@@ -188,6 +188,10 @@ impl ChangeManager {
         error: Option<&Nota>,
         nota: Option<&Nota>,
     ) {
+        // Antes de que se vea el estado: quien lo lea y vuelva a pintar la
+        // página no debe encontrar lo leído durante el cambio (con cola, el
+        // hueco no se suelta entre uno y otro).
+        self.state.lecturas.invalidar();
         let nota = nota.map(Nota::guardar);
         let guardado = error.map(Nota::guardar);
         let r = sqlx::query(

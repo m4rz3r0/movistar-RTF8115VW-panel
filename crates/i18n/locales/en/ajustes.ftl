@@ -128,7 +128,7 @@ ajustes-grupo-estado-aplicado = Done: the router now has the change.
 ajustes-grupo-estado-revertido = The router stopped responding properly and the change was undone automatically.
 ajustes-grupo-estado-fallido = The change could not be applied. The router is as it was.
 ajustes-grupo-estado-parcial = The change could not be applied and part of it did not go back to how it was. Check it in the History.
-ajustes-grupo-estado-en-cola = Queued: it will be applied once the current change is applied.
+ajustes-grupo-estado-en-cola = Queued (position { $puesto }): it will be applied once the previous change is applied.
 ajustes-grupo-estado-cancelado = Not applied: the previous change was not applied or it was removed from the queue. The reason is in the History.
 
 ## How it was at installation (starting snapshot)
@@ -259,6 +259,7 @@ ajustes-barra-ninguna = No action works for everything marked.
 ajustes-tabla-region = Table: { $nombre }
 ajustes-insignia-aplicando = Applying…
 ajustes-insignia-comprobando = Checking…
+ajustes-insignia-en-cola = Queued
 ajustes-aviso-comprobando = Already in the router; checking that everything still works ({ $resto } left).
 ajustes-usuario-en-curso-nuevo = Being created: the list confirms it when the check ends.
 ajustes-interruptor-si = { $nombre } on

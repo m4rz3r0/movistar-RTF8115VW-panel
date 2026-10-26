@@ -1,7 +1,8 @@
 //! «Todo bien, terminar»: dar por buena la vigilancia de un cambio antes de
 //! que acabe su plazo. El botón sale donde se ve un cambio vigilándose (el
 //! diálogo de Ajustes, el de la Biblioteca, el aviso de la página y el
-//! Historial) cuando quien mira lo puede terminar.
+//! Historial) cuando quien mira lo puede terminar; junto a él, el de quitar
+//! de la cola ([`crate::ui::cola`]) cuando el cambio espera su turno.
 
 use crate::t;
 use crate::ui::explorador::{CambioVista, texto_error};
@@ -71,5 +72,49 @@ pub fn TerminarVigilancia(
                 if enviando.get() { t!("vigilancia-terminando") } else { t!("vigilancia-terminar") }
             }}
         </button>
+    }
+}
+
+/// Los botones de un cambio en curso que quien mira puede usar: «Todo bien,
+/// terminar» mientras se vigila y «Quitar de la cola» mientras espera. Al
+/// usarlos, `al_cambiar` recibe el estado nuevo; si no se puede, el motivo
+/// va a `error`.
+#[component]
+pub fn BotonesEnCurso(
+    id: i64,
+    terminable: bool,
+    quitable: bool,
+    #[prop(into)] al_cambiar: Callback<CambioVista>,
+    error: RwSignal<Option<String>>,
+) -> impl IntoView {
+    use crate::ui::cola::QuitarDeLaCola;
+    view! {
+        {terminable.then(|| view! { <TerminarVigilancia id al_terminar=al_cambiar error /> })}
+        {quitable.then(|| view! { <QuitarDeLaCola id al_quitar=al_cambiar error /> })}
+    }
+}
+
+/// [`BotonesEnCurso`] del cambio que se sigue en `cambio` (los diálogos):
+/// se pintan de nuevo solo si cambia lo que se puede hacer, no en cada
+/// sondeo.
+#[component]
+pub fn BotonesDelCambio(
+    cambio: RwSignal<Option<CambioVista>>,
+    error: RwSignal<Option<String>>,
+) -> impl IntoView {
+    let que =
+        Memo::new(move |_| cambio.with(|c| c.as_ref().map(|c| (c.id, c.terminable, c.quitable))));
+    move || {
+        que.get().map(|(id, terminable, quitable)| {
+            view! {
+                <BotonesEnCurso
+                    id
+                    terminable
+                    quitable
+                    al_cambiar=move |c: CambioVista| cambio.set(Some(c))
+                    error
+                />
+            }
+        })
     }
 }

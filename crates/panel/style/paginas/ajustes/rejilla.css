@@ -51,8 +51,16 @@
   pointer-events: none;
 }
 
+/* Varios cambios a la vez (uno en curso y los de la cola): uno por línea. */
+.avisos-cambio > [role="status"] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-2);
+}
+
 .aviso-cambio {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--esp-3);
   padding: 10px 10px 10px 14px;
