@@ -95,17 +95,11 @@ pub(crate) mod servidor {
     /// pinta en el idioma de quien lo mira. Las claves quedan guardadas en
     /// la base de datos: no se renombran ni se borran.
     fn nota(f: &Fallo) -> Nota {
-        let n = |clave: &str, n: usize| Nota::con(clave, &[("n", n.to_string())]);
         match f {
             Fallo::EnCurso => Nota::clave("contrasena-router-error-en-curso"),
             Fallo::SinRouter => Nota::clave("contrasena-router-error-sin-router"),
             Fallo::SoloLectura => Nota::clave("panel-solo-lectura"),
-            Fallo::Nueva(ErrorNueva::Corta) => n("contrasena-router-error-corta", MIN_BYTES),
-            Fallo::Nueva(ErrorNueva::Larga) => n("contrasena-router-error-larga", MAX_BYTES),
-            Fallo::Nueva(ErrorNueva::Control) => Nota::clave("contrasena-router-error-control"),
-            Fallo::Nueva(ErrorNueva::Igual) => Nota::clave("contrasena-router-error-igual"),
-            Fallo::Nueva(ErrorNueva::Caracter) => Nota::clave("contrasena-router-error-caracter"),
-            Fallo::Nueva(ErrorNueva::Espacios) => Nota::clave("contrasena-router-error-espacios"),
+            Fallo::Nueva(e) => Nota::de_contrasena(*e, MAX_BYTES),
             Fallo::Sondeo => Nota::clave("contrasena-router-error-sondeo"),
             Fallo::Rechazada => Nota::clave("contrasena-router-error-rechazada"),
             Fallo::Restaurada => Nota::clave("contrasena-router-error-restaurada"),

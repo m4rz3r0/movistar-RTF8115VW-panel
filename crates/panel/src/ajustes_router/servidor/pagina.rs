@@ -83,8 +83,9 @@ pub(in crate::ajustes_router) async fn leer_tema(
 
 /// Pone la nota a las filas protegidas de los usuarios del router (el
 /// usuario con el que entra el panel y el del operador): no tienen
-/// acciones. Si no se pueden leer las credenciales, solo la del operador;
-/// el servidor las protege igual al pedir un cambio.
+/// acciones. Si no se pueden leer las credenciales, todas llevan nota
+/// ([`crate::usuarios_router::nota_de_fila`]); el servidor las protege igual
+/// al pedir un cambio.
 async fn marcar_protegidos(state: &AppState, vistas: &mut [AjusteVista]) {
     let slug = Componente::UsuariosRouter.slug();
     let Some(v) = vistas
@@ -97,14 +98,14 @@ async fn marcar_protegidos(state: &AppState, vistas: &mut [AjusteVista]) {
         .await
         .ok()
         .flatten()
-        .map(|c| c.usuario)
-        .unwrap_or_default();
+        .map(|c| c.usuario);
     for i in &mut v.instancias {
         let sistema = i.campos.iter().any(|c| {
             c.id == "papel" && matches!(&c.valor, ValorLegible::Opcion(o) if o == "operador")
         });
         let papel = if sistema { "system" } else { "" };
-        i.nota = crate::usuarios_router::protegido(&i.id, papel, &panel).map(str::to_owned);
+        i.nota =
+            crate::usuarios_router::nota_de_fila(&i.id, papel, panel.as_deref()).map(str::to_owned);
     }
 }
 

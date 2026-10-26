@@ -11,27 +11,34 @@
 use super::aviso::Seguimiento;
 use super::rejilla::Pagina;
 use crate::ajustes_router::{AjusteVista, EstadoLectura, InstanciaVista};
-use crate::contrasena_forma::{MIN_BYTES, validar_forma_hasta};
 use crate::t;
 use crate::ui::explorador::texto_error;
 use crate::ui::i18n::traducir;
-use crate::ui::panel_ajustes::{DialogoReautenticar, Reautenticacion, campo, repetible};
-use crate::ui::secreto::Secreto;
+use crate::ui::panel_ajustes::{DialogoReautenticar, Reautenticacion};
 use crate::ui::{Estado, IconoEstado};
-use crate::usuarios_router::{
-    GrupoUsuario, MAX_OTRO, OperacionUsuario, cambiar_usuario_router, preparar_usuario_router,
-    texto_error_otro,
-};
+use crate::usuarios_router::{OperacionUsuario, preparar_usuario_router};
 use crate::validacion_real::{Funcion3, sin_validar};
 use ajustes::ValorLegible;
+use formularios::{CambiarOtro, NuevoUsuario, id_cambio};
 use leptos::{prelude::*, task::spawn_local};
 
-/// Texto del tipo de cuenta `g`.
-fn texto_grupo(g: GrupoUsuario) -> String {
-    match g {
-        GrupoUsuario::User => t!("ajuste-seguridad-usuarios_router-papel-usuario"),
-        GrupoUsuario::Admin => t!("ajuste-seguridad-usuarios_router-papel-administrador"),
-    }
+mod formularios;
+
+/// Ids de los textos que dicen por qué crear o borrar usuarios, o cambiar
+/// otro, está desactivado por la validación real (`aria-describedby` de sus
+/// botones).
+const MOTIVO_USUARIOS: &str = "usuarios-router-motivo-usuarios";
+const MOTIVO_OTRO: &str = "usuarios-router-motivo-otro";
+
+/// Lo que desactiva las acciones de las filas: sin crear ni borrar, sin
+/// cambiar otro, y el id del motivo de cada uno si viene de la validación
+/// real.
+#[derive(Clone, Copy)]
+struct Bloqueos {
+    sin_gestor: bool,
+    sin_otro: bool,
+    motivo_gestor: Option<&'static str>,
+    motivo_otro: Option<&'static str>,
 }
 
 /// Texto de la opción `clave` del campo «Tipo de cuenta» (`operador`, …).
@@ -72,65 +79,6 @@ fn gestor_bloqueado(solo_lectura: bool, sin_validar: bool, estado: &EstadoLectur
     solo_lectura || sin_validar || *estado != EstadoLectura::Leido
 }
 
-/// Elegir el tipo de cuenta: «Usuario» o «Administrador». `nombre` agrupa
-/// los botones de opción (uno por formulario).
-fn grupos(elegido: RwSignal<GrupoUsuario>, nombre: String) -> impl IntoView {
-    let opciones = GrupoUsuario::TODOS
-        .into_iter()
-        .map(|g| {
-            let id = format!("{nombre}-{}", g.del_router());
-            view! {
-                <div class="opcion">
-                    <input
-                        id=id.clone()
-                        type="radio"
-                        name=nombre.clone()
-                        value=g.del_router()
-                        checked=elegido.get_untracked() == g
-                        prop:checked=move || elegido.get() == g
-                        on:change=move |_| elegido.set(g)
-                    />
-                    <label class="opcion-nombre" for=id>{texto_grupo(g)}</label>
-                </div>
-            }
-        })
-        .collect_view();
-    view! {
-        <fieldset class="opciones">
-            <legend>{t!("ajuste-seguridad-usuarios_router-papel")}</legend>
-            {opciones}
-        </fieldset>
-    }
-}
-
-/// Campo de una contraseña nueva con el ojo y su ayuda.
-fn contrasena(
-    valor: RwSignal<String>,
-    id: String,
-    error: RwSignal<Option<String>>,
-    bloqueado: Signal<bool>,
-) -> impl IntoView {
-    let ayuda = format!("{id}-ayuda");
-    view! {
-        <div class="campo campo-secreto">
-            <label for=id.clone()>{t!("ajuste-seguridad-usuarios_router-contrasena")}</label>
-            <Secreto
-                valor
-                nombre=t!("ajuste-seguridad-usuarios_router-contrasena")
-                editable=true
-                id
-                descrito=ayuda.clone()
-                bloqueado
-                error
-                maxlength=MAX_OTRO
-            />
-            <span class="nota" id=ayuda>
-                {t!("ajuste-seguridad-usuarios_router-contrasena-ayuda", min = MIN_BYTES, max = MAX_OTRO)}
-            </span>
-        </div>
-    }
-}
-
 /// Los usuarios de `a` con sus acciones y el formulario de uno nuevo.
 /// `elemento` es el del detalle.
 #[component]
@@ -146,8 +94,12 @@ pub(crate) fn Usuarios(a: AjusteVista, elemento: String) -> impl IntoView {
     // motivo (el servidor también lo rechaza).
     let motivo_usuarios = sin_validar(Funcion3::Usuarios);
     let motivo_otro = sin_validar(Funcion3::ContrasenaOtro);
-    let sin_gestor = gestor_bloqueado(pagina.solo_lectura, motivo_usuarios.is_some(), &a.estado);
-    let sin_otro = pagina.solo_lectura || motivo_otro.is_some();
+    let bloqueos = Bloqueos {
+        sin_gestor: gestor_bloqueado(pagina.solo_lectura, motivo_usuarios.is_some(), &a.estado),
+        sin_otro: pagina.solo_lectura || motivo_otro.is_some(),
+        motivo_gestor: motivo_usuarios.map(|_| MOTIVO_USUARIOS),
+        motivo_otro: motivo_otro.map(|_| MOTIVO_OTRO),
+    };
     let preparar = move |op: OperacionUsuario| {
         if ocupado.get_untracked() {
             return;
@@ -186,7 +138,7 @@ pub(crate) fn Usuarios(a: AjusteVista, elemento: String) -> impl IntoView {
                 fila(
                     i,
                     editando,
-                    (sin_gestor, sin_otro),
+                    bloqueos,
                     ocupado.into(),
                     Callback::new(move |u: String| {
                         preparar(OperacionUsuario::Borrar { usuario: u })
@@ -196,30 +148,34 @@ pub(crate) fn Usuarios(a: AjusteVista, elemento: String) -> impl IntoView {
             .collect_view()
             .into_any(),
     };
-    let motivos = [motivo_usuarios, motivo_otro]
-        .into_iter()
-        .flatten()
-        .map(|m| view! { <p class="nota-solo-lectura">{traducir(m, None)}</p> })
-        .collect_view();
+    let motivos = [
+        (motivo_usuarios, MOTIVO_USUARIOS),
+        (motivo_otro, MOTIVO_OTRO),
+    ]
+    .into_iter()
+    .filter_map(|(m, id)| m.map(|m| (m, id)))
+    .map(|(m, id)| view! { <p class="nota-solo-lectura" id=id>{traducir(m, None)}</p> })
+    .collect_view();
     view! {
         <div class="ajustes-usuarios usuarios-router">{filas}</div>
         <p class="error-formulario" role="alert">{move || error.get()}</p>
         {motivos}
         <NuevoUsuario
-            bloqueado=sin_gestor
+            bloqueado=bloqueos.sin_gestor
             ocupado
             preparar=Callback::new(preparar)
+            motivo=bloqueos.motivo_gestor
         />
         {move || reauth.abierto().then(|| view! { <DialogoReautenticar /> })}
     }
 }
 
 /// La fila de un usuario: su nombre y su tipo de cuenta y, si no está
-/// protegido, sus acciones. `bloqueos`: sin crear ni borrar, sin cambiar.
+/// protegido, sus acciones (ver [`Bloqueos`]).
 fn fila(
     i: &InstanciaVista,
     editando: RwSignal<Option<String>>,
-    bloqueos: (bool, bool),
+    bloqueos: Bloqueos,
     ocupado: Signal<bool>,
     borrar: Callback<String>,
 ) -> impl IntoView + use<> {
@@ -236,7 +192,13 @@ fn fila(
         }
     };
     let Some(nota) = i.nota.clone() else {
-        let (sin_gestor, sin_otro) = bloqueos;
+        let Bloqueos {
+            sin_gestor,
+            sin_otro,
+            motivo_gestor,
+            motivo_otro,
+        } = bloqueos;
+        let controla = id_cambio(&nombre);
         let id_abrir = nombre.clone();
         let id_borrar = nombre.clone();
         let id_form = nombre.clone();
@@ -259,8 +221,10 @@ fn fila(
                             type="button"
                             class="b-sec"
                             aria-expanded=move || abierto_aria().to_string()
+                            aria-controls=controla
+                            aria-describedby=motivo_otro
                             aria-label=t!("ajuste-seguridad-usuarios_router-cambiar-de", nombre = nombre.clone())
-                            disabled=sin_otro
+                            disabled=move || sin_otro || ocupado.get()
                             on:click=move |_| editando.set(Some(id_abrir.clone()))
                         >
                             {t!("ajuste-seguridad-usuarios_router-cambiar")}
@@ -269,6 +233,7 @@ fn fila(
                             type="button"
                             class="b-pel"
                             aria-label=t!("ajuste-seguridad-usuarios_router-borrar-de", nombre = nombre.clone())
+                            aria-describedby=motivo_gestor
                             disabled=move || sin_gestor || ocupado.get()
                             on:click=move |_| borrar.run(id_borrar.clone())
                         >
@@ -288,138 +253,6 @@ fn fila(
         </div>
     }
     .into_any()
-}
-
-/// «Cambiar contraseña o grupo» de `usuario`, en su fila. Pide la
-/// contraseña del panel si hace falta; al acabar, la fila muestra el tipo
-/// de cuenta nuevo (`papel`) y el aviso.
-#[component]
-fn CambiarOtro(
-    usuario: String,
-    papel: RwSignal<String>,
-    editando: RwSignal<Option<String>>,
-) -> impl IntoView {
-    let reauth = expect_context::<Reautenticacion>();
-    let nueva = RwSignal::new(String::new());
-    let grupo =
-        RwSignal::new(GrupoUsuario::de_clave(&papel.get_untracked()).unwrap_or(GrupoUsuario::User));
-    let error = RwSignal::new(None::<String>);
-    let aviso = RwSignal::new(None::<String>);
-    let pendiente = RwSignal::new(false);
-    let dom = format!(
-        "usuario-{}",
-        usuario.replace(|c: char| !c.is_ascii_alphanumeric(), "-")
-    );
-    let usuario = StoredValue::new(usuario);
-    let cambiar = repetible(move |yo| {
-        let clave = nueva.get_untracked();
-        if let Err(e) = validar_forma_hasta(&clave, MAX_OTRO) {
-            error.set(Some(texto_error_otro(e)));
-            return;
-        }
-        error.set(None);
-        aviso.set(None);
-        pendiente.set(true);
-        let g = grupo.get_untracked();
-        let u = usuario.get_value();
-        spawn_local(async move {
-            match cambiar_usuario_router(u.clone(), clave, g).await {
-                Ok(()) => {
-                    nueva.try_set(String::new());
-                    papel.try_set(g.clave().to_owned());
-                    aviso.try_set(Some(t!(
-                        "ajuste-seguridad-usuarios_router-cambiado",
-                        nombre = u
-                    )));
-                }
-                Err(e) => reauth.tratar(&e, error, yo),
-            }
-            pendiente.try_set(false);
-        });
-    });
-    view! {
-        <div class="formulario usuario-cambio" role="group" aria-label=t!("ajuste-seguridad-usuarios_router-cambiar")>
-            <p class="nota">{t!("ajuste-seguridad-usuarios_router-cambiar-nota")}</p>
-            {contrasena(nueva, format!("{dom}-nueva"), error, pendiente.into())}
-            {grupos(grupo, format!("{dom}-grupo"))}
-            <p class="error-formulario" role="alert">{move || error.get()}</p>
-            <p class="aviso-formulario" role="status">{move || aviso.get()}</p>
-            <div class="botones">
-                <button
-                    type="button"
-                    class="b-sec"
-                    disabled=move || pendiente.get()
-                    on:click=move |_| cambiar.run(())
-                >
-                    {t!("ajuste-seguridad-usuarios_router-cambiar-boton")}
-                </button>
-                <button
-                    type="button"
-                    class="b-txt"
-                    disabled=move || pendiente.get()
-                    on:click=move |_| editando.set(None)
-                >
-                    {t!("panel-cancelar")}
-                </button>
-            </div>
-        </div>
-    }
-}
-
-/// «Usuario nuevo»: nombre, contraseña con el ojo y tipo de cuenta; «Crear
-/// usuario» prepara el alta (`preparar`).
-#[component]
-fn NuevoUsuario(
-    bloqueado: bool,
-    ocupado: RwSignal<bool>,
-    preparar: Callback<OperacionUsuario>,
-) -> impl IntoView {
-    let nombre = RwSignal::new(String::new());
-    let clave = RwSignal::new(String::new());
-    let grupo = RwSignal::new(GrupoUsuario::User);
-    let error = RwSignal::new(None::<String>);
-    let crear = move |_| {
-        if bloqueado || ocupado.get_untracked() {
-            return;
-        }
-        if let Err(e) = validar_forma_hasta(&clave.get_untracked(), MAX_OTRO) {
-            error.set(Some(texto_error_otro(e)));
-            return;
-        }
-        error.set(None);
-        preparar.run(OperacionUsuario::Crear {
-            usuario: nombre.get_untracked().trim().to_owned(),
-            contrasena: clave.get_untracked(),
-            grupo: grupo.get_untracked(),
-        });
-    };
-    let sin_tocar = Signal::derive(move || bloqueado || ocupado.get());
-    view! {
-        <section class="formulario usuario-nuevo" aria-labelledby="usuarios-router-nuevo-titulo">
-            <h4 id="usuarios-router-nuevo-titulo">{t!("ajuste-seguridad-usuarios_router-crear-titulo")}</h4>
-            {campo(
-                "usuarios-router-nuevo-nombre",
-                t!("ajuste-seguridad-usuarios_router-nuevo-nombre"),
-                "text",
-                "off",
-                nombre,
-                Some(t!("ajuste-seguridad-usuarios_router-nuevo-nombre-ayuda")),
-            )}
-            {contrasena(clave, "usuarios-router-nuevo-contrasena".into(), error, sin_tocar)}
-            {grupos(grupo, "usuarios-router-nuevo-grupo".into())}
-            <p class="error-formulario" role="alert">{move || error.get()}</p>
-            <div class="botones">
-                <button
-                    type="button"
-                    class="b-pri"
-                    disabled=move || sin_tocar.get()
-                    on:click=crear
-                >
-                    {t!("ajuste-seguridad-usuarios_router-crear")}
-                </button>
-            </div>
-        </section>
-    }
 }
 
 #[cfg(test)]

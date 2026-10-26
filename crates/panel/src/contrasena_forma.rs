@@ -1,4 +1,4 @@
-//! Forma de las contraseñas del router: las reglas de `js/user_profile.js`.
+//! Forma de las contraseñas del router: las reglas de `js/user_profile.js`, más la de no llevar «`».
 //!
 //! La web oficial exige `/^[\x20-\x7e]{8,32}$/` y rechaza
 //! `/(^ |  | $)/`. El panel añade una: sin «`», que en XOR 0x1f (como
@@ -24,6 +24,32 @@ pub enum ErrorNueva {
     Caracter,
     /// Empieza o acaba con un espacio, o lleva dos seguidos.
     Espacios,
+}
+
+impl ErrorNueva {
+    /// Clave del texto de este error y su argumento `$n` (la longitud que
+    /// cita), con `max` como máximo. Una sola tabla para la página y para
+    /// las notas del Historial: una variante nueva no se olvida en ninguna.
+    pub fn clave(self, max: usize) -> (&'static str, Option<usize>) {
+        match self {
+            ErrorNueva::Corta => ("contrasena-router-error-corta", Some(MIN_BYTES)),
+            ErrorNueva::Larga => ("contrasena-router-error-larga", Some(max)),
+            ErrorNueva::Control => ("contrasena-router-error-control", None),
+            ErrorNueva::Igual => ("contrasena-router-error-igual", None),
+            ErrorNueva::Caracter => ("contrasena-router-error-caracter", None),
+            ErrorNueva::Espacios => ("contrasena-router-error-espacios", None),
+        }
+    }
+
+    /// Texto de este error en el idioma de la página, con `max` como máximo.
+    pub fn texto(self, max: usize) -> String {
+        let (clave, n) = self.clave(max);
+        let mut args = ::i18n::FluentArgs::new();
+        if let Some(n) = n {
+            args.set("n", n);
+        }
+        crate::ui::i18n::traducir(clave, Some(&args))
+    }
 }
 
 /// Comprueba la forma de la contraseña nueva con el máximo de la web
@@ -60,16 +86,10 @@ pub fn validar_nueva(nueva: &str, actual: &str) -> Result<(), ErrorNueva> {
     Ok(())
 }
 
-/// Texto de un [`ErrorNueva`] en el idioma de la página.
+/// Texto de un [`ErrorNueva`] en el idioma de la página, con el máximo de la
+/// web oficial ([`MAX_BYTES`]).
 pub fn texto_error_nueva(e: ErrorNueva) -> String {
-    match e {
-        ErrorNueva::Corta => crate::t!("contrasena-router-error-corta", n = MIN_BYTES),
-        ErrorNueva::Larga => crate::t!("contrasena-router-error-larga", n = MAX_BYTES),
-        ErrorNueva::Control => crate::t!("contrasena-router-error-control"),
-        ErrorNueva::Igual => crate::t!("contrasena-router-error-igual"),
-        ErrorNueva::Caracter => crate::t!("contrasena-router-error-caracter"),
-        ErrorNueva::Espacios => crate::t!("contrasena-router-error-espacios"),
-    }
+    e.texto(MAX_BYTES)
 }
 
 #[cfg(test)]
@@ -109,5 +129,22 @@ mod tests {
             validar_nueva("clave-nueva-de-prueba", "clave-de-prueba-1"),
             Ok(())
         );
+    }
+
+    /// Cada error tiene su texto en los dos idiomas, y los de longitud
+    /// citan el mínimo o el máximo pedido.
+    #[test]
+    fn cada_error_con_su_clave() {
+        use ErrorNueva::*;
+        for e in [Corta, Larga, Control, Igual, Caracter, Espacios] {
+            let (clave, _) = e.clave(16);
+            for idioma in ::i18n::Idioma::TODOS {
+                assert!(::i18n::existe(idioma, clave), "{e:?} {idioma:?}");
+            }
+        }
+        assert_eq!(Corta.clave(16).1, Some(MIN_BYTES));
+        assert_eq!(Larga.clave(16).1, Some(16));
+        assert_eq!(Larga.clave(MAX_BYTES).1, Some(MAX_BYTES));
+        assert_eq!(Igual.clave(16).1, None);
     }
 }

@@ -17,7 +17,7 @@
 //! panel ni el del operador (`system`) ([`protegido`]); 403 si se piden.
 
 use crate::ajustes_router::GrupoVista;
-use crate::contrasena_forma::{ErrorNueva, MIN_BYTES};
+use crate::contrasena_forma::ErrorNueva;
 use leptos::prelude::*;
 use leptos::server_fn::codec::Json;
 use serde::{Deserialize, Serialize};
@@ -106,14 +106,7 @@ pub const MAX_OTRO: usize = 16;
 /// Texto de una contraseña nueva que no vale (de 8 a [`MAX_OTRO`]), en el
 /// idioma de la página: el mismo en la página y en el servidor.
 pub fn texto_error_otro(e: ErrorNueva) -> String {
-    match e {
-        ErrorNueva::Corta => crate::t!("contrasena-router-error-corta", n = MIN_BYTES),
-        ErrorNueva::Larga => crate::t!("contrasena-router-error-larga", n = MAX_OTRO),
-        ErrorNueva::Control => crate::t!("contrasena-router-error-control"),
-        ErrorNueva::Igual => crate::t!("contrasena-router-error-igual"),
-        ErrorNueva::Caracter => crate::t!("contrasena-router-error-caracter"),
-        ErrorNueva::Espacios => crate::t!("contrasena-router-error-espacios"),
-    }
+    e.texto(MAX_OTRO)
 }
 
 /// ¿Está protegido el usuario `nombre`, de papel `papel`, si el panel entra
@@ -125,6 +118,21 @@ pub fn protegido(nombre: &str, papel: &str, usuario_panel: &str) -> Option<&'sta
         Some("usuarios-router-protegido-sistema")
     } else {
         None
+    }
+}
+
+/// Nota de la fila de `nombre` en la tarjeta: la de [`protegido`]; y si el
+/// panel no sabe con qué usuario entra (`None`: no se pueden leer sus
+/// credenciales), una nota en todas, que las deja sin acciones (el servidor
+/// las rechazaría igual).
+pub fn nota_de_fila(
+    nombre: &str,
+    papel: &str,
+    usuario_panel: Option<&str>,
+) -> Option<&'static str> {
+    match usuario_panel {
+        Some(u) => protegido(nombre, papel, u),
+        None => Some(protegido(nombre, papel, "").unwrap_or("usuarios-router-sin-credenciales")),
     }
 }
 
@@ -152,6 +160,24 @@ pub async fn cambiar_usuario_router(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Sin saber con qué usuario entra el panel, ninguna fila tiene
+    /// acciones: todas llevan nota.
+    #[test]
+    fn sin_credenciales_todas_las_filas_con_nota() {
+        assert_eq!(nota_de_fila("invitado1", "user", Some("1234")), None);
+        assert_eq!(
+            nota_de_fila("invitado1", "user", None),
+            Some("usuarios-router-sin-credenciales")
+        );
+        assert_eq!(
+            nota_de_fila("operador01", "system", None),
+            Some("usuarios-router-protegido-sistema")
+        );
+        for idioma in ::i18n::Idioma::TODOS {
+            assert!(::i18n::existe(idioma, "usuarios-router-sin-credenciales"));
+        }
+    }
 
     #[test]
     fn protegidos_el_del_panel_y_el_del_operador() {

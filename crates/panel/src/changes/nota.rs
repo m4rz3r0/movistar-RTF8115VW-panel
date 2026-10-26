@@ -98,6 +98,14 @@ impl Nota {
         }])
     }
 
+    /// Una contraseña nueva que no vale, con `max` como máximo
+    /// ([`crate::contrasena_forma::ErrorNueva::clave`]).
+    pub(crate) fn de_contrasena(e: crate::contrasena_forma::ErrorNueva, max: usize) -> Nota {
+        let (clave, n) = e.clave(max);
+        let args: Vec<(&str, String)> = n.map(|n| ("n", n.to_string())).into_iter().collect();
+        Nota::con(clave, &args)
+    }
+
     /// El error de un fallo del gestor: el texto legible según su tipo y,
     /// aparte, lo técnico.
     pub(crate) fn de_error(e: &super::CambioError) -> Nota {

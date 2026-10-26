@@ -93,6 +93,7 @@ contrasena-router-enlace-texto = Se cambia en Configuración del router, junto a
 usuarios-router-contrasena = Contraseña
 usuarios-router-protegido-panel = Es el usuario con el que entra el panel: no se puede borrar ni cambiar desde aquí.
 usuarios-router-protegido-sistema = Es la cuenta del operador: no se puede borrar ni cambiar desde aquí.
+usuarios-router-sin-credenciales = El panel no sabe con qué usuario entra en el router: desde aquí no se puede tocar ninguna cuenta.
 usuarios-router-aviso-borrar = Si luego deshaces el borrado, el usuario vuelve con una contraseña nueva: la de ahora no se puede recuperar. La nueva solo se verá con el ojo, en el detalle del cambio en el Historial. Si es el panel el que lo devuelve solo (porque el cambio falla), esa contraseña no se guarda: el Historial te avisará para que la cambies.
 usuarios-router-aviso-deshacer = El usuario vuelve con una contraseña nueva: la de antes no se puede recuperar. La verás con el ojo en el detalle de este cambio, en el Historial.
 usuarios-router-error-protegido = Este usuario está protegido: es el que usa el panel para entrar en el router o la cuenta del operador. No se puede borrar ni cambiar desde aquí.

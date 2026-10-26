@@ -6,7 +6,7 @@ use crate::ajustes_router::{CambioLegible, PasoVista};
 use crate::changes::{
     CambioError, ChangeManager, ChangeRequest, GrupoRequest, Nota, Paso, PasoPreparado,
 };
-use crate::contrasena_forma::{ErrorNueva, MIN_BYTES, validar_forma_hasta};
+use crate::contrasena_forma::{ErrorNueva, validar_forma_hasta};
 use crate::contrasena_router::servidor::anotar;
 use crate::instalar::servidor::{fallo, interno};
 use crate::instancia::{self, CredencialesRouter};
@@ -204,18 +204,7 @@ fn nota(f: &Fallo) -> Nota {
         Fallo::SoloLectura => Nota::clave("panel-solo-lectura"),
         Fallo::Protegido => Nota::clave("usuarios-router-error-protegido"),
         Fallo::NoExiste => Nota::clave("usuarios-router-error-no-existe"),
-        Fallo::Nueva(ErrorNueva::Corta) => Nota::con(
-            "contrasena-router-error-corta",
-            &[("n", MIN_BYTES.to_string())],
-        ),
-        Fallo::Nueva(ErrorNueva::Larga) => Nota::con(
-            "contrasena-router-error-larga",
-            &[("n", MAX_OTRO.to_string())],
-        ),
-        Fallo::Nueva(ErrorNueva::Control) => Nota::clave("contrasena-router-error-control"),
-        Fallo::Nueva(ErrorNueva::Igual) => Nota::clave("contrasena-router-error-igual"),
-        Fallo::Nueva(ErrorNueva::Caracter) => Nota::clave("contrasena-router-error-caracter"),
-        Fallo::Nueva(ErrorNueva::Espacios) => Nota::clave("contrasena-router-error-espacios"),
+        Fallo::Nueva(e) => Nota::de_contrasena(*e, MAX_OTRO),
         Fallo::Rechazado => Nota::clave("usuarios-router-error-rechazado"),
         Fallo::NoEntra => Nota::clave("usuarios-router-error-no-entra"),
         Fallo::Grupo => Nota::clave("usuarios-router-error-grupo"),
