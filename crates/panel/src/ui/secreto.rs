@@ -15,7 +15,7 @@ use leptos::prelude::*;
 /// está censurada («mostrar»), tachado si está a la vista («ocultar»).
 /// Decorativo: el nombre lo da el botón.
 #[component]
-fn IconoOjo(visible: Signal<bool>) -> impl IntoView {
+pub(crate) fn IconoOjo(visible: Signal<bool>) -> impl IntoView {
     view! {
         <svg
             class="icono icono-ojo"

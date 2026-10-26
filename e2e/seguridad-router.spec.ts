@@ -20,7 +20,7 @@ const t = {
   aplicar: "Aplicar",
   borrar: "Borrar",
   deshacer: "Deshacer",
-  crear: "Crear usuario",
+  crear: "Crear la cuenta en el router",
   hecho: "Hecho: el router tiene ya el cambio.",
   protegidoPanel: "Es el usuario con el que entra el panel",
   avisoBorrar: "Si luego deshaces el borrado",
@@ -121,7 +121,7 @@ test.describe("usuarios del router", () => {
       await expect(page.locator("dialog[open]")).toContainText(t.avisoDeshacer);
       await aplicar(page, t.deshacer);
       if (movil) {
-        await page.getByRole("button", { name: "Abrir Usuarios de la web del router" }).click();
+        await page.getByRole("button", { name: "Abrir Cuentas de la web del router" }).click();
         await page.waitForURL((u) => u.pathname === "/ajustes/seguridad/usuarios");
       }
       await expect(fila(page, nuevo)).toHaveCount(1, { timeout: PLAZO_CAMBIO });

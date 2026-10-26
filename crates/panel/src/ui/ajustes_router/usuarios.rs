@@ -1,4 +1,4 @@
-//! «Usuarios de la web del router»: cada usuario con sus acciones y el formulario de uno nuevo ([`Usuarios`]).
+//! «Cuentas de la web del router»: cada cuenta con sus acciones y el formulario de una nueva ([`Usuarios`]).
 //!
 //! Una fila protegida (el usuario con el que entra el panel, el del
 //! operador) lleva su nota y ningún botón. Las demás, «Cambiar contraseña o
@@ -12,6 +12,7 @@ use super::aviso::Seguimiento;
 use super::rejilla::Pagina;
 use crate::ajustes_router::{AjusteVista, EstadoLectura, InstanciaVista};
 use crate::t;
+use crate::ui::comun::Insignia;
 use crate::ui::i18n::traducir;
 use crate::ui::panel_ajustes::{DialogoReautenticar, Reautenticacion};
 use crate::ui::{Estado, IconoEstado};
@@ -20,6 +21,7 @@ use crate::validacion_real::{Funcion3, sin_validar};
 use ajustes::ValorLegible;
 use formularios::{CambiarOtro, NuevoUsuario, id_cambio};
 use leptos::{prelude::*, task::spawn_local};
+use leptos_router::components::A;
 
 mod formularios;
 
@@ -129,6 +131,20 @@ pub(crate) fn Usuarios(a: AjusteVista, elemento: String) -> impl IntoView {
         });
     };
     repetir.set_value(Some(Callback::new(preparar)));
+    // Lo que cambia el cambio en curso: las filas lo dicen ya, sin esperar
+    // a que termine la comprobación (al terminar, la lista se vuelve a
+    // leer). Un usuario que se está creando aún no está en la lista: va
+    // detrás, con su insignia.
+    let en_curso = Memo::new(move |_| s.filas_en_curso(&elemento.get_value()));
+    let existentes: Vec<String> = a.instancias.iter().map(|i| i.id.clone()).collect();
+    let nuevos = move || {
+        en_curso
+            .get()
+            .into_iter()
+            .filter(|n| !existentes.contains(n))
+            .map(|n| fila_en_curso(&n, s, &elemento.get_value()))
+            .collect_view()
+    };
     let filas = match sin_filas(&a.estado, a.instancias.is_empty()) {
         Some(SinFilas::Motivo(m)) => view! {
             <p class="aviso estado-error">
@@ -146,6 +162,7 @@ pub(crate) fn Usuarios(a: AjusteVista, elemento: String) -> impl IntoView {
             .map(|i| {
                 fila(
                     i,
+                    format!("{}/{}", elemento.get_value(), i.id),
                     editando,
                     bloqueos,
                     ocupado.into(),
@@ -166,23 +183,54 @@ pub(crate) fn Usuarios(a: AjusteVista, elemento: String) -> impl IntoView {
     .map(|(m, id)| view! { <p class="nota-solo-lectura" id=id>{traducir(m, None)}</p> })
     .collect_view();
     view! {
-        <div class="ajustes-usuarios usuarios-router">{filas}</div>
-        <p class="error-formulario" role="alert">{move || error.get()}</p>
-        {motivos}
-        <NuevoUsuario
-            bloqueado=bloqueos.sin_gestor
-            ocupado
-            preparar=Callback::new(preparar)
-            motivo=bloqueos.motivo_gestor
-        />
-        {move || reauth.abierto().then(|| view! { <DialogoReautenticar /> })}
+            // Las dos listas se confundían: esta dice cuál no es y enlaza a la otra.
+            <p class="aviso estado-neutro usuarios-router-no-panel">
+                <span>
+                    {t!("ajuste-seguridad-usuarios_router-no-panel")} " "
+                    <A href="/panel">{t!("ajuste-seguridad-usuarios_router-no-panel-enlace")}</A>
+                    "."
+                </span>
+            </p>
+            <div class="ajustes-usuarios usuarios-router">{filas} {nuevos}</div>
+            <p class="error-formulario" role="alert">{move || error.get()}</p>
+            {motivos}
+            <NuevoUsuario
+                en_curso=en_curso.into()
+                bloqueado=bloqueos.sin_gestor
+                ocupado
+                preparar=Callback::new(preparar)
+                motivo=bloqueos.motivo_gestor
+            />
+            {move || reauth.abierto().then(|| view! { <DialogoReautenticar /> })}
+        }
+}
+
+/// La fila de un usuario que se está creando: su nombre, la insignia del
+/// cambio y qué falta.
+fn fila_en_curso(nombre: &str, s: Seguimiento, elemento: &str) -> impl IntoView + use<> {
+    let id = format!("{elemento}/{nombre}");
+    let insignia = move || {
+        s.insignia(&id)
+            .map(|(estado, texto)| view! { <Insignia estado texto /> })
+    };
+    view! {
+        <div class="ajustes-usuario usuario-en-curso">
+            <div class="ajustes-usuario-fila">
+                <span class="ajustes-usuario-nombre"><strong>{nombre.to_owned()}</strong></span>
+                {insignia}
+            </div>
+            <p class="nota">{t!("ajustes-usuario-en-curso-nuevo")}</p>
+        </div>
     }
 }
 
 /// La fila de un usuario: su nombre y su tipo de cuenta y, si no está
-/// protegido, sus acciones (ver [`Bloqueos`]).
+/// protegido, sus acciones (ver [`Bloqueos`]). `en_curso_id` es como la
+/// nombra el cambio en curso (`<elemento>/<nombre>`): mientras la cambia,
+/// lo dice su insignia y sus botones esperan.
 fn fila(
     i: &InstanciaVista,
+    en_curso_id: String,
     editando: RwSignal<Option<String>>,
     bloqueos: Bloqueos,
     ocupado: Signal<bool>,
@@ -200,6 +248,10 @@ fn fila(
             </span>
         }
     };
+    let s = expect_context::<Seguimiento>();
+    let en_curso_id = StoredValue::new(en_curso_id);
+    let cambiando = move || en_curso_id.with_value(|id| s.insignia(id));
+    let insignia = move || cambiando().map(|(estado, texto)| view! { <Insignia estado texto /> });
     let Some(nota) = i.nota.clone() else {
         let Bloqueos {
             sin_gestor,
@@ -225,6 +277,7 @@ fn fila(
             <div class="ajustes-usuario">
                 <div class="ajustes-usuario-fila">
                     {cabeza}
+                    {insignia}
                     <span class="botones">
                         <button
                             type="button"
@@ -233,7 +286,7 @@ fn fila(
                             aria-controls=controla
                             aria-describedby=motivo_otro
                             aria-label=t!("ajuste-seguridad-usuarios_router-cambiar-de", nombre = nombre.clone())
-                            disabled=move || sin_otro || ocupado.get()
+                            disabled=move || sin_otro || ocupado.get() || cambiando().is_some()
                             on:click=move |_| editando.set(Some(id_abrir.clone()))
                         >
                             {t!("ajuste-seguridad-usuarios_router-cambiar")}
@@ -243,7 +296,7 @@ fn fila(
                             class="b-pel"
                             aria-label=t!("ajuste-seguridad-usuarios_router-borrar-de", nombre = nombre.clone())
                             aria-describedby=motivo_gestor
-                            disabled=move || sin_gestor || ocupado.get()
+                            disabled=move || sin_gestor || ocupado.get() || cambiando().is_some()
                             on:click=move |_| borrar.run(id_borrar.clone())
                         >
                             {t!("ajuste-seguridad-usuarios_router-borrar")}

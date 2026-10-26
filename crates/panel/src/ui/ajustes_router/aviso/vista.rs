@@ -44,7 +44,15 @@ fn estado_texto(a: &CambioActivo) -> String {
         None | Some(EstadoDeCambio::Preparado | EstadoDeCambio::Aplicando) => {
             t!("ajustes-insignia-aplicando")
         }
-        Some(EstadoDeCambio::Vigilando) => t!("ajustes-insignia-comprobando"),
+        // Con lo que le queda: el cambio ya está en el router, pero aún no
+        // se da por bueno (y la lista, hasta entonces, no se vuelve a leer).
+        Some(EstadoDeCambio::Vigilando) => match a.estado.as_ref().and_then(|c| c.restante_s) {
+            Some(s) => t!(
+                "ajustes-aviso-comprobando",
+                resto = crate::ui::explorador::duracion(s.max(0) as u64)
+            ),
+            None => t!("ajustes-insignia-comprobando"),
+        },
         Some(EstadoDeCambio::Aplicado) => t!("ajustes-grupo-estado-aplicado"),
         Some(EstadoDeCambio::Revertido) => t!("ajustes-grupo-estado-revertido"),
         Some(EstadoDeCambio::Fallido) => t!("ajustes-grupo-estado-fallido"),

@@ -147,17 +147,18 @@ pub(super) fn CambiarOtro(
                     type="button"
                     class="b-sec"
                     disabled=move || pendiente.get()
-                    on:click=move |_| cambiar.run(())
-                >
-                    {t!("ajuste-seguridad-usuarios_router-cambiar-boton")}
-                </button>
-                <button
-                    type="button"
-                    class="b-txt"
-                    disabled=move || pendiente.get()
                     on:click=move |_| editando.set(None)
                 >
                     {t!("panel-cancelar")}
+                </button>
+                <button
+                    type="button"
+                    class="b-pri"
+                    aria-busy=move || pendiente.get().then_some("true")
+                    disabled=move || pendiente.get()
+                    on:click=move |_| cambiar.run(())
+                >
+                    {t!("ajuste-seguridad-usuarios_router-cambiar-boton")}
                 </button>
             </div>
         </div>
@@ -169,6 +170,9 @@ pub(super) fn CambiarOtro(
 /// por qué está desactivado, si lo está por la validación real.
 #[component]
 pub(super) fn NuevoUsuario(
+    /// Los usuarios que cambia el cambio en curso: si entre ellos está el
+    /// que se ha escrito, ya se está creando y el formulario se vacía.
+    en_curso: Signal<Vec<String>>,
     bloqueado: bool,
     ocupado: RwSignal<bool>,
     preparar: Callback<OperacionUsuario>,
@@ -193,6 +197,16 @@ pub(super) fn NuevoUsuario(
             grupo: grupo.get_untracked(),
         });
     };
+    Effect::new(move |_| {
+        // Primero la señal, para que el efecto la siga siempre.
+        let curso = en_curso.get();
+        let escrito = nombre.get_untracked().trim().to_owned();
+        if !escrito.is_empty() && curso.contains(&escrito) {
+            nombre.set(String::new());
+            clave.set(String::new());
+            grupo.set(GrupoUsuario::User);
+        }
+    });
     let sin_tocar = Signal::derive(move || bloqueado || ocupado.get());
     view! {
         <section class="formulario usuario-nuevo" aria-labelledby="usuarios-router-nuevo-titulo">

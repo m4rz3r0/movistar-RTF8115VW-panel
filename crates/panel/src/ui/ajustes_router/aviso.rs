@@ -337,12 +337,14 @@ impl Seguimiento {
         self.cerrados.set(Vec::new());
     }
 
-    /// Insignia de `elemento` mientras cambia. Reactivo.
+    /// Insignia de `elemento` mientras cambia, también si lo que cambia es
+    /// una de sus filas (`<elemento>/<fila>`, un usuario del router): la
+    /// tarjeta y el detalle dicen «Aplicando…» o «Comprobando…». Reactivo.
     pub(crate) fn insignia(self, elemento: &str) -> Option<(EstadoVisual, String)> {
         self.activo.with(|a| {
             let a = a
                 .as_ref()
-                .filter(|a| a.elementos.iter().any(|e| e == elemento))?;
+                .filter(|a| a.elementos.iter().any(|e| afecta(e, elemento)))?;
             match a.estado.as_ref().map(|c| c.estado) {
                 None | Some(EstadoDeCambio::Preparado | EstadoDeCambio::Aplicando) => {
                     Some((EstadoVisual::Proceso, t!("ajustes-insignia-aplicando")))
@@ -355,6 +357,18 @@ impl Seguimiento {
         })
     }
 
+    /// Las filas de `elemento` (lo que va tras `<elemento>/`) que cambia el
+    /// cambio en curso, mientras no termine: la lista las enseña ya, con su
+    /// insignia, aunque aún no se haya vuelto a leer. Reactivo.
+    pub(crate) fn filas_en_curso(self, elemento: &str) -> Vec<String> {
+        self.activo.with(|a| {
+            a.as_ref()
+                .filter(|a| !a.terminado())
+                .map(|a| filas_de(&a.elementos, elemento))
+                .unwrap_or_default()
+        })
+    }
+
     /// Valor del interruptor de `elemento` mientras cambia. Reactivo.
     pub(crate) fn interruptor(self, elemento: &str) -> Option<bool> {
         self.activo.with(|a| {
@@ -363,6 +377,24 @@ impl Seguimiento {
             (e == elemento).then_some(*v)
         })
     }
+}
+
+/// ¿Cambiar `cambia` afecta a `elemento`? Si es él o una de sus filas
+/// (`<elemento>/<fila>`).
+fn afecta(cambia: &str, elemento: &str) -> bool {
+    cambia == elemento
+        || cambia
+            .strip_prefix(elemento)
+            .is_some_and(|resto| resto.starts_with('/'))
+}
+
+/// Las filas de `elemento` entre los `elementos` que cambian.
+fn filas_de(elementos: &[String], elemento: &str) -> Vec<String> {
+    elementos
+        .iter()
+        .filter_map(|e| e.strip_prefix(elemento)?.strip_prefix('/'))
+        .map(str::to_owned)
+        .collect()
 }
 
 /// Lo que cambia un grupo, en una línea: el campo con su antes y después si
@@ -382,5 +414,28 @@ pub(crate) fn resumen(g: &GrupoVista) -> String {
             )
         }
         _ => t!("ajustes-aviso-varios", titulo = titulo, n = pasos.len()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{afecta, filas_de};
+
+    /// La tarjeta de los usuarios del router dice que cambia cuando cambia
+    /// uno de sus usuarios, no cuando cambia otra tarjeta con un nombre que
+    /// empieza igual.
+    #[test]
+    fn una_fila_afecta_a_su_elemento() {
+        assert!(afecta("usuarios_router", "usuarios_router"));
+        assert!(afecta("usuarios_router/ana", "usuarios_router"));
+        assert!(!afecta("usuarios_router_x", "usuarios_router"));
+        assert!(!afecta("usuarios_router", "usuarios_router/ana"));
+    }
+
+    #[test]
+    fn filas_que_cambian() {
+        let e = vec!["usuarios_router/ana".to_owned(), "wifi".to_owned()];
+        assert_eq!(filas_de(&e, "usuarios_router"), ["ana"]);
+        assert!(filas_de(&e, "wifi").is_empty());
     }
 }

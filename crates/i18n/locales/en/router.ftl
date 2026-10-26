@@ -109,7 +109,7 @@ usuarios-router-error-uno-cada-vez = Users are deleted one at a time.
 usuarios-router-error-nombre-baja = That name cannot be deleted from the panel: it contains ":" or control characters.
 usuarios-router-error-grupo-sistema = That account type is the operator's: choose Administrator or User.
 usuarios-router-error-grupo-no-valido = Choose an account type: Administrator or User.
-usuarios-router-nota-revertido = The deleted user was created again with a new password that the panel does not store: change it in Settings → Security → Router web users to be able to use it.
+usuarios-router-nota-revertido = The deleted user was created again with a new password that the panel does not store: change it in Settings → Security → Router web accounts to be able to use it.
 
 ## Features still to be checked against a real router
 validacion-real-pendiente-usuarios = Creating and deleting users has not been checked against a real router yet: it is not available for now.
