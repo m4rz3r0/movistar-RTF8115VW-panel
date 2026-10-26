@@ -99,7 +99,7 @@ async fn reanuda_con_la_wan_de_antes_del_cambio() {
 }
 
 #[tokio::test]
-async fn confirmar_espera_a_que_se_retome_lo_pendiente() {
+async fn confirmar_espera_a_que_se_retome_lo_pendiente_y_se_encola() {
     let p = panel_rapido(Duration::from_millis(500)).await;
     let lento = Tiempos {
         bajo: Duration::from_secs(60),
@@ -122,14 +122,11 @@ async fn confirmar_espera_a_que_se_retome_lo_pendiente() {
         tokio::time::sleep(Duration::from_millis(50)).await;
         b.reanudar_pendientes().await;
     });
-    // El cambio nuevo esperó y el retomado se quedó el hueco.
-    assert!(matches!(r, Err(CambioError::EnCurso)), "{r:?}");
+    // El cambio nuevo esperó, el retomado se quedó el hueco y el nuevo
+    // espera en la cola hasta que el retomado queda aplicado.
+    let id = r.unwrap();
     assert_eq!(b.activo(), Some(pendiente));
+    assert_eq!(b.en_cola(), vec![id]);
     esperar_estado(&b, pendiente, Estado::Aplicado).await;
-    esperar_libre_gestor(&b).await;
-    let id = b
-        .confirmar_ligado(&otro.token, None, "admin")
-        .await
-        .unwrap();
     esperar_estado(&b, id, Estado::Aplicado).await;
 }

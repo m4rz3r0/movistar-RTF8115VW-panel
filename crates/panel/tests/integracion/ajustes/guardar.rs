@@ -116,34 +116,66 @@ async fn desmarcar_un_paso_no_lo_escribe() {
     assert_eq!(escritas, ["cbSetUpnpCfg"]);
 }
 
-/// Aplica `primero` y, mientras se vigila, prepara `segundo`: 409.
-async fn segundo_durante_la_vigilancia(primero: (&str, Value), segundo: (&str, Value)) {
+/// Aplica `primero` y, mientras se vigila, prepara y confirma `segundo`:
+/// espera en la cola y se aplica al terminar la vigilancia del primero.
+/// Devuelve el panel para comprobar lo escrito.
+async fn segundo_durante_la_vigilancia(primero: (&str, Value), segundo: (&str, Value)) -> Panel {
     let (p, cookie) = panel_vigilando().await;
     let g = resumen(&p, &cookie, primero.0, primero.1).await;
     let id = confirmar(&p, &cookie, &g, &[]).await;
     let c = ok(&p, "estado_cambio", json!({ "id": id }), &cookie).await;
     assert_eq!(c["estado"], "Vigilando", "{c}");
-    let (status, body) = preparar_ajuste(&p, &cookie, segundo.0, segundo.1).await;
-    assert_eq!(status, 409, "{body}");
-    assert!(body.contains("otro cambio en curso"), "{body}");
+    let g2 = resumen(&p, &cookie, segundo.0, segundo.1).await;
+    let id2 = confirmar(&p, &cookie, &g2, &[]).await;
+    let c2 = ok(&p, "estado_cambio", json!({ "id": id2 }), &cookie).await;
+    assert_eq!(c2["estado"], "EnCola", "{c2}");
+    crate::comun::esperar_hasta(Duration::from_secs(5), "no se vigila", async || {
+        ok(&p, "estado_cambio", json!({ "id": id }), &cookie).await["terminable"] == true
+    })
+    .await;
+    let (status, body) = llamar(
+        &p,
+        "terminar_vigilancia",
+        json!({ "id": id }),
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    let c2 = crate::comun::esperar_hasta_con(Duration::from_secs(5), async || {
+        let c = ok(&p, "estado_cambio", json!({ "id": id2 }), &cookie).await;
+        if c["estado"] == "Vigilando" {
+            Ok(c)
+        } else {
+            Err(format!("{c}"))
+        }
+    })
+    .await;
+    assert_eq!(c2["estado"], "Vigilando", "{c2}");
+    p.state.cambios().unwrap().detener();
+    p
 }
 
 #[tokio::test]
-async fn segundo_ajuste_con_cambio_activo_da_409() {
-    segundo_durante_la_vigilancia(
+async fn segundo_ajuste_con_cambio_activo_se_encola() {
+    let p = segundo_durante_la_vigilancia(
         ("wifi.red_24", json!({ "nombre": "casa-nueva" })),
         ("wifi.red_5", json!({ "nombre": "casa-nueva-5" })),
     )
     .await;
+    assert_eq!(del_punto_de_acceso(&p, "0", "ssid").await, "casa-nueva");
 }
 
+/// Dos ajustes de la misma red: el segundo se prepara sobre lo que dejó el
+/// primero y no lo pisa.
 #[tokio::test]
-async fn par_basico_y_avanzado_con_cambio_activo_da_409() {
-    segundo_durante_la_vigilancia(
+async fn par_basico_y_avanzado_con_cambio_activo_se_encola() {
+    let p = segundo_durante_la_vigilancia(
         ("wifi.red_24", json!({ "nombre": "casa-nueva" })),
         ("wifi.red_24_avanzado", json!({ "max_clientes": "7" })),
     )
     .await;
+    assert_eq!(del_punto_de_acceso(&p, "0", "ssid").await, "casa-nueva");
+    assert_eq!(del_punto_de_acceso(&p, "0", "max_clt_count").await, "7");
 }
 
 #[tokio::test]

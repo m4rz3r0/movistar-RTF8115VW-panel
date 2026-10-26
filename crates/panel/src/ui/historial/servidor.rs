@@ -277,6 +277,7 @@ fn estado_paso(e: EstadoPaso) -> EstadoPasoVista {
         EstadoPaso::Aplicado => EstadoPasoVista::Aplicado,
         EstadoPaso::Fallido => EstadoPasoVista::Fallido,
         EstadoPaso::Revertido => EstadoPasoVista::Revertido,
+        EstadoPaso::Cancelado => EstadoPasoVista::Cancelado,
     }
 }
 

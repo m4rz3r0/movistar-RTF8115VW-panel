@@ -109,7 +109,9 @@ pub async fn aplicar_ajuste(p: &Panel, cookie: &str, grupo: &Value) -> i64 {
 pub async fn esperar_final(p: &Panel, cookie: &str, id: i64) -> Value {
     esperar_hasta_con(Duration::from_secs(10), async || {
         let c = ok(p, "estado_cambio", json!({ "id": id }), cookie).await;
-        if ["Aplicado", "Revertido", "Fallido"].contains(&c["estado"].as_str().unwrap()) {
+        if ["Aplicado", "Revertido", "Fallido", "Cancelado"]
+            .contains(&c["estado"].as_str().unwrap())
+        {
             Ok(c)
         } else {
             Err(format!("sin final: {c}"))

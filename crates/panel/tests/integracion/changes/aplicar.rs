@@ -158,8 +158,10 @@ async fn error_del_router_deja_fallido() {
     assert_eq!(m.activo(), None);
 }
 
+/// Dos confirmaciones a la vez: una se aplica y la otra espera en la cola
+/// (no se intercalan: cada una escribe cuando le toca).
 #[tokio::test]
-async fn cambios_concurrentes_no_se_intercalan() {
+async fn cambios_concurrentes_se_ponen_en_cola() {
     let (p, m) = preparado().await;
     let a = m.preparar(lease0("192.168.1.80")).await.unwrap();
     let b = m
@@ -170,25 +172,14 @@ async fn cambios_concurrentes_no_se_intercalan() {
         m.confirmar_ligado(&a.token, None, "admin"),
         m.confirmar_ligado(&b.token, None, "admin")
     );
-    let (ok, otro, token_otro) = match (ra, rb) {
-        (Ok(id), Err(e)) => (id, e, b.token.clone()),
-        (Err(e), Ok(id)) => (id, e, a.token.clone()),
-        r => panic!("se esperaba uno aceptado y otro en curso: {r:?}"),
-    };
-    assert!(matches!(otro, CambioError::EnCurso), "{otro:?}");
-    assert_eq!(p.sim.control.writes().len(), 1);
-    // Mientras se vigila, sigue ocupado.
-    let r = m.confirmar_ligado(&token_otro, None, "admin").await;
-    assert!(matches!(r, Err(CambioError::EnCurso)), "{r:?}");
-    esperar_estado(&m, ok, Estado::Aplicado).await;
+    let (ia, ib) = (ra.unwrap(), rb.unwrap());
+    esperar_estado(&m, ia, Estado::Aplicado).await;
+    esperar_estado(&m, ib, Estado::Aplicado).await;
     esperar_libre_gestor(&m).await;
-    // El token rechazado por estar ocupado sigue valiendo.
-    let id = m
-        .confirmar_ligado(&token_otro, None, "admin")
-        .await
-        .unwrap();
-    esperar_estado(&m, id, Estado::Aplicado).await;
     assert_eq!(p.sim.control.writes().len(), 2);
+    // Los tokens se gastaron.
+    let r = m.confirmar_ligado(&a.token, None, "admin").await;
+    assert_eq!(r, Err(CambioError::TokenInvalido));
 }
 
 #[tokio::test]

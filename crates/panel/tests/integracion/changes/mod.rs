@@ -15,6 +15,8 @@ use panel::{
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 mod aplicar;
+mod cola;
+mod cola_api;
 mod deshacer;
 mod reanudar;
 mod reintentos;

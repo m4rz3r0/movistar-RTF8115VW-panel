@@ -57,6 +57,8 @@ fn estado_texto(a: &CambioActivo) -> String {
         Some(EstadoDeCambio::Revertido) => t!("ajustes-grupo-estado-revertido"),
         Some(EstadoDeCambio::Fallido) => t!("ajustes-grupo-estado-fallido"),
         Some(EstadoDeCambio::RevertidoParcial) => t!("ajustes-grupo-estado-parcial"),
+        Some(EstadoDeCambio::EnCola) => t!("ajustes-grupo-estado-en-cola"),
+        Some(EstadoDeCambio::Cancelado) => t!("ajustes-grupo-estado-cancelado"),
     }
 }
 

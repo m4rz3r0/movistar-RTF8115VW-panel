@@ -9,7 +9,7 @@ use serde_json::{Value, json};
 
 /// Vigilancia larga (60 s), mirando cada `intervalo`, y que revierte tras
 /// `fallos` comprobaciones fallidas seguidas.
-fn tiempos(intervalo: Duration, fallos: u32) -> Tiempos {
+pub(super) fn tiempos(intervalo: Duration, fallos: u32) -> Tiempos {
     Tiempos {
         bajo: Duration::from_secs(60),
         medio: Duration::from_secs(60),
@@ -22,7 +22,7 @@ fn tiempos(intervalo: Duration, fallos: u32) -> Tiempos {
 
 /// Cambia la IP de la reserva 0 por la Biblioteca (se vigila: toca el
 /// DHCP) y devuelve su id, ya vigilándose.
-async fn aplicar_reserva(p: &Panel, cookie: &str) -> i64 {
+pub(super) async fn aplicar_reserva(p: &Panel, cookie: &str) -> i64 {
     let peticion = json!({ "funcion": LEASES, "instancia": "0",
         "valores": [[POOL, "0"], ["ipv4_addr", "192.168.1.80"]], "borrar": false });
     let prep = ok(
@@ -47,7 +47,7 @@ async fn aplicar_reserva(p: &Panel, cookie: &str) -> i64 {
     id
 }
 
-async fn estado(p: &Panel, cookie: &str, id: i64) -> Value {
+pub(super) async fn estado(p: &Panel, cookie: &str, id: i64) -> Value {
     ok(p, "estado_cambio", json!({ "id": id }), cookie).await
 }
 
@@ -56,7 +56,7 @@ async fn terminar(p: &Panel, cookie: &str, id: i64) -> (u16, String) {
 }
 
 /// Otro usuario del panel con su sesión.
-async fn sesion_de_otro(p: &Panel) -> String {
+pub(super) async fn sesion_de_otro(p: &Panel) -> String {
     panel::auth::create_user(&p.state.db, "otra", "otra contraseña larga")
         .await
         .unwrap();

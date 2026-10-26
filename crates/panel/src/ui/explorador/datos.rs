@@ -402,6 +402,10 @@ pub enum EstadoDeCambio {
     Fallido,
     /// Un grupo que falló y no se pudo revertir entero.
     RevertidoParcial,
+    /// Espera su turno detrás del cambio en curso.
+    EnCola,
+    /// Estuvo en la cola y no llegó a aplicarse.
+    Cancelado,
 }
 
 impl EstadoDeCambio {
@@ -414,6 +418,8 @@ impl EstadoDeCambio {
             EstadoDeCambio::Revertido => t!("biblioteca-cambio-revertido"),
             EstadoDeCambio::Fallido => t!("biblioteca-cambio-fallido"),
             EstadoDeCambio::RevertidoParcial => t!("biblioteca-cambio-revertido-parcial"),
+            EstadoDeCambio::EnCola => t!("biblioteca-cambio-en-cola"),
+            EstadoDeCambio::Cancelado => t!("biblioteca-cambio-cancelado"),
         }
     }
 
@@ -425,6 +431,7 @@ impl EstadoDeCambio {
                 | EstadoDeCambio::Revertido
                 | EstadoDeCambio::Fallido
                 | EstadoDeCambio::RevertidoParcial
+                | EstadoDeCambio::Cancelado
         )
     }
 
@@ -433,7 +440,7 @@ impl EstadoDeCambio {
         use crate::ui::comun::EstadoVisual;
         match self {
             EstadoDeCambio::Aplicado => EstadoVisual::Emite,
-            EstadoDeCambio::Revertido => EstadoVisual::Atencion,
+            EstadoDeCambio::Revertido | EstadoDeCambio::Cancelado => EstadoVisual::Atencion,
             EstadoDeCambio::Fallido | EstadoDeCambio::RevertidoParcial => EstadoVisual::Peligro,
             _ => EstadoVisual::Proceso,
         }
@@ -453,6 +460,12 @@ pub struct CambioVista {
     /// terminar»): la está vigilando el gestor y la hizo él.
     #[serde(default)]
     pub terminable: bool,
+    /// Puesto en la cola (desde 1), mientras espera.
+    #[serde(default)]
+    pub puesto: Option<usize>,
+    /// Quien pregunta puede quitarlo de la cola: lo encoló él.
+    #[serde(default)]
+    pub quitable: bool,
 }
 
 // ------------------------------------------------------------ validación

@@ -47,6 +47,7 @@ historial-paso-aplicando = aplicando
 historial-paso-aplicado = aplicado
 historial-paso-fallido = fallido
 historial-paso-revertido = revertido
+historial-paso-cancelado = cancelado
 # Notas y errores del gestor de cambios: se guardan como claves en la base
 # de datos de cada instalación y se pintan en el idioma de quien mira el
 # Historial. No se renombran ni se borran (solo se cambia su texto).
@@ -63,6 +64,12 @@ nota-wan-caida = la conexión a internet ya estaba caída antes del cambio: solo
 nota-retomada = vigilancia retomada tras un reinicio del panel
 nota-sin-vigilancia = aplicado sin vigilancia: no afecta a la conexión del panel con el router
 nota-vigilancia-terminada = { $usuario } dio la vigilancia por terminada antes de tiempo
+nota-cola-anterior-deshecho = no se aplicó porque el cambio anterior se deshizo
+nota-cola-anterior-no-aplicado = no se aplicó porque el cambio anterior no llegó a aplicarse
+nota-cola-router-cambiado = no se aplicó: el router ha cambiado desde que lo revisaste; vuelve a prepararlo
+nota-cola-no-preparado = no se aplicó: al llegarle el turno no se pudo preparar
+nota-cola-quitado = { $usuario } lo quitó de la cola
+nota-cola-interrumpida = no se aplicó: el panel se detuvo o se reinició antes de llegarle el turno
 cambio-error-router = el router no hizo el cambio
 cambio-error-verificacion = el router no muestra los valores escritos
 cambio-error-preparar = no se pudo preparar el paso
@@ -72,9 +79,13 @@ cambio-error-sin-inversa = no se puede volver atrás: no se conocen los valores 
 cambio-error-router-no-responde = el router dejó de responder
 vigilancia-terminar = Todo bien, terminar
 vigilancia-terminando = Terminando…
+cola-quitar = Quitar de la cola
+cola-quitando = Quitando…
 cambio-terminar-no-vigila = Ese cambio ya no se está vigilando.
 cambio-terminar-otro-usuario = Solo quien hizo el cambio puede terminar su vigilancia.
 cambio-terminar-fallando = El router no respondió bien en la última comprobación: espera a que se recupere o a que el cambio se deshaga solo.
+cambio-quitar-no-en-cola = Ese cambio ya no está esperando en la cola.
+cambio-quitar-otro-usuario = Solo quien lo puso en la cola puede quitarlo.
 cambio-error-internet-caida = se cayó la conexión a internet
 cambio-error-reinicio-sin-vuelta = el router no volvió tras el reinicio en { $s } s
 cambio-error-accion = una acción no se puede deshacer

@@ -59,6 +59,8 @@ biblioteca-cambio-aplicado = applied
 biblioteca-cambio-revertido = reverted
 biblioteca-cambio-fallido = failed
 biblioteca-cambio-revertido-parcial = partly reverted
+biblioteca-cambio-en-cola = queued
+biblioteca-cambio-cancelado = cancelled
 
 ## Function page
 biblioteca-pagina-router = Router page
@@ -162,6 +164,7 @@ biblioteca-aplicar = Apply
 biblioteca-error-bloqueada = Function blocked: { $motivo }.
 biblioteca-error-sin-cambios = Nothing to change: the values match the router's.
 biblioteca-error-en-curso = Another change is in progress; wait for it to finish and try again.
+cambio-error-cola-llena = There are already { $max } changes queued: wait for them to be applied or remove one.
 biblioteca-error-router = { $detalle }. Check the connection to the router and try again.
 biblioteca-error-verificacion = The router does not show the change ({ $detalle }). Nothing has been reverted: check the values on its page.
 biblioteca-error-palabra = The confirmation word does not match: type it exactly as shown.

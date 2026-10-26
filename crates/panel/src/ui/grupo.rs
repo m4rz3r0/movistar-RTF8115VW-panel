@@ -369,6 +369,10 @@ pub fn DialogoGrupo(
             EstadoDeCambio::Preparado | EstadoDeCambio::Aplicando => {
                 (EstadoVisual::Proceso, t!("ajustes-grupo-estado-aplicando"))
             }
+            EstadoDeCambio::EnCola => (EstadoVisual::Proceso, t!("ajustes-grupo-estado-en-cola")),
+            EstadoDeCambio::Cancelado => {
+                (EstadoVisual::Atencion, t!("ajustes-grupo-estado-cancelado"))
+            }
         };
         Some(view! { <div class="estado-cambio"><Insignia estado texto /></div> }.into_any())
     };

@@ -145,11 +145,9 @@ fn ajuste_por_id<'a>(state: &'a AppState, id: &str) -> Result<&'a Ajuste, Server
         .ok_or_else(|| fallo(StatusCode::NOT_FOUND, t!("ajustes-error-ajuste")))
 }
 
-/// Un cambio a la vez: con otro aplicándose o vigilándose no se prepara
-/// nada (409), tampoco en otro ajuste que escribe la misma instancia.
+/// Con otro cambio aplicándose o vigilándose se prepara igual: al
+/// confirmarlo espera en la cola. Con la cola llena (o el gestor apartado
+/// por un cambio de credenciales del router), 409.
 fn libre(g: &ChangeManager) -> Result<(), ServerFnError> {
-    match g.activo() {
-        Some(_) => Err(error_ajuste(CambioError::EnCurso)),
-        None => Ok(()),
-    }
+    g.admite_cambio().map_err(error_ajuste)
 }

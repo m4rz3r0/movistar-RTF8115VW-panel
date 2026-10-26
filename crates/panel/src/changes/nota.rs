@@ -28,6 +28,19 @@ pub(crate) const RETOMADA: &str = "nota-retomada";
 pub(crate) const SIN_VIGILANCIA: &str = "nota-sin-vigilancia";
 /// Quien hizo el cambio dio la vigilancia por terminada (`$usuario`).
 pub(crate) const VIGILANCIA_TERMINADA: &str = "nota-vigilancia-terminada";
+/// Un cambio de la cola que no llegó a aplicarse: el anterior se deshizo
+/// (lo revirtió la vigilancia).
+pub(crate) const COLA_ANTERIOR_DESHECHO: &str = "nota-cola-anterior-deshecho";
+/// … el anterior no llegó a aplicarse (falló, o tampoco se aplicó).
+pub(crate) const COLA_ANTERIOR_NO_APLICADO: &str = "nota-cola-anterior-no-aplicado";
+/// … el router ya no está como cuando se revisó.
+pub(crate) const COLA_ROUTER_CAMBIADO: &str = "nota-cola-router-cambiado";
+/// … al llegarle el turno no se pudo preparar (con el motivo detrás).
+pub(crate) const COLA_NO_PREPARADO: &str = "nota-cola-no-preparado";
+/// … `$usuario` lo quitó de la cola.
+pub(crate) const COLA_QUITADO: &str = "nota-cola-quitado";
+/// … el panel se detuvo o se reinició antes de llegarle el turno.
+pub(crate) const COLA_INTERRUMPIDA: &str = "nota-cola-interrumpida";
 /// La reversión automática volvió a crear un usuario borrado con una
 /// contraseña nueva que no se guarda.
 pub(crate) const USUARIO_REVERTIDO: &str = "usuarios-router-nota-revertido";

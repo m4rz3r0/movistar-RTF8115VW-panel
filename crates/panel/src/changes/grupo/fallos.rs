@@ -190,20 +190,24 @@ impl ChangeManager {
         (resultado, aviso)
     }
 
-    /// Vigila un grupo aplicado hasta un estado final.
-    pub(in crate::changes) async fn seguir(&self, ej: Ejecucion) {
+    /// Vigila un grupo aplicado hasta un estado final, que devuelve.
+    pub(in crate::changes) async fn seguir(&self, ej: Ejecucion) -> Estado {
         let id = ej.id;
         if ej.sin_vigilancia() {
             // Ya quedó aplicado al escribirlo.
-            return;
+            return Estado::Aplicado;
         }
         match ej.base {
             Base::Uptime(antes) => match self.esperar_vuelta(antes).await {
                 Ok(()) => {
                     self.marcar(id, Estado::Aplicado, None, ej.nota.as_ref())
-                        .await
+                        .await;
+                    Estado::Aplicado
                 }
-                Err(e) => self.marcar(id, Estado::Fallido, Some(&e), None).await,
+                Err(e) => {
+                    self.marcar(id, Estado::Fallido, Some(&e), None).await;
+                    Estado::Fallido
+                }
             },
             Base::Wan(wan) => {
                 let nota = if wan {
@@ -217,13 +221,17 @@ impl ChangeManager {
                 };
                 let dur = self.tiempos.vigilancia(ej.riesgo);
                 match self.vigilar(id, dur, wan).await {
-                    Ok(None) => self.marcar(id, Estado::Aplicado, None, nota.as_ref()).await,
+                    Ok(None) => {
+                        self.marcar(id, Estado::Aplicado, None, nota.as_ref()).await;
+                        Estado::Aplicado
+                    }
                     Ok(Some((usuario, responder))) => {
                         tracing::info!(cambio = id, usuario, "vigilancia terminada a mano");
                         let fin = Nota::con(nota::VIGILANCIA_TERMINADA, &[("usuario", usuario)]);
                         let nota = Nota::juntar(nota.into_iter().chain([fin]));
                         self.marcar(id, Estado::Aplicado, None, nota.as_ref()).await;
                         let _ = responder.send(Ok(()));
+                        Estado::Aplicado
                     }
                     Err(motivo)
                         if ej
@@ -234,6 +242,7 @@ impl ChangeManager {
                         let e = motivo.y(Nota::clave(nota::ERROR_ACCION));
                         self.marcar(id, Estado::Fallido, Some(&e), nota.as_ref())
                             .await;
+                        Estado::Fallido
                     }
                     Err(motivo) => {
                         self.revertir_grupo(&ej, motivo, nota.as_ref(), Estado::Revertido)
@@ -245,8 +254,15 @@ impl ChangeManager {
     }
 
     /// Revierte el grupo entero en orden inverso: `ok` si todo vuelve; si
-    /// no, `revertido_parcial` (o `fallido` con un solo paso).
-    async fn revertir_grupo(&self, ej: &Ejecucion, motivo: Nota, nota: Option<&Nota>, ok: Estado) {
+    /// no, `revertido_parcial` (o `fallido` con un solo paso). Devuelve el
+    /// estado en que queda.
+    async fn revertir_grupo(
+        &self,
+        ej: &Ejecucion,
+        motivo: Nota,
+        nota: Option<&Nota>,
+        ok: Estado,
+    ) -> Estado {
         tracing::warn!(cambio = ej.id, "{}; revirtiendo", motivo.para_registro());
         let (fallos, aviso) = self.revertir_pasos(ej.id, &ej.pasos).await;
         let nota = Nota::juntar(nota.cloned().into_iter().chain(aviso));
@@ -254,6 +270,7 @@ impl ChangeManager {
         if fallos.is_empty() {
             let e = motivo.y(Nota::clave(nota::ERROR_REVERTIDO));
             self.marcar(ej.id, ok, Some(&e), nota).await;
+            ok
         } else {
             let estado = if ej.multi {
                 Estado::RevertidoParcial
@@ -263,6 +280,7 @@ impl ChangeManager {
             let e = motivo.y(detalle_reversion(ej.multi, &fallos));
             self.marcar(ej.id, estado, Some(&e), nota).await;
             self.cerrar_sin_revertir(ej.id, &ej.pasos, &fallos).await;
+            estado
         }
     }
 
@@ -302,9 +320,10 @@ impl ChangeManager {
                         sin_plan.push((p.orden, p.funcion, ErrorReversion::Fallo(e)));
                     }
                 },
-                EstadoPaso::Pendiente | EstadoPaso::Fallido | EstadoPaso::Revertido => {
-                    completo = false
-                }
+                EstadoPaso::Pendiente
+                | EstadoPaso::Fallido
+                | EstadoPaso::Revertido
+                | EstadoPaso::Cancelado => completo = false,
             }
         }
         let mut notas = Vec::new();
@@ -389,10 +408,12 @@ impl ChangeManager {
         ej: Ejecucion,
         reserva: Reserva,
     ) {
+        // Mientras se vigila, otro cambio puede esperar en la cola.
+        lock(&self.hueco).con_cola = true;
         let m = self.clone();
         let h = tokio::spawn(async move {
-            m.seguir(ej).await;
-            drop(reserva);
+            let estado = m.seguir(ej).await;
+            m.seguir_la_cola(reserva, estado).await;
         });
         *lock(&self.tarea) = Some(h.abort_handle());
     }

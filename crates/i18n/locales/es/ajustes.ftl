@@ -128,6 +128,8 @@ ajustes-grupo-estado-aplicado = Hecho: el router tiene ya el cambio.
 ajustes-grupo-estado-revertido = El router dejó de responder bien y el cambio se ha deshecho solo.
 ajustes-grupo-estado-fallido = No se ha podido aplicar el cambio. El router sigue como estaba.
 ajustes-grupo-estado-parcial = No se ha podido aplicar el cambio y una parte no ha vuelto a como estaba. Revísalo en el Historial.
+ajustes-grupo-estado-en-cola = En cola: se aplicará cuando el cambio en curso quede aplicado.
+ajustes-grupo-estado-cancelado = No se ha aplicado: el cambio anterior no quedó aplicado o se quitó de la cola. El motivo está en el Historial.
 
 ## Cómo estaba al instalar (foto de partida)
 ajustes-foto-titulo = Cómo estaba al instalar

@@ -40,16 +40,21 @@ impl ChangeManager {
         }
         let mut pasos = Vec::with_capacity(g.pasos.len());
         let mut riesgo: Option<Riesgo> = None;
+        let mut huella = Vec::with_capacity(g.pasos.len());
         for (indice, p) in g.pasos.iter().enumerate() {
             let (diff, sin_cambios) = match self.planificar(&p.req, explicito).await {
                 Ok(plan) => {
                     riesgo = riesgo.max(Some(plan.funcion.riesgo));
+                    huella.push(Some(cola::Huella::de(&plan)));
                     (
                         para_mostrar(&plan.funcion, &self.state.mascara, &plan.campos),
                         false,
                     )
                 }
-                Err(CambioError::SinCambios) => (Diff::default(), true),
+                Err(CambioError::SinCambios) => {
+                    huella.push(None);
+                    (Diff::default(), true)
+                }
                 Err(e) => return Err(e),
             };
             pasos.push(PasoPreparado {
@@ -85,6 +90,7 @@ impl ChangeManager {
                 explicito,
                 deshace,
                 usuario: None,
+                huella,
             },
         );
         Ok(PreparadoGrupo {
@@ -97,7 +103,8 @@ impl ChangeManager {
 
     /// Aplica el grupo preparado con `token` sin los pasos de `desmarcados`
     /// (índices): escribe y verifica cada paso en orden y deja la vigilancia
-    /// en marcha. Devuelve el id del cambio (en `vigilando`). Si un paso
+    /// en marcha. Devuelve el id del cambio (en `vigilando`, o `en_cola` si
+    /// otro se estaba aplicando o vigilando: ver `cola.rs`). Si un paso
     /// falla, revierte los anteriores antes de volver con el error.
     ///
     /// Las acciones piden palabra: van por [`ChangeManager::confirmar`].
@@ -152,30 +159,26 @@ impl ChangeManager {
                 "el gestor aún está retomando cambios pendientes; inténtalo de nuevo".into(),
             ));
         }
-        let reserva = self.reservar()?;
+        // El hueco o, con otro cambio en curso, un sitio en la cola.
+        let entrada = self.entrar()?;
         let Some(pendiente) = lock(&self.pendientes).remove(token) else {
+            if let cola::Entrada::Cola = entrada {
+                self.devolver_sitio();
+            }
             return Err(CambioError::TokenInvalido);
         };
+        let turno = cola::Turno {
+            fila: None,
+            pendiente,
+            desmarcados: desmarcados.to_vec(),
+            usuario: usuario.to_owned(),
+        };
+        let reserva = match entrada {
+            cola::Entrada::Ahora(r) => r,
+            cola::Entrada::Cola => return self.encolar(turno).await,
+        };
         let (tx, rx) = oneshot::channel();
-        let m = self.clone();
-        let usuario = usuario.to_owned();
-        let desmarcados = desmarcados.to_vec();
-        let h = tokio::spawn(async move {
-            match m
-                .aplicar_grupo(&pendiente, &desmarcados, &usuario, &reserva)
-                .await
-            {
-                Ok(ej) => {
-                    let _ = tx.send(Ok(ej.id));
-                    m.seguir(ej).await;
-                }
-                Err(e) => {
-                    let _ = tx.send(Err(e));
-                }
-            }
-            drop(reserva);
-        });
-        *lock(&self.tarea) = Some(h.abort_handle());
+        self.lanzar(reserva, turno, Some(tx));
         rx.await.unwrap_or_else(|_| {
             Err(CambioError::Router(
                 "la aplicación del cambio se interrumpió".into(),
@@ -193,15 +196,21 @@ impl ChangeManager {
     }
 
     /// Escribe y verifica los pasos en orden (con el sondeo en pausa).
-    /// Devuelve lo necesario para vigilar el grupo.
-    async fn aplicar_grupo(
+    /// Devuelve lo necesario para vigilar el grupo. `fila`: la de un cambio
+    /// que esperó en la cola (antes de escribir se comprueba que el router
+    /// sigue como cuando se revisó).
+    pub(in crate::changes) async fn aplicar_grupo(
         &self,
         p: &Pendiente,
         desmarcados: &[usize],
         usuario: &str,
         reserva: &Reserva,
+        fila: Option<i64>,
     ) -> Result<Ejecucion, CambioError> {
         let mut pausa = Some(self.pausar().await?);
+        if fila.is_some() {
+            self.comprobar_huella(p, desmarcados).await?;
+        }
         if let Some(o) = p.deshace
             && let Some(e) = self.ya_deshecho(o).await
         {
@@ -273,6 +282,7 @@ impl ChangeManager {
                 usuario,
                 base,
                 deshace: p.deshace,
+                fila,
             })
             .await
             .map_err(|e| CambioError::Router(format!("no se puede guardar el cambio: {e}")))?;

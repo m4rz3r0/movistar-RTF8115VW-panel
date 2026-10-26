@@ -349,9 +349,10 @@ async fn bloqueada_sin_formulario() {
     assert!(!bloqueada(LEASES) && !bloqueada("cbGetSummary"));
 }
 
-/// Review Focus #3: dos confirmaciones a la vez; una recibe "en curso".
+/// Review Focus #3: dos confirmaciones a la vez; la segunda espera en la
+/// cola y se aplica después.
 #[tokio::test]
-async fn confirmar_a_la_vez_uno_en_curso() {
+async fn confirmar_a_la_vez_uno_espera_en_la_cola() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let a = ok(
         &p,
@@ -374,16 +375,12 @@ async fn confirmar_a_la_vez_uno_en_curso() {
         llamar(&p, "confirmar_cambio", confirmar(&a), Some(&cookie)),
         llamar(&p, "confirmar_cambio", confirmar(&b), Some(&cookie)),
     );
-    let (bien, mal) = match (ra.0, rb.0) {
-        (200, 409) => (ra, rb),
-        (409, 200) => (rb, ra),
-        _ => panic!("se esperaba uno aceptado y otro en curso: {ra:?} {rb:?}"),
-    };
-    assert!(mal.1.contains("otro cambio en curso"), "{}", mal.1);
-    assert!(mal.1.contains("espera a que termine"), "{}", mal.1);
-    assert_eq!(p.sim.control.writes().len(), 1);
-    let id: i64 = bien.1.parse().unwrap();
-    assert_eq!(esperar_final(&p, &cookie, id).await["estado"], "Aplicado");
+    assert_eq!((ra.0, rb.0), (200, 200), "{ra:?} {rb:?}");
+    for r in [ra, rb] {
+        let id: i64 = r.1.parse().unwrap();
+        assert_eq!(esperar_final(&p, &cookie, id).await["estado"], "Aplicado");
+    }
+    assert_eq!(p.sim.control.writes().len(), 2);
 }
 
 #[tokio::test]

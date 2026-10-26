@@ -3,9 +3,7 @@
 use super::*;
 use crate::ajustes_router::servidor::error_ajuste;
 use crate::ajustes_router::{CambioLegible, PasoVista};
-use crate::changes::{
-    CambioError, ChangeManager, ChangeRequest, GrupoRequest, Nota, Paso, PasoPreparado,
-};
+use crate::changes::{ChangeManager, ChangeRequest, GrupoRequest, Nota, Paso, PasoPreparado};
 use crate::contrasena_forma::{ErrorNueva, validar_forma_hasta};
 use crate::contrasena_router::servidor::anotar;
 use crate::instalar::servidor::{fallo, interno};
@@ -72,9 +70,7 @@ pub(super) async fn preparar(op: OperacionUsuario) -> Result<GrupoVista, ServerF
         ));
     }
     let g = gestor(&state)?;
-    if g.activo().is_some() {
-        return Err(error_ajuste(CambioError::EnCurso));
-    }
+    g.admite_cambio().map_err(error_ajuste)?;
     let borra = matches!(op, OperacionUsuario::Borrar { .. });
     let usuario = op.usuario().to_owned();
     let req = match op {

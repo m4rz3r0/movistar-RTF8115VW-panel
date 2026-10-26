@@ -47,6 +47,7 @@ historial-paso-aplicando = applying
 historial-paso-aplicado = applied
 historial-paso-fallido = failed
 historial-paso-revertido = reverted
+historial-paso-cancelado = cancelled
 # Notes and errors from the change manager: stored as keys in each
 # installation's database and shown in the language of whoever views the
 # History. Never rename or delete them (only change their text).
@@ -63,6 +64,12 @@ nota-wan-caida = the internet connection was already down before the change: onl
 nota-retomada = watching resumed after the panel restarted
 nota-sin-vigilancia = applied without watching: it does not affect the panel's connection to the router
 nota-vigilancia-terminada = { $usuario } ended the watch early
+nota-cola-anterior-deshecho = not applied because the previous change was undone
+nota-cola-anterior-no-aplicado = not applied because the previous change was not applied
+nota-cola-router-cambiado = not applied: the router has changed since you reviewed it; prepare it again
+nota-cola-no-preparado = not applied: it could not be prepared when its turn came
+nota-cola-quitado = { $usuario } removed it from the queue
+nota-cola-interrumpida = not applied: the panel stopped or restarted before its turn came
 cambio-error-router = the router didn't make the change
 cambio-error-verificacion = the router doesn't show the values written
 cambio-error-preparar = the step couldn't be prepared
@@ -72,9 +79,13 @@ cambio-error-sin-inversa = it can't be put back: the previous values aren't know
 cambio-error-router-no-responde = the router stopped answering
 vigilancia-terminar = All good, finish
 vigilancia-terminando = Finishing…
+cola-quitar = Remove from queue
+cola-quitando = Removing…
 cambio-terminar-no-vigila = That change is no longer being watched.
 cambio-terminar-otro-usuario = Only whoever made the change can end its watch.
 cambio-terminar-fallando = The router did not answer properly in the last check: wait until it recovers or the change undoes itself.
+cambio-quitar-no-en-cola = That change is no longer waiting in the queue.
+cambio-quitar-otro-usuario = Only whoever queued it can remove it.
 cambio-error-internet-caida = the internet connection went down
 cambio-error-reinicio-sin-vuelta = the router didn't come back after restarting within { $s } s
 cambio-error-accion = an action can't be undone

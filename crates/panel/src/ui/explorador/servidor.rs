@@ -118,6 +118,10 @@ pub(crate) fn error_cambio(e: CambioError) -> ServerFnError {
             crate::t!("biblioteca-error-sin-cambios"),
         ),
         E::EnCurso => (StatusCode::CONFLICT, crate::t!("biblioteca-error-en-curso")),
+        E::ColaLlena => (
+            StatusCode::CONFLICT,
+            crate::t!("cambio-error-cola-llena", max = crate::changes::MAX_COLA),
+        ),
         E::Router(m) => (
             StatusCode::BAD_GATEWAY,
             crate::t!("biblioteca-error-router", detalle = m),
@@ -921,6 +925,8 @@ pub(crate) fn estado(e: Estado) -> EstadoDeCambio {
         Estado::Revertido => EstadoDeCambio::Revertido,
         Estado::Fallido => EstadoDeCambio::Fallido,
         Estado::RevertidoParcial => EstadoDeCambio::RevertidoParcial,
+        Estado::EnCola => EstadoDeCambio::EnCola,
+        Estado::Cancelado => EstadoDeCambio::Cancelado,
     }
 }
 
@@ -942,6 +948,7 @@ pub async fn estado_cambio(
         let fin = c.updated + g.tiempos().vigilancia(c.riesgo).as_secs() as i64;
         (fin - crate::series::now()).max(0)
     });
+    let cola = g.puesto_en_cola(id);
     Ok(CambioVista {
         id: c.id,
         estado: estado(c.estado),
@@ -949,6 +956,8 @@ pub async fn estado_cambio(
         nota: c.nota.as_deref().map(nota_legible),
         restante_s,
         terminable: c.estado == Estado::Vigilando && g.terminable(id, usuario).await,
+        quitable: cola.as_ref().is_some_and(|(_, quien)| quien == usuario),
+        puesto: cola.map(|(n, _)| n),
     })
 }
 

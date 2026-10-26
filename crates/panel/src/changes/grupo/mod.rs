@@ -82,6 +82,8 @@ pub enum EstadoPaso {
     Fallido,
     /// Revertido y verificado.
     Revertido,
+    /// El cambio estuvo en la cola y no llegó a aplicarse.
+    Cancelado,
 }
 
 impl EstadoPaso {
@@ -94,6 +96,7 @@ impl EstadoPaso {
             EstadoPaso::Aplicado => "aplicado",
             EstadoPaso::Fallido => "fallido",
             EstadoPaso::Revertido => "revertido",
+            EstadoPaso::Cancelado => "cancelado",
         }
     }
 
@@ -105,6 +108,7 @@ impl EstadoPaso {
             EstadoPaso::Aplicado,
             EstadoPaso::Fallido,
             EstadoPaso::Revertido,
+            EstadoPaso::Cancelado,
         ]
         .into_iter()
         .find(|e| e.as_str() == s)

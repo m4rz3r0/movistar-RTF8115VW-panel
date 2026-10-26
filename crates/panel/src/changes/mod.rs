@@ -25,8 +25,9 @@
 //!    cambio), la vigilancia solo exige que el router deje entrar: no se
 //!    revierte un intento de arreglar una WAN caída (queda anotado).
 //!
-//! Un único cambio activo a la vez: otro `confirmar` mientras tanto recibe
-//! [`CambioError::EnCurso`]. Al arrancar, [`ChangeManager::reanudar_pendientes`]
+//! Un único cambio activo a la vez: otro `confirmar` mientras tanto espera
+//! su turno en la cola (`cola.rs`; como mucho [`MAX_COLA`], después
+//! [`CambioError::ColaLlena`]). Al arrancar, [`ChangeManager::reanudar_pendientes`]
 //! retoma los cambios que quedaron en `aplicando`/`vigilando`; hasta que
 //! termina, `confirmar` espera. La aplicación corre en su propia tarea: si
 //! quien llamó a `confirmar` se va, el cambio sigue hasta un estado final.
@@ -45,6 +46,7 @@
 //! muestran secretos enmascarados; sus valores anteriores van cifrados.
 
 mod acceso;
+mod cola;
 mod consultas;
 mod especiales;
 mod grupo;
@@ -60,6 +62,7 @@ mod tipos;
 mod vigilancia;
 
 pub use acceso::Enlace;
+pub use cola::{ErrorQuitar, MAX_COLA};
 /// Motivo (clave i18n) de un 409 cuando la regla «sin ping» del
 /// cortafuegos ya está en el router.
 pub(crate) use especiales::SIN_PING_YA_PUESTA;
@@ -111,17 +114,30 @@ const TOKEN_TTL: Duration = Duration::from_secs(10 * 60);
 /// con [`ChangeManager::excluir_cambios`]): no empieza ninguno.
 pub struct Reserva {
     m: Arc<ChangeManager>,
+    /// El hueco ya se vació al acabar la cola (`cola.rs`): al soltarla no
+    /// se toca.
+    suelta: bool,
 }
 
 impl Reserva {
     fn fijar(&self, id: i64) {
-        *lock(&self.m.activo) = Some(Some(id));
+        lock(&self.m.hueco).activo = Some(Some(id));
     }
 }
 
 impl Drop for Reserva {
     fn drop(&mut self) {
-        *lock(&self.m.activo) = None;
+        if !self.suelta {
+            let cola = {
+                let mut h = lock(&self.m.hueco);
+                h.activo = None;
+                h.con_cola = false;
+                std::mem::take(&mut h.cola)
+            };
+            // La tarea se cortó (`detener`) con cambios esperando: no se
+            // aplican.
+            self.m.cancelar_al_cortarse(cola);
+        }
         // Lo leído para mostrar durante el cambio pudo ser de antes de que
         // el router lo aplicase.
         self.m.state.lecturas.invalidar();
@@ -138,8 +154,8 @@ pub struct ChangeManager {
     state: Recursos,
     tiempos: Tiempos,
     pendientes: Mutex<HashMap<String, Pendiente>>,
-    /// Cambio activo: `Some(None)` reservado y aún sin id.
-    activo: Mutex<Option<Option<i64>>>,
+    /// El cambio activo y la cola detrás de él.
+    hueco: Mutex<cola::Hueco>,
     /// Tarea del cambio en curso (aplicación y vigilancia).
     tarea: Mutex<Option<AbortHandle>>,
     /// `true` cuando [`ChangeManager::reanudar_pendientes`] ha terminado.
@@ -181,7 +197,7 @@ impl ChangeManager {
             },
             tiempos,
             pendientes: Mutex::new(HashMap::new()),
-            activo: Mutex::new(None),
+            hueco: Mutex::new(cola::Hueco::default()),
             tarea: Mutex::new(None),
             listo: watch::Sender::new(false),
             reanudando: std::sync::atomic::AtomicBool::new(false),
@@ -231,7 +247,7 @@ impl ChangeManager {
 
     /// Id del cambio en curso (aplicándose o vigilándose).
     pub fn activo(&self) -> Option<i64> {
-        lock(&self.activo).flatten()
+        lock(&self.hueco).activo.flatten()
     }
 
     /// ¿Hay un cambio aplicándose o vigilándose, o se están retomando los
@@ -255,7 +271,7 @@ impl ChangeManager {
         if reanudando && !*self.listo.borrow() {
             return Err(CambioError::EnCurso);
         }
-        self.reservar()
+        self.reservar(false)
     }
 
     /// Espera a que el hueco quede libre y lo reserva (al retomar: lo que
@@ -264,7 +280,7 @@ impl ChangeManager {
     async fn esperar_hueco(self: &Arc<Self>, id: i64) -> Reserva {
         let mut avisado = false;
         loop {
-            if let Ok(r) = self.reservar() {
+            if let Ok(r) = self.reservar(false) {
                 return r;
             }
             if !avisado {
@@ -291,13 +307,19 @@ impl ChangeManager {
         &self.tiempos
     }
 
-    fn reservar(self: &Arc<Self>) -> Result<Reserva, CambioError> {
-        let mut a = lock(&self.activo);
-        if a.is_some() {
+    /// Reserva el hueco libre. `con_cola`: lo tiene la tarea de un cambio,
+    /// que sigue con la cola al terminar (se puede encolar detrás).
+    fn reservar(self: &Arc<Self>, con_cola: bool) -> Result<Reserva, CambioError> {
+        let mut h = lock(&self.hueco);
+        if h.activo.is_some() {
             return Err(CambioError::EnCurso);
         }
-        *a = Some(None);
-        Ok(Reserva { m: self.clone() })
+        h.activo = Some(None);
+        h.con_cola = con_cola;
+        Ok(Reserva {
+            m: self.clone(),
+            suelta: false,
+        })
     }
 }
 

@@ -54,7 +54,7 @@ impl ChangeManager {
         }
     }
 
-    /// Guarda un grupo nuevo (`aplicando`) con todos sus pasos: el principal
+    /// Guarda un grupo nuevo (`aplicando`; si esperó en la cola, en su fila) con todos sus pasos: el principal
     /// con su plan (`aplicando`), y los demás `omitido` o `pendiente` (sin
     /// valores: se guardan al llegar a ellos).
     pub(super) async fn insertar(&self, g: &NuevoGrupo<'_>) -> Result<i64, sqlx::Error> {
@@ -66,32 +66,38 @@ impl ChangeManager {
         };
         let now = series::now();
         let mut tx = self.state.db.begin().await?;
-        let id: i64 = sqlx::query_scalar(
-            "INSERT INTO changes (ts, updated, user_id, usuario, funcion, instancia, riesgo, \
+        // Un cambio que esperó en la cola ya tiene su fila.
+        let id: i64 = if let Some(id) = g.fila {
+            Self::ocupar_fila(&mut tx, id, g, &d, wan_antes).await?;
+            id
+        } else {
+            sqlx::query_scalar(
+                "INSERT INTO changes (ts, updated, user_id, usuario, funcion, instancia, riesgo, \
              estado, operacion, diff, anteriores, anteriores_cifrados, solicitud, nuevos, \
              nuevos_cifrados, wan_antes, ids_antes, titulo) VALUES (?, ?, \
              (SELECT id FROM users WHERE username = ?), \
              ?, ?, ?, ?, 'aplicando', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
-        )
-        .bind(now)
-        .bind(now)
-        .bind(g.usuario)
-        .bind(g.usuario)
-        .bind(funcion_enviada(plan))
-        .bind(&plan.instancia)
-        .bind(riesgo_str(g.riesgo))
-        .bind(d.operacion)
-        .bind(&d.diff)
-        .bind(&d.anteriores)
-        .bind(&d.anteriores_cifrados)
-        .bind(&d.solicitud)
-        .bind(&d.nuevos)
-        .bind(&d.nuevos_cifrados)
-        .bind(wan_antes)
-        .bind(&d.ids_antes)
-        .bind(g.titulo)
-        .fetch_one(&mut *tx)
-        .await?;
+            )
+            .bind(now)
+            .bind(now)
+            .bind(g.usuario)
+            .bind(g.usuario)
+            .bind(funcion_enviada(plan))
+            .bind(&plan.instancia)
+            .bind(riesgo_str(g.riesgo))
+            .bind(d.operacion)
+            .bind(&d.diff)
+            .bind(&d.anteriores)
+            .bind(&d.anteriores_cifrados)
+            .bind(&d.solicitud)
+            .bind(&d.nuevos)
+            .bind(&d.nuevos_cifrados)
+            .bind(wan_antes)
+            .bind(&d.ids_antes)
+            .bind(g.titulo)
+            .fetch_one(&mut *tx)
+            .await?
+        };
         for (i, paso) in g.pasos.iter().enumerate() {
             let (funcion, instancia, datos, estado) = if i == i0 {
                 (
@@ -363,18 +369,18 @@ impl ChangeManager {
 }
 
 /// Lo que se guarda de un plan.
-struct DatosPlan {
-    operacion: &'static str,
+pub(in crate::changes) struct DatosPlan {
+    pub(in crate::changes) operacion: &'static str,
     /// JSON de los valores enviados no secretos.
-    solicitud: String,
+    pub(in crate::changes) solicitud: String,
     /// JSON del diff (secretos enmascarados).
-    diff: String,
+    pub(in crate::changes) diff: String,
     /// JSON de los valores no secretos y, aparte, los secretos cifrados.
-    anteriores: String,
-    anteriores_cifrados: Option<Vec<u8>>,
-    nuevos: String,
-    nuevos_cifrados: Option<Vec<u8>>,
-    ids_antes: Option<String>,
+    pub(in crate::changes) anteriores: String,
+    pub(in crate::changes) anteriores_cifrados: Option<Vec<u8>>,
+    pub(in crate::changes) nuevos: String,
+    pub(in crate::changes) nuevos_cifrados: Option<Vec<u8>>,
+    pub(in crate::changes) ids_antes: Option<String>,
 }
 
 impl DatosPlan {
@@ -405,9 +411,11 @@ pub(super) struct NuevoGrupo<'a> {
     pub(super) usuario: &'a str,
     pub(super) base: Base,
     pub(super) deshace: Option<i64>,
+    /// Su fila `en_cola`, si esperó en la cola.
+    pub(super) fila: Option<i64>,
 }
 
-fn riesgo_str(r: Riesgo) -> &'static str {
+pub(super) fn riesgo_str(r: Riesgo) -> &'static str {
     match r {
         Riesgo::Bajo => "bajo",
         Riesgo::Medio => "medio",
@@ -415,7 +423,7 @@ fn riesgo_str(r: Riesgo) -> &'static str {
     }
 }
 
-fn json<T: Serialize + ?Sized>(v: &T) -> String {
+pub(super) fn json<T: Serialize + ?Sized>(v: &T) -> String {
     serde_json::to_string(v).expect("mapas de cadenas serializables")
 }
 

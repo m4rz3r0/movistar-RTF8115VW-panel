@@ -8,6 +8,7 @@
 
 pub mod ajustes_router;
 pub mod charts;
+pub mod cola;
 pub mod comun;
 pub mod contrasena_campo;
 pub mod estado;

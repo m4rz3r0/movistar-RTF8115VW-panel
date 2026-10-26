@@ -59,6 +59,8 @@ biblioteca-cambio-aplicado = aplicado
 biblioteca-cambio-revertido = revertido
 biblioteca-cambio-fallido = fallido
 biblioteca-cambio-revertido-parcial = revertido en parte
+biblioteca-cambio-en-cola = en cola
+biblioteca-cambio-cancelado = cancelado
 
 ## Ficha
 biblioteca-pagina-router = Página del router
@@ -162,6 +164,7 @@ biblioteca-aplicar = Aplicar
 biblioteca-error-bloqueada = Función bloqueada: { $motivo }.
 biblioteca-error-sin-cambios = No hay nada que cambiar: los valores coinciden con los del router.
 biblioteca-error-en-curso = Hay otro cambio en curso; espera a que termine y vuelve a intentarlo.
+cambio-error-cola-llena = Ya hay { $max } cambios en cola: espera a que se apliquen o quita alguno.
 biblioteca-error-router = { $detalle }. Comprueba la conexión con el router y vuelve a intentarlo.
 biblioteca-error-verificacion = El router no muestra el cambio ({ $detalle }). No se ha revertido nada: revisa los valores en su página.
 biblioteca-error-palabra = La palabra de confirmación no coincide: escríbela exactamente como se indica.

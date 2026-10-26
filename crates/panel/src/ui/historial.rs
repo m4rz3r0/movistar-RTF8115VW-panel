@@ -96,6 +96,7 @@ pub enum EstadoPasoVista {
     Aplicado,
     Fallido,
     Revertido,
+    Cancelado,
 }
 
 impl EstadoPasoVista {
@@ -107,13 +108,14 @@ impl EstadoPasoVista {
             EstadoPasoVista::Aplicado => t!("historial-paso-aplicado"),
             EstadoPasoVista::Fallido => t!("historial-paso-fallido"),
             EstadoPasoVista::Revertido => t!("historial-paso-revertido"),
+            EstadoPasoVista::Cancelado => t!("historial-paso-cancelado"),
         }
     }
 
     pub fn estado(self) -> EstadoVisual {
         match self {
             EstadoPasoVista::Aplicado => EstadoVisual::Emite,
-            EstadoPasoVista::Revertido => EstadoVisual::Atencion,
+            EstadoPasoVista::Revertido | EstadoPasoVista::Cancelado => EstadoVisual::Atencion,
             EstadoPasoVista::Fallido => EstadoVisual::Peligro,
             _ => EstadoVisual::Proceso,
         }

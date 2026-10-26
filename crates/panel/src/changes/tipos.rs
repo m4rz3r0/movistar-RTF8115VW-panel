@@ -175,6 +175,8 @@ pub enum CambioError {
     SinCambios,
     /// Hay otro cambio en curso.
     EnCurso,
+    /// La cola de cambios está llena ([`MAX_COLA`]).
+    ColaLlena,
     /// El router (o el panel) no pudo hacer el cambio.
     Router(String),
     /// El router no muestra lo que se escribió.
@@ -196,6 +198,10 @@ impl std::fmt::Display for CambioError {
             CambioError::Bloqueada(m) => write!(f, "función bloqueada: {m}"),
             CambioError::SinCambios => f.write_str("no hay nada que cambiar"),
             CambioError::EnCurso => f.write_str("hay otro cambio en curso"),
+            CambioError::ColaLlena => write!(
+                f,
+                "ya hay {MAX_COLA} cambios en cola: espera a que se apliquen o quita alguno"
+            ),
             CambioError::Router(e) => write!(f, "{e}"),
             CambioError::Verificacion(v) => {
                 write!(f, "el router no muestra el cambio: {}", v.join("; "))
@@ -225,6 +231,11 @@ pub enum Estado {
     /// Grupo que falló y cuya reversión no se pudo completar: el detalle
     /// (`error`) dice qué pasos siguen aplicados.
     RevertidoParcial,
+    /// Confirmado mientras otro cambio se aplicaba o vigilaba: espera su
+    /// turno en la cola (ver `cola.rs`).
+    EnCola,
+    /// Estuvo en la cola y no llegó a aplicarse (el motivo, en `error`).
+    Cancelado,
 }
 
 impl Estado {
@@ -238,6 +249,8 @@ impl Estado {
             Estado::Revertido => "revertido",
             Estado::Fallido => "fallido",
             Estado::RevertidoParcial => "revertido_parcial",
+            Estado::EnCola => "en_cola",
+            Estado::Cancelado => "cancelado",
         }
     }
 
@@ -250,6 +263,8 @@ impl Estado {
             Estado::Revertido,
             Estado::Fallido,
             Estado::RevertidoParcial,
+            Estado::EnCola,
+            Estado::Cancelado,
         ]
         .into_iter()
         .find(|e| e.as_str() == s)
@@ -302,6 +317,10 @@ pub(super) struct Pendiente {
     /// Usuario del panel que lo preparó ([`ChangeManager::ligar`]): solo él
     /// lo confirma. `None`: sin ligar, y así no lo confirma nadie.
     pub(super) usuario: Option<String>,
+    /// Lo que mostró cada paso al preparar (`None`: sin cambios): si el
+    /// cambio espera en la cola, antes de escribir se vuelve a calcular y
+    /// tiene que salir igual (ver `cola.rs`).
+    pub(super) huella: Vec<Option<super::cola::Huella>>,
 }
 
 /// Lo que el gestor usa del estado del servidor (sin el propio gestor, para
