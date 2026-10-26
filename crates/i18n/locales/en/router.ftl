@@ -115,3 +115,5 @@ usuarios-router-nota-revertido = The deleted user was created again with a new p
 validacion-real-pendiente-usuarios = Creating and deleting users has not been checked against a real router yet: it is not available for now.
 validacion-real-pendiente-contrasena-otro = Changing another user's password has not been checked against a real router yet: it is not available for now.
 validacion-real-pendiente-sin-ping = Not answering ping has not been checked against a real router yet: it is not available for now.
+usuarios-router-no-panel = These are not this panel's users: those are in
+usuarios-router-no-panel-enlace = Panel settings → Who can log in to this panel

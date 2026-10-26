@@ -186,8 +186,8 @@ pub(crate) fn Usuarios(a: AjusteVista, elemento: String) -> impl IntoView {
         // Las dos listas se confundían: esta dice cuál no es y enlaza a la otra.
         <p class="aviso estado-neutro usuarios-router-no-panel">
             <span>
-                {t!("ajuste-seguridad-usuarios_router-no-panel")} " "
-                <A href="/panel">{t!("ajuste-seguridad-usuarios_router-no-panel-enlace")}</A>
+                {t!("usuarios-router-no-panel")} " "
+                <A href="/panel">{t!("usuarios-router-no-panel-enlace")}</A>
                 "."
             </span>
         </p>

@@ -51,8 +51,6 @@ ajuste-seguridad-contrasena_router-ayuda = If it is still the one on the router'
 ## Router users
 ajuste-seguridad-usuarios_router-titulo = Router web accounts
 ajuste-seguridad-usuarios_router-desc = The accounts that can get into the router's web pages and what each one can do.
-ajuste-seguridad-usuarios_router-no-panel = These are not this panel's users: those are in
-ajuste-seguridad-usuarios_router-no-panel-enlace = Panel settings → Who can log in to this panel
 ajuste-seguridad-usuarios_router-ayuda = There is an operator account that the router's web pages do not show: its technical support uses it to get into the router. That is why there may be one more account here than you see there. Neither that account nor the one this panel uses to get in can be deleted or changed from here.
 ajuste-seguridad-usuarios_router-motivo = It is changed with each account's buttons, not here.
 ajuste-seguridad-usuarios_router-nombre = Account name

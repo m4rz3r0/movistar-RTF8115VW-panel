@@ -115,3 +115,5 @@ usuarios-router-nota-revertido = Se volvió a crear el usuario borrado con una c
 validacion-real-pendiente-usuarios = Crear y borrar usuarios aún no se ha comprobado con el router de verdad: de momento no se puede.
 validacion-real-pendiente-contrasena-otro = Cambiar la contraseña de otro usuario aún no se ha comprobado con el router de verdad: de momento no se puede.
 validacion-real-pendiente-sin-ping = No responder al ping aún no se ha comprobado con el router de verdad: de momento no se puede.
+usuarios-router-no-panel = No son los usuarios de este panel: esos están en
+usuarios-router-no-panel-enlace = Ajustes del panel → Quién entra en este panel

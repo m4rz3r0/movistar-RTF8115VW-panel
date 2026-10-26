@@ -51,8 +51,6 @@ ajuste-seguridad-contrasena_router-ayuda = Si sigue siendo la que venía en la p
 ## Usuarios del router
 ajuste-seguridad-usuarios_router-titulo = Cuentas de la web del router
 ajuste-seguridad-usuarios_router-desc = Las cuentas que pueden entrar en la web del router y lo que puede hacer cada una.
-ajuste-seguridad-usuarios_router-no-panel = No son los usuarios de este panel: esos están en
-ajuste-seguridad-usuarios_router-no-panel-enlace = Ajustes del panel → Quién entra en este panel
 ajuste-seguridad-usuarios_router-ayuda = Hay una cuenta del operador que la web del router no enseña: es la que usa su soporte técnico para entrar en el router. Por eso aquí puede aparecer una cuenta más de las que ves allí. Ni esa cuenta ni la que usa este panel para entrar se pueden borrar o cambiar desde aquí.
 ajuste-seguridad-usuarios_router-motivo = Se cambia con los botones de cada cuenta, no aquí.
 ajuste-seguridad-usuarios_router-nombre = Nombre de la cuenta
