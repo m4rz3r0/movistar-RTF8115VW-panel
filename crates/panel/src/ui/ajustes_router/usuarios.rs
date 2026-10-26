@@ -183,26 +183,26 @@ pub(crate) fn Usuarios(a: AjusteVista, elemento: String) -> impl IntoView {
     .map(|(m, id)| view! { <p class="nota-solo-lectura" id=id>{traducir(m, None)}</p> })
     .collect_view();
     view! {
-            // Las dos listas se confundían: esta dice cuál no es y enlaza a la otra.
-            <p class="aviso estado-neutro usuarios-router-no-panel">
-                <span>
-                    {t!("ajuste-seguridad-usuarios_router-no-panel")} " "
-                    <A href="/panel">{t!("ajuste-seguridad-usuarios_router-no-panel-enlace")}</A>
-                    "."
-                </span>
-            </p>
-            <div class="ajustes-usuarios usuarios-router">{filas} {nuevos}</div>
-            <p class="error-formulario" role="alert">{move || error.get()}</p>
-            {motivos}
-            <NuevoUsuario
-                en_curso=en_curso.into()
-                bloqueado=bloqueos.sin_gestor
-                ocupado
-                preparar=Callback::new(preparar)
-                motivo=bloqueos.motivo_gestor
-            />
-            {move || reauth.abierto().then(|| view! { <DialogoReautenticar /> })}
-        }
+        // Las dos listas se confundían: esta dice cuál no es y enlaza a la otra.
+        <p class="aviso estado-neutro usuarios-router-no-panel">
+            <span>
+                {t!("ajuste-seguridad-usuarios_router-no-panel")} " "
+                <A href="/panel">{t!("ajuste-seguridad-usuarios_router-no-panel-enlace")}</A>
+                "."
+            </span>
+        </p>
+        <div class="ajustes-usuarios usuarios-router">{filas} {nuevos}</div>
+        <p class="error-formulario" role="alert">{move || error.get()}</p>
+        {motivos}
+        <NuevoUsuario
+            en_curso=en_curso.into()
+            bloqueado=bloqueos.sin_gestor
+            ocupado
+            preparar=Callback::new(preparar)
+            motivo=bloqueos.motivo_gestor
+        />
+        {move || reauth.abierto().then(|| view! { <DialogoReautenticar /> })}
+    }
 }
 
 /// La fila de un usuario que se está creando: su nombre, la insignia del

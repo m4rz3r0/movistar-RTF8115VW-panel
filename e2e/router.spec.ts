@@ -159,7 +159,7 @@ function sinApiNiClave(texto: string) {
 async function pedirCambio(page: Page, nueva: string) {
   const tarjeta = page.locator("section#router-cambiar-contrasena");
   await tarjeta.locator("#router-contrasena-nueva").fill(nueva);
-  await tarjeta.getByRole("button", { name: /^(Cambiar|Change)$/ }).click();
+  await tarjeta.getByRole("button", { name: /^(Cambiar la contraseña|Change the password)$/ }).click();
   const dialogo = page.locator("dialog[open]");
   await expect(dialogo).toBeVisible();
   if (await dialogo.locator("#reautenticar-contrasena").count()) {
@@ -203,7 +203,7 @@ test.describe("cambiar la contraseña del router", () => {
 
       // Una corta: el error, sin diálogo.
       await nueva.fill("corta");
-      await cambio.getByRole("button", { name: "Cambiar" }).click();
+      await cambio.getByRole("button", { name: "Cambiar la contraseña" }).click();
       await expect(cambio.locator(".error-formulario")).toContainText("demasiado corta");
       await expect(page.locator("dialog[open]")).toHaveCount(0);
 
@@ -421,7 +421,7 @@ test("es a 360 px: en solo lectura la tarjeta se ve desactivada", async ({ page 
   const cambio = page.locator("section#router-cambiar-contrasena");
   await expect(cambio).toContainText("No se puede cambiar mientras el panel esté en solo lectura");
   await expect(cambio.locator("#router-contrasena-nueva")).toBeDisabled();
-  await expect(cambio.getByRole("button", { name: "Cambiar" })).toBeDisabled();
+  await expect(cambio.getByRole("button", { name: "Cambiar la contraseña" })).toBeDisabled();
   // Y se ve apagado, como los botones desactivados.
   await expect(cambio.locator(".secreto-campo")).toHaveCSS("opacity", "0.6");
   await sinDesbordamiento(page, "solo lectura 360");

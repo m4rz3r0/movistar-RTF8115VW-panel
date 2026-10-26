@@ -253,7 +253,10 @@ pub(super) fn Indicadores(
         "rejilla-indicadores"
     };
     view! {
-        <section class=clase aria-label=t!("estado-indicadores")>
+        // Con su título (oculto): los de los indicadores son h3 (axe,
+        // heading-order).
+        <section class=clase aria-labelledby="indicadores-titulo">
+            <h2 id="indicadores-titulo" class="solo-lector">{t!("estado-indicadores")}</h2>
             {tarjetas}
         </section>
     }

@@ -35,8 +35,12 @@ pub(crate) fn lista(a: &AjusteVista) -> impl IntoView + use<> {
             .collect_view();
         // Con foco: una tabla ancha (las reglas del cortafuegos) se recorre
         // con el teclado dentro de su caja, una región con el nombre del
-        // ajuste para el lector de pantalla.
-        let nombre = traducir(&format!("{}-titulo", a.clave), None);
+        // ajuste para el lector de pantalla (distinto del detalle, que es
+        // otra región con el nombre del ajuste: axe, landmark-unique).
+        let nombre = t!(
+            "ajustes-tabla-region",
+            nombre = traducir(&format!("{}-titulo", a.clave), None)
+        );
         view! {
             <div class="tabla-scroll" tabindex="0" role="region" aria-label=nombre>
                 <table class="tabla">

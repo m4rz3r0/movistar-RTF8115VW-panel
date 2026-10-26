@@ -30,6 +30,15 @@ pub mod vista;
 use crate::t;
 use leptos::prelude::*;
 
+/// «aplicado» → «Aplicado»: una etiqueta que también va a media frase,
+/// sola en una insignia.
+pub(crate) fn mayuscula_inicial(s: &str) -> String {
+    let mut c = s.chars();
+    c.next()
+        .map(|p| p.to_uppercase().chain(c).collect())
+        .unwrap_or_default()
+}
+
 /// Texto de un error que trae una server function: el código fijo de sesión
 /// caducada ([`crate::auth::ERROR_SESION`]) se traduce aquí; el resto ya
 /// viene traducido del servidor.

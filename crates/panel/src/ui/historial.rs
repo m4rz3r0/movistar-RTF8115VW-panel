@@ -466,7 +466,7 @@ fn lista_pasos(
                             <span>{p.etiqueta}</span>
                             {instancia}
                             <span class="hist-paso-estado">
-                                <Insignia estado=p.estado.estado() texto=p.estado.etiqueta() />
+                                <Insignia estado=p.estado.estado() texto=super::mayuscula_inicial(&p.estado.etiqueta()) />
                             </span>
                         </summary>
                         <div class="hist-paso-cuerpo">
@@ -670,7 +670,7 @@ fn FilaCambio(
                     <span class="hist-diff">{c.resumen}</span>
                     <span class="hist-insignias">
                         <Insignia estado=c.riesgo.estado() texto=c.riesgo.etiqueta() />
-                        <Insignia estado texto=c.estado.etiqueta() />
+                        <Insignia estado texto=super::mayuscula_inicial(&c.estado.etiqueta()) />
                     </span>
                 </summary>
                 <div class="hist-detalle">

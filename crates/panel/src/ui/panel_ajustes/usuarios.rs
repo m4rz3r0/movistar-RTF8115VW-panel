@@ -215,50 +215,50 @@ pub(super) fn SeccionUsuarios(usuarios: Vec<String>, yo: String) -> impl IntoVie
     };
 
     view! {
-            <section class="tarjeta" aria-labelledby="panel-usuarios">
-                <h2 id="panel-usuarios">{t!("panel-usuarios")}</h2>
-                <p class="nota">{t!("panel-usuarios-texto")}</p>
-                <p class="aviso estado-neutro panel-usuarios-no-router">
-                    <span>
-                        {t!("panel-usuarios-no-router")} " "
-                        <A href=USUARIOS_ROUTER>{t!("panel-usuarios-no-router-enlace")}</A>
-                        "."
-                    </span>
-                </p>
-                <ul class="lista-limpia ajustes-usuarios">
-                    <For each=move || usuarios.get() key=|u| u.clone() children=fila />
-                </ul>
-                {mensajes(error, aviso)}
-                <form
-                    class="ajustes-formulario"
-                    on:submit=move |ev: SubmitEvent| {
-                        ev.prevent_default();
-                        crear.run(());
-                    }
-                >
-                    <h3>{t!("panel-usuario-nuevo")}</h3>
-                    {super::campo("panel-usuario-nombre", t!("panel-usuario-nombre"), "text", "off", nombre, None)}
-                    <CampoContrasena
-                        id="panel-usuario-clave"
-                        etiqueta=t!("panel-usuario-clave", n = MIN_CONTRASENA)
-                        autocompletar="new-password"
-                        valor=clave
-                        requerido=true
-                    />
-                    <div class="botones">
-                        <button
-                            class="b-pri"
-                            type="submit"
-                            aria-busy=move || pendiente.get().then_some("true")
-                            disabled=move || pendiente.get()
-                        >
-                            {t!("panel-usuario-crear")}
-                        </button>
-                    </div>
-                </form>
-                {move || borrando.get().map(|u| view! { <ConfirmarBorrado usuario=u borrando pendiente borrar /> })}
-            </section>
-        }
+        <section class="tarjeta" aria-labelledby="panel-usuarios">
+            <h2 id="panel-usuarios">{t!("panel-usuarios")}</h2>
+            <p class="nota">{t!("panel-usuarios-texto")}</p>
+            <p class="aviso estado-neutro panel-usuarios-no-router">
+                <span>
+                    {t!("panel-usuarios-no-router")} " "
+                    <A href=USUARIOS_ROUTER>{t!("panel-usuarios-no-router-enlace")}</A>
+                    "."
+                </span>
+            </p>
+            <ul class="lista-limpia ajustes-usuarios">
+                <For each=move || usuarios.get() key=|u| u.clone() children=fila />
+            </ul>
+            {mensajes(error, aviso)}
+            <form
+                class="ajustes-formulario"
+                on:submit=move |ev: SubmitEvent| {
+                    ev.prevent_default();
+                    crear.run(());
+                }
+            >
+                <h3>{t!("panel-usuario-nuevo")}</h3>
+                {super::campo("panel-usuario-nombre", t!("panel-usuario-nombre"), "text", "off", nombre, None)}
+                <CampoContrasena
+                    id="panel-usuario-clave"
+                    etiqueta=t!("panel-usuario-clave", n = MIN_CONTRASENA)
+                    autocompletar="new-password"
+                    valor=clave
+                    requerido=true
+                />
+                <div class="botones">
+                    <button
+                        class="b-pri"
+                        type="submit"
+                        aria-busy=move || pendiente.get().then_some("true")
+                        disabled=move || pendiente.get()
+                    >
+                        {t!("panel-usuario-crear")}
+                    </button>
+                </div>
+            </form>
+            {move || borrando.get().map(|u| view! { <ConfirmarBorrado usuario=u borrando pendiente borrar /> })}
+        </section>
+    }
 }
 
 /// Confirma el borrado de `usuario`: qué pasa (deja de entrar, se cierran
