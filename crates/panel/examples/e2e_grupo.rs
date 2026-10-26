@@ -49,6 +49,7 @@ async fn aplicar_grupo(gestor: &Arc<ChangeManager>, grupo: GrupoRequest) -> Resu
         .preparar_grupo(grupo)
         .await
         .map_err(|e| format!("preparar: {e:?}"))?;
+    gestor.ligar(&prep.token, "e2e");
     let id = gestor
         .confirmar_grupo(&prep.token, &[], "e2e")
         .await

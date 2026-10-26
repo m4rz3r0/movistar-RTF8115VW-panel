@@ -1,6 +1,7 @@
 //! Pruebas del gestor de cambios por grupos de pasos contra `router-sim`,
 //! con tiempos de vigilancia cortos.
 
+use crate::comun::ConfirmarLigado;
 use crate::comun::{
     Panel, Registro, esperar_estado, esperar_hasta, esperar_hasta_con, esperar_libre_gestor,
     gestor, get, panel_rapido, preparado, req, tiempos_rapidos,
@@ -138,7 +139,7 @@ fn confirmar_en_segundo_plano(
     token: &str,
 ) -> tokio::task::JoinHandle<Result<i64, CambioError>> {
     let (m, token) = (m.clone(), token.to_owned());
-    tokio::spawn(async move { m.confirmar_grupo(&token, &[], "admin").await })
+    tokio::spawn(async move { m.confirmar_grupo_ligado(&token, &[], "admin").await })
 }
 
 async fn esperar_escrituras(p: &Panel, n: usize) {

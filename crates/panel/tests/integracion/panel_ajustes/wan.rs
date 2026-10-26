@@ -1,6 +1,7 @@
 //! Conexión a internet (WAN) elegida a mano y detección de la red.
 
 use super::*;
+use crate::comun::ConfirmarLigado;
 
 /// La red detectada y las conexiones del router llegan a la página; elegir
 /// la conexión a internet a mano exige reautenticación y un nombre que el
@@ -186,7 +187,9 @@ async fn red_bloqueada_mientras_se_retoman_cambios() {
         identidad: Default::default(),
     };
     let prep = a.preparar(peticion).await.unwrap();
-    a.confirmar(&prep.token, None, "admin").await.unwrap();
+    a.confirmar_ligado(&prep.token, None, "admin")
+        .await
+        .unwrap();
     a.detener();
 
     // El gestor del proceso nuevo, con el hueco ocupado: retomar espera.

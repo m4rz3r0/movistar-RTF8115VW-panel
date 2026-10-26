@@ -2,6 +2,7 @@
 //! orden y mezcla de cambios y reveladores, paginación, enlaces de deshacer y
 //! que no sale ningún secreto.
 
+use crate::comun::ConfirmarLigado;
 use crate::comun::{
     Panel, PanelPrueba, aplicar, body_text, esperar_final, esperar_hasta, fijar, get_con_cookie,
     llamar, ok, valores_de,
@@ -355,7 +356,10 @@ async fn grupo_es_una_fila_con_sus_pasos() {
         })
         .await
         .unwrap();
-    let id = m.confirmar_grupo(&prep.token, &[], "admin").await.unwrap();
+    let id = m
+        .confirmar_grupo_ligado(&prep.token, &[], "admin")
+        .await
+        .unwrap();
     esperar_hasta(Duration::from_secs(10), "aplicado", async || {
         m.cambio(id).await.unwrap().estado == Estado::Aplicado
     })

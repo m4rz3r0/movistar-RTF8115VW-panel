@@ -63,3 +63,33 @@ async fn otro_usuario_no_confirma_ni_gasta_el_token() {
         crate::comun::esperar_libre(&p).await;
     }
 }
+
+/// Un token que no está ligado a ningún usuario (preparado con el gestor
+/// directamente) no se confirma, ni por el gestor ni por HTTP, y no escribe
+/// nada; ligado, sí.
+#[tokio::test]
+async fn token_sin_usuario_se_rechaza() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    let m = p.state.cambios().unwrap();
+    let lease = crate::comun::req(
+        "cbDhcpV4SvrPoolSetStatic",
+        Some("0"),
+        &[
+            ("rtm_cfg_dhcpv4_svr_pool_id", "0"),
+            ("ipv4_addr", "192.168.1.80"),
+        ],
+    );
+    let prep = m.preparar(lease).await.unwrap();
+    let r = m.confirmar(&prep.token, None, "admin").await;
+    assert!(
+        matches!(r, Err(panel::changes::CambioError::TokenInvalido)),
+        "{r:?}"
+    );
+    let (status, body) = confirmar(&p, &cookie, "confirmar_cambio", &json!(prep.token)).await;
+    assert_eq!(status, 400, "{body}");
+    assert!(p.sim.control.writes().is_empty());
+    // Ligado a quien confirma, sí vale (el token no se gastó).
+    m.ligar(&prep.token, "admin");
+    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    assert!(id > 0);
+}

@@ -1,12 +1,16 @@
 //! Deshacer un cambio aplicado, una sola vez.
 
 use super::*;
+use crate::comun::ConfirmarLigado;
 
 #[tokio::test]
 async fn deshacer_restaura_valor_anterior() {
     let (p, m) = preparado().await;
     let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
-    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    let id = m
+        .confirmar_ligado(&prep.token, None, "admin")
+        .await
+        .unwrap();
     // Solo se deshace un cambio ya aplicado.
     let r = m.deshacer(id).await;
     assert!(matches!(r, Err(CambioError::Invalida(_))), "{r:?}");
@@ -19,7 +23,10 @@ async fn deshacer_restaura_valor_anterior() {
         (c.nombre.as_str(), c.antes.as_str(), c.despues.as_str()),
         ("ipv4_addr", "192.168.1.80", "192.168.1.68")
     );
-    let id2 = m.confirmar(&deshacer.token, None, "admin").await.unwrap();
+    let id2 = m
+        .confirmar_ligado(&deshacer.token, None, "admin")
+        .await
+        .unwrap();
     esperar_estado(&m, id2, Estado::Aplicado).await;
     assert_eq!(ip_de_lease(&p, "0").await.as_deref(), Some("192.168.1.68"));
 }
@@ -28,7 +35,10 @@ async fn deshacer_restaura_valor_anterior() {
 async fn deshacer_una_reserva_nueva_la_borra() {
     let (p, m) = preparado().await;
     let prep = m.preparar(nueva_reserva()).await.unwrap();
-    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    let id = m
+        .confirmar_ligado(&prep.token, None, "admin")
+        .await
+        .unwrap();
     esperar_estado(&m, id, Estado::Aplicado).await;
     esperar_libre_gestor(&m).await;
     let deshacer = m.deshacer(id).await.unwrap();
@@ -39,7 +49,10 @@ async fn deshacer_una_reserva_nueva_la_borra() {
             .iter()
             .any(|c| c.nombre == "ipv4_addr" && c.antes == "192.168.1.99" && c.despues.is_empty())
     );
-    let id2 = m.confirmar(&deshacer.token, None, "admin").await.unwrap();
+    let id2 = m
+        .confirmar_ligado(&deshacer.token, None, "admin")
+        .await
+        .unwrap();
     esperar_estado(&m, id2, Estado::Aplicado).await;
     assert_eq!(ip_de_lease(&p, "2").await, None);
     let w = p.sim.control.writes();
@@ -50,7 +63,10 @@ async fn deshacer_una_reserva_nueva_la_borra() {
     esperar_libre_gestor(&m).await;
     // Y deshacer el borrado la vuelve a crear.
     let otra = m.deshacer(id2).await.unwrap();
-    let id3 = m.confirmar(&otra.token, None, "admin").await.unwrap();
+    let id3 = m
+        .confirmar_ligado(&otra.token, None, "admin")
+        .await
+        .unwrap();
     esperar_estado(&m, id3, Estado::Aplicado).await;
     let leases = read::static_leases(&p.state.hgu).await.unwrap();
     assert!(
@@ -64,12 +80,15 @@ async fn deshacer_una_reserva_nueva_la_borra() {
 async fn no_se_deshace_dos_veces() {
     let (p, m) = preparado().await;
     let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
-    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    let id = m
+        .confirmar_ligado(&prep.token, None, "admin")
+        .await
+        .unwrap();
     esperar_estado(&m, id, Estado::Aplicado).await;
     esperar_libre_gestor(&m).await;
     let u1 = m.deshacer(id).await.unwrap();
     let u2 = m.deshacer(id).await.unwrap();
-    let id2 = m.confirmar(&u1.token, None, "admin").await.unwrap();
+    let id2 = m.confirmar_ligado(&u1.token, None, "admin").await.unwrap();
     // Con el primero en curso, ni otro deshacer ni el segundo token.
     let r = m.deshacer(id).await;
     assert!(
@@ -78,7 +97,7 @@ async fn no_se_deshace_dos_veces() {
     );
     esperar_estado(&m, id2, Estado::Aplicado).await;
     esperar_libre_gestor(&m).await;
-    let r = m.confirmar(&u2.token, None, "admin").await;
+    let r = m.confirmar_ligado(&u2.token, None, "admin").await;
     assert!(
         matches!(&r, Err(CambioError::Invalida(e)) if e.contains("ya se ha deshecho")),
         "{r:?}"

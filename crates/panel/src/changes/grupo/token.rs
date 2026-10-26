@@ -5,8 +5,9 @@ use super::*;
 impl ChangeManager {
     /// Liga el cambio preparado con `token` al usuario del panel `usuario`:
     /// solo él lo confirma; otro recibe `TokenInvalido` y el token sigue
-    /// valiendo. Lo llaman las server functions que preparan, con el
-    /// usuario de la sesión.
+    /// valiendo. Un token sin ligar no lo confirma nadie: lo ligan las
+    /// server functions que preparan, con el usuario de la sesión, y quien
+    /// use el gestor directamente.
     pub fn ligar(&self, token: &str, usuario: &str) {
         if let Some(p) = lock(&self.pendientes).get_mut(token) {
             p.usuario = Some(usuario.to_owned());

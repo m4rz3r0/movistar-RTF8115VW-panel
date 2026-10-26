@@ -1,6 +1,7 @@
 //! Revertir y deshacer grupos: fallos a mitad, vigilancia y escrituras inciertas.
 
 use super::*;
+use crate::comun::ConfirmarLigado;
 
 #[tokio::test]
 async fn fallo_en_paso_k_revierte_anteriores() {
@@ -11,7 +12,7 @@ async fn fallo_en_paso_k_revierte_anteriores() {
         .unwrap();
     assert_eq!(prep.riesgo, Riesgo::Medio, "el mayor de los pasos");
     p.sim.control.fail_write_n(3);
-    let r = m.confirmar_grupo(&prep.token, &[], "admin").await;
+    let r = m.confirmar_grupo_ligado(&prep.token, &[], "admin").await;
     assert!(r.is_err(), "{r:?}");
     let c = m.historial(1).await.remove(0);
     assert_eq!(c.estado, Estado::Fallido, "{:?}", c.error);
@@ -41,7 +42,7 @@ async fn fallo_al_revertir_es_revertido_parcial() {
     // Falla el paso 3 y, al revertir, la reversión del paso 1 (escritura 5).
     p.sim.control.fail_write_n(3);
     p.sim.control.fail_write_n(5);
-    let r = m.confirmar_grupo(&prep.token, &[], "admin").await;
+    let r = m.confirmar_grupo_ligado(&prep.token, &[], "admin").await;
     let Err(CambioError::Router(e)) = &r else {
         panic!("{r:?}");
     };
@@ -80,7 +81,10 @@ async fn vigilancia_revierte_grupo_entero() {
         .await
         .unwrap();
     assert_eq!(prep.riesgo, Riesgo::Medio);
-    let id = m.confirmar_grupo(&prep.token, &[], "admin").await.unwrap();
+    let id = m
+        .confirmar_grupo_ligado(&prep.token, &[], "admin")
+        .await
+        .unwrap();
     assert_eq!(m.cambio(id).await.unwrap().riesgo, Riesgo::Medio);
     // Pasado el plazo del riesgo bajo, la vigilancia sigue.
     tokio::time::sleep(Duration::from_millis(300)).await;
@@ -105,7 +109,10 @@ async fn deshacer_grupo() {
         .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.80")]))
         .await
         .unwrap();
-    let id = m.confirmar_grupo(&prep.token, &[], "admin").await.unwrap();
+    let id = m
+        .confirmar_grupo_ligado(&prep.token, &[], "admin")
+        .await
+        .unwrap();
     esperar_estado(&m, id, Estado::Aplicado).await;
     esperar_libre_gestor(&m).await;
     assert!(m.se_puede_deshacer(id).await);
@@ -116,7 +123,7 @@ async fn deshacer_grupo() {
     assert_eq!(d.pasos[0].funcion, LEASES);
     assert_eq!(d.pasos[1].funcion, UPNP);
     assert_eq!(d.diff.campos.len(), 2);
-    let id2 = m.confirmar(&d.token, None, "admin").await.unwrap();
+    let id2 = m.confirmar_ligado(&d.token, None, "admin").await.unwrap();
     let c2 = esperar_estado(&m, id2, Estado::Aplicado).await;
     assert_eq!(c2.pasos.len(), 2);
     assert_eq!(escritas(&p), [UPNP, LEASES, LEASES, UPNP]);
@@ -135,7 +142,7 @@ async fn sin_respuesta_con_otros_valores_se_revierte() {
     p.sim.control.no_answer_next_write(true);
     let m2 = m.clone();
     let token = prep.token.clone();
-    let tarea = tokio::spawn(async move { m2.confirmar(&token, None, "admin").await });
+    let tarea = tokio::spawn(async move { m2.confirmar_ligado(&token, None, "admin").await });
     esperar_hasta(Duration::from_secs(5), "sin escritura", async || {
         !p.sim.control.writes().is_empty()
     })
@@ -198,7 +205,7 @@ async fn pausa_se_suelta_en_relectura() {
     p.sim.control.hang_after_next_write();
     let m2 = m.clone();
     let token = prep.token.clone();
-    tokio::spawn(async move { m2.confirmar(&token, None, "admin").await });
+    tokio::spawn(async move { m2.confirmar_ligado(&token, None, "admin").await });
     esperar_hasta(Duration::from_secs(5), "sin escritura", async || {
         !p.sim.control.writes().is_empty()
     })
@@ -232,7 +239,7 @@ async fn creacion_incierta_en_grupo_es_revertido_parcial() {
         .unwrap();
     p.sim.control.create_twice_next_write();
     p.sim.control.no_answer_next_write(true);
-    let r = m.confirmar_grupo(&prep.token, &[], "admin").await;
+    let r = m.confirmar_grupo_ligado(&prep.token, &[], "admin").await;
     assert!(r.is_err(), "{r:?}");
     let c = m.historial(1).await.remove(0);
     assert_eq!(c.estado, Estado::RevertidoParcial, "{:?}", c.error);
@@ -256,14 +263,17 @@ async fn deshacer_revertido_en_parte_no_se_repite() {
         .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.80")]))
         .await
         .unwrap();
-    let id = m.confirmar_grupo(&prep.token, &[], "admin").await.unwrap();
+    let id = m
+        .confirmar_grupo_ligado(&prep.token, &[], "admin")
+        .await
+        .unwrap();
     esperar_estado(&m, id, Estado::Aplicado).await;
     esperar_libre_gestor(&m).await;
     let d = m.deshacer(id).await.unwrap();
     // Falla el paso 2 del deshacer (UPnP) y la reversión de su paso 1.
     p.sim.control.fail_write_n(2);
     p.sim.control.fail_write_n(3);
-    let r = m.confirmar(&d.token, None, "admin").await;
+    let r = m.confirmar_ligado(&d.token, None, "admin").await;
     assert!(r.is_err(), "{r:?}");
     let u = m.historial(1).await.remove(0);
     assert_eq!(u.estado, Estado::RevertidoParcial, "{:?}", u.error);

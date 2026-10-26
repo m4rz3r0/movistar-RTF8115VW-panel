@@ -1,6 +1,7 @@
 //! Aplicar grupos de pasos: orden, pasos omitidos, acciones y migración.
 
 use super::*;
+use crate::comun::ConfirmarLigado;
 
 #[tokio::test]
 async fn grupo_aplica_en_orden_y_verifica() {
@@ -17,7 +18,10 @@ async fn grupo_aplica_en_orden_y_verifica() {
     assert!(prep.pasos.iter().all(|p| !p.sin_cambios));
     assert_eq!(prep.pasos[1].diff.campos[0].despues, "192.168.1.80");
 
-    let id = m.confirmar_grupo(&prep.token, &[], "admin").await.unwrap();
+    let id = m
+        .confirmar_grupo_ligado(&prep.token, &[], "admin")
+        .await
+        .unwrap();
     let c = esperar_estado(&m, id, Estado::Aplicado).await;
     assert_eq!(escritas(&p), [UPNP, LEASES]);
     assert_eq!(upnp_actual(&p).await, "1");
@@ -56,7 +60,10 @@ async fn pasos_sin_cambio_y_desmarcados_se_omiten() {
     assert!(prep.pasos[0].diff.campos.is_empty());
     // Sin el paso de riesgo medio (desmarcado) el riesgo no cambia aquí: es
     // el de lo preparado.
-    let id = m.confirmar_grupo(&prep.token, &[2], "admin").await.unwrap();
+    let id = m
+        .confirmar_grupo_ligado(&prep.token, &[2], "admin")
+        .await
+        .unwrap();
     let c = esperar_estado(&m, id, Estado::Aplicado).await;
     assert_eq!(escritas(&p), [LEASES]);
     assert_eq!(ssid_actual(&p).await, "RED-1");
@@ -75,7 +82,9 @@ async fn pasos_sin_cambio_y_desmarcados_se_omiten() {
         .preparar_grupo(grupo(vec![upnp("1"), ssid("OTRA")]))
         .await
         .unwrap();
-    let r = m.confirmar_grupo(&prep.token, &[0, 1], "admin").await;
+    let r = m
+        .confirmar_grupo_ligado(&prep.token, &[0, 1], "admin")
+        .await;
     assert!(matches!(r, Err(CambioError::SinCambios)), "{r:?}");
     assert_eq!(m.historial(10).await.len(), 1);
     assert_eq!(escritas(&p).len(), 1);
@@ -100,7 +109,7 @@ async fn acciones_solo_en_grupos_de_un_paso() {
         )]))
         .await
         .unwrap();
-    let r = m.confirmar_grupo(&prep.token, &[], "admin").await;
+    let r = m.confirmar_grupo_ligado(&prep.token, &[], "admin").await;
     assert!(matches!(r, Err(CambioError::PalabraIncorrecta)), "{r:?}");
 }
 

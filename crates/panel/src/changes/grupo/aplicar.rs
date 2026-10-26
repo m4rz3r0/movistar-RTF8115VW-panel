@@ -115,8 +115,8 @@ impl ChangeManager {
         let peticiones: Vec<ChangeRequest> = {
             let p = lock(&self.pendientes);
             match p.get(token) {
-                // De otro usuario del panel: no vale y no se gasta.
-                Some(v) if v.usuario.as_deref().is_some_and(|u| u != usuario) => {
+                // Sin ligar o de otro usuario del panel: no vale y no se gasta.
+                Some(v) if v.usuario.as_deref() != Some(usuario) => {
                     return Err(CambioError::TokenInvalido);
                 }
                 Some(v) if v.caduca > Instant::now() => {

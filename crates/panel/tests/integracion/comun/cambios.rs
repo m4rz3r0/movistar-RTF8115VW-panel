@@ -1,7 +1,7 @@
 //! Gestor de cambios en las pruebas: tiempos cortos, aplicar y esperar.
 
 use super::{PASS, Panel, PanelPrueba, USER, esperar_hasta, esperar_hasta_con, ok};
-use panel::changes::{Cambio, ChangeManager, ChangeRequest, Estado, Tiempos};
+use panel::changes::{Cambio, CambioError, ChangeManager, ChangeRequest, Estado, Tiempos};
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
@@ -163,5 +163,45 @@ pub fn legible(guardado: &str) -> String {
     match Nota::detalle(guardado, i18n::Idioma::Es) {
         Some(d) => format!("{es} [{d}]"),
         None => es,
+    }
+}
+
+/// Confirmar con el gestor directamente: liga antes el token a `usuario`,
+/// como hacen las server functions (un token sin ligar no se confirma).
+#[allow(async_fn_in_trait)]
+pub trait ConfirmarLigado {
+    async fn confirmar_ligado(
+        &self,
+        token: &str,
+        palabra: Option<&str>,
+        usuario: &str,
+    ) -> Result<i64, CambioError>;
+    async fn confirmar_grupo_ligado(
+        &self,
+        token: &str,
+        desmarcados: &[usize],
+        usuario: &str,
+    ) -> Result<i64, CambioError>;
+}
+
+impl ConfirmarLigado for Arc<ChangeManager> {
+    async fn confirmar_ligado(
+        &self,
+        token: &str,
+        palabra: Option<&str>,
+        usuario: &str,
+    ) -> Result<i64, CambioError> {
+        self.ligar(token, usuario);
+        self.confirmar(token, palabra, usuario).await
+    }
+
+    async fn confirmar_grupo_ligado(
+        &self,
+        token: &str,
+        desmarcados: &[usize],
+        usuario: &str,
+    ) -> Result<i64, CambioError> {
+        self.ligar(token, usuario);
+        self.confirmar_grupo(token, desmarcados, usuario).await
     }
 }

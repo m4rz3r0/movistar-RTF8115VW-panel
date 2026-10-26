@@ -1,6 +1,7 @@
 //! Vigilancia tras escribir: escrituras sin respuesta, WAN caída y reversión.
 
 use super::*;
+use crate::comun::ConfirmarLigado;
 
 /// I1: la escritura llega y el router la aplica, pero no contesta (reinicia
 /// un servicio, va cargado…): se relee, se ve aplicada y se vigila, con
@@ -10,7 +11,10 @@ async fn escritura_sin_respuesta_aplicada_se_vigila() {
     let (p, m) = preparado().await;
     let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
     p.sim.control.no_answer_next_write(true);
-    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    let id = m
+        .confirmar_ligado(&prep.token, None, "admin")
+        .await
+        .unwrap();
     let c = esperar_estado(&m, id, Estado::Aplicado).await;
     // La nota se guarda como claves y se pinta en el idioma de quien mira.
     let nota = c.nota.unwrap_or_default();
@@ -44,7 +48,10 @@ async fn escritura_sin_respuesta_aplicada_se_revierte_si_cae_la_wan() {
     let (p, m) = preparado().await;
     let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
     p.sim.control.no_answer_next_write(true);
-    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    let id = m
+        .confirmar_ligado(&prep.token, None, "admin")
+        .await
+        .unwrap();
     p.sim.control.set_wan_up(false);
     esperar_estado(&m, id, Estado::Revertido).await;
     assert_eq!(ip_de_lease(&p, "0").await.as_deref(), Some("192.168.1.68"));
@@ -57,7 +64,7 @@ async fn escritura_sin_respuesta_no_aplicada_queda_fallida() {
     let (p, m) = preparado().await;
     let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
     p.sim.control.no_answer_next_write(false);
-    let r = m.confirmar(&prep.token, None, "admin").await;
+    let r = m.confirmar_ligado(&prep.token, None, "admin").await;
     assert!(
         matches!(&r, Err(CambioError::Router(e)) if e.contains("no se aplicó")),
         "{r:?}"
@@ -73,7 +80,10 @@ async fn escritura_sin_respuesta_no_aplicada_queda_fallida() {
 async fn revierte_si_se_pierde_la_wan() {
     let (p, m) = preparado().await;
     let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
-    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    let id = m
+        .confirmar_ligado(&prep.token, None, "admin")
+        .await
+        .unwrap();
     p.sim.control.set_wan_up(false);
     let c = esperar_estado(&m, id, Estado::Revertido).await;
     assert!(crate::comun::legible(&c.error.unwrap()).contains("WAN"));
@@ -91,7 +101,10 @@ async fn wan_ya_caida_no_provoca_reversion() {
     let (p, m) = preparado().await;
     p.sim.control.set_wan_up(false);
     let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
-    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    let id = m
+        .confirmar_ligado(&prep.token, None, "admin")
+        .await
+        .unwrap();
     let c = esperar_estado(&m, id, Estado::Aplicado).await;
     let nota = c.nota.unwrap();
     assert!(
@@ -110,7 +123,10 @@ async fn revierte_si_el_router_deja_de_responder() {
     let p = panel_rapido(Duration::from_millis(100)).await;
     let m = gestor(&p, tiempos_rapidos()).await;
     let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
-    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    let id = m
+        .confirmar_ligado(&prep.token, None, "admin")
+        .await
+        .unwrap();
     p.sim.control.set_unresponsive(true);
     // Tres fallos seguidos (100 ms de espera cada uno) y, cuando el router
     // vuelve, se revierte.
@@ -125,7 +141,10 @@ async fn revierte_si_el_router_deja_de_responder() {
 async fn revierte_una_creacion() {
     let (p, m) = preparado().await;
     let prep = m.preparar(nueva_reserva()).await.unwrap();
-    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    let id = m
+        .confirmar_ligado(&prep.token, None, "admin")
+        .await
+        .unwrap();
     p.sim.control.set_wan_up(false);
     esperar_estado(&m, id, Estado::Revertido).await;
     assert_eq!(ip_de_lease(&p, "2").await, None);
@@ -159,7 +178,10 @@ async fn crear_un_duplicado_revierte_solo_la_nueva() {
         ],
     );
     let prep = m.preparar(dup).await.unwrap();
-    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    let id = m
+        .confirmar_ligado(&prep.token, None, "admin")
+        .await
+        .unwrap();
     let c = esperar_estado(&m, id, Estado::Vigilando).await;
     assert_eq!(c.instancia.as_deref(), Some("2"), "la nueva, no la 0");
     p.sim.control.set_wan_up(false);
@@ -182,7 +204,7 @@ async fn crear_con_dos_instancias_nuevas_no_borra_nada() {
     let (p, m) = preparado().await;
     let prep = m.preparar(nueva_reserva()).await.unwrap();
     p.sim.control.create_twice_next_write();
-    let r = m.confirmar(&prep.token, None, "admin").await;
+    let r = m.confirmar_ligado(&prep.token, None, "admin").await;
     let Err(CambioError::Verificacion(v)) = r else {
         panic!("{r:?}");
     };
@@ -214,7 +236,10 @@ async fn revierte_un_secreto_que_estaba_vacio() {
         ))
         .await
         .unwrap();
-    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    let id = m
+        .confirmar_ligado(&prep.token, None, "admin")
+        .await
+        .unwrap();
     p.sim.control.set_wan_up(false);
     esperar_estado(&m, id, Estado::Revertido).await;
     let w = p.sim.control.writes();
@@ -256,7 +281,10 @@ async fn revierte_un_valor_fuera_de_las_opciones() {
         .preparar(req(LEASES, Some("0"), &[(POOL, "0"), ("adm_state", "1")]))
         .await
         .unwrap();
-    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    let id = m
+        .confirmar_ligado(&prep.token, None, "admin")
+        .await
+        .unwrap();
     p.sim.control.set_wan_up(false);
     esperar_estado(&m, id, Estado::Revertido).await;
     let n = p
