@@ -92,7 +92,7 @@ Elementos de la respuesta: `accept_ra`, `adm_state`, `ip_intf_id`, `rip_intf_0i`
 
 Activa RIP y el envío/recepción de anuncios en una interfaz.
 
-**Sin comprobar en el router real:** el panel no la escribe.
+**Comprobada en el router real:** pruebas del 2026-10-26, cambios 35 y 36
 
 Lectura pareada: `cbGetRipIntf` con `rip_intf_0i={rip_intf_id}`
 
@@ -356,7 +356,7 @@ Elementos de la respuesta: `adm_state`, `ipv4_addr`, `mac_addr`, `rtm_dhcpv4_svr
 
 Crea, modifica o borra una reserva DHCP (IP fija por MAC).
 
-**Sin comprobar en el router real:** el panel no la escribe.
+**Comprobada en el router real:** pruebas del 2026-10-26, cambios 41 a 45 (crear, editar y borrar)
 
 Lectura pareada: `cbDhcpV4SvrPoolGetStatic` con `rtm_cfg_dhcpv4_svr_pool_id={rtm_cfg_dhcpv4_svr_pool_id}`, `rtm_dhcpv4_svr_pool_static_id={rtm_dhcpv4_svr_pool_static_id}`
 
@@ -398,7 +398,7 @@ Elementos de la respuesta: `adm_state`, `dhcpv4_opt60`, `dhcpv4_opt60_ex`, `dhcp
 
 Configura un pool DHCPv4 (rango, máscara, puerta de enlace, DNS, concesión, IP reservadas y condiciones).
 
-**Sin comprobar en el router real:** el panel no la escribe.
+**Comprobada en el router real:** pruebas del 2026-10-26, cambios 39 y 40
 
 Lectura pareada: `cbGetDhcpv4ServerPool` con `rtm_cfg_dhcpv4_svr_pool_0i={rtm_cfg_dhcpv4_svr_pool_id}`
 
@@ -678,7 +678,7 @@ Elementos de la respuesta: `adm_bandwidth`, `adm_channel`, `adm_guard_interval`,
 
 Configura una radio WiFi: activación, país, estándar, canal, ancho, potencia y opciones avanzadas. Los valores válidos dependen de la banda.
 
-**Sin comprobar en el router real:** el panel no la escribe.
+**Comprobada en el router real:** pruebas del 2026-10-26, cambios 48 a 51
 
 Lectura pareada: `cbGetWifi` con `dpm_cfg_wifi_0i={dpm_cfg_wifi_id}`
 
@@ -1067,7 +1067,7 @@ Elementos de la respuesta: `adm_state`, `desc`, `ext_l4_port_max`, `ext_l4_port_
 
 Crea, modifica o borra una redirección de puertos o el host DMZ.
 
-**Sin comprobar en el router real:** el panel no la escribe.
+**Comprobada en el router real:** pruebas del 2026-10-26, cambios 54 y 55
 
 Lectura pareada: `cbGetNatPortMapping` con `nat_port_mapping_0i={nat_port_mapping_id}`
 
@@ -1101,7 +1101,7 @@ Elementos de la respuesta: `adm_state`, `upnp_cfg`
 
 Activa o desactiva UPnP.
 
-**Sin comprobar en el router real:** el panel no la escribe.
+**Comprobada en el router real:** pruebas del 2026-10-26, cambios 22 y 23
 
 Lectura pareada: `cbGetUpnpCfg`
 
@@ -1377,7 +1377,7 @@ Elementos de la respuesta: `dns_relay_adm_state`, `rtm_cfg_igd`
 
 Activa o desactiva el relé DNS.
 
-**Sin comprobar en el router real:** el panel no la escribe.
+**Comprobada en el router real:** pruebas del 2026-10-26, cambios 37 y 38
 
 Lectura pareada: `cbGetDnsRelay`
 
@@ -1434,7 +1434,7 @@ Elementos de la respuesta: `adm_state`, `dhcpv6_mode`, `dhcpv6_svr_adm_state`, `
 
 Configura IPv6 en la LAN: activación, prefijo delegado, ULA, RA y DHCPv6.
 
-**Sin comprobar en el router real:** el panel no la escribe.
+**Comprobada en el router real:** pruebas del 2026-10-26, cambios 46 y 47
 
 Lectura pareada: `cbGetLanIPv6Config`
 
@@ -1573,7 +1573,7 @@ Elementos de la respuesta: `br_id`, `eth_link_id`, `igmp_last_mbr_qry_count`, `i
 
 Configura los parámetros de IGMP.
 
-**Sin comprobar en el router real:** el panel no la escribe.
+**Comprobada en el router real:** pruebas del 2026-10-26, cambios 24 y 25
 
 Lectura pareada: `cbGetMcastIgmpSetting`
 
@@ -1599,7 +1599,7 @@ Elementos de la respuesta: `adm_state`, `ip_intf_id`, `rtm_cfg_ip_mcast_intf`, `
 
 Activa multicast y la versión de IGMP en una interfaz.
 
-**Sin comprobar en el router real:** el panel no la escribe.
+**Comprobada en el router real:** pruebas del 2026-10-26, cambios 29 y 30
 
 Lectura pareada: `cbGetMcastIntf` con `rtm_ip_mcast_intf_0i={rtm_ip_mcast_intf_id}`
 
@@ -1811,7 +1811,7 @@ Elementos de la respuesta: `adm_state`, `fax_passthrough_adm_state`, `fxs_0i`, `
 
 Configura un puerto de teléfono (ganancias, fax y módem).
 
-**Sin comprobar en el router real:** el panel no la escribe.
+**Comprobada en el router real:** pruebas del 2026-10-26, cambios 31 y 32
 
 Lectura pareada: `cbGetVoicePhysical`
 
@@ -2103,7 +2103,7 @@ Elementos de la respuesta: `diagnosis_config`, `dst_lan_port`, `wan_mirror`
 
 Activa o desactiva el espejo de la WAN hacia un puerto LAN.
 
-**Sin comprobar en el router real:** el panel no la escribe.
+**Comprobada en el router real:** pruebas del 2026-10-26, cambios 26 y 27
 
 Lectura pareada: `cbGetDiagConfig`
 

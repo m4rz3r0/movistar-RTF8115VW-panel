@@ -47,6 +47,21 @@ impl Catalogo {
     pub fn habilitar_todo_para_pruebas(&mut self) -> bool {
         habilitar(self, cfg!(debug_assertions))
     }
+
+    /// Da por no comprobada la función `nombre`. Solo restringe, así que no
+    /// necesita un binario de depuración: las pruebas de la 1.0 la usan para
+    /// tener una función sin comprobar fija aunque se comprueben más en el
+    /// router real. Devuelve si la encontró.
+    #[doc(hidden)]
+    pub fn quitar_comprobada(&mut self, nombre: &str) -> bool {
+        match self.funciones.iter_mut().find(|f| f.name == nombre) {
+            Some(f) => {
+                f.comprobada = Some(Comprobacion::Valor(false));
+                true
+            }
+            None => false,
+        }
+    }
 }
 
 /// [`Catalogo::habilitar_todo_para_pruebas`] con `depuracion` explícito.
@@ -84,6 +99,18 @@ mod tests {
             "cbDeleteUser",
             "scbidirectionalflt.cmd?action=add",
             "scbidirectionalflt.cmd?action=remove",
+            "cbSetUpnpCfg",
+            "cbSetMcastIgmpSetting",
+            "cbSetDiagConfig",
+            "cbSetMcastIntf",
+            "cbSetVoicePhysical",
+            "cbSetRipIntf",
+            "cbSetDnsRelay",
+            "cbSetDhcpv4ServerPool",
+            "cbDhcpV4SvrPoolSetStatic",
+            "cbSetLanIPv6Config",
+            "cbSetWifi",
+            "cbSetNatPortMapping",
         ];
         let mut vistas = nombres.clone();
         esperadas.sort_unstable();

@@ -64,7 +64,7 @@ descripcion = "Activa RIP y el envío/recepción de anuncios en una interfaz."
 riesgo = "alto"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetRipIntf", params = [["rip_intf_0i", "{rip_intf_id}"]] }
-comprobada = false
+comprobada = "pruebas del 2026-10-26, cambios 35 y 36"
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -617,7 +617,7 @@ riesgo = "bajo"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbDhcpV4SvrPoolGetStatic", params = [["rtm_cfg_dhcpv4_svr_pool_id", "{rtm_cfg_dhcpv4_svr_pool_id}"], ["rtm_dhcpv4_svr_pool_static_id", "{rtm_dhcpv4_svr_pool_static_id}"]] }
 lista = { id_param = "rtm_dhcpv4_svr_pool_static_id", all = false, del = true }
-comprobada = false
+comprobada = "pruebas del 2026-10-26, cambios 41 a 45 (crear, editar y borrar)"
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -682,7 +682,7 @@ riesgo = "medio"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetDhcpv4ServerPool", params = [["rtm_cfg_dhcpv4_svr_pool_0i", "{rtm_cfg_dhcpv4_svr_pool_id}"]] }
 lista = { id_param = "rtm_cfg_dhcpv4_svr_pool_id", all = false, del = true }
-comprobada = false
+comprobada = "pruebas del 2026-10-26, cambios 39 y 40"
 
 [[funcion.parametro]]
 nombre = "rtm_cfg_dhcpv4_svr_pool_id"
@@ -1316,7 +1316,7 @@ descripcion = "Configura una radio WiFi: activación, país, estándar, canal, a
 riesgo = "medio"
 acceso = "wifi"
 lectura_pareada = { funcion = "cbGetWifi", params = [["dpm_cfg_wifi_0i", "{dpm_cfg_wifi_id}"]] }
-comprobada = false
+comprobada = "pruebas del 2026-10-26, cambios 48 a 51"
 
 [[funcion.parametro]]
 nombre = "radio_adm_state"
@@ -2126,6 +2126,7 @@ descripcion = "Activa o desactiva los ALG o el NAT loopback (formularios NatAlgF
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetNatConfig", params = [] }
+# 2026-10-26, cambio 28: el router acepta h323_enable pero no lo aplica (falta set_nf_conntrack=1).
 comprobada = false
 
 [[funcion.parametro]]
@@ -2231,7 +2232,7 @@ riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetNatPortMapping", params = [["nat_port_mapping_0i", "{nat_port_mapping_id}"]] }
 lista = { id_param = "nat_port_mapping_id", all = false, del = true }
-comprobada = false
+comprobada = "pruebas del 2026-10-26, cambios 54 y 55"
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -2310,7 +2311,7 @@ descripcion = "Activa o desactiva UPnP."
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetUpnpCfg", params = [] }
-comprobada = false
+comprobada = "pruebas del 2026-10-26, cambios 22 y 23"
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -2824,6 +2825,7 @@ riesgo = "medio"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetDdns", params = [["rtm_ddns_0i", "{rtm_ddns_id}"]] }
 lista = { id_param = "rtm_ddns_id", all = false, del = true }
+# NO PROBAR MÁS: crear una entrada inactiva (2026-10-26, cambio 56) colgó la web del router hasta reiniciarlo.
 comprobada = false
 
 [[funcion.parametro]]
@@ -2882,7 +2884,7 @@ descripcion = "Activa o desactiva el relé DNS."
 riesgo = "medio"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetDnsRelay", params = [] }
-comprobada = false
+comprobada = "pruebas del 2026-10-26, cambios 37 y 38"
 
 [[funcion.parametro]]
 nombre = "dns_relay_adm_state"
@@ -2962,7 +2964,7 @@ descripcion = "Configura IPv6 en la LAN: activación, prefijo delegado, ULA, RA 
 riesgo = "bajo"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetLanIPv6Config", params = [] }
-comprobada = false
+comprobada = "pruebas del 2026-10-26, cambios 46 y 47"
 
 [[funcion.parametro]]
 nombre = "ipv6_adm_state"
@@ -3225,7 +3227,7 @@ descripcion = "Configura los parámetros de IGMP."
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetMcastIgmpSetting", params = [] }
-comprobada = false
+comprobada = "pruebas del 2026-10-26, cambios 24 y 25"
 
 [[funcion.parametro]]
 nombre = "igmp_max_group"
@@ -3271,7 +3273,7 @@ descripcion = "Activa multicast y la versión de IGMP en una interfaz."
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetMcastIntf", params = [["rtm_ip_mcast_intf_0i", "{rtm_ip_mcast_intf_id}"]] }
-comprobada = false
+comprobada = "pruebas del 2026-10-26, cambios 29 y 30"
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -3550,6 +3552,7 @@ descripcion = "Configura una cola de QoS, la de su id (`dpm_cfg_queue_id`, de 0 
 riesgo = "bajo"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetQueue", params = [["dpm_cfg_queue_0i", "{dpm_cfg_queue_id}"]] }
+# 2026-10-26, cambio 34: falló (la lista se leía por la primera cola); tras escribir, el router rehízo su red.
 comprobada = false
 
 [[funcion.parametro]]
@@ -3761,7 +3764,7 @@ descripcion = "Configura un puerto de teléfono (ganancias, fax y módem)."
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetVoicePhysical", params = [] }
-comprobada = false
+comprobada = "pruebas del 2026-10-26, cambios 31 y 32"
 
 [[funcion.parametro]]
 nombre = "fax_passthrough_adm_state"
@@ -4323,7 +4326,7 @@ descripcion = "Activa o desactiva el espejo de la WAN hacia un puerto LAN."
 riesgo = "bajo"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetDiagConfig", params = [] }
-comprobada = false
+comprobada = "pruebas del 2026-10-26, cambios 26 y 27"
 
 [[funcion.parametro]]
 nombre = "wan_mirror"
@@ -4780,6 +4783,7 @@ acceso = "no_corta"
 
 # ======================================================================
 # Área: ocultas
+# 2026-10-26, cambio 33: el router no confirma la acción; no hay forma de comprobarla.
 comprobada = false
 
 [[funcion]]

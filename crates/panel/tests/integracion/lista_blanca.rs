@@ -11,10 +11,15 @@ use std::sync::Arc;
 /// Texto del 409 de lo que no está comprobado en el router real.
 const SIN_COMPROBAR: &str = "no se ha comprobado en este router";
 
-/// Panel con el gestor y todo como en la 1.0, y la cookie.
+/// Panel con el gestor y todo como en la 1.0, y la cookie. UPnP
+/// (`cbSetUpnpCfg`) y las reglas de puertos (`cbSetNatPortMapping`) están
+/// comprobadas en el router real, pero aquí sirven de ejemplo fijo de lo no
+/// comprobado.
 async fn como_la_1_0() -> (Panel, String) {
     let (p, cookie) = PanelPrueba::nuevo()
         .config(|c| c.habilitar_todo = false)
+        .sin_comprobar("cbSetUpnpCfg")
+        .sin_comprobar("cbSetNatPortMapping")
         .arrancar_con_gestor()
         .await;
     reautenticar(&p, &cookie).await;

@@ -40,10 +40,35 @@ cerrada: sin el campo, como `false` (un test pide que toda escritura lo
 lleve, y otro fija la lista de la 1.0). Marcar una función como comprobada
 es cambiar esa línea.
 
-En la 1.0 están comprobadas `cbSetTr69Config`, `cbSetTimeNtp`,
-`cbSetSyslog`, `cbSetWifiAccPt`, `cbSetVoiceSip`, `cbAddUser`,
-`cbDeleteUser` y el alta y la baja de la regla del cortafuegos
-(`scbidirectionalflt.cmd?action=add`/`remove`). Lo demás solo se ve:
+En la 1.0 están comprobadas:
+
+- **Seguridad y sistema:** gestión remota y aviso al operador
+  (`cbSetTr69Config`), hora (`cbSetTimeNtp`), registro (`cbSetSyslog`),
+  diagnóstico (`cbSetDiagConfig`), cuentas de la web del router
+  (`cbAddUser`, `cbDeleteUser`) y el alta y la baja de la regla del
+  cortafuegos (`scbidirectionalflt.cmd?action=add`/`remove`).
+- **WiFi:** cada red (`cbSetWifiAccPt`, también el WPS) y las radios
+  (`cbSetWifi`).
+- **Red de casa:** DHCP (`cbSetDhcpv4ServerPool`), sus reservas
+  (`cbDhcpV4SvrPoolSetStatic`), IPv6 de la red (`cbSetLanIPv6Config`) y
+  relé DNS (`cbSetDnsRelay`).
+- **Puertos y multicast:** reglas de puertos (`cbSetNatPortMapping`), UPnP
+  (`cbSetUpnpCfg`), IGMP (`cbSetMcastIgmpSetting`, `cbSetMcastIntf`) y RIP
+  (`cbSetRipIntf`).
+- **Teléfono:** servidores (`cbSetVoiceSip`) y puerto físico
+  (`cbSetVoicePhysical`).
+
+Probadas y descartadas (2026-10-26):
+
+- `cbSetDdns`: crear una entrada inactiva colgó la web del router hasta
+  reiniciarlo. No se vuelve a probar.
+- `cbSetNatConfig`: los ALG no cambian.
+- `cbSetQueue`: estaba mal modelada.
+- `cbSyncTime`: el router no la confirma.
+- `cbSetSystemTimeZone` y `cbSetNTPInfo`: su lectura no existe en este
+  router.
+
+Lo demás solo se ve:
 
 - **En la página**, sus campos salen como valores, sin notas por campo; sin
   interruptor, sin botón de guardar y sin acciones de la lista (añadir,
