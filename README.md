@@ -20,8 +20,10 @@ habla con la web del router:
   máxima», que se revisan y se aplican de una vez, con un solo deshacer; la
   barra lateral cuenta lo que falta.
 - **Biblioteca**: todas las funciones de la API del router, con su
-  descripción. Los cambios se **vigilan**: si el router deja de responder o
-  se pierde internet, se deshacen solos.
+  descripción. Los cambios que pueden cortar el acceso al router o
+  internet se **vigilan**: si el router deja de responder o se pierde
+  internet, se deshacen solos; «Todo bien, terminar» los da por buenos
+  antes. Lo que confirmes mientras tanto espera en una cola (hasta 5).
 - **Historial** de todo lo cambiado, con deshacer.
 - Usuarios propios con contraseña, en español e inglés, tema claro u oscuro
   y usable en el móvil.
@@ -96,11 +98,13 @@ leer»:
   antes; lo demás se aplica al momento, con «Deshacer» en el aviso.
 
 Antes de guardar unos campos, un resumen enseña lo que cambia («antes →
-después»); después, el cambio se vigila y se puede deshacer desde el propio
-resumen o desde el Historial. «Cómo estaba al instalar» compara el router con
-la foto que tomó el asistente y deja volver a cualquier ajuste. Las
-contraseñas van censuradas, con un ojo para verlas; lo demás, en claro. Lo
-que no está en Ajustes se cambia desde la Biblioteca, también con vigilancia.
+después»); después, si puede cortar el acceso, el cambio se vigila (lo que
+guardes mientras espera en la cola, con «Quitar de la cola») y se puede
+deshacer desde el propio resumen o desde el Historial. «Cómo estaba al
+instalar» compara el router con la foto que tomó el asistente y deja volver
+a cualquier ajuste. Las contraseñas van censuradas, con un ojo para verlas;
+lo demás, en claro. Lo que no está en Ajustes se cambia desde la
+Biblioteca, con la misma vigilancia.
 
 ### Mejoras
 
@@ -265,11 +269,13 @@ cada 3 hilos de la CPU, entre 1 y 2; en una máquina dedicada, 4; como mucho,
 10; `E2E_WORKERS=1`, en serie). Arranca un panel instalado por worker, cuatro
 recién instalados para el asistente, dos para el recorrido de Ajustes (uno
 por idioma), dos para la rejilla de la WiFi, uno para las demás pestañas en
-rejilla y uno para Mejoras, cada uno con su simulador (`e2e/instancias.ts`),
-en puertos consecutivos a partir de `E2E_PORT` y `E2E_SIM_PORT` (3195 y
-8195; con 4 workers, 3195–3208 y 8195–8208). Cada
-cambio se vigila 10 s en vez de 30 s o 2 min (`RP_E2E_VIGILANCIA_S`, que solo
-atiende el binario de depuración). Usa el Chromium de Playwright
+rejilla, uno para Mejoras, uno para los usuarios del router y uno para la
+vigilancia y la cola, cada uno con su simulador (`e2e/instancias.ts`), en
+puertos consecutivos a partir de `E2E_PORT` y `E2E_SIM_PORT` (3195 y 8195;
+con 4 workers, 3195–3210 y 8195–8210). Cada cambio vigilado se vigila 10 s
+en vez de 30 s o 2 min (`RP_E2E_VIGILANCIA_S`, que solo atiende el binario
+de depuración); en el panel de la vigilancia, 5 min, para que no acabe sola
+durante la prueba. Usa el Chromium de Playwright
 (`npx playwright install chromium` si no está; o `E2E_CHROMIUM=<ruta>`).
 
 El e2e usa el `target/debug/panel` de `cargo leptos build`, que se compila

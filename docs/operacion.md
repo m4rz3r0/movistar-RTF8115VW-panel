@@ -88,7 +88,7 @@ Las operaciones delicadas (credenciales y contraseña del router, la conexión
 de internet, confirmar el firmware y todo lo de usuarios) piden volver a
 escribir la contraseña del panel; durante 5 minutos no se vuelve a pedir en
 esa sesión. Con un cambio aplicándose o vigilándose, las credenciales del
-router no se pueden cambiar (se pide esperar).
+router no se pueden cambiar ni esperan en la cola (se pide esperar).
 
 ## Idioma
 
