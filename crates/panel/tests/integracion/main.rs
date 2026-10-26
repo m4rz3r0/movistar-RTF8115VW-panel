@@ -49,6 +49,7 @@ mod sensibles;
 mod tema;
 mod token_usuario;
 mod usuarios_router;
+mod usuarios_router_deshacer;
 mod usuarios_router_guardas;
 mod vista;
 mod voz;

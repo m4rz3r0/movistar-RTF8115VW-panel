@@ -1,6 +1,7 @@
 //! El aviso del cambio en curso (con «Deshacer») y el diálogo de revisión de la página.
 
 use super::*;
+use crate::ui::panel_ajustes::{DialogoReautenticar, Reautenticacion, repetible};
 
 /// El diálogo de revisión abierto, que solo revisa: «Aplicar» lo cierra y
 /// la página sigue el cambio.
@@ -57,16 +58,10 @@ fn estado_texto(a: &CambioActivo) -> String {
 pub(crate) fn AvisoCambio() -> impl IntoView {
     let s = expect_context::<Seguimiento>();
     let preparando = RwSignal::new(false);
-    let deshacer = move |_| {
-        let Some((id, elementos)) = s
-            .activo
-            .with_untracked(|a| a.as_ref().and_then(|a| Some((a.id?, a.elementos.clone()))))
-        else {
-            return;
-        };
-        if preparando.get_untracked() {
-            return;
-        }
+    // Deshacer un alta o una baja de usuarios del router pide la contraseña
+    // del panel y se repite al darla.
+    let (reauth, dialogo_reauth) = Reautenticacion::de_la_pagina();
+    let deshacer_con = move |id: i64, elementos: Vec<String>, yo: Callback<()>| {
         preparando.set(true);
         spawn_local(async move {
             match deshacer_ajuste(id).await {
@@ -80,10 +75,22 @@ pub(crate) fn AvisoCambio() -> impl IntoView {
                         extra: None,
                     }));
                 }
-                Err(e) => s.error.set(Some(texto_error(&e))),
+                Err(e) => reauth.tratar(&e, s.error, yo),
             }
             preparando.try_set(false);
         });
+    };
+    let deshacer = move |_| {
+        let Some((id, elementos)) = s
+            .activo
+            .with_untracked(|a| a.as_ref().and_then(|a| Some((a.id?, a.elementos.clone()))))
+        else {
+            return;
+        };
+        if preparando.get_untracked() {
+            return;
+        }
+        repetible(move |yo| deshacer_con(id, elementos.clone(), yo)).run(());
     };
     let aviso = move || {
         s.activo.get().map(|a| {
@@ -148,5 +155,8 @@ pub(crate) fn AvisoCambio() -> impl IntoView {
             <div role="alert">{error}</div>
         </div>
         <DialogoDeLaPagina />
+        {move || {
+            (dialogo_reauth && reauth.abierto()).then(|| view! { <DialogoReautenticar /> })
+        }}
     }
 }

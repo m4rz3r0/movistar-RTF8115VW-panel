@@ -390,6 +390,18 @@ pub async fn pagina(state: &AppState, pagina: u32) -> Result<PaginaHistorial, Se
     })
 }
 
+/// Deshacer un alta o una baja de usuarios del router exige la ventana de
+/// reautenticación, como crearlos o borrarlos; si no, 401.
+pub async fn exigir_reauth_si_usuarios(
+    state: &AppState,
+    change_id: i64,
+) -> Result<(), ServerFnError> {
+    if gestor(state)?.es_de_usuarios_el_cambio(change_id).await {
+        crate::auth::require_reauth().await?;
+    }
+    Ok(())
+}
+
 pub async fn deshacer(state: &AppState, change_id: i64) -> Result<PreparadoVista, ServerFnError> {
     let g = gestor(state)?;
     match g.deshacer(change_id).await {

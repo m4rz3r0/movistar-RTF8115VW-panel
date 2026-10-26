@@ -24,6 +24,7 @@ use crate::ui::{
         CampoCambio, DialogoCambio, EstadoDeCambio, PreparadoVista, RiesgoCambio, TablaDiff, Valor,
         texto_error,
     },
+    panel_ajustes::{DialogoReautenticar, Reautenticacion, repetible},
 };
 use leptos::prelude::*;
 use leptos::server_fn::codec::Json;
@@ -265,12 +266,14 @@ pub async fn historial(pagina: u32) -> Result<PaginaHistorial, ServerFnError> {
 
 /// Prepara el cambio inverso de `change_id` (solo uno aplicado que nadie
 /// haya deshecho). Se confirma con `confirmar_cambio`, como cualquier otro.
+/// El de un alta o una baja de usuarios del router exige reautenticación.
 #[server(endpoint = "deshacer", input = Json)]
 pub async fn deshacer(change_id: i64) -> Result<PreparadoVista, ServerFnError> {
     // Lleva los datos sensibles de los cambios en claro.
     crate::ui::explorador::servidor::sin_guardar();
     crate::auth::require_user().await?;
     let state = crate::ui::explorador::servidor::app_state()?;
+    servidor::exigir_reauth_si_usuarios(&state, change_id).await?;
     let v = servidor::deshacer(&state, change_id).await?;
     crate::ui::explorador::servidor::ligar_a_la_sesion(&v.token).await?;
     Ok(v)
@@ -850,19 +853,25 @@ pub fn PaginaHistorial() -> impl IntoView {
         });
     });
 
+    // Deshacer un alta o una baja de usuarios del router pide la contraseña
+    // del panel y se repite al darla.
+    let (reauth, dialogo_reauth) = Reautenticacion::de_la_pagina();
     let deshacer_cambio = move |id: i64| {
         if preparando.get_untracked() {
             return;
         }
-        error.set(None);
-        preparando.set(true);
-        spawn_local(async move {
-            match deshacer(id).await {
-                Ok(p) => preparado.set(Some((id, p))),
-                Err(e) => error.set(Some(texto_error(&e))),
-            }
-            preparando.set(false);
+        let pedir = repetible(move |yo| {
+            error.set(None);
+            preparando.set(true);
+            spawn_local(async move {
+                match deshacer(id).await {
+                    Ok(p) => preparado.set(Some((id, p))),
+                    Err(e) => reauth.tratar(&e, error, yo),
+                }
+                preparando.set(false);
+            });
         });
+        pedir.run(());
     };
     let refrescar = move || tick.update(|t| *t += 1);
 
@@ -892,6 +901,9 @@ pub fn PaginaHistorial() -> impl IntoView {
         <p class="error-formulario" role="alert">
             {move || error.get()}
         </p>
+        {move || {
+            (dialogo_reauth && reauth.abierto()).then(|| view! { <DialogoReautenticar /> })
+        }}
         <Transition fallback=|| view! { <p class="pagina-sub">{t!("comun-cargando")}</p> }>
             <ListaHistorial
                 datos

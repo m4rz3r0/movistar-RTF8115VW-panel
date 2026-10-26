@@ -57,6 +57,15 @@ impl Reautenticacion {
         r
     }
 
+    /// El diálogo de la página si ya lo hay y, si no, uno nuevo; `true`
+    /// si es nuevo, y entonces lo pinta quien lo pidió.
+    pub(crate) fn de_la_pagina() -> (Self, bool) {
+        match use_context::<Reautenticacion>() {
+            Some(r) => (r, false),
+            None => (Self::proveer(), true),
+        }
+    }
+
     /// ¿Hay que pintar el diálogo?
     pub(crate) fn abierto(self) -> bool {
         self.abierto.get()

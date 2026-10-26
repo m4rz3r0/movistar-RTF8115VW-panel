@@ -52,6 +52,7 @@ pub(in crate::ajustes_router) async fn deshacer_ajuste(
     cambio: i64,
 ) -> Result<GrupoVista, ServerFnError> {
     let (state, _) = preparar().await?;
+    crate::ui::historial::servidor::exigir_reauth_si_usuarios(&state, cambio).await?;
     let g = gestor(&state)?;
     // De un ajuste o de una acción sobre varios elementos (un paso por
     // elemento, cada uno con el título de su ajuste).
