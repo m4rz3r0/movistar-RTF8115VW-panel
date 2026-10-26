@@ -14,7 +14,7 @@
 id = "gestion_remota"
 tema = "seguridad"
 accion = "apagar_gestion_remota"
-fuentes = ["ba-tr069-control", "ba-tr069-reset", "cw-tr069"]
+fuentes = ["ba-tr069-control", "ba-tr069-reset", "cw-tr069", "nsa-red-casa"]
 respaldo = "foro"
 
 # Aviso periódico al operador apagado.
@@ -32,7 +32,7 @@ id = "wps"
 tema = "wifi"
 accion = "quitar_wps"
 para_cada = "red_wifi"
-fuentes = ["cert-wps", "nsa-red-casa", "cisa-red-casa", "bsi-wlan"]
+fuentes = ["cert-wps", "cisa-red-casa", "incibe-wifi"]
 respaldo = "consenso"
 
 # UPnP apagado.
@@ -51,7 +51,7 @@ tema = "wifi"
 campo = "seguridad"
 valor = "wpa2"
 para_cada = "red_wifi"
-fuentes = ["nsa-red-casa", "bsi-wlan", "incibe-wifi"]
+fuentes = ["nsa-red-casa", "cisa-red-casa", "incibe-wifi"]
 respaldo = "consenso"
 
 # Aislar la red de invitados, solo si está encendida. Es un paso de campo y
@@ -62,7 +62,8 @@ tema = "wifi"
 campo = "wifi.invitados_avanzado.aislamiento"
 valor = "true"
 si = { campo = "wifi.invitados.activa", valor = "true" }
-fuentes = ["incibe-wifi", "bsi-wlan"]
+# Ninguna guía consultada trata el aislamiento entre clientes.
+respaldo = "criterio"
 
 # Espejo del tráfico de internet apagado.
 [[paso]]

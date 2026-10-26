@@ -114,10 +114,9 @@ async fn recomendaciones_que_informan_con_sus_fuentes() {
     let puertos = leer(&p, &cookie, "puertos").await;
     let r = recomendacion(&puertos, "dmz");
     assert_eq!(r["informativa"], true, "{r}");
-    assert!(
-        r["fuentes"].as_array().is_some_and(|f| !f.is_empty()),
-        "{r}"
-    );
+    // Ninguna guía consultada habla de la DMZ: es criterio del panel.
+    assert_eq!(r["respaldo"], "fuentes-respaldo-criterio", "{r}");
+    assert!(r["fuentes"].as_array().is_none_or(|f| f.is_empty()), "{r}");
     // El cortafuegos (sin campo propio): las del elemento.
     let seguridad = leer(&p, &cookie, "seguridad").await;
     let r = recomendacion(&seguridad, "cortafuegos");

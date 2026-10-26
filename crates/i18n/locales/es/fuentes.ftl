@@ -9,5 +9,5 @@ fuentes-clase-foro = Foro
 fuentes-clase-prensa = Prensa
 fuentes-respaldo-consenso = Las guías coinciden.
 fuentes-respaldo-foro = Lo cuentan los foros de usuarios.
-fuentes-respaldo-criterio = Criterio del panel
+fuentes-respaldo-criterio = Criterio del panel.
 fuentes-consultada = Consultada el { $fecha }

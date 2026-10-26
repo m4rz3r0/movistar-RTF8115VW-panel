@@ -751,8 +751,11 @@ fn fuentes_del_catalogo_real() {
             .iter()
             .any(|f| f == "cert-wps")
     );
-    // Lo que solo informa también dice de dónde sale.
-    assert!(!campo("puertos.dmz", "equipo").fuentes.is_empty());
+    // Lo que solo informa también dice de dónde sale (la DMZ, como criterio).
+    assert_eq!(
+        campo("puertos.dmz", "equipo").respaldo,
+        Some(Respaldo::Criterio)
+    );
     assert!(
         !campo("wifi.invitados_avanzado", "separada")
             .fuentes
@@ -792,6 +795,64 @@ fn fuentes_del_catalogo_real() {
         let faltan: Vec<&String> = claves.iter().filter(|k| !i18n::existe(idioma, k)).collect();
         assert!(faltan.is_empty(), "{idioma:?}: {faltan:?}");
     }
+}
+
+/// Cada recomendación cita solo las fuentes que, leídas el 2026-10-26, dicen
+/// lo que se les atribuye; sin ninguna, es criterio del panel.
+#[test]
+fn fuentes_que_respaldan_de_verdad() {
+    let c = cargar();
+    let campo = |ajuste: &str, campo: &str| -> Campo {
+        c.ajuste(ajuste)
+            .and_then(|a| a.campo(campo))
+            .cloned()
+            .unwrap_or_else(|| panic!("falta {ajuste}.{campo}"))
+    };
+    let wps = ["cert-wps", "cisa-red-casa", "incibe-wifi"];
+    let wpa2 = ["nsa-red-casa", "cisa-red-casa", "incibe-wifi"];
+    for red in ["wifi.red_24", "wifi.red_5", "wifi.invitados"] {
+        assert_eq!(campo(red, "wps").fuentes, wps, "{red}");
+        let seguridad = campo(red, "seguridad");
+        let opcion = seguridad.opciones.iter().find(|o| o.recomendada).unwrap();
+        assert_eq!(opcion.fuentes, wpa2, "{red}");
+        assert!(
+            campo(red, "visible")
+                .fuentes
+                .iter()
+                .any(|f| f == "nsa-red-casa")
+        );
+    }
+    assert_eq!(c.paso("wps").unwrap().fuentes, wps);
+    assert_eq!(c.paso("wpa2").unwrap().fuentes, wpa2);
+    // Aislar los invitados entre sí y la DMZ: ninguna guía lo trata.
+    let aislar = campo("wifi.invitados_avanzado", "aislamiento");
+    let paso = c.paso("aislar_invitados").unwrap();
+    let dmz = campo("puertos.dmz", "equipo");
+    for (donde, fuentes, respaldo) in [
+        ("aislamiento", &aislar.fuentes, aislar.respaldo),
+        ("paso aislar_invitados", &paso.fuentes, paso.respaldo),
+        ("dmz", &dmz.fuentes, dmz.respaldo),
+    ] {
+        assert!(fuentes.is_empty(), "{donde}: {fuentes:?}");
+        assert_eq!(respaldo, Some(Respaldo::Criterio), "{donde}");
+    }
+    assert_eq!(
+        campo("wifi.invitados_avanzado", "separada").fuentes,
+        ["nsa-red-casa"]
+    );
+    let cortafuegos = c
+        .elementos()
+        .iter()
+        .find(|e| e.id == "cortafuegos")
+        .unwrap();
+    assert_eq!(cortafuegos.fuentes, ["nsa-red-casa", "cisa-red-casa"]);
+    assert!(
+        c.paso("gestion_remota")
+            .unwrap()
+            .fuentes
+            .iter()
+            .any(|f| f == "nsa-red-casa")
+    );
 }
 
 /// Los estados habituales de TR-104 de la línea y de la llamada tienen su

@@ -9,5 +9,5 @@ fuentes-clase-foro = Forum
 fuentes-clase-prensa = Press
 fuentes-respaldo-consenso = The guides agree.
 fuentes-respaldo-foro = User forums report it.
-fuentes-respaldo-criterio = The panel's own judgement
+fuentes-respaldo-criterio = The panel's own judgement.
 fuentes-consultada = Checked on { $fecha }

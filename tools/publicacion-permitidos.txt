@@ -47,11 +47,11 @@ dominio mullvad.net — proveedor de DNS de ejemplo en las pruebas
 dominio cloudflare.com — proveedor de DNS de ejemplo en las pruebas y fuente de sus recomendaciones
 dominio playwright.dev — documentación de las pruebas e2e
 # Fuentes de las recomendaciones (crates/ajustes/fuentes.toml).
-dominio defense.gov — fuente de las recomendaciones: guía de la NSA para la red de casa
+dominio media.defense.gov — fuente de las recomendaciones: guía de la NSA para la red de casa
 dominio ikarussecurity.com — fuente de las recomendaciones: resumen de la guía de la NSA
-dominio dtic.mil — fuente de las recomendaciones: resumen de la guía de la NSA (CSIAC)
+dominio csiac.dtic.mil — fuente de las recomendaciones: resumen de la guía de la NSA (CSIAC)
 dominio cisa.gov — fuente de las recomendaciones: guía de la CISA para la red de casa
-dominio cert.org — fuente de las recomendaciones: aviso del CERT/CC sobre el WPS
+dominio kb.cert.org — fuente de las recomendaciones: aviso del CERT/CC sobre el WPS
 dominio bsi.bund.de — fuente de las recomendaciones: consejos del BSI para la WLAN
 dominio incibe.es — fuente de las recomendaciones: guías del INCIBE para la WiFi y el router
 dominio privacyguides.org — fuente de las recomendaciones: Privacy Guides (routers y DNS)
@@ -60,7 +60,7 @@ dominio joindns4.eu — fuente de las recomendaciones: proveedor de DNS DNS4EU
 dominio adguard-dns.io — fuente de las recomendaciones: proveedor de DNS AdGuard
 dominio intuitibits.com — fuente de las recomendaciones: por qué no ocultar el nombre de la red
 dominio bandaancha.eu — fuente de las recomendaciones: foros y artículos sobre Movistar y las HGU
-dominio movistar.es — fuente de las recomendaciones: Comunidad Movistar (foro de usuarios)
+dominio comunidad.movistar.es — fuente de las recomendaciones: Comunidad Movistar (foro de usuarios)
 dominio computerworld.com — fuente de las recomendaciones: artículo sobre TR-069
 dominio anthropic.com — créditos de los commits
 dominio config.local — nombre del fichero deploy/config.local, no un dominio

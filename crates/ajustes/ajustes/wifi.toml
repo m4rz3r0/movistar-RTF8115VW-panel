@@ -63,7 +63,7 @@ lee = "authentication"
 tipo = "opcion"
 ademas = [{ parametro = "encryption", lee = "encryption" }]
 opciones = [
-  { valor = "3", clave = "wpa2", recomendada = true, ademas = { encryption = "4" }, fuentes = ["nsa-red-casa", "bsi-wlan", "incibe-wifi"], respaldo = "consenso" },
+  { valor = "3", clave = "wpa2", recomendada = true, ademas = { encryption = "4" }, fuentes = ["nsa-red-casa", "cisa-red-casa", "incibe-wifi"], respaldo = "consenso" },
   { valor = "0", clave = "abierta", aviso = "wifi_abierta", ademas = { encryption = "0" } },
 ]
 seguridad = true
@@ -75,7 +75,7 @@ lee = "ssid_hide"
 tipo = "booleano"
 invertido = true
 recomendado = "true"
-fuentes = ["ssid-oculto"]
+fuentes = ["ssid-oculto", "nsa-red-casa"]
 
 [[ajuste.campo]]
 id = "wps"
@@ -83,7 +83,7 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "wps_adm_state" }
 lee = "wps_adm_state"
 tipo = "booleano"
 recomendado = "false"
-fuentes = ["cert-wps", "nsa-red-casa", "cisa-red-casa", "bsi-wlan"]
+fuentes = ["cert-wps", "cisa-red-casa", "incibe-wifi"]
 respaldo = "consenso"
 seguridad = true
 
@@ -204,7 +204,7 @@ lee = "authentication"
 tipo = "opcion"
 ademas = [{ parametro = "encryption", lee = "encryption" }]
 opciones = [
-  { valor = "3", clave = "wpa2", recomendada = true, ademas = { encryption = "4" }, fuentes = ["nsa-red-casa", "bsi-wlan", "incibe-wifi"], respaldo = "consenso" },
+  { valor = "3", clave = "wpa2", recomendada = true, ademas = { encryption = "4" }, fuentes = ["nsa-red-casa", "cisa-red-casa", "incibe-wifi"], respaldo = "consenso" },
   { valor = "0", clave = "abierta", aviso = "wifi_abierta", ademas = { encryption = "0" } },
 ]
 seguridad = true
@@ -216,7 +216,7 @@ lee = "ssid_hide"
 tipo = "booleano"
 invertido = true
 recomendado = "true"
-fuentes = ["ssid-oculto"]
+fuentes = ["ssid-oculto", "nsa-red-casa"]
 
 [[ajuste.campo]]
 id = "wps"
@@ -224,7 +224,7 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "wps_adm_state" }
 lee = "wps_adm_state"
 tipo = "booleano"
 recomendado = "false"
-fuentes = ["cert-wps", "nsa-red-casa", "cisa-red-casa", "bsi-wlan"]
+fuentes = ["cert-wps", "cisa-red-casa", "incibe-wifi"]
 respaldo = "consenso"
 seguridad = true
 
@@ -345,7 +345,7 @@ lee = "authentication"
 tipo = "opcion"
 ademas = [{ parametro = "encryption", lee = "encryption" }]
 opciones = [
-  { valor = "3", clave = "wpa2", recomendada = true, ademas = { encryption = "4" }, fuentes = ["nsa-red-casa", "bsi-wlan", "incibe-wifi"], respaldo = "consenso" },
+  { valor = "3", clave = "wpa2", recomendada = true, ademas = { encryption = "4" }, fuentes = ["nsa-red-casa", "cisa-red-casa", "incibe-wifi"], respaldo = "consenso" },
   { valor = "0", clave = "abierta", aviso = "wifi_abierta", ademas = { encryption = "0" } },
 ]
 seguridad = true
@@ -357,7 +357,7 @@ lee = "ssid_hide"
 tipo = "booleano"
 invertido = true
 recomendado = "true"
-fuentes = ["ssid-oculto"]
+fuentes = ["ssid-oculto", "nsa-red-casa"]
 
 [[ajuste.campo]]
 id = "wps"
@@ -365,7 +365,7 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "wps_adm_state" }
 lee = "wps_adm_state"
 tipo = "booleano"
 recomendado = "false"
-fuentes = ["cert-wps", "nsa-red-casa", "cisa-red-casa", "bsi-wlan"]
+fuentes = ["cert-wps", "cisa-red-casa", "incibe-wifi"]
 respaldo = "consenso"
 seguridad = true
 
@@ -384,7 +384,7 @@ fijos = { dpm_cfg_wifi_acc_pt_id = "2" }
 id = "separada"
 lee = "guest_networking"
 tipo = "booleano"
-fuentes = ["nsa-red-casa", "cisa-red-casa"]
+fuentes = ["nsa-red-casa"]
 solo_lectura = "ajuste-wifi-invitados_avanzado-separada-motivo"
 
 # Aísla entre sí los dispositivos de la red de invitados (no la separa de la
@@ -395,7 +395,8 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "isolation" }
 lee = "isolation"
 tipo = "booleano"
 recomendado = "true"
-fuentes = ["incibe-wifi", "bsi-wlan"]
+# Ninguna guía consultada trata el aislamiento entre clientes.
+respaldo = "criterio"
 seguridad = true
 
 [[ajuste.campo]]

@@ -133,7 +133,8 @@ leer = { funcion = "cbGetNatPortMapping", params = { dmz = "1" } }
 id = "equipo"
 lee = "int_ip_addr"
 tipo = "ip"
-fuentes = ["nsa-red-casa", "incibe-router"]
+# Ninguna guía consultada habla de la DMZ.
+respaldo = "criterio"
 solo_lectura = "ajuste-puertos-dmz-motivo"
 
 [[ajuste.campo]]
