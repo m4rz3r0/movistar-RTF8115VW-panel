@@ -2,7 +2,8 @@
 //!
 //! Crear y borrar van por el gestor de cambios
 //! ([`preparar_usuario_router`], que se confirma con
-//! `confirmar_ajuste`): se vigilan y se deshacen. El deshacer de un borrado
+//! `confirmar_ajuste`): exigen reautenticación, también desde la
+//! Biblioteca, y se vigilan y se deshacen. El deshacer de un borrado
 //! vuelve a crear el usuario con una contraseña nueva aleatoria, que solo
 //! se ve con el ojo del detalle del cambio en el Historial.
 //!
@@ -137,7 +138,8 @@ pub fn nota_de_fila(
 }
 
 /// Prepara crear o borrar un usuario de la web del router: el resumen del
-/// cambio y su token, que se confirma con `confirmar_ajuste`. 403 con un
+/// cambio y su token, que se confirma con `confirmar_ajuste`. Exige
+/// reautenticación (401 sin ella). 403 con un
 /// usuario protegido; 400 con un nombre, un grupo o una contraseña que no
 /// valen; 409 con un nombre que ya existe o con otro cambio en curso.
 #[server(endpoint = "preparar_usuario_router", input = Json)]

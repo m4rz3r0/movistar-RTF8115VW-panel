@@ -12,7 +12,6 @@ use super::aviso::Seguimiento;
 use super::rejilla::Pagina;
 use crate::ajustes_router::{AjusteVista, EstadoLectura, InstanciaVista};
 use crate::t;
-use crate::ui::explorador::texto_error;
 use crate::ui::i18n::traducir;
 use crate::ui::panel_ajustes::{DialogoReautenticar, Reautenticacion};
 use crate::ui::{Estado, IconoEstado};
@@ -100,6 +99,9 @@ pub(crate) fn Usuarios(a: AjusteVista, elemento: String) -> impl IntoView {
         motivo_gestor: motivo_usuarios.map(|_| MOTIVO_USUARIOS),
         motivo_otro: motivo_otro.map(|_| MOTIVO_OTRO),
     };
+    // Crear o borrar pide la contraseña del panel si hace falta: el
+    // diálogo repite la misma operación (`repetir`).
+    let repetir = StoredValue::new(None::<Callback<OperacionUsuario>>);
     let preparar = move |op: OperacionUsuario| {
         if ocupado.get_untracked() {
             return;
@@ -110,16 +112,23 @@ pub(crate) fn Usuarios(a: AjusteVista, elemento: String) -> impl IntoView {
         // suya (`<elemento>/<nombre>`), no el elemento entero, que al borrar
         // (o deshacer un alta) se cerraría con su detalle.
         let fila = format!("{}/{}", elemento.get_value(), op.usuario());
+        let otra_vez = op.clone();
         spawn_local(async move {
             match preparar_usuario_router(op).await {
                 Ok(g) => s.revisar(g, vec![fila]),
                 Err(e) => {
-                    error.try_set(Some(texto_error(&e)));
+                    let reintentar = Callback::new(move |()| {
+                        if let Some(cb) = repetir.get_value() {
+                            cb.run(otra_vez.clone());
+                        }
+                    });
+                    reauth.tratar(&e, error, reintentar);
                 }
             }
             ocupado.try_set(false);
         });
     };
+    repetir.set_value(Some(Callback::new(preparar)));
     let filas = match sin_filas(&a.estado, a.instancias.is_empty()) {
         Some(SinFilas::Motivo(m)) => view! {
             <p class="aviso estado-error">

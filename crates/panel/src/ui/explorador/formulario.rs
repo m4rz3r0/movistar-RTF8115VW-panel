@@ -5,11 +5,12 @@
 use super::{
     CampoForm, DialogoCambio, EstadoDeCambio, FormVista, FuncionDetalle, ListaInstancias, MASCARA,
     Operacion, ParamVista, Peticion, PreparadoVista, TipoCampo, TipoFuncion, Valor,
-    en_el_navegador, formulario, instancias, preparar_cambio, texto_error, validar_campo,
+    en_el_navegador, formulario, instancias, texto_error, validar_campo,
 };
 use crate::t;
+use crate::ui::panel_ajustes::{DialogoReautenticar, Reautenticacion};
 use crate::ui::{Estado, IconoEstado, secreto::Secreto};
-use leptos::{ev::SubmitEvent, prelude::*, task::spawn_local};
+use leptos::{ev::SubmitEvent, prelude::*};
 
 /// Qué formulario se muestra.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -33,6 +34,8 @@ fn aviso_error(texto: String) -> impl IntoView {
 #[component]
 pub(super) fn Escritura(detalle: FuncionDetalle) -> impl IntoView {
     let funcion = StoredValue::new(detalle.resumen.nombre.clone());
+    // Crear o borrar usuarios del router pide la contraseña del panel.
+    let reauth = Reautenticacion::proveer();
     let es_lista = detalle.lista.is_some() && detalle.resumen.tipo == TipoFuncion::Escritura;
     let se_borra = detalle.lista.as_ref().is_some_and(|l| l.borrar);
     let campos_clave: Vec<(ParamVista, RwSignal<String>)> = detalle
@@ -121,12 +124,13 @@ pub(super) fn Escritura(detalle: FuncionDetalle) -> impl IntoView {
                 valores: claves.get_untracked(),
                 borrar: true,
             };
-            spawn_local(async move {
-                match preparar_cambio(peticion).await {
-                    Ok(p) => preparado.set(Some(p)),
-                    Err(e) => error.set(Some(texto_error(&e))),
-                }
-            });
+            super::preparar::preparar(
+                peticion,
+                reauth,
+                error,
+                Callback::new(move |p| preparado.set(Some(p))),
+                Callback::new(|()| {}),
+            );
         };
         let tabla = move || {
             Suspend::new(async move {
@@ -202,7 +206,7 @@ pub(super) fn Escritura(detalle: FuncionDetalle) -> impl IntoView {
                                 </button>
                             })}
                         </div>
-                        <Formulario form=f on_preparado=move |p| preparado.set(Some(p)) />
+                        <Formulario form=f reauth on_preparado=move |p| preparado.set(Some(p)) />
                     </section>
                 }
                 .into_any(),
@@ -240,6 +244,7 @@ pub(super) fn Escritura(detalle: FuncionDetalle) -> impl IntoView {
             },
         )}
         {dialogo}
+        {move || reauth.abierto().then(|| view! { <DialogoReautenticar /> })}
     }
 }
 
@@ -527,6 +532,7 @@ fn control(i: usize, c: &CampoForm, s: RwSignal<String>, op: Operacion) -> impl 
 #[component]
 fn Formulario(
     form: FormVista,
+    reauth: Reautenticacion,
     #[prop(into)] on_preparado: Callback<PreparadoVista>,
 ) -> impl IntoView {
     let campos: Vec<(CampoForm, RwSignal<String>)> = form
@@ -595,13 +601,13 @@ fn Formulario(
             borrar: false,
         };
         enviando.set(true);
-        spawn_local(async move {
-            match preparar_cambio(peticion).await {
-                Ok(p) => on_preparado.run(p),
-                Err(e) => error.set(Some(texto_error(&e))),
-            }
-            enviando.set(false);
-        });
+        super::preparar::preparar(
+            peticion,
+            reauth,
+            error,
+            on_preparado,
+            Callback::new(move |()| enviando.set(false)),
+        );
     };
 
     view! {

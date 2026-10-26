@@ -48,11 +48,17 @@ pub(super) enum Especial {
     Cortafuegos,
 }
 
+/// ¿Es `funcion` una de las de usuarios del router ([`Especial::Usuarios`])?
+/// Crearlos o borrarlos exige reautenticación, también desde la Biblioteca.
+pub(crate) fn es_de_usuarios(funcion: &str) -> bool {
+    matches!(funcion, ALTA_USUARIO | BAJA_USUARIO)
+}
+
 impl Especial {
     /// La especial de `f`, si lo es.
     pub(super) fn de(f: &Funcion) -> Option<Especial> {
         match f.name.as_str() {
-            ALTA_USUARIO | BAJA_USUARIO => Some(Especial::Usuarios),
+            n if es_de_usuarios(n) => Some(Especial::Usuarios),
             hgu::cortafuegos::ALTA | hgu::cortafuegos::BAJA => Some(Especial::Cortafuegos),
             _ => None,
         }

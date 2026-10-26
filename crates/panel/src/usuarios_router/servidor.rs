@@ -10,7 +10,7 @@ use crate::contrasena_forma::{ErrorNueva, validar_forma_hasta};
 use crate::contrasena_router::servidor::anotar;
 use crate::instalar::servidor::{fallo, interno};
 use crate::instancia::{self, CredencialesRouter};
-use crate::panel_ajustes::servidor::{preparar as preparar_sesion, preparar_delicada};
+use crate::panel_ajustes::servidor::preparar_delicada;
 use crate::state::AppState;
 use crate::t;
 use crate::ui::explorador::MASCARA;
@@ -44,7 +44,8 @@ fn exigir_validada(f: Funcion3) -> Result<(), ServerFnError> {
 pub(super) async fn preparar(op: OperacionUsuario) -> Result<GrupoVista, ServerFnError> {
     // El resumen lleva el nombre en claro.
     crate::ui::explorador::servidor::sin_guardar();
-    let (state, _) = preparar_sesion().await?;
+    // Crear o borrar un usuario del router es delicado: reautenticación.
+    let (state, _) = preparar_delicada().await?;
     exigir_validada(Funcion3::Usuarios)?;
     if let OperacionUsuario::Crear {
         usuario,

@@ -96,7 +96,7 @@ fn cambios_de_otro(p: &Panel) -> Vec<Vec<(String, String)>> {
 
 #[tokio::test]
 async fn crear_usuario_y_deshacer() {
-    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    let (p, cookie) = con_reautenticacion().await;
     let grupo = preparado_ok(&p, &cookie, crear("prueba1", CLAVE, "user")).await;
     assert_eq!(grupo["borra"], false, "{grupo}");
     let id = aplicar_ajuste(&p, &cookie, &grupo).await;
@@ -130,7 +130,7 @@ async fn crear_usuario_y_deshacer() {
 #[tokio::test]
 async fn borrar_usuario_avisa_y_deshacer_crea_con_contrasena_nueva() {
     let registro = registro_global();
-    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    let (p, cookie) = con_reautenticacion().await;
     let grupo = preparado_ok(&p, &cookie, borrar(INVITADO)).await;
     // El diálogo avisa de que el deshacer no puede devolver su contraseña,
     // y lo confirma con el botón de peligro.
@@ -203,7 +203,7 @@ async fn usuario_protegido_403_sin_escribir() {
 
 #[tokio::test]
 async fn crear_usuario_valida_nombre_grupo_y_contrasena() {
-    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    let (p, cookie) = con_reautenticacion().await;
     let largo = "a".repeat(17);
     for op in [
         crear("ab", CLAVE, "user"),

@@ -2,6 +2,7 @@
 
 use crate::comun::{Panel, pagina, registro_global};
 use crate::comun::{PanelPrueba, USER, aplicar_ajuste, esperar_final, esperar_hasta, llamar, ok};
+use crate::comun::{aplicar, reautenticar};
 use panel::validacion_real::{Funcion3, motivo};
 use serde_json::{Value, json};
 use std::time::Duration;
@@ -38,6 +39,7 @@ fn alta(nombre: &str, grupo: &str) -> Value {
 #[tokio::test]
 async fn interruptor_desactivado_vale_en_el_gestor() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    reautenticar(&p, &cookie).await;
     let g = ok(
         &p,
         "preparar_usuario_router",
@@ -114,6 +116,7 @@ async fn interruptor_desactivado_vale_en_el_gestor() {
 #[tokio::test]
 async fn motivos_de_usuarios_con_su_texto() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    reautenticar(&p, &cookie).await;
     let casos = [
         (
             biblioteca(
@@ -180,6 +183,7 @@ async fn motivos_de_usuarios_con_su_texto() {
 #[tokio::test]
 async fn biblioteca_no_borra_un_protegido_como_alta() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    reautenticar(&p, &cookie).await;
     let (status, body) = biblioteca(&p, &cookie, "cbAddUser", Some(USER), json!([]), true).await;
     assert_eq!(status, 403, "{body}");
     assert!(body.contains("protegido"), "{body}");
@@ -193,6 +197,7 @@ async fn biblioteca_no_borra_un_protegido_como_alta() {
 async fn reversion_de_un_borrado_avisa_de_la_contrasena() {
     let registro = registro_global();
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    reautenticar(&p, &cookie).await;
     let g = ok(
         &p,
         "preparar_usuario_router",
@@ -242,6 +247,7 @@ async fn reversion_de_un_borrado_avisa_de_la_contrasena() {
 #[tokio::test]
 async fn reversion_fallida_tras_escribir_tambien_avisa() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    reautenticar(&p, &cookie).await;
     let g = ok(
         &p,
         "preparar_usuario_router",
@@ -280,4 +286,62 @@ async fn reversion_fallida_tras_escribir_tambien_avisa() {
             .unwrap();
     assert!(nota.contains("usuarios-router-nota-revertido"), "{nota}");
     assert!(!error.is_empty(), "sin el detalle de la reversión");
+}
+
+/// Crear o borrar usuarios del router exige reautenticación, en la tarjeta y
+/// en la Biblioteca: sin ella, 401 con el código de reautenticación y sin
+/// escribir nada; con ella, se crea y se borra.
+#[tokio::test]
+async fn crear_y_borrar_exigen_reautenticacion() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    let tarjeta = |op: Value| json!({ "op": op });
+    let crear = json!({ "Crear": { "usuario": "prueba1", "contrasena": CLAVE, "grupo": "user" } });
+    let borrar = json!({ "Borrar": { "usuario": INVITADO } });
+    let mut respuestas = Vec::new();
+    for op in [crear.clone(), borrar] {
+        respuestas.push(llamar(&p, "preparar_usuario_router", tarjeta(op), Some(&cookie)).await);
+    }
+    respuestas.push(
+        biblioteca(
+            &p,
+            &cookie,
+            "cbAddUser",
+            None,
+            alta("prueba2", "user"),
+            false,
+        )
+        .await,
+    );
+    respuestas.push(
+        biblioteca(
+            &p,
+            &cookie,
+            "cbDeleteUser",
+            None,
+            json!([["rqDelList", "invitado1:"]]),
+            false,
+        )
+        .await,
+    );
+    respuestas.push(biblioteca(&p, &cookie, "cbAddUser", Some(INVITADO), json!([]), true).await);
+    for (status, body) in respuestas {
+        assert_eq!(status, 401, "{body}");
+        assert!(body.contains(panel::auth::ERROR_REAUTENTICACION), "{body}");
+    }
+    assert!(p.sim.control.writes().is_empty());
+    // Con la ventana abierta: se crea por la tarjeta y se borra por la
+    // Biblioteca.
+    reautenticar(&p, &cookie).await;
+    let g = ok(&p, "preparar_usuario_router", tarjeta(crear), &cookie).await;
+    aplicar_ajuste(&p, &cookie, &g).await;
+    assert!(p.sim.control.usuarios().iter().any(|(u, _)| u == "prueba1"));
+    let id = aplicar(
+        &p,
+        &cookie,
+        json!({ "funcion": "cbDeleteUser", "instancia": null,
+            "valores": [["rqDelList", "prueba1:"]], "borrar": false }),
+    )
+    .await;
+    assert_eq!(esperar_final(&p, &cookie, id).await["estado"], "Aplicado");
+    assert!(!p.sim.control.usuarios().iter().any(|(u, _)| u == "prueba1"));
 }

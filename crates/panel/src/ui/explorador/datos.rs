@@ -559,12 +559,17 @@ pub async fn instancias(
     super::servidor::instancias(&state, &funcion, claves).await
 }
 
-/// Paso 1 del gestor de cambios: diff y token.
+/// Paso 1 del gestor de cambios: diff y token. Crear o borrar usuarios del
+/// router exige reautenticación, como en su tarjeta.
 #[server(endpoint = "preparar_cambio", input = Json)]
 pub async fn preparar_cambio(peticion: Peticion) -> Result<PreparadoVista, ServerFnError> {
     // Lleva los datos sensibles del diff en claro.
     super::servidor::sin_guardar();
-    crate::auth::require_user().await?;
+    if crate::changes::es_de_usuarios(&peticion.funcion) {
+        crate::auth::require_reauth().await?;
+    } else {
+        crate::auth::require_user().await?;
+    }
     let state = super::servidor::app_state()?;
     super::servidor::preparar(&state, peticion).await
 }

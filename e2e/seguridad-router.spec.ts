@@ -40,6 +40,17 @@ async function entrarEnSuPanel(page: Page) {
   await page.waitForURL((url) => url.pathname === "/");
 }
 
+/** Crear o borrar un usuario pide la contraseña del panel si hace un rato
+ *  que no se escribe: si sale el diálogo, se escribe. */
+async function reautenticarSiLaPide(page: Page) {
+  const dialogo = page.locator("dialog[open]");
+  await expect(dialogo).toBeVisible();
+  if (await dialogo.locator("#reautenticar-contrasena").count()) {
+    await dialogo.locator("#reautenticar-contrasena").fill(CONTRASENA);
+    await dialogo.locator("button[type=submit]").click();
+  }
+}
+
 /** La fila del usuario `nombre`. */
 function fila(page: Page, nombre: string): Locator {
   return page
@@ -82,12 +93,14 @@ test.describe("usuarios del router", () => {
       await page.locator("#usuarios-router-nuevo-contrasena").fill("clave-prueba-1");
       await expect(page.getByRole("radio", { name: "Usuario", exact: true }).first()).toBeChecked();
       await page.getByRole("button", { name: t.crear, exact: true }).click();
+      await reautenticarSiLaPide(page);
       await expect(page.locator("dialog[open] #grupo-titulo")).toHaveText("Revisa el cambio");
       await aplicar(page, t.aplicar);
       await expect(fila(page, nuevo)).toContainText("Usuario", { timeout: PLAZO_CAMBIO });
 
       // Borrar: el diálogo avisa antes de confirmar, con el botón de peligro.
       await fila(page, nuevo).getByRole("button", { name: `Borrar ${nuevo}`, exact: true }).click();
+      await reautenticarSiLaPide(page);
       const dialogo = page.locator("dialog[open]");
       await expect(dialogo).toContainText(t.avisoBorrar);
       await sinDesbordamiento(page, `borrar ${ancho}`);

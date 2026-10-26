@@ -62,7 +62,7 @@ mod vigilancia;
 pub(crate) use especiales::SIN_PING_YA_PUESTA;
 /// La lista de usuarios del router, como la lee el gestor (para el cambio
 /// de otro usuario, que no pasa por él).
-pub(crate) use especiales::{LECTURA_USUARIOS, usuarios_de};
+pub(crate) use especiales::{LECTURA_USUARIOS, es_de_usuarios, usuarios_de};
 use grupo::{Ejecucion, PasoGuardado};
 pub use grupo::{EstadoPaso, GrupoRequest, Paso, PasoCambio, PasoPreparado, PreparadoGrupo};
 pub use motivos::*;
