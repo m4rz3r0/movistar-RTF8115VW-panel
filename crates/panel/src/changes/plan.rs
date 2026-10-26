@@ -357,6 +357,11 @@ pub(super) fn componer(
     // reenviarlo se omite: la vuelta atrás no se bloquea nunca por esto.
     let mut omitidos = BTreeSet::new();
     for p in &f.parametros {
+        // Un campo fijo va siempre con su valor (no se lee ni se cambia).
+        if let Some(fijo) = &p.fijo {
+            payload.push((p.nombre.clone(), fijo.clone()));
+            continue;
+        }
         let (v, leido) = if let Some(v) = efectivos.get(&p.nombre) {
             (v.as_str(), de_la_lectura.contains(&p.nombre))
         } else if op == Operacion::Editar

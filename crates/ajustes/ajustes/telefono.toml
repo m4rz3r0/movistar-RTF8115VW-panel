@@ -222,13 +222,25 @@ fijos = { fxs_id = "0" }
 id = "fax"
 escribe = { funcion = "cbSetVoicePhysical", parametro = "fax_passthrough_adm_state" }
 lee = "fax_passthrough_adm_state"
-tipo = "booleano"
+# Un desplegable en la web del router (voiceadvance.asp), no un sí/no.
+tipo = "opcion"
+opciones = [
+  { valor = "0", clave = "no" },
+  { valor = "1", clave = "auto" },
+  { valor = "2", clave = "siempre" },
+]
 
 [[ajuste.campo]]
 id = "modem"
 escribe = { funcion = "cbSetVoicePhysical", parametro = "modem_passthrough_adm_state" }
 lee = "modem_passthrough_adm_state"
-tipo = "booleano"
+# Un desplegable en la web del router (voiceadvance.asp), no un sí/no.
+tipo = "opcion"
+opciones = [
+  { valor = "0", clave = "no" },
+  { valor = "1", clave = "auto" },
+  { valor = "2", clave = "siempre" },
+]
 
 # El puerto de teléfono en servicio (solo de lectura). Con el router real
 # sale en servicio también sin teléfono conectado: no dice si hay uno.
@@ -276,7 +288,6 @@ id = "fax-y-modem"
 tema = "telefono"
 ajustes = ["telefono.fisico"]
 icono = "fax"
-interruptor = "telefono.fisico.fax"
 datos = ["telefono.fisico.fax", "telefono.fisico.modem", "telefono.fisico.puerto"]
 estado = "derivado:estado_paso_directo"
 

@@ -1817,8 +1817,8 @@ Lectura pareada: `cbGetVoicePhysical`
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
-| `fax_passthrough_adm_state` | Fax en paso directo | bool |  |
-| `modem_passthrough_adm_state` | Módem en paso directo | bool |  |
+| `fax_passthrough_adm_state` | Fax en paso directo | enum | `0` Desactivado, `1` Automático, `2` Forzado |
+| `modem_passthrough_adm_state` | Módem en paso directo | enum | `0` Desactivado, `1` Automático, `2` Forzado |
 | `tx_gain` | Ganancia de emisión (dB) | int |  |
 | `rx_gain` | Ganancia de recepción (dB) | int |  |
 | `fxs_id` | Puerto de teléfono (id) | int |  |

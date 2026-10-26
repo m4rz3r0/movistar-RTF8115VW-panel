@@ -845,6 +845,7 @@ fn parametro(c: &Campo) -> Parametro {
         partido: c.partido,
         tapado: false,
         casilla: None,
+        fijo: None,
     }
 }
 
@@ -918,6 +919,7 @@ pub fn extraer(dir: &Path) -> Result<Vec<Funcion>, String> {
                         partido: None,
                         tapado: false,
                         casilla: None,
+                        fijo: None,
                     },
                     &mut params,
                 );
@@ -1003,6 +1005,7 @@ pub fn extraer(dir: &Path) -> Result<Vec<Funcion>, String> {
                 partido: None,
                 tapado: false,
                 casilla: None,
+                fijo: None,
             })
             .collect();
         if let Some(&i) = vistas.get(&u.nombre) {

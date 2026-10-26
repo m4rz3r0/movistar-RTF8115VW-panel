@@ -61,7 +61,9 @@ Probadas y descartadas (2026-10-26):
 
 - `cbSetDdns`: crear una entrada inactiva colgó la web del router hasta
   reiniciarlo. No se vuelve a probar.
-- `cbSetNatConfig`: los ALG no cambian.
+- `cbSetNatConfig`: los ALG no cambian. Causa encontrada después (ver
+  abajo): son casillas que van por presencia, y la web manda siempre
+  `set_nf_conntrack=1`. Arreglada; falta volver a probarla.
 - `cbSetQueue`: estaba mal modelada.
 - `cbSyncTime`: el router no la confirma.
 - `cbSetSystemTimeZone` y `cbSetNTPInfo`: su lectura no existe en este
@@ -87,6 +89,19 @@ Arreglada y pendiente de comprobar otra vez:
   tras reiniciar, y comprobar que el router da IP nueva) pase, sigue con
   `comprobada = false`, y con ella los ajustes de DHCP y DNS de la red de
   casa.
+
+**Casillas y campos fijos (2026-10-27).** En varias páginas de la web del
+router, un sí/no es una casilla sin `value`: la web la manda como `on` si
+está marcada y no la manda si no lo está, y el router la da por activa si
+el campo llega, valga lo que valga. El catálogo las marca con `casilla`
+(el panel manda `on` o nada, como la web): el grupo DHCP, las ALG de NAT,
+la clasificación QoS, el filtrado y el marcado L2, la WAN (`trigger`,
+`dns_override`) y la línea directa del teléfono. Un CGI no tiene por qué
+hacerlo así: el de la WiFi guarda `ssid_hide=0` como «no», así que
+`ssid_hide` y el prefijo ULA de IPv6, ya comprobados, siguen como 0/1
+hasta probarlos. `fijo` es un valor que la web manda siempre en un campo
+oculto y la lectura no da (`set_nf_conntrack=1`). El paso directo de fax
+y módem es un desplegable (desactivado, automático, siempre), no un sí/no.
 
 Lo demás solo se ve:
 

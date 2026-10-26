@@ -338,6 +338,7 @@ tipo = "text"
 nombre = "trigger"
 etiqueta = "Conexión bajo demanda"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "idle_dis_time"
@@ -363,6 +364,7 @@ tipo = "text"
 nombre = "dns_override"
 etiqueta = "DNS manuales"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "ipv6_type"
@@ -1103,6 +1105,7 @@ tipo = "int"
 nombre = "cls_ethertype"
 etiqueta = "Comprobar EtherType"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_ethertype_value"
@@ -1113,6 +1116,7 @@ tipo = "text"
 nombre = "cls_src_mac"
 etiqueta = "Comprobar MAC de origen"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_src_mac_addr"
@@ -1128,6 +1132,7 @@ tipo = "mac"
 nombre = "cls_dst_mac"
 etiqueta = "Comprobar MAC de destino"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_dst_mac_addr"
@@ -2136,33 +2141,40 @@ descripcion = "Activa o desactiva los ALG o el NAT loopback (formularios NatAlgF
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetNatConfig", params = [] }
-# 2026-10-26, cambio 28: el router acepta h323_enable pero no lo aplica (falta set_nf_conntrack=1).
+# 2026-10-26, cambio 28: el router acepta h323_enable pero no lo aplica.
+# Causa (natalg.asp): las ALG son casillas sin value (presencia) y la web
+# manda siempre set_nf_conntrack=1, que la lectura no da.
 comprobada = false
 
 [[funcion.parametro]]
 nombre = "ftp_enable"
 etiqueta = "ALG de FTP"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "h323_enable"
 etiqueta = "ALG de H.323"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "pptp_enable"
 etiqueta = "ALG de PPTP"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "sip_enable"
 etiqueta = "ALG de SIP"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "set_nf_conntrack"
 etiqueta = "Aplicar ALG (siempre 1)"
 tipo = "int"
+fijo = "1"
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -3377,6 +3389,7 @@ tipo = "int"
 nombre = "mod_dscp"
 etiqueta = "Remarcar DSCP"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "mod_dscp_value"
@@ -3387,6 +3400,7 @@ tipo = "int"
 nombre = "mod_pbit"
 etiqueta = "Remarcar prioridad 802.1p"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "mod_pbit_value"
@@ -3402,6 +3416,7 @@ tipo = "text"
 nombre = "cls_ethertype"
 etiqueta = "Comprobar EtherType"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_ethertype_value"
@@ -3412,6 +3427,7 @@ tipo = "text"
 nombre = "cls_pbit"
 etiqueta = "Comprobar prioridad 802.1p"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_pbit_value"
@@ -3422,6 +3438,7 @@ tipo = "int"
 nombre = "cls_vid"
 etiqueta = "Comprobar VLAN"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_vid_value"
@@ -3432,6 +3449,7 @@ tipo = "int"
 nombre = "cls_src_mac"
 etiqueta = "Comprobar MAC de origen"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_src_mac_addr"
@@ -3447,6 +3465,7 @@ tipo = "mac"
 nombre = "cls_dst_mac"
 etiqueta = "Comprobar MAC de destino"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_dst_mac_addr"
@@ -3462,6 +3481,7 @@ tipo = "mac"
 nombre = "cls_dscp"
 etiqueta = "Comprobar DSCP"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_dscp_value"
@@ -3472,6 +3492,7 @@ tipo = "int"
 nombre = "cls_l4_protocol"
 etiqueta = "Comprobar protocolo"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_l4_protocol_value"
@@ -3482,6 +3503,7 @@ tipo = "int"
 nombre = "cls_src_l4_port"
 etiqueta = "Comprobar puerto de origen"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_src_l4_port_value_min"
@@ -3497,6 +3519,7 @@ tipo = "int"
 nombre = "cls_dst_l4_port"
 etiqueta = "Comprobar puerto de destino"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_dst_l4_port_value_min"
@@ -3512,6 +3535,7 @@ tipo = "int"
 nombre = "cls_src_ipv4"
 etiqueta = "Comprobar IP de origen"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_src_ipv4_addr"
@@ -3527,6 +3551,7 @@ tipo = "ip"
 nombre = "cls_dst_ipv4"
 etiqueta = "Comprobar IP de destino"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_dst_ipv4_addr"
@@ -3640,6 +3665,7 @@ opciones = [["1", "Sin etiqueta"], ["0", "Con etiqueta"]]
 nombre = "vid_override"
 etiqueta = "Reescribir VLAN"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "vid_value"
@@ -3650,6 +3676,7 @@ tipo = "int"
 nombre = "pbit_override"
 etiqueta = "Reescribir prioridad 802.1p"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "pbit_value"
@@ -3715,6 +3742,7 @@ tipo = "int"
 nombre = "warmline_hotline"
 etiqueta = "Línea directa (hotline/warmline)"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "warmline_hotline_number"
@@ -3779,12 +3807,14 @@ comprobada = "pruebas del 2026-10-26, cambios 31 y 32"
 [[funcion.parametro]]
 nombre = "fax_passthrough_adm_state"
 etiqueta = "Fax en paso directo"
-tipo = "bool"
+tipo = "enum"
+opciones = [["0", "Desactivado"], ["1", "Automático"], ["2", "Forzado"]]
 
 [[funcion.parametro]]
 nombre = "modem_passthrough_adm_state"
 etiqueta = "Módem en paso directo"
-tipo = "bool"
+tipo = "enum"
+opciones = [["0", "Desactivado"], ["1", "Automático"], ["2", "Forzado"]]
 
 [[funcion.parametro]]
 nombre = "tx_gain"

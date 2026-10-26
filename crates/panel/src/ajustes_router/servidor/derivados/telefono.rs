@@ -28,11 +28,17 @@ pub(super) fn estado_voz(ctx: &Contexto) -> (EstadoVisual, String) {
     )
 }
 
-/// `derivado:estado_paso_directo`: el del fax, que es el interruptor de su
-/// tarjeta (el de los módems va en sus datos).
+/// ¿Paso directo del fax? Es un desplegable (desactivado, automático,
+/// siempre): solo «desactivado» es que no.
+fn fax(ctx: &Contexto) -> Option<bool> {
+    texto(ctx, "telefono.fisico", "fax").map(|o| o != "no")
+}
+
+/// `derivado:estado_paso_directo`: el del fax (el de los módems va en sus
+/// datos).
 pub(super) fn estado_paso_directo(ctx: &Contexto) -> (EstadoVisual, String) {
     segun(
-        si_no(ctx, "telefono.fisico", "fax"),
+        fax(ctx),
         (EstadoVisual::Emite, "ajustes-estado-paso-directo-si"),
         (EstadoVisual::Apagada, "ajustes-estado-paso-directo-no"),
     )

@@ -40,6 +40,7 @@ mod lista;
 mod lista_blanca;
 mod mejoras;
 mod menu;
+mod nat_alg;
 mod pagina_tema;
 mod pagina_tema_lotes;
 mod pagina_temas;

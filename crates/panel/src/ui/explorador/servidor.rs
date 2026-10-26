@@ -687,7 +687,8 @@ pub async fn formulario(
     let mut campos = Vec::new();
     let mut omitidos = Vec::new();
     for p in &f.parametros {
-        if ident.contains(&p.nombre) && operacion != Operacion::Accion {
+        // Un campo fijo no se enseña: el panel lo manda siempre igual.
+        if (ident.contains(&p.nombre) && operacion != Operacion::Accion) || p.fijo.is_some() {
             continue;
         }
         let cur = buscar(&actual, &p.nombre);

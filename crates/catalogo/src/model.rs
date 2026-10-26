@@ -209,6 +209,10 @@ pub struct Parametro {
     /// panel la lee como `0`/`1` y la escribe igual que la web.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub casilla: Option<Casilla>,
+    /// Valor que la web manda siempre (un campo oculto) y la lectura no da:
+    /// el panel lo envía con este valor y no lo enseña.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fijo: Option<String>,
 }
 
 /// Lo que acompaña a una casilla ([`Parametro::casilla`]).
