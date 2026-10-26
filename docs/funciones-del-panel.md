@@ -44,7 +44,7 @@ En la 1.0 están comprobadas:
 
 - **Seguridad y sistema:** gestión remota y aviso al operador
   (`cbSetTr69Config`), hora (`cbSetTimeNtp`), registro (`cbSetSyslog`),
-  diagnóstico (`cbSetDiagConfig`), cuentas de la web del router
+  diagnóstico (`cbSetDiagConfig`), reiniciar el router (`cbReboot`), cuentas de la web del router
   (`cbAddUser`, `cbDeleteUser`) y el alta y la baja de la regla del
   cortafuegos (`scbidirectionalflt.cmd?action=add`/`remove`).
 - **WiFi:** cada red (`cbSetWifiAccPt`, también el WPS) y las radios

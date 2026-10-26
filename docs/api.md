@@ -2161,7 +2161,7 @@ Lectura pareada: `cbGetSyslog`
 
 Reinicia el router. El panel vigila su vuelta hasta 5 minutos.
 
-**Sin comprobar en el router real:** el panel no la escribe.
+**Comprobada en el router real:** pruebas del 2026-10-26, cambio 57 (el router se reinició y volvió en menos de 5 min)
 
 ### `cbRestoreConfig`
 

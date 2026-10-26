@@ -4421,7 +4421,7 @@ pagina = "reboot.asp"
 descripcion = "Reinicia el router. El panel vigila su vuelta hasta 5 minutos."
 riesgo = "alto"
 acceso = "puede_cortar"
-comprobada = false
+comprobada = "pruebas del 2026-10-26, cambio 57 (el router se reinició y volvió en menos de 5 min)"
 
 [[funcion]]
 name = "cbRestoreConfig"

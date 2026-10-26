@@ -111,6 +111,7 @@ mod tests {
             "cbSetLanIPv6Config",
             "cbSetWifi",
             "cbSetNatPortMapping",
+            "cbReboot",
         ];
         let mut vistas = nombres.clone();
         esperadas.sort_unstable();
