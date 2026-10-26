@@ -96,6 +96,9 @@ fn funcion(md: &mut String, f: &Funcion, m: &Mascara, fixtures: &Path) {
     if let Some(p) = &f.pagina {
         let _ = write!(linea, " · página `{p}`");
     }
+    if let Some(c) = &f.cgi {
+        let _ = write!(linea, " · se manda a `{c}`");
+    }
     let _ = writeln!(md, "{linea}\n\n{}\n", f.descripcion);
     if let Some(b) = &f.bloqueada {
         let _ = writeln!(md, "**Bloqueada:** {b}\n");

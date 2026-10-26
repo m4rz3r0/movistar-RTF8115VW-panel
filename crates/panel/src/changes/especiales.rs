@@ -387,7 +387,7 @@ pub(super) fn funcion_enviada(plan: &Plan) -> &str {
             e.baja(plan.instancia.as_deref().unwrap_or_default(), &plan.valores)
                 .0
         }
-        _ => &plan.funcion.name,
+        _ => plan.funcion.cgi(),
     }
 }
 

@@ -287,9 +287,9 @@ impl ChangeManager {
             .collect();
         let c = &self.state.hgu;
         let r = if basica {
-            c.basic_write(pagina, &f.name, &p).await.map(drop)
+            c.basic_write(pagina, f.cgi(), &p).await.map(drop)
         } else {
-            c.write(pagina, &f.name, &p).await.map(drop)
+            c.write(pagina, f.cgi(), &p).await.map(drop)
         };
         match Especial::de(f) {
             Some(Especial::Usuarios) => r.map_err(super::especiales::sin_texto_del_router),

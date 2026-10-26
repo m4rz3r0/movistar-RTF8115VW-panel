@@ -64,7 +64,12 @@ Probadas y descartadas (2026-10-26):
 - `cbSetNatConfig`: los ALG no cambian. Causa encontrada después (ver
   abajo): son casillas que van por presencia, y la web manda siempre
   `set_nf_conntrack=1`. Arreglada; falta volver a probarla.
-- `cbSetQueue`: estaba mal modelada.
+- `cbSetQueue`: estaba mal modelada. La web la usa de dos formas: el
+  estado de cada cola (solo el id y `adm_state`) y la cola por defecto (el
+  id y `default_traffic_class=-1`; después la web cierra la sesión). El
+  panel mandaba las dos cosas a la vez y reenviaba la clase leída. Ahora
+  son `cbSetQueue` y `cbSetQueue.defecto` (`cgi = "cbSetQueue"`), y faltan
+  por probar.
 - `cbSyncTime`: el router no la confirma.
 - `cbSetSystemTimeZone` y `cbSetNTPInfo`: su lectura no existe en este
   router.

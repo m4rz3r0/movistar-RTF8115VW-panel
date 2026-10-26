@@ -49,7 +49,7 @@ Las funciones del propio panel (`/api/…`) están en
 | [DNS](#dns) | 6 | 3 | 3 | 0 | 0 |
 | [IPv6](#ipv6) | 8 | 2 | 6 | 0 | 3 |
 | [Multicast/IGMP](#multicastigmp) | 5 | 3 | 2 | 0 | 0 |
-| [QoS](#qos) | 7 | 4 | 3 | 0 | 0 |
+| [QoS](#qos) | 8 | 4 | 3 | 1 | 0 |
 | [VoIP](#voip) | 7 | 4 | 3 | 0 | 0 |
 | [TR-069](#tr-069) | 2 | 1 | 1 | 0 | 0 |
 | [Usuarios](#usuarios) | 11 | 2 | 2 | 7 | 7 |
@@ -1703,7 +1703,7 @@ Elementos de la respuesta: `adm_state`, `default_traffic_class`, `dpm_cfg_queue`
 
 *escritura* · UI avanzada · riesgo bajo · se vigila · página `queue.asp`
 
-Configura una cola de QoS, la de su id (`dpm_cfg_queue_id`, de 0 a 7).
+Activa o desactiva una cola de QoS, la de su id (`dpm_cfg_queue_id`, de 0 a 7). Como la web (botón Save de la tabla de colas), manda solo el id y el estado.
 
 **Sin comprobar en el router real:** el panel no la escribe.
 
@@ -1712,8 +1712,20 @@ Lectura pareada: `cbGetQueue` con `dpm_cfg_queue_0i={dpm_cfg_queue_id}`
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
 | `dpm_cfg_queue_id` | Cola (id) | int |  |
-| `default_traffic_class` | Cola por defecto | int |  |
 | `adm_state` | Activado | enum | `1` Activado, `0` Desactivado |
+
+### `cbSetQueue.defecto`
+
+*acción* · UI avanzada · riesgo medio · se vigila · página `queue.asp` · se manda a `cbSetQueue`
+
+Elige la cola por defecto (formulario DefaultQueueForm de la web): manda el id de la cola y `default_traffic_class=-1`, y el router toma la clase de tráfico de esa cola como la de por defecto. La web cierra la sesión 2 s después: el router rehace su red.
+
+**Sin comprobar en el router real:** el panel no la escribe.
+
+| Parámetro | Etiqueta | Tipo | Opciones |
+|---|---|---|---|
+| `dpm_cfg_queue_id` | Cola (id, de 0 a 7) | int |  |
+| `default_traffic_class` | Cola por defecto (siempre -1) | int |  |
 
 ### `cbGetTR98L2Marking`
 

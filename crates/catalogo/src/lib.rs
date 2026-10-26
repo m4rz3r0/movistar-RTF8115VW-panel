@@ -85,6 +85,14 @@ impl Catalogo {
             if !nombres.insert(f.name.as_str()) {
                 return Err(mal(f, "nombre repetido".into()));
             }
+            if let Some(c) = &f.cgi
+                && (self.funcion(c).is_none_or(|o| o.cgi.is_some()) || f.tipo == Tipo::Lectura)
+            {
+                return Err(mal(
+                    f,
+                    format!("cgi {c}: no es otra escritura del catálogo"),
+                ));
+            }
             if f.descripcion.trim().is_empty() {
                 return Err(mal(f, "sin descripción".into()));
             }
@@ -311,6 +319,18 @@ riesgo = "bajo"
             "riesgo = \"bajo\"\nacceso = \"no_corta\"",
         );
         assert!(Catalogo::from_toml(&lectura_con_acceso).is_err());
+        // `cgi` apunta a otra función del catálogo, que va por su nombre.
+        let otra = buena.replace("cbSetX", "cbSetX.otra");
+        let con_cgi = format!("{buena}{}", otra.replace(base, "")).replace(
+            "name = \"cbSetX.otra\"",
+            "name = \"cbSetX.otra\"\ncgi = \"cbSetX\"",
+        );
+        let c = Catalogo::from_toml(&con_cgi).unwrap();
+        assert_eq!(c.funcion("cbSetX.otra").unwrap().cgi(), "cbSetX");
+        assert_eq!(c.funcion("cbSetX").unwrap().cgi(), "cbSetX");
+        assert!(
+            Catalogo::from_toml(&con_cgi.replace("cgi = \"cbSetX\"", "cgi = \"cbSetZ\"")).is_err()
+        );
     }
 
     #[test]

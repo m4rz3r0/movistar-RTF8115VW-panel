@@ -74,6 +74,9 @@ pub(crate) fn write(
                 "",
             ));
         }
+        "cbSetQueue" if param(&clean, "default_traffic_class") == Some("-1") => {
+            cola_por_defecto(s, st, &clean)
+        }
         _ => escritura_generica(s, st, name, &clean),
     };
     match result {
@@ -162,6 +165,36 @@ fn escritura_generica(
         None => st.ediciones.push(Edicion {
             lectura: lectura.to_owned(),
             ident,
+            campos,
+        }),
+    }
+    Ok(())
+}
+
+/// La cola por defecto, como la web (`default_traffic_class=-1` con el id
+/// de la cola): todas las colas toman como clase de tráfico por defecto la
+/// de esa cola.
+fn cola_por_defecto(s: &Inner, st: &mut SimState, p: &[(String, String)]) -> Result<(), String> {
+    const LECTURA: &str = "cbGetQueue";
+    let id = param(p, "dpm_cfg_queue_id").ok_or("falta dpm_cfg_queue_id")?;
+    let colas = crate::lecturas::read_node(s, st, LECTURA, &[])?;
+    let clase = colas
+        .all("dpm_cfg_queue")
+        .into_iter()
+        .find(|c| c.text_of("dpm_cfg_queue_id") == Some(id))
+        .and_then(|c| c.text_of("traffic_class"))
+        .ok_or("no existe esa cola")?
+        .to_owned();
+    let campos = BTreeMap::from([("default_traffic_class".to_owned(), clase)]);
+    match st
+        .ediciones
+        .iter_mut()
+        .find(|e| e.lectura == LECTURA && e.ident.is_empty())
+    {
+        Some(e) => e.campos.extend(campos),
+        None => st.ediciones.push(Edicion {
+            lectura: LECTURA.to_owned(),
+            ident: Params::new(),
             campos,
         }),
     }

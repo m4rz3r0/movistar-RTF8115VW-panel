@@ -10,6 +10,12 @@ pub struct Funcion {
     /// Nombre con el que se invoca: `cbGetWifi`, `te_wifi.wl`,
     /// `te_puertos.cmd?action=add`, `restoreinfo.cgi`, `upload/cfgupload.asp`…
     pub name: String,
+    /// La CGI a la que se manda, si no es `name`: la web usa a veces una
+    /// misma CGI para dos cosas con campos distintos (`cbSetQueue`: el
+    /// estado de cada cola y la cola por defecto), que en el catálogo son
+    /// dos funciones.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cgi: Option<String>,
     /// Área del explorador.
     pub area: Area,
     /// De qué parte de la interfaz del router sale.
@@ -60,6 +66,11 @@ pub enum Comprobacion {
 }
 
 impl Funcion {
+    /// La CGI a la que se manda: [`Funcion::cgi`] o, sin él, el nombre.
+    pub fn cgi(&self) -> &str {
+        self.cgi.as_deref().unwrap_or(&self.name)
+    }
+
     /// ¿Se ha comprobado en el router real? Es la lista blanca de lo que el
     /// panel escribe: falla cerrada, así que sin el campo (o con `false`),
     /// no. Una lectura no escribe: no cuenta.

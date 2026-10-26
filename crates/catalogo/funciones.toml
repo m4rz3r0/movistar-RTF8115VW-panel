@@ -3595,7 +3595,7 @@ area = "qos"
 origen = "avanzada"
 tipo = "escritura"
 pagina = "queue.asp"
-descripcion = "Configura una cola de QoS, la de su id (`dpm_cfg_queue_id`, de 0 a 7)."
+descripcion = "Activa o desactiva una cola de QoS, la de su id (`dpm_cfg_queue_id`, de 0 a 7). Como la web (botón Save de la tabla de colas), manda solo el id y el estado."
 riesgo = "bajo"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetQueue", params = [["dpm_cfg_queue_0i", "{dpm_cfg_queue_id}"]] }
@@ -3608,15 +3608,33 @@ etiqueta = "Cola (id)"
 tipo = "int"
 
 [[funcion.parametro]]
-nombre = "default_traffic_class"
-etiqueta = "Cola por defecto"
-tipo = "int"
-
-[[funcion.parametro]]
 nombre = "adm_state"
 etiqueta = "Activado"
 tipo = "enum"
 opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion]]
+name = "cbSetQueue.defecto"
+cgi = "cbSetQueue"
+area = "qos"
+origen = "avanzada"
+tipo = "accion"
+pagina = "queue.asp"
+descripcion = "Elige la cola por defecto (formulario DefaultQueueForm de la web): manda el id de la cola y `default_traffic_class=-1`, y el router toma la clase de tráfico de esa cola como la de por defecto. La web cierra la sesión 2 s después: el router rehace su red."
+riesgo = "medio"
+acceso = "puede_cortar"
+comprobada = false
+
+[[funcion.parametro]]
+nombre = "dpm_cfg_queue_id"
+etiqueta = "Cola (id, de 0 a 7)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "default_traffic_class"
+etiqueta = "Cola por defecto (siempre -1)"
+tipo = "int"
+fijo = "-1"
 
 [[funcion]]
 name = "cbGetTR98L2Marking"

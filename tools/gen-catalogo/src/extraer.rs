@@ -987,6 +987,7 @@ pub fn extraer(dir: &Path) -> Result<Vec<Funcion>, String> {
             acceso: None,
             bloqueada: None,
             comprobada: None,
+            cgi: None,
         };
         f.riesgo = riesgo_de(&f);
         f.acceso = acceso_de(&f);
@@ -1033,6 +1034,7 @@ pub fn extraer(dir: &Path) -> Result<Vec<Funcion>, String> {
             acceso: None,
             bloqueada: None,
             comprobada: None,
+            cgi: None,
         };
         f.riesgo = riesgo_de(&f);
         f.acceso = acceso_de(&f);
@@ -1049,6 +1051,7 @@ pub fn extraer(dir: &Path) -> Result<Vec<Funcion>, String> {
         }
         let mut func = Funcion {
             name: f.ruta.clone(),
+            cgi: None,
             area: area_de_pagina(&f.ruta),
             origen: if f.ruta.starts_with("te_") {
                 Origen::Basica
