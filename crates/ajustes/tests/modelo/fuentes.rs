@@ -147,3 +147,21 @@ respaldo = "foro""#,
     );
     assert_eq!(fallos_con(&w, FUENTES), Vec::<String>::new());
 }
+
+/// Una fuente que apunta a una sección cita el título real de la página y el
+/// encabezado de esa sección.
+#[test]
+fn fuente_real_cita_la_seccion() {
+    let c = ajustes::CatalogoAjustes::load().expect("ajustes/*.toml legibles");
+    let familias = c
+        .fuentes()
+        .iter()
+        .find(|f| f.id == "cloudflare-familias")
+        .expect("fuente cloudflare-familias");
+    // Página «Set up Cloudflare 1.1.1.1 resolver», sección «1.1.1.1 for
+    // Families» (el ancla `#1111-for-families` de su url).
+    assert_eq!(
+        familias.titulo,
+        "Set up Cloudflare 1.1.1.1 resolver: 1.1.1.1 for Families"
+    );
+}
