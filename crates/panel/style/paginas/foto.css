@@ -1,10 +1,9 @@
 /* Cómo estaba al instalar (foto de partida). */
 /* ------------------------------------------- Cómo estaba al instalar (foto) */
 
-.tema-lectura .tema-foto {
-  margin-right: auto;
+/* El enlace a la foto de partida, al final de la descripción del tema. */
+.tema-desc .tema-foto {
   color: var(--texto);
-  font-size: 14px;
 }
 
 .foto-volver,

@@ -84,22 +84,16 @@ for (const idioma of ["es", "en"] as const) {
         const errores = recogerErrores(page);
         await entrar(page);
 
-        // 1. Abrir Red local (en móvil, con el selector de temas).
-        if (ancho < 640) {
-          await page.goto("/ajustes/puertos");
-          await asentar(page);
-          await expect(page.locator("nav.temas")).toBeHidden();
-          await page.locator("#ajustes-tema").selectOption("red_local");
-          await page.waitForURL((u) => u.pathname === "/ajustes/red_local");
-        } else {
-          await page.goto("/ajustes/red_local");
-          await asentar(page);
-          await expect(page.locator("#ajustes-tema")).toBeHidden();
-          await expect(page.locator("nav.temas a[aria-current=page]")).toHaveAttribute(
-            "href",
-            "/ajustes/red_local",
-          );
-        }
+        // 1. Abrir Red local con su pestaña (en el móvil, la barra se
+        // desplaza de lado: la pestaña se alcanza igual).
+        await page.goto("/ajustes/puertos");
+        await asentar(page);
+        await page.locator('nav.temas a[href="/ajustes/red_local"]').click();
+        await page.waitForURL((u) => u.pathname === "/ajustes/red_local");
+        await expect(page.locator("nav.temas a[aria-current=page]")).toHaveAttribute(
+          "href",
+          "/ajustes/red_local",
+        );
         const dhcp = tarjeta(page, t.dhcp);
         await expect(dhcp).toBeVisible();
         await sinDesbordamiento(page, `red local ${idioma} ${ancho}`);
@@ -179,12 +173,8 @@ for (const idioma of ["es", "en"] as const) {
         await page.locator(".detalle :is(.detalle-cerrar, .detalle-volver):visible").click();
         await page.waitForURL((u) => u.pathname === "/ajustes/red_local");
 
-        // 6. Las pestañas (o el selector en móvil) llevan a otro tema.
-        if (ancho < 640) {
-          await page.locator("#ajustes-tema").selectOption("puertos");
-        } else {
-          await page.locator("nav.temas").getByRole("link", { name: t.puertos }).click();
-        }
+        // 6. Las pestañas llevan a otro tema.
+        await page.locator("nav.temas").getByRole("link", { name: t.puertos }).click();
         await page.waitForURL((u) => u.pathname === "/ajustes/puertos");
         await expect(page.locator("section.lista-seccion").first()).toBeVisible();
         await sinDesbordamiento(page, `puertos ${idioma} ${ancho}`);

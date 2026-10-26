@@ -190,8 +190,9 @@ for (const ancho of [360, 1024, 1440]) {
         const antes = await nombre.inputValue();
         await nombre.fill("RED-9");
         const pregunta = page.locator("dialog[open]");
-        // «Leído hace N s» y «Volver a leer»: leer de nuevo no pierde lo
-        // editado (en el móvil, el detalle tapa la cabecera).
+        // «Leído hace N s» y el icono de volver a leer, en la barra de los
+        // temas: leer de nuevo no pierde lo editado (en el móvil, el
+        // detalle tapa la cabecera).
         const lectura = page.locator(".tema-lectura");
         await expect(lectura).toContainText(/Leído (ahora mismo|hace)/);
         if (ancho > 900) {
@@ -253,11 +254,7 @@ for (const ancho of [360, 1024, 1440]) {
           }
           await r.fulfill({ response: respuesta, json: pagina });
         });
-        if (ancho < 640) {
-          await page.locator("#ajustes-tema").selectOption("wifi");
-        } else {
-          await page.locator('nav.temas a[href="/ajustes/wifi"]').click();
-        }
+        await page.locator('nav.temas a[href="/ajustes/wifi"]').click();
         await page.waitForURL((u) => u.pathname === "/ajustes/wifi");
         const red5 = tarjeta(page, t.red5);
         await expect(insignia(red5)).toHaveText(t.sinLeer);

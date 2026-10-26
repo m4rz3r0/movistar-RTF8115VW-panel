@@ -150,13 +150,9 @@ async function cerrarDetalle(page: Page) {
   }).toPass();
 }
 
-/** Va a un tema con las pestañas o, en móvil, con el selector de temas. */
-async function irA(page: Page, ancho: number, tema: string, nombre: string) {
-  if (ancho < 640) {
-    await page.locator("#ajustes-tema").selectOption(tema);
-  } else {
-    await page.locator("nav.temas").getByRole("link", { name: nombre, exact: true }).click();
-  }
+/** Va a un tema con su pestaña (en el móvil, la barra se desplaza de lado). */
+async function irA(page: Page, tema: string, nombre: string) {
+  await page.locator("nav.temas").getByRole("link", { name: nombre, exact: true }).click();
   await page.waitForURL((u) => u.pathname === `/ajustes/${tema}`);
   await asentar(page);
   await sinApiALaVista(page, tema);
@@ -228,7 +224,7 @@ for (const { idioma, locale, ancho } of pasadas) {
 
       // 3. La IP de un dispositivo conectado, fija, desde su detalle en la
       // lista de dispositivos.
-      await irA(page, ancho, "red_local", t.redLocal);
+      await irA(page, "red_local", t.redLocal);
       await fila(page, t.dispositivos, "host-2").locator(".lista-nombre").click();
       const lateral = page.locator(".detalle-lateral");
       await lateral.getByRole("button", { name: t.fijarHost2, exact: true }).click();
@@ -239,7 +235,7 @@ for (const { idioma, locale, ancho } of pasadas) {
       await cerrarDetalle(page);
 
       // 4. Un puerto abierto hacia ese dispositivo.
-      await irA(page, ancho, "puertos", t.puertos);
+      await irA(page, "puertos", t.puertos);
       await lista(page, t.reglas).getByRole("button", { name: t.abrir }).click();
       const form = lateral.locator("form.regla-formulario");
       await form.getByLabel(t.nombre, { exact: true }).fill(t.nombreRegla);
@@ -257,7 +253,7 @@ for (const { idioma, locale, ancho } of pasadas) {
 
       // 5. La gestión remota del operador (TR-069), apagada, en su detalle
       // (Seguridad va en rejilla).
-      await irA(page, ancho, "seguridad", t.seguridad);
+      await irA(page, "seguridad", t.seguridad);
       const gestion = page.locator("article.tarjeta-el").filter({
         has: page.getByRole("heading", { level: 2, name: t.gestion, exact: true }),
       });

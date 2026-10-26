@@ -15,7 +15,6 @@ ajustes-valor-desconocido = Unrecognised value ({ $valor })
 ajustes-valor-desconocido-desc = The router has a value the panel does not know. It is kept as it is until you choose another one.
 ajustes-efecto = When applied
 ajustes-temas = Settings topics
-ajustes-tema-elegir = Section
 ajustes-actualizando = Updating…
 ajustes-volver = Go to the Internet settings
 ajustes-solo-lectura-aviso = Settings can only be viewed for now: the router firmware has not been tested with the panel yet.

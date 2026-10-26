@@ -14,6 +14,7 @@ mod ajustes_ida_y_vuelta;
 mod ajustes_listas;
 mod ajustes_secretos;
 mod auth;
+mod barra_temas;
 mod binario_e2e;
 mod changes;
 mod conexion;

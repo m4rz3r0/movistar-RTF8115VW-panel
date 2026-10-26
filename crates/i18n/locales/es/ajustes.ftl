@@ -15,7 +15,6 @@ ajustes-valor-desconocido = Valor no reconocido ({ $valor })
 ajustes-valor-desconocido-desc = El router tiene puesto un valor que el panel no conoce. Se conserva tal cual mientras no elijas otro.
 ajustes-efecto = Al aplicarlo
 ajustes-temas = Temas de ajustes
-ajustes-tema-elegir = Sección
 ajustes-actualizando = Actualizando…
 ajustes-volver = Ir a los ajustes de Internet
 ajustes-solo-lectura-aviso = Ahora solo se pueden consultar los ajustes: el firmware del router aún no está probado con el panel.

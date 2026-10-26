@@ -15,8 +15,9 @@
 use super::aviso::Seguimiento;
 use super::detalle::{Borradores, Detalle, sin_guardar};
 use super::lista::{Lista, es_lista, filas_de_la_pagina};
+use super::pestanas::Lectura;
 use super::piezas::enfocar;
-use super::resumen::{LecturaDelTema, ResumenTema};
+use super::resumen::ResumenTema;
 use super::seleccion::{BarraSeleccion, Seleccion, marcables, nombre};
 use super::sin_guardar::SinGuardar;
 use super::tarjeta::{Tarjeta, id_tarjeta};
@@ -177,6 +178,7 @@ pub(crate) fn ContenidoRejilla(
         .cloned()
         .chain(filas.iter().map(|(e, _)| e.clone()))
         .collect();
+    Lectura::llega(p.leido_hace_s);
     let marcables = marcables(&p.acciones, &tarjetas_y_filas);
     sel.conservar(&marcables);
     let nombres: Vec<(String, String)> = p
@@ -391,7 +393,6 @@ pub(crate) fn ContenidoRejilla(
         }
     };
     view! {
-        <LecturaDelTema edad_s=p.leido_hace_s volver_a_leer foto=p.foto_de_partida />
         {desconocido}
         <ResumenTema datos=p.resumen.clone() />
         {pagina.con_seleccion().then(|| view! {
