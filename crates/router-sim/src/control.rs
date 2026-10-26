@@ -225,6 +225,12 @@ impl SimControl {
         self.inner.state().cortafuegos_ilegible = on;
     }
 
+    /// Inicios de sesión básicos rechazados desde el arranque (para contar
+    /// los intentos con una contraseña que no vale).
+    pub fn inicios_fallidos(&self) -> u32 {
+        self.inner.state().inicios_fallidos
+    }
+
     /// La próxima baja de una regla (`item=<FID>|<RID>`) borra el filtro
     /// entero, como si el router hubiera ignorado el `|<RID>`.
     pub fn cortafuegos_proxima_baja_borra_filtro(&self) {

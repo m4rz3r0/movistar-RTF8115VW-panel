@@ -6,7 +6,8 @@
 //! propio ([`cambiar_contrasena_router`]) aparta el gestor, para el sondeo,
 //! escribe la nueva y prueba a entrar con ella antes de quedársela; si no
 //! entra, comprueba si sigue valiendo la anterior: si vale, el router puede
-//! estar aplicándola con retraso y se reintenta con la nueva hasta
+//! estar aplicándola con retraso y se reintenta con la nueva, pocas veces
+//! y con espera creciente, hasta
 //! `plazo_rechazada` (en el estado del servidor);
 //! si tampoco, vuelve a poner la anterior por la sesión que sigue abierta.
 //! Los valores viajan en XOR, como en la web oficial
@@ -42,6 +43,9 @@ pub async fn cambiar_contrasena_router(nueva: String) -> Result<(), ServerFnErro
 }
 
 #[cfg(feature = "ssr")]
+mod reintentos;
+
+#[cfg(feature = "ssr")]
 pub(crate) mod servidor {
     use super::*;
     use crate::changes::Nota;
@@ -58,8 +62,6 @@ pub(crate) mod servidor {
 
     /// Lo más que se espera a que se pare el sondeo (acaba su ciclo).
     const ESPERA_SONDEO: Duration = Duration::from_secs(30);
-    /// Pausa entre los reintentos con la nueva (ver [`aplicada_tarde`]).
-    const PAUSA_REINTENTO: Duration = Duration::from_secs(1);
     /// Título del cambio en el Historial: el del ajuste.
     const TITULO: &str = "ajuste-seguridad-contrasena_router-titulo";
 
@@ -313,21 +315,19 @@ pub(crate) mod servidor {
     }
 
     /// El router respondió al cambio, la nueva no entra y la anterior sí:
-    /// puede que aún la esté aplicando. Se reintenta entrar con `nueva`
-    /// cada [`PAUSA_REINTENTO`] hasta [`AppState::plazo_rechazada`]; dice
-    /// si llegó a entrar. Si no, `en_el_router` aún comprueba la anterior.
+    /// puede que aún la esté aplicando. Se reintenta entrar con `nueva` unas
+    /// pocas veces con espera creciente dentro de
+    /// [`AppState::plazo_rechazada`] ([`super::reintentos::pausas`]: cada
+    /// intento fallido acerca el bloqueo por intentos del router); dice si
+    /// llegó a entrar. Si no, `en_el_router` aún comprueba la anterior.
     async fn aplicada_tarde(state: &AppState, nueva: &CredencialesRouter) -> bool {
-        let fin = tokio::time::Instant::now() + state.plazo_rechazada;
-        loop {
-            let falta = fin.saturating_duration_since(tokio::time::Instant::now());
-            if falta.is_zero() {
-                return false;
-            }
-            tokio::time::sleep(PAUSA_REINTENTO.min(falta)).await;
+        for pausa in super::reintentos::pausas(state.plazo_rechazada) {
+            tokio::time::sleep(pausa).await;
             if entra(state, nueva).await {
                 return true;
             }
         }
+        false
     }
 
     /// No se entra ni con la nueva ni con la anterior: se vuelve a poner la

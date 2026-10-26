@@ -97,3 +97,23 @@ async fn contrasena_router_sin_ninguna_al_acabar_el_plazo_restaura() {
     p.sim.control.invalidate_sessions();
     hgu::read::summary(&p.state.hgu).await.unwrap();
 }
+
+/// Mientras espera a que el router aplique la nueva, el panel no la prueba
+/// cada segundo: pocos intentos con espera creciente (1, 2, 4 s…), como
+/// mucho cuatro, para no acercarse al bloqueo por intentos del router.
+#[tokio::test]
+async fn contrasena_router_pocos_reintentos_con_la_nueva() {
+    registro_global();
+    let (mut p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    reautenticar(&p, &cookie).await;
+    p.state.plazo_rechazada = Duration::from_millis(4500);
+    p.app = panel::build_router(p.state.clone());
+    p.sim.control.modify_pwd_sin_efecto();
+    let antes = p.sim.control.inicios_fallidos();
+    let (status, body) = cambiar(&p, &cookie).await;
+    assert_eq!(status, 502, "{body}");
+    // La primera prueba con la nueva y, como mucho, cuatro reintentos.
+    let fallidos = p.sim.control.inicios_fallidos() - antes;
+    assert!((2..=5).contains(&fallidos), "{fallidos} intentos fallidos");
+    assert_eq!(contrasena_guardada(&p).await, PASS);
+}

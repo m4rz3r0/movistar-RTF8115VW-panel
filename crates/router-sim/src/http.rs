@@ -160,6 +160,7 @@ pub(crate) async fn basic_login(
     let good = credenciales_validas(&s, &f, ("loginUsername", "loginPassword"))
         && rechazada.is_none_or(|r| param(&f, "loginPassword") != Some(mess_userpass(&r).as_str()));
     if !good {
+        s.state().inicios_fallidos += 1;
         return "<script>location.href = \"/te_acceso_router.asp\"</script>".into_response();
     }
     let mut st = s.state();

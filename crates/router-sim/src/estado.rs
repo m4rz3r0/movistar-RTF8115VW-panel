@@ -171,6 +171,8 @@ pub(crate) struct SimState {
     pub(crate) cortafuegos: Vec<hgu::cortafuegos::Filtro>,
     /// `cortafuegos_ilegible`: la página de la lista sale sin `var filter`.
     pub(crate) cortafuegos_ilegible: bool,
+    /// Inicios de sesión básicos rechazados desde el arranque.
+    pub(crate) inicios_fallidos: u32,
     /// La próxima baja de una regla borra además esto: `None` (nada),
     /// `Some(None)` el filtro entero o `Some(Some(rid))` otra regla del
     /// mismo filtro (`cortafuegos_proxima_baja_*`).
