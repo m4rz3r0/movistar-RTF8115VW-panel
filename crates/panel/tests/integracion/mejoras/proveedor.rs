@@ -2,7 +2,9 @@
 //! proveedor de la lista cuentan como hechos, y la revisión se prepara con
 //! ese proveedor, no con el de por defecto.
 
-use super::{del_grupo, dns_del_pool, escribir, grupo, mejoras, paso, preparar};
+use super::{
+    confirmar_sin, del_grupo, del_pool, dns_del_pool, escribir, grupo, mejoras, paso, preparar,
+};
 use crate::comun::PanelPrueba;
 use serde_json::{Value, json};
 
@@ -118,4 +120,22 @@ async fn dns_familiar_cuenta_como_proveedor() {
         .find(|e| e["id"] == "dns-casa")
         .unwrap_or_else(|| panic!("sin dns-casa: {red}"));
     assert!(dns["recomendacion"].is_null(), "{dns}");
+}
+
+/// Aplicar Privacidad máxima con el DNS familiar deja en el pool 0 sus dos
+/// servidores (1.1.1.3 y 1.0.0.3).
+#[tokio::test]
+async fn aplicar_el_dns_familiar() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    let g = grupo(
+        &p,
+        &cookie,
+        "privacidad",
+        json!({ "proveedor_dns": "cloudflare_familiar" }),
+    )
+    .await;
+    assert_eq!(g["proveedor_dns"], "cloudflare_familiar", "{g}");
+    confirmar_sin(&p, &cookie, &g, &["aviso_operador", "hora_neutra"]).await;
+    assert_eq!(del_pool(&p, "ipv4_dns_addr_0").await, "1.1.1.3");
+    assert_eq!(del_pool(&p, "ipv4_dns_addr_1").await, "1.0.0.3");
 }

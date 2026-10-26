@@ -11,10 +11,19 @@ const ACTIVA: &str = "activa";
 
 /// Las instancias activas de la DMZ (`None` si no se pudo leer). El router
 /// del usuario no tiene DMZ, así que el formato de una activa es una
-/// suposición: cuenta toda instancia que no venga marcada como apagada
-/// (una DMZ apagada pero guardada no es una DMZ activa).
+/// suposición (Rulings M y M′): cuenta toda instancia que no venga marcada
+/// como apagada (una DMZ apagada pero guardada no es una DMZ activa) ni
+/// traiga el equipo 0.0.0.0 (ninguno: no manda nada a ningún dispositivo).
 fn activas<'a>(ctx: &Contexto<'a>) -> Option<Vec<&'a InstanciaVista>> {
-    instancias(ctx, AJUSTE).map(|i| i.iter().filter(|i| !apagada(i)).collect())
+    instancias(ctx, AJUSTE).map(|i| i.iter().filter(|i| !apagada(i) && !sin_equipo(i)).collect())
+}
+
+/// Si la instancia trae el equipo 0.0.0.0 (ninguno). Sin el campo, no se
+/// sabe: cuenta como activa.
+fn sin_equipo(i: &InstanciaVista) -> bool {
+    i.campos
+        .iter()
+        .any(|c| c.id == CAMPO && c.valor == ValorLegible::Texto("0.0.0.0".into()))
 }
 
 /// Si la instancia viene marcada como apagada.

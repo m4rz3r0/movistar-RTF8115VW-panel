@@ -117,24 +117,37 @@ async fn dmz_apagada_guardada_desactivada() {
     assert!(e["recomendacion"].is_null(), "{e}");
 }
 
-/// Activa, pero sin equipo (la instancia no lo trae o trae 0.0.0.0): el
-/// texto habla de «un dispositivo de tu casa», sin IP.
+/// Activa, pero la instancia no trae el equipo: el texto habla de «un
+/// dispositivo de tu casa», sin IP.
 #[tokio::test]
 async fn dmz_activa_sin_ip() {
-    for capa in ["dmz-sin-ip", "dmz-ip-cero"] {
-        let (p, cookie) = PanelPrueba::nuevo()
-            .capa(&variante(capa))
-            .arrancar_con_gestor()
-            .await;
-        let e = dmz(&p, &cookie).await;
-        assert_eq!(e["texto_estado"], "Activa", "{capa}: {e}");
-        let problema = e["recomendacion"]["problema"].as_str().unwrap();
-        assert!(
-            problema.starts_with("Todo lo que llega de internet va a un dispositivo de tu casa"),
-            "{capa}: {problema}"
-        );
-        assert!(!problema.contains("0.0.0.0"), "{capa}: {problema}");
-    }
+    let (p, cookie) = PanelPrueba::nuevo()
+        .capa(&variante("dmz-sin-ip"))
+        .arrancar_con_gestor()
+        .await;
+    let e = dmz(&p, &cookie).await;
+    assert_eq!(e["texto_estado"], "Activa", "{e}");
+    let problema = e["recomendacion"]["problema"].as_str().unwrap();
+    assert!(
+        problema.starts_with("Todo lo que llega de internet va a un dispositivo de tu casa"),
+        "{problema}"
+    );
+}
+
+/// Ruling M′: marcada encendida pero con el equipo 0.0.0.0 (ninguno) no
+/// manda nada a ningún dispositivo: «Desactivada» y sin recomendación, para
+/// no dar una falsa alarma.
+#[tokio::test]
+async fn dmz_con_ip_cero_no_cuenta_como_activa() {
+    let (p, cookie) = PanelPrueba::nuevo()
+        .capa(&variante("dmz-ip-cero"))
+        .arrancar_con_gestor()
+        .await;
+    let e = dmz(&p, &cookie).await;
+    assert_eq!(instancias(&e), 1, "{e}");
+    assert_eq!(e["texto_estado"], "Desactivada", "{e}");
+    assert_eq!(e["estado"], "apagada", "{e}");
+    assert!(e["recomendacion"].is_null(), "{e}");
 }
 
 /// Con la lectura de la DMZ fallida, «Sin leer»: nunca «Desactivada» ni
