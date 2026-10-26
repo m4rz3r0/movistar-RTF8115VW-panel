@@ -128,6 +128,14 @@ hacerlo así: el de la WiFi guarda `ssid_hide=0` como «no», así que
 hasta probarlos. `fijo` es un valor que la web manda siempre en un campo
 oculto y la lectura no da (`set_nf_conntrack=1`). El paso directo de fax
 y módem es un desplegable (desactivado, automático, siempre), no un sí/no.
+`depende` marca lo que la web desactiva según otro campo, y que por eso
+no viaja: el valor de cada condición de la clasificación QoS y del
+filtrado L2 mientras su casilla está desmarcada, el VLAN y la prioridad
+del marcado L2 si no se sobrescriben, y el orden de una regla en la
+posición primera o última. `cgi` junta dos funciones del catálogo que la
+web manda a la misma CGI con campos distintos: las colas de QoS
+(`cbSetQueue` y `cbSetQueue.defecto`) y el NAT
+(`cbSetNatConfig` y `cbSetNatConfig.loopback`).
 
 Lo demás solo se ve:
 

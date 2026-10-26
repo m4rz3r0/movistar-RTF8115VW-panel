@@ -1091,6 +1091,7 @@ opciones = [["1", "Primera"], ["2", "Según el orden"], ["3", "Última"]]
 nombre = "order"
 etiqueta = "Orden"
 tipo = "int"
+depende = { de = "order_p", salvo = ["1", "3"] }
 
 [[funcion.parametro]]
 nombre = "filter_intf"
@@ -1123,6 +1124,7 @@ casilla = {}
 nombre = "cls_ethertype_value"
 etiqueta = "EtherType"
 tipo = "text"
+depende = { de = "cls_ethertype" }
 
 [[funcion.parametro]]
 nombre = "cls_src_mac"
@@ -1134,11 +1136,13 @@ casilla = {}
 nombre = "cls_src_mac_addr"
 etiqueta = "MAC de origen"
 tipo = "mac"
+depende = { de = "cls_src_mac" }
 
 [[funcion.parametro]]
 nombre = "cls_src_mac_mask"
 etiqueta = "Máscara de MAC de origen"
 tipo = "mac"
+depende = { de = "cls_src_mac" }
 
 [[funcion.parametro]]
 nombre = "cls_dst_mac"
@@ -1150,11 +1154,13 @@ casilla = {}
 nombre = "cls_dst_mac_addr"
 etiqueta = "MAC de destino"
 tipo = "mac"
+depende = { de = "cls_dst_mac" }
 
 [[funcion.parametro]]
 nombre = "cls_dst_mac_mask"
 etiqueta = "Máscara de MAC de destino"
 tipo = "mac"
+depende = { de = "cls_dst_mac" }
 
 [[funcion.parametro]]
 nombre = "mll_br_filter_id"
@@ -3400,6 +3406,7 @@ opciones = [["1", "Primera"], ["2", "Según el orden"], ["3", "Última"]]
 nombre = "order"
 etiqueta = "Orden"
 tipo = "int"
+depende = { de = "order_p", salvo = ["1", "3"] }
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -3422,6 +3429,7 @@ casilla = {}
 nombre = "mod_dscp_value"
 etiqueta = "DSCP nuevo (0-63)"
 tipo = "int"
+depende = { de = "mod_dscp" }
 
 [[funcion.parametro]]
 nombre = "mod_pbit"
@@ -3433,6 +3441,7 @@ casilla = {}
 nombre = "mod_pbit_value"
 etiqueta = "Prioridad nueva (0-7)"
 tipo = "int"
+depende = { de = "mod_pbit" }
 
 [[funcion.parametro]]
 nombre = "intf"
@@ -3449,6 +3458,7 @@ casilla = {}
 nombre = "cls_ethertype_value"
 etiqueta = "EtherType"
 tipo = "text"
+depende = { de = "cls_ethertype" }
 
 [[funcion.parametro]]
 nombre = "cls_pbit"
@@ -3460,6 +3470,7 @@ casilla = {}
 nombre = "cls_pbit_value"
 etiqueta = "Prioridad (0-7)"
 tipo = "int"
+depende = { de = "cls_pbit" }
 
 [[funcion.parametro]]
 nombre = "cls_vid"
@@ -3471,6 +3482,7 @@ casilla = {}
 nombre = "cls_vid_value"
 etiqueta = "VLAN (1-4094)"
 tipo = "int"
+depende = { de = "cls_vid" }
 
 [[funcion.parametro]]
 nombre = "cls_src_mac"
@@ -3482,11 +3494,13 @@ casilla = {}
 nombre = "cls_src_mac_addr"
 etiqueta = "MAC de origen"
 tipo = "mac"
+depende = { de = "cls_src_mac" }
 
 [[funcion.parametro]]
 nombre = "cls_src_mac_mask"
 etiqueta = "Máscara de MAC de origen"
 tipo = "mac"
+depende = { de = "cls_src_mac" }
 
 [[funcion.parametro]]
 nombre = "cls_dst_mac"
@@ -3498,11 +3512,13 @@ casilla = {}
 nombre = "cls_dst_mac_addr"
 etiqueta = "MAC de destino"
 tipo = "mac"
+depende = { de = "cls_dst_mac" }
 
 [[funcion.parametro]]
 nombre = "cls_dst_mac_mask"
 etiqueta = "Máscara de MAC de destino"
 tipo = "mac"
+depende = { de = "cls_dst_mac" }
 
 [[funcion.parametro]]
 nombre = "cls_dscp"
@@ -3514,6 +3530,7 @@ casilla = {}
 nombre = "cls_dscp_value"
 etiqueta = "DSCP (0-63)"
 tipo = "int"
+depende = { de = "cls_dscp" }
 
 [[funcion.parametro]]
 nombre = "cls_l4_protocol"
@@ -3525,6 +3542,7 @@ casilla = {}
 nombre = "cls_l4_protocol_value"
 etiqueta = "Protocolo (1-255)"
 tipo = "int"
+depende = { de = "cls_l4_protocol" }
 
 [[funcion.parametro]]
 nombre = "cls_src_l4_port"
@@ -3536,11 +3554,13 @@ casilla = {}
 nombre = "cls_src_l4_port_value_min"
 etiqueta = "Puerto de origen desde"
 tipo = "int"
+depende = { de = "cls_src_l4_port" }
 
 [[funcion.parametro]]
 nombre = "cls_src_l4_port_value_max"
 etiqueta = "Puerto de origen hasta"
 tipo = "int"
+depende = { de = "cls_src_l4_port" }
 
 [[funcion.parametro]]
 nombre = "cls_dst_l4_port"
@@ -3552,11 +3572,13 @@ casilla = {}
 nombre = "cls_dst_l4_port_value_min"
 etiqueta = "Puerto de destino desde"
 tipo = "int"
+depende = { de = "cls_dst_l4_port" }
 
 [[funcion.parametro]]
 nombre = "cls_dst_l4_port_value_max"
 etiqueta = "Puerto de destino hasta"
 tipo = "int"
+depende = { de = "cls_dst_l4_port" }
 
 [[funcion.parametro]]
 nombre = "cls_src_ipv4"
@@ -3568,11 +3590,13 @@ casilla = {}
 nombre = "cls_src_ipv4_addr"
 etiqueta = "IP de origen"
 tipo = "ip"
+depende = { de = "cls_src_ipv4" }
 
 [[funcion.parametro]]
 nombre = "cls_src_ipv4_mask"
 etiqueta = "Máscara de IP de origen"
 tipo = "ip"
+depende = { de = "cls_src_ipv4" }
 
 [[funcion.parametro]]
 nombre = "cls_dst_ipv4"
@@ -3584,11 +3608,13 @@ casilla = {}
 nombre = "cls_dst_ipv4_addr"
 etiqueta = "IP de destino"
 tipo = "ip"
+depende = { de = "cls_dst_ipv4" }
 
 [[funcion.parametro]]
 nombre = "cls_dst_ipv4_mask"
 etiqueta = "Máscara de IP de destino"
 tipo = "ip"
+depende = { de = "cls_dst_ipv4" }
 
 [[funcion.parametro]]
 nombre = "rtm_cfg_qos_cls_id"
@@ -3716,6 +3742,7 @@ casilla = {}
 nombre = "vid_value"
 etiqueta = "VLAN"
 tipo = "int"
+depende = { de = "vid_override" }
 
 [[funcion.parametro]]
 nombre = "pbit_override"
@@ -3728,6 +3755,7 @@ nombre = "pbit_value"
 etiqueta = "Prioridad 802.1p"
 tipo = "enum"
 opciones = [["0", "0"], ["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"], ["5", "5"], ["6", "6"], ["7", "7"]]
+depende = { de = "pbit_override" }
 
 [[funcion.parametro]]
 nombre = "mll_br_marking_id"

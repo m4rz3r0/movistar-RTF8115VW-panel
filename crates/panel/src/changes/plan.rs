@@ -381,6 +381,7 @@ pub(super) fn componer(
     // reenviarlo se omite: la vuelta atrás no se bloquea nunca por esto.
     let mut omitidos = BTreeSet::new();
     let cambiadas = ranuras::cambiadas(f, actual, &efectivos);
+    let mut desactivados = Vec::new();
     for p in &f.parametros {
         // Un campo fijo va siempre con su valor (no se lee ni se cambia).
         if let Some(fijo) = &p.fijo {
@@ -401,6 +402,21 @@ pub(super) fn componer(
                 }
             }
             continue;
+        }
+        // Lo que la web desactiva según otro campo (el valor de una
+        // condición desmarcada) no viaja con el formulario.
+        if let Some(d) = &p.depende
+            && op != Operacion::Borrar
+        {
+            let de = efectivos.get(&d.de).map(String::as_str).or_else(|| {
+                (op == Operacion::Editar)
+                    .then(|| buscar(actual, &d.de))
+                    .flatten()
+            });
+            if !d.activo(de) {
+                desactivados.push(p.nombre.clone());
+                continue;
+            }
         }
         let (v, leido) = if let Some(v) = efectivos.get(&p.nombre) {
             (v.as_str(), de_la_lectura.contains(&p.nombre))
@@ -437,6 +453,11 @@ pub(super) fn componer(
         payload.push((p.nombre.clone(), v.to_owned()));
     }
     for k in &omitidos {
+        efectivos.remove(k);
+    }
+    // Lo desactivado no se escribe: tampoco sale en el resumen ni se
+    // comprueba después.
+    for k in &desactivados {
         efectivos.remove(k);
     }
     let secreto =

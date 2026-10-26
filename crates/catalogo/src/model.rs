@@ -244,6 +244,35 @@ pub struct Parametro {
     /// Una ranura libre vale [`RANURA_LIBRE`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ranuras: Option<u8>,
+    /// La web lo desactiva (y `.serialize()` no lo manda) según otro campo:
+    /// el valor de una condición mientras su casilla está desmarcada.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub depende: Option<Depende>,
+}
+
+/// De qué depende que un campo vaya ([`Parametro::depende`]).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Depende {
+    /// El parámetro del que depende.
+    pub de: String,
+    /// Valores de `de` con los que no va (`order` con la posición primera o
+    /// última). Sin ellos, `de` es una casilla y va solo si está marcada.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub salvo: Vec<String>,
+}
+
+impl Depende {
+    /// ¿Va el campo, si `de` vale `v`? Una casilla está marcada con `1` (lo
+    /// leído) o `on` (lo que manda la web).
+    pub fn activo(&self, v: Option<&str>) -> bool {
+        let v = v.map(str::trim);
+        if self.salvo.is_empty() {
+            matches!(v, Some("1" | "on"))
+        } else {
+            v.is_none_or(|v| !self.salvo.iter().any(|s| s == v))
+        }
+    }
 }
 
 /// Valor de una ranura libre ([`Parametro::ranuras`]).

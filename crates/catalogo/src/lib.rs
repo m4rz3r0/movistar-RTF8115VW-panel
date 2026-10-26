@@ -9,8 +9,8 @@ pub mod mask;
 mod model;
 
 pub use model::{
-    Acceso, Area, Casilla, Comprobacion, Funcion, LecturaPareada, Lista, Origen, Parametro,
-    Partido, RANURA_LIBRE, Riesgo, Tipo, TipoParam,
+    Acceso, Area, Casilla, Comprobacion, Depende, Funcion, LecturaPareada, Lista, Origen,
+    Parametro, Partido, RANURA_LIBRE, Riesgo, Tipo, TipoParam,
 };
 
 use serde::Deserialize;
@@ -143,6 +143,15 @@ impl Catalogo {
                         f,
                         format!("{}: ranuras solo de IP y al menos una", p.nombre),
                     ));
+                }
+                if let Some(d) = &p.depende {
+                    let de = f.parametros.iter().find(|x| x.nombre == d.de);
+                    if de.is_none_or(|x| d.salvo.is_empty() && x.casilla.is_none()) {
+                        return Err(mal(
+                            f,
+                            format!("{}: depende de {}, que no es una casilla", p.nombre, d.de),
+                        ));
+                    }
                 }
                 match (p.partido, p.tipo) {
                     (None, _) | (Some(Partido::Ip4), TipoParam::Ip) => {}
@@ -331,6 +340,18 @@ riesgo = "bajo"
         assert!(
             Catalogo::from_toml(&con_cgi.replace("cgi = \"cbSetX\"", "cgi = \"cbSetZ\"")).is_err()
         );
+        // `depende` de una casilla, o de otro campo con `salvo`.
+        let dep = |extra: &str| {
+            format!(
+                "{buena}\n[[funcion.parametro]]\nnombre = \"c\"\netiqueta = \"C\"\ntipo = \"bool\"\n\
+                 casilla = {{}}\n\n[[funcion.parametro]]\nnombre = \"v\"\netiqueta = \"V\"\n\
+                 tipo = \"int\"\n{extra}\n"
+            )
+        };
+        assert!(Catalogo::from_toml(&dep("depende = { de = \"c\" }")).is_ok());
+        assert!(Catalogo::from_toml(&dep("depende = { de = \"x_id\" }")).is_err());
+        assert!(Catalogo::from_toml(&dep("depende = { de = \"x_id\", salvo = [\"1\"] }")).is_ok());
+        assert!(Catalogo::from_toml(&dep("depende = { de = \"nada\", salvo = [\"1\"] }")).is_err());
     }
 
     #[test]
