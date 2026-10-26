@@ -31,6 +31,7 @@ mod fuentes;
 mod grupos;
 mod historial;
 mod historial_idioma;
+mod hora_local;
 mod http;
 mod idioma;
 mod instalar;

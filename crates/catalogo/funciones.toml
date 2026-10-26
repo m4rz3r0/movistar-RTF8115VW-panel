@@ -4422,6 +4422,16 @@ nombre = "rqFileName"
 etiqueta = "Fichero"
 tipo = "text"
 
+[[funcion.parametro]]
+nombre = "rqUsername"
+etiqueta = "Usuario del FTP (vacío: anónimo)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "rqPasswd"
+etiqueta = "Contraseña del FTP"
+tipo = "secret"
+
 [[funcion]]
 name = "cbGetDiagConfig"
 area = "sistema"
@@ -4544,16 +4554,11 @@ area = "sistema"
 origen = "avanzada"
 tipo = "accion"
 pagina = "restore_default.asp"
-descripcion = "Restaura un perfil de configuración guardado y reinicia el router."
+descripcion = "Restaura la configuración de fábrica y reinicia el router (restore_default.asp: la web manda solo el sessionKey)."
 riesgo = "alto"
 acceso = "puede_cortar"
 bloqueada = "sustituye toda la configuración y reinicia; no hay forma de comprobarla ni de deshacerla desde el panel"
 comprobada = false
-
-[[funcion.parametro]]
-nombre = "file"
-etiqueta = "Perfil guardado"
-tipo = "text"
 
 [[funcion]]
 name = "cbSaveConfig"
@@ -4672,14 +4677,14 @@ area = "sistema"
 origen = "oculta"
 tipo = "accion"
 pagina = "ntp.asp"
-descripcion = "Fija la hora local del router a mano (ntp.asp, oculta). Sin lectura que la compruebe: acción."
+descripcion = "Fija la hora del router a mano (ntp.asp, oculta). Como la web, la fecha y la hora del router se mandan en segundos desde 1970 (UTC), con la zona que da cbGetSummary; también vale el número de segundos. Sin lectura que la compruebe: acción."
 riesgo = "bajo"
 acceso = "no_corta"
 comprobada = false
 
 [[funcion.parametro]]
 nombre = "SysTime"
-etiqueta = "Hora local"
+etiqueta = "Fecha y hora del router (AAAA-MM-DD HH:MM)"
 tipo = "text"
 
 [[funcion]]

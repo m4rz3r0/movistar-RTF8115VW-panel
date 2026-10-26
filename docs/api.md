@@ -2113,6 +2113,8 @@ Descarga un firmware de un servidor FTP/TFTP y lo graba.
 | `rqServerIP` | Servidor | ip |  |
 | `rqPort` | Puerto | int |  |
 | `rqFileName` | Fichero | text |  |
+| `rqUsername` | Usuario del FTP (vacío: anónimo) | text |  |
+| `rqPasswd` | Contraseña del FTP | secret |  |
 
 ### `cbGetDiagConfig`
 
@@ -2192,15 +2194,11 @@ Reinicia el router. El panel vigila su vuelta hasta 5 minutos.
 
 *acción* · UI avanzada · riesgo alto · se vigila · página `restore_default.asp`
 
-Restaura un perfil de configuración guardado y reinicia el router.
+Restaura la configuración de fábrica y reinicia el router (restore_default.asp: la web manda solo el sessionKey).
 
 **Bloqueada:** sustituye toda la configuración y reinicia; no hay forma de comprobarla ni de deshacerla desde el panel
 
 **Sin comprobar en el router real:** el panel no la escribe.
-
-| Parámetro | Etiqueta | Tipo | Opciones |
-|---|---|---|---|
-| `file` | Perfil guardado | text |  |
 
 ### `cbSaveConfig`
 
@@ -2291,13 +2289,13 @@ Recibe un fichero de configuración desde la UI básica y lo aplica.
 
 *acción* · oculta · riesgo bajo · sin vigilancia · página `ntp.asp`
 
-Fija la hora local del router a mano (ntp.asp, oculta). Sin lectura que la compruebe: acción.
+Fija la hora del router a mano (ntp.asp, oculta). Como la web, la fecha y la hora del router se mandan en segundos desde 1970 (UTC), con la zona que da cbGetSummary; también vale el número de segundos. Sin lectura que la compruebe: acción.
 
 **Sin comprobar en el router real:** el panel no la escribe.
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
-| `SysTime` | Hora local | text |  |
+| `SysTime` | Fecha y hora del router (AAAA-MM-DD HH:MM) | text |  |
 
 ### `cbGetTimeNtp`
 

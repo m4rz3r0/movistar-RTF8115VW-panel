@@ -91,6 +91,11 @@ impl ChangeManager {
         if !explicito {
             especiales::opcion_dhcp::preparar(f, op, &actual, &mut valores)
                 .map_err(CambioError::Invalida)?;
+            if f.name == especiales::hora_local::FUNCION {
+                let zona = self.zona_del_router().await?;
+                especiales::hora_local::preparar(&mut valores, zona)
+                    .map_err(CambioError::Invalida)?;
+            }
         }
         let Compuesto {
             efectivos,
@@ -236,6 +241,21 @@ impl ChangeManager {
             .filter(|c| !c.children.is_empty())
             .map(hojas)
             .collect())
+    }
+
+    /// Zona del router en minutos (UTC menos la hora local), de su resumen.
+    async fn zona_del_router(&self) -> Result<i64, CambioError> {
+        use especiales::hora_local::{RESUMEN, ZONA};
+        let n = self.state.hgu.call(RESUMEN, &[]).await.map_err(|e| {
+            CambioError::Router(format!("no se puede leer la zona del router: {e}"))
+        })?;
+        fn buscar_zona(n: &hgu::xml::XmlNode) -> Option<&str> {
+            n.text_of(ZONA)
+                .or_else(|| n.children.iter().find_map(buscar_zona))
+        }
+        buscar_zona(&n)
+            .and_then(|z| z.trim().parse().ok())
+            .ok_or_else(|| CambioError::Router(format!("{RESUMEN} no da {ZONA}")))
     }
 
     /// Envía la carga del plan (las claves de la UI básica, ofuscadas con
