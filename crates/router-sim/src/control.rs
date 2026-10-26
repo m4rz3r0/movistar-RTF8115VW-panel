@@ -101,6 +101,30 @@ impl SimControl {
         }
     }
 
+    /// Las conexiones TCP abiertas hasta ahora dejan de responder, sin
+    /// cerrarse: lo que llegue por ellas no tiene respuesta. Las nuevas van
+    /// con normalidad. Como un router que rehace su red.
+    pub fn cortar_conexiones(&self) {
+        crate::conexiones::cortar(&self.inner.epoca);
+    }
+
+    /// Las sesiones abiertas hasta ahora (básicas y avanzadas) dejan de
+    /// responder: sus peticiones se quedan colgadas para siempre, sin
+    /// caducar. Una sesión nueva va con normalidad. Como un router que
+    /// rehace su servidor web y no reconoce ni rechaza las de antes.
+    pub fn colgar_sesiones(&self) {
+        self.inner.state().colgar_sesiones();
+    }
+
+    /// Tras responder a la próxima escritura real, el router rehace su red
+    /// (como al cambiar el QoS en el router real): corta las conexiones
+    /// abiertas ([`SimControl::cortar_conexiones`]) y cuelga las sesiones
+    /// ([`SimControl::colgar_sesiones`]). La respuesta de esa escritura sí
+    /// llega.
+    pub fn rehacer_red_tras_proxima_escritura(&self) {
+        self.inner.state().rehacer_red_tras_escritura = true;
+    }
+
     /// La próxima reserva DHCP nueva (`cbDhcpV4SvrPoolSetStatic` con id -1)
     /// se crea dos veces (dos ids nuevos con los mismos valores).
     pub fn create_twice_next_write(&self) {

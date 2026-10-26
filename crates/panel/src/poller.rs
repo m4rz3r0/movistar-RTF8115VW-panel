@@ -507,6 +507,11 @@ impl Poller {
                 let mut st = self.handle.status();
                 st.sin_configurar = false;
                 st.failures = st.failures.saturating_add(1);
+                // Una vez por racha de fallos, con la cadena del error (sin
+                // secretos: ver `hgu::Error`).
+                if st.failures == 1 {
+                    tracing::warn!("el sondeo no puede leer el router: {e}");
+                }
                 st.error = Some(e.to_string());
                 Next::Backoff(self.cfg.delay(st.failures, Some(&e)))
             }
@@ -685,6 +690,12 @@ impl Poller {
             };
             st.snapshot = Some(snap);
             st.error = None;
+            if st.failures > 0 {
+                tracing::info!(
+                    "el sondeo vuelve a leer el router tras {} fallos",
+                    st.failures
+                );
+            }
             st.failures = 0;
             st.sin_configurar = false;
             st.last_ok = Some(Instant::now());

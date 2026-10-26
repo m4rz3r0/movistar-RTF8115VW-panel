@@ -17,9 +17,11 @@ use tokio::{
     time::Instant,
 };
 
+mod contacto;
 mod entrar;
 mod local;
 mod por_id;
+pub use contacto::{Contacto, EstadoContacto};
 pub use entrar::Credenciales;
 pub use por_id::TOPE_POSICIONES;
 
@@ -80,6 +82,9 @@ struct State {
     basic_ok: bool,
     adv_ok: bool,
     last_request: Option<Instant>,
+    /// Mientras hay una [`Exclusiva`]: un error de red no descarta la
+    /// sesión (de ella depende la vuelta atrás de quien la tiene).
+    conservar_sesion: bool,
 }
 
 struct Shared {
@@ -88,6 +93,8 @@ struct Shared {
     configurado: AtomicBool,
     /// Ver [`Client::escrituras`].
     escrituras: AtomicU64,
+    /// Ver [`Client::contacto`].
+    contacto: std::sync::Mutex<Option<Contacto>>,
     state: Mutex<State>,
 }
 
@@ -156,8 +163,13 @@ impl Client {
         let timeout = cfg
             .as_ref()
             .map_or_else(|| ClientConfig::new("", "", "").timeout, |c| c.timeout);
+        // Sin conexiones ociosas: cada petición abre la suya. Una conexión
+        // guardada que el router cortó en silencio (al rehacer su red, p. ej.
+        // tras cambiar el QoS) solo daría un error más; y el router es lento
+        // de todos modos.
         let http = reqwest::Client::builder()
             .timeout(timeout)
+            .pool_max_idle_per_host(0)
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .expect("configuración de reqwest válida");
@@ -166,6 +178,7 @@ impl Client {
                 http,
                 configurado: AtomicBool::new(cfg.is_some()),
                 escrituras: AtomicU64::new(0),
+                contacto: std::sync::Mutex::new(None),
                 state: Mutex::new(State {
                     cfg,
                     ..State::default()
@@ -184,6 +197,7 @@ impl Client {
         Self::invalidate(&mut st);
         st.last_request = None;
         st.cfg = Some(cfg);
+        self.anotar_contacto(None);
         self.shared.configurado.store(true, Ordering::SeqCst);
     }
 
@@ -219,10 +233,9 @@ impl Client {
     /// abierta para volver atrás. Las llamadas por este cliente esperan; las
     /// de otro cliente (otra sesión) no.
     pub async fn en_exclusiva(&self) -> Exclusiva<'_> {
-        Exclusiva {
-            client: self,
-            st: self.shared.state.lock().await,
-        }
+        let mut st = self.shared.state.lock().await;
+        st.conservar_sesion = true;
+        Exclusiva { client: self, st }
     }
 
     /// Si hay un router configurado.
@@ -491,6 +504,7 @@ impl Client {
             st.basic_ok = true;
             Ok(())
         } else {
+            self.anotar_contacto(Some(EstadoContacto::Rechaza));
             Err(Error::Auth("el router rechazó usuario o contraseña"))
         }
     }
@@ -539,6 +553,7 @@ impl Client {
         };
         if !node.result_ok() {
             Self::invalidate(st);
+            self.anotar_contacto(Some(EstadoContacto::Rechaza));
             return Err(Error::Auth("el router rechazó usuario o contraseña"));
         }
         let sid = node
@@ -608,8 +623,24 @@ impl Client {
         }
         .await;
         st.last_request = Some(Instant::now());
-        let (status, set, text) =
-            result.map_err(|e| Error::Network(e.without_url().to_string()))?;
+        let (status, set, text) = match result {
+            Ok(r) => {
+                self.anotar_contacto(Some(EstadoContacto::Responde));
+                r
+            }
+            Err(e) => {
+                self.anotar_contacto(Some(EstadoContacto::SinRespuesta));
+                // Nada de lo que no respondió vale para la petición
+                // siguiente: la sesión (y sus cookies) se descarta y la
+                // siguiente vuelve a entrar. Un router que rehízo su red o su
+                // servidor web pudo perder la sesión sin decirlo; mantenerla
+                // viva con el sondeo la haría fallar para siempre.
+                if !st.conservar_sesion {
+                    Self::invalidate(st);
+                }
+                return Err(Error::Network(contacto::cadena(e)));
+            }
+        };
         for c in set {
             if let Some((k, v)) = c.split(';').next().and_then(|nv| nv.split_once('=')) {
                 st.cookies.insert(k.trim().to_owned(), v.trim().to_owned());
@@ -669,6 +700,12 @@ impl Turno<'_> {
 pub struct Exclusiva<'a> {
     client: &'a Client,
     st: MutexGuard<'a, State>,
+}
+
+impl Drop for Exclusiva<'_> {
+    fn drop(&mut self) {
+        self.st.conservar_sesion = false;
+    }
 }
 
 impl Exclusiva<'_> {

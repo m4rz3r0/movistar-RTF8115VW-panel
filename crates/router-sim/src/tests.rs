@@ -35,6 +35,7 @@ fn inner_de_prueba() -> Inner {
         catalogo: Catalogo::load().unwrap(),
         wan: None,
         unresponsive: AtomicBool::new(false),
+        epoca: Default::default(),
         retardo_ms: AtomicU64::new(0),
         state: Mutex::new(SimState::default()),
     }

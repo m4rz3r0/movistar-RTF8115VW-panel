@@ -440,7 +440,7 @@ impl ChangeManager {
     ) -> Result<(Option<Nota>, bool), FalloPaso> {
         let mut nota = None;
         let comprobacion = match self.enviar(plan).await {
-            Ok(()) => self.comprobar(plan, Lado::Nuevo).await,
+            Ok(()) => self.releer_tras_escribir(plan, pausa).await,
             // El router rechazó la escritura: no se aplicó nada.
             Err(e @ hgu::Error::CallFailed { .. }) => {
                 return Err(FalloPaso::no_aplicado(CambioError::Router(e.to_string())));

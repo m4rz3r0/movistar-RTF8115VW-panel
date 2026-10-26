@@ -14,6 +14,7 @@ mod fixtures;
 mod lecturas;
 mod listas;
 mod pools;
+mod red;
 mod reservas;
 mod sesion;
 mod usuarios;

@@ -19,6 +19,7 @@ mod cola;
 mod cola_api;
 mod deshacer;
 mod reanudar;
+mod red;
 mod reintentos;
 mod secretos;
 mod sin_vigilancia;

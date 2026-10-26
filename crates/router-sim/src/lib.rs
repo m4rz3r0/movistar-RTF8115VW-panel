@@ -8,6 +8,7 @@
 //! el cortafuegos (`cortafuegos`: sus dos páginas y el alta y la baja de
 //! reglas).
 
+mod conexiones;
 mod control;
 mod cortafuegos;
 mod escrituras;
@@ -127,6 +128,7 @@ impl Sim {
             catalogo: Catalogo::load().expect("el catálogo de funciones carga"),
             wan,
             unresponsive: AtomicBool::new(false),
+            epoca: Arc::new(AtomicU64::new(0)),
             retardo_ms: AtomicU64::new(u64::try_from(cfg.retardo.as_millis()).unwrap_or(u64::MAX)),
             state: Mutex::new(SimState {
                 seed: SystemTime::now()
@@ -144,6 +146,10 @@ impl Sim {
             .await
             .unwrap_or_else(|e| panic!("no se puede escuchar en {addr}: {e}"));
         let local = listener.local_addr().expect("dirección local");
+        let listener = conexiones::Escucha {
+            tcp: listener,
+            epoca: inner.epoca.clone(),
+        };
         let app = Router::new()
             .route("/", get(root))
             .route("/cgi-bin/te_acceso_router.cgi", post(basic_login))

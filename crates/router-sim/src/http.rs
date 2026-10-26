@@ -86,7 +86,8 @@ fn has_basic(st: &SimState, c: &HashMap<String, String>) -> bool {
         .is_some_and(|id| st.basic.contains(id))
 }
 
-/// Cuelga las peticiones mientras el router «no responde» y retarda cada
+/// Cuelga las peticiones mientras el router «no responde» o si llevan una
+/// sesión colgada (`colgar_sesiones`), y retarda cada
 /// respuesta lo fijado con [`SimControl::set_retardo`] (salvo la del propio
 /// ajuste del retardo).
 pub(crate) async fn hang_if_unresponsive(
@@ -96,6 +97,17 @@ pub(crate) async fn hang_if_unresponsive(
 ) -> Response {
     while s.unresponsive.load(Ordering::SeqCst) {
         tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    let c = cookies(req.headers());
+    let colgada = {
+        let st = s.state();
+        ["_httpdSessionId_", "SessionID"]
+            .iter()
+            .filter_map(|k| c.get(*k))
+            .any(|id| st.sesiones_colgadas.contains(id))
+    };
+    if colgada {
+        std::future::pending::<()>().await;
     }
     let ms = s.retardo_ms.load(Ordering::SeqCst);
     if ms > 0 && req.uri().path() != RUTA_RETARDO {
@@ -321,6 +333,10 @@ fn cgi_sync(s: &Inner, name: &str, headers: &HeaderMap, body: &Bytes) -> (Respon
         if st.hang_after_write == HangAfterWrite::Now {
             st.hang_after_write = HangAfterWrite::Off;
             s.unresponsive.store(true, Ordering::SeqCst);
+        }
+        if real && std::mem::take(&mut st.rehacer_red_tras_escritura) {
+            st.colgar_sesiones();
+            crate::conexiones::cortar(&s.epoca);
         }
         let sin_respuesta = real && std::mem::take(&mut st.no_answer_next);
         (xml(body), sin_respuesta)

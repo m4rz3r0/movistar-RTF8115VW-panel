@@ -6,7 +6,7 @@ use hgu::xml::XmlNode;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     sync::{
-        Mutex, MutexGuard,
+        Arc, Mutex, MutexGuard,
         atomic::{AtomicBool, AtomicU64},
     },
     time::{Duration, Instant},
@@ -27,6 +27,9 @@ pub(crate) struct Inner {
     /// Conexión a internet de las fixtures (ver [`wan_de_las_fixtures`]).
     pub(crate) wan: Option<String>,
     pub(crate) unresponsive: AtomicBool,
+    /// Época de las conexiones TCP (ver `conexiones`): al subir, las
+    /// abiertas hasta entonces dejan de responder.
+    pub(crate) epoca: Arc<AtomicU64>,
     /// Retardo de cada respuesta en milisegundos (`set_retardo`).
     pub(crate) retardo_ms: AtomicU64,
     pub(crate) state: Mutex<SimState>,
@@ -135,6 +138,11 @@ pub(crate) struct SimState {
     pub(crate) hang_after_write: HangAfterWrite,
     /// `no_answer_next_write`.
     pub(crate) no_answer_next: bool,
+    /// `rehacer_red_tras_proxima_escritura`.
+    pub(crate) rehacer_red_tras_escritura: bool,
+    /// Sesiones (`_httpdSessionId_` y `SessionID`) que ya no responden
+    /// (`colgar_sesiones`): sus peticiones se quedan sin respuesta.
+    pub(crate) sesiones_colgadas: HashSet<String>,
     /// `create_twice_next_write`.
     pub(crate) create_twice: bool,
     /// Escrituras reales recibidas (para `fail_write_n`/`hang_after_write_n`).
@@ -185,6 +193,12 @@ impl SimState {
         self.counter += 1;
         let n = u64::from(self.seed) * 1000 + u64::from(self.counter);
         format!("{}", n % 1_000_000_000_000)
+    }
+
+    /// Las sesiones abiertas dejan de responder (ver `sesiones_colgadas`).
+    pub(crate) fn colgar_sesiones(&mut self) {
+        let abiertas: Vec<String> = self.basic.iter().chain(&self.advanced).cloned().collect();
+        self.sesiones_colgadas.extend(abiertas);
     }
 
     pub(crate) fn invalidate_sessions(&mut self) {
