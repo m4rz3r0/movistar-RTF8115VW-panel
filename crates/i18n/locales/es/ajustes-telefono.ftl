@@ -18,7 +18,7 @@ ajuste-telefono-linea-en_servicio = Estado de la línea
 ajuste-telefono-linea-en_servicio-desc = Si la línea está en marcha en el router. No dice si hay un teléfono conectado.
 ajuste-telefono-linea-en_servicio-activa = Activa
 ajuste-telefono-linea-en_servicio-activa-desc = La línea está en marcha en el router, haya o no un teléfono conectado.
-ajuste-telefono-linea-en_servicio-desactivada = Desactivada
+ajuste-telefono-linea-en_servicio-desactivada = Apagada
 ajuste-telefono-linea-en_servicio-desactivada-desc = La línea está apagada en el router: el fijo no funciona.
 ajuste-telefono-linea-en_servicio-arrancando = Arrancando
 ajuste-telefono-linea-en_servicio-arrancando-desc = La línea se está poniendo en marcha.
@@ -27,7 +27,7 @@ ajuste-telefono-linea-en_servicio-registrandose-desc = La línea se está dando 
 ajuste-telefono-linea-en_servicio-dandose_de_baja = Dándose de baja
 ajuste-telefono-linea-en_servicio-dandose_de_baja-desc = La línea se está dando de baja en el servidor de voz del operador.
 ajuste-telefono-linea-en_servicio-con_error = Con error
-ajuste-telefono-linea-en_servicio-con_error-desc = La línea no ha podido ponerse en marcha: el fijo no funciona.
+ajuste-telefono-linea-en_servicio-con_error-desc = La línea tiene un fallo: el fijo no funciona.
 ajuste-telefono-linea-en_servicio-en_pruebas = En pruebas
 ajuste-telefono-linea-en_servicio-en_pruebas-desc = El router está comprobando la línea.
 ajuste-telefono-linea-en_servicio-sin_llamadas_nuevas = Sin llamadas nuevas
@@ -107,7 +107,7 @@ ajuste-telefono-sip_oculto-salida-desc = La dirección por la que salen todas la
 ajuste-telefono-sip_oculto-salida_puerto = Puerto del servidor de salida
 ajuste-telefono-sip_oculto-salida_puerto-desc = Un número del 1 al 65535 que da el operador.
 
-## Toma de teléfono
+## Puerto de teléfono
 ajuste-telefono-fisico-titulo = Fax, módem y alarmas
 ajuste-telefono-fisico-desc = Para dispositivos que no son teléfonos y usan el puerto de teléfono del router.
 ajuste-telefono-fisico-ayuda = Algunos dispositivos se comunican por la línea de teléfono con pitidos: faxes, alarmas, datáfonos o módems antiguos. Si tienes uno y no consigue conectar, comprueba que su opción está encendida.

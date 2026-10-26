@@ -18,7 +18,7 @@ ajuste-telefono-linea-en_servicio = Line status
 ajuste-telefono-linea-en_servicio-desc = Whether the line is running on the router. It does not tell whether a phone is plugged in.
 ajuste-telefono-linea-en_servicio-activa = Active
 ajuste-telefono-linea-en_servicio-activa-desc = The line is running on the router, whether or not a phone is plugged in.
-ajuste-telefono-linea-en_servicio-desactivada = Disabled
+ajuste-telefono-linea-en_servicio-desactivada = Off
 ajuste-telefono-linea-en_servicio-desactivada-desc = The line is off on the router: the landline does not work.
 ajuste-telefono-linea-en_servicio-arrancando = Starting up
 ajuste-telefono-linea-en_servicio-arrancando-desc = The line is getting started.
@@ -27,7 +27,7 @@ ajuste-telefono-linea-en_servicio-registrandose-desc = The line is registering w
 ajuste-telefono-linea-en_servicio-dandose_de_baja = Unregistering
 ajuste-telefono-linea-en_servicio-dandose_de_baja-desc = The line is unregistering from the operator's voice server.
 ajuste-telefono-linea-en_servicio-con_error = Error
-ajuste-telefono-linea-en_servicio-con_error-desc = The line could not get started: the landline does not work.
+ajuste-telefono-linea-en_servicio-con_error-desc = The line has a fault: the landline does not work.
 ajuste-telefono-linea-en_servicio-en_pruebas = Testing
 ajuste-telefono-linea-en_servicio-en_pruebas-desc = The router is testing the line.
 ajuste-telefono-linea-en_servicio-sin_llamadas_nuevas = No new calls
@@ -107,7 +107,7 @@ ajuste-telefono-sip_oculto-salida-desc = The address through which all calls go 
 ajuste-telefono-sip_oculto-salida_puerto = Outgoing server port
 ajuste-telefono-sip_oculto-salida_puerto-desc = A number from 1 to 65535 given by the operator.
 
-## Phone socket
+## Phone port
 ajuste-telefono-fisico-titulo = Fax, modem and alarms
 ajuste-telefono-fisico-desc = For devices that are not phones and use the router's phone socket.
 ajuste-telefono-fisico-ayuda = Some devices talk over the phone line with beeps: faxes, alarms, card terminals or old modems. If you have one and it cannot connect, check that its option is on.
