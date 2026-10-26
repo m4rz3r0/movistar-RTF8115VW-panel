@@ -290,7 +290,7 @@ impl ChangeManager {
         tracing::info!(
             cambio = id,
             pasos = n,
-            funcion = %plan0.funcion.name,
+            funcion = %crate::changes::especiales::funcion_enviada(&plan0),
             instancia = crate::changes::especiales::instancia_en_registro(&plan0),
             usuario,
             diff = %resumen(&plan0.campos),
@@ -420,7 +420,7 @@ impl ChangeManager {
         tracing::info!(
             cambio = id,
             paso = i + 1,
-            funcion = %plan.funcion.name,
+            funcion = %crate::changes::especiales::funcion_enviada(&plan),
             instancia = crate::changes::especiales::instancia_en_registro(&plan),
             diff = %resumen(&plan.campos),
             "paso aplicándose"

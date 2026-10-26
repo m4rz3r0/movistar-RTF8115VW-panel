@@ -359,13 +359,25 @@ async fn cambiar_otro_sin_guardar_no_entra() {
 }
 
 /// La función que se anota de una baja es la que se envía (`cbDeleteUser`),
-/// en el cambio, en su paso y en el detalle del Historial; y su deshacer
-/// sigue funcionando.
+/// en el cambio, en su paso, en el registro y en el detalle del Historial; y
+/// su deshacer sigue funcionando.
 #[tokio::test]
 async fn baja_anota_la_funcion_que_se_envia() {
+    let registro = registro_global();
+    // El registro es de todo el binario (otras pruebas también borran): basta
+    // con que haya una línea más de bajas con la función que se envía.
+    let bajas = || {
+        registro
+            .texto()
+            .lines()
+            .filter(|l| l.contains("cambio aplicándose") && l.contains("funcion=cbDeleteUser"))
+            .count()
+    };
+    let antes = bajas();
     let (p, cookie) = con_reautenticacion().await;
     let grupo = preparado_ok(&p, &cookie, borrar(INVITADO)).await;
     let id = aplicar_ajuste(&p, &cookie, &grupo).await;
+    assert!(bajas() > antes, "el registro no anota cbDeleteUser");
     let (cambio, paso): (String, String) = sqlx::query_as(
         "SELECT c.funcion, p.funcion FROM changes c JOIN cambio_pasos p ON p.cambio_id = c.id \
          WHERE c.id = ?",
