@@ -13,6 +13,7 @@ mod escrituras;
 mod fixtures;
 mod lecturas;
 mod listas;
+mod modelo;
 mod pools;
 mod red;
 mod reservas;

@@ -94,7 +94,7 @@ Activa RIP y el envío/recepción de anuncios en una interfaz.
 
 **Sin comprobar en el router real:** el panel no la escribe.
 
-Lectura pareada: `cbGetRipIntf`
+Lectura pareada: `cbGetRipIntf` con `rip_intf_0i={rip_intf_id}`
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
@@ -1006,7 +1006,7 @@ Elementos de la respuesta: `adm_state`, `ftp_enable`, `h323_enable`, `ip_intf_id
 
 *escritura* · UI avanzada · riesgo bajo · sin vigilancia · página `natalg.asp`
 
-Activa o desactiva los ALG o el NAT loopback (formularios NatAlgForm y NatLoopbackForm).
+Activa o desactiva los ALG o el NAT loopback (formularios NatAlgForm y NatLoopbackForm). El de los ALG manda siempre `set_nf_conntrack = 1`, que la lectura no devuelve, así que el panel no lo envía: sin él, un cambio de `h323_enable` no tuvo efecto en el router real.
 
 **Sin comprobar en el router real:** el panel no la escribe.
 
@@ -1038,7 +1038,7 @@ Activa o cambia el NAT de una interfaz.
 
 **Sin comprobar en el router real:** el panel no la escribe.
 
-Lectura pareada: `cbGetNatIntf`
+Lectura pareada: `cbGetNatIntf` con `nat_intf_0i={nat_intf_id}`
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
@@ -1601,7 +1601,7 @@ Activa multicast y la versión de IGMP en una interfaz.
 
 **Sin comprobar en el router real:** el panel no la escribe.
 
-Lectura pareada: `cbGetMcastIntf`
+Lectura pareada: `cbGetMcastIntf` con `rtm_ip_mcast_intf_0i={rtm_ip_mcast_intf_id}`
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
@@ -1695,7 +1695,7 @@ Lista: instancia por `rtm_cfg_qos_cls_id`; `del=DEL` borra
 
 *lectura* · UI avanzada · riesgo bajo · página `queue.asp`
 
-Colas de QoS y cola por defecto.
+Colas de QoS: una lista de 8 (ids 0 a 7), cada una con su cola por defecto, clase de tráfico, interfaz, prioridad, peso y política.
 
 Elementos de la respuesta: `adm_state`, `default_traffic_class`, `dpm_cfg_queue`, `dpm_cfg_queue_0i`, `dpm_cfg_queue_id`, `intf_name`, `opr_status`, `policy`, `priority`, `traffic_class`, `weight`
 
@@ -1703,11 +1703,11 @@ Elementos de la respuesta: `adm_state`, `default_traffic_class`, `dpm_cfg_queue`
 
 *escritura* · UI avanzada · riesgo bajo · se vigila · página `queue.asp`
 
-Configura una cola de QoS.
+Configura una cola de QoS, la de su id (`dpm_cfg_queue_id`, de 0 a 7).
 
 **Sin comprobar en el router real:** el panel no la escribe.
 
-Lectura pareada: `cbGetQueue`
+Lectura pareada: `cbGetQueue` con `dpm_cfg_queue_0i={dpm_cfg_queue_id}`
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
@@ -1886,7 +1886,7 @@ Elementos de la respuesta: `acs_URL` (sensible), `acs_password` 🔒, `acs_usern
 
 Configura TR-069 (ACS, credenciales, Inform). Desde cwmp.asp (oculta). Desactivarlo corta la gestión remota del operador.
 
-**Comprobada en el router real:** antes de la fase 3 (referencia de la prueba por confirmar)
+**Comprobada en el router real:** fase 3, cambios 1 y 2
 
 Lectura pareada: `cbGetTr69Config`
 
@@ -2288,7 +2288,7 @@ Elementos de la respuesta: `adm_state`, `ever_synced`, `ip_intf_id`, `ntp_state`
 
 Configura NTP: activación, interfaz y servidores. Desde ntp.asp (oculta).
 
-**Comprobada en el router real:** antes de la fase 3 (referencia de la prueba por confirmar)
+**Comprobada en el router real:** fase 3, cambio 3
 
 Lectura pareada: `cbGetTimeNtp`
 

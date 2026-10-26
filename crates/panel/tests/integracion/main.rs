@@ -17,6 +17,7 @@ mod auth;
 mod barra_temas;
 mod binario_e2e;
 mod changes;
+mod cola_qos;
 mod conexion;
 mod contrasena_router;
 mod contrasena_router_plazo;

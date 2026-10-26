@@ -63,7 +63,7 @@ pagina = "rip.asp"
 descripcion = "Activa RIP y el envío/recepción de anuncios en una interfaz."
 riesgo = "alto"
 acceso = "puede_cortar"
-lectura_pareada = { funcion = "cbGetRipIntf", params = [] }
+lectura_pareada = { funcion = "cbGetRipIntf", params = [["rip_intf_0i", "{rip_intf_id}"]] }
 comprobada = false
 
 [[funcion.parametro]]
@@ -2122,7 +2122,7 @@ area = "nat"
 origen = "avanzada"
 tipo = "escritura"
 pagina = "natalg.asp"
-descripcion = "Activa o desactiva los ALG o el NAT loopback (formularios NatAlgForm y NatLoopbackForm)."
+descripcion = "Activa o desactiva los ALG o el NAT loopback (formularios NatAlgForm y NatLoopbackForm). El de los ALG manda siempre `set_nf_conntrack = 1`, que la lectura no devuelve, así que el panel no lo envía: sin él, un cambio de `h323_enable` no tuvo efecto en el router real."
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetNatConfig", params = [] }
@@ -2181,7 +2181,7 @@ pagina = "natintf.asp"
 descripcion = "Activa o cambia el NAT de una interfaz."
 riesgo = "alto"
 acceso = "puede_cortar"
-lectura_pareada = { funcion = "cbGetNatIntf", params = [] }
+lectura_pareada = { funcion = "cbGetNatIntf", params = [["nat_intf_0i", "{nat_intf_id}"]] }
 comprobada = false
 
 [[funcion.parametro]]
@@ -3270,7 +3270,7 @@ pagina = "multicastintf.asp"
 descripcion = "Activa multicast y la versión de IGMP en una interfaz."
 riesgo = "bajo"
 acceso = "no_corta"
-lectura_pareada = { funcion = "cbGetMcastIntf", params = [] }
+lectura_pareada = { funcion = "cbGetMcastIntf", params = [["rtm_ip_mcast_intf_0i", "{rtm_ip_mcast_intf_id}"]] }
 comprobada = false
 
 [[funcion.parametro]]
@@ -3537,7 +3537,7 @@ area = "qos"
 origen = "avanzada"
 tipo = "lectura"
 pagina = "queue.asp"
-descripcion = "Colas de QoS y cola por defecto."
+descripcion = "Colas de QoS: una lista de 8 (ids 0 a 7), cada una con su cola por defecto, clase de tráfico, interfaz, prioridad, peso y política."
 riesgo = "bajo"
 
 [[funcion]]
@@ -3546,10 +3546,10 @@ area = "qos"
 origen = "avanzada"
 tipo = "escritura"
 pagina = "queue.asp"
-descripcion = "Configura una cola de QoS."
+descripcion = "Configura una cola de QoS, la de su id (`dpm_cfg_queue_id`, de 0 a 7)."
 riesgo = "bajo"
 acceso = "puede_cortar"
-lectura_pareada = { funcion = "cbGetQueue", params = [] }
+lectura_pareada = { funcion = "cbGetQueue", params = [["dpm_cfg_queue_0i", "{dpm_cfg_queue_id}"]] }
 comprobada = false
 
 [[funcion.parametro]]
@@ -3968,7 +3968,7 @@ descripcion = "Configura TR-069 (ACS, credenciales, Inform). Desde cwmp.asp (ocu
 riesgo = "alto"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetTr69Config", params = [] }
-comprobada = "antes de la fase 3 (referencia de la prueba por confirmar)"
+comprobada = "fase 3, cambios 1 y 2"
 
 [[funcion.parametro]]
 nombre = "enableCWMP"
@@ -4583,7 +4583,7 @@ descripcion = "Configura NTP: activación, interfaz y servidores. Desde ntp.asp 
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetTimeNtp", params = [] }
-comprobada = "antes de la fase 3 (referencia de la prueba por confirmar)"
+comprobada = "fase 3, cambio 3"
 
 [[funcion.parametro]]
 nombre = "adm_state"
