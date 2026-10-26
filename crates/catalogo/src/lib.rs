@@ -8,7 +8,8 @@ pub mod mask;
 mod model;
 
 pub use model::{
-    Area, Funcion, LecturaPareada, Lista, Origen, Parametro, Partido, Riesgo, Tipo, TipoParam,
+    Acceso, Area, Funcion, LecturaPareada, Lista, Origen, Parametro, Partido, Riesgo, Tipo,
+    TipoParam,
 };
 
 use serde::Deserialize;
@@ -91,6 +92,21 @@ impl Catalogo {
             }
             if f.tipo == Tipo::Lectura && f.riesgo != Riesgo::Bajo {
                 return Err(mal(f, "una lectura no puede tener riesgo".into()));
+            }
+            // Cada escritura dice si puede cortar el acceso del panel: sin
+            // eso no se sabe si vigilarla.
+            match (f.tipo, f.acceso) {
+                (Tipo::Lectura, Some(_)) => {
+                    return Err(mal(f, "una lectura no lleva acceso".into()));
+                }
+                (Tipo::Escritura | Tipo::Accion, None) => {
+                    return Err(mal(
+                        f,
+                        "sin acceso (puede_cortar, no_corta o wifi): no se sabe si vigilarla"
+                            .into(),
+                    ));
+                }
+                _ => {}
             }
             let mut params = HashSet::new();
             for p in &f.parametros {
@@ -233,6 +249,7 @@ riesgo = "bajo"
             format!(
                 "{base}\n[[funcion]]\nname = \"cbSetX\"\narea = \"wan\"\norigen = \"avanzada\"\n\
                  tipo = \"escritura\"\ndescripcion = \"x\"\nriesgo = \"alto\"\n\
+                 acceso = \"puede_cortar\"\n\
                  lectura_pareada = {{ funcion = \"cbGetX\", params = [[\"x_0i\", \"{{x_id}}\"]] }}\n{extra}\n\
                  [[funcion.parametro]]\nnombre = \"x_id\"\netiqueta = \"X\"\ntipo = \"int\"\n"
             )
@@ -255,6 +272,11 @@ riesgo = "bajo"
             "{buena}\n[[funcion.parametro]]\nnombre = \"del\"\netiqueta = \"D\"\ntipo = \"text\"\n"
         );
         assert!(Catalogo::from_toml(&del_editable).is_err());
+        // Sin acceso, una escritura no vale; una lectura no lo lleva.
+        let sin_acceso = buena.replace("acceso = \"puede_cortar\"\n", "");
+        assert!(Catalogo::from_toml(&sin_acceso).is_err());
+        let lectura_con_acceso = base.replace("riesgo = \"bajo\"", "riesgo = \"bajo\"\nacceso = \"no_corta\"");
+        assert!(Catalogo::from_toml(&lectura_con_acceso).is_err());
     }
 
     #[test]
@@ -383,6 +405,63 @@ riesgo = "bajo"
                 o,
                 "{n}"
             );
+        }
+    }
+
+    /// Lo que decide la vigilancia: lo que puede dejar al panel sin router
+    /// (o la casa sin internet) se vigila; las cuentas, la voz, los avisos
+    /// al operador y los nombres, no; la WiFi depende de por dónde llegue el
+    /// panel.
+    #[test]
+    fn reglas_de_acceso() {
+        let c = cat();
+        let acceso = |n: &str| {
+            c.funcion(n)
+                .unwrap_or_else(|| panic!("falta {n}"))
+                .acceso
+                .unwrap_or_else(|| panic!("{n} sin acceso"))
+        };
+        for f in c.todas().iter().filter(|f| f.tipo != Tipo::Lectura) {
+            let a = f.acceso.expect("validado al cargar");
+            if matches!(f.area, Area::Wan | Area::Cortafuegos | Area::LanDhcp)
+                && f.name != "te_mrl.cmd?action=setpc"
+            {
+                assert_eq!(a, Acceso::PuedeCortar, "{}", f.name);
+            }
+            if f.area == Area::Wifi && f.tipo == Tipo::Escritura {
+                assert_eq!(a, Acceso::Wifi, "{}", f.name);
+            }
+            if matches!(f.area, Area::Voip | Area::Tr069) {
+                assert_eq!(a, Acceso::NoCorta, "{}", f.name);
+            }
+            if f.area != Area::Wifi {
+                assert_ne!(a, Acceso::Wifi, "{}", f.name);
+            }
+        }
+        for n in [
+            "cbSetLanIPv4Addr",
+            "cbSetDhcpv4ServerPool",
+            "cbDhcpV4SvrPoolSetStatic",
+            "cbReboot",
+            "cbSetNatIntf",
+            "cbModifyPwd",
+            "cbModifyPwdOther",
+            "te_cambio_contrasena.cgi",
+            "cbSetDnsRelayServer",
+        ] {
+            assert_eq!(acceso(n), Acceso::PuedeCortar, "{n}");
+        }
+        for n in [
+            "cbAddUser",
+            "cbDeleteUser",
+            "cbSetVoiceLine",
+            "cbSetTr69Config",
+            "te_mrl.cmd?action=setpc",
+            "cbSetUpnpCfg",
+            "cbSetNatPortMapping",
+            "cbSaveConfig",
+        ] {
+            assert_eq!(acceso(n), Acceso::NoCorta, "{n}");
         }
     }
 

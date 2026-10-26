@@ -25,6 +25,10 @@ Las funciones del propio panel (`/api/…`) están en
 - Riesgo: vigilancia tras el cambio de 30 s (bajo), 2 min (medio) o 5 min
   (alto). Las lecturas no tienen riesgo. Las funciones **bloqueadas** no se
   invocan nunca desde el panel.
+- Vigilancia: solo se vigila lo que puede cortar el acceso del panel al
+  router o la conexión a internet («se vigila»); lo demás se da por
+  aplicado en cuanto la relectura muestra lo nuevo («sin vigilancia»).
+  La WiFi se vigila salvo que el panel compruebe que llega por cable.
 - En la lectura pareada, `{param}` es el valor de ese parámetro en la
   escritura. Los elementos marcados con 🔒 son secretos (en pantalla,
   censurados con el ojo) y los marcados «(sensible)», datos personales
@@ -82,7 +86,7 @@ Elementos de la respuesta: `accept_ra`, `adm_state`, `ip_intf_id`, `rip_intf_0i`
 
 ### `cbSetRipIntf`
 
-*escritura* · UI avanzada · riesgo alto · página `rip.asp`
+*escritura* · UI avanzada · riesgo alto · se vigila · página `rip.asp`
 
 Activa RIP y el envío/recepción de anuncios en una interfaz.
 
@@ -113,7 +117,7 @@ Elementos de la respuesta: `adm_state`, `desc`, `dst_addr`, `dst_mask`, `fwd_pol
 
 ### `cbSetRoutingV4Rule`
 
-*escritura* · UI avanzada · riesgo alto · página `default_gateway.asp`
+*escritura* · UI avanzada · riesgo alto · se vigila · página `default_gateway.asp`
 
 Crea, modifica o borra una ruta IPv4 o la puerta de enlace por defecto.
 
@@ -150,7 +154,7 @@ Elementos de la respuesta: `adm_state`, `desc`, `dst_addr`, `dst_prefix`, `fwd_p
 
 ### `cbSetRoutingV6Rule`
 
-*escritura* · UI avanzada · riesgo alto · página `default_gateway.asp`
+*escritura* · UI avanzada · riesgo alto · se vigila · página `default_gateway.asp`
 
 Crea, modifica o borra una ruta IPv6 o la puerta de enlace IPv6 por defecto.
 
@@ -193,7 +197,7 @@ Elementos de la respuesta: `ac_name`, `adm_state`, `dhcpv4_req_opt60_value`, `dh
 
 ### `cbSetWanIPIntf`
 
-*escritura* · UI avanzada · riesgo alto · página `wanintf.asp`
+*escritura* · UI avanzada · riesgo alto · se vigila · página `wanintf.asp`
 
 Crea, modifica o borra una conexión WAN: tipo, VLAN, credenciales PPP, IP estática, DNS e IPv6. Puede dejar sin internet.
 
@@ -230,7 +234,7 @@ Lista: instancia por `ip_intf_id`; `del=DEL` borra
 
 ### `te_mm.cmd?action=Apply`
 
-*escritura* · UI básica · riesgo alto · página `te_multipuesto_monopuesto.asp`
+*escritura* · UI básica · riesgo alto · se vigila · página `te_multipuesto_monopuesto.asp`
 
 Cambia entre multipuesto (router) y monopuesto (puente) con usuario y contraseña PPPoE. Puede dejar sin internet.
 
@@ -245,7 +249,7 @@ Lectura pareada: `te_multipuesto_monopuesto.asp`
 
 ### `te_mrl.cmd?action=wanApply`
 
-*escritura* · UI básica · riesgo alto · página `te_mapa_red_local.asp`
+*escritura* · UI básica · riesgo alto · se vigila · página `te_mapa_red_local.asp`
 
 Cambia el modo WAN (multipuesto/monopuesto) y las credenciales PPPoE desde el mapa de red de la UI básica.
 
@@ -297,7 +301,7 @@ Elementos de la respuesta: `adm_state`, `opt_code`, `opt_len`, `opt_value`, `rtm
 
 ### `cbDhcpV4SvrPoolSetOpt`
 
-*escritura* · UI avanzada · riesgo bajo · página `dhcp.asp`
+*escritura* · UI avanzada · riesgo bajo · se vigila · página `dhcp.asp`
 
 Crea, modifica o borra una opción DHCP de un pool (valor en hexadecimal).
 
@@ -332,7 +336,7 @@ Elementos de la respuesta: `adm_state`, `ipv4_addr`, `mac_addr`, `rtm_dhcpv4_svr
 
 ### `cbDhcpV4SvrPoolSetStatic`
 
-*escritura* · UI avanzada · riesgo bajo · página `dhcp.asp`
+*escritura* · UI avanzada · riesgo bajo · se vigila · página `dhcp.asp`
 
 Crea, modifica o borra una reserva DHCP (IP fija por MAC).
 
@@ -372,7 +376,7 @@ Elementos de la respuesta: `adm_state`, `dhcpv4_opt60`, `dhcpv4_opt60_ex`, `dhcp
 
 ### `cbSetDhcpv4ServerPool`
 
-*escritura* · UI avanzada · riesgo medio · página `dhcp.asp`
+*escritura* · UI avanzada · riesgo medio · se vigila · página `dhcp.asp`
 
 Configura un pool DHCPv4 (rango, máscara, puerta de enlace, DNS, concesión, IP reservadas y condiciones).
 
@@ -437,7 +441,7 @@ Elementos de la respuesta: `adm_state`, `ip_intf_id`, `ipv4_addr`, `ipv4_addr_0i
 
 ### `cbSetLanIPv4Addr`
 
-*escritura* · UI avanzada · riesgo alto · página `ipv4.asp`
+*escritura* · UI avanzada · riesgo alto · se vigila · página `ipv4.asp`
 
 Cambia, añade o borra la IP y máscara LAN del router. Cambia la dirección del propio panel: riesgo alto.
 
@@ -463,7 +467,7 @@ Elementos de la respuesta: `adm_state`, `br_id`, `eth_link_id`, `igmp_snooping`,
 
 ### `cbSetLanIPv4Intf`
 
-*escritura* · UI avanzada · riesgo alto · página `ipv4.asp`
+*escritura* · UI avanzada · riesgo alto · se vigila · página `ipv4.asp`
 
 Activa una interfaz LAN y su IGMP snooping. Puede dejar sin acceso al router.
 
@@ -494,7 +498,7 @@ Elementos de la respuesta: `adm_state`, `default_vid_value`, `mll_bridge_0i`, `m
 
 ### `cbSetTR98L2Bridge`
 
-*escritura* · UI avanzada · riesgo alto · página `bridging.asp`
+*escritura* · UI avanzada · riesgo alto · se vigila · página `bridging.asp`
 
 Crea, modifica o borra un puente de nivel 2. Puede aislar la LAN: riesgo alto.
 
@@ -526,7 +530,7 @@ Elementos de la respuesta: `adm_state`, `cls_admit_only_vlan_tagged`, `cls_dst_m
 
 ### `cbSetTR98L2Filtering`
 
-*escritura* · UI avanzada · riesgo alto · página `filtering.asp`
+*escritura* · UI avanzada · riesgo alto · se vigila · página `filtering.asp`
 
 Crea, modifica o borra un filtro de puente. Puede aislar la LAN: riesgo alto.
 
@@ -561,7 +565,7 @@ Mapa de red de la UI básica; sus variables dan LAN, DHCP, modo WAN y credencial
 
 ### `te_mapa_red_local.cgi`
 
-*escritura* · UI básica · riesgo alto · página `te_mapa_red_local.asp`
+*escritura* · UI básica · riesgo alto · se vigila · página `te_mapa_red_local.asp`
 
 Igual que te_red_local.cgi, desde el mapa de red de la UI básica.
 
@@ -580,7 +584,7 @@ Lectura pareada: `te_mapa_red_local.asp`
 
 ### `te_mrl.cmd?action=setpc`
 
-*escritura* · UI básica · riesgo bajo · página `te_mapa_red_local.asp`
+*escritura* · UI básica · riesgo bajo · sin vigilancia · página `te_mapa_red_local.asp`
 
 Pone nombre y tipo a un equipo del mapa de red de la UI básica.
 
@@ -602,7 +606,7 @@ Página básica de la red local; sus variables dan IP y máscara del router, DHC
 
 ### `te_red_local.cgi`
 
-*escritura* · UI básica · riesgo alto · página `te_red_local.asp`
+*escritura* · UI básica · riesgo alto · se vigila · página `te_red_local.asp`
 
 Cambia desde la UI básica la IP y máscara del router, el servidor DHCP y su rango. Cambia la dirección del propio panel.
 
@@ -636,7 +640,7 @@ Elementos de la respuesta: `adm_bandwidth`, `adm_channel`, `adm_guard_interval`,
 
 ### `cbSetWifi`
 
-*escritura* · UI avanzada · riesgo medio · página `wifi.asp`
+*escritura* · UI avanzada · riesgo medio · se vigila si el panel va por WiFi · página `wifi.asp`
 
 Configura una radio WiFi: activación, país, estándar, canal, ancho, potencia y opciones avanzadas. Los valores válidos dependen de la banda.
 
@@ -699,7 +703,7 @@ Elementos de la respuesta: `adm_state`, `authentication`, `bssid`, `dpm_cfg_wifi
 
 ### `cbSetWifiAccPt`
 
-*escritura* · UI avanzada · riesgo medio · página `wifi.asp`
+*escritura* · UI avanzada · riesgo medio · se vigila si el panel va por WiFi · página `wifi.asp`
 
 Configura un punto de acceso: SSID, ocultación, seguridad y clave, clientes máximos, WMM, aislamiento y WPS. Con `validation_only=1` solo valida.
 
@@ -752,7 +756,7 @@ Enlaces WDS (puente inalámbrico) configurados.
 
 ### `cbSetWifiWds`
 
-*escritura* · UI avanzada · riesgo medio · página `wifi.asp`
+*escritura* · UI avanzada · riesgo medio · se vigila si el panel va por WiFi · página `wifi.asp`
 
 Crea, modifica o borra un enlace WDS con otro punto de acceso.
 
@@ -769,7 +773,7 @@ Lista: instancia por `dpm_cfg_wifi_wds_id`; `del=DEL` borra
 
 ### `cbTriggerWifiAccPtWpsProc`
 
-*acción* · UI avanzada · riesgo medio · página `wifi.asp`
+*acción* · UI avanzada · riesgo medio · sin vigilancia · página `wifi.asp`
 
 Arranca un emparejamiento WPS (formulario WiFiWPSStartForm, que no aparece en las páginas capturadas: sus campos no se conocen).
 
@@ -781,7 +785,7 @@ Página básica de la WiFi 2,4 GHz; sus variables dan SSID, seguridad, canal, fi
 
 ### `te_wifi.cmd?action=save`
 
-*escritura* · UI básica · riesgo medio · página `te_wifi.asp`
+*escritura* · UI básica · riesgo medio · se vigila si el panel va por WiFi · página `te_wifi.asp`
 
 Guarda la lista del filtro MAC de la WiFi 2,4 GHz (UI básica).
 
@@ -795,7 +799,7 @@ Lectura pareada: `te_wifi.asp`
 
 ### `te_wifi.wl`
 
-*escritura* · UI básica · riesgo medio · página `te_wifi.asp`
+*escritura* · UI básica · riesgo medio · se vigila si el panel va por WiFi · página `te_wifi.asp`
 
 Configura la WiFi 2,4 GHz desde la UI básica: SSID, ocultación, seguridad, clave (XOR 0x1f), activación, canal y filtro MAC.
 
@@ -831,7 +835,7 @@ Página básica de la WiFi 5 GHz; sus variables dan SSID, seguridad, canal, filt
 
 ### `te_wifi_5ghz.cmd?action=save`
 
-*escritura* · UI básica · riesgo medio · página `te_wifi_5ghz.asp`
+*escritura* · UI básica · riesgo medio · se vigila si el panel va por WiFi · página `te_wifi_5ghz.asp`
 
 Guarda la lista del filtro MAC de la WiFi 5 GHz (UI básica).
 
@@ -845,7 +849,7 @@ Lectura pareada: `te_wifi_5ghz.asp`
 
 ### `te_wifi_5ghz.wl`
 
-*escritura* · UI básica · riesgo medio · página `te_wifi_5ghz.asp`
+*escritura* · UI básica · riesgo medio · se vigila si el panel va por WiFi · página `te_wifi_5ghz.asp`
 
 Configura la WiFi 5 GHz desde la UI básica (mismos campos que te_wifi.wl).
 
@@ -881,7 +885,7 @@ Página básica de la red de invitados; sus variables dan SSID, seguridad y clav
 
 ### `te_wifi_guest.wl`
 
-*escritura* · UI básica · riesgo medio · página `te_wifi_guest.asp`
+*escritura* · UI básica · riesgo medio · se vigila si el panel va por WiFi · página `te_wifi_guest.asp`
 
 Configura la red de invitados desde la UI básica: SSID, seguridad, clave (XOR 0x1f), activación y máximo de invitados.
 
@@ -948,7 +952,7 @@ Elementos de la respuesta: `adm_state`, `ftp_enable`, `h323_enable`, `ip_intf_id
 
 ### `cbSetNatConfig`
 
-*escritura* · UI avanzada · riesgo bajo · página `natalg.asp`
+*escritura* · UI avanzada · riesgo bajo · sin vigilancia · página `natalg.asp`
 
 Activa o desactiva los ALG o el NAT loopback (formularios NatAlgForm y NatLoopbackForm).
 
@@ -974,7 +978,7 @@ Elementos de la respuesta: `adm_state`, `ip_intf_id`, `nat_intf_0i`, `nat_intf_i
 
 ### `cbSetNatIntf`
 
-*escritura* · UI avanzada · riesgo alto · página `natintf.asp`
+*escritura* · UI avanzada · riesgo alto · se vigila · página `natintf.asp`
 
 Activa o cambia el NAT de una interfaz.
 
@@ -1003,7 +1007,7 @@ Elementos de la respuesta: `adm_state`, `desc`, `ext_l4_port_max`, `ext_l4_port_
 
 ### `cbSetNatPortMapping`
 
-*escritura* · UI avanzada · riesgo bajo · página `natportmap.asp`
+*escritura* · UI avanzada · riesgo bajo · sin vigilancia · página `natportmap.asp`
 
 Crea, modifica o borra una redirección de puertos o el host DMZ.
 
@@ -1035,7 +1039,7 @@ Elementos de la respuesta: `adm_state`, `upnp_cfg`
 
 ### `cbSetUpnpCfg`
 
-*escritura* · UI avanzada · riesgo bajo · página `upnp.asp`
+*escritura* · UI avanzada · riesgo bajo · sin vigilancia · página `upnp.asp`
 
 Activa o desactiva UPnP.
 
@@ -1058,7 +1062,7 @@ Lee las redirecciones de puertos de la UI básica (respuesta en texto).
 
 ### `te_ppp_pm.cmd?action=create`
 
-*escritura* · UI básica · riesgo bajo · página `te_puertos.asp`
+*escritura* · UI básica · riesgo bajo · sin vigilancia · página `te_puertos.asp`
 
 Crea una redirección de puertos desde la UI básica (campos de la regla separados por comas).
 
@@ -1070,7 +1074,7 @@ Lectura pareada: `te_ppp_pm.cmd?action=retrieve`
 
 ### `te_ppp_pm.cmd?action=delete`
 
-*escritura* · UI básica · riesgo bajo · página `te_puertos.asp`
+*escritura* · UI básica · riesgo bajo · sin vigilancia · página `te_puertos.asp`
 
 Borra una redirección de puertos desde la UI básica.
 
@@ -1083,7 +1087,7 @@ Lectura pareada: `te_ppp_pm.cmd?action=retrieve`
 
 ### `te_ppp_pm.cmd?action=update`
 
-*escritura* · UI básica · riesgo bajo · página `te_puertos.asp`
+*escritura* · UI básica · riesgo bajo · sin vigilancia · página `te_puertos.asp`
 
 Modifica una redirección de puertos desde la UI básica.
 
@@ -1101,7 +1105,7 @@ Página básica de redirección de puertos; sus variables dan la LAN y la interf
 
 ### `te_puertos.cmd?action=active`
 
-*escritura* · UI básica · riesgo bajo · página `te_puertos.asp`
+*escritura* · UI básica · riesgo bajo · sin vigilancia · página `te_puertos.asp`
 
 Activa o desactiva una regla de puertos con el formato antiguo de la UI básica.
 
@@ -1118,7 +1122,7 @@ Lectura pareada: `te_puertos.asp`
 
 ### `te_puertos.cmd?action=delete`
 
-*escritura* · UI básica · riesgo bajo · página `te_puertos.asp`
+*escritura* · UI básica · riesgo bajo · sin vigilancia · página `te_puertos.asp`
 
 Borra una regla de puertos con el formato antiguo de la UI básica.
 
@@ -1134,7 +1138,7 @@ Lectura pareada: `te_puertos.asp`
 
 ### `te_upnp.cmd`
 
-*escritura* · UI básica · riesgo bajo · página `te_otras_funcionalidades.asp`
+*escritura* · UI básica · riesgo bajo · sin vigilancia · página `te_otras_funcionalidades.asp`
 
 Activa o desactiva UPnP desde la UI básica.
 
@@ -1161,7 +1165,7 @@ Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalida
 
 ### `scbidirectionalflt.cmd?action=add`
 
-*escritura* · oculta · riesgo alto · página `scbidirectionalflt_ed.asp`
+*escritura* · oculta · riesgo alto · se vigila · página `scbidirectionalflt_ed.asp`
 
 Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Añade una entrada (interfaz, versión, acción por defecto) o una regla (protocolo, origen, destino, puertos, acción).
 
@@ -1196,7 +1200,7 @@ Lectura pareada: `scbidirectionalflt_ls.asp`
 
 ### `scbidirectionalflt.cmd?action=modify`
 
-*escritura* · oculta · riesgo alto · página `scbidirectionalflt_ed.asp`
+*escritura* · oculta · riesgo alto · se vigila · página `scbidirectionalflt_ed.asp`
 
 Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Modifica una entrada o regla.
 
@@ -1231,7 +1235,7 @@ Lectura pareada: `scbidirectionalflt.cmd?action=view`
 
 ### `scbidirectionalflt.cmd?action=remove`
 
-*escritura* · oculta · riesgo alto · página `scbidirectionalflt_ls.asp`
+*escritura* · oculta · riesgo alto · se vigila · página `scbidirectionalflt_ls.asp`
 
 Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Borra una entrada o regla.
 
@@ -1261,7 +1265,7 @@ Lista: instancia por `rtm_ddns_0i`; `all=ALL` lista todas
 
 ### `cbSetDdns`
 
-*escritura* · UI avanzada · riesgo medio · página `ddns.asp`
+*escritura* · UI avanzada · riesgo medio · sin vigilancia · página `ddns.asp`
 
 Crea, modifica o borra una entrada de DNS dinámico.
 
@@ -1289,7 +1293,7 @@ Elementos de la respuesta: `dns_relay_adm_state`, `rtm_cfg_igd`
 
 ### `cbSetDnsRelay`
 
-*escritura* · UI avanzada · riesgo medio · página `dnsrelay.asp`
+*escritura* · UI avanzada · riesgo medio · se vigila · página `dnsrelay.asp`
 
 Activa o desactiva el relé DNS.
 
@@ -1315,7 +1319,7 @@ Elementos de la respuesta: `adm_state`, `dns_addr`, `ip_addr_type`, `ip_intf_id`
 
 ### `cbSetDnsRelayServer`
 
-*escritura* · UI avanzada · riesgo medio · página `dnsrelay.asp`
+*escritura* · UI avanzada · riesgo medio · se vigila · página `dnsrelay.asp`
 
 Añade, modifica o borra un servidor DNS del relé.
 
@@ -1342,7 +1346,7 @@ Elementos de la respuesta: `adm_state`, `dhcpv6_mode`, `dhcpv6_svr_adm_state`, `
 
 ### `cbSetLanIPv6Config`
 
-*escritura* · UI avanzada · riesgo bajo · página `ipv6.asp`
+*escritura* · UI avanzada · riesgo bajo · se vigila · página `ipv6.asp`
 
 Configura IPv6 en la LAN: activación, prefijo delegado, ULA, RA y DHCPv6.
 
@@ -1371,7 +1375,7 @@ Lectura pareada: `cbGetLanIPv6Config`
 
 ### `scbidirectionalfwl.cmd?action=create`
 
-*escritura* · UI básica · riesgo alto · página `te_ipv6.asp`
+*escritura* · UI básica · riesgo alto · se vigila · página `te_ipv6.asp`
 
 Abre puertos IPv6 hacia un equipo de la LAN (UI básica).
 
@@ -1386,7 +1390,7 @@ Lectura pareada: `te_ipv6.asp`
 
 ### `scbidirectionalfwl.cmd?action=delete`
 
-*escritura* · UI básica · riesgo alto · página `te_ipv6.asp`
+*escritura* · UI básica · riesgo alto · se vigila · página `te_ipv6.asp`
 
 Borra una apertura de puertos IPv6 (UI básica).
 
@@ -1401,7 +1405,7 @@ Lectura pareada: `te_ipv6.asp`
 
 ### `scbidirectionalfwl.cmd?action=save`
 
-*escritura* · UI básica · riesgo alto · página `te_ipv6.asp`
+*escritura* · UI básica · riesgo alto · se vigila · página `te_ipv6.asp`
 
 Guarda la lista de aperturas de puertos IPv6 (UI básica).
 
@@ -1422,7 +1426,7 @@ Página básica de IPv6; sus variables dan prefijos, DHCPv6 y las aperturas de p
 
 ### `te_ipv6.cmd?action=dhcpapply`
 
-*escritura* · UI básica · riesgo bajo · página `te_ipv6.asp`
+*escritura* · UI básica · riesgo bajo · se vigila · página `te_ipv6.asp`
 
 Configura DHCPv6 (modo y rango) desde la UI básica.
 
@@ -1437,7 +1441,7 @@ Lectura pareada: `te_ipv6.asp`
 
 ### `te_ipv6.cmd?action=lanapply`
 
-*escritura* · UI básica · riesgo bajo · página `te_ipv6.asp`
+*escritura* · UI básica · riesgo bajo · se vigila · página `te_ipv6.asp`
 
 Cambia el prefijo IPv6 de la LAN desde la UI básica.
 
@@ -1469,7 +1473,7 @@ Elementos de la respuesta: `br_id`, `eth_link_id`, `igmp_last_mbr_qry_count`, `i
 
 ### `cbSetMcastIgmpSetting`
 
-*escritura* · UI avanzada · riesgo bajo · página `igmp.asp`
+*escritura* · UI avanzada · riesgo bajo · sin vigilancia · página `igmp.asp`
 
 Configura los parámetros de IGMP.
 
@@ -1493,7 +1497,7 @@ Elementos de la respuesta: `adm_state`, `ip_intf_id`, `rtm_cfg_ip_mcast_intf`, `
 
 ### `cbSetMcastIntf`
 
-*escritura* · UI avanzada · riesgo bajo · página `multicastintf.asp`
+*escritura* · UI avanzada · riesgo bajo · sin vigilancia · página `multicastintf.asp`
 
 Activa multicast y la versión de IGMP en una interfaz.
 
@@ -1536,7 +1540,7 @@ Elementos de la respuesta: `adm_state`, `cls_dscp`, `cls_dscp_value`, `cls_dst_i
 
 ### `cbSetClassification`
 
-*escritura* · UI avanzada · riesgo bajo · página `classification.asp`
+*escritura* · UI avanzada · riesgo bajo · se vigila · página `classification.asp`
 
 Crea, modifica o borra una regla de clasificación de QoS (condiciones y remarcado DSCP/802.1p).
 
@@ -1595,7 +1599,7 @@ Elementos de la respuesta: `adm_state`, `default_traffic_class`, `dpm_cfg_queue`
 
 ### `cbSetQueue`
 
-*escritura* · UI avanzada · riesgo bajo · página `queue.asp`
+*escritura* · UI avanzada · riesgo bajo · se vigila · página `queue.asp`
 
 Configura una cola de QoS.
 
@@ -1624,7 +1628,7 @@ Elementos de la respuesta: `adm_state`, `marking_br_id`, `marking_intf`, `mll_br
 
 ### `cbSetTR98L2Marking`
 
-*escritura* · UI avanzada · riesgo bajo · página `marking.asp`
+*escritura* · UI avanzada · riesgo bajo · se vigila · página `marking.asp`
 
 Crea, modifica o borra un marcado de nivel 2.
 
@@ -1666,7 +1670,7 @@ Elementos de la respuesta: `adm_state`, `auth_password` 🔒, `auth_username` (s
 
 ### `cbSetVoiceLine`
 
-*escritura* · UI avanzada · riesgo bajo · página `voiceadvance.asp`
+*escritura* · UI avanzada · riesgo bajo · sin vigilancia · página `voiceadvance.asp`
 
 Configura una línea de voz: credenciales SIP, línea directa y VAD.
 
@@ -1695,7 +1699,7 @@ Elementos de la respuesta: `adm_state`, `fax_passthrough_adm_state`, `fxs_0i`, `
 
 ### `cbSetVoicePhysical`
 
-*escritura* · UI avanzada · riesgo bajo · página `voiceadvance.asp`
+*escritura* · UI avanzada · riesgo bajo · sin vigilancia · página `voiceadvance.asp`
 
 Configura un puerto de teléfono (ganancias, fax y módem).
 
@@ -1719,7 +1723,7 @@ Elementos de la respuesta: `adm_state`, `alt_outbound_proxy_cfg` (sensible), `al
 
 ### `cbSetVoiceSip`
 
-*escritura* · UI avanzada · riesgo bajo · página `voiceadvance.asp`
+*escritura* · UI avanzada · riesgo bajo · sin vigilancia · página `voiceadvance.asp`
 
 Configura SIP (servidores, puertos, tiempos, DTMF, T.38). Puede dejar sin teléfono.
 
@@ -1766,7 +1770,7 @@ Elementos de la respuesta: `acs_URL` (sensible), `acs_password` 🔒, `acs_usern
 
 ### `cbSetTr69Config`
 
-*escritura* · oculta · riesgo alto · página `cwmp.asp`
+*escritura* · oculta · riesgo alto · sin vigilancia · página `cwmp.asp`
 
 Configura TR-069 (ACS, credenciales, Inform). Desde cwmp.asp (oculta). Desactivarlo corta la gestión remota del operador.
 
@@ -1787,7 +1791,7 @@ Lectura pareada: `cbGetTr69Config`
 
 ### `cbAddUser`
 
-*escritura* · UI avanzada · riesgo medio · página `user_profile.asp`
+*escritura* · UI avanzada · riesgo medio · sin vigilancia · página `user_profile.asp`
 
 Crea un usuario de la interfaz web con su grupo (user, admin; system solo si la sesión es system). Usuario, contraseña y grupo van en claro.
 
@@ -1801,7 +1805,7 @@ Lectura pareada: `cbGetUserList`
 
 ### `cbCheckLogin`
 
-*acción* · UI avanzada · riesgo bajo · página `login.asp`
+*acción* · UI avanzada · riesgo bajo · sin vigilancia · página `login.asp`
 
 Inicio de sesión en la UI avanzada: devuelve SessionID. Usuario y contraseña van ofuscados con XOR 0x1f.
 
@@ -1815,7 +1819,7 @@ Inicio de sesión en la UI avanzada: devuelve SessionID. Usuario y contraseña v
 
 ### `cbCheckLogout`
 
-*acción* · UI avanzada · riesgo bajo · página `logout.asp`
+*acción* · UI avanzada · riesgo bajo · sin vigilancia · página `logout.asp`
 
 Cierra la sesión de la UI avanzada.
 
@@ -1829,7 +1833,7 @@ Comprueba la sesión: devuelve LoginRole y AccessMask. Todas las páginas avanza
 
 ### `cbDeleteUser`
 
-*escritura* · UI avanzada · riesgo medio · página `user_profile.asp`
+*escritura* · UI avanzada · riesgo medio · sin vigilancia · página `user_profile.asp`
 
 Borra usuarios de la interfaz web (lista de nombres, cada uno seguido de «:»).
 
@@ -1849,7 +1853,7 @@ Elementos de la respuesta: `UserName` (sensible), `UserRole`
 
 ### `cbModifyPwd`
 
-*acción* · UI avanzada · riesgo medio · página `user_profile.asp`
+*acción* · UI avanzada · riesgo medio · se vigila · página `user_profile.asp`
 
 Cambia la contraseña del usuario con sesión iniciada (contraseña actual y nueva).
 
@@ -1863,7 +1867,7 @@ Cambia la contraseña del usuario con sesión iniciada (contraseña actual y nue
 
 ### `cbModifyPwdOther`
 
-*acción* · UI avanzada · riesgo medio · página `user_profile.asp`
+*acción* · UI avanzada · riesgo medio · se vigila · página `user_profile.asp`
 
 Cambia la contraseña y el grupo de otro usuario (ventana user_profile_modifyOthers.asp). No se puede comprobar después: acción.
 
@@ -1877,7 +1881,7 @@ Cambia la contraseña y el grupo de otro usuario (ventana user_profile_modifyOth
 
 ### `te_acceso_router.cgi`
 
-*acción* · UI básica · riesgo bajo · página `te_acceso_router.asp`
+*acción* · UI básica · riesgo bajo · sin vigilancia · página `te_acceso_router.asp`
 
 Inicio de sesión en la UI básica (formulario de te_acceso_router.asp): fija la cookie _httpdSessionId_.
 
@@ -1891,7 +1895,7 @@ Inicio de sesión en la UI básica (formulario de te_acceso_router.asp): fija la
 
 ### `te_cambio_contrasena.cgi`
 
-*acción* · UI básica · riesgo bajo · página `te_cambio_contrasena.asp`
+*acción* · UI básica · riesgo bajo · se vigila · página `te_cambio_contrasena.asp`
 
 Cambia la contraseña de acceso desde la UI básica (actual y nueva, XOR 0x1f).
 
@@ -1904,7 +1908,7 @@ Cambia la contraseña de acceso desde la UI básica (actual y nueva, XOR 0x1f).
 
 ### `te_logout.cgi`
 
-*acción* · UI básica · riesgo bajo · página `te_header.asp`
+*acción* · UI básica · riesgo bajo · sin vigilancia · página `te_header.asp`
 
 Cierra la sesión de la UI básica.
 
@@ -1914,7 +1918,7 @@ Cierra la sesión de la UI básica.
 
 ### `backup_restore.asp`
 
-*acción* · UI avanzada · riesgo bajo · página `backup_restore.asp`
+*acción* · UI avanzada · riesgo bajo · sin vigilancia · página `backup_restore.asp`
 
 Página de copia y restauración de la configuración.
 
@@ -1922,7 +1926,7 @@ Página de copia y restauración de la configuración.
 
 ### `cbDownloadConfig`
 
-*acción* · UI avanzada · riesgo bajo · página `backup_restore.asp`
+*acción* · UI avanzada · riesgo bajo · sin vigilancia · página `backup_restore.asp`
 
 Descarga el fichero de copia generado por cbSaveConfig (backup=1).
 
@@ -1934,7 +1938,7 @@ Descarga el fichero de copia generado por cbSaveConfig (backup=1).
 
 ### `cbFWUpgradeByFTP`
 
-*acción* · UI avanzada · riesgo alto · página `fw_upgrade.asp`
+*acción* · UI avanzada · riesgo alto · se vigila · página `fw_upgrade.asp`
 
 Descarga un firmware de un servidor FTP/TFTP y lo graba.
 
@@ -1957,7 +1961,7 @@ Elementos de la respuesta: `diagnosis_config`, `dst_lan_port`, `wan_mirror`
 
 ### `cbSetDiagConfig`
 
-*escritura* · UI avanzada · riesgo bajo · página `diagsw.asp`
+*escritura* · UI avanzada · riesgo bajo · se vigila · página `diagsw.asp`
 
 Activa o desactiva el espejo de la WAN hacia un puerto LAN.
 
@@ -1994,7 +1998,7 @@ Elementos de la respuesta: `bind_interface`, `remote_ip`, `remote_port`, `remote
 
 ### `cbSetSyslog`
 
-*escritura* · UI avanzada · riesgo bajo · página `syslog.asp`
+*escritura* · UI avanzada · riesgo bajo · sin vigilancia · página `syslog.asp`
 
 Configura el registro del sistema (destino local o remoto, servidor y severidad). El router también exporta el registro si recibe `export=EXPORT` (lo que syslog.asp hace al cargarse): el panel nunca lo envía, porque solo manda los parámetros de este catálogo.
 
@@ -2011,13 +2015,13 @@ Lectura pareada: `cbGetSyslog`
 
 ### `cbReboot`
 
-*acción* · UI avanzada · riesgo alto · página `reboot.asp`
+*acción* · UI avanzada · riesgo alto · se vigila · página `reboot.asp`
 
 Reinicia el router. El panel vigila su vuelta hasta 5 minutos.
 
 ### `cbRestoreConfig`
 
-*acción* · UI avanzada · riesgo alto · página `restore_default.asp`
+*acción* · UI avanzada · riesgo alto · se vigila · página `restore_default.asp`
 
 Restaura un perfil de configuración guardado y reinicia el router.
 
@@ -2029,7 +2033,7 @@ Restaura un perfil de configuración guardado y reinicia el router.
 
 ### `cbSaveConfig`
 
-*acción* · UI avanzada · riesgo bajo · página `save.asp`
+*acción* · UI avanzada · riesgo bajo · sin vigilancia · página `save.asp`
 
 Con `save=1` graba la configuración en flash; con `backup=1` genera el fichero de copia (lo que hace backup_restore.asp al cargarse).
 
@@ -2040,7 +2044,7 @@ Con `save=1` graba la configuración en flash; con `backup=1` genera el fichero 
 
 ### `syslog.asp`
 
-*acción* · UI avanzada · riesgo bajo · página `syslog.asp`
+*acción* · UI avanzada · riesgo bajo · sin vigilancia · página `syslog.asp`
 
 Página del registro del sistema.
 
@@ -2048,7 +2052,7 @@ Página del registro del sistema.
 
 ### `upload/cfgupload.asp`
 
-*acción* · UI avanzada · riesgo alto · página `upload/cfgupload.asp`
+*acción* · UI avanzada · riesgo alto · se vigila · página `upload/cfgupload.asp`
 
 Recibe un fichero de configuración y lo aplica.
 
@@ -2056,7 +2060,7 @@ Recibe un fichero de configuración y lo aplica.
 
 ### `upload/imgupgrade.asp`
 
-*acción* · UI avanzada · riesgo alto · página `upload/imgupgrade.asp`
+*acción* · UI avanzada · riesgo alto · se vigila · página `upload/imgupgrade.asp`
 
 Recibe un firmware y lo graba.
 
@@ -2064,7 +2068,7 @@ Recibe un firmware y lo graba.
 
 ### `restoreinfo.cgi`
 
-*acción* · UI básica · riesgo alto · página `te_otras_funcionalidades.asp`
+*acción* · UI básica · riesgo alto · se vigila · página `te_otras_funcionalidades.asp`
 
 Restablece los valores de fábrica (enlace de te_otras_funcionalidades.asp).
 
@@ -2084,7 +2088,7 @@ Página básica de otras funciones (UPnP, DNS, copia y restauración, reset de f
 
 ### `te_uploadinfo.asp`
 
-*acción* · UI básica · riesgo alto · página `te_uploadinfo.asp`
+*acción* · UI básica · riesgo alto · se vigila · página `te_uploadinfo.asp`
 
 Recibe un firmware desde la UI básica y lo graba.
 
@@ -2092,7 +2096,7 @@ Recibe un firmware desde la UI básica y lo graba.
 
 ### `te_uploadsettings.asp`
 
-*acción* · UI básica · riesgo alto · página `te_uploadsettings.asp`
+*acción* · UI básica · riesgo alto · se vigila · página `te_uploadsettings.asp`
 
 Recibe un fichero de configuración desde la UI básica y lo aplica.
 
@@ -2100,7 +2104,7 @@ Recibe un fichero de configuración desde la UI básica y lo aplica.
 
 ### `cbSetLocalTime`
 
-*acción* · oculta · riesgo bajo · página `ntp.asp`
+*acción* · oculta · riesgo bajo · sin vigilancia · página `ntp.asp`
 
 Fija la hora local del router a mano (ntp.asp, oculta). Sin lectura que la compruebe: acción.
 
@@ -2118,7 +2122,7 @@ Elementos de la respuesta: `adm_state`, `ever_synced`, `ip_intf_id`, `ntp_state`
 
 ### `cbSetTimeNtp`
 
-*escritura* · oculta · riesgo bajo · página `ntp.asp`
+*escritura* · oculta · riesgo bajo · sin vigilancia · página `ntp.asp`
 
 Configura NTP: activación, interfaz y servidores. Desde ntp.asp (oculta).
 
@@ -2142,7 +2146,7 @@ NTP según system.asp. Restos de system.asp: la página existe pero el router re
 
 ### `cbSetNTPInfo`
 
-*escritura* · incompleta · riesgo bajo · página `system.asp`
+*escritura* · incompleta · riesgo bajo · sin vigilancia · página `system.asp`
 
 Configura NTP según system.asp. Restos de system.asp: la página existe pero el router responde 404 a sus llamadas.
 
@@ -2165,7 +2169,7 @@ Hora del sistema según system.asp. Restos de system.asp: la página existe pero
 
 ### `cbSetSystemTime`
 
-*acción* · incompleta · riesgo bajo · página `system.asp`
+*acción* · incompleta · riesgo bajo · sin vigilancia · página `system.asp`
 
 Fija la hora del sistema según system.asp. Restos de system.asp: la página existe pero el router responde 404 a sus llamadas.
 
@@ -2181,7 +2185,7 @@ Zona horaria y horario de verano según system.asp. Restos de system.asp: la pá
 
 ### `cbSetSystemTimeZone`
 
-*escritura* · incompleta · riesgo bajo · página `system.asp`
+*escritura* · incompleta · riesgo bajo · sin vigilancia · página `system.asp`
 
 Configura la zona horaria según system.asp. Restos de system.asp: la página existe pero el router responde 404 a sus llamadas.
 
@@ -2202,7 +2206,7 @@ Lectura pareada: `cbGetSystemTimeZone`
 
 ### `cbSyncTime`
 
-*acción* · incompleta · riesgo bajo · página `system.asp`
+*acción* · incompleta · riesgo bajo · sin vigilancia · página `system.asp`
 
 Fuerza la sincronización horaria según system.asp. Restos de system.asp: la página existe pero el router responde 404 a sus llamadas.
 

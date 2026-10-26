@@ -27,6 +27,7 @@ tipo = "escritura"
 pagina = "p.asp"
 descripcion = "Escribe un pool"
 riesgo = "medio"
+acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetP", params = [["p_0i", "{p_id}"]] }
 lista = { id_param = "p_id", all = false, del = false }
 

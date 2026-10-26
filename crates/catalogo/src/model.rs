@@ -30,8 +30,14 @@ pub struct Funcion {
     /// Cómo se enumeran y seleccionan las instancias, si es una lista.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lista: Option<Lista>,
-    /// Riesgo de usarla (determina la vigilancia tras un cambio).
+    /// Riesgo de usarla (determina cuánto dura la vigilancia tras un
+    /// cambio, si se vigila).
     pub riesgo: Riesgo,
+    /// Si puede cortar el acceso del panel al router (o la conexión a
+    /// internet), que es lo que decide si un cambio se vigila. Obligatorio
+    /// en las escrituras y acciones; las lecturas no lo llevan.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acceso: Option<Acceso>,
     /// Motivo por el que el panel no la invoca nunca.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bloqueada: Option<String>,
@@ -131,6 +137,26 @@ pub enum Riesgo {
     Medio,
     /// Vigilancia de 5 min.
     Alto,
+}
+
+/// Qué puede hacer una escritura con el acceso del panel al router, que
+/// llega por la red de casa (normalmente por cable). Decide si el gestor de
+/// cambios vigila el cambio: solo tiene sentido vigilar lo que puede dejar
+/// al panel sin router (o la casa sin internet, que la vigilancia también
+/// comprueba). Ante la duda, `PuedeCortar`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Acceso {
+    /// Puede cortar el acceso o la conexión a internet: IP o máscara de la
+    /// red local, DHCP, cortafuegos, rutas, WAN, reinicios… Se vigila.
+    PuedeCortar,
+    /// No toca nada por lo que pase el panel (cuentas de la web del router,
+    /// voz, avisos al operador, nombres, hora…): se da por aplicado en
+    /// cuanto la relectura confirma el valor nuevo, sin vigilancia.
+    NoCorta,
+    /// La WiFi: solo corta el acceso si el panel llega al router por WiFi.
+    /// Se vigila salvo que el panel compruebe que va por cable.
+    Wifi,
 }
 
 /// Parámetro de una función.

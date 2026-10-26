@@ -1,7 +1,7 @@
 //! `docs/api.md`: el catálogo revisado en formato legible.
 
 use catalogo::{
-    Area, Catalogo, Funcion, Origen, Riesgo, Tipo, TipoParam,
+    Acceso, Area, Catalogo, Funcion, Origen, Riesgo, Tipo, TipoParam,
     mask::{Mascara, Nivel},
 };
 use regex::Regex;
@@ -29,6 +29,14 @@ fn riesgo(r: Riesgo) -> &'static str {
         Riesgo::Bajo => "bajo",
         Riesgo::Medio => "medio",
         Riesgo::Alto => "alto",
+    }
+}
+
+fn acceso(a: Acceso) -> &'static str {
+    match a {
+        Acceso::PuedeCortar => "se vigila",
+        Acceso::NoCorta => "sin vigilancia",
+        Acceso::Wifi => "se vigila si el panel va por WiFi",
     }
 }
 
@@ -81,6 +89,9 @@ fn funcion(md: &mut String, f: &Funcion, m: &Mascara, fixtures: &Path) {
         origen(f.origen),
         riesgo(f.riesgo)
     );
+    if let Some(a) = f.acceso {
+        let _ = write!(linea, " · {}", acceso(a));
+    }
     if let Some(p) = &f.pagina {
         let _ = write!(linea, " · página `{p}`");
     }
@@ -184,6 +195,10 @@ pub fn generar(cat: &Catalogo, fixtures: &Path) -> Result<String, String> {
          - Riesgo: vigilancia tras el cambio de 30 s (bajo), 2 min (medio) o 5 min\n  \
            (alto). Las lecturas no tienen riesgo. Las funciones **bloqueadas** no se\n  \
            invocan nunca desde el panel.\n\
+         - Vigilancia: solo se vigila lo que puede cortar el acceso del panel al\n  \
+           router o la conexión a internet («se vigila»); lo demás se da por\n  \
+           aplicado en cuanto la relectura muestra lo nuevo («sin vigilancia»).\n  \
+           La WiFi se vigila salvo que el panel compruebe que llega por cable.\n\
          - En la lectura pareada, `{param}` es el valor de ese parámetro en la\n  \
            escritura. Los elementos marcados con 🔒 son secretos (en pantalla,\n  \
            censurados con el ojo) y los marcados «(sensible)», datos personales\n  \

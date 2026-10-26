@@ -31,6 +31,7 @@ tipo = "escritura"
 pagina = "x.asp"
 descripcion = "Escribe X"
 riesgo = "medio"
+acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetX" }
 
 [[funcion.parametro]]
@@ -93,6 +94,7 @@ tipo = "escritura"
 pagina = "te_x.asp"
 descripcion = "Escribe X desde la web básica"
 riesgo = "alto"
+acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetX" }
 
 [[funcion.parametro]]
