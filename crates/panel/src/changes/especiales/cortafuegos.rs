@@ -124,6 +124,39 @@ pub(crate) fn filas_del_cortafuegos(filtros: &[Filtro]) -> Vec<(BTreeMap<String,
         .collect()
 }
 
+/// ¿Quedó la baja de la regla `rid` como se pidió? Su filtro
+/// (`plan.valores["belong"]`) sigue en el router, ya no tiene la regla y,
+/// de las que tenía al planificar (`plan.ids_antes`), solo falta ella. Un
+/// router que borra el filtro entero u otra regla no da la baja por buena.
+fn baja_exacta(filtros: &[Filtro], plan: &Plan, rid: &str) -> Comprobacion {
+    let difiere = |m: String| Comprobacion::Difiere(vec![m]);
+    let fid = plan.valores.get("belong").map(String::as_str);
+    let Some(filtro) = filtros.iter().find(|f| Some(f.fid.as_str()) == fid) else {
+        return difiere(format!(
+            "ya no está el filtro de la regla {rid}: la baja borró más de la cuenta"
+        ));
+    };
+    let quedan: BTreeSet<&str> = filtro.reglas.iter().map(|r| r.rid.as_str()).collect();
+    if quedan.contains(rid) {
+        return difiere("la regla sigue existiendo".to_owned());
+    }
+    let faltan: Vec<&str> = plan
+        .ids_antes
+        .iter()
+        .flatten()
+        .map(String::as_str)
+        .filter(|x| *x != rid && !quedan.contains(x))
+        .collect();
+    if faltan.is_empty() {
+        Comprobacion::Coincide(None)
+    } else {
+        difiere(format!(
+            "faltan otras reglas del filtro ({}): la baja borró más de la cuenta",
+            faltan.join(", ")
+        ))
+    }
+}
+
 impl ChangeManager {
     /// Como [`ChangeManager::funcion_escribible`], pero viendo la petición
     /// entera: la regla «sin ping» del cortafuegos se escribe aunque su
@@ -223,7 +256,9 @@ impl ChangeManager {
                 instancia: Some(rid),
                 valores,
                 lectura: Lectura::Cortafuegos,
-                ids_antes: None,
+                // Las reglas del filtro antes de la baja: al comprobarla,
+                // tiene que faltar solo la suya ([`baja_exacta`]).
+                ids_antes: Some(filtro.reglas.iter().map(|r| r.rid.clone()).collect()),
             });
         }
         let (filtros, filtro) = self.filtros_e_internet().await?;
@@ -262,16 +297,18 @@ impl ChangeManager {
 
     /// ¿Muestra el router el lado `lado` de un plan de la regla «sin
     /// ping»? Al crear, aparece una regla nueva (un RID que no estaba) con
-    /// la huella y lo escrito; al borrar, su RID ya no tiene la huella.
+    /// la huella y lo escrito; al borrar, su RID ya no tiene la huella y
+    /// el filtro solo ha perdido esa regla ([`baja_exacta`]).
     pub(in crate::changes) async fn comprobar_cortafuegos(
         &self,
         plan: &Plan,
         lado: Lado,
     ) -> Comprobacion {
-        let filas = match self.filtros().await {
-            Ok(f) => filas_del_cortafuegos(&f),
+        let filtros = match self.filtros().await {
+            Ok(f) => f,
             Err(e) => return Comprobacion::SinLectura(e.to_string()),
         };
+        let filas = filas_del_cortafuegos(&filtros);
         let rid = |fila: &BTreeMap<String, String>| fila.get("RID").cloned().unwrap_or_default();
         let con_huella = |r: &str| filas.iter().any(|(fila, h)| *h && rid(fila) == r);
         let difiere = |m: &str| Comprobacion::Difiere(vec![m.to_owned()]);
@@ -324,7 +361,8 @@ impl ChangeManager {
             (Operacion::Borrar, Lado::Nuevo, Some(r)) if con_huella(r) => {
                 difiere("la regla sigue existiendo")
             }
-            (Operacion::Borrar, Lado::Nuevo, _) => Comprobacion::Coincide(None),
+            (Operacion::Borrar, Lado::Nuevo, Some(r)) => baja_exacta(&filtros, plan, r),
+            (Operacion::Borrar, Lado::Nuevo, None) => Comprobacion::Coincide(None),
             (Operacion::Borrar, Lado::Anterior, Some(r)) if con_huella(r) => {
                 Comprobacion::Coincide(None)
             }

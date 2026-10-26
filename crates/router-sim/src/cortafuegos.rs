@@ -94,13 +94,20 @@ fn alta(st: &mut SimState, params: &[(String, String)]) {
 }
 
 /// `item` = `<FID>|<RID>` quita la regla; `<FID>` solo, el filtro entero.
+/// Con `cortafuegos_baja_de_mas`, la de una regla borra además el filtro o
+/// otra regla.
 fn baja(st: &mut SimState, item: &str) {
     match item.split_once('|') {
-        Some((fid, rid)) => {
-            if let Some(f) = st.cortafuegos.iter_mut().find(|f| f.fid == fid) {
-                f.reglas.retain(|r| r.rid != rid);
+        Some((fid, rid)) => match st.cortafuegos_baja_de_mas.take() {
+            Some(None) => st.cortafuegos.retain(|f| f.fid != fid),
+            otra => {
+                let otra = otra.flatten();
+                if let Some(f) = st.cortafuegos.iter_mut().find(|f| f.fid == fid) {
+                    f.reglas
+                        .retain(|r| r.rid != rid && Some(&r.rid) != otra.as_ref());
+                }
             }
-        }
+        },
         None => st.cortafuegos.retain(|f| f.fid != item),
     }
 }

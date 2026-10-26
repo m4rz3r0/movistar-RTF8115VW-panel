@@ -1,7 +1,7 @@
 //! Cortafuegos (Tarea 3 de la fase 3): la tarjeta de Seguridad con las reglas, «No responder al ping desde internet» y su deshacer, que borra solo su regla.
 
 use crate::comun::{Panel, ajustes_de};
-use crate::comun::{PanelPrueba, aplicar_ajuste, leer, llamar, ok};
+use crate::comun::{PanelPrueba, aplicar_ajuste, esperar_final, leer, llamar, ok};
 use hgu::cortafuegos::{Filtro, Regla, es_sin_ping};
 use serde_json::{Value, json};
 
@@ -364,4 +364,44 @@ async fn ping_de_ipv6_restringido_con_el_de_ipv4_abierto() {
         abierto_redes(&e).is_some_and(|d| d.starts_with("El ping por IPv6, la web")),
         "{e}"
     );
+}
+
+/// La baja de la regla «sin ping» solo se da por buena si su filtro sigue y
+/// le falta solo esa regla: si el router borra el filtro entero u otra
+/// regla, el deshacer no queda aplicado y dice por qué.
+#[tokio::test]
+async fn deshacer_sin_ping_que_borra_de_mas_no_se_da_por_bueno() {
+    for (borra_filtro, motivo) in [
+        (true, "ya no está el filtro"),
+        (false, "faltan otras reglas"),
+    ] {
+        let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+        let id = aplicar_sin_ping(&p, &cookie).await;
+        if borra_filtro {
+            p.sim.control.cortafuegos_proxima_baja_borra_filtro();
+        } else {
+            p.sim.control.cortafuegos_proxima_baja_borra_tambien("0");
+        }
+        let d = ok(&p, "deshacer_ajuste", json!({ "cambio": id }), &cookie).await;
+        // Puede fallar ya al confirmar (502) o al acabar: lo que cuenta es
+        // cómo queda el cambio.
+        let (status, body) = llamar(
+            &p,
+            "confirmar_ajuste",
+            json!({ "token": d["token"], "desmarcados": [] }),
+            Some(&cookie),
+        )
+        .await;
+        if status == 200 {
+            esperar_final(&p, &cookie, body.trim().parse().unwrap()).await;
+        }
+        let (estado, error): (String, String) = sqlx::query_as(
+            "SELECT estado, COALESCE(error, '') FROM changes ORDER BY id DESC LIMIT 1",
+        )
+        .fetch_one(&p.state.db)
+        .await
+        .unwrap();
+        assert_ne!(estado, "aplicado", "{status} {body}: {error}");
+        assert!(error.contains(motivo), "{motivo}: {error}");
+    }
 }

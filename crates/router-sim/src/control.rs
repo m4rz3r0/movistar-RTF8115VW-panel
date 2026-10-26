@@ -225,6 +225,17 @@ impl SimControl {
         self.inner.state().cortafuegos_ilegible = on;
     }
 
+    /// La próxima baja de una regla (`item=<FID>|<RID>`) borra el filtro
+    /// entero, como si el router hubiera ignorado el `|<RID>`.
+    pub fn cortafuegos_proxima_baja_borra_filtro(&self) {
+        self.inner.state().cortafuegos_baja_de_mas = Some(None);
+    }
+
+    /// La próxima baja de una regla borra también la regla `rid` de su filtro.
+    pub fn cortafuegos_proxima_baja_borra_tambien(&self, rid: &str) {
+        self.inner.state().cortafuegos_baja_de_mas = Some(Some(rid.to_owned()));
+    }
+
     /// Sustituye la regla `rid` del filtro `fid` por `r` (con el RID de `r`):
     /// otra regla en su lugar, como si alguien la hubiera cambiado.
     pub fn cortafuegos_sustituir(&self, fid: &str, rid: &str, r: hgu::cortafuegos::Regla) {
