@@ -108,7 +108,7 @@ async fn sin_ping_ida_y_vuelta() {
     assert!(
         e["accion_propia"]["motivo"]
             .as_str()
-            .is_some_and(|m| m.contains("ya puesta")),
+            .is_some_and(|m| m.contains("Regla del panel puesta")),
         "{e}"
     );
     // Deshacer la quita: solo su regla.
@@ -225,20 +225,22 @@ async fn sin_ping_ya_puesta_409() {
     assert_eq!(escrituras(&p).len(), 1);
 }
 
-/// Con la regla del panel puesta (solo IPv4) y el ping de IPv6 abierto, la
-/// tarjeta no dice que el router no responde: sigue en ámbar por IPv6 y el
-/// motivo no afirma el efecto de la regla.
+/// Con la regla del panel puesta, la del operador que deja pasar el ping
+/// sigue delante (como en el router real, E5, cambio 11): la tarjeta no
+/// dice que el router no responde (sigue en ámbar) y el motivo y lo
+/// pendiente explican que la regla está puesta pero no basta.
 #[tokio::test]
-async fn sin_ping_puesta_con_ipv6_abierto_no_afirma_el_efecto() {
+async fn sin_ping_puesta_no_afirma_que_no_responda() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     aplicar_sin_ping(&p, &cookie).await;
     let e = elemento(&p, &cookie, "cortafuegos").await;
     assert_eq!(e["estado"], "atencion", "{e}");
-    assert_eq!(e["texto_estado"], "Responde al ping por IPv6", "{e}");
-    let motivo = e["accion_propia"]["motivo"].as_str().unwrap_or_default();
-    assert!(motivo.contains("IPv4"), "{e}");
-    assert!(!motivo.contains("no contesta"), "{e}");
+    assert_eq!(e["texto_estado"], "Responde al ping", "{e}");
+    let sin_efecto =
+        "Regla del panel puesta; el router sigue respondiendo al ping por otra regla del operador.";
+    assert_eq!(e["accion_propia"]["motivo"], sin_efecto, "{e}");
     let problema = e["recomendacion"]["problema"].as_str().unwrap_or_default();
+    assert!(problema.contains(sin_efecto), "{e}");
     assert!(problema.contains("por IPv6"), "{e}");
 }
 

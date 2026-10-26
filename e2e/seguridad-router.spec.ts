@@ -26,7 +26,8 @@ const t = {
   avisoBorrar: "Si luego deshaces el borrado",
   avisoDeshacer: "El usuario vuelve con una contraseña nueva",
   sinPing: "No responder al ping desde internet",
-  yaPuesta: "ya puesta",
+  // La regla puesta no basta: la del operador que deja pasar el ping va delante.
+  reglaPuesta: "Regla del panel puesta; el router sigue respondiendo al ping",
 };
 
 /** Entra en el panel de Seguridad (`baseURL`), que no es el del worker. */
@@ -167,7 +168,7 @@ test.describe("cortafuegos", () => {
       expect(await violacionesGraves(page), `diálogo sin ping ${ancho}`).toEqual([]);
       const aviso = await aplicar(page, t.aplicar);
       await expect(filas).toHaveCount(17, { timeout: PLAZO_CAMBIO });
-      await expect(page.locator(".cortafuegos-sin-ping")).toContainText(t.yaPuesta);
+      await expect(page.locator(".cortafuegos-sin-ping")).toContainText(t.reglaPuesta);
       await sinDesbordamiento(page, `sin ping ${ancho}`);
 
       // Deshacer: quita solo su regla. En el móvil, el detalle tapa el aviso.
@@ -184,7 +185,7 @@ test.describe("cortafuegos", () => {
         await page.waitForURL((u) => u.pathname === "/ajustes/seguridad/cortafuegos");
       }
       await expect(filas).toHaveCount(16, { timeout: PLAZO_CAMBIO });
-      await expect(page.locator(".cortafuegos-sin-ping")).not.toContainText(t.yaPuesta);
+      await expect(page.locator(".cortafuegos-sin-ping")).not.toContainText(t.reglaPuesta);
       expect(await violacionesGraves(page), `deshecho ${ancho}`).toEqual([]);
       expect(errores, "errores o avisos en la consola").toEqual([]);
     });

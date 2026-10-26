@@ -128,6 +128,7 @@ impl Componente {
                 "sin-ping-recomendado",
                 "activar-recomendado",
                 "ya-puesta",
+                "puesta-sin-efecto",
                 "desactivada",
                 "sin-leer",
                 "sin-filtro",

@@ -45,9 +45,11 @@ pub(super) fn puesta(f: &[Filtro]) -> bool {
 }
 
 /// El ping que llega de internet, por versión: abierto desde cualquier
-/// origen. En IPv4 solo cuenta sin la regla del panel; con ella no se
-/// afirma nada (su efecto está aún sin validar en el router real, y la
-/// regla no toca IPv6).
+/// origen por una regla del operador. La regla del panel va al final de su
+/// filtro, detrás de esa regla, así que no la anula: en el router real el
+/// ping siguió respondiendo con ella puesta (E5, cambio 11). Con la regla
+/// puesta y el ping abierto, la tarjeta sigue en ámbar y el motivo de la
+/// acción lo explica.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct Ping {
     pub v4: bool,
@@ -71,17 +73,16 @@ fn ping_abierto(a: &[Abierto]) -> bool {
 
 /// El ping de [`Ping`] según los filtros leídos.
 pub(super) fn ping(f: &[Filtro]) -> Ping {
-    let regla = puesta(f);
     Ping {
-        v4: !regla && ping_abierto(&abiertos_en(f, "0")),
+        v4: ping_abierto(&abiertos_en(f, "0")),
         v6: ping_abierto(&abiertos_en(f, "1")),
-        regla,
+        regla: puesta(f),
     }
 }
 
-/// Estado de la tarjeta: en ámbar si responde al ping por alguna versión;
-/// con la regla del panel puesta y nada más abierto, solo eso (sin decir
-/// que no responde).
+/// Estado de la tarjeta: en ámbar si responde al ping por alguna versión
+/// (también con la regla del panel puesta: su motivo lo explica); con la
+/// regla puesta y nada más abierto, solo eso (sin decir que no responde).
 pub(super) fn estado(p: Ping) -> (EstadoVisual, &'static str) {
     match (p.v4, p.v6) {
         (true, true) => (EstadoVisual::Atencion, "ajustes-estado-cortafuegos-ping"),
@@ -131,6 +132,14 @@ pub(super) fn enumerar(nombres: &[String]) -> String {
 fn problema(f: &[Filtro], p: Ping) -> Vec<String> {
     let mut out = Vec::new();
     match (p.v4, p.v6) {
+        // Con la regla del panel puesta, se dice que no basta (sale aunque
+        // la acción no se ofrezca en este router).
+        (true, v6) if p.regla => {
+            out.push(t!("ajuste-seguridad-cortafuegos-puesta-sin-efecto"));
+            if v6 {
+                out.push(t!("ajustes-problema-seguridad-cortafuegos-ping-ipv6"));
+            }
+        }
         (true, true) => out.push(t!("ajustes-problema-seguridad-cortafuegos-ping")),
         (true, false) => out.push(t!("ajustes-problema-seguridad-cortafuegos-ping-ipv4")),
         (false, true) => out.push(t!("ajustes-problema-seguridad-cortafuegos-ping-ipv6")),
@@ -157,11 +166,10 @@ fn ping_restringido(a: &[Abierto]) -> bool {
 }
 
 /// Lo abierto solo desde redes concretas: el ping, por versión (en una
-/// versión no se pierde por estar abierto a cualquiera en la otra; el de
-/// IPv4 no cuenta con la regla del panel puesta, como en [`ping`]), y los
-/// demás servicios.
+/// versión no se pierde por estar abierto a cualquiera en la otra; la
+/// regla del panel no lo quita, como en [`ping`]), y los demás servicios.
 fn restringidos(f: &[Filtro]) -> Vec<String> {
-    let v4 = !puesta(f) && ping_restringido(&abiertos_en(f, "0"));
+    let v4 = ping_restringido(&abiertos_en(f, "0"));
     let v6 = ping_restringido(&abiertos_en(f, "1"));
     let mut out = match (v4, v6) {
         (true, true) => vec![nombre(Servicio::Ping)],
@@ -191,10 +199,13 @@ pub(super) fn abierto_redes(ctx: &Contexto) -> Option<ValorLegible> {
 }
 
 /// Por qué no se ofrece el alta, sin contar la validación: la regla del
-/// panel ya está, desactivada (no descarta nada) o activa.
+/// panel ya está, desactivada (no descarta nada) o activa (y, si otra regla
+/// del operador sigue dejando pasar el ping, se dice).
 fn motivo_regla(f: &[Filtro]) -> Option<String> {
     if !hay_regla(f) {
         None
+    } else if puesta(f) && ping(f).v4 {
+        Some(t!("ajuste-seguridad-cortafuegos-puesta-sin-efecto"))
     } else if puesta(f) {
         Some(t!("ajuste-seguridad-cortafuegos-ya-puesta"))
     } else {
@@ -205,11 +216,13 @@ fn motivo_regla(f: &[Filtro]) -> Option<String> {
 /// El texto de la recomendación: «sin ping» si el ping de IPv4 está abierto
 /// y el panel puede poner su regla; con ella desactivada no la ofrece, sino
 /// activarla desde la web del router; y «revisar» si queda algo que la
-/// regla no arregla. Sin «sin ping» en este router (`con_sin_ping` falso),
-/// no ofrece la regla: todo lo pendiente es «revisar».
+/// regla no arregla (también el ping de IPv4 con la regla ya puesta y
+/// activa: el panel no puede hacer más). Sin «sin ping» en este router
+/// (`con_sin_ping` falso), no ofrece la regla: todo lo pendiente es
+/// «revisar».
 fn texto(f: &[Filtro], p: Ping, problema: &[String], con_sin_ping: bool) -> String {
     let mut texto = Vec::new();
-    let v4 = p.v4 && con_sin_ping;
+    let v4 = p.v4 && con_sin_ping && !p.regla;
     match (v4, hay_regla(f)) {
         (true, false) => texto.push(t!("ajuste-seguridad-cortafuegos-sin-ping-recomendado")),
         (true, true) => texto.push(t!("ajuste-seguridad-cortafuegos-activar-recomendado")),

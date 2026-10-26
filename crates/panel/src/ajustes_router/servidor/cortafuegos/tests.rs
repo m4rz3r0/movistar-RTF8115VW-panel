@@ -23,16 +23,44 @@ fn el_ping_por_version() {
     let p = ping(&f);
     assert_eq!((p.v4, p.v6, p.regla), (true, true, false));
     assert_eq!(estado(p).1, "ajustes-estado-cortafuegos-ping");
-    // Con la regla, IPv6 sigue abierto: no se dice que no responda.
-    let p = ping(&con_regla(f.clone()));
-    assert_eq!((p.v4, p.v6, p.regla), (false, true, true));
-    assert_eq!(estado(p).1, "ajustes-estado-cortafuegos-ping-ipv6");
-    // Sin el ping de IPv6, solo «regla puesta», sin afirmar su efecto.
-    let mut sin_v6 = con_regla(f);
+    // Con la regla, la del operador sigue dejando pasar el ping de IPv4
+    // (la del panel va detrás): la tarjeta nunca dice que no responde, y el
+    // motivo y lo pendiente dicen que la regla está puesta pero no basta.
+    let con = con_regla(f.clone());
+    let p = ping(&con);
+    assert_eq!((p.v4, p.v6, p.regla), (true, true, true));
+    assert_eq!(estado(p).1, "ajustes-estado-cortafuegos-ping");
+    assert!(motivo_regla(&con).unwrap().contains("sigue respondiendo"));
+    let mut sin_v6 = con_regla(f.clone());
     sin_v6[1].reglas.retain(|r| r.icmp_type != "55");
     let p = ping(&sin_v6);
+    assert_eq!((p.v4, p.v6, p.regla), (true, false, true));
+    assert_eq!(estado(p).1, "ajustes-estado-cortafuegos-ping-ipv4");
+    // Sin ninguna otra regla que abra el ping, solo «regla puesta», sin
+    // afirmar su efecto.
+    let mut solo_regla = con_regla(f);
+    solo_regla[1].reglas.retain(|r| r.icmp_type != "55");
+    solo_regla[0].reglas.remove(8);
+    let p = ping(&solo_regla);
     assert_eq!((p.v4, p.v6, p.regla), (false, false, true));
     assert_eq!(estado(p).1, "ajustes-estado-cortafuegos-regla-puesta");
+}
+
+/// Con la regla del panel puesta y activa y el ping de IPv4 aún abierto por
+/// el operador, lo pendiente lo dice y la recomendación no vuelve a
+/// ofrecer la regla: queda pedírselo al operador.
+#[test]
+fn con_la_regla_puesta_el_ping_ipv4_sigue_pendiente() {
+    let mut f = con_regla(filtros());
+    f[1].reglas.retain(|r| r.icmp_type != "55");
+    let p = ping(&f);
+    let pr = problema(&f, p);
+    assert_eq!(pr.len(), 1, "{pr:?}");
+    assert!(pr[0].contains("otra regla del operador"), "{pr:?}");
+    let t = texto(&f, p, &pr, true);
+    assert!(!t.contains("pase más desapercibido"), "{t}");
+    assert!(!t.contains("desactivada"), "{t}");
+    assert!(t.contains("operador"), "{t}");
 }
 
 /// Una regla con la huella pero desactivada no cuenta para el estado
@@ -102,9 +130,13 @@ fn la_regla_desactivada_tiene_su_motivo() {
     let p = ping(&f);
     let t = texto(&f, p, &problema(&f, p), true);
     assert!(!t.contains("pase más desapercibido"), "{t}");
-    // Activa, «ya puesta».
+    // Activa y con el ping del operador abierto, que no basta; sin él,
+    // «ya puesta».
     let f = con_regla(filtros());
-    assert!(motivo_regla(&f).unwrap().contains("ya puesta"));
+    assert!(motivo_regla(&f).unwrap().contains("sigue respondiendo"));
+    let mut solo_regla = con_regla(filtros());
+    solo_regla[0].reglas.remove(8);
+    assert!(motivo_regla(&solo_regla).unwrap().contains("ya puesta"));
     assert!(motivo_regla(&filtros()).is_none());
 }
 
@@ -126,16 +158,15 @@ fn regla_desactivada_y_solo_ping_ipv4_con_texto() {
     assert!(t.contains("A favor:") && t.contains("En contra:"), "{t}");
 }
 
-/// Con la regla del panel puesta, el ping de IPv4 desde redes concretas no
-/// sale como abierto: la regla lo descarta antes (no se afirma su efecto,
-/// pero tampoco lo contrario).
+/// Con la regla del panel puesta, el ping de IPv4 desde redes concretas
+/// sigue saliendo como abierto: la regla va detrás y no lo quita.
 #[test]
-fn con_la_regla_puesta_no_se_lista_el_ping_ipv4_restringido() {
+fn con_la_regla_puesta_se_lista_el_ping_ipv4_restringido() {
     let mut f = con_regla(filtros());
     ping_de_redes(&mut f, true, false);
     assert!(puesta(&f));
     let r = restringidos(&f);
-    assert!(!r.iter().any(|s| s.contains("ping")), "{r:?}");
+    assert!(r.iter().any(|s| s.contains("ping por IPv4")), "{r:?}");
 }
 
 /// Sin «sin ping» en este router, la recomendación no ofrece la regla del

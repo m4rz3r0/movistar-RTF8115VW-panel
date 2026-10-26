@@ -133,6 +133,7 @@ ajuste-seguridad-cortafuegos-sin-ping = Do not answer ping from the internet
 ajuste-seguridad-cortafuegos-sin-ping-ayuda = Adds a panel rule that drops ping coming from the internet over IPv4 to the router's connection; ping over IPv6 is not affected. The operator's rules are not touched, and "Undo" removes only this one.
 ajuste-seguridad-cortafuegos-desactivada = The panel's rule is on the router but switched off: it drops nothing. The panel does not switch it on; switch it on or delete it from the router's web interface.
 ajuste-seguridad-cortafuegos-ya-puesta = The panel's rule is already in place. It is for IPv4 only: ping over IPv6 is not affected.
+ajuste-seguridad-cortafuegos-puesta-sin-efecto = Panel rule in place; the router still answers ping because of another rule from the operator.
 ajuste-seguridad-cortafuegos-sin-leer = The firewall rules cannot be read: without them, the panel does not add its own.
 ajuste-seguridad-cortafuegos-sin-filtro = The firewall has no incoming group of rules for the internet connection: the panel does not know where to put its own.
 ajuste-seguridad-cortafuegos-sin-ping-recomendado = Recommended if you want your router to be less noticeable on the internet. Pros: the rule drops ping coming over IPv4, so whoever scans the internet looking for devices has a harder time seeing that yours is on. Cons: you will not be able to check with a ping from outside that your connection works, and some operator tests might fail.

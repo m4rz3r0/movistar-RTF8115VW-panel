@@ -133,6 +133,7 @@ ajuste-seguridad-cortafuegos-sin-ping = No responder al ping desde internet
 ajuste-seguridad-cortafuegos-sin-ping-ayuda = Añade una regla del panel que descarta el ping que llega de internet por IPv4 a la conexión del router; el ping por IPv6 no lo toca. Las reglas del operador no se tocan, y «Deshacer» quita solo esta.
 ajuste-seguridad-cortafuegos-desactivada = La regla del panel está en el router pero desactivada: no descarta nada. El panel no la activa; actívala o bórrala desde la web del router.
 ajuste-seguridad-cortafuegos-ya-puesta = Regla del panel ya puesta. Es solo para IPv4: el ping por IPv6 no lo toca.
+ajuste-seguridad-cortafuegos-puesta-sin-efecto = Regla del panel puesta; el router sigue respondiendo al ping por otra regla del operador.
 ajuste-seguridad-cortafuegos-sin-leer = No se pueden leer las reglas del cortafuegos: sin ellas, el panel no añade la suya.
 ajuste-seguridad-cortafuegos-sin-filtro = El cortafuegos no tiene el grupo de reglas de entrada de la conexión a internet: el panel no sabe dónde poner la suya.
 ajuste-seguridad-cortafuegos-sin-ping-recomendado = Recomendado si quieres que tu router pase más desapercibido en internet. A favor: la regla descarta el ping que llega por IPv4, y a quien recorre internet buscando equipos le cuesta más ver que el tuyo está encendido. En contra: no podrás comprobar con un ping desde fuera que tu conexión funciona, y algunas pruebas del operador podrían fallar.
