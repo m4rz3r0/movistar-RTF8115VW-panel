@@ -31,6 +31,61 @@ código, junto a cada `#[server(endpoint = "…")]`.
 | `comprobar_contrasena_router` | Comprueba, sin escribir nada, que se puede cambiar la contraseña del router a la nueva. Exige reautenticación. |
 | `cambiar_contrasena_router` | Cambia la contraseña del router y el panel pasa a usarla si entra con ella. Exige reautenticación; 409 con otro cambio en curso. |
 
+## Lo que el panel escribe: solo lo comprobado en el router real
+
+Cada escritura o acción de `crates/catalogo/funciones.toml` lleva
+`comprobada`: la referencia de la prueba en el router real
+(`comprobada = "E3, cambio 14"`) o `false`. Es una lista blanca que falla
+cerrada: sin el campo, como `false` (un test pide que toda escritura lo
+lleve, y otro fija la lista de la 1.0). Marcar una función como comprobada
+es cambiar esa línea.
+
+En la 1.0 están comprobadas `cbSetTr69Config`, `cbSetTimeNtp`,
+`cbSetSyslog`, `cbSetWifiAccPt`, `cbSetVoiceSip`, `cbAddUser`,
+`cbDeleteUser` y el alta y la baja de la regla del cortafuegos
+(`scbidirectionalflt.cmd?action=add`/`remove`). Lo demás solo se ve:
+
+- **En la página**, sus campos salen como valores, sin notas por campo; sin
+  interruptor, sin botón de guardar y sin acciones de la lista (añadir,
+  borrar, fijar la IP de un dispositivo). Una recomendación de un campo
+  sin comprobar se queda como información: dice qué pasa y por qué
+  conviene cambiarlo, sin botón ni lotes, detrás de las que se pueden
+  aplicar.
+- **En Mejoras**, los pasos sin comprobar no salen (un lote sin ninguno
+  tampoco). «Cómo estaba al instalar» no ofrece volver a esos valores.
+- **En la Biblioteca**, la función sale bloqueada, con su motivo.
+- **El gestor** responde 409 sin escribir (`funcion-sin-comprobar`), venga
+  la petición de donde venga. El deshacer y la reversión de lo ya hecho
+  siguen funcionando.
+
+La contraseña del propio router (`cbModifyPwd`) está pendiente de la E4 y
+sigue activa: su flujo no pasa por el gestor, está protegido (prueba la
+nueva, vuelve a la anterior y avisa) y la E4 se hace con él (TODO en el
+catálogo y en `contrasena_router.rs`).
+
+Aparte, dos funciones del panel están desactivadas en este router
+(`crates/panel/src/validacion_real.rs`), aunque sus escrituras estén
+comprobadas:
+
+- **Cambiar la contraseña o el grupo de otra cuenta** de la web del
+  router: en este router solo la cuenta `1234` entra en la web
+  (`cbCheckLogin` responde `Result=4` a las demás), así que el panel no
+  puede comprobar que la contraseña nueva funciona. Para cambiarla, se
+  borra la cuenta y se crea de nuevo. Crear y borrar cuentas sí funciona.
+- **«No responder al ping desde internet»**: la regla del panel se pone y
+  se quita bien, pero el router sigue respondiendo al ping porque otra
+  regla del operador lo permite.
+
+La tarjeta no las ofrece: solo enseña sus valores y una nota de una línea
+con el motivo. `preparar_sin_ping` y `cambiar_usuario_router` responden 409
+sin escribir.
+
+Las pruebas contra router-sim lo habilitan todo (el catálogo entero y las
+dos funciones) con un solo interruptor: `Config::habilitar_todo`, que en el
+e2e pone `RP_E2E_HABILITAR_TODO=1` (`e2e/arrancar.sh`). Solo lo atiende un
+binario de depuración; `deploy/pruebas/release-local.sh` comprueba que el
+de release no lo hace.
+
 ## Vigilancia y cola de cambios
 
 Solo se vigila lo que puede cortar el acceso del panel al router o la

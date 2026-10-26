@@ -104,6 +104,16 @@ are masked, with an eye to reveal them; everything else is shown in clear.
 Whatever is not in Settings is changed from the Library, also with
 watching.
 
+The panel only writes what has been checked on the real router (an
+allowlist in the function catalogue; see
+[funciones-del-panel.md](docs/funciones-del-panel.md), in Spanish). The rest
+is shown, with its value and its recommendations as information, but with
+no toggle or button, and the Library does not write it. On this router,
+besides, you cannot change the password of another account of its web
+pages (only the `1234` account can log in there, so the panel cannot check
+the new one: delete the account and create it again) nor stop answering ping
+from the internet (another operator rule still allows it).
+
 ### Improvements
 
 "Improvements" (`/mejoras`) gathers in two batches the settings worth
@@ -123,6 +133,10 @@ lose:
   AdGuard or Cloudflare for Families, which filters adult websites) or, if
   you already use your own DNS servers, keeps them; and, if you tick it,
   takes the time from a neutral server.
+
+The batches only carry the steps the panel writes: those touching something
+not yet checked on the real router (such as UPnP, the mirror or the home
+network's DNS) do not show until they are checked.
 
 Each card says which steps are done, which are left and which could not be
 read, and the sidebar counts the pending ones. "Review and apply" opens the
@@ -274,9 +288,12 @@ per worker, four freshly installed ones for the setup wizard, two for the
 Settings walkthrough (one per language), two for the WiFi grid, one for the
 other grid tabs and one for Improvements, each with its own simulator
 (`e2e/instancias.ts`), on consecutive ports from `E2E_PORT` and
-`E2E_SIM_PORT` (3195 and 8195; with 4 workers, 3195–3208 and 8195–8208). Each
-change is watched for 10 s instead of 30 s or 2 min (`RP_E2E_VIGILANCIA_S`,
-honoured only by the debug build). It uses Playwright's Chromium
+`E2E_SIM_PORT` (3195 and 8195; with 4 workers, 3195–3208 and 8195–8208).
+Against the simulator everything is enabled, also what has not been checked
+on the real router (`RP_E2E_HABILITAR_TODO=1`, honoured only by the debug
+build). Each change is watched for 10 s instead of 30 s or 2 min
+(`RP_E2E_VIGILANCIA_S`, honoured only by the debug build). It uses
+Playwright's Chromium
 (`npx playwright install chromium` if missing; or `E2E_CHROMIUM=<path>`).
 
 The e2e run uses the `target/debug/panel` from `cargo leptos build`, which is

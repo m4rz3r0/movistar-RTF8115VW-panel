@@ -106,6 +106,16 @@ a cualquier ajuste. Las contraseñas van censuradas, con un ojo para verlas;
 lo demás, en claro. Lo que no está en Ajustes se cambia desde la
 Biblioteca, con la misma vigilancia.
 
+El panel solo escribe lo que se ha comprobado en el router real (una lista
+blanca en el catálogo de funciones; ver
+[funciones-del-panel.md](docs/funciones-del-panel.md)). Lo demás se ve, con
+su valor y sus recomendaciones como información, pero sin interruptor ni
+botón, y la Biblioteca no lo escribe. En este router, además, no se puede
+cambiar la contraseña de otra cuenta de su web (solo la cuenta `1234` entra
+en ella, así que el panel no puede comprobar la nueva: se borra la cuenta y
+se crea de nuevo) ni dejar de responder al ping desde internet (otra regla
+del operador lo sigue permitiendo).
+
 ### Mejoras
 
 «Mejoras» (`/mejoras`) junta en dos lotes los ajustes que conviene cambiar
@@ -123,6 +133,10 @@ y dice, en cada uno, para quién es, qué se gana y qué se pierde:
   Cloudflare familiar, que filtra webs para adultos) o, si ya usas unos DNS
   propios, los mantiene; y, si lo marcas, toma la hora de un servidor
   neutro.
+
+Los lotes solo llevan los pasos que el panel escribe: los que tocan algo sin
+comprobar en el router real (como el UPnP, el espejo o los DNS de la red de
+casa) no salen hasta que se comprueben.
 
 Cada tarjeta dice qué pasos están hechos, cuáles faltan y cuáles no se
 pudieron leer, y la barra lateral cuenta los pendientes. «Revisar y
@@ -272,10 +286,13 @@ por idioma), dos para la rejilla de la WiFi, uno para las demás pestañas en
 rejilla, uno para Mejoras, uno para los usuarios del router y uno para la
 vigilancia y la cola, cada uno con su simulador (`e2e/instancias.ts`), en
 puertos consecutivos a partir de `E2E_PORT` y `E2E_SIM_PORT` (3195 y 8195;
-con 4 workers, 3195–3210 y 8195–8210). Cada cambio vigilado se vigila 10 s
-en vez de 30 s o 2 min (`RP_E2E_VIGILANCIA_S`, que solo atiende el binario
-de depuración); en el panel de la vigilancia, 5 min, para que no acabe sola
-durante la prueba. Usa el Chromium de Playwright
+con 4 workers, 3195–3210 y 8195–8210). Contra el simulador todo está
+habilitado, también lo no comprobado en el router real
+(`RP_E2E_HABILITAR_TODO=1`, que solo atiende el binario de depuración).
+Cada cambio vigilado se vigila 10 s en vez de 30 s o 2 min
+(`RP_E2E_VIGILANCIA_S`, que solo atiende el binario de depuración); en el
+panel de la vigilancia, 5 min, para que no acabe sola durante la prueba.
+Usa el Chromium de Playwright
 (`npx playwright install chromium` si no está; o `E2E_CHROMIUM=<ruta>`).
 
 El e2e usa el `target/debug/panel` de `cargo leptos build`, que se compila
