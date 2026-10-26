@@ -55,7 +55,7 @@ pub struct Regla {
     #[serde(rename = "RID")]
     pub rid: String,
     pub enable: String,
-    /// 1 ICMP, 2 TCP, 3 UDP.
+    /// 0 ninguno («NONE»: no filtra por protocolo), 1 ICMP, 2 TCP, 3 UDP.
     pub protocol: String,
     /// 0 descartar, 1 rechazar, 2 permitir.
     pub action: String,
@@ -263,26 +263,38 @@ pub fn item(fid: &str, rid: &str) -> String {
     format!("{fid}|{rid}")
 }
 
-/// ¿Abre la regla TCP `r` el puerto `p`?
+/// ¿Abre la regla TCP `r` el puerto `p`? Un puerto inicial 0 es
+/// «cualquiera», como lo pinta el router (`dsport==="0"` sale vacío en
+/// `scbidirectionalflt_ls.asp`): abre todos.
 fn abre(r: &Regla, p: u32) -> bool {
     let desde = r.dest_start_port.parse::<u32>().unwrap_or(0);
     let hasta = r.dest_end_port.parse::<u32>().unwrap_or(0).max(desde);
-    desde != 0 && (desde..=hasta).contains(&p)
+    desde == 0 || (desde..=hasta).contains(&p)
 }
 
-/// Lo que abre una regla de entrada que permite el paso.
+/// Los servicios TCP que abre `r`.
+fn servicios_tcp(r: &Regla) -> impl Iterator<Item = Servicio> + '_ {
+    [
+        (Servicio::Web, &[80, 443][..]),
+        (Servicio::Ssh, &[22][..]),
+        (Servicio::GestionOperador, &[7547][..]),
+    ]
+    .into_iter()
+    .filter(|(_, puertos)| puertos.iter().any(|p| abre(r, *p)))
+    .map(|(s, _)| s)
+}
+
+/// Lo que abre una regla de entrada que permite el paso. El protocolo 0
+/// («NONE», la primera entrada de `PROTOCOL` en la página; el editor no lo
+/// ofrece) no filtra por protocolo: cuenta como todos, el ping incluido
+/// (mejor avisar de más que callar algo abierto).
 fn servicios_de(r: &Regla) -> Vec<Servicio> {
     match r.protocol.as_str() {
+        "0" => std::iter::once(Servicio::Ping)
+            .chain(servicios_tcp(r))
+            .collect(),
         "1" if ICMP_PING.contains(&r.icmp_type.as_str()) => vec![Servicio::Ping],
-        "2" => [
-            (Servicio::Web, &[80, 443][..]),
-            (Servicio::Ssh, &[22][..]),
-            (Servicio::GestionOperador, &[7547][..]),
-        ]
-        .into_iter()
-        .filter(|(_, puertos)| puertos.iter().any(|p| abre(r, *p)))
-        .map(|(s, _)| s)
-        .collect(),
+        "2" => servicios_tcp(r).collect(),
         _ => Vec::new(),
     }
 }

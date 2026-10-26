@@ -141,3 +141,57 @@ fn filtro_de_entrada_de_la_conexion() {
     );
     assert_eq!(filtro_de_entrada_v4(&f, "3"), None);
 }
+
+/// Un filtro de entrada IPv4 con solo `reglas`.
+fn entrada(reglas: Vec<Regla>) -> Vec<Filtro> {
+    let mut f = filtros();
+    f.truncate(1);
+    f[0].reglas = reglas;
+    f
+}
+
+fn abiertos_desde_cualquiera(f: &[Filtro]) -> Vec<Servicio> {
+    abiertos(f)
+        .into_iter()
+        .filter(|a| a.desde_cualquiera)
+        .map(|a| a.servicio)
+        .collect()
+}
+
+/// El router trata el puerto 0 como «cualquiera» (`dsport==="0"` sale
+/// vacío en la lista): una regla TCP que permite con puertos 0..0 abre
+/// todo.
+#[test]
+fn tcp_con_puerto_0_abre_todos() {
+    let f = entrada(vec![regla("2", "2", "0")]);
+    assert_eq!(
+        abiertos_desde_cualquiera(&f),
+        [Servicio::Web, Servicio::Ssh, Servicio::GestionOperador]
+    );
+    // Un rango concreto, solo lo suyo.
+    let mut r = regla("2", "2", "0");
+    r.dest_start_port = "20".into();
+    r.dest_end_port = "25".into();
+    assert_eq!(
+        abiertos_desde_cualquiera(&entrada(vec![r])),
+        [Servicio::Ssh]
+    );
+}
+
+/// El protocolo 0 («NONE» en `PROTOCOL` de la página; el editor no lo
+/// ofrece) no filtra por protocolo: cuenta como todos, el ping incluido.
+#[test]
+fn protocolo_0_cuenta_como_todos() {
+    let f = entrada(vec![regla("0", "2", "0")]);
+    assert_eq!(
+        abiertos_desde_cualquiera(&f),
+        [
+            Servicio::Ping,
+            Servicio::Web,
+            Servicio::Ssh,
+            Servicio::GestionOperador
+        ]
+    );
+    // Si descarta, no abre nada.
+    assert!(abiertos(&entrada(vec![regla("0", "0", "0")])).is_empty());
+}
