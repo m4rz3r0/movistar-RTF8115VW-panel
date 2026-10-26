@@ -235,3 +235,49 @@ async fn reversion_de_un_borrado_avisa_de_la_contrasena() {
     assert!(!registro.texto().contains(&x), "en el registro");
     assert!(!html.contains(&x), "en el HTML de /historial");
 }
+
+/// Si la reversión de un borrado llega a escribir el alta pero no se
+/// verifica, el usuario pudo volver con una contraseña que el panel no
+/// guarda: el cambio, fallido, también lleva la nota que lo dice.
+#[tokio::test]
+async fn reversion_fallida_tras_escribir_tambien_avisa() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    let g = ok(
+        &p,
+        "preparar_usuario_router",
+        json!({ "op": { "Borrar": { "usuario": INVITADO } } }),
+        &cookie,
+    )
+    .await;
+    let id = ok(
+        &p,
+        "confirmar_ajuste",
+        json!({ "token": g["token"], "desmarcados": [] }),
+        &cookie,
+    )
+    .await
+    .as_i64()
+    .unwrap();
+    esperar_hasta(Duration::from_secs(5), "no llega a vigilarse", async || {
+        ok(&p, "estado_cambio", json!({ "id": id }), &cookie).await["estado"] == "Vigilando"
+    })
+    .await;
+    let escritas = p.sim.control.writes().len();
+    // El alta de la reversión responde bien pero no se aplica.
+    p.sim.control.ignore_next_write();
+    p.sim.control.set_wan_up(false);
+    let c = esperar_final(&p, &cookie, id).await;
+    assert_eq!(c["estado"], "Fallido", "{c}");
+    assert!(
+        p.sim.control.writes().len() > escritas,
+        "no llegó a escribir"
+    );
+    let (nota, error): (String, String) =
+        sqlx::query_as("SELECT COALESCE(nota, ''), COALESCE(error, '') FROM changes WHERE id = ?")
+            .bind(id)
+            .fetch_one(&p.state.db)
+            .await
+            .unwrap();
+    assert!(nota.contains("usuarios-router-nota-revertido"), "{nota}");
+    assert!(!error.is_empty(), "sin el detalle de la reversión");
+}

@@ -86,9 +86,9 @@ impl ChangeManager {
     }
 
     /// Revierte `pasos` en orden inverso y marca cada uno. Devuelve los que
-    /// no se pudieron revertir y los avisos de lo revertido para la nota
-    /// del cambio (un usuario que vuelve con una contraseña que el panel no
-    /// guarda).
+    /// no se pudieron revertir y los avisos para la nota del cambio de lo
+    /// revertido o de lo que llegó a escribirse al intentarlo (un usuario
+    /// que vuelve con una contraseña que el panel no guarda).
     pub(in crate::changes) async fn revertir_pasos(
         &self,
         id: i64,
@@ -97,9 +97,10 @@ impl ChangeManager {
         let mut fallos = Vec::new();
         let mut avisos = Vec::new();
         for p in pasos.iter().rev() {
-            match self.revertir_plan(id, &p.plan).await {
-                Ok(aviso) => {
-                    avisos.extend(aviso);
+            let (resultado, aviso) = self.revertir_plan(id, &p.plan).await;
+            avisos.extend(aviso);
+            match resultado {
+                Ok(()) => {
                     self.marcar_paso(id, p.orden, EstadoPaso::Revertido, None)
                         .await
                 }
@@ -142,21 +143,27 @@ impl ChangeManager {
     /// transitorios (router sin respuesta, relectura fallida) se reintentan
     /// durante `alto`; los deterministas terminan en el acto. Con un aviso
     /// para el Historial si lo revertido lo necesita
-    /// ([`nota::USUARIO_REVERTIDO`]).
-    async fn revertir_plan(&self, id: i64, plan: &Plan) -> Result<Option<Nota>, ErrorReversion> {
+    /// ([`nota::USUARIO_REVERTIDO`]), también si falla tras llegar a
+    /// escribir.
+    async fn revertir_plan(
+        &self,
+        id: i64,
+        plan: &Plan,
+    ) -> (Result<(), ErrorReversion>, Option<Nota>) {
         let Some(mut req) = inversa(plan) else {
             // Sin inversa, vale si el router ya muestra lo de antes (p. ej.
             // una creación sin instancia conocida que no llegó a hacerse).
-            return match plan.operacion {
+            let r = match plan.operacion {
                 Operacion::Accion => Err(ErrorReversion::SinInversa),
                 _ => match self.comprobar(plan, Lado::Anterior).await {
-                    Comprobacion::Coincide(_) => Ok(None),
+                    Comprobacion::Coincide(_) => Ok(()),
                     _ if plan.operacion == Operacion::Crear => Err(ErrorReversion::Fallo(
                         "no se sabe qué instancia se creó; revisa la lista en el router".into(),
                     )),
                     _ => Err(ErrorReversion::SinInversa),
                 },
             };
+            return (r, None);
         };
         // Un usuario borrado vuelve con una contraseña nueva aleatoria (la
         // de antes no se puede leer). Aquí no hay cambio de deshacer que la
@@ -165,24 +172,22 @@ impl ChangeManager {
         let fin = Instant::now() + self.tiempos.alto;
         // Plan del último intento que llegó a escribir (o pudo llegar).
         let mut enviado = None;
-        loop {
+        let resultado = loop {
             let error = match self.revertir_una_vez(&req, plan, &mut enviado).await {
-                // Solo si llegó a escribirse: si el usuario ya estaba, sigue
-                // con su contraseña.
-                Ok(()) => {
-                    return Ok(
-                        (recrea && enviado.is_some()).then(|| Nota::clave(nota::USUARIO_REVERTIDO))
-                    );
-                }
-                Err(FalloReversion::Definitivo(e)) => return Err(ErrorReversion::Fallo(e)),
+                Ok(()) => break Ok(()),
+                Err(FalloReversion::Definitivo(e)) => break Err(ErrorReversion::Fallo(e)),
                 Err(FalloReversion::Reintentar(e)) => e,
             };
             tracing::warn!(cambio = id, "reversión: {error}; se reintenta");
             if Instant::now() >= fin {
-                return Err(ErrorReversion::Fallo(error));
+                break Err(ErrorReversion::Fallo(error));
             }
             tokio::time::sleep(self.tiempos.intervalo).await;
-        }
+        };
+        // Solo si llegó a escribirse (aunque luego fallara: el alta pudo
+        // aplicarse); si el usuario ya estaba, sigue con su contraseña.
+        let aviso = (recrea && enviado.is_some()).then(|| Nota::clave(nota::USUARIO_REVERTIDO));
+        (resultado, aviso)
     }
 
     /// Vigila un grupo aplicado hasta un estado final.
