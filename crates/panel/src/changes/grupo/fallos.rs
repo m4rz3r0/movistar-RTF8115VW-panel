@@ -193,6 +193,10 @@ impl ChangeManager {
     /// Vigila un grupo aplicado hasta un estado final.
     pub(in crate::changes) async fn seguir(&self, ej: Ejecucion) {
         let id = ej.id;
+        if ej.sin_vigilancia() {
+            // Ya quedó aplicado al escribirlo.
+            return;
+        }
         match ej.base {
             Base::Uptime(antes) => match self.esperar_vuelta(antes).await {
                 Ok(()) => {
@@ -339,6 +343,7 @@ impl ChangeManager {
                 nota,
                 riesgo,
                 multi: true,
+                vigilar: true,
             };
             self.vigilar_en_segundo_plano(ej, reserva);
             return;

@@ -61,6 +61,7 @@ nota-sin-campos-escritos = the router doesn't show the fields written
 nota-sin-releer = it couldn't be read again either
 nota-wan-caida = the internet connection was already down before the change: only whether the router answers is watched
 nota-retomada = watching resumed after the panel restarted
+nota-sin-vigilancia = applied without watching: it does not affect the panel's connection to the router
 cambio-error-router = the router didn't make the change
 cambio-error-verificacion = the router doesn't show the values written
 cambio-error-preparar = the step couldn't be prepared

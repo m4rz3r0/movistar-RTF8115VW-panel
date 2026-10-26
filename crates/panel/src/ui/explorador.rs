@@ -384,11 +384,18 @@ fn ficha(d: FuncionDetalle) -> impl IntoView {
     let r = d.resumen.clone();
     let area_href = format!("/explorador/{}", r.area);
     let riesgo = (r.tipo != TipoFuncion::Lectura).then(|| {
-        let texto = t!(
-            "biblioteca-riesgo-vigilancia",
-            riesgo = r.riesgo.etiqueta(),
-            vigilancia = duracion(d.vigilancia_s)
-        );
+        let texto = if d.vigilancia_s == 0 {
+            t!(
+                "biblioteca-riesgo-sin-vigilancia",
+                riesgo = r.riesgo.etiqueta()
+            )
+        } else {
+            t!(
+                "biblioteca-riesgo-vigilancia",
+                riesgo = r.riesgo.etiqueta(),
+                vigilancia = duracion(d.vigilancia_s)
+            )
+        };
         view! { <Insignia estado=r.riesgo.estado() texto /> }
     });
     let bloqueo = r.bloqueada.clone().map(|m| {

@@ -178,6 +178,8 @@ async fn red_bloqueada_mientras_se_retoman_cambios() {
     };
     // Un proceso anterior deja un cambio vigilándose.
     let a = ChangeManager::new(p.state.clone(), tiempos(Duration::from_secs(60)));
+    // UPnP no se vigila: aquí se fuerza, para dejarlo vigilándose.
+    a.vigilar_siempre();
     a.reanudar_pendientes().await;
     let peticion = ChangeRequest {
         funcion: "cbSetUpnpCfg".into(),

@@ -63,6 +63,14 @@ impl ChangeManager {
         let Some(riesgo) = riesgo else {
             return Err(CambioError::SinCambios);
         };
+        let vigila = self
+            .se_vigila(
+                pasos
+                    .iter()
+                    .filter(|p| !p.sin_cambios)
+                    .map(|p| p.funcion.as_str()),
+            )
+            .await;
         let token = nuevo_token();
         let mut pend = lock(&self.pendientes);
         let ahora = Instant::now();
@@ -83,6 +91,7 @@ impl ChangeManager {
             token,
             pasos,
             riesgo,
+            vigila,
         })
     }
 
@@ -245,6 +254,15 @@ impl ChangeManager {
             .filter_map(|i| self.state.catalogo.funcion(&p.pasos[i].req.funcion))
             .map(|f| f.riesgo)
             .fold(plan0.funcion.riesgo, Riesgo::max);
+        // Antes de escribir nada: después, un cambio de la WiFi podría haber
+        // dejado al panel sin saber por dónde llega.
+        let mut vigilar = self
+            .se_vigila(
+                (i0..n)
+                    .filter(|i| !omitir(*i))
+                    .map(|i| p.pasos[i].req.funcion.as_str()),
+            )
+            .await;
         let id = self
             .insertar(&NuevoGrupo {
                 principal: (i0, &plan0),
@@ -300,7 +318,9 @@ impl ChangeManager {
                 .escribir_paso(id, i, &mut plan, &mut pausa, multi)
                 .await
             {
-                Ok(nota) => {
+                Ok((nota, confirmado)) => {
+                    // Sin confirmar lo escrito, se vigila igualmente.
+                    vigilar |= !confirmado;
                     self.marcar_paso(id, i, EstadoPaso::Aplicado, None).await;
                     if let Some(nota) = nota {
                         notas.push(if multi { nota.del_paso(i) } else { nota });
@@ -329,18 +349,30 @@ impl ChangeManager {
                 }
             }
         }
-        let nota = Nota::juntar(notas);
-        self.marcar(id, Estado::Vigilando, None, nota.as_ref())
-            .await;
-        drop(pausa);
-        Ok(Ejecucion {
+        let ej = Ejecucion {
             id,
             pasos: escritos,
             base,
-            nota,
+            nota: Nota::juntar(notas),
             riesgo,
             multi,
-        })
+            vigilar,
+        };
+        // Lo que no puede cortar el acceso queda aplicado ya.
+        if ej.sin_vigilancia() {
+            let nota = Nota::juntar(
+                ej.nota
+                    .clone()
+                    .into_iter()
+                    .chain([Nota::clave(nota::SIN_VIGILANCIA)]),
+            );
+            self.marcar(id, Estado::Aplicado, None, nota.as_ref()).await;
+        } else {
+            self.marcar(id, Estado::Vigilando, None, ej.nota.as_ref())
+                .await;
+        }
+        drop(pausa);
+        Ok(ej)
     }
 
     /// Planifica el paso `i` (no el primero) y lo guarda en `aplicando`.
@@ -386,7 +418,8 @@ impl ChangeManager {
         Ok(Some(plan))
     }
 
-    /// Escribe un paso y lo verifica. Devuelve la nota del paso.
+    /// Escribe un paso y lo verifica. Devuelve la nota del paso y si la
+    /// relectura confirmó lo escrito (si no, el cambio se vigila).
     async fn escribir_paso(
         &self,
         id: i64,
@@ -394,7 +427,7 @@ impl ChangeManager {
         plan: &mut Plan,
         pausa: &mut Option<PauseGuard>,
         multi: bool,
-    ) -> Result<Option<Nota>, FalloPaso> {
+    ) -> Result<(Option<Nota>, bool), FalloPaso> {
         let mut nota = None;
         let comprobacion = match self.enviar(plan).await {
             Ok(()) => self.comprobar(plan, Lado::Nuevo).await,
@@ -433,6 +466,7 @@ impl ChangeManager {
                 }
             },
         };
+        let confirmado = matches!(comprobacion, Comprobacion::Coincide(_));
         match comprobacion {
             Comprobacion::Coincide(nueva) => {
                 if let Some(n) = nueva {
@@ -454,6 +488,6 @@ impl ChangeManager {
                     .await);
             }
         }
-        Ok(nota)
+        Ok((nota, confirmado))
     }
 }

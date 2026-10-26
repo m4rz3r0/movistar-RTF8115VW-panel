@@ -48,6 +48,7 @@ impl ChangeManager {
                     .collect(),
             },
             riesgo: g.riesgo,
+            vigila: g.vigila,
             palabra,
             funcion: req.funcion.clone(),
             instancia: req.instancia.clone(),

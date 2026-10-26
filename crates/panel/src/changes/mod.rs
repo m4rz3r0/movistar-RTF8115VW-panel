@@ -44,6 +44,7 @@
 //! podría borrar la clave. Los registros (`tracing`) y el historial solo
 //! muestran secretos enmascarados; sus valores anteriores van cifrados.
 
+mod acceso;
 mod consultas;
 mod especiales;
 mod grupo;
@@ -57,6 +58,7 @@ mod router;
 mod tipos;
 mod vigilancia;
 
+pub use acceso::Enlace;
 /// Motivo (clave i18n) de un 409 cuando la regla «sin ping» del
 /// cortafuegos ya está en el router.
 pub(crate) use especiales::SIN_PING_YA_PUESTA;
@@ -146,6 +148,11 @@ pub struct ChangeManager {
     /// ([`ChangeManager::forzar_interruptores`]), que se suman a los de
     /// [`crate::validacion_real::sin_validar`].
     interruptores: OnceLock<fn(Funcion3) -> Option<&'static str>>,
+    /// Por dónde llega el panel al router, y cuándo se averiguó
+    /// ([`ChangeManager::enlace`]).
+    enlace: Mutex<Option<(Instant, Enlace)>>,
+    /// Vigilar todos los cambios ([`ChangeManager::vigilar_siempre`]).
+    siempre: std::sync::atomic::AtomicBool,
 }
 
 /// Hueco de `AppState` para el gestor del servidor.
@@ -174,6 +181,8 @@ impl ChangeManager {
             listo: watch::Sender::new(false),
             reanudando: std::sync::atomic::AtomicBool::new(false),
             interruptores: OnceLock::new(),
+            enlace: Mutex::new(None),
+            siempre: std::sync::atomic::AtomicBool::new(false),
         })
     }
 
@@ -184,6 +193,15 @@ impl ChangeManager {
     #[doc(hidden)]
     pub fn forzar_interruptores(&self, f: fn(Funcion3) -> Option<&'static str>) {
         let _ = self.interruptores.set(f);
+    }
+
+    /// Vigila todos los cambios, también los que no pueden cortar el acceso
+    /// del panel. Solo para las pruebas de la reversión automática: el
+    /// servidor no lo usa nunca.
+    #[doc(hidden)]
+    pub fn vigilar_siempre(&self) {
+        self.siempre
+            .store(true, std::sync::atomic::Ordering::SeqCst);
     }
 
     /// Clave del motivo por el que `f` sigue desactivada, o `None` (ver

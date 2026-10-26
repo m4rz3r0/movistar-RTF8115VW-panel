@@ -197,6 +197,9 @@ async fn biblioteca_no_borra_un_protegido_como_alta() {
 async fn reversion_de_un_borrado_avisa_de_la_contrasena() {
     let registro = registro_global();
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    // Borrar un usuario no se vigila: aquí se fuerza, para probar la
+    // reversión automática.
+    p.state.cambios().unwrap().vigilar_siempre();
     reautenticar(&p, &cookie).await;
     let g = ok(
         &p,
@@ -247,6 +250,9 @@ async fn reversion_de_un_borrado_avisa_de_la_contrasena() {
 #[tokio::test]
 async fn reversion_fallida_tras_escribir_tambien_avisa() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    // Borrar un usuario no se vigila: aquí se fuerza, para probar la
+    // reversión automática.
+    p.state.cambios().unwrap().vigilar_siempre();
     reautenticar(&p, &cookie).await;
     let g = ok(
         &p,

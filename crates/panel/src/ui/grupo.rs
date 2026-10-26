@@ -329,9 +329,12 @@ pub fn DialogoGrupo(
             }
         })
     };
-    let vigilancia = move || {
-        let plazo = duracion(grupo.with(|g| g.vigilancia_s));
-        t!("ajustes-grupo-vigilancia", plazo = plazo.as_str())
+    let vigilancia = move || match grupo.with(|g| g.vigilancia_s) {
+        0 => t!("ajustes-grupo-sin-vigilancia"),
+        s => {
+            let plazo = duracion(s);
+            t!("ajustes-grupo-vigilancia", plazo = plazo.as_str())
+        }
     };
 
     let bloqueado = Signal::derive(move || fase.get() != Fase::Revisar);

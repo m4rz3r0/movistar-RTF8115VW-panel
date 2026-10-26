@@ -162,7 +162,7 @@ pub(in crate::ajustes_router) async fn preparar_lote(
         &de_cada_paso,
         prep.token,
         &prep.pasos,
-        prep.riesgo,
+        (prep.riesgo, prep.vigila),
         &|i, param| buscar(&pedidos[i], param).map(str::to_owned),
     );
     for paso in &mut vista.pasos {

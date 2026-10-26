@@ -4,7 +4,7 @@
 
 ## Page
 ajustes-titulo = Settings
-ajustes-desc = Change what you need on the router in plain language. Every change is watched and, if the router stops responding, it is undone on its own.
+ajustes-desc = Change what you need on the router in plain language. Whatever could cut the connection is watched and, if the router stops responding, it is undone on its own.
 ajustes-detalles-tecnicos = Technical details
 ajustes-detalles-tecnicos-desc = For anyone who wants to know which router functions are used underneath.
 ajustes-detalles-lectura = Read
@@ -62,11 +62,11 @@ ajustes-nivel-oculto-desc = Not shown in the operator's web interface.
 
 ## Risks
 ajustes-riesgo-bajo = Low risk
-ajustes-riesgo-bajo-desc = Does not cut the connection. It is watched for a few seconds after applying it.
+ajustes-riesgo-bajo-desc = Does not cut the connection.
 ajustes-riesgo-medio = Medium risk
-ajustes-riesgo-medio-desc = May briefly cut the WiFi or some service. It is watched for a couple of minutes and undone if something fails.
+ajustes-riesgo-medio-desc = May briefly cut the WiFi or some service.
 ajustes-riesgo-alto = High risk
-ajustes-riesgo-alto-desc = May leave you without internet or without access to the router. It is watched for several minutes and undone if something fails.
+ajustes-riesgo-alto-desc = May leave you without internet or without access to the router.
 
 ## Errors
 ajustes-error-tema = That settings section does not exist.
@@ -113,6 +113,7 @@ ajustes-grupo-col-antes = Now
 ajustes-grupo-col-despues = After
 ajustes-grupo-vacio = (empty)
 ajustes-grupo-vigilancia = After applying it, the panel watches the router for { $plazo } and undoes it on its own if the router stops responding or the internet goes down.
+ajustes-grupo-sin-vigilancia = It does not affect the panel's connection to the router: it is applied as soon as the router shows it, with no wait. You can undo it afterwards.
 ajustes-grupo-ninguno = Tick at least one step to apply the change.
 ajustes-grupo-aplicar = Apply
 ajustes-grupo-borrar = Delete

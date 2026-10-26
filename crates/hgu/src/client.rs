@@ -18,6 +18,7 @@ use tokio::{
 };
 
 mod entrar;
+mod local;
 mod por_id;
 pub use entrar::Credenciales;
 pub use por_id::TOPE_POSICIONES;

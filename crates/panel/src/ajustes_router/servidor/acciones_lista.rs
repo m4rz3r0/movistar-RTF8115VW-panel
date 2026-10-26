@@ -135,7 +135,7 @@ pub(super) async fn preparar_en_lista(
         &de_cada_paso,
         prep.token,
         &prep.pasos,
-        prep.riesgo,
+        (prep.riesgo, prep.vigila),
         &|i, param| buscar(&pedidos[i], param).map(str::to_owned),
     );
     Ok(GrupoVista {

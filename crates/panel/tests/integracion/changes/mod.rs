@@ -19,6 +19,7 @@ mod deshacer;
 mod reanudar;
 mod reintentos;
 mod secretos;
+mod sin_vigilancia;
 mod vigilancia;
 
 const LEASES: &str = "cbDhcpV4SvrPoolSetStatic";

@@ -214,16 +214,25 @@ pub fn DialogoCambio(
         .map(|i| t!("biblioteca-dialogo-instancia", i = i))
         .unwrap_or_default();
     let vigilancia = duracion(preparado.vigilancia_s);
-    let nota = if preparado.palabra.is_some() {
-        t!("biblioteca-nota-accion", vigilancia = vigilancia.as_str())
-    } else {
-        t!("biblioteca-nota-cambio", vigilancia = vigilancia.as_str())
+    let sin_vigilancia = preparado.vigilancia_s == 0;
+    let nota = match (preparado.palabra.is_some(), sin_vigilancia) {
+        (true, false) => t!("biblioteca-nota-accion", vigilancia = vigilancia.as_str()),
+        (true, true) => t!("biblioteca-nota-accion-sin-vigilancia"),
+        (false, false) => t!("biblioteca-nota-cambio", vigilancia = vigilancia.as_str()),
+        (false, true) => t!("biblioteca-nota-cambio-sin-vigilancia"),
     };
-    let riesgo = t!(
-        "biblioteca-riesgo-vigilancia",
-        riesgo = preparado.riesgo.etiqueta(),
-        vigilancia = vigilancia.as_str()
-    );
+    let riesgo = if sin_vigilancia {
+        t!(
+            "biblioteca-riesgo-sin-vigilancia",
+            riesgo = preparado.riesgo.etiqueta()
+        )
+    } else {
+        t!(
+            "biblioteca-riesgo-vigilancia",
+            riesgo = preparado.riesgo.etiqueta(),
+            vigilancia = vigilancia.as_str()
+        )
+    };
     let campo_palabra = preparado.palabra.clone().map(|w| {
         let w2 = w.clone();
         view! {

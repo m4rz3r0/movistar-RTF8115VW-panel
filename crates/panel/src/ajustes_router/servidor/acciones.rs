@@ -130,7 +130,7 @@ pub(in crate::ajustes_router) async fn preparar_accion(
         &de_cada_paso,
         prep.token,
         &prep.pasos,
-        prep.riesgo,
+        (prep.riesgo, prep.vigila),
         &|i, param| buscar(&pedidos[i], param).map(str::to_owned),
     ))
 }
@@ -144,7 +144,7 @@ pub(super) fn vista_por_pasos(
     ajustes: &[&Ajuste],
     token: String,
     pasos: &[PasoPreparado],
-    r: Riesgo,
+    (r, vigila): (Riesgo, bool),
     completar: &dyn Fn(usize, &str) -> Option<String>,
 ) -> GrupoVista {
     let efecto = pasos
@@ -167,7 +167,7 @@ pub(super) fn vista_por_pasos(
             .collect(),
         riesgo: riesgo(r),
         efecto,
-        vigilancia_s: g.tiempos().vigilancia(r).as_secs(),
+        vigilancia_s: g.tiempos().plazo(r, vigila).as_secs(),
         detalle: None,
         aviso: None,
         borra: false,
@@ -221,7 +221,7 @@ pub(super) async fn vista_deshacer(
         &ajustes,
         prep.token.clone(),
         &prep.pasos,
-        prep.riesgo,
+        (prep.riesgo, prep.vigila),
         &|i, param| buscar(&actuales[i], param).map(str::to_owned),
     ))
 }

@@ -61,6 +61,7 @@ nota-sin-campos-escritos = el router no muestra los campos escritos
 nota-sin-releer = tampoco se pudo releer
 nota-wan-caida = la conexión a internet ya estaba caída antes del cambio: solo se vigila que el router responda
 nota-retomada = vigilancia retomada tras un reinicio del panel
+nota-sin-vigilancia = aplicado sin vigilancia: no afecta a la conexión del panel con el router
 cambio-error-router = el router no hizo el cambio
 cambio-error-verificacion = el router no muestra los valores escritos
 cambio-error-preparar = no se pudo preparar el paso

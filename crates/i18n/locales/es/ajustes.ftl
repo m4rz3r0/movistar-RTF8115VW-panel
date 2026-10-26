@@ -4,7 +4,7 @@
 
 ## Página
 ajustes-titulo = Ajustes del router
-ajustes-desc = Cambia lo que quieras del router en lenguaje claro. Cada cambio se vigila y, si el router deja de responder, se deshace solo.
+ajustes-desc = Cambia lo que quieras del router en lenguaje claro. Lo que puede cortar la conexión se vigila y, si el router deja de responder, se deshace solo.
 ajustes-detalles-tecnicos = Detalles técnicos
 ajustes-detalles-tecnicos-desc = Para quien quiera saber qué funciones del router se usan por debajo.
 ajustes-detalles-lectura = Lectura
@@ -62,11 +62,11 @@ ajustes-nivel-oculto-desc = No aparece en la web del operador.
 
 ## Riesgos
 ajustes-riesgo-bajo = Riesgo bajo
-ajustes-riesgo-bajo-desc = No corta la conexión. Se vigila unos segundos tras aplicarlo.
+ajustes-riesgo-bajo-desc = No corta la conexión.
 ajustes-riesgo-medio = Riesgo medio
-ajustes-riesgo-medio-desc = Puede cortar un momento la WiFi o algún servicio. Se vigila un par de minutos y se deshace si algo falla.
+ajustes-riesgo-medio-desc = Puede cortar un momento la WiFi o algún servicio.
 ajustes-riesgo-alto = Riesgo alto
-ajustes-riesgo-alto-desc = Puede dejarte sin internet o sin acceso al router. Se vigila varios minutos y se deshace si algo falla.
+ajustes-riesgo-alto-desc = Puede dejarte sin internet o sin acceso al router.
 
 ## Errores
 ajustes-error-tema = Ese tema de ajustes no existe.
@@ -113,6 +113,7 @@ ajustes-grupo-col-antes = Ahora
 ajustes-grupo-col-despues = Después
 ajustes-grupo-vacio = (vacío)
 ajustes-grupo-vigilancia = Tras aplicarlo, el panel vigila el router durante { $plazo } y lo deshace solo si deja de responder o se cae internet.
+ajustes-grupo-sin-vigilancia = No afecta a la conexión del panel con el router: queda aplicado en cuanto el router lo muestra, sin esperar. Puedes deshacerlo después.
 ajustes-grupo-ninguno = Marca al menos un paso para aplicar el cambio.
 ajustes-grupo-aplicar = Aplicar
 ajustes-grupo-borrar = Borrar

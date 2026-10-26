@@ -2,8 +2,8 @@
 //! scripts capturados del router.
 
 use catalogo::{
-    Acceso, Area, Funcion, LecturaPareada, Lista, Origen, Parametro, Partido, Riesgo, Tipo, TipoParam,
-    mask::Mascara,
+    Acceso, Area, Funcion, LecturaPareada, Lista, Origen, Parametro, Partido, Riesgo, Tipo,
+    TipoParam, mask::Mascara,
 };
 use regex::Regex;
 use std::{

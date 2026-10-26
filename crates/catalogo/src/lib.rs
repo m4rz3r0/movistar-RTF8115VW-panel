@@ -275,7 +275,10 @@ riesgo = "bajo"
         // Sin acceso, una escritura no vale; una lectura no lo lleva.
         let sin_acceso = buena.replace("acceso = \"puede_cortar\"\n", "");
         assert!(Catalogo::from_toml(&sin_acceso).is_err());
-        let lectura_con_acceso = base.replace("riesgo = \"bajo\"", "riesgo = \"bajo\"\nacceso = \"no_corta\"");
+        let lectura_con_acceso = base.replace(
+            "riesgo = \"bajo\"",
+            "riesgo = \"bajo\"\nacceso = \"no_corta\"",
+        );
         assert!(Catalogo::from_toml(&lectura_con_acceso).is_err());
     }
 

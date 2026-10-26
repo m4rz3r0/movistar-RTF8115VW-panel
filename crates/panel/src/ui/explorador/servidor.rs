@@ -272,9 +272,12 @@ pub fn detalle(state: &AppState, nombre: &str) -> Result<FuncionDetalle, ServerF
     let f = funcion(state, nombre)?;
     let ident = identidad(f);
     let id_lista = f.lista.as_ref().map(|l| l.id_param.as_str());
+    // Lo que no puede cortar el acceso no se vigila; la WiFi, según por
+    // dónde llegue el panel (aquí se cuenta como si se vigilara).
+    let vigila = f.acceso != Some(catalogo::Acceso::NoCorta);
     let vigilancia_s = state
         .cambios()
-        .map_or(0, |g| g.tiempos().vigilancia(f.riesgo).as_secs());
+        .map_or(0, |g| g.tiempos().plazo(f.riesgo, vigila).as_secs());
     Ok(FuncionDetalle {
         resumen: resumen(state, f),
         etiqueta_area: f.area.etiqueta().to_owned(),
@@ -890,7 +893,7 @@ pub(crate) fn vista_preparado(
         borrar: prep.borrar,
         campos,
         riesgo: riesgo(prep.riesgo),
-        vigilancia_s: g.tiempos().vigilancia(prep.riesgo).as_secs(),
+        vigilancia_s: g.tiempos().plazo(prep.riesgo, prep.vigila).as_secs(),
         palabra: prep.palabra,
         aviso: None,
     }

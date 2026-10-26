@@ -197,6 +197,7 @@ impl ChangeManager {
             base: Base::Wan(wan_antes),
             nota: Some(nota),
             multi: false,
+            vigilar: true,
         };
         self.vigilar_en_segundo_plano(ej, reserva);
     }

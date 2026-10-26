@@ -57,6 +57,16 @@ impl Tiempos {
             Riesgo::Alto => self.alto,
         }
     }
+
+    /// Lo que se vigila un cambio de riesgo `riesgo`: nada si no se vigila
+    /// (`vigila`, ver [`PreparadoGrupo::vigila`]).
+    pub fn plazo(&self, riesgo: Riesgo, vigila: bool) -> Duration {
+        if vigila {
+            self.vigilancia(riesgo)
+        } else {
+            Duration::ZERO
+        }
+    }
 }
 
 /// Petición de cambio.
@@ -140,6 +150,8 @@ pub struct Preparado {
     pub token: String,
     pub diff: Diff,
     pub riesgo: Riesgo,
+    /// Se vigilará tras aplicarlo (ver [`PreparadoGrupo::vigila`]).
+    pub vigila: bool,
     /// Palabra que hay que escribir para confirmar (acciones).
     pub palabra: Option<String>,
     /// Lo que se va a escribir: función, instancia y si es un borrado (lo

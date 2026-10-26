@@ -112,8 +112,12 @@ pub(in crate::ajustes_router) async fn deshacer_ajuste(
             .any(|p| p.diff.campos.iter().any(|c| c.nombre == "rqPwd"));
         let borra = prep.borrar;
         let detalle = prep.instancia.clone().or(instancia);
-        let vista =
-            crate::usuarios_router::servidor::vista(&g, prep.token, &prep.pasos, prep.riesgo);
+        let vista = crate::usuarios_router::servidor::vista(
+            &g,
+            prep.token,
+            &prep.pasos,
+            (prep.riesgo, prep.vigila),
+        );
         return Ok(GrupoVista {
             aviso: aviso.or_else(|| recrea.then(|| t!("usuarios-router-aviso-deshacer"))),
             borra,
@@ -123,7 +127,8 @@ pub(in crate::ajustes_router) async fn deshacer_ajuste(
     }
     // La regla «sin ping» del cortafuegos, también: su deshacer la quita.
     if a.componente == Some(Componente::Cortafuegos) {
-        let vista = super::cortafuegos::vista(&g, prep.token, &prep.pasos, prep.riesgo);
+        let vista =
+            super::cortafuegos::vista(&g, prep.token, &prep.pasos, (prep.riesgo, prep.vigila));
         return Ok(GrupoVista { aviso, ..vista });
     }
     // El ajuste de cada paso (el detalle de un elemento guarda varios en un
@@ -151,7 +156,14 @@ pub(in crate::ajustes_router) async fn deshacer_ajuste(
     }
     let completar = |i: usize, param: &str| buscar(&actuales[i], param).map(str::to_owned);
     let vista = if de_cada_paso.iter().all(|x| x.id == a.id) {
-        vista_grupo(&g, a, prep.token, &prep.pasos, prep.riesgo, &completar)
+        vista_grupo(
+            &g,
+            a,
+            prep.token,
+            &prep.pasos,
+            (prep.riesgo, prep.vigila),
+            &completar,
+        )
     } else {
         super::acciones::vista_por_pasos(
             &g,
@@ -159,7 +171,7 @@ pub(in crate::ajustes_router) async fn deshacer_ajuste(
             &de_cada_paso,
             prep.token,
             &prep.pasos,
-            prep.riesgo,
+            (prep.riesgo, prep.vigila),
             &completar,
         )
     };

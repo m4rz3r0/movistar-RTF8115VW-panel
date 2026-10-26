@@ -112,7 +112,7 @@ pub(super) async fn preparar(op: OperacionUsuario) -> Result<GrupoVista, ServerF
         titulo: Some(TITULO.into()),
     };
     let prep = g.preparar_grupo(grupo).await.map_err(error_ajuste)?;
-    let v = vista(&g, prep.token, &prep.pasos, prep.riesgo);
+    let v = vista(&g, prep.token, &prep.pasos, (prep.riesgo, prep.vigila));
     Ok(GrupoVista {
         detalle: Some(usuario),
         // El deshacer no puede devolverle su contraseña: se avisa antes.
@@ -163,7 +163,7 @@ pub(crate) fn vista(
     g: &ChangeManager,
     token: String,
     pasos: &[PasoPreparado],
-    r: Riesgo,
+    (r, vigila): (Riesgo, bool),
 ) -> GrupoVista {
     GrupoVista {
         token,
@@ -179,7 +179,7 @@ pub(crate) fn vista(
             .collect(),
         riesgo: riesgo(r),
         efecto: None,
-        vigilancia_s: g.tiempos().vigilancia(r).as_secs(),
+        vigilancia_s: g.tiempos().plazo(r, vigila).as_secs(),
         detalle: None,
         aviso: None,
         borra: false,

@@ -278,7 +278,7 @@ pub(crate) fn vista(
     g: &ChangeManager,
     token: String,
     pasos: &[PasoPreparado],
-    r: Riesgo,
+    (r, vigila): (Riesgo, bool),
 ) -> GrupoVista {
     GrupoVista {
         token,
@@ -303,7 +303,7 @@ pub(crate) fn vista(
             .collect(),
         riesgo: riesgo(r),
         efecto: None,
-        vigilancia_s: g.tiempos().vigilancia(r).as_secs(),
+        vigilancia_s: g.tiempos().plazo(r, vigila).as_secs(),
         detalle: None,
         aviso: None,
         borra: false,
@@ -356,7 +356,12 @@ pub(in crate::ajustes_router) async fn preparar_sin_ping() -> Result<GrupoVista,
         titulo: Some(TITULO.into()),
     };
     let prep = g.preparar_grupo(grupo).await.map_err(error_ajuste)?;
-    Ok(vista(&g, prep.token, &prep.pasos, prep.riesgo))
+    Ok(vista(
+        &g,
+        prep.token,
+        &prep.pasos,
+        (prep.riesgo, prep.vigila),
+    ))
 }
 
 #[cfg(test)]
