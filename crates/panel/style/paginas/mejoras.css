@@ -136,10 +136,10 @@
 }
 
 /* «Más consejos»: plegados, sin botón. */
+/* Con el triángulo de los demás desplegables: sin él, parecía texto. */
 .lote-consejos summary {
-  display: flex;
-  align-items: center;
-  min-height: 32px;
+  display: list-item;
+  padding: 6px 0;
   color: var(--suave);
   font-weight: 500;
   cursor: pointer;
