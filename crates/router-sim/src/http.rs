@@ -157,7 +157,7 @@ pub(crate) async fn basic_login(
         s.aplicar_contrasena_pendiente(&mut st, true);
         st.login_falla_con.clone()
     };
-    let good = credenciales_validas(&s, &f, ("loginUsername", "loginPassword"))
+    let good = credenciales_del_panel(&s, &f)
         && rechazada.is_none_or(|r| param(&f, "loginPassword") != Some(mess_userpass(&r).as_str()));
     if !good {
         s.state().inicios_fallidos += 1;
@@ -343,7 +343,9 @@ fn advanced_login(
             .as_deref()
             .is_none_or(|r| param(params, "rqPasswd") != Some(mess_userpass(r).as_str()));
     if !good {
-        return failure("cbCheckLogin", "login");
+        // Como el router real: Result=4 con un usuario o una contraseña
+        // que no valen.
+        return response(&result_node("cbCheckLogin", Vec::new(), "4", "login"));
     }
     let sid = st.next_token();
     st.advanced.insert(sid.clone());
@@ -353,6 +355,20 @@ fn advanced_login(
         "0",
         "",
     ))
+}
+
+/// ¿Vienen en el inicio de sesión básico (`loginUsername`, `loginPassword`,
+/// con XOR 0x1f) las credenciales del usuario fijo de la web? Como en el
+/// router real, su formulario no tiene campo de usuario (va oculto): otro
+/// usuario de la tabla no entra por aquí, solo por `cbCheckLogin`.
+fn credenciales_del_panel(s: &Inner, params: &[(String, String)]) -> bool {
+    match (
+        param(params, "loginUsername"),
+        param(params, "loginPassword"),
+    ) {
+        (Some(u), Some(c)) => mess_userpass(u) == s.user && mess_userpass(c) == s.password(),
+        _ => false,
+    }
 }
 
 /// ¿Vienen en `params` (con XOR 0x1f, en los campos `campos`: usuario y

@@ -326,7 +326,8 @@ async fn login_falla_con_tambien_en_el_avanzado_aunque_el_basico_pase() {
     sim.control.login_falla_con(PASS);
     let mal = avanzado(base, cookie).await.unwrap();
     assert!(
-        !mal.contains("<SessionID>") && mal.contains("<Result>1</Result>"),
+        // Como el router real: Result=4.
+        !mal.contains("<SessionID>") && mal.contains("<Result>4</Result>"),
         "{mal}"
     );
 }

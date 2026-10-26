@@ -341,3 +341,19 @@ async fn texto_del_router_no_se_anota() {
     assert!(!html.contains(TEXTO), "en el HTML de /historial");
     assert_eq!(p.sim.control.usuarios(), originales());
 }
+
+/// Si el router responde bien al cambio de otro usuario pero no guarda la
+/// contraseña, la prueba de acceso (básico con el panel, avanzado con el
+/// otro) no entra: el cambio no se da por hecho.
+#[tokio::test]
+async fn cambiar_otro_sin_guardar_no_entra() {
+    let (p, cookie) = con_reautenticacion().await;
+    p.sim.control.ignore_next_write();
+    let (status, body) = cambiar(&p, &cookie, INVITADO, "clave-nueva-1", "user").await;
+    assert_eq!(status, 502, "{body}");
+    assert!(body.contains("no entra con la contraseña nueva"), "{body}");
+    assert_eq!(
+        p.sim.control.contrasena_de(INVITADO).as_deref(),
+        Some("clave-de-prueba-1")
+    );
+}

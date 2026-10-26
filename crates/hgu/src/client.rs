@@ -17,7 +17,9 @@ use tokio::{
     time::Instant,
 };
 
+mod entrar;
 mod por_id;
+pub use entrar::Credenciales;
 pub use por_id::TOPE_POSICIONES;
 
 /// Lecturas seguidas como mucho en un [`Turno`] antes de ceder el cerrojo
@@ -340,21 +342,6 @@ impl Client {
         self.page_locked(&mut st, path).await
     }
 
-    /// Inicia sesión, la básica y la avanzada, sin leer nada más: comprueba
-    /// unas credenciales que quizá no pueden leer otra cosa (las de otro
-    /// usuario de la web del router). Error si el router las rechaza.
-    pub async fn entrar(&self) -> Result<(), Error> {
-        let mut st = self.shared.state.lock().await;
-        for _ in 0..2 {
-            if self.ensure_advanced(&mut st).await? {
-                return Ok(());
-            }
-        }
-        Err(Error::SessionExpired(
-            "el router sigue pidiendo iniciar sesión".into(),
-        ))
-    }
-
     /// Cierra la sesión en el router (best effort) y olvida las cookies.
     pub async fn logout(&self) {
         let mut st = self.shared.state.lock().await;
@@ -466,11 +453,25 @@ impl Client {
         if st.basic_ok {
             return Ok(());
         }
-        tracing::debug!("login básico");
         let (user, password) = {
             let cfg = st.cfg.as_ref().ok_or(Error::NoConfigurado)?;
-            (mess_userpass(&cfg.user), mess_userpass(&cfg.password))
+            (cfg.user.clone(), cfg.password.clone())
         };
+        self.login_basico(st, &user, &password).await
+    }
+
+    /// Inicio de sesión básico (`te_acceso_router.cgi`) con `usuario` y
+    /// `contrasena` (en claro; viajan con [`mess_userpass`]). En el router
+    /// real solo vale el usuario fijo de la web: su formulario no tiene
+    /// campo de usuario.
+    async fn login_basico(
+        &self,
+        st: &mut State,
+        usuario: &str,
+        contrasena: &str,
+    ) -> Result<(), Error> {
+        tracing::debug!("login básico");
+        let (user, password) = (mess_userpass(usuario), mess_userpass(contrasena));
         self.send(st, Method::GET, "/", None).await?;
         let body = form_body(&[
             ("curWebPage", "/te_wifi.asp"),
@@ -499,11 +500,26 @@ impl Client {
             return Ok(true);
         }
         self.ensure_basic(st).await?;
-        tracing::debug!("login avanzado");
         let (user, password) = {
             let cfg = st.cfg.as_ref().ok_or(Error::NoConfigurado)?;
-            (mess_userpass(&cfg.user), mess_userpass(&cfg.password))
+            (cfg.user.clone(), cfg.password.clone())
         };
+        self.login_avanzado(st, &user, &password).await
+    }
+
+    /// Inicio de sesión avanzado (`cbCheckLogin`) con `usuario` y
+    /// `contrasena` (en claro; viajan con [`mess_userpass`]), sobre la
+    /// sesión básica que ya haya. `Ok(false)`: la básica había caducado (ya
+    /// invalidada). Un usuario o una contraseña que no valen (el router
+    /// real responde `Result=4`) dan `Auth`.
+    async fn login_avanzado(
+        &self,
+        st: &mut State,
+        usuario: &str,
+        contrasena: &str,
+    ) -> Result<bool, Error> {
+        tracing::debug!("login avanzado");
+        let (user, password) = (mess_userpass(usuario), mess_userpass(contrasena));
         let body = form_body(&[
             ("rqUsername", &user),
             ("rqPasswd", &password),

@@ -333,7 +333,7 @@ async fn en_el_router(
         contrasena: nueva.to_owned(),
         ..panel.clone()
     };
-    if !entra(state, &otro).await {
+    if !entra(state, panel, &otro).await {
         tracing::warn!("el usuario cambiado no entra en el router con la contraseña nueva");
         return Err(Fallo::NoEntra);
     }
@@ -345,12 +345,23 @@ async fn en_el_router(
     Ok(())
 }
 
-/// ¿Entra `c` en el router? Solo los dos inicios de sesión (otro usuario
-/// quizá no puede leer nada más), con un cliente y una sesión aparte que
+/// ¿Entra `otro` en el router? El inicio de sesión básico con las
+/// credenciales del panel (`panel`: en el router real esa página solo
+/// admite el usuario fijo de la web) y el avanzado con las de `otro`, sin
+/// leer nada más (quizá no puede), con un cliente y una sesión aparte que
 /// se cierra; si tarda más de [`AppState::espera_prueba_router`], no.
-async fn entra(state: &AppState, c: &CredencialesRouter) -> bool {
-    let cliente = hgu::Client::new(c.client_config(&state.cfg));
-    let r = tokio::time::timeout(state.espera_prueba_router, cliente.entrar()).await;
+async fn entra(state: &AppState, panel: &CredencialesRouter, otro: &CredencialesRouter) -> bool {
+    let cliente = hgu::Client::new(panel.client_config(&state.cfg));
+    let prueba = cliente.entrar_como(credenciales(panel), credenciales(otro));
+    let r = tokio::time::timeout(state.espera_prueba_router, prueba).await;
     cliente.logout().await;
     matches!(r, Ok(Ok(())))
+}
+
+/// Las credenciales de `c` para [`hgu::Client::entrar_como`].
+fn credenciales(c: &CredencialesRouter) -> hgu::client::Credenciales<'_> {
+    hgu::client::Credenciales {
+        usuario: &c.usuario,
+        contrasena: &c.contrasena,
+    }
 }
