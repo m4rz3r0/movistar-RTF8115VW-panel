@@ -1,6 +1,6 @@
 [package]
 name = "router-sim"
-version = "0.9.0"
+version = "0.9.1"
 description = "Router Askey RTF8115VW simulado para pruebas y desarrollo"
 default-run = "router-sim"
 edition.workspace = true
