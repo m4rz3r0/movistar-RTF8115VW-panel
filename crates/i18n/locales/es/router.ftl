@@ -106,6 +106,7 @@ usuarios-router-error-no-entra = El router respondió, pero el usuario no entra 
 usuarios-router-error-grupo = El usuario ya entra con la contraseña nueva, pero el router no muestra el tipo de cuenta pedido. Vuelve a leer la lista.
 usuarios-router-historial-nota = La contraseña nueva no se guarda en el panel: este cambio no se puede deshacer desde aquí.
 usuarios-router-error-uno-cada-vez = Los usuarios se borran de uno en uno.
+usuarios-router-error-nombre-baja = Ese nombre no se puede borrar desde el panel: lleva «:» o caracteres de control.
 usuarios-router-error-grupo-sistema = Ese tipo de cuenta es el del operador: elige Administrador o Usuario.
 usuarios-router-error-grupo-no-valido = Elige un tipo de cuenta: Administrador o Usuario.
 usuarios-router-nota-revertido = Se volvió a crear el usuario borrado con una contraseña nueva que el panel no guarda: cámbiala en Ajustes → Seguridad → Usuarios de la web del router para poder usarlo.

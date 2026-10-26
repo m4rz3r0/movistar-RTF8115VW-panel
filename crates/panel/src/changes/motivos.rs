@@ -17,6 +17,9 @@ pub const USUARIO_GRUPO_NO_VALIDO: &str = "usuarios-router-error-grupo-no-valido
 /// Motivo de [`CambioError::Invalida`] con un nombre de usuario que no es de
 /// 4 a 20 letras, cifras o «_». Es la clave i18n del texto.
 pub const USUARIO_NOMBRE_NO_VALIDO: &str = "usuarios-router-error-nombre";
+/// Motivo de [`CambioError::Invalida`] al pedir la baja de un nombre con
+/// «:» o caracteres de control. Es la clave i18n del texto.
+pub const USUARIO_NOMBRE_BAJA_NO_VALIDO: &str = "usuarios-router-error-nombre-baja";
 
 /// Código HTTP y clave i18n de los motivos del gestor que las pantallas
 /// enseñan con su propio texto: los de los usuarios del router, la regla
@@ -24,8 +27,9 @@ pub const USUARIO_NOMBRE_NO_VALIDO: &str = "usuarios-router-error-nombre";
 /// `None`: cada pantalla da su texto genérico.
 pub fn motivo_con_texto(e: &CambioError) -> Option<(u16, &'static str)> {
     use crate::validacion_real::{Funcion3, motivo};
-    const DE_USUARIOS: [&str; 4] = [
+    const DE_USUARIOS: [&str; 5] = [
         USUARIO_UNO_CADA_VEZ,
+        USUARIO_NOMBRE_BAJA_NO_VALIDO,
         USUARIO_GRUPO_SISTEMA,
         USUARIO_GRUPO_NO_VALIDO,
         USUARIO_NOMBRE_NO_VALIDO,

@@ -345,3 +345,41 @@ async fn crear_y_borrar_exigen_reautenticacion() {
     assert_eq!(esperar_final(&p, &cookie, id).await["estado"], "Aplicado");
     assert!(!p.sim.control.usuarios().iter().any(|(u, _)| u == "prueba1"));
 }
+
+/// Un nombre con «:» (el separador de la lista de bajas) o con caracteres
+/// de control no se borra, ni desde la tarjeta ni desde la Biblioteca: 400
+/// con su motivo y sin escribir.
+#[tokio::test]
+async fn baja_rechaza_nombres_con_dos_puntos_o_control() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    reautenticar(&p, &cookie).await;
+    let mut respuestas = Vec::new();
+    for nombre in ["invitado1:operador01", "invi\u{7}tado1"] {
+        respuestas.push(
+            llamar(
+                &p,
+                "preparar_usuario_router",
+                json!({ "op": { "Borrar": { "usuario": nombre } } }),
+                Some(&cookie),
+            )
+            .await,
+        );
+        respuestas.push(biblioteca(&p, &cookie, "cbAddUser", Some(nombre), json!([]), true).await);
+    }
+    for (status, body) in respuestas {
+        assert_eq!(status, 400, "{body}");
+        assert!(body.contains("no se puede borrar desde el panel"), "{body}");
+    }
+    // Por `cbDeleteUser`, la validación del parámetro ya lo para antes.
+    let (status, body) = biblioteca(
+        &p,
+        &cookie,
+        "cbDeleteUser",
+        None,
+        json!([["rqDelList", "invi\u{7}tado1:"]]),
+        false,
+    )
+    .await;
+    assert_eq!(status, 400, "{body}");
+    assert!(p.sim.control.writes().is_empty());
+}

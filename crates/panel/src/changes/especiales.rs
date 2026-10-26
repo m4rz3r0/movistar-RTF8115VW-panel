@@ -16,14 +16,18 @@
 //! valen para la tarjeta, la Biblioteca y cualquier petición fabricada:
 //! nunca el usuario con el que entra el panel ni el del operador (`system`),
 //! un solo nombre por baja, grupo `user` o `admin`, el nombre de
-//! `^\w{4,20}$` y sin repetir, y la contraseña de 8 a 16 caracteres.
+//! `^\w{4,20}$` y sin repetir, la contraseña de 8 a 16 caracteres y, al
+//! borrar, un nombre sin «:» ni caracteres de control.
 //!
 //! La regla «sin ping» del cortafuegos tiene su propio módulo
 //! ([`cortafuegos`]).
 
 use super::*;
 use crate::validacion_real::Funcion3;
-use hgu::fmt::{ALTA_USUARIO, BAJA_USUARIO, lista_de_baja, nombres_de_baja, usuario_valido};
+use hgu::fmt::{
+    ALTA_USUARIO, BAJA_USUARIO, lista_de_baja, nombre_de_baja_valido, nombres_de_baja,
+    usuario_valido,
+};
 use hgu::xml::XmlNode;
 
 mod cortafuegos;
@@ -246,6 +250,11 @@ impl ChangeManager {
             }
         };
         if let Some(nombres) = bajas {
+            // Ni «:» (borraría otros en `rqDelList`) ni caracteres de
+            // control, aunque no se exija la forma de un nombre nuevo.
+            if nombres.iter().any(|n| !nombre_de_baja_valido(n)) {
+                return Err(CambioError::Invalida(USUARIO_NOMBRE_BAJA_NO_VALIDO.into()));
+            }
             if nombres.iter().any(|n| protegido(n)) {
                 return Err(bloqueado());
             }

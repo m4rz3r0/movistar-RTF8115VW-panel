@@ -89,6 +89,14 @@ pub fn nombres_de_baja(lista: &str) -> Vec<&str> {
     lista.split(':').filter(|n| !n.is_empty()).collect()
 }
 
+/// ¿Se puede pedir la baja de `nombre`? No vacío, sin `:` (el separador de
+/// [`lista_de_baja`]: borraría otros) y sin caracteres de control. Es más
+/// laxo que [`usuario_valido`]: un usuario creado fuera del panel puede no
+/// cumplir su regla y aun así borrarse.
+pub fn nombre_de_baja_valido(nombre: &str) -> bool {
+    !nombre.is_empty() && !nombre.contains(':') && !nombre.chars().any(char::is_control)
+}
+
 /// ¿Vale `nombre` como usuario nuevo? La regla de `js/user_profile.js`,
 /// `/^\w{4,20}$/`: de 4 a 20 letras ASCII, cifras o `_`.
 pub fn usuario_valido(nombre: &str) -> bool {
@@ -199,5 +207,15 @@ mod tests {
         assert_eq!(v["d"], "x y");
         assert_eq!(v["neg"], "-3");
         assert_eq!(v.len(), 4);
+    }
+
+    #[test]
+    fn nombre_de_baja_sin_dos_puntos_ni_control() {
+        assert!(nombre_de_baja_valido("invitado1"));
+        // Creado fuera del panel, con otra forma: se puede borrar.
+        assert!(nombre_de_baja_valido("ana.o-1"));
+        for n in ["", "a:b", "a\u{7}b", "a\nb"] {
+            assert!(!nombre_de_baja_valido(n), "{n:?}");
+        }
     }
 }

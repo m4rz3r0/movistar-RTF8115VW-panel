@@ -21,7 +21,8 @@ use ajustes::TipoCampo;
 use axum::http::StatusCode;
 use catalogo::Riesgo;
 use hgu::fmt::{
-    ALTA_USUARIO, CAMBIO_OTRO, PAGINA_USUARIOS, parametros_cambio_otro, usuario_valido,
+    ALTA_USUARIO, CAMBIO_OTRO, PAGINA_USUARIOS, nombre_de_baja_valido, parametros_cambio_otro,
+    usuario_valido,
 };
 use std::collections::BTreeMap;
 
@@ -61,6 +62,14 @@ pub(super) async fn preparar(op: OperacionUsuario) -> Result<GrupoVista, ServerF
         }
         validar_forma_hasta(contrasena, MAX_OTRO)
             .map_err(|e| fallo(StatusCode::BAD_REQUEST, texto_error_otro(e)))?;
+    }
+    if let OperacionUsuario::Borrar { usuario } = &op
+        && !nombre_de_baja_valido(usuario)
+    {
+        return Err(fallo(
+            StatusCode::BAD_REQUEST,
+            t!("usuarios-router-error-nombre-baja"),
+        ));
     }
     let g = gestor(&state)?;
     if g.activo().is_some() {
