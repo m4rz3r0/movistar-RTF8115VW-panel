@@ -38,6 +38,8 @@ pub async fn panel_rapido(timeout: Duration) -> Panel {
     cfg.timeout = timeout;
     cfg.min_gap = Duration::from_millis(1);
     p.state.hgu = hgu::Client::new(cfg);
+    // Un solo cliente del router para las páginas, `/salud` y el gestor.
+    p.app = panel::build_router(p.state.clone());
     p
 }
 
