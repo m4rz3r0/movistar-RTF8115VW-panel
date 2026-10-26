@@ -126,7 +126,11 @@ test.describe("usuarios del router", () => {
       }
       await expect(fila(page, nuevo)).toHaveCount(1, { timeout: PLAZO_CAMBIO });
       await sinDesbordamiento(page, `deshecho ${ancho}`);
-      expect(errores, "errores o avisos en la consola").toEqual([]);
+      // El 401 que abre el diálogo de reautenticación es el esperado.
+      expect(
+        errores.filter((e) => !/status of 401/.test(e)),
+        "errores o avisos en la consola",
+      ).toEqual([]);
     });
   }
 });
