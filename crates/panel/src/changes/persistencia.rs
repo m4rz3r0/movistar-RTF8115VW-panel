@@ -1,5 +1,6 @@
 //! Persistencia de los cambios y sus pasos en la base de datos.
 
+use super::especiales::funcion_enviada;
 use super::*;
 
 impl ChangeManager {
@@ -76,7 +77,7 @@ impl ChangeManager {
         .bind(now)
         .bind(g.usuario)
         .bind(g.usuario)
-        .bind(&plan.funcion.name)
+        .bind(funcion_enviada(plan))
         .bind(&plan.instancia)
         .bind(riesgo_str(g.riesgo))
         .bind(d.operacion)
@@ -92,10 +93,20 @@ impl ChangeManager {
         .fetch_one(&mut *tx)
         .await?;
         for (i, paso) in g.pasos.iter().enumerate() {
-            let (instancia, datos, estado) = if i == i0 {
-                (&plan.instancia, &d, EstadoPaso::Aplicando)
+            let (funcion, instancia, datos, estado) = if i == i0 {
+                (
+                    funcion_enviada(plan),
+                    &plan.instancia,
+                    &d,
+                    EstadoPaso::Aplicando,
+                )
             } else {
-                (&paso.req.instancia, &DatosPlan::vacio(), g.estados[i])
+                (
+                    paso.req.funcion.as_str(),
+                    &paso.req.instancia,
+                    &DatosPlan::vacio(),
+                    g.estados[i],
+                )
             };
             sqlx::query(
                 "INSERT INTO cambio_pasos (cambio_id, orden, funcion, instancia, etiqueta, \
@@ -105,7 +116,7 @@ impl ChangeManager {
             )
             .bind(id)
             .bind(i as i64)
-            .bind(&paso.req.funcion)
+            .bind(funcion)
             .bind(instancia)
             .bind(&paso.etiqueta)
             .bind(datos.operacion)
@@ -140,11 +151,13 @@ impl ChangeManager {
     ) -> Result<(), sqlx::Error> {
         let d = self.datos_plan(plan);
         sqlx::query(
-            "UPDATE cambio_pasos SET instancia = ?, operacion = ?, solicitud = ?, diff = ?, \
+            "UPDATE cambio_pasos SET funcion = ?, instancia = ?, operacion = ?, solicitud = ?, \
+             diff = ?, \
              valores_nuevos = ?, valores_nuevos_cifrados = ?, valores_anteriores = ?, \
              valores_anteriores_cifrados = ?, ids_antes = ?, estado = 'aplicando' \
              WHERE cambio_id = ? AND orden = ?",
         )
+        .bind(funcion_enviada(plan))
         .bind(&plan.instancia)
         .bind(d.operacion)
         .bind(&d.solicitud)

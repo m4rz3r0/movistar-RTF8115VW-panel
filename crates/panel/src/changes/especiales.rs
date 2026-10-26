@@ -377,6 +377,19 @@ impl ChangeManager {
     }
 }
 
+/// La función que de verdad se envía con `plan`, la que se anota: la baja
+/// de una instancia especial es otra escritura (`cbDeleteUser`, o la baja
+/// de la regla del cortafuegos; ver [`Especial::baja`]).
+pub(super) fn funcion_enviada(plan: &Plan) -> &str {
+    match Especial::de(&plan.funcion) {
+        Some(e) if plan.operacion == Operacion::Borrar => {
+            e.baja(plan.instancia.as_deref().unwrap_or_default(), &plan.valores)
+                .0
+        }
+        _ => &plan.funcion.name,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

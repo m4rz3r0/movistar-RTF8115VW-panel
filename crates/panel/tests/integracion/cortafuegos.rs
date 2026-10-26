@@ -405,3 +405,31 @@ async fn deshacer_sin_ping_que_borra_de_mas_no_se_da_por_bueno() {
         assert!(error.contains(motivo), "{motivo}: {error}");
     }
 }
+
+/// El deshacer de «sin ping» anota la baja que envía (no el alta), y
+/// deshacerlo a su vez vuelve a poner la regla.
+#[tokio::test]
+async fn baja_de_sin_ping_anota_la_funcion_que_se_envia() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    let id = aplicar_sin_ping(&p, &cookie).await;
+    let d = ok(&p, "deshacer_ajuste", json!({ "cambio": id }), &cookie).await;
+    let baja = aplicar_ajuste(&p, &cookie, &d).await;
+    let (cambio, paso): (String, String) = sqlx::query_as(
+        "SELECT c.funcion, p.funcion FROM changes c JOIN cambio_pasos p ON p.cambio_id = c.id \
+         WHERE c.id = ?",
+    )
+    .bind(baja)
+    .fetch_one(&p.state.db)
+    .await
+    .unwrap();
+    let remove = hgu::cortafuegos::BAJA;
+    assert_eq!((cambio.as_str(), paso.as_str()), (remove, remove));
+    let d = ok(&p, "deshacer_ajuste", json!({ "cambio": baja }), &cookie).await;
+    aplicar_ajuste(&p, &cookie, &d).await;
+    assert!(
+        p.sim.control.cortafuegos()[0]
+            .reglas
+            .iter()
+            .any(es_sin_ping)
+    );
+}

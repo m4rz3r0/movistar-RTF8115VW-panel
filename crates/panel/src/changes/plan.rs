@@ -397,8 +397,11 @@ pub(super) fn inversa(plan: &Plan) -> Option<ChangeRequest> {
     // Un usuario borrado vuelve con `cbAddUser`, aunque el borrado llegase
     // como `cbDeleteUser` (de la Biblioteca); la contraseña la pone quien
     // lo deshace (`especiales::con_contrasena_nueva`).
-    let funcion = match plan.operacion {
-        Operacion::Borrar if plan.lectura == Lectura::Usuarios => hgu::fmt::ALTA_USUARIO.to_owned(),
+    // Igual la regla del cortafuegos, cuya baja se anota con la función
+    // que se envía (la de quitar).
+    let funcion = match (plan.operacion, &plan.lectura) {
+        (Operacion::Borrar, Lectura::Usuarios) => hgu::fmt::ALTA_USUARIO.to_owned(),
+        (Operacion::Borrar, Lectura::Cortafuegos) => hgu::cortafuegos::ALTA.to_owned(),
         _ => f.name.clone(),
     };
     // La baja de la regla «sin ping» va atada al filtro donde se creó.

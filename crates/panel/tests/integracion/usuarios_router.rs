@@ -357,3 +357,33 @@ async fn cambiar_otro_sin_guardar_no_entra() {
         Some("clave-de-prueba-1")
     );
 }
+
+/// La función que se anota de una baja es la que se envía (`cbDeleteUser`),
+/// en el cambio, en su paso y en el detalle del Historial; y su deshacer
+/// sigue funcionando.
+#[tokio::test]
+async fn baja_anota_la_funcion_que_se_envia() {
+    let (p, cookie) = con_reautenticacion().await;
+    let grupo = preparado_ok(&p, &cookie, borrar(INVITADO)).await;
+    let id = aplicar_ajuste(&p, &cookie, &grupo).await;
+    let (cambio, paso): (String, String) = sqlx::query_as(
+        "SELECT c.funcion, p.funcion FROM changes c JOIN cambio_pasos p ON p.cambio_id = c.id \
+         WHERE c.id = ?",
+    )
+    .bind(id)
+    .fetch_one(&p.state.db)
+    .await
+    .unwrap();
+    assert_eq!(
+        (cambio.as_str(), paso.as_str()),
+        ("cbDeleteUser", "cbDeleteUser")
+    );
+    let html = pagina(&p, &cookie, "/historial").await;
+    assert!(
+        html.contains("cbDeleteUser"),
+        "sin cbDeleteUser en /historial"
+    );
+    let d = ok(&p, "deshacer_ajuste", json!({ "cambio": id }), &cookie).await;
+    aplicar_ajuste(&p, &cookie, &d).await;
+    assert!(p.sim.control.usuarios().contains(&par(INVITADO, "user")));
+}
