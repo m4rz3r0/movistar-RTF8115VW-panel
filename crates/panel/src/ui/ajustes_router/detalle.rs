@@ -14,7 +14,7 @@ use super::aviso::Seguimiento;
 use super::campo::Campo;
 use super::consulta;
 use super::edicion::Edicion;
-use super::piezas::{ayuda, detalles_tecnicos, dom, enfocar, fila, motivos};
+use super::piezas::{detalles_tecnicos, dom, enfocar, fila, motivos};
 use super::rejilla::Pagina;
 use super::seleccion::nombre;
 use crate::ajustes_router::{
@@ -25,40 +25,15 @@ use crate::ui::comun::Insignia;
 use crate::ui::explorador::texto_error;
 use crate::ui::i18n::traducir;
 use crate::ui::{Estado, IconoEstado};
-use ajustes::Nivel;
 use leptos::{ev, prelude::*, task::spawn_local};
 use std::collections::{BTreeMap, HashMap};
 
+mod cabeza;
+
+use cabeza::cabeza_columna;
+
 /// Id del título del detalle (recibe el foco al abrirlo).
 pub(crate) const ID_TITULO_DETALLE: &str = "detalle-titulo";
-
-/// Título de la columna de un ajuste, por su nivel.
-fn titulo_columna(n: Nivel) -> String {
-    match n {
-        Nivel::Basico => t!("ajustes-detalle-basico"),
-        Nivel::Avanzado => t!("ajustes-nivel-avanzado"),
-        Nivel::Oculto => t!("ajustes-nivel-oculto"),
-    }
-}
-
-/// Título, descripción y ayuda de la columna del ajuste `a` (`id`, el id
-/// de su título). Lo oculto dice qué significa. La única columna de un
-/// elemento se titula «Opciones» (su nivel solo dice algo junto a otras).
-fn cabeza_columna(a: &AjusteVista, id: String, unica: bool) -> impl IntoView + use<> {
-    let titulo = if unica {
-        t!("ajustes-detalle-opciones")
-    } else {
-        titulo_columna(a.nivel)
-    };
-    let oculto = (a.nivel == Nivel::Oculto)
-        .then(|| view! { <p class="detalle-nota-oculto">{t!("ajustes-nivel-oculto-desc")}</p> });
-    view! {
-        <h3 id=id>{titulo}</h3>
-        {oculto}
-        <p class="ajuste-desc">{traducir(&format!("{}-desc", a.clave), None)}</p>
-        {ayuda(a)}
-    }
-}
 
 /// ¿Se editan en el detalle los campos de `a`? Ni una lista (sus campos son
 /// la plantilla de una instancia nueva) ni un ajuste con componente propio.
@@ -66,12 +41,20 @@ fn se_edita(a: &AjusteVista) -> bool {
     !a.lista && a.componente.is_none()
 }
 
-/// ¿Se pinta `a` dentro de las conexiones a internet de `e` (la fibra)? Sí
-/// si es un ajuste suelto sin componente y las conexiones se leyeron; si
-/// no, va en su propia columna.
-fn junto_a_conexion(a: &AjusteVista, e: &ElementoVista) -> bool {
+/// ¿Acompaña `a` a las conexiones a internet de `e` (la fibra)? Sí si es
+/// un ajuste suelto sin componente en un elemento con ellas.
+fn acompana_a_conexion(a: &AjusteVista, e: &ElementoVista) -> bool {
     a.componente.is_none()
         && !a.lista
+        && e.ajustes
+            .iter()
+            .any(|x| x.componente.as_deref() == Some(super::conexion::CONEXION))
+}
+
+/// ¿Se pinta `a` dentro de las conexiones a internet de `e` (la fibra)? Sí
+/// si las acompaña y se leyeron; si no, va en su propia columna.
+fn junto_a_conexion(a: &AjusteVista, e: &ElementoVista) -> bool {
+    acompana_a_conexion(a, e)
         && e.ajustes.iter().any(|x| {
             x.componente.as_deref() == Some(super::conexion::CONEXION)
                 && x.estado == EstadoLectura::Leido
@@ -114,7 +97,7 @@ fn columna_de_consulta(a: &AjusteVista, unica: bool, e: &ElementoVista) -> impl 
     };
     view! {
         <section class="detalle-columna" aria-labelledby=col>
-            {cabeza_columna(a, titulo, unica)}
+            {cabeza_columna(a, titulo, unica, false)}
             {cuerpo}
             {detalles_tecnicos(&a.clave, &a.tecnico)}
         </section>
@@ -128,7 +111,7 @@ fn columna(
     ed: Edicion,
     editable: bool,
     bloqueado: Signal<bool>,
-    unica: bool,
+    (unica, acompana): (bool, bool),
 ) -> impl IntoView + use<> {
     let prefijo = dom(a);
     let col = format!("{prefijo}-columna");
@@ -165,7 +148,7 @@ fn columna(
     });
     view! {
         <section class="detalle-columna" aria-labelledby=col>
-            {cabeza_columna(a, col_titulo, unica)}
+            {cabeza_columna(a, col_titulo, unica, acompana)}
             <div class="ajuste-campos">{campos}</div>
             {motivos(&a.campos)}
             {efecto}
@@ -279,7 +262,14 @@ pub(crate) fn Detalle(e: ElementoVista, registro: Registro) -> impl IntoView {
     let columnas = leidos
         .iter()
         .map(|a| match ediciones.iter().find(|(id, _, _)| *id == a.id) {
-            Some((_, _, ed)) => columna(a, *ed, editable, preparando.into(), unica).into_any(),
+            Some((_, _, ed)) => columna(
+                a,
+                *ed,
+                editable,
+                preparando.into(),
+                (unica, acompana_a_conexion(a, &e)),
+            )
+            .into_any(),
             None => columna_de_consulta(a, unica, &e).into_any(),
         })
         .collect_view();
