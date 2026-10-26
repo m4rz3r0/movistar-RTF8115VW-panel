@@ -3808,8 +3808,9 @@ opciones = [["1", "Activado"], ["0", "Desactivado"]]
 
 [[funcion.parametro]]
 nombre = "warmline_hotline_flag"
-etiqueta = "Modo línea directa"
+etiqueta = "Modo línea directa (siempre 1)"
 tipo = "int"
+fijo = "1"
 
 [[funcion.parametro]]
 nombre = "warmline_hotline"
@@ -3834,8 +3835,9 @@ tipo = "int"
 
 [[funcion.parametro]]
 nombre = "web"
-etiqueta = "Origen del formulario (BASIC/ADVANCED)"
+etiqueta = "Origen del formulario (siempre ADVANCED)"
 tipo = "text"
+fijo = "ADVANCED"
 
 [[funcion.parametro]]
 nombre = "auth_username"

@@ -1812,12 +1812,12 @@ Lectura pareada: `cbGetVoiceLine` con `interwork_id={interwork_id}`
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
 | `adm_state` | Activado | enum | `1` Activado, `0` Desactivado |
-| `warmline_hotline_flag` | Modo línea directa | int |  |
+| `warmline_hotline_flag` | Modo línea directa (siempre 1) | int |  |
 | `warmline_hotline` | Línea directa (hotline/warmline) | bool |  |
 | `warmline_hotline_number` | Número de la línea directa | text |  |
 | `warmline_hotline_timeout` | Espera de la warmline (s) | int |  |
 | `interwork_id` | Línea (id) | int |  |
-| `web` | Origen del formulario (BASIC/ADVANCED) | text |  |
+| `web` | Origen del formulario (siempre ADVANCED) | text |  |
 | `auth_username` | Usuario SIP | text |  |
 | `auth_password` | Contraseña SIP | secret |  |
 | `vad_state` | Detección de silencio (VAD) | enum | `1` Activado, `0` Desactivado |
