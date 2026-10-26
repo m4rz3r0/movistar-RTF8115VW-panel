@@ -398,11 +398,11 @@ Elementos de la respuesta: `adm_state`, `dhcpv4_opt60`, `dhcpv4_opt60_ex`, `dhcp
 
 Configura un pool DHCPv4 (rango, máscara, puerta de enlace, DNS, concesión, IP reservadas y condiciones).
 
-**Comprobada en el router real:** pruebas del 2026-10-26, cambios 39 y 40
+**Sin comprobar en el router real:** el panel no la escribe.
 
 Lectura pareada: `cbGetDhcpv4ServerPool` con `rtm_cfg_dhcpv4_svr_pool_0i={rtm_cfg_dhcpv4_svr_pool_id}`
 
-Lista: instancia por `rtm_cfg_dhcpv4_svr_pool_id`; `del=DEL` borra
+Lista: instancia por `rtm_cfg_dhcpv4_svr_pool_id`
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|

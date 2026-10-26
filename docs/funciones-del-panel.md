@@ -49,9 +49,8 @@ En la 1.0 están comprobadas:
   cortafuegos (`scbidirectionalflt.cmd?action=add`/`remove`).
 - **WiFi:** cada red (`cbSetWifiAccPt`, también el WPS) y las radios
   (`cbSetWifi`).
-- **Red de casa:** DHCP (`cbSetDhcpv4ServerPool`), sus reservas
-  (`cbDhcpV4SvrPoolSetStatic`), IPv6 de la red (`cbSetLanIPv6Config`) y
-  relé DNS (`cbSetDnsRelay`).
+- **Red de casa:** las reservas del DHCP (`cbDhcpV4SvrPoolSetStatic`),
+  IPv6 de la red (`cbSetLanIPv6Config`) y relé DNS (`cbSetDnsRelay`).
 - **Puertos y multicast:** reglas de puertos (`cbSetNatPortMapping`), UPnP
   (`cbSetUpnpCfg`), IGMP (`cbSetMcastIgmpSetting`, `cbSetMcastIntf`) y RIP
   (`cbSetRipIntf`).
@@ -67,6 +66,28 @@ Probadas y descartadas (2026-10-26):
 - `cbSyncTime`: el router no la confirma.
 - `cbSetSystemTimeZone` y `cbSetNTPInfo`: su lectura no existe en este
   router.
+
+Arreglada y pendiente de comprobar otra vez:
+
+- `cbSetDhcpv4ServerPool` (el grupo DHCP de casa). Los cambios 39 y 40
+  cambiaron y deshicieron la concesión y el router los dio por aplicados,
+  pero dejaron activas, con el valor vacío, las cuatro condiciones del
+  grupo (opción 60, 61, 77 y MAC). Tras el reinicio del cambio 57 el router
+  dejó de dar IP nueva a cualquier dispositivo: ninguno encaja en esas
+  condiciones. La causa: en la web del router son casillas sin `value`; la
+  web las manda como `on` si están marcadas y no las manda si no lo están,
+  y el router las da por marcadas si el campo llega, valga lo que valga
+  (captura del 2026-10-26). El panel mandaba `dhcpv4_opt60=0`, y así con
+  las cuatro. Ahora el catálogo las marca como `casilla`: el panel manda
+  `on` o nada, como la web, y nunca deja activa una condición con el valor
+  vacío (o una MAC todo ceros): la desactiva, y el diff lo dice. Las
+  condiciones son `solo_lectura` (no salen en el formulario y una petición
+  que las cambie se rechaza) y solo se escribe el grupo de casa, id 0
+  (`editables = ["0"]`): el de id 1 (TEF_IOT) es del operador. Hasta que
+  la prueba en el router real (cambiar y deshacer la concesión, también
+  tras reiniciar, y comprobar que el router da IP nueva) pase, sigue con
+  `comprobada = false`, y con ella los ajustes de DHCP y DNS de la red de
+  casa.
 
 Lo demás solo se ve:
 

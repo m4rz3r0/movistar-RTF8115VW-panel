@@ -240,6 +240,49 @@ fn no_reenviable(p: &Parametro, v: &str) -> bool {
     enmascarado(v) || (p.tapado && v.trim().is_empty())
 }
 
+/// ¿Casilla marcada? Así la da la lectura (`1`) o la manda la web (`on`).
+fn marcada(v: &str) -> bool {
+    matches!(v.trim(), "1" | "on")
+}
+
+/// Una condición activa con su valor vacío (o una MAC todo ceros) no
+/// encaja con ningún dispositivo: el router deja de dar IP nueva a todos.
+/// La desactiva en `efectivos`, venga de la petición o de la lectura, y así
+/// sale también en el diff.
+fn desactivar_condiciones_vacias(
+    f: &Funcion,
+    op: Operacion,
+    actual: &BTreeMap<String, String>,
+    efectivos: &mut BTreeMap<String, String>,
+) {
+    let valor = |efectivos: &BTreeMap<String, String>, k: &str| {
+        efectivos
+            .get(k)
+            .map(String::as_str)
+            .or_else(|| {
+                (op == Operacion::Editar)
+                    .then(|| buscar(actual, k))
+                    .flatten()
+            })
+            .map(str::to_owned)
+    };
+    for p in &f.parametros {
+        let Some(vn) = p.casilla.as_ref().and_then(|c| c.valor.as_deref()) else {
+            continue;
+        };
+        if !valor(efectivos, &p.nombre).is_some_and(|v| marcada(&v)) {
+            continue;
+        }
+        let v = valor(efectivos, vn).unwrap_or_default();
+        let es_mac = f.parametro(vn).is_some_and(|x| x.tipo == TipoParam::Mac);
+        let vacio = v.trim().is_empty()
+            || (es_mac && v.chars().all(|c| matches!(c, '0' | ':' | '-' | ' ')));
+        if vacio {
+            efectivos.insert(p.nombre.clone(), "0".to_owned());
+        }
+    }
+}
+
 /// Une valores de la petición y valores actuales. No hace peticiones.
 ///
 /// `explicito`: los valores son exactos (reversión o deshacer, con valores
@@ -275,6 +318,7 @@ pub(super) fn componer(
         };
         efectivos.insert(k.clone(), v);
     }
+    desactivar_condiciones_vacias(f, op, actual, &mut efectivos);
     let mut payload = Vec::new();
     let mut secretos_tapados = Vec::new();
     // Con `explicito` (reversión o deshacer), un secreto que no sirve para
@@ -304,6 +348,14 @@ pub(super) fn componer(
                 continue;
             }
             secretos_tapados.push(p.nombre.clone());
+        }
+        // Una casilla va como la manda la web: `on` si está marcada y fuera
+        // si no (el router la da por marcada si el campo llega).
+        if p.casilla.is_some() {
+            if marcada(v) {
+                payload.push((p.nombre.clone(), "on".to_owned()));
+            }
+            continue;
         }
         payload.push((p.nombre.clone(), v.to_owned()));
     }

@@ -9,8 +9,8 @@ pub mod mask;
 mod model;
 
 pub use model::{
-    Acceso, Area, Comprobacion, Funcion, LecturaPareada, Lista, Origen, Parametro, Partido, Riesgo,
-    Tipo, TipoParam,
+    Acceso, Area, Casilla, Comprobacion, Funcion, LecturaPareada, Lista, Origen, Parametro,
+    Partido, Riesgo, Tipo, TipoParam,
 };
 
 use serde::Deserialize;

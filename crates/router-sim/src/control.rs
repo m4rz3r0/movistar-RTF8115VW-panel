@@ -281,6 +281,32 @@ impl SimControl {
         }
     }
 
+    /// Pone `campo` = `valor` en la instancia de la lista de `lectura` cuyo
+    /// `id_param` vale `id`, como si alguien la hubiera cambiado en la web
+    /// del router. `false` si no existe.
+    pub fn fijar_en_lista(
+        &self,
+        lectura: &str,
+        id_param: &str,
+        id: &str,
+        campo: &str,
+        valor: &str,
+    ) -> bool {
+        let mut st = self.inner.state();
+        if crate::escrituras::materializar_lista(&self.inner, &mut st, lectura).is_err() {
+            return false;
+        }
+        let Some(n) = st
+            .listas
+            .get_mut(lectura)
+            .and_then(|l| l.nodos.iter_mut().find(|n| n.text_of(id_param) == Some(id)))
+        else {
+            return false;
+        };
+        crate::xml::set_child(n, campo, valor);
+        true
+    }
+
     /// Cambia la versión de firmware (`SWVersion`) que da `cbGetSummary`.
     pub fn set_firmware(&self, firmware: &str) {
         self.inner.state().firmware = Some(firmware.to_owned());

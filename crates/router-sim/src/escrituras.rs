@@ -129,6 +129,13 @@ fn escritura_generica(
         return Ok(());
     };
     let lectura = pareada.funcion.as_str();
+    let casillas;
+    let p = if param(p, "del") == Some("DEL") {
+        p
+    } else {
+        casillas = como_casillas(f, p);
+        casillas.as_slice()
+    };
     if let Some(lista) = &f.lista {
         if name == "cbDhcpV4SvrPoolSetStatic" {
             let p = validar_reserva(s, st, lectura, p)?;
@@ -210,6 +217,22 @@ fn validar_reserva(
     Ok(p)
 }
 
+/// Las casillas de `f` ([`catalogo::Parametro::casilla`]) como las guarda el
+/// router: marcada (`1`) si el campo llega, valga lo que valga, y
+/// desmarcada (`0`) si no llega.
+fn como_casillas(f: &catalogo::Funcion, p: &[(String, String)]) -> Params {
+    let mut out: Params = p
+        .iter()
+        .filter(|(k, _)| f.parametro(k).is_none_or(|x| x.casilla.is_none()))
+        .cloned()
+        .collect();
+    for c in f.parametros.iter().filter(|x| x.casilla.is_some()) {
+        let marcada = param(p, &c.nombre).is_some();
+        out.push((c.nombre.clone(), if marcada { "1" } else { "0" }.to_owned()));
+    }
+    out
+}
+
 /// Parámetros que llevan valor a la instancia (todos menos los de control y
 /// los que ella excluye).
 fn campos_escritos(p: &[(String, String)], excluir: &[&str]) -> BTreeMap<String, String> {
@@ -280,7 +303,11 @@ pub(crate) fn escribir_lista(
 
 /// Crea la lista viva de `lectura` (si no existe) a partir de la fixture `all=ALL` (o, sin
 /// ella, la de sin parámetros o la suma de las fixtures por instancia).
-fn materializar_lista(s: &Inner, st: &mut SimState, lectura: &str) -> Result<(), String> {
+pub(crate) fn materializar_lista(
+    s: &Inner,
+    st: &mut SimState,
+    lectura: &str,
+) -> Result<(), String> {
     if !st.listas.contains_key(lectura) {
         let viva = construir_lista(s, lectura)?;
         st.listas.insert(lectura.to_owned(), viva);

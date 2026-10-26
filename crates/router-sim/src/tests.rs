@@ -53,6 +53,7 @@ fn lista_sin_del_rechaza_borrar() {
         id_param: "x_id".into(),
         all: false,
         del: false,
+        editables: Vec::new(),
     };
     let r = escribir_lista(
         &s,

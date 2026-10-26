@@ -54,6 +54,22 @@ impl ChangeManager {
             (_, Some(_), false, None) => Operacion::Crear,
             _ => Operacion::Editar,
         };
+        // Solo las instancias editables de la lista (el pool DHCP del
+        // operador, por ejemplo, no se toca): ni otras ni nuevas.
+        if let Some(l) = &f.lista
+            && !l.editables.is_empty()
+            && op != Operacion::Accion
+            && !req
+                .instancia
+                .as_ref()
+                .is_some_and(|i| l.editables.contains(i))
+        {
+            return Err(CambioError::Invalida(format!(
+                "{}: la instancia {} es solo de lectura en el panel",
+                f.name,
+                req.instancia.as_deref().unwrap_or("nueva")
+            )));
+        }
         let mut valores = req.valores.clone();
         if let Some(l) = &f.lista
             && op != Operacion::Accion
@@ -81,6 +97,21 @@ impl ChangeManager {
                  no se escribe, para no tocar otra",
                 req.instancia.as_deref().unwrap_or("-")
             )));
+        }
+        // Lo que el panel solo lee (las condiciones del pool DHCP) se
+        // reenvía tal cual: una petición no lo cambia. El deshacer y la
+        // reversión vuelven a valores reales y siguen.
+        if !explicito && op == Operacion::Editar {
+            for (k, v) in &req.valores {
+                let Some(p) = f.parametro(k).filter(|p| p.solo_lectura) else {
+                    continue;
+                };
+                if buscar(&actual, k).is_some_and(|cur| !iguales(Some(p), cur, v)) {
+                    return Err(CambioError::Invalida(format!(
+                        "{k}: es solo de lectura en el panel"
+                    )));
+                }
+            }
         }
         let Compuesto {
             efectivos,

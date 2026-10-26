@@ -106,7 +106,6 @@ mod tests {
             "cbSetVoicePhysical",
             "cbSetRipIntf",
             "cbSetDnsRelay",
-            "cbSetDhcpv4ServerPool",
             "cbDhcpV4SvrPoolSetStatic",
             "cbSetLanIPv6Config",
             "cbSetWifi",

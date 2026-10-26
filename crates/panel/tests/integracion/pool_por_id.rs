@@ -9,13 +9,13 @@ use crate::comun::{
 use serde_json::{Value, json};
 
 /// Posición del pool en la lectura (no es su id).
-const POSICION: &str = "rtm_cfg_dhcpv4_svr_pool_0i";
+pub(crate) const POSICION: &str = "rtm_cfg_dhcpv4_svr_pool_0i";
 /// En las fixtures, la posición del pool de casa (id 0) y la del otro (id 1).
-const CASA: &str = "1";
-const OTRO: &str = "0";
+pub(crate) const CASA: &str = "1";
+pub(crate) const OTRO: &str = "0";
 
 /// Hojas del pool de la posición `pos` del simulador, sin el `Result`.
-async fn pool(p: &Panel, pos: &str) -> Vec<(String, String)> {
+pub(crate) async fn pool(p: &Panel, pos: &str) -> Vec<(String, String)> {
     let n = p
         .state
         .hgu
@@ -40,7 +40,7 @@ fn juntar_hojas(n: &hgu::xml::XmlNode, out: &mut Vec<(String, String)>) {
 }
 
 /// Valor de `nombre` en el pool de la posición `pos`.
-async fn del_pool(p: &Panel, pos: &str, nombre: &str) -> String {
+pub(crate) async fn del_pool(p: &Panel, pos: &str, nombre: &str) -> String {
     pool(p, pos)
         .await
         .into_iter()
@@ -79,7 +79,7 @@ fn en_la_pagina(pagina: &Value, ajuste: &str, campo: &str) -> Value {
 }
 
 /// Prepara `valores` en `ajuste` (200) y devuelve el resumen.
-async fn preparar(p: &Panel, cookie: &str, ajuste: &str, valores: Value) -> Value {
+pub(crate) async fn preparar(p: &Panel, cookie: &str, ajuste: &str, valores: Value) -> Value {
     ok(
         p,
         "preparar_ajuste",

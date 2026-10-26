@@ -306,6 +306,7 @@ pub fn detalle(state: &AppState, nombre: &str) -> Result<FuncionDetalle, ServerF
         lista: f.lista.as_ref().map(|l| ListaVista {
             id_param: l.id_param.clone(),
             borrar: l.del,
+            editables: l.editables.clone(),
         }),
         claves: f
             .parametros
@@ -688,6 +689,11 @@ pub async fn formulario(
     let mut omitidos = Vec::new();
     for p in &f.parametros {
         if ident.contains(&p.nombre) && operacion != Operacion::Accion {
+            continue;
+        }
+        // Lo que el panel solo lee no sale en el formulario: la escritura
+        // lo reenvía tal como lo lee.
+        if p.solo_lectura {
             continue;
         }
         let cur = buscar(&actual, &p.nombre);

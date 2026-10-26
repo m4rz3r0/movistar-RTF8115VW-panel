@@ -3,9 +3,9 @@
 //! (rellenado con la lectura pareada) que termina en el gestor de cambios.
 
 use super::{
-    CampoForm, DialogoCambio, EstadoDeCambio, FormVista, FuncionDetalle, ListaInstancias, MASCARA,
-    Operacion, ParamVista, Peticion, PreparadoVista, TipoCampo, TipoFuncion, Valor,
-    en_el_navegador, formulario, instancias, texto_error, validar_campo,
+    CampoForm, DialogoCambio, EstadoDeCambio, FormVista, FuncionDetalle, ListaInstancias,
+    ListaVista, MASCARA, Operacion, ParamVista, Peticion, PreparadoVista, TipoCampo, TipoFuncion,
+    Valor, en_el_navegador, formulario, instancias, texto_error, validar_campo,
 };
 use crate::t;
 use crate::ui::panel_ajustes::{DialogoReautenticar, Reautenticacion};
@@ -38,6 +38,12 @@ pub(super) fn Escritura(detalle: FuncionDetalle) -> impl IntoView {
     let reauth = Reautenticacion::proveer();
     let es_lista = detalle.lista.is_some() && detalle.resumen.tipo == TipoFuncion::Escritura;
     let se_borra = detalle.lista.as_ref().is_some_and(|l| l.borrar);
+    // Con instancias editables fijas no se añaden otras.
+    let se_anade = detalle
+        .lista
+        .as_ref()
+        .is_none_or(|l| l.editables.is_empty());
+    let lista_vista = StoredValue::new(detalle.lista.clone());
     let campos_clave: Vec<(ParamVista, RwSignal<String>)> = detalle
         .claves
         .iter()
@@ -133,9 +139,10 @@ pub(super) fn Escritura(detalle: FuncionDetalle) -> impl IntoView {
             );
         };
         let tabla = move || {
+            let lista_vista = lista_vista.get_value();
             Suspend::new(async move {
                 match res.await {
-                    Ok(i) => tabla_instancias(i, se_borra, modo, borrar).into_any(),
+                    Ok(i) => tabla_instancias(i, lista_vista, se_borra, modo, borrar).into_any(),
                     Err(e) => aviso_error(texto_error(&e)).into_any(),
                 }
             })
@@ -144,16 +151,18 @@ pub(super) fn Escritura(detalle: FuncionDetalle) -> impl IntoView {
             <section class="seccion" aria-labelledby="titulo-instancias">
                 <div class="seccion-cabecera">
                     <h2 id="titulo-instancias" class="titulo-seccion">{t!("biblioteca-instancias-titulo")}</h2>
-                    <button
-                        class="b-sec"
-                        type="button"
-                        on:click=move |_| {
-                            error.set(None);
-                            modo.set(Modo::Form(None));
-                        }
-                    >
-                        {t!("biblioteca-anadir")}
-                    </button>
+                    {se_anade.then(|| view! {
+                        <button
+                            class="b-sec"
+                            type="button"
+                            on:click=move |_| {
+                                error.set(None);
+                                modo.set(Modo::Form(None));
+                            }
+                        >
+                            {t!("biblioteca-anadir")}
+                        </button>
+                    })}
                 </div>
                 {en_el_navegador(
                     || view! { <p class="estado-espera">{t!("biblioteca-leyendo")}</p> },
@@ -248,9 +257,11 @@ pub(super) fn Escritura(detalle: FuncionDetalle) -> impl IntoView {
     }
 }
 
-/// Tabla de instancias con «Editar» y «Borrar» por fila.
+/// Tabla de instancias con «Editar» y «Borrar» por fila (solo en las
+/// editables de `lista`).
 fn tabla_instancias(
     i: ListaInstancias,
+    lista: Option<ListaVista>,
     se_borra: bool,
     modo: RwSignal<Modo>,
     borrar: impl Fn(String) + Copy + Send + Sync + 'static,
@@ -296,8 +307,10 @@ fn tabla_instancias(
                     view! { <td>{c}</td> }
                 })
                 .collect_view();
-            // Sin id propio (`#n`) no se puede pedir la instancia.
-            let con_id = !f.id.starts_with('#');
+            // Sin id propio (`#n`) no se puede pedir la instancia; la que
+            // no es editable solo se ve.
+            let con_id = !f.id.starts_with('#')
+                && lista.as_ref().is_none_or(|l| l.editable(&f.id));
             let id_editar = f.id.clone();
             let id_borrar = f.id.clone();
             let etiqueta = f.id.clone();

@@ -203,6 +203,27 @@ pub struct Parametro {
     /// valor de quien la pide, y no se reenvía nunca desde la lectura.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub tapado: bool,
+    /// Casilla de la página sin `value` (`<input type="checkbox">`): la web
+    /// la manda como `on` si está marcada y no la manda si no lo está, y el
+    /// router la da por marcada si el campo llega, valga lo que valga. El
+    /// panel la lee como `0`/`1` y la escribe igual que la web.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub casilla: Option<Casilla>,
+    /// El panel no lo cambia: lo reenvía tal como lo lee (la web lo manda
+    /// siempre) y rechaza una petición que lo cambie.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub solo_lectura: bool,
+}
+
+/// Lo que acompaña a una casilla ([`Parametro::casilla`]).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Casilla {
+    /// Parámetro con el valor de la condición que activa la casilla. Una
+    /// condición activa con ese valor vacío (o una MAC todo ceros) no
+    /// encaja con ningún dispositivo: el panel nunca la deja activa.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub valor: Option<String>,
 }
 
 /// Tipo del valor de un parámetro.
@@ -261,4 +282,8 @@ pub struct Lista {
     /// Admite `del=DEL` para borrar una instancia.
     #[serde(default)]
     pub del: bool,
+    /// Ids de las únicas instancias que el panel escribe; las demás (y las
+    /// nuevas) son solo de lectura. Vacío: todas.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub editables: Vec<String>,
 }
