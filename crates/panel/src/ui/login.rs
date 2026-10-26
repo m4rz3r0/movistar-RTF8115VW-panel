@@ -2,6 +2,7 @@
 
 use crate::auth::{Login, safe_next};
 use crate::t;
+use crate::ui::contrasena_campo::CampoContrasena;
 use crate::ui::i18n::SelectorIdioma;
 use leptos::prelude::*;
 use leptos_router::hooks::{use_navigate, use_query_map};
@@ -19,6 +20,7 @@ pub fn PaginaLogin() -> impl IntoView {
             navigate(&next, Default::default());
         }
     });
+    let contrasena = RwSignal::new(String::new());
     let error = move || match action.value().get() {
         Some(Err(ServerFnError::ServerError(msg))) => Some(super::mensaje_del_servidor(&msg)),
         Some(Err(_)) => Some(t!("comun-error-conexion")),
@@ -52,16 +54,16 @@ pub fn PaginaLogin() -> impl IntoView {
                             autofocus
                         />
                     </p>
-                    <p class="campo">
-                        <label for="contrasena">{t!("login-contrasena")}</label>
-                        <input
-                            id="contrasena"
-                            name="contrasena"
-                            type="password"
-                            autocomplete="current-password"
-                            required
-                        />
-                    </p>
+                    // Con el ojo, para comprobar lo escrito; sin JavaScript,
+                    // el campo se envía igual.
+                    <CampoContrasena
+                        id="contrasena"
+                        nombre="contrasena"
+                        etiqueta=t!("login-contrasena")
+                        autocompletar="current-password"
+                        valor=contrasena
+                        requerido=true
+                    />
                     <p class="error" role="alert" aria-live="assertive">
                         {error}
                     </p>

@@ -9,6 +9,7 @@ use crate::instalar::{
     lectura_inicial, probar_router, url_sugerida,
 };
 use crate::t;
+use crate::ui::contrasena_campo::CampoContrasena;
 use crate::ui::i18n::SelectorIdioma;
 use crate::ui::router::resumen_red;
 use leptos::{ev::SubmitEvent, prelude::*, task::spawn_local};
@@ -172,22 +173,22 @@ fn PasoAdmin(paso: RwSignal<Paso>, token: RwSignal<String>) -> impl IntoView {
             {campo("instalar-token", t!("instalar-token"), "text", "off", token, None)}
             <p class="nota">{t!("instalar-token-ayuda")}</p>
             {campo("instalar-usuario", t!("instalar-usuario"), "text", "username", usuario, None)}
-            {campo(
-                "instalar-contrasena",
-                t!("instalar-contrasena", n = MIN_CONTRASENA),
-                "password",
-                "new-password",
-                contrasena,
-                None,
-            )}
-            {campo(
-                "instalar-repetir",
-                t!("instalar-repetir"),
-                "password",
-                "new-password",
-                repetir,
-                None,
-            )}
+            <CampoContrasena
+                id="instalar-contrasena"
+                nombre="instalar-contrasena"
+                etiqueta=t!("instalar-contrasena", n = MIN_CONTRASENA)
+                autocompletar="new-password"
+                valor=contrasena
+                requerido=true
+            />
+            <CampoContrasena
+                id="instalar-repetir"
+                nombre="instalar-repetir"
+                etiqueta=t!("instalar-repetir")
+                autocompletar="new-password"
+                valor=repetir
+                requerido=true
+            />
             {error_de(error)}
             <button class="b-pri" type="submit" disabled=move || pendiente.get()>
                 {t!("instalar-crear-admin")}
@@ -305,14 +306,14 @@ fn PasoRouter(
                 usuario,
                 Some(t!("instalar-router-usuario-ejemplo")),
             )}
-            {campo(
-                "instalar-router-contrasena",
-                t!("instalar-router-contrasena"),
-                "password",
-                "off",
-                contrasena,
-                None,
-            )}
+            <CampoContrasena
+                id="instalar-router-contrasena"
+                nombre="instalar-router-contrasena"
+                etiqueta=t!("instalar-router-contrasena")
+                autocompletar="off"
+                valor=contrasena
+                requerido=true
+            />
             {move || info.get().map(|i| detectado(&i))}
             {error_de(error)}
             <div class="instalar-botones">
