@@ -264,11 +264,12 @@ for (const ancho of [360, 1024, 1440]) {
         // El resto, como siempre.
         await expect(page.getByRole("switch")).toHaveCount(4);
         const red24 = tarjeta(page, t.red24);
+        // Sin leer no tiene acciones: no se puede marcar (su tarjeta ofrece
+        // volver a leer). Las demás redes, sí.
+        await expect(marca(red5, t.red5)).toHaveCount(0);
         await marca(red24, t.red24).click();
-        await marca(red5, t.red5).click();
         const barra = page.getByRole("toolbar", { name: t.barra });
         await expect(barra.getByRole("button", { name: t.quitarWps })).toBeVisible();
-        await expect(barra).toContainText(`No entra lo que no se ha podido leer: ${t.red5}.`);
         await sinDesbordamiento(page, `sin leer ${sufijo}`);
         await quieta(page);
         await page.screenshot({ path: `${CAPTURAS}/wifi-sin-leer-${sufijo}.png`, fullPage: ancho > 900, animations: "disabled" });
