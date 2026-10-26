@@ -47,6 +47,7 @@
 mod consultas;
 mod especiales;
 mod grupo;
+mod motivos;
 mod nota;
 mod persistencia;
 pub mod plan;
@@ -64,6 +65,7 @@ pub(crate) use especiales::SIN_PING_YA_PUESTA;
 pub(crate) use especiales::{LECTURA_USUARIOS, usuarios_de};
 use grupo::{Ejecucion, PasoGuardado};
 pub use grupo::{EstadoPaso, GrupoRequest, Paso, PasoCambio, PasoPreparado, PreparadoGrupo};
+pub use motivos::*;
 pub use nota::Nota;
 use plan::*;
 pub use plan::{PALABRA_ACCION, PALABRA_REINICIO};
