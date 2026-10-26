@@ -63,17 +63,23 @@ fn invitadas(ctx: &Contexto) -> Option<(Vec<Invitada>, bool)> {
 
 /// `derivado:otras_invitadas`: cuántas de las otras redes de invitados
 /// (ids 3 a 7) están separadas de la red de casa («5 de 5 separadas»).
-/// `None` si falta alguna de las listas, si no traen ninguna o si de
-/// alguna no se sabe si está separada: una cifra parcial parecería
-/// completa.
+/// «Sin leer» si no se pudo leer alguna de las listas o de alguna red no se
+/// sabe si está separada: una cifra parcial parecería completa. `None` si
+/// las listas no traen ninguna.
 pub(in super::super) fn otras_invitadas(ctx: &Contexto) -> Option<ValorLegible> {
-    let (todas, completas) = invitadas(ctx)?;
+    let sin_leer = || Some(ValorLegible::Texto(t!("ajustes-estado-sin-leer")));
+    let Some((todas, completas)) = invitadas(ctx) else {
+        return sin_leer();
+    };
     let otras: Vec<Invitada> = todas
         .into_iter()
         .filter(|i| i.id > PRIMERA_INVITADA)
         .collect();
-    if !completas || otras.is_empty() || otras.iter().any(|i| i.separada.is_none()) {
+    if completas && otras.is_empty() {
         return None;
+    }
+    if !completas || otras.iter().any(|i| i.separada.is_none()) {
+        return sin_leer();
     }
     let separadas = otras.iter().filter(|i| i.separada == Some(true)).count();
     Some(ValorLegible::Texto(t!(
@@ -102,7 +108,7 @@ fn nombre(i: &Invitada) -> String {
 /// casa. Es un riesgo: quien se conecte a ella llega a los dispositivos de
 /// casa. Si falta la lista de una radio, avisa solo de las redes que se
 /// ven: las de la otra radio no se dan por separadas, solo no se nombran (y
-/// el dato `otras_invitadas` sale sin cifra).
+/// el dato `otras_invitadas` no sale: dice «Sin leer»).
 pub(in super::super) fn invitada_sin_separar(ctx: &Contexto) -> Option<RecomendacionVista> {
     let (todas, _) = invitadas(ctx)?;
     let sin_separar: Vec<String> = todas

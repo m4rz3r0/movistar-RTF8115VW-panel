@@ -106,7 +106,13 @@ async fn renovacion_de_clave_ida_y_vuelta() {
     // La clave y el nombre de la red viajan con el valor que tenían, y el
     // resto de lo que no se ha tocado, también.
     for k in ["key_phrase", "ssid"] {
-        assert!(claves.contains(&k), "la escritura no lleva {k}: {claves:?}");
+        let enviado = w[0].iter().find(|(a, _)| a == k).map(|(_, v)| v);
+        let previo = antes.iter().find(|(a, _)| a == k).map(|(_, v)| v);
+        assert!(
+            previo.is_some_and(|v| !v.is_empty()),
+            "sin {k} en la lectura"
+        );
+        assert_eq!(enviado, previo, "{k} cambia en la escritura");
     }
     for (k, v) in &w[0] {
         if k == "regen_key_interval" {
@@ -152,6 +158,10 @@ async fn pmf_y_separada_solo_lectura() {
     ] {
         let (status, body) = preparar(&p, &cookie, ajuste, valores.clone()).await;
         assert_eq!(status, 400, "{ajuste} {valores}: {body}");
+        assert!(
+            body.contains("solo se puede consultar"),
+            "{ajuste} {valores}: {body}"
+        );
     }
     assert!(escrituras_wifi(&p).is_empty());
 }
@@ -202,9 +212,12 @@ async fn otras_invitadas_en_la_tarjeta() {
     );
 }
 
+/// El dato «Sin leer»: no se sabe la cifra entera.
+const SIN_LEER: &str = "Sin leer";
+
 /// Si falla la lista de puntos de acceso de una radio, faltan sus redes de
-/// invitados: el dato no sale con una cifra parcial y la recomendación solo
-/// nombra las redes que se ven.
+/// invitados: el dato sale «Sin leer», no con una cifra parcial, y la
+/// recomendación solo nombra las redes que se ven.
 #[tokio::test]
 async fn otras_invitadas_con_una_lista_sin_leer() {
     // Falla la de 5 GHz, la de la red 3 sin separar: ni cifra ni aviso.
@@ -216,14 +229,7 @@ async fn otras_invitadas_con_una_lista_sin_leer() {
         .control
         .fail_reads_con("cbListWifiAccPt", "dpm_cfg_wifi_id", "1", true);
     let e = elemento(&p, &cookie, "invitados").await;
-    assert!(
-        !e["datos"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|d| d["clave"] == "ajustes-dato-otras_invitadas"),
-        "{e}"
-    );
+    assert_eq!(otras_invitadas(&e), json!({ "Texto": SIN_LEER }), "{e}");
     assert_ne!(e["recomendacion"]["informativa"], true, "{e}");
 
     // Falla la de 2,4 GHz: la red 3 se ve y se avisa de ella, pero sin cifra.
@@ -235,21 +241,14 @@ async fn otras_invitadas_con_una_lista_sin_leer() {
         .control
         .fail_reads_con("cbListWifiAccPt", "dpm_cfg_wifi_id", "0", true);
     let e = elemento(&p, &cookie, "invitados").await;
-    assert!(
-        !e["datos"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|d| d["clave"] == "ajustes-dato-otras_invitadas"),
-        "{e}"
-    );
+    assert_eq!(otras_invitadas(&e), json!({ "Texto": SIN_LEER }), "{e}");
     let r = &e["recomendacion"];
     assert_eq!(r["informativa"], true, "{e}");
     assert!(r["problema"].as_str().unwrap().contains("(red 3)"), "{r}");
 }
 
 /// Una red de la que no se sabe si está separada no cuenta como «no
-/// separada»: el dato no sale.
+/// separada»: el dato sale «Sin leer».
 #[tokio::test]
 async fn otras_invitadas_con_separacion_ilegible() {
     let (p, cookie) = PanelPrueba::nuevo()
@@ -257,13 +256,6 @@ async fn otras_invitadas_con_separacion_ilegible() {
         .arrancar_con_gestor()
         .await;
     let e = elemento(&p, &cookie, "invitados").await;
-    assert!(
-        !e["datos"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|d| d["clave"] == "ajustes-dato-otras_invitadas"),
-        "{e}"
-    );
+    assert_eq!(otras_invitadas(&e), json!({ "Texto": SIN_LEER }), "{e}");
     assert_ne!(e["recomendacion"]["informativa"], true, "{e}");
 }
