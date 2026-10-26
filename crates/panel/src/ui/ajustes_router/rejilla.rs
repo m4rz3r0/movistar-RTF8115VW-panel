@@ -378,7 +378,7 @@ pub(crate) fn ContenidoRejilla(
         }
     };
     view! {
-        <LecturaDelTema edad_s=p.leido_hace_s volver_a_leer />
+        <LecturaDelTema edad_s=p.leido_hace_s volver_a_leer foto=p.foto_de_partida />
         {desconocido}
         <ResumenTema datos=p.resumen.clone() />
         <BarraSeleccion

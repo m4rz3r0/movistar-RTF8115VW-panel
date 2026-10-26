@@ -13,14 +13,15 @@
   margin-top: var(--esp-2);
 }
 
-/* «Leído hace N s» y «Volver a leer», encima del resumen. */
+/* El enlace a la foto de partida, «Leído hace N s» y «Volver a leer», en
+   una barra encima del resumen. */
 .tema-lectura {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--esp-3);
-  margin-bottom: var(--esp-3);
+  gap: var(--esp-2) var(--esp-3);
+  margin-bottom: var(--esp-2);
   color: var(--tenue);
   font-size: 13px;
 }

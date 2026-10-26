@@ -81,17 +81,11 @@ pub(crate) const ID_SOLO_LECTURA: &str = "ajustes-solo-lectura";
 #[component]
 pub fn SinVista() -> impl IntoView {}
 
-/// Descripción del tema, enlace a la foto de partida (si la hay) y aviso de
-/// solo lectura (si el panel aún no escribe).
-pub(crate) fn introduccion(tema: &str, foto: bool, solo_lectura: bool) -> impl IntoView + use<> {
+/// Descripción del tema y aviso de solo lectura (si el panel aún no
+/// escribe). El enlace a la foto de partida va en la barra de la lectura
+/// ([`resumen::LecturaDelTema`]).
+pub(crate) fn introduccion(tema: &str, solo_lectura: bool) -> impl IntoView + use<> {
     let desc = traducir(&format!("ajustes-tema-{tema}-desc"), None);
-    let foto = foto.then(|| {
-        view! {
-            <p class="tema-foto">
-                <a href=RUTA_FOTO>{t!("ajustes-foto-enlace")}</a>
-            </p>
-        }
-    });
     let aviso = solo_lectura.then(|| {
         view! {
             <p class="aviso estado-aviso" role="status" id=ID_SOLO_LECTURA>
@@ -105,7 +99,6 @@ pub(crate) fn introduccion(tema: &str, foto: bool, solo_lectura: bool) -> impl I
     });
     view! {
         <p class="tema-desc">{desc}</p>
-        {foto}
         {aviso}
     }
 }
@@ -422,7 +415,7 @@ pub fn PaginaTema() -> impl IntoView {
                 {move || Suspend::new(async move {
                     match datos.await {
                         Ok(Some(p)) => {
-                            let intro = introduccion(&p.tema, p.foto_de_partida, p.solo_lectura);
+                            let intro = introduccion(&p.tema, p.solo_lectura);
                             let nota = nota_tema::nota_tema(&p.tema);
                             view! {
                                 {intro}

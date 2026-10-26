@@ -37,9 +37,15 @@ fn leido_hace(s: u64) -> String {
 
 /// Cuánto hace que se leyó del router lo que se ve (`edad_s` al llegar la
 /// lectura; cuenta cada segundo en el navegador) y «Volver a leer», que lo
-/// lee de nuevo sin la caché.
+/// lee de nuevo sin la caché. Con `foto`, a la izquierda de la misma barra,
+/// el enlace a lo que ha cambiado desde la instalación: una fila en vez de
+/// dos encima del resumen.
 #[component]
-pub(crate) fn LecturaDelTema(edad_s: u64, volver_a_leer: Callback<()>) -> impl IntoView {
+pub(crate) fn LecturaDelTema(
+    edad_s: u64,
+    volver_a_leer: Callback<()>,
+    #[prop(optional)] foto: bool,
+) -> impl IntoView {
     let pasados = RwSignal::new(0u64);
     Effect::new(move |_| {
         let h = set_interval_with_handle(
@@ -57,6 +63,9 @@ pub(crate) fn LecturaDelTema(edad_s: u64, volver_a_leer: Callback<()>) -> impl I
     });
     view! {
         <div class="tema-lectura">
+            {foto.then(|| view! {
+                <a class="tema-foto" href=super::RUTA_FOTO>{t!("ajustes-foto-enlace")}</a>
+            })}
             <span>{move || leido_hace(edad_s + pasados.get())}</span>
             <button type="button" class="b-sec" on:click=move |_| volver_a_leer.run(())>
                 {t!("ajustes-volver-a-leer")}
