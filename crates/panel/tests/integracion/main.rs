@@ -45,6 +45,7 @@ mod poller;
 mod pool_por_id;
 mod red;
 mod registro_y_dns;
+mod seleccion;
 mod sensibles;
 mod tema;
 mod token_usuario;

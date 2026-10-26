@@ -218,8 +218,8 @@ for (const ancho of [360, 1440]) {
         await expect(remota).toHaveClass(/riesgo/);
         await expect(remota.getByRole("button", { name: t.apagarRemota })).toBeVisible();
         // Teléfono: cada tarjeta con su glifo (no los arcos de la WiFi), el
-        // interruptor del teléfono por internet con su nombre y, con
-        // acciones en lote, la marca redonda.
+        // interruptor del teléfono por internet con su nombre y, como sus
+        // acciones valen cada una para una sola tarjeta, sin marca redonda.
         await page.goto("/ajustes/telefono");
         await asentar(page);
         await expect(page.locator("article.tarjeta-el")).toHaveCount(4);
@@ -230,7 +230,7 @@ for (const ancho of [360, 1440]) {
             name: "Teléfono por internet encendido",
           }),
         ).toBeVisible();
-        await expect(page.locator("article.tarjeta-el .marcar")).toHaveCount(4);
+        await expect(page.locator("article.tarjeta-el .marcar")).toHaveCount(0);
         // La contraseña del router no tiene un estado que decir: sin insignia.
         await page.goto("/ajustes/seguridad");
         await asentar(page);

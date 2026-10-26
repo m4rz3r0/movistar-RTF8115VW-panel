@@ -1,5 +1,11 @@
 //! Selección de elementos: la marca redonda, lo marcado y la barra de acciones.
 //!
+//! Marcar sirve para aplicar una acción a varios elementos a la vez: solo
+//! se pueden marcar los que comparten alguna acción de la pantalla con otro
+//! ([`marcables`]). Sin eso no hay marca, ni tecla de marcar, ni barra; lo
+//! que vale para un solo elemento ya lo ofrece su tarjeta (su recomendación,
+//! su interruptor o su detalle).
+//!
 //! La marca es un círculo en la esquina de la tarjeta (nunca una casilla
 //! cuadrada): solo se ve al pasar el ratón, con el foco o cuando ya hay
 //! alguna marcada. La barra aparece al marcar algo, dice cuántas, ofrece
@@ -46,6 +52,17 @@ impl Seleccion {
         self.0.update(BTreeSet::clear);
     }
 
+    /// Deja marcados solo los de `marcables` (tras una relectura, lo que ya
+    /// no se puede marcar no sigue contando en la barra).
+    pub(crate) fn conservar(self, marcables: &BTreeSet<String>) {
+        if self
+            .0
+            .with_untracked(|s| s.iter().any(|id| !marcables.contains(id)))
+        {
+            self.0.update(|s| s.retain(|id| marcables.contains(id)));
+        }
+    }
+
     /// Cuántos hay marcados. Reactivo.
     pub(crate) fn cuantas(self) -> usize {
         self.0.with(BTreeSet::len)
@@ -55,6 +72,29 @@ impl Seleccion {
     pub(crate) fn ids(self) -> BTreeSet<String> {
         self.0.get()
     }
+}
+
+/// Los elementos de la pantalla que se pueden marcar: los que tienen alguna
+/// acción de `acciones` que vale también para otro elemento. Un elemento sin
+/// lectura no tiene acciones (no entra). Vacío: la pantalla no ofrece
+/// selección.
+pub(crate) fn marcables(acciones: &[AccionVista], elementos: &[ElementoVista]) -> BTreeSet<String> {
+    let cuantos = |a: &AccionVista| {
+        elementos
+            .iter()
+            .filter(|e| e.acciones.contains(&a.id))
+            .count()
+    };
+    let compartidas: Vec<&String> = acciones
+        .iter()
+        .filter(|a| cuantos(a) >= 2)
+        .map(|a| &a.id)
+        .collect();
+    elementos
+        .iter()
+        .filter(|e| e.acciones.iter().any(|a| compartidas.contains(&a)))
+        .map(|e| e.id.clone())
+        .collect()
 }
 
 /// Lo que ofrece la barra para lo marcado: las acciones que se pueden
@@ -222,6 +262,38 @@ mod tests {
             clave: format!("ajustes-accion-{id}"),
             peligro: false,
         }
+    }
+
+    /// Solo se marca lo que comparte una acción con otro elemento: una
+    /// pantalla cuyas acciones valen cada una para un solo elemento (o para
+    /// ninguno) no ofrece selección.
+    #[test]
+    fn solo_se_marca_lo_que_comparte_una_accion() {
+        let acciones = [
+            accion("encender"),
+            accion("aislar"),
+            accion("apagar_gestion"),
+        ];
+        let elementos = [
+            elemento("red-24", &["encender", "aislar"], true),
+            elemento("red-5", &["encender"], true),
+            elemento("radio-24", &[], true),
+            elemento("invitados", &[], false),
+        ];
+        let ids = |s: BTreeSet<String>| s.into_iter().collect::<Vec<_>>();
+        assert_eq!(ids(marcables(&acciones, &elementos)), ["red-24", "red-5"]);
+
+        // Como en Seguridad: una acción, y para un solo elemento.
+        let solas = [
+            elemento("gestion", &["apagar_gestion"], true),
+            elemento("contrasena", &[], true),
+            elemento("cortafuegos", &[], true),
+        ];
+        assert!(marcables(&acciones, &solas).is_empty());
+        // Sin acciones en la pantalla, nada.
+        assert!(marcables(&[], &elementos).is_empty());
+        // Una lista con una sola fila tampoco: no hay «varios».
+        assert!(marcables(&acciones, &elementos[1..2]).is_empty());
     }
 
     /// La barra ofrece solo lo que vale para todo lo marcado que se ha
