@@ -93,7 +93,7 @@ contrasena-router-enlace-texto = It is changed in Router settings, next to the p
 usuarios-router-contrasena = Password
 usuarios-router-protegido-panel = It is the user this panel logs in with: it cannot be deleted or changed from here.
 usuarios-router-protegido-sistema = It is the operator's account: it cannot be deleted or changed from here.
-usuarios-router-aviso-borrar = If you undo the deletion later, the user comes back with a new password: the current one cannot be recovered. The new one will only be visible with the eye, in the change's details in the History.
+usuarios-router-aviso-borrar = If you undo the deletion later, the user comes back with a new password: the current one cannot be recovered. The new one will only be visible with the eye, in the change's details in the History. If the panel brings it back by itself (because the change fails), that password is not stored: the History will tell you to change it.
 usuarios-router-aviso-deshacer = The user comes back with a new password: the previous one cannot be recovered. You will see it with the eye in this change's details, in the History.
 usuarios-router-error-protegido = This user is protected: it is the one the panel uses to log in to the router, or the operator's account. It cannot be deleted or changed from here.
 usuarios-router-error-existe = The router already has a user with that name.
@@ -104,6 +104,10 @@ usuarios-router-error-rechazado = The router did not accept the change: the user
 usuarios-router-error-no-entra = The router answered, but the user cannot log in with the new password. Try again or change it from the router's web interface.
 usuarios-router-error-grupo = The user now logs in with the new password, but the router does not show the account type asked for. Read the list again.
 usuarios-router-historial-nota = The new password is not stored in the panel: this change cannot be undone from here.
+usuarios-router-error-uno-cada-vez = Users are deleted one at a time.
+usuarios-router-error-grupo-sistema = That account type is the operator's: choose Administrator or User.
+usuarios-router-error-grupo-no-valido = Choose an account type: Administrator or User.
+usuarios-router-nota-revertido = The deleted user was created again with a new password that the panel does not store: change it in Settings → Security → Router web users to be able to use it.
 
 ## Features still to be checked against a real router
 validacion-real-pendiente-usuarios = Creating and deleting users has not been checked against a real router yet: it is not available for now.

@@ -93,7 +93,7 @@ contrasena-router-enlace-texto = Se cambia en Configuración del router, junto a
 usuarios-router-contrasena = Contraseña
 usuarios-router-protegido-panel = Es el usuario con el que entra el panel: no se puede borrar ni cambiar desde aquí.
 usuarios-router-protegido-sistema = Es la cuenta del operador: no se puede borrar ni cambiar desde aquí.
-usuarios-router-aviso-borrar = Si luego deshaces el borrado, el usuario vuelve con una contraseña nueva: la de ahora no se puede recuperar. La nueva solo se verá con el ojo, en el detalle del cambio en el Historial.
+usuarios-router-aviso-borrar = Si luego deshaces el borrado, el usuario vuelve con una contraseña nueva: la de ahora no se puede recuperar. La nueva solo se verá con el ojo, en el detalle del cambio en el Historial. Si es el panel el que lo devuelve solo (porque el cambio falla), esa contraseña no se guarda: el Historial te avisará para que la cambies.
 usuarios-router-aviso-deshacer = El usuario vuelve con una contraseña nueva: la de antes no se puede recuperar. La verás con el ojo en el detalle de este cambio, en el Historial.
 usuarios-router-error-protegido = Este usuario está protegido: es el que usa el panel para entrar en el router o la cuenta del operador. No se puede borrar ni cambiar desde aquí.
 usuarios-router-error-existe = Ya hay un usuario con ese nombre en el router.
@@ -104,6 +104,10 @@ usuarios-router-error-rechazado = El router no aceptó el cambio: el usuario sig
 usuarios-router-error-no-entra = El router respondió, pero el usuario no entra con la contraseña nueva. Prueba otra vez o cámbiala desde la web del router.
 usuarios-router-error-grupo = El usuario ya entra con la contraseña nueva, pero el router no muestra el tipo de cuenta pedido. Vuelve a leer la lista.
 usuarios-router-historial-nota = La contraseña nueva no se guarda en el panel: este cambio no se puede deshacer desde aquí.
+usuarios-router-error-uno-cada-vez = Los usuarios se borran de uno en uno.
+usuarios-router-error-grupo-sistema = Ese tipo de cuenta es el del operador: elige Administrador o Usuario.
+usuarios-router-error-grupo-no-valido = Elige un tipo de cuenta: Administrador o Usuario.
+usuarios-router-nota-revertido = Se volvió a crear el usuario borrado con una contraseña nueva que el panel no guarda: cámbiala en Ajustes → Seguridad → Usuarios de la web del router para poder usarlo.
 
 ## Funciones pendientes de comprobar con el router de verdad
 validacion-real-pendiente-usuarios = Crear y borrar usuarios aún no se ha comprobado con el router de verdad: de momento no se puede.

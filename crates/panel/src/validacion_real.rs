@@ -1,10 +1,17 @@
 //! Interruptores de las funciones de la fase 3 que dependen de una prueba en el router real.
 //!
-//! Cada función nueva se habilita cuando su validación (§3 del spec) la ha
-//! confirmado en el router del usuario. Mientras no, [`sin_validar`] da la
-//! clave del motivo: la interfaz deja sus botones desactivados con él y el
-//! servidor responde 409 sin escribir. Se usa en el servidor y en el
-//! navegador (es `const`).
+//! Con un interruptor en `Some(motivo)` ([`sin_validar`]), la interfaz deja
+//! los botones de su función desactivados con ese motivo y el servidor
+//! responde 409 sin escribir: la tarjeta y, para todo lo que entra por el
+//! gestor (Biblioteca o petición fabricada), `planificar_especial`. El
+//! deshacer y la reversión de lo ya hecho siguen funcionando. Se usa en el
+//! servidor y en el navegador (es `const`).
+//!
+//! Estado (Ruling Q): en la candidata v0.9.0 las tres están habilitadas
+//! (`None`) para poder hacer la E3 y la E5 desde el panel, que solo usa el
+//! usuario con el controlador delante. Tras cada validación se fija la suya:
+//! validada, sigue habilitada; fallida, pasa a `Some(motivo(f))`. La Tarea 9
+//! añade un test que fija el valor de cada una en la 1.0.
 
 /// Funciones de la fase 3 que esperan su validación real.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -17,9 +24,10 @@ pub enum Funcion3 {
     SinPing,
 }
 
-/// Clave del motivo por el que `f` sigue desactivada, o `None` si ya está
-/// validada. Hoy, las tres esperan la validación del controlador: si la E3
-/// o la E5 no la confirman, la suya pasa a `Some(...)`.
+/// Clave del motivo por el que `f` está desactivada, o `None` si está
+/// habilitada. Hoy las tres dan `None` sin estar validadas: así lo pide la
+/// candidata para hacer la E3 y la E5 (Ruling Q, ver el módulo). La que no
+/// valide pasará a `Some(motivo(f))`.
 pub const fn sin_validar(f: Funcion3) -> Option<&'static str> {
     match f {
         Funcion3::Usuarios | Funcion3::ContrasenaOtro | Funcion3::SinPing => None,

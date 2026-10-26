@@ -78,6 +78,7 @@ use crate::{
     poller::PollerHandle,
     series,
     state::{AppState, RedActual},
+    validacion_real::Funcion3,
 };
 use catalogo::{Catalogo, mask::Mascara};
 use catalogo::{Funcion, Riesgo, Tipo, mask::MASCARA};
@@ -139,6 +140,10 @@ pub struct ChangeManager {
     listo: watch::Sender<bool>,
     /// `reanudar_pendientes` ya empezó (solo se hace una vez).
     reanudando: std::sync::atomic::AtomicBool,
+    /// Interruptores de la validación real forzados por una prueba
+    /// ([`ChangeManager::forzar_interruptores`]); sin ellos, los de
+    /// [`crate::validacion_real::sin_validar`].
+    interruptores: OnceLock<fn(Funcion3) -> Option<&'static str>>,
 }
 
 /// Hueco de `AppState` para el gestor del servidor.
@@ -166,7 +171,25 @@ impl ChangeManager {
             tarea: Mutex::new(None),
             listo: watch::Sender::new(false),
             reanudando: std::sync::atomic::AtomicBool::new(false),
+            interruptores: OnceLock::new(),
         })
+    }
+
+    /// Fuerza los interruptores de la validación real de este gestor. Solo
+    /// para las pruebas, que no pueden cambiar la constante: el servidor usa
+    /// siempre [`crate::validacion_real::sin_validar`]. Vale la primera vez.
+    #[doc(hidden)]
+    pub fn forzar_interruptores(&self, f: fn(Funcion3) -> Option<&'static str>) {
+        let _ = self.interruptores.set(f);
+    }
+
+    /// Clave del motivo por el que `f` sigue desactivada, o `None` (ver
+    /// [`crate::validacion_real::sin_validar`]).
+    pub(crate) fn sin_validar(&self, f: Funcion3) -> Option<&'static str> {
+        match self.interruptores.get() {
+            Some(forzados) => forzados(f),
+            None => crate::validacion_real::sin_validar(f),
+        }
     }
 
     /// El gestor del servidor: lo crea y lo guarda en `state` la primera vez;

@@ -24,6 +24,9 @@ pub(crate) const SIN_CAMPOS_ESCRITOS: &str = "nota-sin-campos-escritos";
 pub(crate) const SIN_RELEER: &str = "nota-sin-releer";
 pub(crate) const WAN_CAIDA: &str = "nota-wan-caida";
 pub(crate) const RETOMADA: &str = "nota-retomada";
+/// La reversión automática volvió a crear un usuario borrado con una
+/// contraseña nueva que no se guarda.
+pub(crate) const USUARIO_REVERTIDO: &str = "usuarios-router-nota-revertido";
 /// «paso 2: …», para la nota de un paso de un grupo.
 const PASO: &str = "nota-paso";
 /// «paso 2 (UDP): …», con el nombre del paso.
@@ -262,6 +265,7 @@ mod tests {
     fn las_claves_existen_en_los_dos_idiomas() {
         for clave in [
             VERIFICACION_LIMITADA,
+            USUARIO_REVERTIDO,
             REINICIO_SIN_RESPUESTA,
             SIN_CONFIRMAR,
             RELEIDO_APLICADA,

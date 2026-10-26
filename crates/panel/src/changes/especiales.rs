@@ -22,6 +22,7 @@
 //! ([`cortafuegos`]).
 
 use super::*;
+use crate::validacion_real::Funcion3;
 use hgu::fmt::{ALTA_USUARIO, BAJA_USUARIO, lista_de_baja, nombres_de_baja, usuario_valido};
 use hgu::xml::XmlNode;
 
@@ -137,14 +138,17 @@ fn contrasena_aleatoria() -> String {
 }
 
 /// Si `req` vuelve a crear un usuario (el deshacer o la reversión de un
-/// borrado), le pone una contraseña nueva aleatoria: la de antes no se
-/// puede leer. Solo queda, cifrada, en los valores nuevos del cambio (el
-/// ojo del detalle en el Historial).
-pub(super) fn con_contrasena_nueva(req: &mut ChangeRequest) {
-    if req.funcion == ALTA_USUARIO && !req.borrar && !req.valores.contains_key("rqPwd") {
+/// borrado), le pone una contraseña nueva aleatoria y da `true`: la de antes
+/// no se puede leer. En el deshacer queda, cifrada, en los valores nuevos
+/// del cambio (el ojo del detalle en el Historial); en la reversión
+/// automática no se guarda y el cambio lleva una nota que lo dice.
+pub(super) fn con_contrasena_nueva(req: &mut ChangeRequest) -> bool {
+    let recrea = req.funcion == ALTA_USUARIO && !req.borrar && !req.valores.contains_key("rqPwd");
+    if recrea {
         req.valores
             .insert("rqPwd".to_owned(), contrasena_aleatoria());
     }
+    recrea
 }
 
 /// La instancia de `plan` para el registro: el nombre de un usuario es un
@@ -176,6 +180,20 @@ impl ChangeManager {
         req: &ChangeRequest,
         explicito: bool,
     ) -> Result<Plan, CambioError> {
+        // El interruptor de la validación real vale aquí, venga de donde
+        // venga la petición (tarjeta, Biblioteca o fabricada). El deshacer y
+        // la reversión (`explicito`) siguen: vuelven a lo que ya había.
+        let interruptor = match e {
+            Especial::Usuarios => Some(Funcion3::Usuarios),
+            Especial::Cortafuegos if !req.borrar => Some(Funcion3::SinPing),
+            Especial::Cortafuegos => None,
+        };
+        if let Some(m) = interruptor
+            .filter(|_| !explicito)
+            .and_then(|f3| self.sin_validar(f3))
+        {
+            return Err(CambioError::Bloqueada(m.into()));
+        }
         if e == Especial::Cortafuegos {
             return self.planificar_cortafuegos(f, req).await;
         }
@@ -225,10 +243,10 @@ impl ChangeManager {
                 return Err(bloqueado());
             }
             let [nombre] = nombres.as_slice() else {
-                return Err(CambioError::Invalida("se borra un usuario cada vez".into()));
+                return Err(CambioError::Invalida(USUARIO_UNO_CADA_VEZ.into()));
             };
             let grupo = papel(nombre)
-                .ok_or_else(|| CambioError::Invalida("ese usuario no está en el router".into()))?;
+                .ok_or_else(|| CambioError::InstanciaCambiada(USUARIO_NO_EXISTE.into()))?;
             return Ok(Plan {
                 funcion: f.clone(),
                 operacion: Operacion::Borrar,
@@ -246,22 +264,18 @@ impl ChangeManager {
         let (nombre, contrasena, grupo) = (valor("rqUser"), valor("rqPwd"), valor("rqGroup"));
         if protegido(nombre) || grupo == SISTEMA {
             return Err(if grupo == SISTEMA {
-                CambioError::Invalida("el grupo system es del operador".into())
+                CambioError::Invalida(USUARIO_GRUPO_SISTEMA.into())
             } else {
                 bloqueado()
             });
         }
         if !GRUPOS.contains(&grupo) {
-            return Err(CambioError::Invalida(
-                "grupo no válido: user o admin".into(),
-            ));
+            return Err(CambioError::Invalida(USUARIO_GRUPO_NO_VALIDO.into()));
         }
         // Lo que viene del router (el deshacer de un borrado) no se valida:
         // su nombre ya estaba en él.
         if !explicito && !usuario_valido(nombre) {
-            return Err(CambioError::Invalida(
-                "el nombre tiene que ser de 4 a 20 letras, cifras o _".into(),
-            ));
+            return Err(CambioError::Invalida(USUARIO_NOMBRE_NO_VALIDO.into()));
         }
         crate::contrasena_forma::validar_forma_hasta(contrasena, crate::usuarios_router::MAX_OTRO)
             .map_err(|_| CambioError::Invalida("rqPwd: contraseña no válida".into()))?;
@@ -366,7 +380,7 @@ mod tests {
             borrar: false,
             identidad: BTreeMap::new(),
         };
-        con_contrasena_nueva(&mut req);
+        assert!(con_contrasena_nueva(&mut req));
         assert_eq!(req.valores["rqPwd"].len(), LARGO_ALEATORIA);
         // El borrado genérico de una creación, no.
         let mut baja = ChangeRequest {
@@ -374,7 +388,7 @@ mod tests {
             valores: BTreeMap::new(),
             ..req
         };
-        con_contrasena_nueva(&mut baja);
+        assert!(!con_contrasena_nueva(&mut baja));
         assert!(baja.valores.is_empty());
     }
 }

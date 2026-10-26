@@ -29,7 +29,7 @@ impl ChangeManager {
         }
         if g.pasos.len() > 1 {
             for p in &g.pasos {
-                if self.funcion_escribible(&p.req.funcion)?.tipo == Tipo::Accion {
+                if self.funcion_escribible_para(&p.req)?.tipo == Tipo::Accion {
                     return Err(CambioError::Invalida(format!(
                         "{}: una acción solo puede ir sola (no se podría revertir si falla otro \
                          paso)",

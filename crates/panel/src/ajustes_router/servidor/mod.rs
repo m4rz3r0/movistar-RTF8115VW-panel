@@ -30,9 +30,8 @@ pub(super) use pagina::leer_tema;
 use super::*;
 use crate::{
     changes::{
-        BLOQUEO_SECRETO_TAPADO, BLOQUEO_SOLO_LECTURA, BLOQUEO_USUARIO_PROTEGIDO, CambioError,
-        ChangeManager, ChangeRequest, Diff, GrupoRequest, Paso, PasoPreparado, USUARIO_YA_EXISTE,
-        buscar,
+        BLOQUEO_SECRETO_TAPADO, BLOQUEO_SOLO_LECTURA, CambioError, ChangeManager, ChangeRequest,
+        Diff, GrupoRequest, Paso, PasoPreparado, buscar,
     },
     instalar::servidor::fallo,
     instancia,
@@ -42,7 +41,7 @@ use crate::{
     t,
     ui::explorador::{
         MASCARA,
-        servidor::{error_cambio, gestor, riesgo},
+        servidor::{error_cambio, error_con_texto, gestor, riesgo},
     },
 };
 use ajustes::{
@@ -76,6 +75,9 @@ pub(crate) fn clave(a: &Ajuste) -> Clave {
 /// nombres de la API (el detalle técnico va al registro).
 pub(crate) fn error_ajuste(e: CambioError) -> ServerFnError {
     use CambioError as E;
+    if let Some(r) = error_con_texto(&e) {
+        return r;
+    }
     match e {
         E::SinCambios => fallo(StatusCode::CONFLICT, t!("ajustes-error-sin-cambios")),
         E::EnCurso => fallo(StatusCode::CONFLICT, t!("biblioteca-error-en-curso")),
@@ -85,16 +87,6 @@ pub(crate) fn error_ajuste(e: CambioError) -> ServerFnError {
         E::Bloqueada(m) if m == BLOQUEO_SECRETO_TAPADO => {
             fallo(StatusCode::FORBIDDEN, t!("cambio-error-secreto-tapado"))
         }
-        E::Bloqueada(m) if m == BLOQUEO_USUARIO_PROTEGIDO => {
-            fallo(StatusCode::FORBIDDEN, t!("usuarios-router-error-protegido"))
-        }
-        E::InstanciaCambiada(m) if m == USUARIO_YA_EXISTE => {
-            fallo(StatusCode::CONFLICT, t!("usuarios-router-error-existe"))
-        }
-        E::InstanciaCambiada(m) if m == crate::changes::SIN_PING_YA_PUESTA => fallo(
-            StatusCode::CONFLICT,
-            t!("ajuste-seguridad-cortafuegos-ya-puesta"),
-        ),
         E::Bloqueada(m) => {
             tracing::warn!("ajustes: escritura bloqueada: {m}");
             fallo(StatusCode::FORBIDDEN, t!("ajustes-error-bloqueada"))

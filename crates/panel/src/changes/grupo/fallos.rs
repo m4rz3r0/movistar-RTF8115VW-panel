@@ -69,7 +69,7 @@ impl ChangeManager {
             return fallo.error;
         }
         tracing::warn!(cambio = id, "revirtiendo lo aplicado");
-        let fallos = self.revertir_pasos(id, &escritos).await;
+        let (fallos, aviso) = self.revertir_pasos(id, &escritos).await;
         let (estado, e) = if fallos.is_empty() {
             (Estado::Fallido, texto.y(Nota::clave(nota::ERROR_REVERTIDO)))
         } else {
@@ -80,22 +80,26 @@ impl ChangeManager {
             };
             (estado, texto.y(detalle_reversion(multi, &fallos)))
         };
-        self.marcar(id, estado, Some(&e), None).await;
+        self.marcar(id, estado, Some(&e), aviso.as_ref()).await;
         self.cerrar_sin_revertir(id, &escritos, &fallos).await;
         CambioError::Router(e.para_registro())
     }
 
     /// Revierte `pasos` en orden inverso y marca cada uno. Devuelve los que
-    /// no se pudieron revertir.
+    /// no se pudieron revertir y los avisos de lo revertido para la nota
+    /// del cambio (un usuario que vuelve con una contraseña que el panel no
+    /// guarda).
     pub(in crate::changes) async fn revertir_pasos(
         &self,
         id: i64,
         pasos: &[PasoEscrito],
-    ) -> Vec<(usize, String, ErrorReversion)> {
+    ) -> (Vec<(usize, String, ErrorReversion)>, Option<Nota>) {
         let mut fallos = Vec::new();
+        let mut avisos = Vec::new();
         for p in pasos.iter().rev() {
             match self.revertir_plan(id, &p.plan).await {
-                Ok(()) => {
+                Ok(aviso) => {
+                    avisos.extend(aviso);
                     self.marcar_paso(id, p.orden, EstadoPaso::Revertido, None)
                         .await
                 }
@@ -114,7 +118,7 @@ impl ChangeManager {
                 }
             }
         }
-        fallos
+        (fallos, Nota::juntar(avisos))
     }
 
     /// Con el grupo ya en su estado final: los pasos sin verificar que no se
@@ -136,15 +140,17 @@ impl ChangeManager {
 
     /// Escribe los valores anteriores de `plan` y verifica. Los fallos
     /// transitorios (router sin respuesta, relectura fallida) se reintentan
-    /// durante `alto`; los deterministas terminan en el acto.
-    async fn revertir_plan(&self, id: i64, plan: &Plan) -> Result<(), ErrorReversion> {
+    /// durante `alto`; los deterministas terminan en el acto. Con un aviso
+    /// para el Historial si lo revertido lo necesita
+    /// ([`nota::USUARIO_REVERTIDO`]).
+    async fn revertir_plan(&self, id: i64, plan: &Plan) -> Result<Option<Nota>, ErrorReversion> {
         let Some(mut req) = inversa(plan) else {
             // Sin inversa, vale si el router ya muestra lo de antes (p. ej.
             // una creación sin instancia conocida que no llegó a hacerse).
             return match plan.operacion {
                 Operacion::Accion => Err(ErrorReversion::SinInversa),
                 _ => match self.comprobar(plan, Lado::Anterior).await {
-                    Comprobacion::Coincide(_) => Ok(()),
+                    Comprobacion::Coincide(_) => Ok(None),
                     _ if plan.operacion == Operacion::Crear => Err(ErrorReversion::Fallo(
                         "no se sabe qué instancia se creó; revisa la lista en el router".into(),
                     )),
@@ -153,14 +159,21 @@ impl ChangeManager {
             };
         };
         // Un usuario borrado vuelve con una contraseña nueva aleatoria (la
-        // de antes no se puede leer): no se enseña, habrá que cambiarla.
-        crate::changes::especiales::con_contrasena_nueva(&mut req);
+        // de antes no se puede leer). Aquí no hay cambio de deshacer que la
+        // guarde para el ojo: el Historial avisa de que hay que cambiarla.
+        let recrea = crate::changes::especiales::con_contrasena_nueva(&mut req);
         let fin = Instant::now() + self.tiempos.alto;
         // Plan del último intento que llegó a escribir (o pudo llegar).
         let mut enviado = None;
         loop {
             let error = match self.revertir_una_vez(&req, plan, &mut enviado).await {
-                Ok(()) => return Ok(()),
+                // Solo si llegó a escribirse: si el usuario ya estaba, sigue
+                // con su contraseña.
+                Ok(()) => {
+                    return Ok(
+                        (recrea && enviado.is_some()).then(|| Nota::clave(nota::USUARIO_REVERTIDO))
+                    );
+                }
                 Err(FalloReversion::Definitivo(e)) => return Err(ErrorReversion::Fallo(e)),
                 Err(FalloReversion::Reintentar(e)) => e,
             };
@@ -219,7 +232,9 @@ impl ChangeManager {
     /// no, `revertido_parcial` (o `fallido` con un solo paso).
     async fn revertir_grupo(&self, ej: &Ejecucion, motivo: Nota, nota: Option<&Nota>, ok: Estado) {
         tracing::warn!(cambio = ej.id, "{}; revirtiendo", motivo.para_registro());
-        let fallos = self.revertir_pasos(ej.id, &ej.pasos).await;
+        let (fallos, aviso) = self.revertir_pasos(ej.id, &ej.pasos).await;
+        let nota = Nota::juntar(nota.cloned().into_iter().chain(aviso));
+        let nota = nota.as_ref();
         if fallos.is_empty() {
             let e = motivo.y(Nota::clave(nota::ERROR_REVERTIDO));
             self.marcar(ej.id, ok, Some(&e), nota).await;
@@ -326,11 +341,12 @@ impl ChangeManager {
         let m = self.clone();
         let h = tokio::spawn(async move {
             let motivo = || Nota::clave(nota::ERROR_INTERRUMPIDO);
-            let mut fallos = m.revertir_pasos(id, &escritos).await;
+            let (mut fallos, aviso) = m.revertir_pasos(id, &escritos).await;
+            let aviso = aviso.as_ref();
             fallos.extend(sin_plan);
             if fallos.is_empty() && escritos.is_empty() {
                 let e = motivo().y(Nota::clave(nota::ERROR_NINGUN_PASO));
-                m.marcar(id, Estado::Fallido, Some(&e), None).await;
+                m.marcar(id, Estado::Fallido, Some(&e), aviso).await;
             } else if fallos.is_empty() {
                 // Cortado mientras se vigilaba: como una vigilancia fallida.
                 let ok = if aplicando {
@@ -339,10 +355,11 @@ impl ChangeManager {
                     Estado::Revertido
                 };
                 let e = motivo().y(Nota::clave(nota::ERROR_REVERTIDO));
-                m.marcar(id, ok, Some(&e), None).await;
+                m.marcar(id, ok, Some(&e), aviso).await;
             } else {
                 let e = motivo().y(detalle_reversion(true, &fallos));
-                m.marcar(id, Estado::RevertidoParcial, Some(&e), None).await;
+                m.marcar(id, Estado::RevertidoParcial, Some(&e), aviso)
+                    .await;
                 m.cerrar_sin_revertir(id, &escritos, &fallos).await;
             }
             drop(reserva);

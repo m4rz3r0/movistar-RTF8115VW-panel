@@ -77,10 +77,21 @@ pub(crate) fn gestor(state: &AppState) -> Result<Arc<ChangeManager>, ServerFnErr
         .ok_or_else(|| interno("el gestor de cambios no está instalado"))
 }
 
+/// El error de un motivo del gestor con texto propio
+/// ([`crate::changes::motivo_con_texto`]), en el idioma de la petición.
+pub(crate) fn error_con_texto(e: &CambioError) -> Option<ServerFnError> {
+    let (codigo, clave) = crate::changes::motivo_con_texto(e)?;
+    let status = StatusCode::from_u16(codigo).unwrap_or(StatusCode::BAD_REQUEST);
+    Some(con_estado(status, crate::ui::i18n::traducir(clave, None)))
+}
+
 /// Error del gestor en el idioma de la petición y con qué hacer. El detalle
 /// que trae el gestor (`m`) está en español.
 pub(crate) fn error_cambio(e: CambioError) -> ServerFnError {
     use CambioError as E;
+    if let Some(r) = error_con_texto(&e) {
+        return r;
+    }
     let (status, msg) = match e {
         E::Bloqueada(m) if m == crate::changes::BLOQUEO_SOLO_LECTURA => {
             (StatusCode::FORBIDDEN, crate::t!("panel-solo-lectura"))
@@ -88,14 +99,6 @@ pub(crate) fn error_cambio(e: CambioError) -> ServerFnError {
         E::Bloqueada(m) if m == crate::changes::BLOQUEO_SECRETO_TAPADO => (
             StatusCode::FORBIDDEN,
             crate::t!("cambio-error-secreto-tapado"),
-        ),
-        E::Bloqueada(m) if m == crate::changes::BLOQUEO_USUARIO_PROTEGIDO => (
-            StatusCode::FORBIDDEN,
-            crate::t!("usuarios-router-error-protegido"),
-        ),
-        E::InstanciaCambiada(m) if m == crate::changes::USUARIO_YA_EXISTE => (
-            StatusCode::CONFLICT,
-            crate::t!("usuarios-router-error-existe"),
         ),
         E::Bloqueada(m) => (
             StatusCode::FORBIDDEN,

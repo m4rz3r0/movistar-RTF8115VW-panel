@@ -48,6 +48,7 @@ mod registro_y_dns;
 mod sensibles;
 mod tema;
 mod usuarios_router;
+mod usuarios_router_guardas;
 mod vista;
 mod voz;
 mod wifi_avanzado;

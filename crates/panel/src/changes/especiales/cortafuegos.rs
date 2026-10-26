@@ -10,11 +10,11 @@
 //!   internet; si ya hay una regla con la huella, 409
 //!   ([`SIN_PING_YA_PUESTA`]);
 //! - su baja (el deshacer o la reversión): la misma función con `borrar` y
-//!   el RID como instancia, sin valores. Solo si esa regla existe y tiene la
-//!   huella ([`cf::es_sin_ping`]); si no, `InstanciaCambiada` (409) sin
-//!   escribir. Se escribe `scbidirectionalflt.cmd?action=remove` con
-//!   `item=<FID>|<RID>` y `escape=true`: nunca un FID suelto, que borraría el
-//!   filtro entero.
+//!   el RID como instancia, sin valores. Solo si esa regla existe, tiene la
+//!   huella ([`cf::es_sin_ping`]) y está en un filtro de entrada IPv4; si
+//!   no, `InstanciaCambiada` (409) sin escribir. Se escribe
+//!   `scbidirectionalflt.cmd?action=remove` con `item=<FID>|<RID>` y
+//!   `escape=true`: nunca un FID suelto, que borraría el filtro entero.
 //!
 //! `modify` y las aperturas IPv6 (`scbidirectionalfwl`) no se eximen nunca.
 
@@ -87,6 +87,16 @@ pub(in crate::changes) fn baja(
             ("escape".to_owned(), "true".to_owned()),
         ],
     )
+}
+
+/// El filtro de la regla `rid` si es la del panel: con su huella
+/// ([`cf::es_sin_ping`]) y en un filtro de entrada IPv4 (Ruling G).
+fn filtro_de_la_regla<'a>(filtros: &'a [Filtro], rid: &str) -> Option<&'a Filtro> {
+    filtros.iter().find(|x| {
+        x.tipo == "0"
+            && x.version == "0"
+            && x.reglas.iter().any(|r| r.rid == rid && cf::es_sin_ping(r))
+    })
 }
 
 /// Cada regla como la ve el gestor, `{RID, belong, version, enabled,
@@ -194,15 +204,12 @@ impl ChangeManager {
         if req.borrar {
             let rid = req.instancia.clone().unwrap_or_default();
             let filtros = self.filtros().await?;
-            let filtro = filtros
-                .iter()
-                .find(|x| x.reglas.iter().any(|r| r.rid == rid && cf::es_sin_ping(r)))
-                .ok_or_else(|| {
-                    CambioError::InstanciaCambiada(format!(
-                        "la regla {rid} ya no es la del panel (no está o tiene otra huella): \
+            let filtro = filtro_de_la_regla(&filtros, &rid).ok_or_else(|| {
+                CambioError::InstanciaCambiada(format!(
+                    "la regla {rid} ya no es la del panel (no está o tiene otra huella): \
                          no se borra, para no tocar otra"
-                    ))
-                })?;
+                ))
+            })?;
             let valores: BTreeMap<String, String> =
                 [("belong".to_owned(), filtro.fid.clone())].into();
             return Ok(Plan {
@@ -375,6 +382,52 @@ mod tests {
         let mut remove = req(&[("item", "0|16")], None, false);
         remove.funcion = BAJA.into();
         assert!(!exento_de_bloqueo(&remove));
+    }
+
+    /// La baja solo reconoce la regla del panel en un filtro de entrada
+    /// IPv4: con la misma huella en el de IPv6 o en uno de salida, no.
+    #[test]
+    fn la_baja_exige_el_filtro_de_entrada_ipv4() {
+        let vacio = String::new;
+        let regla = cf::Regla {
+            rid: "16".into(),
+            enable: "1".into(),
+            protocol: "1".into(),
+            action: "0".into(),
+            reject_type: vacio(),
+            icmp_type: "25".into(),
+            orig_addr: vacio(),
+            orig_mask: vacio(),
+            orig_start_port: vacio(),
+            orig_end_port: vacio(),
+            dest_addr: vacio(),
+            dest_mask: vacio(),
+            dest_start_port: vacio(),
+            dest_end_port: vacio(),
+        };
+        let filtro = |fid: &str, tipo: &str, version: &str| Filtro {
+            fid: fid.into(),
+            name: String::new(),
+            interface: String::new(),
+            intf_id: String::new(),
+            tipo: tipo.into(),
+            version: version.into(),
+            default: String::new(),
+            reglas: vec![regla.clone()],
+        };
+        let v4 = [filtro("0", "0", "0")];
+        assert_eq!(
+            filtro_de_la_regla(&v4, "16").map(|f| f.fid.as_str()),
+            Some("0")
+        );
+        assert!(filtro_de_la_regla(&v4, "15").is_none());
+        for (tipo, version) in [("0", "1"), ("1", "0")] {
+            let otro = [filtro("1", tipo, version)];
+            assert!(
+                filtro_de_la_regla(&otro, "16").is_none(),
+                "tipo {tipo}, versión {version}"
+            );
+        }
     }
 
     /// La baja lleva siempre el filtro y la regla.
