@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { PLAZO_CAMBIO, plazoDeTest } from "./cambios";
 import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
+import { capturaOpcional } from "./util";
 
 // Ajustes → WiFi dice si cada red está encendida o apagada: la insignia de
 // la tarjeta de cada red y, en la radio encendida sin ninguna red
@@ -92,8 +93,8 @@ for (const idioma of ["es", "en"] as const) {
         await expect(nota).toBeVisible();
         await sinDesbordamiento(page, `wifi ${idioma} ${ancho}`);
         if (idioma === "es") {
-          await red24.screenshot({ path: `capturas/w1-red-apagada-${idioma}-${ancho}.png` });
-          await radio24.screenshot({ path: `capturas/w1-radio-sin-redes-${idioma}-${ancho}.png` });
+          await capturaOpcional(red24, { path: `capturas/w1-red-apagada-${idioma}-${ancho}.png` });
+          await capturaOpcional(radio24, { path: `capturas/w1-radio-sin-redes-${idioma}-${ancho}.png` });
         }
 
         if (cambia) {

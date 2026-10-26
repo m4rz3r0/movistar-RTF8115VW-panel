@@ -83,7 +83,7 @@ test("volver UPnP a como estaba al instalar", async ({ page }) => {
   await page.route(
     "**/api/confirmar_ajuste",
     async (r) => {
-      await new Promise((ok) => setTimeout(ok, 1_500));
+      await new Promise((ok) => setTimeout(ok, 800));
       await r.continue();
     },
     { times: 1 },
@@ -100,7 +100,7 @@ test("volver UPnP a como estaba al instalar", async ({ page }) => {
   await page.route(
     "**/api/deshacer_ajuste",
     async (r) => {
-      await new Promise((ok) => setTimeout(ok, 1_500));
+      await new Promise((ok) => setTimeout(ok, 800));
       await r.continue();
     },
     { times: 1 },

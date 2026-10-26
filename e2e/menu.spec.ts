@@ -1,6 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { USUARIO } from "./instancias";
 import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
+import { capturaOpcional } from "./util";
 
 // Menú reorganizado, a 360 y 1440 px, en español y en inglés: el nombre de
 // usuario abre «Ajustes del panel», y Recomendaciones no sale en el menú
@@ -48,7 +49,7 @@ for (const idioma of ["es", "en"] as const) {
         await expect(nav.getByRole("link", { name: t.recomendaciones })).toHaveCount(0);
         await expect(page.locator("a[href^='/recomendaciones']")).toHaveCount(0);
         await sinDesbordamiento(page, `menú ${idioma} ${ancho}`);
-        await page.screenshot({ path: `capturas/menu-${idioma}-${ancho}.png`, fullPage: true });
+        await capturaOpcional(page, { path: `capturas/menu-${idioma}-${ancho}.png`, fullPage: true });
 
         // 2. El nombre de usuario abre «Ajustes del panel».
         const usuario = page.locator("a.sesion-usuario");

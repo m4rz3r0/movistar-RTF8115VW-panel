@@ -8,6 +8,7 @@ import {
   sinDesbordamiento,
   violacionesGraves,
 } from "./util";
+import { capturaOpcional } from "./util";
 
 // Puertos y Red local en lista con columnas (Tarea 5 del rediseño), en
 // español contra router-sim, a 360 y 1440 px y en los dos temas:
@@ -105,8 +106,9 @@ async function anchoDeLaTabla(page: Page): Promise<number> {
 }
 
 async function captura(page: Page, nombre: string, completa: boolean) {
+  if (!process.env.E2E_CAPTURAS) return;
   await quieta(page);
-  await page.screenshot({
+  await capturaOpcional(page, {
     path: `${CAPTURAS}/${nombre}.png`,
     fullPage: completa,
     animations: "disabled",

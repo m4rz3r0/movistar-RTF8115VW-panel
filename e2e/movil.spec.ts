@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
+import { capturaOpcional } from "./util";
 
 // Sin desbordamiento horizontal a 360 px (y capturas a 360 y 1440) en las
 // páginas principales del panel instalado, contra router-sim.
@@ -40,7 +41,7 @@ for (const ancho of anchos) {
         });
         await asentar(page);
 
-        await page.screenshot({
+        await capturaOpcional(page, {
           path: `capturas/${p.nombre}-${ancho.width}.png`,
           fullPage: true,
         });
@@ -72,7 +73,7 @@ for (const ancho of anchos) {
       await expect(pasos.locator(".hist-paso-cuerpo").first()).toBeVisible();
       await expect(pasos.locator(".hist-paso-cuerpo").last()).toBeVisible();
 
-      await page.screenshot({
+      await capturaOpcional(page, {
         path: `capturas/historial-grupo-${ancho.width}.png`,
         fullPage: true,
       });

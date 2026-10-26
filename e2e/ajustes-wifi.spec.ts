@@ -10,6 +10,7 @@ import {
   sinDesbordamiento,
   violacionesGraves,
 } from "./util";
+import { capturaOpcional } from "./util";
 
 // Ajustes → WiFi en rejilla (la pestaña modelo del rediseño), en español a
 // 360, 1024 y 1440 px y en los dos temas, contra router-sim:
@@ -80,7 +81,7 @@ async function confirmarDespacio(page: Page) {
   await page.route(
     "**/api/confirmar_ajuste",
     async (r) => {
-      await new Promise((ok) => setTimeout(ok, 1_500));
+      await new Promise((ok) => setTimeout(ok, 800));
       await r.continue();
     },
     { times: 1 },
@@ -150,7 +151,7 @@ for (const ancho of [360, 1024, 1440]) {
         await expect(red24).toHaveClass(/marcada/);
         await sinDesbordamiento(page, `dos marcadas ${sufijo}`);
         await quieta(page);
-        await page.screenshot({ path: `${CAPTURAS}/wifi-marcadas-${sufijo}.png`, fullPage: ancho > 900, animations: "disabled" });
+        await capturaOpcional(page, { path: `${CAPTURAS}/wifi-marcadas-${sufijo}.png`, fullPage: ancho > 900, animations: "disabled" });
         expect(await violacionesGraves(page), "dos marcadas").toEqual([]);
 
         // «Quitar WPS»: un solo cambio con un paso por red (aquí se cancela).
@@ -179,7 +180,7 @@ for (const ancho of [360, 1024, 1440]) {
         await expect(titulo).toBeFocused();
         await sinDesbordamiento(page, `detalle ${sufijo}`);
         await quieta(page);
-        await page.screenshot({ path: `${CAPTURAS}/wifi-detalle-${sufijo}.png`, fullPage: ancho > 900, animations: "disabled" });
+        await capturaOpcional(page, { path: `${CAPTURAS}/wifi-detalle-${sufijo}.png`, fullPage: ancho > 900, animations: "disabled" });
         expect(await violacionesGraves(page), "detalle").toEqual([]);
         await page.keyboard.press("Escape");
         await page.waitForURL((u) => u.pathname === "/ajustes/wifi");
@@ -275,7 +276,7 @@ for (const ancho of [360, 1024, 1440]) {
         await expect(barra.getByRole("button", { name: t.quitarWps })).toBeVisible();
         await sinDesbordamiento(page, `sin leer ${sufijo}`);
         await quieta(page);
-        await page.screenshot({ path: `${CAPTURAS}/wifi-sin-leer-${sufijo}.png`, fullPage: ancho > 900, animations: "disabled" });
+        await capturaOpcional(page, { path: `${CAPTURAS}/wifi-sin-leer-${sufijo}.png`, fullPage: ancho > 900, animations: "disabled" });
         expect(await violacionesGraves(page), "sin leer").toEqual([]);
         await page.unrouteAll({ behavior: "wait" });
         expect(errores, "errores o avisos en la consola").toEqual([]);
@@ -314,7 +315,7 @@ for (const ancho of [360, 1024, 1440]) {
         await expect(dialogo.locator("tbody td").nth(0)).toHaveText(t.encendida);
         await expect(dialogo.locator("tbody td").nth(1)).toHaveText(t.apagada);
         await quieta(page);
-        await page.screenshot({ path: `${CAPTURAS}/wifi-interruptor-con-efecto-${sufijo}.png`, animations: "disabled" });
+        await capturaOpcional(page, { path: `${CAPTURAS}/wifi-interruptor-con-efecto-${sufijo}.png`, animations: "disabled" });
         expect(await violacionesGraves(page), "diálogo del interruptor").toEqual([]);
         await dialogo.getByRole("button", { name: t.cancelar }).click();
         await expect(page.locator("dialog[open]")).toHaveCount(0);
@@ -334,7 +335,7 @@ for (const ancho of [360, 1024, 1440]) {
         await expect(dialogo.locator("fieldset.grupo-paso")).toHaveCount(2);
         let aviso = await aplicarYSeguir(page, t.aplicar, [red24, red5]);
         await quieta(page);
-        await page.screenshot({ path: `${CAPTURAS}/wifi-aviso-${sufijo}.png`, animations: "disabled" });
+        await capturaOpcional(page, { path: `${CAPTURAS}/wifi-aviso-${sufijo}.png`, animations: "disabled" });
         expect(await violacionesGraves(page), "aviso").toEqual([]);
         await aviso.getByRole("button", { name: t.deshacer, exact: true }).click();
         await expect(dialogo.locator("#grupo-titulo")).toHaveText(t.volver);

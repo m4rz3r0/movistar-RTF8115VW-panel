@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { PLAZO_CAMBIO, cambiarUpnp, esperarFinal, estadoCambio, plazoDeTest } from "./cambios";
 import { CONTRASENA, USUARIO, instalado } from "./instancias";
 import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
+import { capturaOpcional } from "./util";
 
 // La Biblioteca (una función de lectura con un parámetro) abierta justo
 // después de aplicar un cambio, con el router lento: el servidor pinta la
@@ -142,7 +143,7 @@ for (const ancho of [360, 1440]) {
       const ocultar = xml.getByRole("button", { name: "Ocultar claves en el XML" });
       await expect(ocultar).toHaveAttribute("aria-pressed", "true");
       await sinDesbordamiento(page, `biblioteca sensibles ${ancho}`);
-      await page.screenshot({ path: `capturas/biblioteca-sensibles-${ancho}.png`, fullPage: true });
+      await capturaOpcional(page, { path: `capturas/biblioteca-sensibles-${ancho}.png`, fullPage: true });
       await ocultar.click();
       await expect(pre).toContainText("<acs_password>••••••</acs_password>");
       expect(errores, "errores o avisos en la consola").toEqual([]);

@@ -1,5 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import { asentar, entrar, quieta, sinDesbordamiento } from "./util";
+import { capturaOpcional } from "./util";
 
 // El diálogo de revisión de Ajustes a 360 px con valores largos: una MAC
 // («Fijar esta IP») y la dirección web del servidor de la gestión remota.
@@ -67,7 +68,7 @@ test("una MAC en el diálogo, entera o partida por «:»", async ({ page }) => {
   await quieta(page);
   expect(await cortesFeos(page)).toEqual([]);
   await sinDesbordamiento(page, "diálogo con una MAC");
-  await page.screenshot({ path: "capturas/dialogo-valores-mac-360.png" });
+  await capturaOpcional(page, { path: "capturas/dialogo-valores-mac-360.png" });
   await dialogo.getByRole("button", { name: "Cancelar", exact: true }).click();
   await expect(dialogo).toHaveCount(0);
 });
@@ -87,7 +88,7 @@ test("una dirección web en el diálogo, partida por «/», «.» o «-»", asyn
   await quieta(page);
   expect(await cortesFeos(page)).toEqual([]);
   await sinDesbordamiento(page, "diálogo con una dirección web");
-  await page.screenshot({ path: "capturas/dialogo-valores-url-360.png" });
+  await capturaOpcional(page, { path: "capturas/dialogo-valores-url-360.png" });
   await dialogo.getByRole("button", { name: "Cancelar", exact: true }).click();
   await expect(dialogo).toHaveCount(0);
 });

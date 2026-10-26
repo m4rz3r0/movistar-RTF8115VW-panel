@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { PLAZO_CAMBIO, plazoDeTest } from "./cambios";
 import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
+import { capturaOpcional } from "./util";
 
 // Puertos abiertos (/ajustes/puertos) a 360, 768, 1024, 1280 y 1440 px, en
 // español y en inglés, contra router-sim:
@@ -168,7 +169,7 @@ for (const idioma of ["es", "en"] as const) {
         await expect(desc1).toContainText("TCP");
         await sinDesbordamiento(page, `puertos ${idioma} ${ancho}`);
         sinApi(await reglas(page, t).innerText());
-        await page.screenshot({ path: `capturas/puertos-${idioma}-${ancho}.png`, fullPage: true });
+        await capturaOpcional(page, { path: `capturas/puertos-${idioma}-${ancho}.png`, fullPage: true });
         // Su detalle dice qué hacer.
         const detalle1 = await abrir(page, t, "desc-1");
         await expect(detalle1).toContainText(t.queHacer);
@@ -295,7 +296,7 @@ for (const idioma of ["es", "en"] as const) {
           await expect(pasos.nth(0).getByText("192.168.1.62")).toBeVisible();
           sinApi(await dialogo.innerText());
           await sinDesbordamiento(page, `diálogo ${idioma} ${ancho}`);
-          await page.screenshot({ path: `capturas/puertos-dialogo-${idioma}-${ancho}.png` });
+          await capturaOpcional(page, { path: `capturas/puertos-dialogo-${idioma}-${ancho}.png` });
           await dialogo.getByRole("button", { name: t.cancelar }).click();
           await expect(page.locator("dialog[open]")).toHaveCount(0);
         }

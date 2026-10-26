@@ -10,6 +10,7 @@ import {
   sinDesbordamiento,
   violacionesGraves,
 } from "./util";
+import { capturaOpcional } from "./util";
 
 // Internet, Seguridad, Teléfono y Sistema en rejilla (como la WiFi), en
 // español a 360 y 1440 px y en los dos temas, contra router-sim: la franja
@@ -131,7 +132,7 @@ async function rejilla(page: Page, c: Caso, sufijo: string, ancho: number) {
     .evaluateAll((ds) => ds.filter((d) => d.scrollWidth > d.clientWidth).map((d) => d.textContent));
   expect(salen, `${c.tema} ${sufijo}: el resumen se sale`).toEqual([]);
   await quieta(page);
-  await page.screenshot({
+  await capturaOpcional(page, {
     path: `${CAPTURAS}/${c.tema}-${sufijo}.png`,
     fullPage: ancho > 900,
     animations: "disabled",
@@ -174,7 +175,7 @@ for (const ancho of [360, 1440]) {
           await c.editar(detalle, sufijo);
           await sinDesbordamiento(page, `${c.tema} detalle ${sufijo}`);
           await quieta(page);
-          await page.screenshot({
+          await capturaOpcional(page, {
             path: `${CAPTURAS}/${c.tema}-detalle-${sufijo}.png`,
             fullPage: ancho > 900,
             animations: "disabled",
@@ -300,7 +301,7 @@ test.describe("temas en rejilla: guardados de verdad", () => {
           await c.editar(detalle, sufijo);
           await sinDesbordamiento(page, `${c.tema} detalle ${sufijo}`);
           await quieta(page);
-          await page.screenshot({
+          await capturaOpcional(page, {
             path: `${CAPTURAS}/${c.tema}-detalle-${sufijo}.png`,
             fullPage: ancho > 900,
             animations: "disabled",

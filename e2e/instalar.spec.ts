@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { nuevos } from "./instancias";
 import { asentar, recogerErrores, sinDesbordamiento } from "./util";
+import { capturaOpcional } from "./util";
 
 // Asistente de primera instalación en un panel recién instalado (base de
 // datos vacía, simulador): el token del fichero, el administrador, el router,
@@ -61,7 +62,7 @@ for (const { idioma, locale, ancho } of pasadas) {
       await expect(page.locator("h1")).toHaveText(t.titulo);
       await asentar(page);
       await sinDesbordamiento(page, "paso del administrador");
-      await page.screenshot({ path: `capturas/instalar-${idioma}-${ancho}.png`, fullPage: true });
+      await capturaOpcional(page, { path: `capturas/instalar-${idioma}-${ancho}.png`, fullPage: true });
 
       // El token, del fichero junto a la base de datos.
       const token = readFileSync(join(panel.dir, "instalar.token"), "utf8").trim();
@@ -88,7 +89,7 @@ for (const { idioma, locale, ancho } of pasadas) {
       await expect(page.locator(".instalar-botones a")).toHaveCount(1);
       await expect(page.locator("a[href^='/recomendaciones']")).toHaveCount(0);
       await sinDesbordamiento(page, "fin del asistente");
-      await page.screenshot({ path: `capturas/instalar-fin-${idioma}-${ancho}.png`, fullPage: true });
+      await capturaOpcional(page, { path: `capturas/instalar-fin-${idioma}-${ancho}.png`, fullPage: true });
 
       await page.getByRole("link", { name: t.irEstado }).click();
       await page.waitForURL((url) => url.pathname === "/");

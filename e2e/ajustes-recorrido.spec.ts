@@ -2,6 +2,7 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 import { PLAZO_CAMBIO, plazoDeTest } from "./cambios";
 import { CONTRASENA, USUARIO, recorridos } from "./instancias";
 import { asentar, hidratada, recogerErrores, sinDesbordamiento } from "./util";
+import { capturaOpcional } from "./util";
 
 // Criterio de éxito 1 del spec de Ajustes: alguien que no conoce este router
 // cambia la contraseña WiFi, apaga el WPS, fija la IP de un dispositivo,
@@ -274,7 +275,7 @@ for (const { idioma, locale, ancho } of pasadas) {
       await expect(dialogo.locator("tbody td").nth(1)).toHaveText(t.apagada);
       await aplicarEnRejilla(page, t, "gestión remota");
       await expect(gestion.locator(".tarjeta-datos dd").first()).toContainText(t.apagada);
-      await page.screenshot({ path: `capturas/recorrido-${idioma}-${ancho}.png`, fullPage: true });
+      await capturaOpcional(page, { path: `capturas/recorrido-${idioma}-${ancho}.png`, fullPage: true });
 
       // El Historial: los cinco cambios, sin la API a la vista.
       await page.goto(t.historial);

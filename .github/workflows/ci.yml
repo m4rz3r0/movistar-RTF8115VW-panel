@@ -70,8 +70,10 @@ jobs:
       # Versión con al menos dos semanas publicada (cadena de suministro).
       - name: Instalar cargo-nextest
         run: cargo install --locked cargo-nextest@0.9.146
-      - name: Tests
-        run: cargo nextest run --workspace --profile ci
+      # Sin ssr solo se comprueba que compila: los tests de sin ssr son un
+      # subconjunto de los de con ssr (panel no tiene funciones por defecto).
+      - name: Compila sin el servidor
+        run: cargo check --workspace --all-targets
       - name: Tests con el servidor (ssr)
         run: cargo nextest run --workspace --features panel/ssr --profile ci
       - name: Doctests

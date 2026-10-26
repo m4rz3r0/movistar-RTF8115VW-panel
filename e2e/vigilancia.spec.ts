@@ -9,6 +9,7 @@ import {
   sinDesbordamiento,
   violacionesGraves,
 } from "./util";
+import { capturaOpcional } from "./util";
 
 // La vigilancia y la cola, en un panel propio que vigila 5 min
 // (instancias.ts), así que nada termina solo durante la prueba:
@@ -101,7 +102,7 @@ test("Ajustes: terminar la vigilancia y la cola en el aviso", async ({ page }) =
   await expect(tercero).toContainText("En cola (puesto 2)", { timeout: 15_000 });
   await expect(tercero.getByRole("button", { name: t.quitar })).toBeVisible();
   await quieta(page);
-  await page.screenshot({ path: `${CAPTURAS}/aviso-vigilando-y-cola-1440.png`, animations: "disabled" });
+  await capturaOpcional(page, { path: `${CAPTURAS}/aviso-vigilando-y-cola-1440.png`, animations: "disabled" });
   expect(await violacionesGraves(page), "aviso con la cola").toEqual([]);
 
   // «Quitar de la cola»: no se aplica y la tarjeta vuelve a como estaba.
@@ -120,7 +121,7 @@ test("Ajustes: terminar la vigilancia y la cola en el aviso", async ({ page }) =
   await expect(insignia(red24)).toHaveText(t.comprobando, { timeout: 15_000 });
   await expect(segundo.getByRole("button", { name: t.terminar })).toBeVisible({ timeout: 15_000 });
   await quieta(page);
-  await page.screenshot({ path: `${CAPTURAS}/aviso-terminado-y-siguiente-1440.png`, animations: "disabled" });
+  await capturaOpcional(page, { path: `${CAPTURAS}/aviso-terminado-y-siguiente-1440.png`, animations: "disabled" });
   await segundo.getByRole("button", { name: t.terminar }).click();
   await expect(segundo).toContainText(t.hecho);
   await expect(insignia(red24)).toHaveText(t.encendida);
@@ -152,7 +153,7 @@ test("Historial: terminar y quitar de la cola desde la fila, en el móvil", asyn
   }
   await sinDesbordamiento(page, "historial 360");
   await quieta(page);
-  await page.screenshot({ path: `${CAPTURAS}/historial-vigilando-y-cola-360.png`, fullPage: true });
+  await capturaOpcional(page, { path: `${CAPTURAS}/historial-vigilando-y-cola-360.png`, fullPage: true });
   expect(await violacionesGraves(page), "historial con la cola").toEqual([]);
 
   await quitar.click();
@@ -164,6 +165,6 @@ test("Historial: terminar y quitar de la cola desde la fila, en el móvil", asyn
   expect(await estadoCambio(page, vigilado)).toBe("Aplicado");
   expect(await estadoCambio(page, enCola)).toBe("Cancelado");
   await quieta(page);
-  await page.screenshot({ path: `${CAPTURAS}/historial-terminado-y-quitado-360.png`, fullPage: true });
+  await capturaOpcional(page, { path: `${CAPTURAS}/historial-terminado-y-quitado-360.png`, fullPage: true });
   expect(errores, "errores o avisos en la consola").toEqual([]);
 });

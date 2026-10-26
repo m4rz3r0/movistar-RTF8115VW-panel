@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { PLAZO_CAMBIO, plazoDeTest } from "./cambios";
 import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
+import { capturaOpcional } from "./util";
 
 // Red local (/ajustes/red_local) a 360 y 1440 px, en español y en inglés,
 // contra router-sim: la tarjeta del reparto de direcciones (DHCP), su
@@ -97,7 +98,7 @@ for (const idioma of ["es", "en"] as const) {
         const dhcp = tarjeta(page, t.dhcp);
         await expect(dhcp).toBeVisible();
         await sinDesbordamiento(page, `red local ${idioma} ${ancho}`);
-        await page.screenshot({
+        await capturaOpcional(page, {
           path: `capturas/ajustes-red-local-${idioma}-${ancho}.png`,
           fullPage: true,
         });
@@ -136,7 +137,7 @@ for (const idioma of ["es", "en"] as const) {
         await expect(cambio.locator("td").nth(1)).toHaveText(despues);
         sinApi(await dialogo.innerText());
         await sinDesbordamiento(page, `diálogo ${idioma} ${ancho}`);
-        await page.screenshot({ path: `capturas/ajustes-dialogo-${idioma}-${ancho}.png` });
+        await capturaOpcional(page, { path: `capturas/ajustes-dialogo-${idioma}-${ancho}.png` });
 
         const aviso = page.locator(".avisos-cambio [role=status] .aviso-cambio");
         if (aplicaDeVerdad) {
