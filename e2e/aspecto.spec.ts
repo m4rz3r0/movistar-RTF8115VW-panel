@@ -10,7 +10,7 @@ import {
 import { capturaOpcional } from "./util";
 
 // Aspecto de Estado, Mejoras, Historial, Biblioteca, Configuración del router y
-// Ajustes del panel con el sistema visual nuevo (spec del rediseño, §3), en
+// Ajustes del panel con el sistema visual nuevo, en
 // español a 360 y 1440 px y en los dos temas, contra router-sim: axe sin
 // violaciones serias (entre ellas, el contraste), sin desbordamiento
 // horizontal, cada botón de `main` en la escala única (.b-pri, .b-sec,

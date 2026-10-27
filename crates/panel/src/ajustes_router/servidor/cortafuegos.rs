@@ -49,7 +49,7 @@ pub(super) fn puesta(f: &[Filtro]) -> bool {
 /// El ping que llega de internet, por versión: abierto desde cualquier
 /// origen por una regla del operador. La regla del panel va al final de su
 /// filtro, detrás de esa regla, así que no la anula: en el router real el
-/// ping siguió respondiendo con ella puesta (E5, cambio 11). Con la regla
+/// ping siguió respondiendo con ella puesta. Con la regla
 /// puesta y el ping abierto, la tarjeta sigue en ámbar y el motivo de la
 /// acción lo explica.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -234,7 +234,7 @@ pub fn filtro_de_entrada_v4<'a>(f: &'a [Filtro], ip_intf_id: &str) -> Option<&'a
 }
 
 /// Carga del alta de la regla «sin ping» en `filtro`, la comprobada en el
-/// router real (E5, cambio 11): activa, ICMP, descartar y `echo_request`,
+/// router real: activa, ICMP, descartar y `echo_request`,
 /// sin `escape`, id, puertos ni direcciones (con ICMP no se envían). El
 /// editor completo, como la web, la manda con [`carga_regla`].
 pub fn carga_sin_ping(filtro: &Filtro) -> Vec<(&'static str, String)> {

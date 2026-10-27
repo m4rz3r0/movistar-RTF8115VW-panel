@@ -38,7 +38,7 @@ código, junto a cada `#[server(endpoint = "…")]`.
 
 Cada escritura o acción de `crates/catalogo/funciones.toml` lleva
 `comprobada`: la referencia de la prueba en el router real
-(`comprobada = "E3, cambio 14"`) o `false`. Es una lista blanca que falla
+(`comprobada = "ida y vuelta"`) o `false`. Es una lista blanca que falla
 cerrada: sin el campo, como `false` (un test pide que toda escritura lo
 lleve, y otro fija la lista de la 1.0). Marcar una función como comprobada
 es cambiar esa línea.

@@ -1,4 +1,4 @@
-//! Interruptores de la validación real en el gestor: qué funciones de la fase 3 deja hacer este proceso.
+//! Interruptores de la validación real en el gestor: qué funciones de la validación en el router real deja hacer este proceso.
 //!
 //! La base son los valores de la versión
 //! ([`crate::validacion_real::en_la_version`]). Las pruebas contra
@@ -41,7 +41,7 @@ impl ChangeManager {
         let _ = self.interruptores.forzados.set(f);
     }
 
-    /// Las funciones de la fase 3 que deja hacer este gestor: lo que manda
+    /// Las funciones de la validación real que deja hacer este gestor: lo que manda
     /// el servidor a la interfaz y lo que comprueba antes de escribir.
     pub fn desactivadas(&self) -> Desactivadas {
         combinar(

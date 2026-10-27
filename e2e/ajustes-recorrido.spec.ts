@@ -4,7 +4,7 @@ import { CONTRASENA, USUARIO, recorridos } from "./instancias";
 import { asentar, hidratada, recogerErrores, sinDesbordamiento } from "./util";
 import { capturaOpcional } from "./util";
 
-// Criterio de éxito 1 del spec de Ajustes: alguien que no conoce este router
+// Recorrido completo de Ajustes: alguien que no conoce este router
 // cambia la contraseña WiFi, apaga el WPS, fija la IP de un dispositivo,
 // abre un puerto y desactiva la gestión remota del operador (TR-069), sin
 // documentación y sin ver ningún nombre de la API (`cb…`) fuera de los

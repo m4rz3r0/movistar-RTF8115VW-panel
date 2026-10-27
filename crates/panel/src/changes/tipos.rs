@@ -375,7 +375,7 @@ pub(super) const BLOQUEO_IP_LAN: &str = "bloqueada en v1: cambiar la IP del rout
 /// Motivo de [`CambioError::Bloqueada`] cuando la escritura reenviaría un
 /// secreto que el router da vacío o tapado (al completar la carga con lo
 /// leído): podría borrar esa clave. Es la clave i18n del texto. Se quitará
-/// cuando la fase 3 compruebe qué hace el router real con ese reenvío.
+/// cuando se compruebe qué hace el router real con ese reenvío.
 pub const BLOQUEO_SECRETO_TAPADO: &str = "cambio-error-secreto-tapado";
 /// Motivo de [`CambioError::Bloqueada`] al pedir borrar o cambiar el
 /// usuario del router con el que entra el panel o el del operador

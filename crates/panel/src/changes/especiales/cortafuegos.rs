@@ -111,7 +111,7 @@ pub(in crate::changes) fn baja_de_filtro(fid: &str) -> (&'static str, Vec<(Strin
 }
 
 /// El filtro de la regla `rid` si es la del panel: con su huella
-/// ([`cf::es_sin_ping`]) y en un filtro de entrada IPv4 (Ruling G).
+/// ([`cf::es_sin_ping`]) y en un filtro de entrada IPv4.
 fn filtro_de_la_regla<'a>(filtros: &'a [Filtro], rid: &str) -> Option<&'a Filtro> {
     filtros.iter().find(|x| {
         x.tipo == "0"

@@ -78,7 +78,7 @@ ajuste-seguridad-usuarios_router-borrar = Borrar
 ajuste-seguridad-usuarios_router-borrar-de = Borrar { $nombre }
 ajuste-seguridad-usuarios_router-vacia = El router no tiene ningún usuario en su web.
 
-## Cortafuegos (fase 3): las reglas, solo de lectura, y la regla propia del
+## Cortafuegos: las reglas, solo de lectura, y la regla propia del
 ## panel para no responder al ping desde internet.
 
 ajuste-seguridad-cortafuegos-titulo = Cortafuegos

@@ -5,7 +5,7 @@ import { capturaOpcional } from "./util";
 
 // Menú reorganizado, a 360 y 1440 px, en español y en inglés: el nombre de
 // usuario abre «Ajustes del panel», y Recomendaciones no sale en el menú
-// hasta que tenga sus tarjetas (fase 4).
+// hasta que tenga sus tarjetas.
 
 const textos = {
   es: {

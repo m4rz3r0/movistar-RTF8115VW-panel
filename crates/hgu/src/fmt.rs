@@ -27,7 +27,7 @@ pub const CAMBIO_CONTRASENA: &str = "cbModifyPwd";
 /// Es [`mess_userpass`] (XOR 0x1f por carácter), como en `js/user_profile.js`
 /// de la web oficial, que pasa los tres valores por `mess_userpass`. Del
 /// router real solo se sabe que en claro lo rechaza; que acepte el XOR está
-/// pendiente de la E4 de la fase 3. Es involutiva.
+/// sin comprobar. Es involutiva.
 pub fn codificar_cambio_contrasena(valor: &str) -> String {
     mess_userpass(valor)
 }

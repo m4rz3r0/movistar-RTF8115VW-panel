@@ -10,7 +10,7 @@ import {
 } from "./util";
 import { capturaOpcional } from "./util";
 
-// Puertos y Red local en lista con columnas (Tarea 5 del rediseño), en
+// Puertos y Red local en lista con columnas, en
 // español contra router-sim, a 360 y 1440 px y en los dos temas:
 // - ordenar por la columna «Puerto externo» (de menor a mayor y al revés);
 // - el filtro de texto aparece con 9 reglas y no con 8 (las que faltan, en

@@ -21,7 +21,8 @@
 //! TODO(E4): `cbModifyPwd` no está comprobada en el router real
 //! (`comprobada = false` en el catálogo) y, aun así, este flujo sigue
 //! activo: no pasa por la lista blanca del gestor, está protegido (prueba la
-//! nueva, restaura la anterior y avisa) y la E4 se hace con él. Tras la E4,
+//! nueva, restaura la anterior y avisa) y la prueba en el router real se hará
+//! con él. Después,
 //! su referencia en el catálogo o, si falla, desactivar el flujo.
 
 use leptos::prelude::*;

@@ -226,7 +226,7 @@ async fn sin_ping_ya_puesta_409() {
 }
 
 /// Con la regla del panel puesta, la del operador que deja pasar el ping
-/// sigue delante (como en el router real, E5, cambio 11): la tarjeta no
+/// sigue delante (como en el router real): la tarjeta no
 /// dice que el router no responde (sigue en ámbar) y el motivo y lo
 /// pendiente explican que la regla está puesta pero no basta.
 #[tokio::test]

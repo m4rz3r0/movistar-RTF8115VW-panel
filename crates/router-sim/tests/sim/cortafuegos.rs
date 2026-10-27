@@ -166,7 +166,7 @@ async fn alta_y_baja_de_una_regla() {
     c.basic_write(PAGINA_EDITOR, ALTA, &p).await.unwrap();
     let f = leer(&c).await.unwrap();
     assert_eq!(f[0].reglas.len(), 11);
-    // La carga comprobada en el router real (E5, cambio 11): sin `escape`.
+    // La carga comprobada en el router real: sin `escape`.
     assert_eq!(p.first(), Some(&("target", "rule")));
     let nueva = f[0].reglas.last().unwrap();
     assert_eq!(nueva.rid, "16");
