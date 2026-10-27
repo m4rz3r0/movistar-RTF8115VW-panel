@@ -2,6 +2,7 @@
 //! telefonía, televisión y radios) y de la red de seguridad WAN del gestor
 //! de cambios con conexiones distintas de `ip2`.
 
+use crate::comun::ConfirmarLigado;
 use crate::comun::{
     Panel, PanelPrueba, body_text, esperar_hasta, esperar_hasta_con, get_con_cookie, sesion,
 };
@@ -166,7 +167,10 @@ fn lease0(ip: &str) -> ChangeRequest {
 /// reversión; devuelve el motivo.
 async fn cortar_wan_y_esperar_reversion(p: &Panel, m: &std::sync::Arc<ChangeManager>) -> String {
     let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
-    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    let id = m
+        .confirmar_ligado(&prep.token, None, "admin")
+        .await
+        .unwrap();
     p.sim.control.set_wan_up(false);
     esperar_hasta_con(Duration::from_secs(10), async || {
         let c = m.cambio(id).await.unwrap();
@@ -316,7 +320,10 @@ async fn deteccion_no_se_anota_con_cambio_activo() {
         .await
         .unwrap();
     let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
-    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    let id = m
+        .confirmar_ligado(&prep.token, None, "admin")
+        .await
+        .unwrap();
     esperar_hasta(Duration::from_secs(5), "sin vigilancia", async || {
         m.cambio(id).await.unwrap().estado == Estado::Vigilando
     })

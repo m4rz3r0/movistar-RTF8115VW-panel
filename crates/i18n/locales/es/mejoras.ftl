@@ -14,7 +14,7 @@ mejoras-lote-privacidad-titulo = Mejoras, privacidad máxima
 mejoras-aviso-tr069 = Un reinicio de fábrica o un técnico pueden volver a encender la gestión remota. Si llamas al soporte, quizá te pidan encenderla. Conviene encenderla de vez en cuando para recibir las actualizaciones del router.
 
 ## Consejos sin botón
-mejoras-consejo-wpa3 = Usa WPA3 y la protección de las tramas de gestión si algún día el router lo permite: este no lo admite.
+mejoras-consejo-wpa3 = Este router solo ofrece la WiFi abierta, WPA2 y WPA/WPA2: no tiene WPA3. Si algún día cambias de router, elige uno con WPA3.
 mejoras-consejo-nombre_y_mac = No ocultes el nombre de la red ni filtres por MAC: no protegen, y ocultar el nombre hace que los móviles lo anuncien allá donde van.
 mejoras-consejo-contrasena_admin = Cambia la contraseña de administración que trae la etiqueta del router (llegará al panel más adelante).
 mejoras-consejo-reenvios = Revisa que ningún reenvío de puertos apunte al propio router.
@@ -55,6 +55,8 @@ mejoras-dns-cloudflare = Cloudflare
 mejoras-dns-cloudflare-desc = Muy rápido. Es una empresa de Estados Unidos.
 mejoras-dns-adguard = AdGuard
 mejoras-dns-adguard-desc = Bloquea anuncios y rastreadores. Puede romper alguna web.
+mejoras-dns-cloudflare_familiar = Cloudflare familiar
+mejoras-dns-cloudflare_familiar-desc = Recomendado si en casa hay menores y quieres un filtro familiar. A favor: filtra las webs para adultos y el malware en todos los dispositivos de casa, sin instalar nada. En contra: filtra para todos, incluidos los adultos; se salta cambiando el DNS del dispositivo, y Cloudflare ve las consultas.
 mejoras-dns-elegir = Servicio de DNS para la red de casa
 
 ## Estado de los lotes y su revisión

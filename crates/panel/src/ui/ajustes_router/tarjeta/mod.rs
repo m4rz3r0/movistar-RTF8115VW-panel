@@ -94,7 +94,7 @@ pub(crate) fn Tarjeta(e: ElementoVista) -> impl IntoView {
             }
             on:keydown=teclas
         >
-            {pagina.marcar.then(|| view! { <Marca id=id.clone() nombre=nombre.clone() /> })}
+            {pagina.marcable(&id).then(|| view! { <Marca id=id.clone() nombre=nombre.clone() /> })}
             {cabecera::cabecera(&e, &nombre, titulo_cabecera)}
             {cuerpo}
             {pie::pie(&e, &nombre, abrir)}

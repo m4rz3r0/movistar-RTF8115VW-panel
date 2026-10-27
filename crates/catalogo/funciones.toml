@@ -9,6 +9,15 @@
 # LAN, puentes, cortafuegos y TR-069 alto; WiFi, DNS y rango DHCP medio; resto
 # bajo; las lecturas no tienen riesgo. En `lectura_pareada.params`, `{p}` es el
 # valor del parámetro `p` de la escritura.
+#
+# `acceso` (obligatorio en escrituras y acciones) decide si el gestor de
+# cambios vigila el cambio: `puede_cortar` (IP o máscara de la LAN, DHCP,
+# cortafuegos y filtros, rutas, WAN y VLAN, QoS, IPv6 de la LAN, DNS del
+# relé, reinicios, firmware y contraseñas de acceso: se vigila durante el plazo
+# de su riesgo), `no_corta` (cuentas de la web, voz, TR-069, nombres, puertos,
+# hora…: se da por aplicado en cuanto la relectura muestra lo nuevo) y `wifi`
+# (solo corta si el panel llega al router por WiFi: se vigila salvo que el
+# panel compruebe que va por cable). Ante la duda, `puede_cortar`.
 
 # ======================================================================
 # Área: wan
@@ -53,7 +62,9 @@ tipo = "escritura"
 pagina = "rip.asp"
 descripcion = "Activa RIP y el envío/recepción de anuncios en una interfaz."
 riesgo = "alto"
-lectura_pareada = { funcion = "cbGetRipIntf", params = [] }
+acceso = "puede_cortar"
+lectura_pareada = { funcion = "cbGetRipIntf", params = [["rip_intf_0i", "{rip_intf_id}"]] }
+comprobada = "pruebas del 2026-10-26, cambios 35 y 36"
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -106,37 +117,19 @@ name = "cbSetRoutingV4Rule"
 area = "wan"
 origen = "avanzada"
 tipo = "escritura"
-pagina = "default_gateway.asp"
+pagina = "routing_rules.asp"
 descripcion = "Crea, modifica o borra una ruta IPv4 o la puerta de enlace por defecto."
 riesgo = "alto"
+acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetRoutingV4Rule", params = [["rtm_rulev4_0i", "{rtm_rulev4_id}"]] }
 lista = { id_param = "rtm_rulev4_id", all = false, del = true }
-
-[[funcion.parametro]]
-nombre = "ip_intf_id"
-etiqueta = "Interfaz IP"
-tipo = "int"
-
-[[funcion.parametro]]
-nombre = "rtm_rulev4_id"
-etiqueta = "Ruta (id; -1 = nueva)"
-tipo = "int"
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "adm_state"
 etiqueta = "Activado"
 tipo = "enum"
 opciones = [["1", "Activado"], ["0", "Desactivado"]]
-
-[[funcion.parametro]]
-nombre = "metric"
-etiqueta = "Métrica"
-tipo = "int"
-
-[[funcion.parametro]]
-nombre = "fwd_policy"
-etiqueta = "Política"
-tipo = "text"
 
 [[funcion.parametro]]
 nombre = "dst_addr"
@@ -155,6 +148,26 @@ nombre = "gw_addr"
 etiqueta = "Puerta de enlace"
 tipo = "ip"
 partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "ip_intf_id"
+etiqueta = "Interfaz IP"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "metric"
+etiqueta = "Métrica"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "fwd_policy"
+etiqueta = "Política"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "rtm_rulev4_id"
+etiqueta = "Ruta (id; -1 = nueva)"
+tipo = "int"
 
 [[funcion]]
 name = "cbGetRoutingV6Rule"
@@ -189,8 +202,10 @@ tipo = "escritura"
 pagina = "default_gateway.asp"
 descripcion = "Crea, modifica o borra una ruta IPv6 o la puerta de enlace IPv6 por defecto."
 riesgo = "alto"
+acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetRoutingV6Rule", params = [["rtm_rulev6_0i", "{rtm_rulev6_id}"]] }
 lista = { id_param = "rtm_rulev6_id", all = false, del = true }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "ip_intf_id"
@@ -265,8 +280,10 @@ tipo = "escritura"
 pagina = "wanintf.asp"
 descripcion = "Crea, modifica o borra una conexión WAN: tipo, VLAN, credenciales PPP, IP estática, DNS e IPv6. Puede dejar sin internet."
 riesgo = "alto"
+acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetWanIPIntf", params = [["ip_intf_0i", "{ip_intf_id}"]] }
 lista = { id_param = "ip_intf_id", all = false, del = true }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -321,6 +338,7 @@ tipo = "text"
 nombre = "trigger"
 etiqueta = "Conexión bajo demanda"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "idle_dis_time"
@@ -346,6 +364,37 @@ tipo = "text"
 nombre = "dns_override"
 etiqueta = "DNS manuales"
 tipo = "bool"
+casilla = {}
+
+[[funcion.parametro]]
+nombre = "static_ipv4_addr"
+etiqueta = "IP estática"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "static_ipv4_mask"
+etiqueta = "Máscara estática"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "static_ipv4_gw"
+etiqueta = "Puerta de enlace estática"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "dnsv4_svr0"
+etiqueta = "DNS primario"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "dnsv4_svr1"
+etiqueta = "DNS secundario"
+tipo = "ip"
+partido = "ip4"
 
 [[funcion.parametro]]
 nombre = "ipv6_type"
@@ -363,42 +412,13 @@ opciones = [["1", "Activado"], ["0", "Desactivado"]]
 nombre = "ipv6_addr_type"
 etiqueta = "Direccionamiento IPv6"
 tipo = "enum"
+depende = { de = "ipv6_type", salvo = ["2"] }
 opciones = [["1", "SLAAC"], ["0", "DHCP"]]
 
 [[funcion.parametro]]
 nombre = "ip_intf_id"
 etiqueta = "Interfaz IP"
 tipo = "int"
-
-[[funcion.parametro]]
-nombre = "dnsv4_svr0"
-etiqueta = "DNS primario"
-tipo = "ip"
-partido = "ip4"
-
-[[funcion.parametro]]
-nombre = "dnsv4_svr1"
-etiqueta = "DNS secundario"
-tipo = "ip"
-partido = "ip4"
-
-[[funcion.parametro]]
-nombre = "static_ipv4_addr"
-etiqueta = "IP estática"
-tipo = "ip"
-partido = "ip4"
-
-[[funcion.parametro]]
-nombre = "static_ipv4_gw"
-etiqueta = "Puerta de enlace estática"
-tipo = "ip"
-partido = "ip4"
-
-[[funcion.parametro]]
-nombre = "static_ipv4_mask"
-etiqueta = "Máscara estática"
-tipo = "ip"
-partido = "ip4"
 
 [[funcion]]
 name = "te_mm.cmd?action=Apply"
@@ -408,7 +428,9 @@ tipo = "escritura"
 pagina = "te_multipuesto_monopuesto.asp"
 descripcion = "Cambia entre multipuesto (router) y monopuesto (puente) con usuario y contraseña PPPoE. Puede dejar sin internet."
 riesgo = "alto"
+acceso = "puede_cortar"
 lectura_pareada = { funcion = "te_multipuesto_monopuesto.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "userselection"
@@ -438,7 +460,9 @@ tipo = "escritura"
 pagina = "te_mapa_red_local.asp"
 descripcion = "Cambia el modo WAN (multipuesto/monopuesto) y las credenciales PPPoE desde el mapa de red de la UI básica."
 riesgo = "alto"
+acceso = "puede_cortar"
 lectura_pareada = { funcion = "te_mapa_red_local.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "userselection"
@@ -524,8 +548,10 @@ tipo = "escritura"
 pagina = "dhcp.asp"
 descripcion = "Crea, modifica o borra una opción DHCP de un pool (valor en hexadecimal)."
 riesgo = "bajo"
+acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbDhcpV4SvrPoolGetOpt", params = [["rtm_cfg_dhcpv4_svr_pool_id", "{rtm_cfg_dhcpv4_svr_pool_id}"], ["rtm_dhcpv4_svr_pool_opt_id", "{rtm_dhcpv4_svr_pool_opt_id}"]] }
 lista = { id_param = "rtm_dhcpv4_svr_pool_opt_id", all = false, del = true }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -533,20 +559,24 @@ etiqueta = "Activado"
 tipo = "enum"
 opciones = [["1", "Activado"], ["0", "Desactivado"]]
 
+# Como la web: el código por debajo de 255, el valor en hexadecimal sin
+# espacios y, sin longitud, la de los bytes del valor. Para los códigos
+# 224 a 254 la web convierte el texto a hexadecimal; el panel lo pide ya
+# convertido (es lo que guarda y devuelve el router).
 [[funcion.parametro]]
 nombre = "opt_code"
-etiqueta = "Código de opción"
+etiqueta = "Código de opción (0 a 254)"
 tipo = "int"
 
 [[funcion.parametro]]
 nombre = "opt_len"
-etiqueta = "Longitud"
+etiqueta = "Longitud en bytes (vacía: la del valor)"
 tipo = "int"
 
 [[funcion.parametro]]
 nombre = "opt_value"
-etiqueta = "Valor (hexadecimal)"
-tipo = "text"
+etiqueta = "Valor en hexadecimal (también de 224 a 254)"
+tipo = "hex"
 
 [[funcion.parametro]]
 nombre = "rtm_dhcpv4_svr_pool_opt_id"
@@ -591,8 +621,10 @@ tipo = "escritura"
 pagina = "dhcp.asp"
 descripcion = "Crea, modifica o borra una reserva DHCP (IP fija por MAC)."
 riesgo = "bajo"
+acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbDhcpV4SvrPoolGetStatic", params = [["rtm_cfg_dhcpv4_svr_pool_id", "{rtm_cfg_dhcpv4_svr_pool_id}"], ["rtm_dhcpv4_svr_pool_static_id", "{rtm_dhcpv4_svr_pool_static_id}"]] }
 lista = { id_param = "rtm_dhcpv4_svr_pool_static_id", all = false, del = true }
+comprobada = "pruebas del 2026-10-26, cambios 41 a 45 (crear, editar y borrar)"
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -654,25 +686,40 @@ tipo = "escritura"
 pagina = "dhcp.asp"
 descripcion = "Configura un pool DHCPv4 (rango, máscara, puerta de enlace, DNS, concesión, IP reservadas y condiciones)."
 riesgo = "medio"
+acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetDhcpv4ServerPool", params = [["rtm_cfg_dhcpv4_svr_pool_0i", "{rtm_cfg_dhcpv4_svr_pool_id}"]] }
 lista = { id_param = "rtm_cfg_dhcpv4_svr_pool_id", all = false, del = true }
+# NO COMPROBADA: el cambio 39 (solo lease_time) dejó activas con valor vacío
+# las cuatro condiciones del grupo (opción 60, 61, 77 y MAC), y tras el
+# reinicio del cambio 57 el router dejó de dar IP nueva. Las casillas de
+# condición son checkbox sin value en dhcp.asp: por el JS, el router las da
+# por marcadas si el campo llega, valga lo que valga (falta confirmarlo).
+comprobada = "T12 del 2026-10-27, cambios 77 a 79 (pool id 0; tras reiniciar, un dispositivo nuevo toma IP)"
 
 [[funcion.parametro]]
 nombre = "rtm_cfg_dhcpv4_svr_pool_id"
 etiqueta = "Pool DHCP"
 tipo = "int"
 
+# IP reservadas (el pool no las reparte): el router las guarda en 32
+# ranuras `reserved_ipv4_addr_<i>`/`reserved_ipv4_mask_<i>` dentro de
+# `<reserved_ipv4>`; una libre es 0.0.0.0. La web añade en la ranura
+# siguiente a la última usada y borra con 0.0.0.0/0.0.0.0, cada vez con
+# solo esa ranura y el id del pool. El panel manda además todo el pool,
+# como al editarlo (sin las demás ranuras).
 [[funcion.parametro]]
 nombre = "reserved_ipv4_addr"
 etiqueta = "IP reservada (no se reparte)"
 tipo = "ip"
 partido = "ip4"
+ranuras = 32
 
 [[funcion.parametro]]
 nombre = "reserved_ipv4_mask"
-etiqueta = "Máscara de la reservada"
+etiqueta = "Máscara de la IP reservada"
 tipo = "ip"
 partido = "ip4"
+ranuras = 32
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -705,11 +752,13 @@ tipo = "int"
 nombre = "lease_time_u"
 etiqueta = "Concesión ilimitada"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "dhcpv4_opt60"
 etiqueta = "Condición por opción 60 (vendor ID)"
 tipo = "bool"
+casilla = { valor = "dhcpv4_opt60_value" }
 
 [[funcion.parametro]]
 nombre = "dhcpv4_opt60_value"
@@ -732,6 +781,7 @@ opciones = [["0", "Exacta"], ["1", "Prefijo"], ["2", "Sufijo"], ["3", "Subcadena
 nombre = "dhcpv4_opt61"
 etiqueta = "Condición por opción 61 (client ID)"
 tipo = "bool"
+casilla = { valor = "dhcpv4_opt61_value" }
 
 [[funcion.parametro]]
 nombre = "dhcpv4_opt61_value"
@@ -748,6 +798,7 @@ opciones = [["0", "Incluir"], ["1", "Excluir"]]
 nombre = "dhcpv4_opt77"
 etiqueta = "Condición por opción 77 (user class)"
 tipo = "bool"
+casilla = { valor = "dhcpv4_opt77_value" }
 
 [[funcion.parametro]]
 nombre = "dhcpv4_opt77_value"
@@ -764,6 +815,7 @@ opciones = [["0", "Incluir"], ["1", "Excluir"]]
 nombre = "mac_addr"
 etiqueta = "Dirección MAC"
 tipo = "bool"
+casilla = { valor = "mac_addr_value" }
 
 [[funcion.parametro]]
 nombre = "mac_addr_ex"
@@ -856,8 +908,10 @@ tipo = "escritura"
 pagina = "ipv4.asp"
 descripcion = "Cambia, añade o borra la IP y máscara LAN del router. Cambia la dirección del propio panel: riesgo alto."
 riesgo = "alto"
+acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetLanIPv4Addr", params = [["ip_intf_id", "{ip_intf_id}"], ["ipv4_addr_id", "{ipv4_addr_id}"]] }
 lista = { id_param = "ipv4_addr_id", all = false, del = true }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -904,7 +958,9 @@ tipo = "escritura"
 pagina = "ipv4.asp"
 descripcion = "Activa una interfaz LAN y su IGMP snooping. Puede dejar sin acceso al router."
 riesgo = "alto"
+acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetLanIPv4Intf", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -961,8 +1017,10 @@ tipo = "escritura"
 pagina = "bridging.asp"
 descripcion = "Crea, modifica o borra un puente de nivel 2. Puede aislar la LAN: riesgo alto."
 riesgo = "alto"
+acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetTR98L2Bridge", params = [["mll_bridge_0i", "{mll_bridge_id}"]] }
 lista = { id_param = "mll_bridge_id", all = false, del = true }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "name"
@@ -1013,8 +1071,10 @@ tipo = "escritura"
 pagina = "filtering.asp"
 descripcion = "Crea, modifica o borra un filtro de puente. Puede aislar la LAN: riesgo alto."
 riesgo = "alto"
+acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetTR98L2Filtering", params = [["mll_br_filter_0i", "{mll_br_filter_id}"]] }
 lista = { id_param = "mll_br_filter_id", all = false, del = true }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -1032,6 +1092,7 @@ opciones = [["1", "Primera"], ["2", "Según el orden"], ["3", "Última"]]
 nombre = "order"
 etiqueta = "Orden"
 tipo = "int"
+depende = { de = "order_p", salvo = ["1", "3"] }
 
 [[funcion.parametro]]
 nombre = "filter_intf"
@@ -1058,41 +1119,49 @@ tipo = "int"
 nombre = "cls_ethertype"
 etiqueta = "Comprobar EtherType"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_ethertype_value"
 etiqueta = "EtherType"
 tipo = "text"
+depende = { de = "cls_ethertype" }
 
 [[funcion.parametro]]
 nombre = "cls_src_mac"
 etiqueta = "Comprobar MAC de origen"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_src_mac_addr"
 etiqueta = "MAC de origen"
 tipo = "mac"
+depende = { de = "cls_src_mac" }
 
 [[funcion.parametro]]
 nombre = "cls_src_mac_mask"
 etiqueta = "Máscara de MAC de origen"
 tipo = "mac"
+depende = { de = "cls_src_mac" }
 
 [[funcion.parametro]]
 nombre = "cls_dst_mac"
 etiqueta = "Comprobar MAC de destino"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_dst_mac_addr"
 etiqueta = "MAC de destino"
 tipo = "mac"
+depende = { de = "cls_dst_mac" }
 
 [[funcion.parametro]]
 nombre = "cls_dst_mac_mask"
 etiqueta = "Máscara de MAC de destino"
 tipo = "mac"
+depende = { de = "cls_dst_mac" }
 
 [[funcion.parametro]]
 nombre = "mll_br_filter_id"
@@ -1116,7 +1185,9 @@ tipo = "escritura"
 pagina = "te_mapa_red_local.asp"
 descripcion = "Igual que te_red_local.cgi, desde el mapa de red de la UI básica."
 riesgo = "alto"
+acceso = "puede_cortar"
 lectura_pareada = { funcion = "te_mapa_red_local.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "ethIpAddress"
@@ -1166,7 +1237,9 @@ tipo = "escritura"
 pagina = "te_mapa_red_local.asp"
 descripcion = "Pone nombre y tipo a un equipo del mapa de red de la UI básica."
 riesgo = "bajo"
+acceso = "no_corta"
 lectura_pareada = { funcion = "te_mapa_red_local.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "hostName"
@@ -1210,7 +1283,9 @@ tipo = "escritura"
 pagina = "te_red_local.asp"
 descripcion = "Cambia desde la UI básica la IP y máscara del router, el servidor DHCP y su rango. Cambia la dirección del propio panel."
 riesgo = "alto"
+acceso = "puede_cortar"
 lectura_pareada = { funcion = "te_red_local.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "ethIpAddress"
@@ -1273,7 +1348,9 @@ tipo = "escritura"
 pagina = "wifi.asp"
 descripcion = "Configura una radio WiFi: activación, país, estándar, canal, ancho, potencia y opciones avanzadas. Los valores válidos dependen de la banda."
 riesgo = "medio"
+acceso = "wifi"
 lectura_pareada = { funcion = "cbGetWifi", params = [["dpm_cfg_wifi_0i", "{dpm_cfg_wifi_id}"]] }
+comprobada = "pruebas del 2026-10-26, cambios 48 a 51"
 
 [[funcion.parametro]]
 nombre = "radio_adm_state"
@@ -1445,7 +1522,9 @@ tipo = "escritura"
 pagina = "wifi.asp"
 descripcion = "Configura un punto de acceso: SSID, ocultación, seguridad y clave, clientes máximos, WMM, aislamiento y WPS. Con `validation_only=1` solo valida."
 riesgo = "medio"
+acceso = "wifi"
 lectura_pareada = { funcion = "cbGetWifiAccPt", params = [["dpm_cfg_wifi_acc_pt_id", "{dpm_cfg_wifi_acc_pt_id}"]] }
+comprobada = "fase 3, cambios 6 y 7 (clave) y E1, cambios 9 y 10"
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -1590,8 +1669,10 @@ tipo = "escritura"
 pagina = "wifi.asp"
 descripcion = "Crea, modifica o borra un enlace WDS con otro punto de acceso."
 riesgo = "medio"
+acceso = "wifi"
 lectura_pareada = { funcion = "cbGetWifiWds", params = [["dpm_cfg_wifi_wds_0i", "{dpm_cfg_wifi_wds_id}"]] }
 lista = { id_param = "dpm_cfg_wifi_wds_id", all = false, del = true }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "dpm_cfg_wifi_wds_id"
@@ -1622,6 +1703,8 @@ tipo = "accion"
 pagina = "wifi.asp"
 descripcion = "Arranca un emparejamiento WPS (formulario WiFiWPSStartForm, que no aparece en las páginas capturadas: sus campos no se conocen)."
 riesgo = "medio"
+acceso = "no_corta"
+comprobada = false
 
 [[funcion]]
 name = "te_wifi.asp"
@@ -1640,7 +1723,9 @@ tipo = "escritura"
 pagina = "te_wifi.asp"
 descripcion = "Guarda la lista del filtro MAC de la WiFi 2,4 GHz (UI básica)."
 riesgo = "medio"
+acceso = "wifi"
 lectura_pareada = { funcion = "te_wifi.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "wlMACaddr"
@@ -1665,7 +1750,9 @@ tipo = "escritura"
 pagina = "te_wifi.asp"
 descripcion = "Configura la WiFi 2,4 GHz desde la UI básica: SSID, ocultación, seguridad, clave (XOR 0x1f), activación, canal y filtro MAC."
 riesgo = "medio"
+acceso = "wifi"
 lectura_pareada = { funcion = "te_wifi.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "wlSsidIdx"
@@ -1780,7 +1867,9 @@ tipo = "escritura"
 pagina = "te_wifi_5ghz.asp"
 descripcion = "Guarda la lista del filtro MAC de la WiFi 5 GHz (UI básica)."
 riesgo = "medio"
+acceso = "wifi"
 lectura_pareada = { funcion = "te_wifi_5ghz.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "wlMACaddr"
@@ -1805,7 +1894,9 @@ tipo = "escritura"
 pagina = "te_wifi_5ghz.asp"
 descripcion = "Configura la WiFi 5 GHz desde la UI básica (mismos campos que te_wifi.wl)."
 riesgo = "medio"
+acceso = "wifi"
 lectura_pareada = { funcion = "te_wifi_5ghz.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "wlSsidIdx"
@@ -1920,7 +2011,9 @@ tipo = "escritura"
 pagina = "te_wifi_guest.asp"
 descripcion = "Configura la red de invitados desde la UI básica: SSID, seguridad, clave (XOR 0x1f), activación y máximo de invitados."
 riesgo = "medio"
+acceso = "wifi"
 lectura_pareada = { funcion = "te_wifi_guest.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "wlSsidIdx"
@@ -2063,39 +2156,63 @@ area = "nat"
 origen = "avanzada"
 tipo = "escritura"
 pagina = "natalg.asp"
-descripcion = "Activa o desactiva los ALG o el NAT loopback (formularios NatAlgForm y NatLoopbackForm)."
+descripcion = "Activa o desactiva los ALG de FTP, H.323, PPTP y SIP (formulario NatAlgForm de natalg.asp): son casillas que van por presencia, y la web manda siempre `set_nf_conntrack=1`, que la lectura no devuelve."
 riesgo = "bajo"
+acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetNatConfig", params = [] }
+# 2026-10-26, cambio 28: el router acepta h323_enable pero no lo aplica.
+# Causa (natalg.asp): las ALG son casillas sin value (presencia) y la web
+# manda siempre set_nf_conntrack=1, que la lectura no da.
+comprobada = "T12 del 2026-10-27, cambios 62 y 63 (h323 apagado y vuelta)"
 
 [[funcion.parametro]]
 nombre = "ftp_enable"
 etiqueta = "ALG de FTP"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "h323_enable"
 etiqueta = "ALG de H.323"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "pptp_enable"
 etiqueta = "ALG de PPTP"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "sip_enable"
 etiqueta = "ALG de SIP"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "set_nf_conntrack"
 etiqueta = "Aplicar ALG (siempre 1)"
 tipo = "int"
+fijo = "1"
+
+[[funcion]]
+name = "cbSetNatConfig.loopback"
+cgi = "cbSetNatConfig"
+area = "nat"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "natloopback.asp"
+descripcion = "Activa o desactiva el NAT loopback (formulario NatLoopbackForm de natloopback.asp): `adm_state` es una casilla que va por presencia, con el id leído del loopback."
+riesgo = "bajo"
+acceso = "no_corta"
+lectura_pareada = { funcion = "cbGetNatConfig", params = [] }
+comprobada = "T12 del 2026-10-27, cambios 75 y 76"
 
 [[funcion.parametro]]
 nombre = "adm_state"
 etiqueta = "Activado"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "rtm_cfg_nat_lb_intf_id"
@@ -2118,8 +2235,10 @@ origen = "avanzada"
 tipo = "escritura"
 pagina = "natintf.asp"
 descripcion = "Activa o cambia el NAT de una interfaz."
-riesgo = "bajo"
-lectura_pareada = { funcion = "cbGetNatIntf", params = [] }
+riesgo = "alto"
+acceso = "puede_cortar"
+lectura_pareada = { funcion = "cbGetNatIntf", params = [["nat_intf_0i", "{nat_intf_id}"]] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -2130,7 +2249,8 @@ opciones = [["1", "Activado"], ["0", "Desactivado"]]
 [[funcion.parametro]]
 nombre = "type"
 etiqueta = "Tipo"
-tipo = "text"
+tipo = "enum"
+opciones = [["0", "Simétrica"], ["1", "Cono completo"]]
 
 [[funcion.parametro]]
 nombre = "nat_intf_id"
@@ -2165,8 +2285,10 @@ tipo = "escritura"
 pagina = "natportmap.asp"
 descripcion = "Crea, modifica o borra una redirección de puertos o el host DMZ."
 riesgo = "bajo"
+acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetNatPortMapping", params = [["nat_port_mapping_0i", "{nat_port_mapping_id}"]] }
 lista = { id_param = "nat_port_mapping_id", all = false, del = true }
+comprobada = "pruebas del 2026-10-26, cambios 54 y 55"
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -2227,6 +2349,47 @@ tipo = "ip"
 partido = "ip4"
 
 [[funcion]]
+name = "cbSetNatPortMapping.dmz"
+cgi = "cbSetNatPortMapping"
+area = "nat"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "natdmz.asp"
+descripcion = "Enciende, apaga o cambia el host DMZ (natdmz.asp): todo lo que llega de internet sin regla va a ese equipo. En el router es una instancia más de las redirecciones, con `desc=DMZ` y sin protocolo ni puertos; la web la crea (id -1) al aplicar si no existe."
+riesgo = "alto"
+acceso = "no_corta"
+lectura_pareada = { funcion = "cbGetNatPortMapping", params = [["nat_port_mapping_0i", "{nat_port_mapping_id}"]] }
+lista = { id_param = "nat_port_mapping_id", all = false, del = true }
+comprobada = false
+
+[[funcion.parametro]]
+nombre = "adm_state"
+etiqueta = "Estado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "int_ip_addr"
+etiqueta = "Equipo de la DMZ"
+tipo = "ip"
+
+[[funcion.parametro]]
+nombre = "nat_port_mapping_id"
+etiqueta = "Instancia (id; -1 = nueva)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "ip_intf_id"
+etiqueta = "Interfaz IP (id)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "desc"
+etiqueta = "Descripción (siempre DMZ)"
+tipo = "text"
+fijo = "DMZ"
+
+[[funcion]]
 name = "cbGetUpnpCfg"
 area = "nat"
 origen = "avanzada"
@@ -2243,7 +2406,9 @@ tipo = "escritura"
 pagina = "upnp.asp"
 descripcion = "Activa o desactiva UPnP."
 riesgo = "bajo"
+acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetUpnpCfg", params = [] }
+comprobada = "pruebas del 2026-10-26, cambios 22 y 23"
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -2278,7 +2443,9 @@ tipo = "escritura"
 pagina = "te_puertos.asp"
 descripcion = "Crea una redirección de puertos desde la UI básica (campos de la regla separados por comas)."
 riesgo = "bajo"
+acceso = "no_corta"
 lectura_pareada = { funcion = "te_ppp_pm.cmd?action=retrieve", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "inst"
@@ -2293,7 +2460,9 @@ tipo = "escritura"
 pagina = "te_puertos.asp"
 descripcion = "Borra una redirección de puertos desde la UI básica."
 riesgo = "bajo"
+acceso = "no_corta"
 lectura_pareada = { funcion = "te_ppp_pm.cmd?action=retrieve", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "id"
@@ -2313,7 +2482,9 @@ tipo = "escritura"
 pagina = "te_puertos.asp"
 descripcion = "Modifica una redirección de puertos desde la UI básica."
 riesgo = "bajo"
+acceso = "no_corta"
 lectura_pareada = { funcion = "te_ppp_pm.cmd?action=retrieve", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "inst"
@@ -2337,7 +2508,9 @@ tipo = "escritura"
 pagina = "te_puertos.asp"
 descripcion = "Activa o desactiva una regla de puertos con el formato antiguo de la UI básica."
 riesgo = "bajo"
+acceso = "no_corta"
 lectura_pareada = { funcion = "te_puertos.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "portName"
@@ -2377,7 +2550,9 @@ tipo = "escritura"
 pagina = "te_puertos.asp"
 descripcion = "Borra una regla de puertos con el formato antiguo de la UI básica."
 riesgo = "bajo"
+acceso = "no_corta"
 lectura_pareada = { funcion = "te_puertos.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "portName"
@@ -2412,7 +2587,9 @@ tipo = "escritura"
 pagina = "te_otras_funcionalidades.asp"
 descripcion = "Activa o desactiva UPnP desde la UI básica."
 riesgo = "bajo"
+acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetUpnpCfg", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "enblUpnp"
@@ -2435,6 +2612,7 @@ tipo = "lectura"
 pagina = "scbidirectionalflt_ls.asp"
 descripcion = "Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Lista las reglas IPv4/IPv6 (HTML)."
 riesgo = "bajo"
+bloqueada = "no responde en el router real; la lista sale de scbidirectionalflt_ls.asp"
 
 [[funcion.parametro]]
 nombre = "escape"
@@ -2447,14 +2625,12 @@ area = "cortafuegos"
 origen = "oculta"
 tipo = "escritura"
 pagina = "scbidirectionalflt_ed.asp"
-descripcion = "Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Añade una entrada (interfaz, versión, acción por defecto) o una regla (protocolo, origen, destino, puertos, acción)."
+descripcion = "Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Añade una regla al final de un filtro. El panel la usa para su regla «sin ping» (Ajustes → Seguridad), con la carga comprobada: `target=rule&belong&version&enabled&protocol&specificAction&icmpType`, sin `escape`. El editor completo, como la web, va en `scbidirectionalflt.cmd?action=add.regla`."
 riesgo = "alto"
-lectura_pareada = { funcion = "scbidirectionalflt.cmd?action=view", params = [] }
-
-[[funcion.parametro]]
-nombre = "id"
-etiqueta = "Id"
-tipo = "int"
+acceso = "puede_cortar"
+bloqueada = "el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo"
+lectura_pareada = { funcion = "scbidirectionalflt_ls.asp", params = [] }
+comprobada = "E5, cambio 11 (la regla se pone; «sin ping» no basta en este router)"
 
 [[funcion.parametro]]
 nombre = "escape"
@@ -2463,17 +2639,18 @@ tipo = "text"
 
 [[funcion.parametro]]
 nombre = "target"
-etiqueta = "Objetivo (entry/rule)"
+etiqueta = "Objetivo (rule)"
 tipo = "text"
+fijo = "rule"
 
 [[funcion.parametro]]
 nombre = "belong"
-etiqueta = "Entrada a la que pertenece"
+etiqueta = "Filtro al que pertenece (FID)"
 tipo = "int"
 
 [[funcion.parametro]]
 nombre = "version"
-etiqueta = "Versión de IGMP"
+etiqueta = "Versión de IP (la del filtro: 0 IPv4, 1 IPv6)"
 tipo = "int"
 
 [[funcion.parametro]]
@@ -2483,22 +2660,22 @@ tipo = "bool"
 
 [[funcion.parametro]]
 nombre = "protocol"
-etiqueta = "Protocolo"
+etiqueta = "Protocolo (1 ICMP, 2 TCP, 3 UDP)"
 tipo = "text"
 
 [[funcion.parametro]]
 nombre = "specificAction"
-etiqueta = "Acción"
+etiqueta = "Acción (0 descartar, 1 rechazar, 2 permitir)"
 tipo = "text"
 
 [[funcion.parametro]]
 nombre = "rejectType"
-etiqueta = "Tipo de rechazo"
+etiqueta = "Tipo de rechazo (solo al rechazar)"
 tipo = "text"
 
 [[funcion.parametro]]
 nombre = "icmpType"
-etiqueta = "Tipo ICMP"
+etiqueta = "Tipo ICMP (solo con ICMP)"
 tipo = "text"
 
 [[funcion.parametro]]
@@ -2541,24 +2718,106 @@ nombre = "dstportend"
 etiqueta = "Puerto de destino hasta"
 tipo = "text"
 
+[[funcion]]
+name = "scbidirectionalflt.cmd?action=add.regla"
+cgi = "scbidirectionalflt.cmd?action=add"
+area = "cortafuegos"
+origen = "oculta"
+tipo = "escritura"
+pagina = "scbidirectionalflt_ed.asp"
+descripcion = "Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Añade una regla al final de un filtro (protocolo, origen, destino, puertos, acción), como la web: `escape=true&target=rule&…`; lo que no aplica no viaja. El router responde 301 a la lista."
+riesgo = "alto"
+acceso = "puede_cortar"
+bloqueada = "el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo"
+lectura_pareada = { funcion = "scbidirectionalflt_ls.asp", params = [] }
+# Sin comprobar con esta carga: el cambio 11 de la E5 se hizo sin `escape=true`.
+comprobada = "T12 del 2026-10-27, cambio 67"
+
 [[funcion.parametro]]
-nombre = "name"
-etiqueta = "Nombre"
+nombre = "escape"
+etiqueta = "Escapar (true)"
+tipo = "text"
+fijo = "true"
+
+[[funcion.parametro]]
+nombre = "target"
+etiqueta = "Objetivo (rule)"
+tipo = "text"
+fijo = "rule"
+
+[[funcion.parametro]]
+nombre = "belong"
+etiqueta = "Filtro al que pertenece (FID)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "version"
+etiqueta = "Versión de IP (la del filtro: 0 IPv4, 1 IPv6)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "enabled"
+etiqueta = "Activada"
+tipo = "bool"
+
+[[funcion.parametro]]
+nombre = "protocol"
+etiqueta = "Protocolo (1 ICMP, 2 TCP, 3 UDP)"
 tipo = "text"
 
 [[funcion.parametro]]
-nombre = "interface"
-etiqueta = "Interfaz"
+nombre = "specificAction"
+etiqueta = "Acción (0 descartar, 1 rechazar, 2 permitir)"
 tipo = "text"
 
 [[funcion.parametro]]
-nombre = "type"
-etiqueta = "Tipo"
+nombre = "rejectType"
+etiqueta = "Tipo de rechazo (solo al rechazar)"
 tipo = "text"
 
 [[funcion.parametro]]
-nombre = "default"
-etiqueta = "Acción por defecto"
+nombre = "icmpType"
+etiqueta = "Tipo ICMP (solo con ICMP)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "srcaddr"
+etiqueta = "IP de origen"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "srcmask"
+etiqueta = "Máscara de origen"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "srcportstart"
+etiqueta = "Puerto de origen desde"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "srcportend"
+etiqueta = "Puerto de origen hasta"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "dstaddr"
+etiqueta = "IP de destino"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "dstmask"
+etiqueta = "Máscara de destino"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "dstportstart"
+etiqueta = "Puerto de destino desde"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "dstportend"
+etiqueta = "Puerto de destino hasta"
 tipo = "text"
 
 [[funcion]]
@@ -2567,33 +2826,32 @@ area = "cortafuegos"
 origen = "oculta"
 tipo = "escritura"
 pagina = "scbidirectionalflt_ed.asp"
-descripcion = "Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Modifica una entrada o regla."
+descripcion = "Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Cambia una regla entera (`id=<RID>&target=rule&…`, sin `escape`), como la web: el panel manda la regla leída con lo cambiado. El router responde 301 a la lista."
 riesgo = "alto"
-lectura_pareada = { funcion = "scbidirectionalflt.cmd?action=view", params = [] }
+acceso = "puede_cortar"
+bloqueada = "el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo"
+lectura_pareada = { funcion = "scbidirectionalflt_ls.asp", params = [] }
+comprobada = "T12 del 2026-10-27, cambio 68"
 
 [[funcion.parametro]]
 nombre = "id"
-etiqueta = "Id"
+etiqueta = "Regla (RID)"
 tipo = "int"
 
 [[funcion.parametro]]
-nombre = "escape"
-etiqueta = "Escapar (true)"
-tipo = "text"
-
-[[funcion.parametro]]
 nombre = "target"
-etiqueta = "Objetivo (entry/rule)"
+etiqueta = "Objetivo (rule)"
 tipo = "text"
+fijo = "rule"
 
 [[funcion.parametro]]
 nombre = "belong"
-etiqueta = "Entrada a la que pertenece"
+etiqueta = "Filtro al que pertenece (FID)"
 tipo = "int"
 
 [[funcion.parametro]]
 nombre = "version"
-etiqueta = "Versión de IGMP"
+etiqueta = "Versión de IP (la del filtro: 0 IPv4, 1 IPv6)"
 tipo = "int"
 
 [[funcion.parametro]]
@@ -2603,22 +2861,22 @@ tipo = "bool"
 
 [[funcion.parametro]]
 nombre = "protocol"
-etiqueta = "Protocolo"
+etiqueta = "Protocolo (1 ICMP, 2 TCP, 3 UDP)"
 tipo = "text"
 
 [[funcion.parametro]]
 nombre = "specificAction"
-etiqueta = "Acción"
+etiqueta = "Acción (0 descartar, 1 rechazar, 2 permitir)"
 tipo = "text"
 
 [[funcion.parametro]]
 nombre = "rejectType"
-etiqueta = "Tipo de rechazo"
+etiqueta = "Tipo de rechazo (solo al rechazar)"
 tipo = "text"
 
 [[funcion.parametro]]
 nombre = "icmpType"
-etiqueta = "Tipo ICMP"
+etiqueta = "Tipo ICMP (solo con ICMP)"
 tipo = "text"
 
 [[funcion.parametro]]
@@ -2661,6 +2919,51 @@ nombre = "dstportend"
 etiqueta = "Puerto de destino hasta"
 tipo = "text"
 
+[[funcion]]
+name = "scbidirectionalflt.cmd?action=remove"
+area = "cortafuegos"
+origen = "oculta"
+tipo = "escritura"
+pagina = "scbidirectionalflt_ls.asp"
+descripcion = "Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Borra una regla (`item=<FID>|<RID>&escape=true`, como `removeClick`). El router responde 301 a la lista."
+riesgo = "alto"
+acceso = "puede_cortar"
+bloqueada = "el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo"
+lectura_pareada = { funcion = "scbidirectionalflt_ls.asp", params = [] }
+# La carga es la misma para cualquier regla (`item=<FID>|<RID>&escape=true`).
+comprobada = "E5, cambio 12"
+
+[[funcion.parametro]]
+nombre = "item"
+etiqueta = "Regla a borrar (FID|RID)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "escape"
+etiqueta = "Escapar (true)"
+tipo = "text"
+fijo = "true"
+
+[[funcion]]
+name = "scbidirectionalflt.cmd?action=add.filtro"
+cgi = "scbidirectionalflt.cmd?action=add"
+area = "cortafuegos"
+origen = "oculta"
+tipo = "escritura"
+pagina = "scbidirectionalflt_ed.asp"
+descripcion = "Añade un filtro (una entrada) vacío: nombre, interfaz, entrada o salida, versión de IP y acción por defecto (`target=entry&…`, sin `escape`), como la web. El router responde 301 a la lista."
+riesgo = "alto"
+acceso = "puede_cortar"
+bloqueada = "el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo"
+lectura_pareada = { funcion = "scbidirectionalflt_ls.asp", params = [] }
+comprobada = "T12 del 2026-10-27, cambio 70"
+
+[[funcion.parametro]]
+nombre = "target"
+etiqueta = "Objetivo (entry)"
+tipo = "text"
+fijo = "entry"
+
 [[funcion.parametro]]
 nombre = "name"
 etiqueta = "Nombre"
@@ -2668,38 +2971,98 @@ tipo = "text"
 
 [[funcion.parametro]]
 nombre = "interface"
-etiqueta = "Interfaz"
+etiqueta = "Interfaz (IntfID)"
 tipo = "text"
 
 [[funcion.parametro]]
 nombre = "type"
-etiqueta = "Tipo"
+etiqueta = "Tipo (0 entrada, 1 salida)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "version"
+etiqueta = "Versión de IP (0 IPv4, 1 IPv6)"
 tipo = "text"
 
 [[funcion.parametro]]
 nombre = "default"
-etiqueta = "Acción por defecto"
+etiqueta = "Acción por defecto (0 descartar, 1 permitir)"
 tipo = "text"
 
 [[funcion]]
-name = "scbidirectionalflt.cmd?action=remove"
+name = "scbidirectionalflt.cmd?action=modify.filtro"
+cgi = "scbidirectionalflt.cmd?action=modify"
+area = "cortafuegos"
+origen = "oculta"
+tipo = "escritura"
+pagina = "scbidirectionalflt_ed.asp"
+descripcion = "Cambia un filtro (`id=<FID>&target=entry&…`), como la web. El router responde 301 a la lista."
+riesgo = "alto"
+acceso = "puede_cortar"
+bloqueada = "el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo"
+lectura_pareada = { funcion = "scbidirectionalflt_ls.asp", params = [] }
+comprobada = "T12 del 2026-10-27, cambio 71"
+
+[[funcion.parametro]]
+nombre = "id"
+etiqueta = "Filtro (FID)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "target"
+etiqueta = "Objetivo (entry)"
+tipo = "text"
+fijo = "entry"
+
+[[funcion.parametro]]
+nombre = "name"
+etiqueta = "Nombre"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "interface"
+etiqueta = "Interfaz (IntfID)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "type"
+etiqueta = "Tipo (0 entrada, 1 salida)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "version"
+etiqueta = "Versión de IP (0 IPv4, 1 IPv6)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "default"
+etiqueta = "Acción por defecto (0 descartar, 1 permitir)"
+tipo = "text"
+
+[[funcion]]
+name = "scbidirectionalflt.cmd?action=remove.filtro"
+cgi = "scbidirectionalflt.cmd?action=remove"
 area = "cortafuegos"
 origen = "oculta"
 tipo = "escritura"
 pagina = "scbidirectionalflt_ls.asp"
-descripcion = "Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Borra una entrada o regla."
+descripcion = "Borra un filtro (`item=<FID>&escape=true`, sin `|`): el router lo borra con todas sus reglas; el panel solo borra filtros vacíos, para poder deshacerlo. El router responde 301 a la lista."
 riesgo = "alto"
-lectura_pareada = { funcion = "scbidirectionalflt.cmd?action=view", params = [] }
+acceso = "puede_cortar"
+bloqueada = "el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo"
+lectura_pareada = { funcion = "scbidirectionalflt_ls.asp", params = [] }
+comprobada = "T12 del 2026-10-27, cambio 72"
 
 [[funcion.parametro]]
 nombre = "item"
-etiqueta = "Elemento a borrar"
+etiqueta = "Filtro a borrar (FID)"
 tipo = "text"
 
 [[funcion.parametro]]
 nombre = "escape"
 etiqueta = "Escapar (true)"
 tipo = "text"
+fijo = "true"
 
 # ======================================================================
 # Área: dns
@@ -2732,8 +3095,11 @@ tipo = "escritura"
 pagina = "ddns.asp"
 descripcion = "Crea, modifica o borra una entrada de DNS dinámico."
 riesgo = "medio"
+acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetDdns", params = [["rtm_ddns_0i", "{rtm_ddns_id}"]] }
 lista = { id_param = "rtm_ddns_id", all = false, del = true }
+# NO PROBAR MÁS: crear una entrada inactiva (2026-10-26, cambio 56) colgó la web del router hasta reiniciarlo.
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -2789,7 +3155,9 @@ tipo = "escritura"
 pagina = "dnsrelay.asp"
 descripcion = "Activa o desactiva el relé DNS."
 riesgo = "medio"
+acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetDnsRelay", params = [] }
+comprobada = "pruebas del 2026-10-26, cambios 37 y 38"
 
 [[funcion.parametro]]
 nombre = "dns_relay_adm_state"
@@ -2820,8 +3188,10 @@ tipo = "escritura"
 pagina = "dnsrelay.asp"
 descripcion = "Añade, modifica o borra un servidor DNS del relé."
 riesgo = "medio"
+acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetDnsRelayServer", params = [["rtm_cfg_dns_relay_id", "{rtm_cfg_dns_relay_id}"]] }
 lista = { id_param = "rtm_cfg_dns_relay_id", all = false, del = true }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -2865,7 +3235,9 @@ tipo = "escritura"
 pagina = "ipv6.asp"
 descripcion = "Configura IPv6 en la LAN: activación, prefijo delegado, ULA, RA y DHCPv6."
 riesgo = "bajo"
+acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetLanIPv6Config", params = [] }
+comprobada = "pruebas del 2026-10-26, cambios 46 y 47"
 
 [[funcion.parametro]]
 nombre = "ipv6_adm_state"
@@ -2888,6 +3260,7 @@ tipo = "int"
 nombre = "ss_ipv6_prefix_adm_state"
 etiqueta = "Prefijo ULA"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "ss_ipv6_prefix"
@@ -2914,16 +3287,19 @@ opciones = [["0", "Desactivado"], ["1", "Sin estado"], ["2", "Con estado"]]
 nombre = "iana_manual_addr_min"
 etiqueta = "Primer id de interfaz"
 tipo = "int"
+depende = { de = "dhcpv6_mode", salvo = ["0"] }
 
 [[funcion.parametro]]
 nombre = "iana_manual_addr_max"
 etiqueta = "Último id de interfaz"
 tipo = "int"
+depende = { de = "dhcpv6_mode", salvo = ["0"] }
 
 [[funcion.parametro]]
 nombre = "lease_time"
 etiqueta = "Duración de la concesión (s)"
 tipo = "int"
+depende = { de = "dhcpv6_mode", salvo = ["0"] }
 
 [[funcion.parametro]]
 nombre = "ip_intf_id"
@@ -2968,7 +3344,10 @@ tipo = "escritura"
 pagina = "te_ipv6.asp"
 descripcion = "Abre puertos IPv6 hacia un equipo de la LAN (UI básica)."
 riesgo = "alto"
+acceso = "puede_cortar"
+bloqueada = "cortafuegos sin lectura comprobable: la Biblioteca no lo escribe"
 lectura_pareada = { funcion = "te_ipv6.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "newinst"
@@ -2988,7 +3367,10 @@ tipo = "escritura"
 pagina = "te_ipv6.asp"
 descripcion = "Borra una apertura de puertos IPv6 (UI básica)."
 riesgo = "alto"
+acceso = "puede_cortar"
+bloqueada = "cortafuegos sin lectura comprobable: la Biblioteca no lo escribe"
 lectura_pareada = { funcion = "te_ipv6.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "oldinst"
@@ -3008,7 +3390,10 @@ tipo = "escritura"
 pagina = "te_ipv6.asp"
 descripcion = "Guarda la lista de aperturas de puertos IPv6 (UI básica)."
 riesgo = "alto"
+acceso = "puede_cortar"
+bloqueada = "cortafuegos sin lectura comprobable: la Biblioteca no lo escribe"
 lectura_pareada = { funcion = "te_ipv6.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "inst"
@@ -3037,7 +3422,9 @@ tipo = "escritura"
 pagina = "te_ipv6.asp"
 descripcion = "Configura DHCPv6 (modo y rango) desde la UI básica."
 riesgo = "bajo"
+acceso = "puede_cortar"
 lectura_pareada = { funcion = "te_ipv6.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "IPv6DHCPMode"
@@ -3067,7 +3454,9 @@ tipo = "escritura"
 pagina = "te_ipv6.asp"
 descripcion = "Cambia el prefijo IPv6 de la LAN desde la UI básica."
 riesgo = "bajo"
+acceso = "puede_cortar"
 lectura_pareada = { funcion = "te_ipv6.asp", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "globalIPv6Address"
@@ -3113,7 +3502,9 @@ tipo = "escritura"
 pagina = "igmp.asp"
 descripcion = "Configura los parámetros de IGMP."
 riesgo = "bajo"
+acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetMcastIgmpSetting", params = [] }
+comprobada = "pruebas del 2026-10-26, cambios 24 y 25"
 
 [[funcion.parametro]]
 nombre = "igmp_max_group"
@@ -3157,7 +3548,9 @@ tipo = "escritura"
 pagina = "multicastintf.asp"
 descripcion = "Activa multicast y la versión de IGMP en una interfaz."
 riesgo = "bajo"
-lectura_pareada = { funcion = "cbGetMcastIntf", params = [] }
+acceso = "no_corta"
+lectura_pareada = { funcion = "cbGetMcastIntf", params = [["rtm_ip_mcast_intf_0i", "{rtm_ip_mcast_intf_id}"]] }
+comprobada = "pruebas del 2026-10-26, cambios 29 y 30"
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -3168,7 +3561,8 @@ opciones = [["1", "Activado"], ["0", "Desactivado"]]
 [[funcion.parametro]]
 nombre = "version"
 etiqueta = "Versión de IGMP"
-tipo = "int"
+tipo = "enum"
+opciones = [["0", "Automática"], ["1", "IGMPv1"], ["2", "IGMPv2"], ["3", "IGMPv3"]]
 
 [[funcion.parametro]]
 nombre = "rtm_ip_mcast_intf_id"
@@ -3220,8 +3614,10 @@ tipo = "escritura"
 pagina = "classification.asp"
 descripcion = "Crea, modifica o borra una regla de clasificación de QoS (condiciones y remarcado DSCP/802.1p)."
 riesgo = "bajo"
+acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetClassification", params = [["rtm_cfg_qos_cls_0i", "{rtm_cfg_qos_cls_id}"]] }
 lista = { id_param = "rtm_cfg_qos_cls_id", all = false, del = true }
+comprobada = "T12 del 2026-10-27, cambios 65 y 66"
 
 [[funcion.parametro]]
 nombre = "order_p"
@@ -3233,6 +3629,7 @@ opciones = [["1", "Primera"], ["2", "Según el orden"], ["3", "Última"]]
 nombre = "order"
 etiqueta = "Orden"
 tipo = "int"
+depende = { de = "order_p", salvo = ["1", "3"] }
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -3249,21 +3646,25 @@ tipo = "int"
 nombre = "mod_dscp"
 etiqueta = "Remarcar DSCP"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "mod_dscp_value"
 etiqueta = "DSCP nuevo (0-63)"
 tipo = "int"
+depende = { de = "mod_dscp" }
 
 [[funcion.parametro]]
 nombre = "mod_pbit"
 etiqueta = "Remarcar prioridad 802.1p"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "mod_pbit_value"
 etiqueta = "Prioridad nueva (0-7)"
 tipo = "int"
+depende = { de = "mod_pbit" }
 
 [[funcion.parametro]]
 nombre = "intf"
@@ -3274,141 +3675,169 @@ tipo = "text"
 nombre = "cls_ethertype"
 etiqueta = "Comprobar EtherType"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_ethertype_value"
 etiqueta = "EtherType"
 tipo = "text"
+depende = { de = "cls_ethertype" }
 
 [[funcion.parametro]]
 nombre = "cls_pbit"
 etiqueta = "Comprobar prioridad 802.1p"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_pbit_value"
 etiqueta = "Prioridad (0-7)"
 tipo = "int"
+depende = { de = "cls_pbit" }
 
 [[funcion.parametro]]
 nombre = "cls_vid"
 etiqueta = "Comprobar VLAN"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_vid_value"
 etiqueta = "VLAN (1-4094)"
 tipo = "int"
+depende = { de = "cls_vid" }
 
 [[funcion.parametro]]
 nombre = "cls_src_mac"
 etiqueta = "Comprobar MAC de origen"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_src_mac_addr"
 etiqueta = "MAC de origen"
 tipo = "mac"
+depende = { de = "cls_src_mac" }
 
 [[funcion.parametro]]
 nombre = "cls_src_mac_mask"
 etiqueta = "Máscara de MAC de origen"
 tipo = "mac"
+depende = { de = "cls_src_mac" }
 
 [[funcion.parametro]]
 nombre = "cls_dst_mac"
 etiqueta = "Comprobar MAC de destino"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_dst_mac_addr"
 etiqueta = "MAC de destino"
 tipo = "mac"
+depende = { de = "cls_dst_mac" }
 
 [[funcion.parametro]]
 nombre = "cls_dst_mac_mask"
 etiqueta = "Máscara de MAC de destino"
 tipo = "mac"
+depende = { de = "cls_dst_mac" }
 
 [[funcion.parametro]]
 nombre = "cls_dscp"
 etiqueta = "Comprobar DSCP"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_dscp_value"
 etiqueta = "DSCP (0-63)"
 tipo = "int"
+depende = { de = "cls_dscp" }
 
 [[funcion.parametro]]
 nombre = "cls_l4_protocol"
 etiqueta = "Comprobar protocolo"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_l4_protocol_value"
 etiqueta = "Protocolo (1-255)"
 tipo = "int"
+depende = { de = "cls_l4_protocol" }
 
 [[funcion.parametro]]
 nombre = "cls_src_l4_port"
 etiqueta = "Comprobar puerto de origen"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_src_l4_port_value_min"
 etiqueta = "Puerto de origen desde"
 tipo = "int"
+depende = { de = "cls_src_l4_port" }
 
 [[funcion.parametro]]
 nombre = "cls_src_l4_port_value_max"
 etiqueta = "Puerto de origen hasta"
 tipo = "int"
+depende = { de = "cls_src_l4_port" }
 
 [[funcion.parametro]]
 nombre = "cls_dst_l4_port"
 etiqueta = "Comprobar puerto de destino"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_dst_l4_port_value_min"
 etiqueta = "Puerto de destino desde"
 tipo = "int"
+depende = { de = "cls_dst_l4_port" }
 
 [[funcion.parametro]]
 nombre = "cls_dst_l4_port_value_max"
 etiqueta = "Puerto de destino hasta"
 tipo = "int"
+depende = { de = "cls_dst_l4_port" }
 
 [[funcion.parametro]]
 nombre = "cls_src_ipv4"
 etiqueta = "Comprobar IP de origen"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_src_ipv4_addr"
 etiqueta = "IP de origen"
 tipo = "ip"
+depende = { de = "cls_src_ipv4" }
 
 [[funcion.parametro]]
 nombre = "cls_src_ipv4_mask"
 etiqueta = "Máscara de IP de origen"
 tipo = "ip"
+depende = { de = "cls_src_ipv4" }
 
 [[funcion.parametro]]
 nombre = "cls_dst_ipv4"
 etiqueta = "Comprobar IP de destino"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "cls_dst_ipv4_addr"
 etiqueta = "IP de destino"
 tipo = "ip"
+depende = { de = "cls_dst_ipv4" }
 
 [[funcion.parametro]]
 nombre = "cls_dst_ipv4_mask"
 etiqueta = "Máscara de IP de destino"
 tipo = "ip"
+depende = { de = "cls_dst_ipv4" }
 
 [[funcion.parametro]]
 nombre = "rtm_cfg_qos_cls_id"
@@ -3421,7 +3850,7 @@ area = "qos"
 origen = "avanzada"
 tipo = "lectura"
 pagina = "queue.asp"
-descripcion = "Colas de QoS y cola por defecto."
+descripcion = "Colas de QoS: una lista de 8 (ids 0 a 7), cada una con su cola por defecto, clase de tráfico, interfaz, prioridad, peso y política."
 riesgo = "bajo"
 
 [[funcion]]
@@ -3430,9 +3859,12 @@ area = "qos"
 origen = "avanzada"
 tipo = "escritura"
 pagina = "queue.asp"
-descripcion = "Configura una cola de QoS."
+descripcion = "Activa o desactiva una cola de QoS, la de su id (`dpm_cfg_queue_id`, de 0 a 7). Como la web (botón Save de la tabla de colas), manda solo el id y el estado."
 riesgo = "bajo"
-lectura_pareada = { funcion = "cbGetQueue", params = [] }
+acceso = "puede_cortar"
+lectura_pareada = { funcion = "cbGetQueue", params = [["dpm_cfg_queue_0i", "{dpm_cfg_queue_id}"]] }
+# 2026-10-26, cambio 34: falló (la lista se leía por la primera cola); tras escribir, el router rehízo su red.
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "dpm_cfg_queue_id"
@@ -3440,15 +3872,33 @@ etiqueta = "Cola (id)"
 tipo = "int"
 
 [[funcion.parametro]]
-nombre = "default_traffic_class"
-etiqueta = "Cola por defecto"
-tipo = "int"
-
-[[funcion.parametro]]
 nombre = "adm_state"
 etiqueta = "Activado"
 tipo = "enum"
 opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion]]
+name = "cbSetQueue.defecto"
+cgi = "cbSetQueue"
+area = "qos"
+origen = "avanzada"
+tipo = "accion"
+pagina = "queue.asp"
+descripcion = "Elige la cola por defecto (formulario DefaultQueueForm de la web): manda el id de la cola y `default_traffic_class=-1`, y el router toma la clase de tráfico de esa cola como la de por defecto. La web cierra la sesión 2 s después: el router rehace su red."
+riesgo = "medio"
+acceso = "puede_cortar"
+comprobada = false
+
+[[funcion.parametro]]
+nombre = "dpm_cfg_queue_id"
+etiqueta = "Cola (id, de 0 a 7)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "default_traffic_class"
+etiqueta = "Cola por defecto (siempre -1)"
+tipo = "int"
+fijo = "-1"
 
 [[funcion]]
 name = "cbGetTR98L2Marking"
@@ -3478,8 +3928,10 @@ tipo = "escritura"
 pagina = "marking.asp"
 descripcion = "Crea, modifica o borra un marcado de nivel 2."
 riesgo = "bajo"
+acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetTR98L2Marking", params = [["mll_br_marking_0i", "{mll_br_marking_id}"]] }
 lista = { id_param = "mll_br_marking_id", all = false, del = true }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -3507,22 +3959,26 @@ opciones = [["1", "Sin etiqueta"], ["0", "Con etiqueta"]]
 nombre = "vid_override"
 etiqueta = "Reescribir VLAN"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "vid_value"
 etiqueta = "VLAN"
 tipo = "int"
+depende = { de = "vid_override" }
 
 [[funcion.parametro]]
 nombre = "pbit_override"
 etiqueta = "Reescribir prioridad 802.1p"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "pbit_value"
 etiqueta = "Prioridad 802.1p"
 tipo = "enum"
 opciones = [["0", "0"], ["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"], ["5", "5"], ["6", "6"], ["7", "7"]]
+depende = { de = "pbit_override" }
 
 [[funcion.parametro]]
 nombre = "mll_br_marking_id"
@@ -3563,7 +4019,9 @@ tipo = "escritura"
 pagina = "voiceadvance.asp"
 descripcion = "Configura una línea de voz: credenciales SIP, línea directa y VAD."
 riesgo = "bajo"
+acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetVoiceLine", params = [["interwork_id", "{interwork_id}"]] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -3573,13 +4031,15 @@ opciones = [["1", "Activado"], ["0", "Desactivado"]]
 
 [[funcion.parametro]]
 nombre = "warmline_hotline_flag"
-etiqueta = "Modo línea directa"
+etiqueta = "Modo línea directa (siempre 1)"
 tipo = "int"
+fijo = "1"
 
 [[funcion.parametro]]
 nombre = "warmline_hotline"
 etiqueta = "Línea directa (hotline/warmline)"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "warmline_hotline_number"
@@ -3598,8 +4058,9 @@ tipo = "int"
 
 [[funcion.parametro]]
 nombre = "web"
-etiqueta = "Origen del formulario (BASIC/ADVANCED)"
+etiqueta = "Origen del formulario (siempre ADVANCED)"
 tipo = "text"
+fijo = "ADVANCED"
 
 [[funcion.parametro]]
 nombre = "auth_username"
@@ -3637,17 +4098,21 @@ tipo = "escritura"
 pagina = "voiceadvance.asp"
 descripcion = "Configura un puerto de teléfono (ganancias, fax y módem)."
 riesgo = "bajo"
+acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetVoicePhysical", params = [] }
+comprobada = "pruebas del 2026-10-26, cambios 31 y 32"
 
 [[funcion.parametro]]
 nombre = "fax_passthrough_adm_state"
 etiqueta = "Fax en paso directo"
-tipo = "bool"
+tipo = "enum"
+opciones = [["0", "Desactivado"], ["1", "Automático"], ["2", "Forzado"]]
 
 [[funcion.parametro]]
 nombre = "modem_passthrough_adm_state"
 etiqueta = "Módem en paso directo"
-tipo = "bool"
+tipo = "enum"
+opciones = [["0", "Desactivado"], ["1", "Automático"], ["2", "Forzado"]]
 
 [[funcion.parametro]]
 nombre = "tx_gain"
@@ -3681,7 +4146,9 @@ tipo = "escritura"
 pagina = "voiceadvance.asp"
 descripcion = "Configura SIP (servidores, puertos, tiempos, DTMF, T.38). Puede dejar sin teléfono."
 riesgo = "bajo"
+acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetVoiceSip", params = [] }
+comprobada = "E6, cambio 13"
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -3840,7 +4307,9 @@ tipo = "escritura"
 pagina = "cwmp.asp"
 descripcion = "Configura TR-069 (ACS, credenciales, Inform). Desde cwmp.asp (oculta). Desactivarlo corta la gestión remota del operador."
 riesgo = "alto"
+acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetTr69Config", params = [] }
+comprobada = "fase 3, cambios 1 y 2"
 
 [[funcion.parametro]]
 nombre = "enableCWMP"
@@ -3893,9 +4362,13 @@ area = "usuarios"
 origen = "avanzada"
 tipo = "escritura"
 pagina = "user_profile.asp"
-descripcion = "Crea un usuario de la interfaz web con su grupo (user, admin; system solo si la sesión es system)."
-riesgo = "bajo"
+descripcion = "Crea un usuario de la interfaz web con su grupo (user, admin; system solo si la sesión es system). Usuario, contraseña y grupo van en claro."
+# Medio: crea una cuenta que puede entrar en el router. El gestor no deja
+# crear uno con el nombre del panel ni con el papel system.
+riesgo = "medio"
+acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetUserList", params = [] }
+comprobada = "E3, cambio 14"
 
 [[funcion.parametro]]
 nombre = "rqUser"
@@ -3920,7 +4393,9 @@ tipo = "accion"
 pagina = "login.asp"
 descripcion = "Inicio de sesión en la UI avanzada: devuelve SessionID. Usuario y contraseña van ofuscados con XOR 0x1f."
 riesgo = "bajo"
+acceso = "no_corta"
 bloqueada = "la usa hgu::Client para su propia sesión; invocarla desde el explorador rompería la sesión compartida del panel"
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "rqUsername"
@@ -3945,7 +4420,9 @@ tipo = "accion"
 pagina = "logout.asp"
 descripcion = "Cierra la sesión de la UI avanzada."
 riesgo = "bajo"
+acceso = "no_corta"
 bloqueada = "la usa hgu::Client para su propia sesión; invocarla desde el explorador rompería la sesión compartida del panel"
+comprobada = false
 
 [[funcion]]
 name = "cbCheckSession"
@@ -3962,9 +4439,13 @@ area = "usuarios"
 origen = "avanzada"
 tipo = "escritura"
 pagina = "user_profile.asp"
-descripcion = "Borra usuarios de la interfaz web (lista de nombres)."
-riesgo = "bajo"
+descripcion = "Borra usuarios de la interfaz web (lista de nombres, cada uno seguido de «:»)."
+# Medio: borrar el usuario con el que entra el panel lo dejaría fuera. El
+# gestor no deja borrar ese ni el del operador (system), y de uno en uno.
+riesgo = "medio"
+acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetUserList", params = [] }
+comprobada = "E3, cambio 16"
 
 [[funcion.parametro]]
 nombre = "rqDelList"
@@ -3989,21 +4470,27 @@ pagina = "user_profile.asp"
 descripcion = "Cambia la contraseña del usuario con sesión iniciada (contraseña actual y nueva)."
 # Medio, no bajo: si sale mal, puede dejar al panel sin acceso al router.
 riesgo = "medio"
+acceso = "puede_cortar"
 bloqueada = "cambia la contraseña con la que el propio panel inicia sesión: la vigilancia no podría volver a entrar ni revertir; se cambia desde el router"
+# TODO(E4): la contraseña del propio router sigue activa sin comprobar: su
+# flujo (Configuración del router) no pasa por el gestor, está protegido
+# (comprueba, restaura y avisa) y la E4 se hace con él. Tras la E4, la
+# referencia de la prueba aquí, o el flujo se desactiva si falla.
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "rqUser"
-etiqueta = "Usuario"
+etiqueta = "Usuario (XOR 0x1f)"
 tipo = "text"
 
 [[funcion.parametro]]
 nombre = "rqOPwd"
-etiqueta = "Contraseña actual"
+etiqueta = "Contraseña actual (XOR 0x1f)"
 tipo = "secret"
 
 [[funcion.parametro]]
 nombre = "rqNPwd"
-etiqueta = "Contraseña nueva"
+etiqueta = "Contraseña nueva (XOR 0x1f)"
 tipo = "secret"
 
 [[funcion]]
@@ -4014,7 +4501,9 @@ tipo = "accion"
 pagina = "user_profile.asp"
 descripcion = "Cambia la contraseña y el grupo de otro usuario (ventana user_profile_modifyOthers.asp). No se puede comprobar después: acción."
 riesgo = "medio"
-bloqueada = "puede cambiar la contraseña del usuario con el que el propio panel inicia sesión (RP_ROUTER_USER): la vigilancia no podría volver a entrar ni revertir; se cambia desde el router"
+acceso = "puede_cortar"
+bloqueada = "puede cambiar la contraseña del usuario con el que el propio panel inicia sesión (RP_ROUTER_USER): la vigilancia no podría volver a entrar ni revertir; además, en este router no se puede comprobar: solo la cuenta 1234 entra en su web"
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "rqUser"
@@ -4039,7 +4528,9 @@ tipo = "accion"
 pagina = "te_acceso_router.asp"
 descripcion = "Inicio de sesión en la UI básica (formulario de te_acceso_router.asp): fija la cookie _httpdSessionId_."
 riesgo = "bajo"
+acceso = "no_corta"
 bloqueada = "la usa hgu::Client para su propia sesión; invocarla desde el explorador rompería la sesión compartida del panel"
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "curWebPage"
@@ -4064,7 +4555,9 @@ tipo = "accion"
 pagina = "te_cambio_contrasena.asp"
 descripcion = "Cambia la contraseña de acceso desde la UI básica (actual y nueva, XOR 0x1f)."
 riesgo = "bajo"
+acceso = "puede_cortar"
 bloqueada = "cambia la contraseña con la que el propio panel inicia sesión: la vigilancia no podría volver a entrar ni revertir; se cambia desde el router"
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "inOrgPassword"
@@ -4084,10 +4577,12 @@ tipo = "accion"
 pagina = "te_header.asp"
 descripcion = "Cierra la sesión de la UI básica."
 riesgo = "bajo"
+acceso = "no_corta"
 bloqueada = "la usa hgu::Client para su propia sesión; invocarla desde el explorador rompería la sesión compartida del panel"
 
 # ======================================================================
 # Área: sistema
+comprobada = false
 
 [[funcion]]
 name = "backup_restore.asp"
@@ -4097,7 +4592,9 @@ tipo = "accion"
 pagina = "backup_restore.asp"
 descripcion = "Página de copia y restauración de la configuración."
 riesgo = "bajo"
+acceso = "no_corta"
 bloqueada = "al cargarse llama a cbSaveConfig con backup=1 (genera la copia con secretos)"
+comprobada = false
 
 [[funcion]]
 name = "cbDownloadConfig"
@@ -4105,13 +4602,15 @@ area = "sistema"
 origen = "avanzada"
 tipo = "accion"
 pagina = "backup_restore.asp"
-descripcion = "Descarga el fichero de copia generado por cbSaveConfig (backup=1)."
+descripcion = "Descarga el fichero de copia generado por cbSaveConfig (backup=1): POST sin cuerpo con `fileName` y `sessionKey` en la URL; responde `application/octet-stream` con el fichero (`config_<fecha>.tar`)."
 riesgo = "bajo"
-bloqueada = "descarga la configuración completa con todas las contraseñas y claves en claro"
+acceso = "no_corta"
+bloqueada = "la copia lleva todas las contraseñas: se descarga desde Ajustes → Sistema → Copia de la configuración (guarda, la genera y la descarga), no desde la Biblioteca"
+comprobada = "T12 del 2026-10-27, copia de ~50 KB descargada"
 
 [[funcion.parametro]]
 nombre = "fileName"
-etiqueta = "Fichero"
+etiqueta = "Fichero (va en la URL)"
 tipo = "text"
 
 [[funcion]]
@@ -4122,7 +4621,9 @@ tipo = "accion"
 pagina = "fw_upgrade.asp"
 descripcion = "Descarga un firmware de un servidor FTP/TFTP y lo graba."
 riesgo = "alto"
+acceso = "puede_cortar"
 bloqueada = "graba un firmware: un fallo deja el router inservible"
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "rqProtocol"
@@ -4144,6 +4645,16 @@ nombre = "rqFileName"
 etiqueta = "Fichero"
 tipo = "text"
 
+[[funcion.parametro]]
+nombre = "rqUsername"
+etiqueta = "Usuario del FTP (vacío: anónimo)"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "rqPasswd"
+etiqueta = "Contraseña del FTP"
+tipo = "secret"
+
 [[funcion]]
 name = "cbGetDiagConfig"
 area = "sistema"
@@ -4161,7 +4672,9 @@ tipo = "escritura"
 pagina = "diagsw.asp"
 descripcion = "Activa o desactiva el espejo de la WAN hacia un puerto LAN."
 riesgo = "bajo"
+acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetDiagConfig", params = [] }
+comprobada = "pruebas del 2026-10-26, cambios 26 y 27"
 
 [[funcion.parametro]]
 nombre = "wan_mirror"
@@ -4210,7 +4723,9 @@ tipo = "escritura"
 pagina = "syslog.asp"
 descripcion = "Configura el registro del sistema (destino local o remoto, servidor y severidad). El router también exporta el registro si recibe `export=EXPORT` (lo que syslog.asp hace al cargarse): el panel nunca lo envía, porque solo manda los parámetros de este catálogo."
 riesgo = "bajo"
+acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetSyslog", params = [] }
+comprobada = "fase 3, cambios 4 y 5"
 
 [[funcion.parametro]]
 nombre = "syslog_enable"
@@ -4253,6 +4768,8 @@ tipo = "accion"
 pagina = "reboot.asp"
 descripcion = "Reinicia el router. El panel vigila su vuelta hasta 5 minutos."
 riesgo = "alto"
+acceso = "puede_cortar"
+comprobada = "pruebas del 2026-10-26, cambio 57 (el router se reinició y volvió en menos de 5 min)"
 
 [[funcion]]
 name = "cbRestoreConfig"
@@ -4260,14 +4777,11 @@ area = "sistema"
 origen = "avanzada"
 tipo = "accion"
 pagina = "restore_default.asp"
-descripcion = "Restaura un perfil de configuración guardado y reinicia el router."
+descripcion = "Restaura la configuración de fábrica y reinicia el router (restore_default.asp: la web manda solo el sessionKey)."
 riesgo = "alto"
+acceso = "puede_cortar"
 bloqueada = "sustituye toda la configuración y reinicia; no hay forma de comprobarla ni de deshacerla desde el panel"
-
-[[funcion.parametro]]
-nombre = "file"
-etiqueta = "Perfil guardado"
-tipo = "text"
+comprobada = false
 
 [[funcion]]
 name = "cbSaveConfig"
@@ -4277,6 +4791,8 @@ tipo = "accion"
 pagina = "save.asp"
 descripcion = "Con `save=1` graba la configuración en flash; con `backup=1` genera el fichero de copia (lo que hace backup_restore.asp al cargarse)."
 riesgo = "bajo"
+acceso = "no_corta"
+comprobada = "T12 del 2026-10-27, copia de ~50 KB descargada"
 
 [[funcion.parametro]]
 nombre = "backup"
@@ -4296,7 +4812,9 @@ tipo = "accion"
 pagina = "syslog.asp"
 descripcion = "Página del registro del sistema."
 riesgo = "bajo"
+acceso = "no_corta"
 bloqueada = "al cargarse llama a cbSetSyslog con export=EXPORT (exportación del registro)"
+comprobada = false
 
 [[funcion]]
 name = "upload/cfgupload.asp"
@@ -4306,7 +4824,9 @@ tipo = "accion"
 pagina = "upload/cfgupload.asp"
 descripcion = "Recibe un fichero de configuración y lo aplica."
 riesgo = "alto"
+acceso = "puede_cortar"
 bloqueada = "sube y aplica una configuración completa; no se puede comprobar ni deshacer"
+comprobada = false
 
 [[funcion]]
 name = "upload/imgupgrade.asp"
@@ -4316,7 +4836,9 @@ tipo = "accion"
 pagina = "upload/imgupgrade.asp"
 descripcion = "Recibe un firmware y lo graba."
 riesgo = "alto"
+acceso = "puede_cortar"
 bloqueada = "graba un firmware: un fallo deja el router inservible"
+comprobada = false
 
 [[funcion]]
 name = "restoreinfo.cgi"
@@ -4326,7 +4848,9 @@ tipo = "accion"
 pagina = "te_otras_funcionalidades.asp"
 descripcion = "Restablece los valores de fábrica (enlace de te_otras_funcionalidades.asp)."
 riesgo = "alto"
+acceso = "puede_cortar"
 bloqueada = "reset de fábrica: borra la configuración, incluidas las credenciales PPP y WiFi"
+comprobada = false
 
 [[funcion]]
 name = "te_acerca_de___.asp"
@@ -4354,7 +4878,9 @@ tipo = "accion"
 pagina = "te_uploadinfo.asp"
 descripcion = "Recibe un firmware desde la UI básica y lo graba."
 riesgo = "alto"
+acceso = "puede_cortar"
 bloqueada = "graba un firmware: un fallo deja el router inservible"
+comprobada = false
 
 [[funcion]]
 name = "te_uploadsettings.asp"
@@ -4364,7 +4890,9 @@ tipo = "accion"
 pagina = "te_uploadsettings.asp"
 descripcion = "Recibe un fichero de configuración desde la UI básica y lo aplica."
 riesgo = "alto"
+acceso = "puede_cortar"
 bloqueada = "sube y aplica una configuración completa; no se puede comprobar ni deshacer"
+comprobada = false
 
 [[funcion]]
 name = "cbSetLocalTime"
@@ -4372,12 +4900,14 @@ area = "sistema"
 origen = "oculta"
 tipo = "accion"
 pagina = "ntp.asp"
-descripcion = "Fija la hora local del router a mano (ntp.asp, oculta). Sin lectura que la compruebe: acción."
+descripcion = "Fija la hora del router a mano (ntp.asp, oculta). Como la web, la fecha y la hora del router se mandan en segundos desde 1970 (UTC), con la zona que da cbGetSummary; también vale el número de segundos. Sin lectura que la compruebe: acción."
 riesgo = "bajo"
+acceso = "no_corta"
+comprobada = "T12 del 2026-10-27, cambios 73 y 74 (el router toma la hora pedida)"
 
 [[funcion.parametro]]
 nombre = "SysTime"
-etiqueta = "Hora local"
+etiqueta = "Fecha y hora del router (AAAA-MM-DD HH:MM)"
 tipo = "text"
 
 [[funcion]]
@@ -4397,7 +4927,9 @@ tipo = "escritura"
 pagina = "ntp.asp"
 descripcion = "Configura NTP: activación, interfaz y servidores. Desde ntp.asp (oculta)."
 riesgo = "bajo"
+acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetTimeNtp", params = [] }
+comprobada = "fase 3, cambio 3"
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -4452,7 +4984,9 @@ tipo = "escritura"
 pagina = "system.asp"
 descripcion = "Configura NTP según system.asp. Restos de system.asp: la página existe pero el router responde 404 a sus llamadas."
 riesgo = "bajo"
+acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetNTPInfo", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "rqNTPOnOff"
@@ -4501,6 +5035,8 @@ tipo = "accion"
 pagina = "system.asp"
 descripcion = "Fija la hora del sistema según system.asp. Restos de system.asp: la página existe pero el router responde 404 a sus llamadas."
 riesgo = "bajo"
+acceso = "no_corta"
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "rqUTCSec"
@@ -4524,7 +5060,9 @@ tipo = "escritura"
 pagina = "system.asp"
 descripcion = "Configura la zona horaria según system.asp. Restos de system.asp: la página existe pero el router responde 404 a sus llamadas."
 riesgo = "bajo"
+acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetSystemTimeZone", params = [] }
+comprobada = false
 
 [[funcion.parametro]]
 nombre = "rqOffset"
@@ -4584,9 +5122,12 @@ tipo = "accion"
 pagina = "system.asp"
 descripcion = "Fuerza la sincronización horaria según system.asp. Restos de system.asp: la página existe pero el router responde 404 a sus llamadas."
 riesgo = "bajo"
+acceso = "no_corta"
 
 # ======================================================================
 # Área: ocultas
+# 2026-10-26, cambio 33: el router no confirma la acción; no hay forma de comprobarla.
+comprobada = false
 
 [[funcion]]
 name = "cwmp.asp"

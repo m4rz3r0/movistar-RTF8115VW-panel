@@ -37,6 +37,8 @@ impl ChangeManager {
     }
 
     async fn reanudar_filas(self: &Arc<Self>) {
+        // Lo que esperaba en la cola no se aplica a ciegas.
+        self.cancelar_cola_al_arrancar().await;
         let filas = match sqlx::query(
             "SELECT * FROM changes WHERE estado IN ('aplicando', 'vigilando') ORDER BY id",
         )
@@ -197,6 +199,7 @@ impl ChangeManager {
             base: Base::Wan(wan_antes),
             nota: Some(nota),
             multi: false,
+            vigilar: true,
         };
         self.vigilar_en_segundo_plano(ej, reserva);
     }

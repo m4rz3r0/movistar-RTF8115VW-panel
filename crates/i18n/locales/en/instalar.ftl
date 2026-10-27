@@ -8,7 +8,7 @@ instalar-paso-fin = Done
 
 ## Administrator
 instalar-admin-texto = Create the user you will sign in to the panel with.
-instalar-token = Setup token
+instalar-token = Setup code
 instalar-token-ayuda = It is in the service log and in the instalar.token file, next to the panel database. It only works once.
 instalar-usuario = Panel username
 instalar-contrasena = Password (at least { $n } characters)
@@ -50,7 +50,7 @@ instalar-red-sin-detectar = The router network could not be detected: you can tr
 instalar-ir-estado = Go to Status
 
 ## Errors
-instalar-error-token = Invalid setup token
+instalar-error-token = Invalid setup code
 instalar-error-terminada = Setup is already done
 instalar-error-red = The setup wizard only answers from the local network
 instalar-error-usuario = Invalid username: 1 to 64 characters, no spaces

@@ -105,6 +105,8 @@ fn como_elemento(e: &ElementoVista, f: &Fila) -> ElementoVista {
         ajustes: Vec::new(),
         lectura: e.lectura.clone(),
         acciones: e.acciones.clone(),
+        accion_propia: None,
+        desactivadas: e.desactivadas,
     }
 }
 
@@ -112,7 +114,8 @@ fn como_elemento(e: &ElementoVista, f: &Fila) -> ElementoVista {
 #[derive(Clone, Copy)]
 pub(crate) struct DatosLista {
     pub tipo: Tipo,
-    /// Lleva la marca redonda (la lista tiene acciones).
+    /// Lleva la marca redonda (sus filas son de las que se pueden marcar en
+    /// la pantalla: comparten acciones entre ellas).
     pub marcar: bool,
     /// Se puede cambiar (ni solo lectura ni sin leer).
     pub editable: bool,
@@ -180,13 +183,15 @@ fn cabeza(
 /// La lista del elemento `e`. `red`: la red de casa de la página;
 /// `acciones`, las de la página (la de borrar de esta lista va también en
 /// su detalle); `existentes`, las IP fijas de la página (`(id, mac, ip)`),
-/// para saber si se puede fijar la IP de un dispositivo.
+/// para saber si se puede fijar la IP de un dispositivo (`None`: no se
+/// fijan, p. ej. sin comprobar en el router real). Una lista que no se
+/// escribe ([`crate::validacion_real::escribible`]) solo se consulta.
 #[component]
 pub(crate) fn Lista(
     e: ElementoVista,
     red: RedCasa,
     acciones: Vec<AccionVista>,
-    existentes: Vec<(String, String, String)>,
+    existentes: Option<Vec<(String, String, String)>>,
     registro: Registro,
 ) -> impl IntoView {
     let pagina = expect_context::<Pagina>();
@@ -202,8 +207,8 @@ pub(crate) fn Lista(
     let cabeceras: Vec<String> = a.columnas.iter().map(|c| cabecera(&a, c)).collect();
     let d = DatosLista {
         tipo,
-        marcar: leida && !e.acciones.is_empty(),
-        editable: leida && !pagina.solo_lectura,
+        marcar: leida && ids.iter().any(|id| pagina.marcable(id)),
+        editable: leida && !pagina.solo_lectura && crate::validacion_real::escribible(&a),
         con_interruptor: interruptor.is_some(),
         cabeceras: StoredValue::new(cabeceras.clone()),
         instancias: StoredValue::new(a.instancias.clone()),
@@ -337,6 +342,7 @@ pub(crate) fn Lista(
                         abierto
                         red=red.clone()
                         existentes=existentes.get_value()
+                        editable=d.editable
                         borrar=borrar.clone()
                         registro
                     />

@@ -1,45 +1,91 @@
 //! Estado en memoria del simulador: fixtures, sesiones, escrituras y fallos programados.
 
+use crate::usuarios::Usuario;
 use catalogo::Catalogo;
 use hgu::xml::XmlNode;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     sync::{
-        Mutex, MutexGuard,
+        Arc, Mutex, MutexGuard,
         atomic::{AtomicBool, AtomicU64},
     },
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 pub(crate) type Params = Vec<(String, String)>;
 pub(crate) type FixtureKey = (String, Params);
 
 pub(crate) struct Inner {
+    /// Usuario del simulador: el que cambia `cbModifyPwd`.
     pub(crate) user: String,
-    /// Contraseña aceptada (cambiable con [`SimControl::set_password`]).
-    pub(crate) password: Mutex<String>,
+    /// Usuarios de la web del router, con el del simulador (su contraseña
+    /// se cambia con [`SimControl::set_password`]).
+    pub(crate) usuarios: Mutex<Vec<Usuario>>,
     pub(crate) fixtures: HashMap<FixtureKey, String>,
     /// Catálogo de funciones (lecturas pareadas y listas).
     pub(crate) catalogo: Catalogo,
     /// Conexión a internet de las fixtures (ver [`wan_de_las_fixtures`]).
     pub(crate) wan: Option<String>,
     pub(crate) unresponsive: AtomicBool,
+    /// Época de las conexiones TCP (ver `conexiones`): al subir, las
+    /// abiertas hasta entonces dejan de responder.
+    pub(crate) epoca: Arc<AtomicU64>,
     /// Retardo de cada respuesta en milisegundos (`set_retardo`).
     pub(crate) retardo_ms: AtomicU64,
     pub(crate) state: Mutex<SimState>,
 }
 
 impl Inner {
+    /// Contraseña del usuario del simulador (vacía si alguien lo borró).
     pub(crate) fn password(&self) -> String {
-        self.password
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .clone()
+        self.usuarios()
+            .iter()
+            .find(|u| u.nombre == self.user)
+            .map(|u| u.contrasena.clone())
+            .unwrap_or_default()
+    }
+
+    /// Pone `nueva` como contraseña del usuario del simulador.
+    pub(crate) fn fijar_password(&self, nueva: String) {
+        if let Some(u) = self.usuarios().iter_mut().find(|u| u.nombre == self.user) {
+            u.contrasena = nueva;
+        }
+    }
+
+    pub(crate) fn usuarios(&self) -> MutexGuard<'_, Vec<Usuario>> {
+        self.usuarios.lock().unwrap_or_else(|e| e.into_inner())
     }
 
     pub(crate) fn state(&self) -> MutexGuard<'_, SimState> {
         self.state.lock().unwrap_or_else(|e| e.into_inner())
     }
+
+    /// Aplica la contraseña pendiente de un `cbModifyPwd` aplazado si ya
+    /// toca (`modify_pwd_con_retraso`, `modify_pwd_tras_inicios`). La llama
+    /// cada inicio de sesión; `basico` dice si es el básico, el único que
+    /// cuenta para `modify_pwd_tras_inicios`.
+    pub(crate) fn aplicar_contrasena_pendiente(&self, st: &mut SimState, basico: bool) {
+        let toca = match &mut st.pwd_pendiente {
+            Some((_, Aplazada::Desde(desde))) => Instant::now() >= *desde,
+            Some((_, Aplazada::TrasInicios(n))) if basico => {
+                let toca = *n == 0;
+                *n = n.saturating_sub(1);
+                toca
+            }
+            _ => false,
+        };
+        if toca && let Some((nueva, _)) = st.pwd_pendiente.take() {
+            self.fijar_password(nueva);
+        }
+    }
+}
+
+/// Cuándo aplica el router la contraseña de un `cbModifyPwd` aplazado.
+pub(crate) enum Aplazada {
+    /// En el primer inicio de sesión desde este instante.
+    Desde(Instant),
+    /// En el inicio de sesión básico que sigue a estos (que aún no la ven).
+    TrasInicios(u32),
 }
 
 /// Lo escrito en una instancia de una lectura que no es una lista: campos
@@ -92,6 +138,11 @@ pub(crate) struct SimState {
     pub(crate) hang_after_write: HangAfterWrite,
     /// `no_answer_next_write`.
     pub(crate) no_answer_next: bool,
+    /// `rehacer_red_tras_proxima_escritura`.
+    pub(crate) rehacer_red_tras_escritura: bool,
+    /// Sesiones (`_httpdSessionId_` y `SessionID`) que ya no responden
+    /// (`colgar_sesiones`): sus peticiones se quedan sin respuesta.
+    pub(crate) sesiones_colgadas: HashSet<String>,
     /// `create_twice_next_write`.
     pub(crate) create_twice: bool,
     /// Escrituras reales recibidas (para `fail_write_n`/`hang_after_write_n`).
@@ -111,12 +162,42 @@ pub(crate) struct SimState {
     pub(crate) listas: HashMap<String, ListaViva>,
     /// `modify_pwd_sin_efecto`.
     pub(crate) modify_pwd_sin_efecto: bool,
+    /// `modify_pwd_con_retraso`: el retraso del próximo `cbModifyPwd`.
+    pub(crate) modify_pwd_retraso: Option<Duration>,
+    /// `modify_pwd_tras_inicios`: los inicios de sesión del próximo
+    /// `cbModifyPwd` que aún no ven la nueva.
+    pub(crate) modify_pwd_tras_inicios: Option<u32>,
+    /// Contraseña de un `cbModifyPwd` aplazado y cuándo vale.
+    pub(crate) pwd_pendiente: Option<(String, Aplazada)>,
     /// `login_falla_con`.
     pub(crate) login_falla_con: Option<String>,
     /// Último `cbReboot`: `SysUptime` cuenta desde aquí.
     pub(crate) rebooted: Option<Instant>,
     /// `SWVersion` de `cbGetSummary` (`set_firmware`).
     pub(crate) firmware: Option<String>,
+    /// Filtros del cortafuegos (ver `cortafuegos`).
+    pub(crate) cortafuegos: Vec<hgu::cortafuegos::Filtro>,
+    /// `cortafuegos_ilegible`: la página de la lista sale sin `var filter`.
+    pub(crate) cortafuegos_ilegible: bool,
+    /// Inicios de sesión básicos rechazados desde el arranque.
+    pub(crate) inicios_fallidos: u32,
+    /// La próxima baja de una regla borra además esto: `None` (nada),
+    /// `Some(None)` el filtro entero o `Some(Some(rid))` otra regla del
+    /// mismo filtro (`cortafuegos_proxima_baja_*`).
+    pub(crate) cortafuegos_baja_de_mas: Option<Option<String>>,
+    /// Se ha exportado el registro desde el arranque (ver `registro`).
+    pub(crate) registro_exportado: bool,
+    /// Texto del registro fijado con `fijar_registro` (`None`: el de serie).
+    pub(crate) registro: Option<String>,
+    /// Veces que se ha guardado la configuración (`cbSaveConfig save=1`).
+    pub(crate) guardados: u32,
+    /// El fichero de copia generado con `cbSaveConfig backup=1` y cuántos
+    /// guardados llevaba entonces (la copia es de lo último guardado).
+    pub(crate) copia: Option<(String, u32)>,
+    /// Contenido fijado de la copia (`fijar_copia`).
+    pub(crate) copia_fijada: Option<Vec<u8>>,
+    /// `fileName` de cada copia descargada.
+    pub(crate) copias_descargadas: Vec<String>,
 }
 
 impl SimState {
@@ -125,6 +206,12 @@ impl SimState {
         self.counter += 1;
         let n = u64::from(self.seed) * 1000 + u64::from(self.counter);
         format!("{}", n % 1_000_000_000_000)
+    }
+
+    /// Las sesiones abiertas dejan de responder (ver `sesiones_colgadas`).
+    pub(crate) fn colgar_sesiones(&mut self) {
+        let abiertas: Vec<String> = self.basic.iter().chain(&self.advanced).cloned().collect();
+        self.sesiones_colgadas.extend(abiertas);
     }
 
     pub(crate) fn invalidate_sessions(&mut self) {

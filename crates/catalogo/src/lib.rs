@@ -4,11 +4,13 @@
 //! partir del análisis del router y revisado a mano). Se compila dentro del
 //! binario y se valida al cargar: un catálogo inválido impide arrancar.
 
+mod comprobadas;
 pub mod mask;
 mod model;
 
 pub use model::{
-    Area, Funcion, LecturaPareada, Lista, Origen, Parametro, Partido, Riesgo, Tipo, TipoParam,
+    Acceso, Area, Casilla, Comprobacion, Depende, Funcion, LecturaPareada, Lista, Origen,
+    Parametro, Partido, RANURA_LIBRE, Riesgo, Tipo, TipoParam,
 };
 
 use serde::Deserialize;
@@ -83,6 +85,14 @@ impl Catalogo {
             if !nombres.insert(f.name.as_str()) {
                 return Err(mal(f, "nombre repetido".into()));
             }
+            if let Some(c) = &f.cgi
+                && (self.funcion(c).is_none_or(|o| o.cgi.is_some()) || f.tipo == Tipo::Lectura)
+            {
+                return Err(mal(
+                    f,
+                    format!("cgi {c}: no es otra escritura del catálogo"),
+                ));
+            }
             if f.descripcion.trim().is_empty() {
                 return Err(mal(f, "sin descripción".into()));
             }
@@ -92,6 +102,22 @@ impl Catalogo {
             if f.tipo == Tipo::Lectura && f.riesgo != Riesgo::Bajo {
                 return Err(mal(f, "una lectura no puede tener riesgo".into()));
             }
+            // Cada escritura dice si puede cortar el acceso del panel: sin
+            // eso no se sabe si vigilarla.
+            match (f.tipo, f.acceso) {
+                (Tipo::Lectura, Some(_)) => {
+                    return Err(mal(f, "una lectura no lleva acceso".into()));
+                }
+                (Tipo::Escritura | Tipo::Accion, None) => {
+                    return Err(mal(
+                        f,
+                        "sin acceso (puede_cortar, no_corta o wifi): no se sabe si vigilarla"
+                            .into(),
+                    ));
+                }
+                _ => {}
+            }
+            comprobadas::validar(f).map_err(|m| mal(f, m.into()))?;
             let mut params = HashSet::new();
             for p in &f.parametros {
                 if !params.insert(p.nombre.as_str()) {
@@ -108,6 +134,24 @@ impl Catalogo {
                         return Err(mal(f, format!("{} tiene opciones sin ser enum", p.nombre)));
                     }
                     _ => {}
+                }
+                // Una ranura libre es `0.0.0.0`: solo hay ranuras de IP.
+                if p.ranuras.is_some_and(|n| n == 0)
+                    || (p.ranuras.is_some() && p.tipo != TipoParam::Ip)
+                {
+                    return Err(mal(
+                        f,
+                        format!("{}: ranuras solo de IP y al menos una", p.nombre),
+                    ));
+                }
+                if let Some(d) = &p.depende {
+                    let de = f.parametros.iter().find(|x| x.nombre == d.de);
+                    if de.is_none_or(|x| d.salvo.is_empty() && x.casilla.is_none()) {
+                        return Err(mal(
+                            f,
+                            format!("{}: depende de {}, que no es una casilla", p.nombre, d.de),
+                        ));
+                    }
                 }
                 match (p.partido, p.tipo) {
                     (None, _) | (Some(Partido::Ip4), TipoParam::Ip) => {}
@@ -179,6 +223,26 @@ mod tests {
     }
 
     #[test]
+    fn las_ranuras_de_las_ip_reservadas_dan_su_parametro() {
+        let c = cat();
+        let f = c.funcion("cbSetDhcpv4ServerPool").unwrap();
+        let (p, i) = f.ranura("reserved_ipv4_addr_31").unwrap();
+        assert_eq!((p.nombre.as_str(), i), ("reserved_ipv4_addr", 31));
+        assert_eq!(
+            f.parametro("reserved_ipv4_mask_0").unwrap().nombre,
+            "reserved_ipv4_mask"
+        );
+        for fuera in [
+            "reserved_ipv4_addr_32",
+            "reserved_ipv4_addr_03",
+            "reserved_ipv4_addr_+1",
+        ] {
+            assert!(f.parametro(fuera).is_none(), "{fuera}");
+        }
+        assert!(f.ranura("lease_time").is_none());
+    }
+
+    #[test]
     fn catalogo_carga_y_valida() {
         let c = cat();
         assert!(c.todas().len() > 100, "{}", c.todas().len());
@@ -233,6 +297,7 @@ riesgo = "bajo"
             format!(
                 "{base}\n[[funcion]]\nname = \"cbSetX\"\narea = \"wan\"\norigen = \"avanzada\"\n\
                  tipo = \"escritura\"\ndescripcion = \"x\"\nriesgo = \"alto\"\n\
+                 acceso = \"puede_cortar\"\n\
                  lectura_pareada = {{ funcion = \"cbGetX\", params = [[\"x_0i\", \"{{x_id}}\"]] }}\n{extra}\n\
                  [[funcion.parametro]]\nnombre = \"x_id\"\netiqueta = \"X\"\ntipo = \"int\"\n"
             )
@@ -255,6 +320,38 @@ riesgo = "bajo"
             "{buena}\n[[funcion.parametro]]\nnombre = \"del\"\netiqueta = \"D\"\ntipo = \"text\"\n"
         );
         assert!(Catalogo::from_toml(&del_editable).is_err());
+        // Sin acceso, una escritura no vale; una lectura no lo lleva.
+        let sin_acceso = buena.replace("acceso = \"puede_cortar\"\n", "");
+        assert!(Catalogo::from_toml(&sin_acceso).is_err());
+        let lectura_con_acceso = base.replace(
+            "riesgo = \"bajo\"",
+            "riesgo = \"bajo\"\nacceso = \"no_corta\"",
+        );
+        assert!(Catalogo::from_toml(&lectura_con_acceso).is_err());
+        // `cgi` apunta a otra función del catálogo, que va por su nombre.
+        let otra = buena.replace("cbSetX", "cbSetX.otra");
+        let con_cgi = format!("{buena}{}", otra.replace(base, "")).replace(
+            "name = \"cbSetX.otra\"",
+            "name = \"cbSetX.otra\"\ncgi = \"cbSetX\"",
+        );
+        let c = Catalogo::from_toml(&con_cgi).unwrap();
+        assert_eq!(c.funcion("cbSetX.otra").unwrap().cgi(), "cbSetX");
+        assert_eq!(c.funcion("cbSetX").unwrap().cgi(), "cbSetX");
+        assert!(
+            Catalogo::from_toml(&con_cgi.replace("cgi = \"cbSetX\"", "cgi = \"cbSetZ\"")).is_err()
+        );
+        // `depende` de una casilla, o de otro campo con `salvo`.
+        let dep = |extra: &str| {
+            format!(
+                "{buena}\n[[funcion.parametro]]\nnombre = \"c\"\netiqueta = \"C\"\ntipo = \"bool\"\n\
+                 casilla = {{}}\n\n[[funcion.parametro]]\nnombre = \"v\"\netiqueta = \"V\"\n\
+                 tipo = \"int\"\n{extra}\n"
+            )
+        };
+        assert!(Catalogo::from_toml(&dep("depende = { de = \"c\" }")).is_ok());
+        assert!(Catalogo::from_toml(&dep("depende = { de = \"x_id\" }")).is_err());
+        assert!(Catalogo::from_toml(&dep("depende = { de = \"x_id\", salvo = [\"1\"] }")).is_ok());
+        assert!(Catalogo::from_toml(&dep("depende = { de = \"nada\", salvo = [\"1\"] }")).is_err());
     }
 
     #[test]
@@ -285,6 +382,34 @@ riesgo = "bajo"
                 assert!(f.bloqueada.is_some(), "{}", f.name);
             }
         }
+    }
+
+    /// La Biblioteca no escribe el cortafuegos: no sabe leer sus filtros (se
+    /// edita desde Seguridad, que lo lee de su página).
+    /// El NAT de una interfaz puede dejar la casa sin internet: riesgo alto.
+    #[test]
+    fn cortafuegos_bloqueado_en_la_biblioteca() {
+        let c = cat();
+        for n in [
+            "scbidirectionalflt.cmd?action=add",
+            "scbidirectionalflt.cmd?action=modify",
+            "scbidirectionalflt.cmd?action=remove",
+            "scbidirectionalflt.cmd?action=add.regla",
+            "scbidirectionalflt.cmd?action=add.filtro",
+            "scbidirectionalflt.cmd?action=modify.filtro",
+            "scbidirectionalflt.cmd?action=remove.filtro",
+            "scbidirectionalfwl.cmd?action=create",
+            "scbidirectionalfwl.cmd?action=delete",
+            "scbidirectionalfwl.cmd?action=save",
+        ] {
+            let f = c.funcion(n).unwrap_or_else(|| panic!("falta {n}"));
+            let m = f
+                .bloqueada
+                .as_deref()
+                .unwrap_or_else(|| panic!("{n} no está bloqueada"));
+            assert!(m.len() > 10, "{n}: motivo demasiado corto");
+        }
+        assert_eq!(c.funcion("cbSetNatIntf").unwrap().riesgo, Riesgo::Alto);
     }
 
     #[test]
@@ -359,6 +484,63 @@ riesgo = "bajo"
                 o,
                 "{n}"
             );
+        }
+    }
+
+    /// Lo que decide la vigilancia: lo que puede dejar al panel sin router
+    /// (o la casa sin internet) se vigila; las cuentas, la voz, los avisos
+    /// al operador y los nombres, no; la WiFi depende de por dónde llegue el
+    /// panel.
+    #[test]
+    fn reglas_de_acceso() {
+        let c = cat();
+        let acceso = |n: &str| {
+            c.funcion(n)
+                .unwrap_or_else(|| panic!("falta {n}"))
+                .acceso
+                .unwrap_or_else(|| panic!("{n} sin acceso"))
+        };
+        for f in c.todas().iter().filter(|f| f.tipo != Tipo::Lectura) {
+            let a = f.acceso.expect("validado al cargar");
+            if matches!(f.area, Area::Wan | Area::Cortafuegos | Area::LanDhcp)
+                && f.name != "te_mrl.cmd?action=setpc"
+            {
+                assert_eq!(a, Acceso::PuedeCortar, "{}", f.name);
+            }
+            if f.area == Area::Wifi && f.tipo == Tipo::Escritura {
+                assert_eq!(a, Acceso::Wifi, "{}", f.name);
+            }
+            if matches!(f.area, Area::Voip | Area::Tr069) {
+                assert_eq!(a, Acceso::NoCorta, "{}", f.name);
+            }
+            if f.area != Area::Wifi {
+                assert_ne!(a, Acceso::Wifi, "{}", f.name);
+            }
+        }
+        for n in [
+            "cbSetLanIPv4Addr",
+            "cbSetDhcpv4ServerPool",
+            "cbDhcpV4SvrPoolSetStatic",
+            "cbReboot",
+            "cbSetNatIntf",
+            "cbModifyPwd",
+            "cbModifyPwdOther",
+            "te_cambio_contrasena.cgi",
+            "cbSetDnsRelayServer",
+        ] {
+            assert_eq!(acceso(n), Acceso::PuedeCortar, "{n}");
+        }
+        for n in [
+            "cbAddUser",
+            "cbDeleteUser",
+            "cbSetVoiceLine",
+            "cbSetTr69Config",
+            "te_mrl.cmd?action=setpc",
+            "cbSetUpnpCfg",
+            "cbSetNatPortMapping",
+            "cbSaveConfig",
+        ] {
+            assert_eq!(acceso(n), Acceso::NoCorta, "{n}");
         }
     }
 

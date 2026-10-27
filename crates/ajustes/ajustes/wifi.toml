@@ -37,6 +37,7 @@ lee = "adm_state"
 tipo = "booleano"
 textos_valor = true
 recomendado = "true"
+respaldo = "criterio"
 
 [[ajuste.campo]]
 id = "nombre"
@@ -62,7 +63,7 @@ lee = "authentication"
 tipo = "opcion"
 ademas = [{ parametro = "encryption", lee = "encryption" }]
 opciones = [
-  { valor = "3", clave = "wpa2", recomendada = true, ademas = { encryption = "4" } },
+  { valor = "3", clave = "wpa2", recomendada = true, ademas = { encryption = "4" }, fuentes = ["nsa-red-casa", "cisa-red-casa", "incibe-wifi"], respaldo = "consenso" },
   { valor = "0", clave = "abierta", aviso = "wifi_abierta", ademas = { encryption = "0" } },
 ]
 seguridad = true
@@ -74,6 +75,7 @@ lee = "ssid_hide"
 tipo = "booleano"
 invertido = true
 recomendado = "true"
+fuentes = ["ssid-oculto", "nsa-red-casa"]
 
 [[ajuste.campo]]
 id = "wps"
@@ -81,6 +83,8 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "wps_adm_state" }
 lee = "wps_adm_state"
 tipo = "booleano"
 recomendado = "false"
+fuentes = ["cert-wps", "cisa-red-casa", "incibe-wifi"]
+respaldo = "consenso"
 seguridad = true
 
 [[ajuste]]
@@ -91,12 +95,22 @@ efecto = "wifi_corte"
 leer = { funcion = "cbGetWifiAccPt", params = { dpm_cfg_wifi_acc_pt_id = "0" } }
 fijos = { dpm_cfg_wifi_acc_pt_id = "0" }
 
+# Si la red está separada de la red de casa. Solo se lee: la escritura de
+# los puntos de acceso de la web avanzada no tiene este parámetro, y el
+# panel no inventa uno.
+[[ajuste.campo]]
+id = "separada"
+lee = "guest_networking"
+tipo = "booleano"
+solo_lectura = "ajuste-wifi-red_24_avanzado-separada-motivo"
+
 [[ajuste.campo]]
 id = "aislamiento"
 escribe = { funcion = "cbSetWifiAccPt", parametro = "isolation" }
 lee = "isolation"
 tipo = "booleano"
 recomendado = "false"
+respaldo = "criterio"
 
 [[ajuste.campo]]
 id = "wmm"
@@ -104,6 +118,7 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "wmm" }
 lee = "wmm"
 tipo = "booleano"
 recomendado = "true"
+respaldo = "criterio"
 
 [[ajuste.campo]]
 id = "max_clientes"
@@ -111,6 +126,41 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "max_clt_count" }
 lee = "max_clt_count"
 tipo = "numero"
 validar = { min = 1, max = 64 }
+
+# Protección de las tramas de gestión. Solo se lee hasta que una escritura
+# con `validation_only = 1` sobre una red apagada confirme qué valores
+# acepta (validación E2 del controlador): no entra en el catálogo de
+# escritura, porque viajaría en toda escritura de la red.
+[[ajuste.campo]]
+id = "pmf"
+lee = "wifi_pmf"
+tipo = "opcion"
+opciones = [{ valor = "0", clave = "desactivada" }]
+solo_lectura = "ajuste-wifi-red_24_avanzado-pmf-motivo"
+
+# Bloqueo del WPS: lo pone el router; el panel solo lo enseña. El método
+# (`wps_method`) no es campo: su significado está sin validar y queda en
+# «Detalles técnicos».
+[[ajuste.campo]]
+id = "wps_bloqueo"
+lee = "wps_setup_lock"
+tipo = "booleano"
+solo_lectura = "ajuste-wifi-red_24_avanzado-wps_bloqueo-motivo"
+
+# Cada cuánto renueva el router la clave de grupo, en segundos. Ya viajaba
+# en toda escritura de la red con su valor leído; aquí se puede elegir.
+# Pendiente de la validación E1 del controlador: si falla, pasa a
+# `solo_lectura` con su motivo.
+[[ajuste.campo]]
+id = "renovacion_clave"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "regen_key_interval" }
+lee = "regen_key_interval"
+tipo = "opcion"
+opciones = [
+  { valor = "0", clave = "nunca" },
+  { valor = "3600", clave = "hora" },
+  { valor = "86400", clave = "dia" },
+]
 
 [[ajuste]]
 id = "wifi.red_5"
@@ -128,6 +178,7 @@ lee = "adm_state"
 tipo = "booleano"
 textos_valor = true
 recomendado = "true"
+respaldo = "criterio"
 
 [[ajuste.campo]]
 id = "nombre"
@@ -153,7 +204,7 @@ lee = "authentication"
 tipo = "opcion"
 ademas = [{ parametro = "encryption", lee = "encryption" }]
 opciones = [
-  { valor = "3", clave = "wpa2", recomendada = true, ademas = { encryption = "4" } },
+  { valor = "3", clave = "wpa2", recomendada = true, ademas = { encryption = "4" }, fuentes = ["nsa-red-casa", "cisa-red-casa", "incibe-wifi"], respaldo = "consenso" },
   { valor = "0", clave = "abierta", aviso = "wifi_abierta", ademas = { encryption = "0" } },
 ]
 seguridad = true
@@ -165,6 +216,7 @@ lee = "ssid_hide"
 tipo = "booleano"
 invertido = true
 recomendado = "true"
+fuentes = ["ssid-oculto", "nsa-red-casa"]
 
 [[ajuste.campo]]
 id = "wps"
@@ -172,6 +224,8 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "wps_adm_state" }
 lee = "wps_adm_state"
 tipo = "booleano"
 recomendado = "false"
+fuentes = ["cert-wps", "cisa-red-casa", "incibe-wifi"]
+respaldo = "consenso"
 seguridad = true
 
 [[ajuste]]
@@ -182,12 +236,22 @@ efecto = "wifi_corte"
 leer = { funcion = "cbGetWifiAccPt", params = { dpm_cfg_wifi_acc_pt_id = "1" } }
 fijos = { dpm_cfg_wifi_acc_pt_id = "1" }
 
+# Si la red está separada de la red de casa. Solo se lee: la escritura de
+# los puntos de acceso de la web avanzada no tiene este parámetro, y el
+# panel no inventa uno.
+[[ajuste.campo]]
+id = "separada"
+lee = "guest_networking"
+tipo = "booleano"
+solo_lectura = "ajuste-wifi-red_5_avanzado-separada-motivo"
+
 [[ajuste.campo]]
 id = "aislamiento"
 escribe = { funcion = "cbSetWifiAccPt", parametro = "isolation" }
 lee = "isolation"
 tipo = "booleano"
 recomendado = "false"
+respaldo = "criterio"
 
 [[ajuste.campo]]
 id = "wmm"
@@ -195,6 +259,7 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "wmm" }
 lee = "wmm"
 tipo = "booleano"
 recomendado = "true"
+respaldo = "criterio"
 
 [[ajuste.campo]]
 id = "max_clientes"
@@ -202,6 +267,41 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "max_clt_count" }
 lee = "max_clt_count"
 tipo = "numero"
 validar = { min = 1, max = 64 }
+
+# Protección de las tramas de gestión. Solo se lee hasta que una escritura
+# con `validation_only = 1` sobre una red apagada confirme qué valores
+# acepta (validación E2 del controlador): no entra en el catálogo de
+# escritura, porque viajaría en toda escritura de la red.
+[[ajuste.campo]]
+id = "pmf"
+lee = "wifi_pmf"
+tipo = "opcion"
+opciones = [{ valor = "0", clave = "desactivada" }]
+solo_lectura = "ajuste-wifi-red_5_avanzado-pmf-motivo"
+
+# Bloqueo del WPS: lo pone el router; el panel solo lo enseña. El método
+# (`wps_method`) no es campo: su significado está sin validar y queda en
+# «Detalles técnicos».
+[[ajuste.campo]]
+id = "wps_bloqueo"
+lee = "wps_setup_lock"
+tipo = "booleano"
+solo_lectura = "ajuste-wifi-red_5_avanzado-wps_bloqueo-motivo"
+
+# Cada cuánto renueva el router la clave de grupo, en segundos. Ya viajaba
+# en toda escritura de la red con su valor leído; aquí se puede elegir.
+# Pendiente de la validación E1 del controlador: si falla, pasa a
+# `solo_lectura` con su motivo.
+[[ajuste.campo]]
+id = "renovacion_clave"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "regen_key_interval" }
+lee = "regen_key_interval"
+tipo = "opcion"
+opciones = [
+  { valor = "0", clave = "nunca" },
+  { valor = "3600", clave = "hora" },
+  { valor = "86400", clave = "dia" },
+]
 
 [[ajuste]]
 id = "wifi.invitados"
@@ -219,6 +319,7 @@ lee = "adm_state"
 tipo = "booleano"
 textos_valor = true
 recomendado = "false"
+respaldo = "criterio"
 
 [[ajuste.campo]]
 id = "nombre"
@@ -244,7 +345,7 @@ lee = "authentication"
 tipo = "opcion"
 ademas = [{ parametro = "encryption", lee = "encryption" }]
 opciones = [
-  { valor = "3", clave = "wpa2", recomendada = true, ademas = { encryption = "4" } },
+  { valor = "3", clave = "wpa2", recomendada = true, ademas = { encryption = "4" }, fuentes = ["nsa-red-casa", "cisa-red-casa", "incibe-wifi"], respaldo = "consenso" },
   { valor = "0", clave = "abierta", aviso = "wifi_abierta", ademas = { encryption = "0" } },
 ]
 seguridad = true
@@ -256,6 +357,7 @@ lee = "ssid_hide"
 tipo = "booleano"
 invertido = true
 recomendado = "true"
+fuentes = ["ssid-oculto", "nsa-red-casa"]
 
 [[ajuste.campo]]
 id = "wps"
@@ -263,6 +365,8 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "wps_adm_state" }
 lee = "wps_adm_state"
 tipo = "booleano"
 recomendado = "false"
+fuentes = ["cert-wps", "cisa-red-casa", "incibe-wifi"]
+respaldo = "consenso"
 seguridad = true
 
 [[ajuste]]
@@ -280,6 +384,7 @@ fijos = { dpm_cfg_wifi_acc_pt_id = "2" }
 id = "separada"
 lee = "guest_networking"
 tipo = "booleano"
+fuentes = ["nsa-red-casa"]
 solo_lectura = "ajuste-wifi-invitados_avanzado-separada-motivo"
 
 # Aísla entre sí los dispositivos de la red de invitados (no la separa de la
@@ -290,6 +395,8 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "isolation" }
 lee = "isolation"
 tipo = "booleano"
 recomendado = "true"
+# Ninguna guía consultada trata el aislamiento entre clientes.
+respaldo = "criterio"
 seguridad = true
 
 [[ajuste.campo]]
@@ -298,6 +405,7 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "wmm" }
 lee = "wmm"
 tipo = "booleano"
 recomendado = "true"
+respaldo = "criterio"
 
 [[ajuste.campo]]
 id = "max_clientes"
@@ -305,6 +413,41 @@ escribe = { funcion = "cbSetWifiAccPt", parametro = "max_clt_count" }
 lee = "max_clt_count"
 tipo = "numero"
 validar = { min = 1, max = 64 }
+
+# Protección de las tramas de gestión. Solo se lee hasta que una escritura
+# con `validation_only = 1` sobre una red apagada confirme qué valores
+# acepta (validación E2 del controlador): no entra en el catálogo de
+# escritura, porque viajaría en toda escritura de la red.
+[[ajuste.campo]]
+id = "pmf"
+lee = "wifi_pmf"
+tipo = "opcion"
+opciones = [{ valor = "0", clave = "desactivada" }]
+solo_lectura = "ajuste-wifi-invitados_avanzado-pmf-motivo"
+
+# Bloqueo del WPS: lo pone el router; el panel solo lo enseña. El método
+# (`wps_method`) no es campo: su significado está sin validar y queda en
+# «Detalles técnicos».
+[[ajuste.campo]]
+id = "wps_bloqueo"
+lee = "wps_setup_lock"
+tipo = "booleano"
+solo_lectura = "ajuste-wifi-invitados_avanzado-wps_bloqueo-motivo"
+
+# Cada cuánto renueva el router la clave de grupo, en segundos. Ya viajaba
+# en toda escritura de la red con su valor leído; aquí se puede elegir.
+# Pendiente de la validación E1 del controlador: si falla, pasa a
+# `solo_lectura` con su motivo.
+[[ajuste.campo]]
+id = "renovacion_clave"
+escribe = { funcion = "cbSetWifiAccPt", parametro = "regen_key_interval" }
+lee = "regen_key_interval"
+tipo = "opcion"
+opciones = [
+  { valor = "0", clave = "nunca" },
+  { valor = "3600", clave = "hora" },
+  { valor = "86400", clave = "dia" },
+]
 
 [[ajuste]]
 id = "wifi.radio_24"
@@ -321,6 +464,7 @@ lee = "radio_adm_state"
 tipo = "booleano"
 textos_valor = true
 recomendado = "true"
+respaldo = "criterio"
 
 [[ajuste.campo]]
 id = "canal"
@@ -328,7 +472,7 @@ escribe = { funcion = "cbSetWifi", parametro = "adm_channel" }
 lee = "adm_channel"
 tipo = "opcion"
 opciones = [
-  { valor = "0", clave = "automatico", recomendada = true },
+  { valor = "0", clave = "automatico", recomendada = true, respaldo = "criterio" },
   { valor = "1", clave = "canal_1" },
   { valor = "6", clave = "canal_6" },
   { valor = "11", clave = "canal_11" },
@@ -340,7 +484,7 @@ escribe = { funcion = "cbSetWifi", parametro = "adm_bandwidth" }
 lee = "adm_bandwidth"
 tipo = "opcion"
 opciones = [
-  { valor = "1", clave = "mhz_20", recomendada = true },
+  { valor = "1", clave = "mhz_20", recomendada = true, respaldo = "criterio" },
   { valor = "2", clave = "mhz_40" },
 ]
 
@@ -358,7 +502,7 @@ escribe = { funcion = "cbSetWifi", parametro = "adm_tx_pwr_ratio" }
 lee = "adm_tx_pwr_ratio"
 tipo = "opcion"
 opciones = [
-  { valor = "255", clave = "automatica", recomendada = true },
+  { valor = "255", clave = "automatica", recomendada = true, respaldo = "criterio" },
   { valor = "100", clave = "maxima" },
   { valor = "50", clave = "media" },
   { valor = "20", clave = "baja" },
@@ -370,7 +514,7 @@ escribe = { funcion = "cbSetWifi", parametro = "standard" }
 lee = "standard"
 tipo = "opcion"
 opciones = [
-  { valor = "14", clave = "bgn", recomendada = true },
+  { valor = "14", clave = "bgn", recomendada = true, respaldo = "criterio" },
   { valor = "12", clave = "gn" },
 ]
 
@@ -389,6 +533,7 @@ lee = "radio_adm_state"
 tipo = "booleano"
 textos_valor = true
 recomendado = "true"
+respaldo = "criterio"
 
 [[ajuste.campo]]
 id = "canal"
@@ -396,7 +541,7 @@ escribe = { funcion = "cbSetWifi", parametro = "adm_channel" }
 lee = "adm_channel"
 tipo = "opcion"
 opciones = [
-  { valor = "0", clave = "automatico", recomendada = true },
+  { valor = "0", clave = "automatico", recomendada = true, respaldo = "criterio" },
   { valor = "36", clave = "canal_36" },
   { valor = "100", clave = "canal_100" },
 ]
@@ -409,7 +554,7 @@ tipo = "opcion"
 opciones = [
   { valor = "1", clave = "mhz_20" },
   { valor = "2", clave = "mhz_40" },
-  { valor = "3", clave = "mhz_80", recomendada = true },
+  { valor = "3", clave = "mhz_80", recomendada = true, respaldo = "criterio" },
 ]
 
 [[ajuste]]
@@ -426,7 +571,7 @@ escribe = { funcion = "cbSetWifi", parametro = "adm_tx_pwr_ratio" }
 lee = "adm_tx_pwr_ratio"
 tipo = "opcion"
 opciones = [
-  { valor = "255", clave = "automatica", recomendada = true },
+  { valor = "255", clave = "automatica", recomendada = true, respaldo = "criterio" },
   { valor = "100", clave = "maxima" },
   { valor = "50", clave = "media" },
   { valor = "20", clave = "baja" },
@@ -438,7 +583,7 @@ escribe = { funcion = "cbSetWifi", parametro = "standard" }
 lee = "standard"
 tipo = "opcion"
 opciones = [
-  { valor = "25", clave = "anac", recomendada = true },
+  { valor = "25", clave = "anac", recomendada = true, respaldo = "criterio" },
   { valor = "9", clave = "an" },
 ]
 
@@ -448,6 +593,7 @@ escribe = { funcion = "cbSetWifi", parametro = "beamforming" }
 lee = "beamforming"
 tipo = "booleano"
 recomendado = "true"
+respaldo = "criterio"
 
 # Elementos de la pestaña: cada red junta su tarjeta básica y la avanzada;
 # cada radio, igual. Los datos son los seis de la tarjeta (spec §5.1).
@@ -478,7 +624,7 @@ ajustes = ["wifi.invitados", "wifi.invitados_avanzado"]
 papel = "invitados"
 interruptor = "wifi.invitados.activa"
 datos = ["wifi.invitados.seguridad", "wifi.invitados.contrasena", "wifi.invitados.visible",
-         "derivado:canal_y_ancho", "wifi.invitados_avanzado.aislamiento", "derivado:conectados"]
+         "derivado:otras_invitadas", "wifi.invitados_avanzado.aislamiento", "derivado:conectados"]
 estado = "derivado:estado_red"
 
 [[elemento]]

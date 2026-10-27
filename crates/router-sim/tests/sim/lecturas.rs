@@ -159,12 +159,20 @@ async fn cada_ajuste_del_catalogo_se_lee() {
             .iter()
             .map(|(k, v)| (k.as_str(), v.as_str()))
             .collect();
-        let leida = match a.busqueda() {
-            Some((posicion, ident)) => {
-                c.call_por_id(&a.leer.funcion, &params, posicion, &ident)
-                    .await
+        // El cortafuegos se lee de su página (`var filter`), como lo lee el
+        // panel.
+        let leida = if a.leer.funcion == hgu::cortafuegos::PAGINA_LISTA {
+            hgu::cortafuegos::leer(&c)
+                .await
+                .map(|f| hgu::cortafuegos::a_xml(&f))
+        } else {
+            match a.busqueda() {
+                Some((posicion, ident)) => {
+                    c.call_por_id(&a.leer.funcion, &params, posicion, &ident)
+                        .await
+                }
+                None => c.call(&a.leer.funcion, &params).await,
             }
-            None => c.call(&a.leer.funcion, &params).await,
         };
         let n = match leida {
             Ok(n) => n,

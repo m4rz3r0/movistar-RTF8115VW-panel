@@ -2,6 +2,7 @@
 //! guardan como claves) y las etiquetas de un cambio de la Biblioteca (las
 //! del catálogo de funciones están en castellano).
 
+use crate::comun::ConfirmarLigado;
 use crate::comun::{PanelPrueba, esperar_estado, esperar_libre_gestor, ok, req};
 use panel::changes::{Estado, GrupoRequest, Paso};
 use serde_json::{Value, json};
@@ -52,7 +53,10 @@ async fn notas_y_etiquetas_en_el_idioma_de_quien_mira() {
     // Con la WAN caída antes del cambio, la nota lo dice.
     p.sim.control.set_wan_up(false);
     let prep = g.preparar_grupo(grupo_de_la_biblioteca()).await.unwrap();
-    let id = g.confirmar_grupo(&prep.token, &[], "admin").await.unwrap();
+    let id = g
+        .confirmar_grupo_ligado(&prep.token, &[], "admin")
+        .await
+        .unwrap();
     esperar_estado(&g, id, Estado::Aplicado).await;
     esperar_libre_gestor(&g).await;
 
@@ -95,7 +99,10 @@ async fn una_nota_antigua_se_muestra_tal_cual() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let g = p.state.cambios().unwrap();
     let prep = g.preparar_grupo(grupo_de_la_biblioteca()).await.unwrap();
-    let id = g.confirmar_grupo(&prep.token, &[], "admin").await.unwrap();
+    let id = g
+        .confirmar_grupo_ligado(&prep.token, &[], "admin")
+        .await
+        .unwrap();
     esperar_estado(&g, id, Estado::Aplicado).await;
     esperar_libre_gestor(&g).await;
     let antigua = "vigilancia retomada tras un reinicio del panel";
@@ -143,7 +150,7 @@ async fn el_error_de_un_paso_sin_nombres_de_la_api() {
     let g = p.state.cambios().unwrap();
     let prep = g.preparar_grupo(grupo_de_la_biblioteca()).await.unwrap();
     p.sim.control.fail_write_n(2);
-    let r = g.confirmar_grupo(&prep.token, &[], "admin").await;
+    let r = g.confirmar_grupo_ligado(&prep.token, &[], "admin").await;
     assert!(r.is_err(), "{r:?}");
     let id = g.historial(1).await.remove(0).id;
     let c = esperar_estado(&g, id, Estado::Fallido).await;
@@ -235,7 +242,10 @@ async fn clave_desconocida_texto_generico() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let g = p.state.cambios().unwrap();
     let prep = g.preparar_grupo(grupo_de_la_biblioteca()).await.unwrap();
-    let id = g.confirmar_grupo(&prep.token, &[], "admin").await.unwrap();
+    let id = g
+        .confirmar_grupo_ligado(&prep.token, &[], "admin")
+        .await
+        .unwrap();
     esperar_estado(&g, id, Estado::Aplicado).await;
     esperar_libre_gestor(&g).await;
     for (guardado, en_lo_tecnico) in [

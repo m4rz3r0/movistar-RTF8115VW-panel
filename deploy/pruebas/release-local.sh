@@ -22,7 +22,9 @@
 # 4. Comprueba lo desplegado (panel, site/, LICENSE, AVISO-LEGAL.md,
 #    deploy/linux/README.md), que el panel sirve su web desde site/, que no
 #    atiende RP_E2E_VIGILANCIA_S (la vigilancia corta de las pruebas, que
-#    solo existe con debug-assertions) y que --comprobar dice que está al día.
+#    solo existe con debug-assertions) ni RP_E2E_HABILITAR_TODO (lo no
+#    comprobado en el router real, también solo con debug-assertions) y que
+#    --comprobar dice que está al día.
 #
 # Necesita el panel compilado: RP_PRUEBA_PANEL (por defecto
 # target/release/panel) y RP_PRUEBA_SITE (por defecto target/site), de
@@ -179,6 +181,7 @@ RP_HISTORY_KEY=$DATOS/history.key
 RP_ORIGIN=http://localhost:$PUERTO_PANEL
 RP_LOG=warn
 RP_E2E_VIGILANCIA_S=1
+RP_E2E_HABILITAR_TODO=1
 EOF
 # start: el entorno de la unidad desplegada (Environment=), luego el fichero
 # de entorno (EnvironmentFile=) y ExecStart, en segundo plano; stop: lo para.
@@ -250,6 +253,8 @@ if [ ! -f "$TMP/panel.log" ]; then
 	fallo "falta el registro del panel ($TMP/panel.log): no se puede comprobar RP_E2E_VIGILANCIA_S"
 elif grep -q 'vigilancia de pruebas' "$TMP/panel.log"; then
 	fallo "el panel release atiende RP_E2E_VIGILANCIA_S (¿debug-assertions en [profile.release]?)"
+elif grep -q 'todo habilitado para las pruebas' "$TMP/panel.log"; then
+	fallo "el panel release atiende RP_E2E_HABILITAR_TODO (¿debug-assertions en [profile.release]?)"
 fi
 # La hoja de estilos, con el hash en el nombre si la web lo lleva (hash.txt).
 CSS=pkg/panel.css

@@ -1,0 +1,50 @@
+/* «De dónde sale»: las fuentes de una recomendación, plegadas, en la
+   recomendación de un campo, en la de una tarjeta y en cada paso de
+   Mejoras. */
+.de-donde {
+  font-size: 12.5px;
+}
+
+.de-donde summary {
+  width: fit-content;
+  color: var(--suave);
+  cursor: pointer;
+}
+
+.de-donde summary:hover {
+  color: var(--texto);
+}
+
+.de-donde-respaldo {
+  margin: var(--esp-1) 0 0;
+  color: var(--suave);
+}
+
+.de-donde-lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-1);
+  margin: var(--esp-1) 0 0;
+  padding-left: var(--esp-3);
+  border-left: 2px solid var(--borde);
+  list-style: none;
+}
+
+.de-donde-lista a {
+  overflow-wrap: anywhere;
+}
+
+/* Quién la publica, su clase y cuándo se consultó, separados por un punto. */
+.de-donde-datos {
+  display: block;
+  color: var(--suave);
+}
+
+.de-donde-datos > span + span::before {
+  content: " · ";
+}
+
+/* En la tarjeta, en su propia línea bajo la recomendación. */
+.tarjeta-rec .de-donde {
+  flex-basis: 100%;
+}

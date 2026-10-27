@@ -43,6 +43,7 @@ lee = "adm_state"
 tipo = "booleano"
 # Una reserva nueva nace activa (la plantilla parte del recomendado).
 recomendado = "true"
+respaldo = "criterio"
 
 [[ajuste]]
 id = "red_local.dhcp"
@@ -57,6 +58,7 @@ escribe = { funcion = "cbSetDhcpv4ServerPool", parametro = "adm_state" }
 lee = "adm_state"
 tipo = "booleano"
 recomendado = "true"
+respaldo = "criterio"
 
 [[ajuste.campo]]
 id = "inicio"
@@ -78,7 +80,7 @@ lee = "lease_time"
 tipo = "opcion"
 opciones = [
   { valor = "3600", clave = "hora" },
-  { valor = "43200", clave = "doce_horas", recomendada = true },
+  { valor = "43200", clave = "doce_horas", recomendada = true, respaldo = "criterio" },
   { valor = "86400", clave = "dia" },
   { valor = "604800", clave = "semana" },
 ]
@@ -101,7 +103,8 @@ escribe = { funcion = "cbSetDhcpv4ServerPool", parametro = "ipv4_dns_addr_0" }
 lee = "ipv4_dns_addr_0"
 tipo = "ip"
 recomendado = "9.9.9.9"
-aceptados = ["9.9.9.10", "86.54.11.100", "1.1.1.1", "94.140.14.14"]
+fuentes = ["pg-dns", "pg-dns-vision", "quad9-servicio", "quad9-privacidad"]
+aceptados = ["9.9.9.10", "86.54.11.100", "1.1.1.1", "94.140.14.14", "1.1.1.3"]
 # DNS públicos de Movistar, documentados por el operador. Otro DNS que no
 # es del router (vacío, 0.0.0.0 o su IP de casa) es propio: vale como el
 # recomendado, y el paso de Privacidad máxima lo da por hecho.
@@ -132,6 +135,7 @@ escribe = { funcion = "cbSetLanIPv6Config", parametro = "radv_adm_state" }
 lee = "radv_adm_state"
 tipo = "booleano"
 recomendado = "true"
+respaldo = "criterio"
 # Sin IPv6 en casa, los anuncios no hacen nada: no se recomiendan.
 recomendado_si = { campo = "ipv6", cuando = "true" }
 

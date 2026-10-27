@@ -1,35 +1,19 @@
 //! Planificación de las escrituras y E/S con el router.
 
+use super::especiales::{self, Especial};
 use super::*;
 
 impl ChangeManager {
     pub(super) fn funcion_escribible(&self, nombre: &str) -> Result<&Funcion, CambioError> {
-        let f = self
-            .state
+        guardas(self.funcion_del_catalogo(nombre)?, false)
+    }
+
+    /// La función `nombre` del catálogo; `Invalida` si no está.
+    pub(super) fn funcion_del_catalogo(&self, nombre: &str) -> Result<&Funcion, CambioError> {
+        self.state
             .catalogo
             .funcion(nombre)
-            .ok_or_else(|| CambioError::Invalida(format!("función desconocida: {nombre}")))?;
-        if let Some(m) = &f.bloqueada {
-            return Err(CambioError::Bloqueada(m.clone()));
-        }
-        if f.tipo == Tipo::Lectura {
-            return Err(CambioError::Invalida(format!("{nombre} es una lectura")));
-        }
-        if f.pagina.is_none() {
-            return Err(CambioError::Invalida(format!("{nombre}: sin página")));
-        }
-        if CAMBIAN_IP_LAN.contains(&f.name.as_str()) {
-            return Err(CambioError::Bloqueada(BLOQUEO_IP_LAN.into()));
-        }
-        let basica = f.origen == catalogo::Origen::Basica || !f.name.starts_with("cb");
-        if basica
-            && f.parametros
-                .iter()
-                .any(|p| p.tipo == catalogo::TipoParam::Secret)
-        {
-            return Err(CambioError::Bloqueada(BLOQUEO_SECRETOS_BASICA.into()));
-        }
-        Ok(f)
+            .ok_or_else(|| CambioError::Invalida(format!("función desconocida: {nombre}")))
     }
 
     /// `explicito`: valores exactos (reversión/deshacer; ver [`componer`]).
@@ -38,7 +22,18 @@ impl ChangeManager {
         req: &ChangeRequest,
         explicito: bool,
     ) -> Result<Plan, CambioError> {
-        let f = self.funcion_escribible(&req.funcion)?;
+        let f = self.funcion_escribible_para(req)?;
+        // La lista blanca: solo lo comprobado en el router real (el
+        // catálogo). El deshacer y la reversión (`explicito`) vuelven a lo
+        // que ya había y siguen.
+        if !explicito && !f.comprobada() {
+            return Err(CambioError::Bloqueada(
+                crate::validacion_real::SIN_COMPROBAR.into(),
+            ));
+        }
+        if let Some(e) = Especial::de(f) {
+            return self.planificar_especial(e, f, req, explicito).await;
+        }
         for k in req.valores.keys() {
             if f.parametro(k).is_none() {
                 return Err(CambioError::Invalida(format!(
@@ -86,6 +81,21 @@ impl ChangeManager {
                  no se escribe, para no tocar otra",
                 req.instancia.as_deref().unwrap_or("-")
             )));
+        }
+        // Activar una condición sin valor deja sin IP nueva a todos.
+        if !explicito {
+            condicion_vacia(f, &actual, &req.valores).map_err(CambioError::Invalida)?;
+        }
+        ranuras::preparar(f, op, explicito, &actual, &mut valores)
+            .map_err(CambioError::Invalida)?;
+        if !explicito {
+            especiales::opcion_dhcp::preparar(f, op, &actual, &mut valores)
+                .map_err(CambioError::Invalida)?;
+            if f.name == especiales::hora_local::FUNCION {
+                let zona = self.zona_del_router().await?;
+                especiales::hora_local::preparar(&mut valores, zona)
+                    .map_err(CambioError::Invalida)?;
+            }
         }
         let Compuesto {
             efectivos,
@@ -183,7 +193,8 @@ impl ChangeManager {
                 vars.remove("sessionKey");
                 Ok(vars)
             }
-            Lectura::Ninguna => Ok(BTreeMap::new()),
+            // Una lista sin instancia que leer sola: se lista.
+            Lectura::Ninguna | Lectura::Usuarios | Lectura::Cortafuegos => Ok(BTreeMap::new()),
         }
     }
 
@@ -192,6 +203,21 @@ impl ChangeManager {
         &self,
         l: &Lectura,
     ) -> Result<Vec<BTreeMap<String, String>>, hgu::Error> {
+        if *l == Lectura::Usuarios {
+            let n = self
+                .state
+                .hgu
+                .call(especiales::LECTURA_USUARIOS, &[])
+                .await?;
+            return Ok(especiales::usuarios_de(&n));
+        }
+        if *l == Lectura::Cortafuegos {
+            let filtros = hgu::cortafuegos::leer(&self.state.hgu).await?;
+            return Ok(especiales::filas_del_cortafuegos(&filtros)
+                .into_iter()
+                .map(|(fila, _)| fila)
+                .collect());
+        }
         let Lectura::Xml {
             funcion,
             params,
@@ -217,11 +243,52 @@ impl ChangeManager {
             .collect())
     }
 
+    /// Zona del router en minutos (UTC menos la hora local), de su resumen.
+    async fn zona_del_router(&self) -> Result<i64, CambioError> {
+        use especiales::hora_local::{RESUMEN, ZONA};
+        let n = self.state.hgu.call(RESUMEN, &[]).await.map_err(|e| {
+            CambioError::Router(format!("no se puede leer la zona del router: {e}"))
+        })?;
+        fn buscar_zona(n: &hgu::xml::XmlNode) -> Option<&str> {
+            n.text_of(ZONA)
+                .or_else(|| n.children.iter().find_map(buscar_zona))
+        }
+        buscar_zona(&n)
+            .and_then(|z| z.trim().parse().ok())
+            .ok_or_else(|| CambioError::Router(format!("{RESUMEN} no da {ZONA}")))
+    }
+
     /// Envía la carga del plan (las claves de la UI básica, ofuscadas con
     /// XOR 0x1f como hace la página).
     pub(super) async fn enviar(&self, plan: &Plan) -> Result<(), hgu::Error> {
         let f = &plan.funcion;
         let pagina = f.pagina.as_deref().unwrap_or_default();
+        // Borrar una instancia especial es otra escritura (un usuario:
+        // `cbDeleteUser` con su nombre; una regla del cortafuegos, la baja
+        // de la UI básica con `item=<FID>|<RID>`, y un filtro vacío, con
+        // `item=<FID>`, desde su lista).
+        if plan.operacion == Operacion::Borrar
+            && let Some(e) = Especial::de(f)
+        {
+            let (funcion, params) =
+                e.baja(plan.instancia.as_deref().unwrap_or_default(), &plan.valores);
+            let p: Vec<(&str, &str)> = params
+                .iter()
+                .map(|(k, v)| (k.as_str(), v.as_str()))
+                .collect();
+            let c = &self.state.hgu;
+            return match e {
+                Especial::Cortafuegos | Especial::FiltroCortafuegos => c
+                    .basic_write(hgu::cortafuegos::PAGINA_LISTA, funcion, &p)
+                    .await
+                    .map(drop),
+                Especial::Usuarios => c
+                    .write(pagina, funcion, &p)
+                    .await
+                    .map(drop)
+                    .map_err(super::especiales::sin_texto_del_router),
+            };
+        }
         let basica = !f.name.starts_with("cb");
         let m = &self.state.mascara;
         let params: Vec<(String, String)> = plan
@@ -240,10 +307,14 @@ impl ChangeManager {
             .map(|(k, v)| (k.as_str(), v.as_str()))
             .collect();
         let c = &self.state.hgu;
-        if basica {
-            c.basic_write(pagina, &f.name, &p).await.map(drop)
+        let r = if basica {
+            c.basic_write(pagina, f.cgi(), &p).await.map(drop)
         } else {
-            c.write(pagina, &f.name, &p).await.map(drop)
+            c.write(pagina, f.cgi(), &p).await.map(drop)
+        };
+        match Especial::de(f) {
+            Some(Especial::Usuarios) => r.map_err(super::especiales::sin_texto_del_router),
+            _ => r,
         }
     }
 
@@ -257,6 +328,12 @@ impl ChangeManager {
     }
 
     async fn comprobar_en_el_router(&self, plan: &Plan, lado: Lado) -> Comprobacion {
+        if plan.lectura == Lectura::Usuarios {
+            return self.comprobar_usuarios(plan, lado).await;
+        }
+        if plan.lectura == Lectura::Cortafuegos {
+            return self.comprobar_cortafuegos(plan, lado).await;
+        }
         let f = &plan.funcion;
         let no_leido =
             |e: hgu::Error| Comprobacion::SinLectura(format!("no se puede releer el estado: {e}"));
@@ -360,32 +437,32 @@ pub(super) fn identidad_cambiada<'a>(
         .map(|(k, _)| k.as_str())
 }
 
-#[cfg(test)]
-mod tests_identidad {
-    use super::identidad_cambiada;
-    use std::collections::BTreeMap;
-
-    fn mapa(pares: &[(&str, &str)]) -> BTreeMap<String, String> {
-        pares
+/// Las guardas de escritura de `f`. `exento` salta solo su bloqueo del
+/// catálogo (`f.bloqueada`): las demás se comprueban siempre.
+pub(super) fn guardas(f: &Funcion, exento: bool) -> Result<&Funcion, CambioError> {
+    let nombre = &f.name;
+    if let Some(m) = f.bloqueada.as_ref().filter(|_| !exento) {
+        return Err(CambioError::Bloqueada(m.clone()));
+    }
+    if f.tipo == Tipo::Lectura {
+        return Err(CambioError::Invalida(format!("{nombre} es una lectura")));
+    }
+    if f.pagina.is_none() {
+        return Err(CambioError::Invalida(format!("{nombre}: sin página")));
+    }
+    if CAMBIAN_IP_LAN.contains(&f.name.as_str()) {
+        return Err(CambioError::Bloqueada(BLOQUEO_IP_LAN.into()));
+    }
+    let basica = f.origen == catalogo::Origen::Basica || !f.name.starts_with("cb");
+    if basica
+        && f.parametros
             .iter()
-            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
-            .collect()
+            .any(|p| p.tipo == catalogo::TipoParam::Secret)
+    {
+        return Err(CambioError::Bloqueada(BLOQUEO_SECRETOS_BASICA.into()));
     }
-
-    /// La misma instancia (aunque cambie el formato de su MAC) pasa; otra
-    /// en su id, o sin el dato, no.
-    #[test]
-    fn identidad_de_la_instancia() {
-        let id = mapa(&[("mac_addr", "02:00:00:00:00:0A")]);
-        assert_eq!(
-            identidad_cambiada(&id, &mapa(&[("mac_addr", " 02:00:00:00:00:0a")])),
-            None
-        );
-        assert_eq!(
-            identidad_cambiada(&id, &mapa(&[("mac_addr", "02:00:00:00:00:0b")])),
-            Some("mac_addr")
-        );
-        assert_eq!(identidad_cambiada(&id, &BTreeMap::new()), Some("mac_addr"));
-        assert_eq!(identidad_cambiada(&BTreeMap::new(), &BTreeMap::new()), None);
-    }
+    Ok(f)
 }
+
+#[cfg(test)]
+mod tests_identidad;

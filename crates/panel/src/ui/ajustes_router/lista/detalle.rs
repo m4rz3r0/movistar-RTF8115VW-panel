@@ -41,7 +41,8 @@ fn borrar_de(tipo: Tipo, nombre: String) -> String {
 /// El detalle de `fila` de la lista `a` (o, sin ella, el de una nueva, con
 /// el id `abierto`). `borrar`: la acción que la borra, si la lista la
 /// tiene; `existentes`, las IP fijas (`(id, mac, ip)`), para saber si se
-/// puede fijar la IP de un dispositivo.
+/// puede fijar la IP de un dispositivo (`None`: no se fija); `editable`, si
+/// la lista se escribe.
 #[component]
 pub(crate) fn DetalleFila(
     tipo: Tipo,
@@ -49,14 +50,14 @@ pub(crate) fn DetalleFila(
     fila: Option<Fila>,
     abierto: String,
     red: RedCasa,
-    existentes: Vec<(String, String, String)>,
+    existentes: Option<Vec<(String, String, String)>>,
+    editable: bool,
     borrar: Option<String>,
     registro: Registro,
 ) -> impl IntoView {
     let pagina = expect_context::<Pagina>();
     let s = expect_context::<Seguimiento>();
     let error = RwSignal::new(None::<String>);
-    let editable = !pagina.solo_lectura;
     let id_fila = fila.as_ref().map(|f| f.id.clone());
     // Una instancia nueva, al aplicarse, ya está en su lista: su detalle
     // (vacío) se cierra.
@@ -114,8 +115,8 @@ pub(crate) fn DetalleFila(
                     <DetalleDispositivo
                         d
                         lan=red.lan
-                        existentes
-                        solo_lectura=!editable
+                        solo_lectura=!editable || existentes.is_none()
+                        existentes=existentes.clone().unwrap_or_default()
                         error
                         preparado
                     />

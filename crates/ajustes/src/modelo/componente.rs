@@ -10,6 +10,9 @@ pub enum Componente {
     Reservas,
     Puertos,
     ContrasenaRouter,
+    UsuariosRouter,
+    Cortafuegos,
+    Conexion,
 }
 
 impl Componente {
@@ -20,6 +23,9 @@ impl Componente {
             Componente::Reservas => "reservas",
             Componente::Puertos => "puertos",
             Componente::ContrasenaRouter => "contrasena_router",
+            Componente::UsuariosRouter => "usuarios_router",
+            Componente::Cortafuegos => "cortafuegos",
+            Componente::Conexion => "conexion",
         }
     }
 
@@ -100,6 +106,49 @@ impl Componente {
                 "error-cambiada",
             ],
             Componente::ContrasenaRouter => &[],
+            Componente::UsuariosRouter => &[
+                "crear",
+                "crear-titulo",
+                "nuevo-nombre",
+                "nuevo-nombre-ayuda",
+                "contrasena",
+                "contrasena-ayuda",
+                "cambiar",
+                "cambiar-de",
+                "cambiar-boton",
+                "cambiar-nota",
+                "cambiado",
+                "borrar",
+                "borrar-de",
+                "vacia",
+            ],
+            Componente::Cortafuegos => &[
+                "sin-ping",
+                "sin-ping-ayuda",
+                "sin-ping-recomendado",
+                "activar-recomendado",
+                "ya-puesta",
+                "puesta-sin-efecto",
+                "desactivada",
+                "sin-leer",
+                "sin-filtro",
+                "revisar-recomendado",
+                "servicio-ping",
+                "servicio-web",
+                "servicio-ssh",
+                "servicio-gestion",
+                "servicio-ping-ipv4",
+                "servicio-ping-ipv6",
+                "y",
+            ],
+            Componente::Conexion => &[
+                "del-operador",
+                "internet",
+                "sin-identificar",
+                "monopuesto-titulo",
+                "monopuesto-pasos",
+                "monopuesto-avisos",
+            ],
         }
     }
 }

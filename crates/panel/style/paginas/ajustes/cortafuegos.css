@@ -1,0 +1,101 @@
+/* Editor del cortafuegos, en el detalle de Seguridad: un bloque por filtro
+   (cabecera con sus datos y botones, la tabla de reglas en orden y el
+   formulario de lo que se edita), que en el móvil se apila. */
+.cortafuegos-editor {
+  display: grid;
+  gap: var(--esp-3);
+}
+
+.cortafuegos-filtro {
+  display: grid;
+  gap: var(--esp-2);
+  padding: var(--esp-3);
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+}
+
+.cortafuegos-filtro-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--esp-2) var(--esp-3);
+}
+
+.cortafuegos-filtro-cabecera h4 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.cortafuegos-filtro-datos {
+  margin: var(--esp-1) 0 0;
+  color: var(--tenue);
+  font-size: 0.875rem;
+}
+
+.cortafuegos-editor .botones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-2);
+}
+
+.cortafuegos-tabla td {
+  vertical-align: middle;
+}
+
+.cortafuegos-tabla tr.cortafuegos-inactiva td:not(.cortafuegos-acciones) {
+  color: var(--tenue);
+}
+
+.cortafuegos-acciones {
+  white-space: nowrap;
+}
+
+.cortafuegos-acciones button {
+  min-height: 28px;
+  margin-inline-end: var(--esp-1);
+}
+
+.cortafuegos-form {
+  display: grid;
+  gap: var(--esp-3);
+  margin: 0;
+  padding: var(--esp-3);
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+}
+
+.cortafuegos-form legend {
+  padding: 0 var(--esp-1);
+  font-weight: 600;
+}
+
+.cortafuegos-form-campos,
+.cortafuegos-form-lados {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: var(--esp-2) var(--esp-3);
+}
+
+.cortafuegos-form-lado {
+  display: grid;
+  align-content: start;
+  gap: var(--esp-2);
+}
+
+.cortafuegos-form .campo {
+  display: grid;
+  gap: var(--esp-1);
+}
+
+.cortafuegos-form .campo-casilla {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-2);
+}
+
+.cortafuegos-form input[type="text"],
+.cortafuegos-form select {
+  width: 100%;
+  min-width: 0;
+}

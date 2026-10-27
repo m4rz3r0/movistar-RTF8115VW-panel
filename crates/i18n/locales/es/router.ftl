@@ -57,9 +57,9 @@ router-error-conexion-no-existe = El router no tiene ninguna conexión { $nombre
 contrasena-router-titulo = Cambiar la contraseña del router
 contrasena-router-texto = Cambia la contraseña de la web del router. Desde ese momento, el panel entra con la nueva y tú también tendrás que usarla para entrar en el router. El panel prueba la nueva antes de quedarse con ella y, si algo falla, vuelve a poner la anterior.
 contrasena-router-nueva = Contraseña nueva
-contrasena-router-nueva-ayuda = Entre { $min } y { $max } caracteres. Las letras con tilde, la ñ y algunos símbolos ocupan más de uno. Pulsa el ojo para comprobar lo que has escrito.
+contrasena-router-nueva-ayuda = Entre { $min } y { $max } caracteres: letras sin tilde, números, espacios y signos del teclado inglés, sin «`». Sin espacio al principio ni al final, ni dos seguidos. Pulsa el ojo para comprobar lo que has escrito.
 contrasena-router-solo-lectura = No se puede cambiar mientras el panel esté en solo lectura: primero confirma el firmware en la tarjeta «Firmware».
-contrasena-router-cambiar = Cambiar
+contrasena-router-cambiar = Cambiar la contraseña
 contrasena-router-cambiando = Cambiando…
 contrasena-router-cambiada = Contraseña del router cambiada: el panel ya entra con la nueva. Para entrar tú en la web del router, usa también la nueva.
 contrasena-router-confirmar-titulo = ¿Cambiar la contraseña del router?
@@ -70,9 +70,11 @@ contrasena-router-confirmar-boton = Cambiar la contraseña
 # (y panel-solo-lectura y comun-error-interno, en sus ficheros) se guardan
 # en la base de datos de cada instalación, en el Historial: no se renombran
 # ni se borran (solo se cambia su texto).
-contrasena-router-error-corta = La contraseña nueva es demasiado corta: tiene que tener al menos { $n } caracteres. Las letras con tilde, la ñ y algunos símbolos ocupan más de uno.
-contrasena-router-error-larga = La contraseña nueva es demasiado larga: como mucho { $n } caracteres. Las letras con tilde, la ñ y algunos símbolos ocupan más de uno.
+contrasena-router-error-corta = La contraseña nueva es demasiado corta: tiene que tener al menos { $n } caracteres.
+contrasena-router-error-larga = La contraseña nueva es demasiado larga: como mucho { $n } caracteres.
 contrasena-router-error-control = La contraseña nueva no puede llevar saltos de línea, tabuladores ni otros caracteres invisibles.
+contrasena-router-error-caracter = La contraseña nueva solo puede llevar letras sin tilde, números, espacios y signos del teclado inglés, sin «`»: ni ñ, ni tildes, ni otros símbolos.
+contrasena-router-error-espacios = La contraseña nueva no puede empezar ni acabar con un espacio, ni llevar dos espacios seguidos.
 contrasena-router-error-igual = La contraseña nueva es la misma que ya tiene el router.
 contrasena-router-error-en-curso = Hay otro cambio en curso en el router: espera a que termine para cambiar la contraseña.
 contrasena-router-error-sin-router = El panel aún no sabe cómo entrar en el router: guarda primero su dirección, usuario y contraseña.
@@ -84,3 +86,35 @@ contrasena-router-error-grave = El panel no consigue entrar en el router ni con 
 contrasena-router-historial-nota = Este cambio no se puede deshacer desde aquí: para poner otra contraseña, vuelve a cambiarla en Configuración del router.
 contrasena-router-enlace = Cambiar la contraseña del router
 contrasena-router-enlace-texto = Se cambia en Configuración del router, junto a la contraseña con la que entra el panel.
+
+## Usuarios de la web del router (Ajustes → Seguridad → Usuarios)
+# Las claves usuarios-router-error-* y usuarios-router-historial-nota quedan
+# guardadas en el Historial: no se renombran ni se borran.
+usuarios-router-contrasena = Contraseña
+usuarios-router-protegido-panel = Es el usuario con el que entra el panel: no se puede borrar ni cambiar desde aquí.
+usuarios-router-protegido-sistema = Es la cuenta del operador: no se puede borrar ni cambiar desde aquí.
+usuarios-router-sin-credenciales = El panel no sabe con qué usuario entra en el router: desde aquí no se puede tocar ninguna cuenta.
+usuarios-router-aviso-borrar = Si luego deshaces el borrado, el usuario vuelve con una contraseña nueva: la de ahora no se puede recuperar. La nueva solo se verá con el ojo, en el detalle del cambio en el Historial. Si es el panel el que lo devuelve solo (porque el cambio falla), esa contraseña no se guarda: el Historial te lo dirá.
+usuarios-router-aviso-deshacer = El usuario vuelve con una contraseña nueva: la de antes no se puede recuperar. La verás con el ojo en el detalle de este cambio, en el Historial.
+usuarios-router-error-protegido = Este usuario está protegido: es el que usa el panel para entrar en el router o la cuenta del operador. No se puede borrar ni cambiar desde aquí.
+usuarios-router-error-existe = Ya hay un usuario con ese nombre en el router.
+usuarios-router-error-nombre = El nombre tiene que tener de 4 a 20 letras sin tilde, números o «_», sin espacios.
+usuarios-router-error-no-existe = Ese usuario ya no está en el router: vuelve a leer la lista.
+usuarios-router-error-en-curso = Hay otro cambio en curso en el router: espera a que termine.
+usuarios-router-error-rechazado = El router no aceptó el cambio: el usuario sigue como estaba.
+usuarios-router-error-no-entra = El router respondió, pero el usuario no entra con la contraseña nueva. Prueba otra vez o cámbiala desde la web del router.
+usuarios-router-error-grupo = El usuario ya entra con la contraseña nueva, pero el router no muestra el tipo de cuenta pedido. Vuelve a leer la lista.
+usuarios-router-historial-nota = La contraseña nueva no se guarda en el panel: este cambio no se puede deshacer desde aquí.
+usuarios-router-error-uno-cada-vez = Los usuarios se borran de uno en uno.
+usuarios-router-error-nombre-baja = Ese nombre no se puede borrar desde el panel: lleva «:» o caracteres de control.
+usuarios-router-error-grupo-sistema = Ese tipo de cuenta es el del operador: elige Administrador o Usuario.
+usuarios-router-error-grupo-no-valido = Elige un tipo de cuenta: Administrador o Usuario.
+usuarios-router-nota-revertido = Se volvió a crear el usuario borrado con una contraseña nueva que el panel no guarda. En este router esa cuenta no puede entrar en la web; si necesitas otra contraseña, bórrala y créala de nuevo.
+usuarios-router-no-panel = No son los usuarios de este panel: esos están en
+usuarios-router-no-panel-enlace = Ajustes del panel → Quién entra en este panel
+
+## Funciones que este router no permite hacer desde el panel
+funcion-sin-comprobar = Esta función no se ha comprobado en este router: el panel no la usa.
+funcion-no-disponible-usuarios = En este router, el panel no crea ni borra cuentas de su web.
+funcion-no-disponible-contrasena-otro = En este router solo la cuenta 1234 puede entrar en la web, así que el panel no puede comprobar que la contraseña nueva funciona. Para cambiarla, borra la cuenta y créala de nuevo.
+funcion-no-disponible-sin-ping = En este router, quitar la respuesta al ping no basta: otra regla del operador lo sigue permitiendo.

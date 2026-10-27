@@ -1,8 +1,4 @@
 //! Derivados de Teléfono: la línea, el teléfono por internet, el paso directo y la franja de resumen.
-//!
-//! El estado de cada uno es el que tiene puesto (encendido o apagado): el
-//! router da también si la línea está registrada (`clt_status`), pero su
-//! significado no se ha comprobado con el router real y no se usa.
 
 use super::*;
 
@@ -15,20 +11,34 @@ pub(super) fn estado_linea(ctx: &Contexto) -> (EstadoVisual, String) {
     )
 }
 
-/// `derivado:estado_voz`: el teléfono por internet, encendido o apagado.
+/// `derivado:estado_voz`: el teléfono por internet apagado o, encendido,
+/// si el router está registrado en el operador. Encendido y con un registro
+/// que no se reconoce, solo «Encendido».
 pub(super) fn estado_voz(ctx: &Contexto) -> (EstadoVisual, String) {
+    let encendido = si_no(ctx, "telefono.sip_oculto", "activo");
+    let si = match texto(ctx, "telefono.sip_oculto", "estado_registro") {
+        Some("registrada") => (EstadoVisual::Emite, "ajustes-estado-voz-registrada"),
+        Some("sin_registrar") => (EstadoVisual::Atencion, "ajustes-estado-voz-sin-registrar"),
+        _ => (EstadoVisual::Emite, "ajustes-estado-voz-si"),
+    };
     segun(
-        si_no(ctx, "telefono.sip_oculto", "activo"),
-        (EstadoVisual::Emite, "ajustes-estado-voz-si"),
+        encendido,
+        si,
         (EstadoVisual::Apagada, "ajustes-estado-voz-no"),
     )
 }
 
-/// `derivado:estado_paso_directo`: el del fax, que es el interruptor de su
-/// tarjeta (el de los módems va en sus datos).
+/// ¿Paso directo del fax? Es un desplegable (desactivado, automático,
+/// siempre): solo «desactivado» es que no.
+fn fax(ctx: &Contexto) -> Option<bool> {
+    texto(ctx, "telefono.fisico", "fax").map(|o| o != "no")
+}
+
+/// `derivado:estado_paso_directo`: el del fax (el de los módems va en sus
+/// datos).
 pub(super) fn estado_paso_directo(ctx: &Contexto) -> (EstadoVisual, String) {
     segun(
-        si_no(ctx, "telefono.fisico", "fax"),
+        fax(ctx),
         (EstadoVisual::Emite, "ajustes-estado-paso-directo-si"),
         (EstadoVisual::Apagada, "ajustes-estado-paso-directo-no"),
     )

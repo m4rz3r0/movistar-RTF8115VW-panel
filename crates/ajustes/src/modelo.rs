@@ -162,6 +162,7 @@ mod catalogo_toml {
     pub use super::componente::Componente;
     pub use super::elemento::{Accion, Elemento};
     use super::{Nivel, Requiere, Tema, TipoCampo};
+    use crate::fuentes::Respaldo;
     use serde::{Deserialize, Deserializer};
     use std::collections::BTreeMap;
 
@@ -220,6 +221,29 @@ mod catalogo_toml {
         /// posición 1). Se recorren las posiciones hasta dar con ella.
         #[serde(default)]
         pub buscar: Option<String>,
+        /// En una lista, solo las instancias con estos valores (la DMZ:
+        /// `solo = { desc = "DMZ" }`, una instancia más de las
+        /// redirecciones de puertos).
+        #[serde(default, deserialize_with = "tabla_a_pares")]
+        pub solo: Vec<(String, String)>,
+        /// En una lista, fuera las instancias con estos valores (las reglas
+        /// de puertos sin la DMZ).
+        #[serde(default, deserialize_with = "tabla_a_pares")]
+        pub excluir: Vec<(String, String)>,
+    }
+
+    impl Lectura {
+        /// ¿Va `leidos` (los elementos de una instancia) en la lista, según
+        /// `solo` y `excluir`?
+        pub fn admite(&self, leidos: &std::collections::BTreeMap<String, String>) -> bool {
+            let casa = |pares: &[(String, String)]| {
+                pares
+                    .iter()
+                    .all(|(k, v)| leidos.get(k).is_some_and(|x| x == v))
+            };
+            (self.solo.is_empty() || casa(&self.solo))
+                && (self.excluir.is_empty() || !casa(&self.excluir))
+        }
     }
 
     impl Ajuste {
@@ -322,6 +346,12 @@ mod catalogo_toml {
         /// `<p>-<campo>-false`, en el resumen de un cambio y en su valor.
         #[serde(default)]
         pub textos_valor: bool,
+        /// Ids de las fuentes de su recomendación (`fuentes.toml`).
+        #[serde(default)]
+        pub fuentes: Vec<String>,
+        /// En qué se apoya su recomendación (`criterio`: sin fuente real).
+        #[serde(default)]
+        pub respaldo: Option<Respaldo>,
     }
 
     impl Campo {
@@ -391,6 +421,12 @@ mod catalogo_toml {
         /// (`ademas = { encryption = "4" }`).
         #[serde(default)]
         pub ademas: BTreeMap<String, String>,
+        /// Ids de las fuentes de su recomendación (`fuentes.toml`).
+        #[serde(default)]
+        pub fuentes: Vec<String>,
+        /// En qué se apoya su recomendación (`criterio`: sin fuente real).
+        #[serde(default)]
+        pub respaldo: Option<Respaldo>,
     }
 
     /// Valores del router para sí y no.

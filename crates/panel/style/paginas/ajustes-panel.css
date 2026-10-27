@@ -83,3 +83,14 @@
 .aviso-formulario:empty {
   display: none;
 }
+
+/* La insignia de un usuario que cambia, junto a su nombre. */
+.ajustes-usuario-fila > .ins {
+  margin-right: auto;
+}
+
+/* El aviso que separa las cuentas del router de los usuarios del panel. */
+.panel-usuarios-no-router,
+.usuarios-router-no-panel {
+  margin: 0;
+}

@@ -7,6 +7,7 @@ import {
   sinDesbordamiento,
   violacionesGraves,
 } from "./util";
+import { capturaOpcional } from "./util";
 
 // Aspecto de Estado, Mejoras, Historial, Biblioteca, Configuración del router y
 // Ajustes del panel con el sistema visual nuevo (spec del rediseño, §3), en
@@ -115,7 +116,7 @@ for (const ancho of [360, 1440]) {
             await expect.soft(redes.locator("svg.emision-off")).toHaveCount(n - emiten);
           }
           await quieta(page);
-          await page.screenshot({
+          await capturaOpcional(page, {
             path: `${CAPTURAS}/${p.nombre}-${sufijo}.png`,
             fullPage: true,
             animations: "disabled",

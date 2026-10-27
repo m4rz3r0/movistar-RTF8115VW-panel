@@ -6,6 +6,7 @@ use super::campo::{etiqueta, valor_resumido};
 use super::piezas::motivos;
 use crate::ajustes_router::AjusteVista;
 use crate::t;
+use crate::ui::i18n::traducir;
 use leptos::prelude::*;
 use leptos_router::components::A;
 
@@ -32,8 +33,16 @@ pub(crate) fn lista(a: &AjusteVista) -> impl IntoView + use<> {
                 view! { <tr>{celdas}</tr> }
             })
             .collect_view();
+        // Con foco: una tabla ancha (las reglas del cortafuegos) se recorre
+        // con el teclado dentro de su caja, una región con el nombre del
+        // ajuste para el lector de pantalla (distinto del detalle, que es
+        // otra región con el nombre del ajuste: axe, landmark-unique).
+        let nombre = t!(
+            "ajustes-tabla-region",
+            nombre = traducir(&format!("{}-titulo", a.clave), None)
+        );
         view! {
-            <div class="tabla-scroll">
+            <div class="tabla-scroll" tabindex="0" role="region" aria-label=nombre>
                 <table class="tabla">
                     <thead><tr>{cabeza}</tr></thead>
                     <tbody>{filas}</tbody>

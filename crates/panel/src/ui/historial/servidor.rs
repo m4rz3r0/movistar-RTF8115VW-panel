@@ -92,6 +92,7 @@ async fn fila_cambio(
     o: &Ocultar,
     de_ajustes: &Etiquetas,
     mut c: Cambio,
+    usuario: &str,
 ) -> Result<CambioFila, ServerFnError> {
     let g = gestor(state)?;
     // Los datos sensibles, en claro (se descifra este cambio solo si tiene
@@ -186,6 +187,12 @@ async fn fila_cambio(
         } else {
             None
         };
+    // Lo que puede hacer quien mira con un cambio en curso suyo.
+    let terminable =
+        c.estado == crate::changes::Estado::Vigilando && g.terminable(c.id, usuario).await;
+    let quitable = g
+        .puesto_en_cola(c.id)
+        .is_some_and(|(_, quien)| quien == usuario);
     let enlace = |id: Option<i64>| async move {
         match id {
             Some(id) => vinculo(state, id).await,
@@ -217,6 +224,8 @@ async fn fila_cambio(
         deshace: enlace(deshace).await?,
         puede_deshacer,
         sin_deshacer,
+        terminable,
+        quitable,
         titulo: titulo.as_deref().map(traducir),
         pasos,
     })
@@ -277,6 +286,7 @@ fn estado_paso(e: EstadoPaso) -> EstadoPasoVista {
         EstadoPaso::Aplicado => EstadoPasoVista::Aplicado,
         EstadoPaso::Fallido => EstadoPasoVista::Fallido,
         EstadoPaso::Revertido => EstadoPasoVista::Revertido,
+        EstadoPaso::Cancelado => EstadoPasoVista::Cancelado,
     }
 }
 
@@ -341,7 +351,13 @@ async fn fila_revelado(
     }))
 }
 
-pub async fn pagina(state: &AppState, pagina: u32) -> Result<PaginaHistorial, ServerFnError> {
+/// La página `pagina` del historial vista por `usuario` (los botones de
+/// sus cambios en curso).
+pub async fn pagina(
+    state: &AppState,
+    pagina: u32,
+    usuario: &str,
+) -> Result<PaginaHistorial, ServerFnError> {
     let g = gestor(state)?;
     let pagina = pagina.max(1);
     let total: i64 = sqlx::query_scalar(
@@ -371,7 +387,7 @@ pub async fn pagina(state: &AppState, pagina: u32) -> Result<PaginaHistorial, Se
         let entrada = match c.get::<String, _>("k").as_str() {
             "c" => match g.cambio(id).await {
                 Some(c) => Some(EntradaVista::Cambio(Box::new(
-                    fila_cambio(state, &o, &de_ajustes, c).await?,
+                    fila_cambio(state, &o, &de_ajustes, c, usuario).await?,
                 ))),
                 None => None,
             },
@@ -388,6 +404,18 @@ pub async fn pagina(state: &AppState, pagina: u32) -> Result<PaginaHistorial, Se
         total: total as u32,
         hay_mas: desde + u64::from(POR_PAGINA) < total,
     })
+}
+
+/// Deshacer un alta o una baja de usuarios del router exige la ventana de
+/// reautenticación, como crearlos o borrarlos; si no, 401.
+pub async fn exigir_reauth_si_usuarios(
+    state: &AppState,
+    change_id: i64,
+) -> Result<(), ServerFnError> {
+    if gestor(state)?.es_de_usuarios_el_cambio(change_id).await {
+        crate::auth::require_reauth().await?;
+    }
+    Ok(())
 }
 
 pub async fn deshacer(state: &AppState, change_id: i64) -> Result<PreparadoVista, ServerFnError> {

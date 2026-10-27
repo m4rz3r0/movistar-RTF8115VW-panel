@@ -23,12 +23,14 @@ valor = "false"
 /// condición, un campo por red opcional y una elección.
 const LOTES: &str = r#"
 [[paso]]
+respaldo = "criterio"
 id = "ocultar"
 tema = "wifi"
 accion = "ocultar_nombre"
 para_cada = "red_wifi"
 
 [[paso]]
+respaldo = "criterio"
 id = "maximo"
 tema = "wifi"
 campo = "wifi.avanzado.maximo"
@@ -36,6 +38,7 @@ valor = "8"
 si = { campo = "wifi.red.visible", valor = "true" }
 
 [[paso]]
+respaldo = "criterio"
 id = "seguro"
 tema = "wifi"
 campo = "seguridad"
@@ -44,6 +47,7 @@ para_cada = "red_wifi"
 opcional = true
 
 [[paso]]
+respaldo = "criterio"
 id = "elegido"
 tema = "wifi"
 ajuste = "wifi.avanzado"
@@ -55,6 +59,7 @@ id = "tope"
 [[eleccion.opcion]]
 id = "poco"
 defecto = true
+respaldo = "criterio"
 valores = { maximo = "4" }
 
 [[eleccion.opcion]]

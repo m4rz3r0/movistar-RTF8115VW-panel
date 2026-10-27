@@ -9,6 +9,7 @@ import {
   sinDesbordamiento,
   violacionesGraves,
 } from "./util";
+import { capturaOpcional } from "./util";
 
 // La página Mejoras, en español a 360 y 1440 px y en los dos temas, contra
 // router-sim con las fixtures sin tocar (en el panel de Mejoras, no en el del
@@ -86,7 +87,7 @@ for (const ancho of [360, 1440]) {
         if (ancho <= 860) {
           await page.locator("button.menu-boton").click();
         }
-        const cuenta = page.locator("nav .cuenta");
+        const cuenta = page.locator("nav.nav .cuenta");
         await expect(cuenta).toHaveText("6");
         await expect(cuenta).toHaveAttribute("aria-label", "6 pasos pendientes");
         await expect(cuenta).toBeVisible();
@@ -101,7 +102,7 @@ for (const ancho of [360, 1440]) {
         expect(cabe, "scrollWidth <= clientWidth").toBe(true);
         expect.soft(await violacionesGraves(page), `mejoras ${sufijo}`).toEqual([]);
         await quieta(page);
-        await page.screenshot({
+        await capturaOpcional(page, {
           path: `${CAPTURAS}/mejoras-${sufijo}.png`,
           fullPage: true,
           animations: "disabled",
@@ -177,7 +178,7 @@ for (const tema of ["oscuro", "claro"] as const) {
       await sinDesbordamiento(page, `sin leer ${tema}`);
       expect.soft(await violacionesGraves(page), `sin leer ${tema}`).toEqual([]);
       await quieta(page);
-      await page.screenshot({
+      await capturaOpcional(page, {
         path: `${CAPTURAS}/mejoras-sin-leer-1440-${tema}.png`,
         fullPage: true,
         animations: "disabled",
@@ -204,7 +205,7 @@ test.describe("contador sin consultas de más", () => {
     const errores = recogerErrores(page);
     await entrarEnSuPanel(page);
     await asentar(page);
-    const cuenta = page.locator("nav .cuenta");
+    const cuenta = page.locator("nav.nav .cuenta");
     await expect(cuenta).toHaveText("6");
     const consultas: string[] = [];
     page.on("request", (r) => {
@@ -233,7 +234,7 @@ const HECHO = "Hecho: el router tiene ya el cambio.";
 /** El contador de la barra lateral (en el móvil, abriendo el menú). */
 async function esperarContador(page: Page, ancho: number, valor: string) {
   if (ancho <= 860) await page.locator("button.menu-boton").click();
-  await expect(page.locator("nav .cuenta")).toHaveText(valor);
+  await expect(page.locator("nav.nav .cuenta")).toHaveText(valor);
   if (ancho <= 860) await page.locator("button.menu-boton").click();
 }
 
@@ -309,7 +310,7 @@ for (const [ancho, tema] of [
       await sinDesbordamiento(page, `revisión ${sufijo}`);
       expect.soft(await violacionesGraves(page), `revisión ${sufijo}`).toEqual([]);
       await quieta(page);
-      await page.screenshot({
+      await capturaOpcional(page, {
         path: `${CAPTURAS_REVISION}/revision-${sufijo}.png`,
         animations: "disabled",
       });
@@ -418,7 +419,7 @@ for (const ancho of [360, 1440]) {
       await sinDesbordamiento(page, `ajustes wifi ${ancho}`);
       expect.soft(await violacionesGraves(page), `ajustes wifi ${ancho}`).toEqual([]);
       await quieta(page);
-      await red24.screenshot({
+      await capturaOpcional(red24, {
         path: `${CAPTURAS_AJUSTES}/tarjeta-wifi-${ancho}.png`,
         animations: "disabled",
       });
@@ -441,7 +442,7 @@ test.describe("contador tras un cambio en Ajustes", () => {
     await entrarEnSuPanel(page);
     await page.goto("/ajustes/wifi");
     await asentar(page);
-    const cuenta = page.locator("nav .cuenta");
+    const cuenta = page.locator("nav.nav .cuenta");
     await expect(cuenta).toHaveText("6");
     const rec = tarjetaDeAjustes(page, "Red WiFi 2,4 GHz").locator(".tarjeta-rec");
     await rec.getByRole("button", { name: "Quitar WPS" }).click();

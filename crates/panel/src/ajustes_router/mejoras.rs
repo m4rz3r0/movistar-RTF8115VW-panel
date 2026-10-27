@@ -72,6 +72,13 @@ pub struct PasoLoteVista {
     pub nota_proveedor: Option<String>,
     /// Sale desmarcado en la revisión y no cuenta como pendiente.
     pub opcional: bool,
+    /// De dónde sale (en el de los DNS, también la página de cada
+    /// proveedor).
+    #[serde(default)]
+    pub fuentes: Vec<super::FuenteVista>,
+    /// Clave de traducción de su respaldo (`fuentes-respaldo-criterio`).
+    #[serde(default)]
+    pub respaldo: Option<String>,
 }
 
 /// Estado de un paso.
@@ -142,5 +149,5 @@ pub async fn preparar_lote(
     id: String,
     opciones: OpcionesLote,
 ) -> Result<GrupoVista, ServerFnError> {
-    super::servidor::preparar_lote(id, opciones).await
+    super::servidor::ligada(super::servidor::preparar_lote(id, opciones).await?).await
 }

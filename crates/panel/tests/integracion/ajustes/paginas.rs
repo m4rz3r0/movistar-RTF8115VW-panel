@@ -59,10 +59,12 @@ fn parametros_del_catalogo() -> Vec<String> {
 }
 
 /// Palabras corrientes que también son parámetros (las mismas que deja
-/// pasar `ajustes::catalogo_real`).
-const FORMAS_CORRIENTES: [&str; 9] = [
+/// pasar `ajustes::catalogo_real`; «DMZ», el nombre corriente de la
+/// función, que Puertos lee con el parámetro `dmz`).
+const FORMAS_CORRIENTES: [&str; 10] = [
     "account",
     "Account",
+    "DMZ",
     "all",
     "All",
     "beamforming",
@@ -286,10 +288,19 @@ async fn recomendacion_visible_en_la_tarjeta() {
         "{recos:#?}"
     );
     // Solo para quién es: a favor y en contra, en el detalle.
-    assert!(recos.iter().all(|r| !r.contains("A favor:")), "{recos:#?}");
+    assert!(
+        recos
+            .iter()
+            .all(|r| !r.contains("A favor") && !r.contains("pros-contras")),
+        "{recos:#?}"
+    );
     let (_, _, html) = pagina(&p, &cookie, "/ajustes/wifi/red-24").await;
     let (visible, _) = partir(&html, "<script", "</script>");
-    assert!(visible.contains("A favor:"), "en el detalle");
+    // A favor y en contra van en sus dos bloques, con su encabezado.
+    assert!(
+        visible.contains(r#"class="pros-contras-favor""#) && visible.contains("A favor"),
+        "en el detalle"
+    );
     assert!(
         !visible.contains("(recomendada)"),
         "marca repetida en el selector"

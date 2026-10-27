@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { PLAZO_CAMBIO, plazoDeTest } from "./cambios";
 import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
+import { capturaOpcional } from "./util";
 
 // Red local (/ajustes/red_local) a 360 y 1440 px, en español y en inglés,
 // contra router-sim: los dispositivos conectados y las IP fijas, cada uno en
@@ -120,7 +121,7 @@ for (const idioma of ["es", "en"] as const) {
         await sinDesbordamiento(page, `red local ${idioma} ${ancho}`);
         sinApi(await dispositivos.innerText());
         sinApi(await fijas.innerText());
-        await page.screenshot({
+        await capturaOpcional(page, {
           path: `capturas/red_local-${idioma}-${ancho}.png`,
           fullPage: true,
         });
@@ -172,7 +173,7 @@ for (const idioma of ["es", "en"] as const) {
         await expect(dialogo.getByText("192.168.1.62")).toBeVisible();
         sinApi(await dialogo.innerText());
         await sinDesbordamiento(page, `diálogo ${idioma} ${ancho}`);
-        await page.screenshot({ path: `capturas/red_local-dialogo-${idioma}-${ancho}.png` });
+        await capturaOpcional(page, { path: `capturas/red_local-dialogo-${idioma}-${ancho}.png` });
 
         if (aplicaDeVerdad) {
           await aplicar(page, t);

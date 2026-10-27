@@ -8,7 +8,14 @@ use crate::valores::traducir;
 
 /// Datos calculados que puede pedir un elemento (`derivado:<nombre>` en
 /// `datos`): el panel los resuelve en `ajustes_router::servidor::derivados`.
-pub const DERIVADOS_DATO: &[&str] = &["canal_y_ancho", "conectados", "nombres_ddns", "cuentas"];
+pub const DERIVADOS_DATO: &[&str] = &[
+    "canal_y_ancho",
+    "conectados",
+    "nombres_ddns",
+    "cuentas",
+    "abierto_redes",
+    "otras_invitadas",
+];
 
 /// Reglas de estado que puede pedir un elemento (`derivado:<nombre>` en
 /// `estado`).
@@ -16,12 +23,15 @@ pub const DERIVADOS_ESTADO: &[&str] = &[
     "estado_red",
     "estado_dns",
     "estado_ddns",
+    "estado_conexion",
     "estado_gestion_remota",
+    "estado_cortafuegos",
     "estado_linea",
     "estado_voz",
     "estado_paso_directo",
     "estado_hora",
     "estado_diagnostico",
+    "estado_dmz",
     "segun_lo_recomendado",
 ];
 

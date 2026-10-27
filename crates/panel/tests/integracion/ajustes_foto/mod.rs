@@ -196,7 +196,12 @@ async fn volver_a_partida_rechaza_lo_que_no_se_restaura() {
         404
     );
     // Un campo que solo se lee.
-    assert_eq!(volver(&p, c, "puertos.alg", Some("ftp"), None).await.0, 400);
+    assert_eq!(
+        volver(&p, c, "internet.conexion", Some("estado"), None)
+            .await
+            .0,
+        400
+    );
     // Un secreto que el router no deja leer (tapado al leer) no se reenvía
     // vacío desde la foto.
     let (status, body) = volver(&p, c, "telefono.linea", Some("contrasena"), None).await;

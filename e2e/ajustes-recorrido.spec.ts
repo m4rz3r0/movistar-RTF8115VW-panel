@@ -2,6 +2,7 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 import { PLAZO_CAMBIO, plazoDeTest } from "./cambios";
 import { CONTRASENA, USUARIO, recorridos } from "./instancias";
 import { asentar, hidratada, recogerErrores, sinDesbordamiento } from "./util";
+import { capturaOpcional } from "./util";
 
 // Criterio de éxito 1 del spec de Ajustes: alguien que no conoce este router
 // cambia la contraseña WiFi, apaga el WPS, fija la IP de un dispositivo,
@@ -50,7 +51,8 @@ const textos = {
     gestionCampo: "Gestión remota",
     apagada: "Apagada",
     recomendada: /^Recomendado: Apagada Recomendado si [^.]+\.$/,
-    pros: /^A favor: .+\. En contra: .+\.$/,
+    favor: "A favor",
+    contra: "En contra",
     historial: "/historial",
   },
   en: {
@@ -87,7 +89,8 @@ const textos = {
     gestionCampo: "Remote management",
     apagada: "Off",
     recomendada: /^Recommended: Off Recommended if [^.]+\.$/,
-    pros: /^Pros: .+\. Cons: .+\.$/,
+    favor: "Pros",
+    contra: "Cons",
     historial: "/historial",
   },
 } as const;
@@ -148,13 +151,9 @@ async function cerrarDetalle(page: Page) {
   }).toPass();
 }
 
-/** Va a un tema con las pestañas o, en móvil, con el selector de temas. */
-async function irA(page: Page, ancho: number, tema: string, nombre: string) {
-  if (ancho < 640) {
-    await page.locator("#ajustes-tema").selectOption(tema);
-  } else {
-    await page.locator("nav.temas").getByRole("link", { name: nombre, exact: true }).click();
-  }
+/** Va a un tema con su pestaña (en el móvil, la barra se desplaza de lado). */
+async function irA(page: Page, tema: string, nombre: string) {
+  await page.locator("nav.temas").getByRole("link", { name: nombre, exact: true }).click();
   await page.waitForURL((u) => u.pathname === `/ajustes/${tema}`);
   await asentar(page);
   await sinApiALaVista(page, tema);
@@ -226,7 +225,7 @@ for (const { idioma, locale, ancho } of pasadas) {
 
       // 3. La IP de un dispositivo conectado, fija, desde su detalle en la
       // lista de dispositivos.
-      await irA(page, ancho, "red_local", t.redLocal);
+      await irA(page, "red_local", t.redLocal);
       await fila(page, t.dispositivos, "host-2").locator(".lista-nombre").click();
       const lateral = page.locator(".detalle-lateral");
       await lateral.getByRole("button", { name: t.fijarHost2, exact: true }).click();
@@ -237,7 +236,7 @@ for (const { idioma, locale, ancho } of pasadas) {
       await cerrarDetalle(page);
 
       // 4. Un puerto abierto hacia ese dispositivo.
-      await irA(page, ancho, "puertos", t.puertos);
+      await irA(page, "puertos", t.puertos);
       await lista(page, t.reglas).getByRole("button", { name: t.abrir }).click();
       const form = lateral.locator("form.regla-formulario");
       await form.getByLabel(t.nombre, { exact: true }).fill(t.nombreRegla);
@@ -255,7 +254,7 @@ for (const { idioma, locale, ancho } of pasadas) {
 
       // 5. La gestión remota del operador (TR-069), apagada, en su detalle
       // (Seguridad va en rejilla).
-      await irA(page, ancho, "seguridad", t.seguridad);
+      await irA(page, "seguridad", t.seguridad);
       const gestion = page.locator("article.tarjeta-el").filter({
         has: page.getByRole("heading", { level: 2, name: t.gestion, exact: true }),
       });
@@ -265,13 +264,18 @@ for (const { idioma, locale, ancho } of pasadas) {
       const reco = detalle.locator(".recomendacion").first();
       await expect(reco.locator(":scope > p")).toHaveText(t.recomendada);
       await reco.locator("details.recomendacion-pros > summary").click();
-      await expect(reco.locator("details.recomendacion-pros > p")).toHaveText(t.pros);
+      // A favor y en contra, cada uno en su bloque con su encabezado.
+      const pros = reco.locator("details.recomendacion-pros .pros-contras");
+      await expect(pros.locator(".pros-contras-favor dt")).toHaveText(t.favor);
+      await expect(pros.locator(".pros-contras-favor dd")).toHaveText(/^\S.+\.$/);
+      await expect(pros.locator(".pros-contras-contra dt")).toHaveText(t.contra);
+      await expect(pros.locator(".pros-contras-contra dd")).toHaveText(/^\S.+\.$/);
       await sinDesbordamiento(page, "gestión remota");
       await detalle.getByRole("button", { name: t.guardarCambios }).click();
       await expect(dialogo.locator("tbody td").nth(1)).toHaveText(t.apagada);
       await aplicarEnRejilla(page, t, "gestión remota");
       await expect(gestion.locator(".tarjeta-datos dd").first()).toContainText(t.apagada);
-      await page.screenshot({ path: `capturas/recorrido-${idioma}-${ancho}.png`, fullPage: true });
+      await capturaOpcional(page, { path: `capturas/recorrido-${idioma}-${ancho}.png`, fullPage: true });
 
       // El Historial: los cinco cambios, sin la API a la vista.
       await page.goto(t.historial);

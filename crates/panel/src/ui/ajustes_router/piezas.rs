@@ -100,9 +100,16 @@ fn sin_repetidos<'a>(claves: impl IntoIterator<Item = &'a String>) -> Vec<&'a St
     claves.into_iter().filter(|k| vistas.insert(*k)).collect()
 }
 
-/// Motivos (sin repetir) de los campos que solo se pueden consultar.
+/// Motivos (sin repetir) de los campos que solo se pueden consultar. Lo
+/// que no se escribe por no estar comprobado en el router real no lleva
+/// nota: solo se ve su valor.
 pub(crate) fn motivos(campos: &[CampoVista]) -> Option<impl IntoView + use<>> {
-    let claves = sin_repetidos(campos.iter().filter_map(|c| c.solo_lectura.as_ref()));
+    let claves = sin_repetidos(
+        campos
+            .iter()
+            .filter_map(|c| c.solo_lectura.as_ref())
+            .filter(|k| *k != crate::validacion_real::SIN_COMPROBAR),
+    );
     (!claves.is_empty()).then(|| {
         claves
             .into_iter()

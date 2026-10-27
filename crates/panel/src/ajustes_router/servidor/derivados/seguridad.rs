@@ -1,4 +1,4 @@
-//! Derivados de Seguridad: la gestión remota, las cuentas del router y la franja de resumen.
+//! Derivados de Seguridad: la gestión remota, el cortafuegos, las cuentas del router y la franja de resumen.
 
 use super::*;
 
@@ -19,6 +19,23 @@ pub(super) fn estado_gestion_remota(ctx: &Contexto) -> (EstadoVisual, String) {
         (EstadoVisual::Atencion, "ajustes-estado-gestion-remota-si"),
         (EstadoVisual::Apagada, "ajustes-estado-gestion-remota-no"),
     )
+}
+
+/// `derivado:estado_cortafuegos`: si el router responde al ping desde
+/// internet, por versión (en ámbar), si solo está la regla del panel (de
+/// IPv4, sin afirmar su efecto) o si nada lo abre.
+pub(super) fn estado_cortafuegos(ctx: &Contexto) -> (EstadoVisual, String) {
+    use super::super::cortafuegos as cf;
+    match cf::filtros(ctx) {
+        Some(f) => {
+            let (estado, clave) = cf::estado(cf::ping(&f));
+            (estado, clave.to_owned())
+        }
+        None => (
+            EstadoVisual::Atencion,
+            "ajustes-estado-desconocido".to_owned(),
+        ),
+    }
 }
 
 /// Cuántas cuentas tiene la web del router.

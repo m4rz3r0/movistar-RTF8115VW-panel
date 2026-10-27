@@ -1,6 +1,7 @@
 //! Retomar al arrancar grupos que quedaron a medias.
 
 use super::*;
+use crate::comun::ConfirmarLigado;
 
 #[tokio::test]
 async fn reanuda_grupo_a_medias() {
@@ -19,7 +20,7 @@ async fn reanuda_grupo_a_medias() {
     p.sim.control.hang_after_write_n(2);
     let a2 = a.clone();
     let token = prep.token.clone();
-    let tarea = tokio::spawn(async move { a2.confirmar_grupo(&token, &[], "admin").await });
+    let tarea = tokio::spawn(async move { a2.confirmar_grupo_ligado(&token, &[], "admin").await });
     esperar_hasta(Duration::from_secs(5), "sin paso 2", async || {
         p.sim.control.writes().len() >= 2
     })
@@ -57,7 +58,7 @@ async fn reanuda_grupo_sin_terminar_revierte_lo_escrito() {
     p.sim.control.hang_after_write_n(1);
     let a2 = a.clone();
     let token = prep.token.clone();
-    let tarea = tokio::spawn(async move { a2.confirmar_grupo(&token, &[], "admin").await });
+    let tarea = tokio::spawn(async move { a2.confirmar_grupo_ligado(&token, &[], "admin").await });
     esperar_hasta(Duration::from_secs(5), "sin paso 1", async || {
         !p.sim.control.writes().is_empty()
     })
@@ -194,7 +195,10 @@ async fn reanuda_vigilancia_de_grupo_y_revierte_si_cae_la_wan() {
         .preparar_grupo(grupo(vec![upnp("1"), lease0("192.168.1.80")]))
         .await
         .unwrap();
-    let id = a.confirmar_grupo(&prep.token, &[], "admin").await.unwrap();
+    let id = a
+        .confirmar_grupo_ligado(&prep.token, &[], "admin")
+        .await
+        .unwrap();
     assert_eq!(a.cambio(id).await.unwrap().estado, Estado::Vigilando);
     a.detener();
 

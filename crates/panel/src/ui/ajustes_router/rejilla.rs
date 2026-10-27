@@ -15,9 +15,10 @@
 use super::aviso::Seguimiento;
 use super::detalle::{Borradores, Detalle, sin_guardar};
 use super::lista::{Lista, es_lista, filas_de_la_pagina};
+use super::pestanas::Lectura;
 use super::piezas::enfocar;
-use super::resumen::{LecturaDelTema, ResumenTema};
-use super::seleccion::{BarraSeleccion, Seleccion, nombre};
+use super::resumen::ResumenTema;
+use super::seleccion::{BarraSeleccion, Seleccion, marcables, nombre};
 use super::sin_guardar::SinGuardar;
 use super::tarjeta::{Tarjeta, id_tarjeta};
 use crate::ajustes_router::{ElementoVista, PaginaTema, preparar_accion};
@@ -26,6 +27,7 @@ use crate::ui::explorador::texto_error;
 use crate::ui::{Estado, IconoEstado};
 use leptos::{ev, prelude::*, task::spawn_local};
 use leptos_router::{NavigateOptions, hooks::use_navigate};
+use std::collections::BTreeSet;
 
 /// Lo que comparten las tarjetas y el detalle de la rejilla.
 #[derive(Clone, Copy)]
@@ -34,9 +36,10 @@ pub(crate) struct Pagina {
     pub tema: StoredValue<String>,
     /// El panel está en solo lectura: nada se cambia.
     pub solo_lectura: bool,
-    /// El tema tiene acciones sobre varios elementos: las tarjetas llevan
-    /// la marca redonda (sin acciones, marcar no serviría de nada).
-    pub marcar: bool,
+    /// Los elementos (tarjetas y filas) que se pueden marcar: los que
+    /// comparten una acción con otro ([`marcables`]). Vacío: la pantalla
+    /// no ofrece selección (ni marca, ni tecla, ni barra).
+    pub marcables: StoredValue<BTreeSet<String>>,
     /// El elemento cuyo detalle se ve.
     pub abierto: RwSignal<Option<String>>,
     /// Lleva a la dirección de un elemento (abre su detalle).
@@ -47,6 +50,18 @@ pub(crate) struct Pagina {
     pub volver_a_leer: Callback<()>,
     /// El detalle que se pinte lleva el foco a su título (se acaba de abrir).
     pub enfocar_detalle: RwSignal<bool>,
+}
+
+impl Pagina {
+    /// ¿Se puede marcar el elemento (tarjeta o fila) `id`?
+    pub(crate) fn marcable(self, id: &str) -> bool {
+        self.marcables.with_value(|m| m.contains(id))
+    }
+
+    /// ¿Ofrece la pantalla selección?
+    pub(crate) fn con_seleccion(self) -> bool {
+        self.marcables.with_value(|m| !m.is_empty())
+    }
 }
 
 /// Las tarjetas de la rejilla, en orden.
@@ -82,7 +97,7 @@ pub(crate) fn teclas_de_tarjeta(ev: &ev::KeyboardEvent, id: &str, p: Pagina, sel
     }
     match ev.key().as_str() {
         "Enter" => p.abrir.run(id.to_owned()),
-        " " if p.marcar => {
+        " " if p.marcable(id) => {
             ev.prevent_default();
             sel.alternar(id);
         }
@@ -163,6 +178,9 @@ pub(crate) fn ContenidoRejilla(
         .cloned()
         .chain(filas.iter().map(|(e, _)| e.clone()))
         .collect();
+    Lectura::llega(p.leido_hace_s);
+    let marcables = marcables(&p.acciones, &tarjetas_y_filas);
+    sel.conservar(&marcables);
     let nombres: Vec<(String, String)> = p
         .elementos
         .iter()
@@ -261,10 +279,7 @@ pub(crate) fn ContenidoRejilla(
     let pagina = Pagina {
         tema,
         solo_lectura: p.solo_lectura,
-        marcar: p
-            .elementos
-            .iter()
-            .any(|e| !es_lista(e) && !e.acciones.is_empty()),
+        marcables: StoredValue::new(marcables.clone()),
         abierto,
         abrir: Callback::new({
             let ir_a = ir_a.clone();
@@ -322,8 +337,9 @@ pub(crate) fn ContenidoRejilla(
     let existentes = p
         .ajustes()
         .find(|a| a.componente.as_deref() == Some(super::RESERVAS))
-        .map(|a| super::reservas::existentes(&a.instancias))
-        .unwrap_or_default();
+        // Sin escribir las IP fijas, la IP de un dispositivo no se fija.
+        .filter(|a| crate::validacion_real::escribible(a))
+        .map(|a| super::reservas::existentes(&a.instancias));
     let listas = p
         .elementos
         .iter()
@@ -378,15 +394,16 @@ pub(crate) fn ContenidoRejilla(
         }
     };
     view! {
-        <LecturaDelTema edad_s=p.leido_hace_s volver_a_leer />
         {desconocido}
         <ResumenTema datos=p.resumen.clone() />
-        <BarraSeleccion
-            acciones=p.acciones.clone()
-            elementos=tarjetas_y_filas
-            solo_lectura=p.solo_lectura
-            al_pulsar=accion
-        />
+        {pagina.con_seleccion().then(|| view! {
+            <BarraSeleccion
+                acciones=p.acciones.clone()
+                elementos=tarjetas_y_filas
+                solo_lectura=p.solo_lectura
+                al_pulsar=accion
+            />
+        })}
         <div class="rejilla-elementos" class:hay-marcadas=move || { sel.cuantas() > 0 }>{tarjetas}</div>
         {listas}
         {move || salida.with(Option::is_some).then(|| {

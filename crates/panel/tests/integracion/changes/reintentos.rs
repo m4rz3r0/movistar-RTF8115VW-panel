@@ -1,12 +1,16 @@
 //! Reversiones cuya relectura falla: se reintentan sin duplicar.
 
 use super::*;
+use crate::comun::ConfirmarLigado;
 
 #[tokio::test]
 async fn relectura_fallida_tras_revertir_se_reintenta() {
     let (p, m) = preparado().await;
     let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
-    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    let id = m
+        .confirmar_ligado(&prep.token, None, "admin")
+        .await
+        .unwrap();
     p.sim
         .control
         .fail_reads_after_next_write("cbDhcpV4SvrPoolGetStatic");
@@ -54,7 +58,10 @@ async fn reintento_de_revertir_un_borrado_no_duplica() {
         ..req(LEASES, Some("1"), &[(POOL, "0")])
     };
     let prep = m.preparar(borrar).await.unwrap();
-    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    let id = m
+        .confirmar_ligado(&prep.token, None, "admin")
+        .await
+        .unwrap();
     assert_eq!(ip_de_lease(&p, "1").await, None);
     revertir_con_relectura_fallida(&p, &m, id).await;
     let recreadas: Vec<_> = read::static_leases(&p.state.hgu)
@@ -76,7 +83,10 @@ async fn reintento_de_revertir_una_creacion_acepta_que_ya_no_exista() {
     let p = panel_rapido(Duration::from_millis(100)).await;
     let m = gestor(&p, tiempos_rapidos()).await;
     let prep = m.preparar(nueva_reserva()).await.unwrap();
-    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    let id = m
+        .confirmar_ligado(&prep.token, None, "admin")
+        .await
+        .unwrap();
     p.sim.control.hang_after_next_write();
     p.sim.control.set_wan_up(false);
     esperar_hasta(Duration::from_secs(5), "sin reversión", async || {
@@ -102,7 +112,10 @@ async fn reintento_de_revertir_una_creacion_acepta_que_ya_no_exista() {
 async fn router_que_rechaza_la_reversion_falla_sin_reintentar() {
     let (p, m) = preparado().await;
     let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
-    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    let id = m
+        .confirmar_ligado(&prep.token, None, "admin")
+        .await
+        .unwrap();
     p.sim.control.fail_next_write("valores no admitidos");
     p.sim.control.set_wan_up(false);
     let c = esperar_estado(&m, id, Estado::Fallido).await;

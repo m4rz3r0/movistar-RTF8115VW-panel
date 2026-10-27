@@ -10,6 +10,7 @@ import {
   sinDesbordamiento,
   violacionesGraves,
 } from "./util";
+import { capturaOpcional } from "./util";
 
 // Ajustes → WiFi en rejilla (la pestaña modelo del rediseño), en español a
 // 360, 1024 y 1440 px y en los dos temas, contra router-sim:
@@ -52,7 +53,10 @@ const t = {
   encendida: "Encendida",
   apagada: "Apagada",
   motivo: "No se ha podido leer este ajuste del router. Prueba de nuevo en un momento.",
-  enCurso: "Hay otro cambio en curso",
+  enCola: "En cola (puesto 1)",
+  enColaInsignia: "En cola",
+  quitar: "Quitar de la cola",
+  noAplicado: "No se ha aplicado",
 };
 
 /** La tarjeta cuyo título es exactamente `titulo`. */
@@ -77,7 +81,7 @@ async function confirmarDespacio(page: Page) {
   await page.route(
     "**/api/confirmar_ajuste",
     async (r) => {
-      await new Promise((ok) => setTimeout(ok, 1_500));
+      await new Promise((ok) => setTimeout(ok, 800));
       await r.continue();
     },
     { times: 1 },
@@ -147,7 +151,7 @@ for (const ancho of [360, 1024, 1440]) {
         await expect(red24).toHaveClass(/marcada/);
         await sinDesbordamiento(page, `dos marcadas ${sufijo}`);
         await quieta(page);
-        await page.screenshot({ path: `${CAPTURAS}/wifi-marcadas-${sufijo}.png`, fullPage: ancho > 900, animations: "disabled" });
+        await capturaOpcional(page, { path: `${CAPTURAS}/wifi-marcadas-${sufijo}.png`, fullPage: ancho > 900, animations: "disabled" });
         expect(await violacionesGraves(page), "dos marcadas").toEqual([]);
 
         // «Quitar WPS»: un solo cambio con un paso por red (aquí se cancela).
@@ -176,7 +180,7 @@ for (const ancho of [360, 1024, 1440]) {
         await expect(titulo).toBeFocused();
         await sinDesbordamiento(page, `detalle ${sufijo}`);
         await quieta(page);
-        await page.screenshot({ path: `${CAPTURAS}/wifi-detalle-${sufijo}.png`, fullPage: ancho > 900, animations: "disabled" });
+        await capturaOpcional(page, { path: `${CAPTURAS}/wifi-detalle-${sufijo}.png`, fullPage: ancho > 900, animations: "disabled" });
         expect(await violacionesGraves(page), "detalle").toEqual([]);
         await page.keyboard.press("Escape");
         await page.waitForURL((u) => u.pathname === "/ajustes/wifi");
@@ -190,8 +194,9 @@ for (const ancho of [360, 1024, 1440]) {
         const antes = await nombre.inputValue();
         await nombre.fill("RED-9");
         const pregunta = page.locator("dialog[open]");
-        // «Leído hace N s» y «Volver a leer»: leer de nuevo no pierde lo
-        // editado (en el móvil, el detalle tapa la cabecera).
+        // «Leído hace N s» y el icono de volver a leer, en la barra de los
+        // temas: leer de nuevo no pierde lo editado (en el móvil, el
+        // detalle tapa la cabecera).
         const lectura = page.locator(".tema-lectura");
         await expect(lectura).toContainText(/Leído (ahora mismo|hace)/);
         if (ancho > 900) {
@@ -253,11 +258,7 @@ for (const ancho of [360, 1024, 1440]) {
           }
           await r.fulfill({ response: respuesta, json: pagina });
         });
-        if (ancho < 640) {
-          await page.locator("#ajustes-tema").selectOption("wifi");
-        } else {
-          await page.locator('nav.temas a[href="/ajustes/wifi"]').click();
-        }
+        await page.locator('nav.temas a[href="/ajustes/wifi"]').click();
         await page.waitForURL((u) => u.pathname === "/ajustes/wifi");
         const red5 = tarjeta(page, t.red5);
         await expect(insignia(red5)).toHaveText(t.sinLeer);
@@ -267,14 +268,15 @@ for (const ancho of [360, 1024, 1440]) {
         // El resto, como siempre.
         await expect(page.getByRole("switch")).toHaveCount(4);
         const red24 = tarjeta(page, t.red24);
+        // Sin leer no tiene acciones: no se puede marcar (su tarjeta ofrece
+        // volver a leer). Las demás redes, sí.
+        await expect(marca(red5, t.red5)).toHaveCount(0);
         await marca(red24, t.red24).click();
-        await marca(red5, t.red5).click();
         const barra = page.getByRole("toolbar", { name: t.barra });
         await expect(barra.getByRole("button", { name: t.quitarWps })).toBeVisible();
-        await expect(barra).toContainText(`No entra lo que no se ha podido leer: ${t.red5}.`);
         await sinDesbordamiento(page, `sin leer ${sufijo}`);
         await quieta(page);
-        await page.screenshot({ path: `${CAPTURAS}/wifi-sin-leer-${sufijo}.png`, fullPage: ancho > 900, animations: "disabled" });
+        await capturaOpcional(page, { path: `${CAPTURAS}/wifi-sin-leer-${sufijo}.png`, fullPage: ancho > 900, animations: "disabled" });
         expect(await violacionesGraves(page), "sin leer").toEqual([]);
         await page.unrouteAll({ behavior: "wait" });
         expect(errores, "errores o avisos en la consola").toEqual([]);
@@ -313,7 +315,7 @@ for (const ancho of [360, 1024, 1440]) {
         await expect(dialogo.locator("tbody td").nth(0)).toHaveText(t.encendida);
         await expect(dialogo.locator("tbody td").nth(1)).toHaveText(t.apagada);
         await quieta(page);
-        await page.screenshot({ path: `${CAPTURAS}/wifi-interruptor-con-efecto-${sufijo}.png`, animations: "disabled" });
+        await capturaOpcional(page, { path: `${CAPTURAS}/wifi-interruptor-con-efecto-${sufijo}.png`, animations: "disabled" });
         expect(await violacionesGraves(page), "diálogo del interruptor").toEqual([]);
         await dialogo.getByRole("button", { name: t.cancelar }).click();
         await expect(page.locator("dialog[open]")).toHaveCount(0);
@@ -333,7 +335,7 @@ for (const ancho of [360, 1024, 1440]) {
         await expect(dialogo.locator("fieldset.grupo-paso")).toHaveCount(2);
         let aviso = await aplicarYSeguir(page, t.aplicar, [red24, red5]);
         await quieta(page);
-        await page.screenshot({ path: `${CAPTURAS}/wifi-aviso-${sufijo}.png`, animations: "disabled" });
+        await capturaOpcional(page, { path: `${CAPTURAS}/wifi-aviso-${sufijo}.png`, animations: "disabled" });
         expect(await violacionesGraves(page), "aviso").toEqual([]);
         await aviso.getByRole("button", { name: t.deshacer, exact: true }).click();
         await expect(dialogo.locator("#grupo-titulo")).toHaveText(t.volver);
@@ -353,13 +355,19 @@ for (const ancho of [360, 1024, 1440]) {
         // Mientras su cambio se aplica, no se vuelve a pulsar.
         await expect(interruptor).toHaveAttribute("aria-disabled", "true");
         await expect(insignia(invitados)).toHaveText(t.comprobando, { timeout: 15_000 });
-        // Otro interruptor mientras tanto: «hay otro cambio en curso» y su
+        // Otro interruptor mientras tanto: espera en la cola, con su línea
+        // en el aviso («En cola», «Quitar de la cola»); al quitarlo, su
         // insignia vuelve a como estaba (el que se sigue, no se pierde).
         await red24.getByRole("switch", { name: `${t.red24} apagada` }).click();
-        await expect(page.locator(".avisos-cambio [role=alert]")).toContainText(t.enCurso);
+        const enCola = aviso.filter({ hasText: t.red24 });
+        await expect(enCola).toContainText(t.enCola, { timeout: 15_000 });
+        await expect(insignia(red24)).toHaveText(t.enColaInsignia);
+        await enCola.getByRole("button", { name: t.quitar }).click();
+        await expect(enCola).toContainText(t.noAplicado);
         await expect(insignia(red24)).toHaveText(t.apagada);
         await expect(red24.getByRole("switch")).toHaveAttribute("aria-checked", "false");
         await expect(insignia(invitados)).toHaveText(t.comprobando);
+        aviso = aviso.filter({ hasText: t.invitados });
         await expect(aviso).toContainText(
           `${t.invitados}: Red encendida, ${t.apagada} → ${t.encendida}`,
         );
@@ -389,9 +397,7 @@ for (const ancho of [360, 1024, 1440]) {
           await aplicarYSeguir(page, t.deshacer, [red5]);
           await expect(insignia(red5)).toHaveText(t.apagada);
         }
-        // El 409 de «hay otro cambio en curso» lo provoca la prueba.
-        const otros = errores.filter((e) => !e.includes("status of 409 (Conflict)"));
-        expect(otros, "errores o avisos en la consola").toEqual([]);
+        expect(errores, "errores o avisos en la consola").toEqual([]);
       });
     });
   }

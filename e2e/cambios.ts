@@ -35,8 +35,9 @@ export function ajusteDe(pagina: { elementos: { ajustes: AjusteLeido[] }[] }, id
 
 /**
  * Cambia la apertura automática de puertos (UPnP) al valor contrario: un
- * cambio de riesgo bajo, que se vigila RP_E2E_VIGILANCIA_S. Devuelve su id.
- * Otra llamada lo deja como estaba.
+ * cambio de riesgo bajo que no puede cortar el acceso del panel al router,
+ * así que queda aplicado sin vigilancia. Con otro cambio en curso, espera
+ * en la cola. Devuelve su id. Otra llamada lo deja como estaba.
  */
 export async function cambiarUpnp(page: Page): Promise<number> {
   const tema = await api(page, "leer_tema", { tema: "puertos" });
@@ -46,6 +47,27 @@ export async function cambiarUpnp(page: Page): Promise<number> {
     p: { ajuste: "puertos.upnp", instancia: null, borrar: false, valores: { activo: String(!activo) } },
   });
   return api(page, "confirmar_ajuste", { token: grupo.token, desmarcados: [] });
+}
+
+/** Reservas de IP fija del servidor DHCP (Biblioteca). */
+const RESERVAS = "cbDhcpV4SvrPoolSetStatic";
+const POOL = "rtm_cfg_dhcpv4_svr_pool_id";
+
+/**
+ * Cambia la IP de la reserva 0 entre la de las fixtures y otra, por la
+ * Biblioteca: toca el DHCP (puede cortar el acceso del panel), así que se
+ * vigila RP_E2E_VIGILANCIA_S. Devuelve su id. Otra llamada lo deja como
+ * estaba.
+ */
+export async function cambiarVigilado(page: Page): Promise<number> {
+  const f = await api(page, "formulario", { funcion: RESERVAS, instancia: "0", claves: [[POOL, "0"]] });
+  const campos: { param: { nombre: string }; valor: string }[] = f.campos;
+  const ip = campos.find((c) => c.param.nombre === "ipv4_addr")?.valor;
+  const nueva = ip === "192.168.1.80" ? "192.168.1.68" : "192.168.1.80";
+  const prep = await api(page, "preparar_cambio", {
+    peticion: { funcion: RESERVAS, instancia: "0", valores: [[POOL, "0"], ["ipv4_addr", nueva]], borrar: false },
+  });
+  return api(page, "confirmar_cambio", { token: prep.token, palabra: null });
 }
 
 /** Estado del cambio `id` («Vigilando», «Aplicado»…). */

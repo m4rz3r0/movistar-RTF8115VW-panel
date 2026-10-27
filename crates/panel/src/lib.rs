@@ -11,12 +11,17 @@
 pub mod ajustes_router;
 pub mod app;
 pub mod auth;
+pub mod contrasena_forma;
 pub mod contrasena_router;
+pub mod copia_router;
 pub mod instalar;
 pub mod panel_ajustes;
 pub mod preferencias;
+pub mod registro_router;
 pub mod tema;
 pub mod ui;
+pub mod usuarios_router;
+pub mod validacion_real;
 pub mod vista;
 
 #[cfg(feature = "ssr")]
@@ -41,6 +46,8 @@ pub mod lecturas;
 pub mod poller;
 #[cfg(feature = "ssr")]
 pub mod redes;
+#[cfg(feature = "ssr")]
+pub mod salud;
 #[cfg(feature = "ssr")]
 pub mod security;
 #[cfg(feature = "ssr")]
@@ -105,17 +112,11 @@ mod server {
     }
 
     /// Comprobación de vida para el actualizador (sin login). No consulta al
-    /// router: `router` es `"ok"` si el sondeo tiene datos recientes y sin
-    /// error, `"sin_configurar"` si el panel aún no tiene las credenciales
-    /// del router (`ok` sigue siendo `true`: el panel funciona).
+    /// router (una petición propia competiría con la sesión del panel):
+    /// `router` dice cómo acabó la última comunicación real con él
+    /// ([`crate::salud::router_en_salud`]). `ok` es siempre `true`: el panel funciona.
     async fn salud(State(state): State<AppState>) -> Json<Value> {
-        let router = if !state.hgu.configurado() {
-            "sin_configurar"
-        } else if state.poller.healthy() {
-            "ok"
-        } else {
-            "error"
-        };
+        let router = crate::salud::router_en_salud(&state.hgu);
         Json(json!({
             "ok": true,
             "version": env!("CARGO_PKG_VERSION"),

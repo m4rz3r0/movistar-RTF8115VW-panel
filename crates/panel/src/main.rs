@@ -75,6 +75,14 @@ async fn serve() -> std::process::ExitCode {
             return ExitCode::FAILURE;
         }
     };
+    // Solo el binario de depuración lo atiende; release-local.sh comprueba
+    // que el de release no lo anuncia.
+    if cfg.todo_habilitado() {
+        eprintln!(
+            "panel: todo habilitado para las pruebas contra router-sim ({})",
+            panel::config::HABILITAR_TODO
+        );
+    }
     // `RP_LISTEN` manda sobre `site-addr` de cargo-leptos.
     leptos.site_addr = cfg.listen;
     panel::estaticos::configurar_hash(&mut leptos);

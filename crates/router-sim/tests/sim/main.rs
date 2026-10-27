@@ -8,10 +8,16 @@ mod comun;
 use comun::*;
 
 mod control;
+mod copia;
+mod cortafuegos;
 mod escrituras;
 mod fixtures;
 mod lecturas;
 mod listas;
+mod modelo;
 mod pools;
+mod red;
+mod registro;
 mod reservas;
 mod sesion;
+mod usuarios;

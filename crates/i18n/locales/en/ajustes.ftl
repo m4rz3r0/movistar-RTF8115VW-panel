@@ -4,7 +4,7 @@
 
 ## Page
 ajustes-titulo = Settings
-ajustes-desc = Change what you need on the router in plain language. Every change is watched and, if the router stops responding, it is undone on its own.
+ajustes-desc = Change what you need on the router in plain language. Whatever could cut the connection is watched and, if the router stops responding, it is undone on its own.
 ajustes-detalles-tecnicos = Technical details
 ajustes-detalles-tecnicos-desc = For anyone who wants to know which router functions are used underneath.
 ajustes-detalles-lectura = Read
@@ -15,7 +15,6 @@ ajustes-valor-desconocido = Unrecognised value ({ $valor })
 ajustes-valor-desconocido-desc = The router has a value the panel does not know. It is kept as it is until you choose another one.
 ajustes-efecto = When applied
 ajustes-temas = Settings topics
-ajustes-tema-elegir = Topic
 ajustes-actualizando = Updating…
 ajustes-volver = Go to the Internet settings
 ajustes-solo-lectura-aviso = Settings can only be viewed for now: the router firmware has not been tested with the panel yet.
@@ -26,6 +25,9 @@ ajustes-cancelar = Cancel
 ajustes-recomendado-valor = Recommended: { $valor }
 ajustes-recomendado-pros = Pros and cons
 ajustes-recomendado-marca = Pros:
+ajustes-recomendado-contra-marca = Cons:
+ajustes-recomendado-favor = Pros
+ajustes-recomendado-contra = Cons
 ajustes-secreto-tapado-pedir = The router won't let this password be read: type it to save the changes.
 ajustes-secreto-sin-leer-desc = The router won't let its current value be read; if you type one, the new one is saved.
 ajustes-hueco = This setting will have its own screen here; it is not ready yet.
@@ -60,11 +62,11 @@ ajustes-nivel-oculto-desc = Not shown in the operator's web interface.
 
 ## Risks
 ajustes-riesgo-bajo = Low risk
-ajustes-riesgo-bajo-desc = Does not cut the connection. It is watched for a few seconds after applying it.
+ajustes-riesgo-bajo-desc = Does not cut the connection.
 ajustes-riesgo-medio = Medium risk
-ajustes-riesgo-medio-desc = May briefly cut the WiFi or some service. It is watched for a couple of minutes and undone if something fails.
+ajustes-riesgo-medio-desc = May briefly cut the WiFi or some service.
 ajustes-riesgo-alto = High risk
-ajustes-riesgo-alto-desc = May leave you without internet or without access to the router. It is watched for several minutes and undone if something fails.
+ajustes-riesgo-alto-desc = May leave you without internet or without access to the router.
 
 ## Errors
 ajustes-error-tema = That settings section does not exist.
@@ -111,6 +113,7 @@ ajustes-grupo-col-antes = Now
 ajustes-grupo-col-despues = After
 ajustes-grupo-vacio = (empty)
 ajustes-grupo-vigilancia = After applying it, the panel watches the router for { $plazo } and undoes it on its own if the router stops responding or the internet goes down.
+ajustes-grupo-sin-vigilancia = It does not affect the panel's connection to the router: it is applied as soon as the router shows it, with no wait. You can undo it afterwards.
 ajustes-grupo-ninguno = Tick at least one step to apply the change.
 ajustes-grupo-aplicar = Apply
 ajustes-grupo-borrar = Delete
@@ -125,6 +128,8 @@ ajustes-grupo-estado-aplicado = Done: the router now has the change.
 ajustes-grupo-estado-revertido = The router stopped responding properly and the change was undone automatically.
 ajustes-grupo-estado-fallido = The change could not be applied. The router is as it was.
 ajustes-grupo-estado-parcial = The change could not be applied and part of it did not go back to how it was. Check it in the History.
+ajustes-grupo-estado-en-cola = Queued (position { $puesto }): it will be applied once the previous change is applied.
+ajustes-grupo-estado-cancelado = Not applied: the previous change was not applied or it was removed from the queue. The reason is in the History.
 
 ## How it was at installation (starting snapshot)
 ajustes-foto-titulo = How it was at installation
@@ -251,8 +256,12 @@ ajustes-marcadas = { $n ->
 ajustes-desmarcar-todo = Unmark all
 ajustes-barra-sin-leer = Left out because they could not be read: { $nombres }.
 ajustes-barra-ninguna = No action works for everything marked.
+ajustes-tabla-region = Table: { $nombre }
 ajustes-insignia-aplicando = Applying…
 ajustes-insignia-comprobando = Checking…
+ajustes-insignia-en-cola = Queued
+ajustes-aviso-comprobando = Already in the router; checking that everything still works ({ $resto } left).
+ajustes-usuario-en-curso-nuevo = Being created: the list confirms it when the check ends.
 ajustes-interruptor-si = { $nombre } on
 ajustes-interruptor-no = { $nombre } off
 ajustes-abrir = Open
@@ -302,21 +311,45 @@ ajustes-estado-dns-no = Off
 ajustes-estado-ddns-si = Active
 ajustes-estado-ddns-no = Off
 ajustes-estado-ddns-sin-usar = Not in use
+ajustes-estado-conexion-pppoe = Connected (PPPoE)
+ajustes-estado-conexion-dhcp = Connected (DHCP)
+ajustes-estado-conexion-fija = Connected (fixed address)
+ajustes-estado-conexion-otro = Connected
+ajustes-estado-conexion-sin = No connection
 ajustes-estado-gestion-remota-si = On
 ajustes-estado-gestion-remota-no = Off
+ajustes-estado-cortafuegos-ping = Answers ping
+ajustes-estado-cortafuegos-sin-ping = Does not answer ping
+ajustes-estado-cortafuegos-ping-ipv4 = Answers ping over IPv4
+ajustes-estado-cortafuegos-ping-ipv6 = Answers ping over IPv6
+ajustes-estado-cortafuegos-regla-puesta = Panel rule in place (IPv4)
 ajustes-estado-linea-si = Active
 ajustes-estado-linea-no = Off
 ajustes-estado-voz-si = On
 ajustes-estado-voz-no = Off
+ajustes-estado-voz-registrada = Registered
+ajustes-estado-voz-sin-registrar = Not registered
 ajustes-estado-paso-directo-si = On
 ajustes-estado-paso-directo-no = Off
 ajustes-estado-hora-si = Automatic
 ajustes-estado-hora-no = Not corrected
 ajustes-estado-diagnostico-si = Copying traffic
 ajustes-estado-diagnostico-no = Off
+ajustes-estado-dmz-activa = On
+ajustes-estado-dmz-desactivada = Off
 ajustes-dato-nombres_ddns = Names
 ajustes-dato-nombres_ddns-ninguno = None
 ajustes-dato-cuentas = Accounts
+ajustes-dato-abierto_redes = Open only from specific networks
+ajustes-dato-otras_invitadas = Other guest networks
+ajustes-dato-otras_invitadas-valor = { $n } of { $total } separated
+ajustes-wifi-invitada-nombre = “{ $nombre }” (network { $id })
+ajustes-wifi-invitada-numero = network { $id }
+ajustes-problema-wifi-invitada-sin-separar = { $n ->
+    [one] The guest network { $redes } is on and not separated from the home network: anyone who connects to it reaches your devices.
+   *[other] The guest networks { $redes } are on and not separated from the home network: anyone who connects to them reaches your devices.
+}
+ajustes-wifi-invitada-sin-separar-recomendado = Recommended if that network is for visitors: the panel cannot separate it or turn it off yet; if the router's web page allows it, separate it from the home network there, or turn it off if you do not use it. Pros: whoever connects to it reaches the internet but not your devices. Cons: the printer and the TV at home cannot be seen from it.
 
 ## Security and System actions
 ajustes-accion-apagar_gestion_remota = Turn off remote management
@@ -326,6 +359,10 @@ ajuste-accion-usar_hora_neutra-titulo = Router time, use a neutral server
 
 ## What is happening now (the card's recommendation)
 ajustes-problema-seguridad-activa-encendida = Remote management is on: the operator can get into the router from the internet and change any setting without asking you.
+ajustes-problema-seguridad-cortafuegos-ping = The router answers ping from the internet: anyone can tell that your connection is on.
+ajustes-problema-seguridad-cortafuegos-ping-ipv4 = The router answers ping coming from the internet over IPv4: anyone can tell that your connection is on.
+ajustes-problema-seguridad-cortafuegos-ping-ipv6 = The router answers ping coming from the internet over IPv6: anyone can tell that your connection is on, and the panel's rule is for IPv4 only.
+ajustes-problema-seguridad-cortafuegos-servicios-cualquiera = Open from anywhere on the internet: { $servicios }.
 ajustes-problema-sistema-activa-false = The router does not set its clock over the internet: it drifts, and after a power cut it can end up with a very different time.
 ajustes-problema-sistema-servidor_1 = The router sets its clock from { $valor }: it depends on whoever runs that server.
 ajustes-problema-sistema-espejo-true = The traffic copy is on: anyone who plugs into that socket can see everything your home does on the internet.
@@ -333,7 +370,7 @@ ajustes-problema-sistema-envio-true = The router sends its log to another comput
 ajustes-problema-red_local-principal = Your devices ask { $valor } for website names: if it is the router itself, your lookups are answered by the operator.
 ajustes-problema-telefono-tonos-en_la_voz = The keys you press during a call are mixed into the voice: if the call sounds bad, a phone menu may not recognise them.
 ajustes-problema-telefono-tonos-mensajes = The keys you press during a call go as separate messages: if the operator does not support it, phone menus do not get them.
-ajustes-problema-telefono-activo-false = Internet phone is off: the landline cannot make or receive calls.
+ajustes-problema-telefono-activo-true = Internet phone is on: the router connects to the operator's voice server, even if you have no landline phone plugged in.
 
 ## Summary strip of Internet, Security, Phone and System
 ajustes-resumen-internet-conexion = Internet connection
@@ -376,8 +413,6 @@ ajustes-interruptor-hora-si = Automatic time on
 ajustes-interruptor-hora-no = Automatic time off
 ajustes-interruptor-servidores-si = Internet phone on
 ajustes-interruptor-servidores-no = Internet phone off
-ajustes-interruptor-fax-y-modem-si = Fax pass-through on
-ajustes-interruptor-fax-y-modem-no = Fax pass-through off
 ajustes-detalle-opciones = Options
 ajustes-accion-activar_rele = Turn on the relay
 ajustes-accion-desactivar_rele = Turn off the relay
@@ -388,3 +423,39 @@ ajuste-accion-desactivar_rele-titulo = DNS relay, turn it off
 ajuste-accion-encender_voz-titulo = Internet phone, turn it on
 ajuste-accion-apagar_voz-titulo = Internet phone, turn it off
 ajustes-problema-sistema-servidor_2 = The backup server is { $valor }: it depends on whoever runs that server.
+
+## DMZ and parental controls (Ports)
+ajustes-problema-puertos-dmz = Everything that arrives from the internet goes to { $ip }: that device is exposed as if there were no router in front of it.
+ajustes-problema-puertos-dmz-sin-ip = Everything that arrives from the internet goes to a device in your home: it is exposed as if there were no router in front of it.
+ajustes-puertos-dmz-recomendado = Recommended if that device is not your own router that protects itself: turn the DMZ off from the router's web page and open only the ports it needs; the panel can't do it. Pros: the device stops receiving everything from the internet and only what you decide stays open. Cons: whatever relied on the DMZ, such as a console or a server, may stop working until you open its ports.
+ajustes-puertos-parental = This router has no parental controls: no connection schedules and no website filter. If you need to limit what can be reached from home, there are two ways:
+ajustes-puertos-parental-titulo = Parental controls
+ajustes-puertos-parental-dns = A DNS service with a family filter for the whole home network: in the improvements, when you review "Maximum privacy", you can pick the family DNS, which blocks adult websites and malware. Recommended if blocking adult or dangerous websites is enough. Pros: nothing to buy and it takes a moment to change. Cons: it sets no schedules, it filters the adults too, and a device with a different DNS configured gets around it.
+ajustes-puertos-parental-router = Your own router behind this one. Recommended if you want schedules and limits per device. Pros: it does all of that, usually with its own app. Cons: you have to buy it and set it up.
+ajustes-puertos-parental-enlace = Choose the family DNS in the improvements
+
+## Configuration backup (at the foot of System)
+copia-router-titulo = Configuration backup
+copia-router-desc = A backup of every router setting, like the one its web interface gives. When you press the button, the router saves its current configuration, prepares the backup and your browser downloads it as a config_<date>.tar file. Use it to get your settings back if the router ever has to be restored.
+copia-router-secretos = The file holds every router password: the WiFi one, the one for its web interface and the ones for the internet connection. Keep it somewhere safe and do not share it. The panel does not keep any copy.
+copia-router-descargar = Download backup
+copia-router-preparando = Preparing the backup…
+copia-router-hecha = Downloaded: { $nombre } ({ $kb } KB).
+copia-router-en-curso = A change is in progress: wait for it to finish and try again.
+copia-router-error = The router did not give the backup. Try again in a moment.
+copia-router-sin-router = The panel does not have the router set up yet.
+
+## Router log (at the foot of System)
+registro-router-titulo = Router log
+registro-router-desc = What the router keeps a note of: restarts, connections, logins to its web interface and warnings. It is read when you press the button, the same way the router's web interface downloads it, and no setting changes.
+registro-router-leer = Read the log
+registro-router-volver = Read again
+registro-router-leyendo = Reading…
+registro-router-descargar = Download
+registro-router-filtrar = Filter lines
+registro-router-recortado = The log is very long: only its last lines are shown.
+registro-router-vacio = The log is empty.
+registro-router-apagado = The router has its log turned off and writes nothing down. Turn it on with «Keep the log», in «System log» on this tab.
+registro-router-sin-coincidencias = No line contains what you typed.
+registro-router-error = The router did not return its log. Try again in a moment.
+registro-router-sin-router = The panel does not have the router configured yet.

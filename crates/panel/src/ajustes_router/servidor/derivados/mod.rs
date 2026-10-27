@@ -9,12 +9,16 @@
 //! de la franja de resumen.
 
 mod internet;
+mod puertos;
 mod seguridad;
 mod sistema;
 mod telefono;
 pub(super) mod wifi;
 
+pub(super) use internet::{conexiones, marcar_conexiones};
+
 use super::*;
+use crate::ajustes_router::RecomendacionVista;
 use crate::ui::comun::EstadoVisual;
 use ajustes::Elemento;
 
@@ -31,6 +35,11 @@ pub(super) struct Contexto<'a> {
     /// Desde cuándo está apagado cada punto de acceso que se apagó desde
     /// el panel (su id → segundos Unix), del Historial.
     pub apagadas: &'a HashMap<String, i64>,
+    /// La conexión a internet del panel entre las leídas (la elegida a mano
+    /// o la detectada), si hay.
+    pub wan: Option<&'a str>,
+    /// Las funciones de la fase 3 que el servidor tiene desactivadas.
+    pub desactivadas: crate::validacion_real::Desactivadas,
 }
 
 impl<'a> Contexto<'a> {
@@ -221,6 +230,19 @@ pub(super) fn dispositivos(ctx: &Contexto, e: &Elemento) -> Vec<Option<String>> 
     wifi::dispositivos(ctx, e)
 }
 
+/// Recomendación que no sale de un campo del elemento (las dos solo
+/// informan): en la red de invitados, si alguna red de invitados encendida
+/// no está separada de la red de casa; en la DMZ, si está activa.
+pub(super) fn recomendacion_propia(ctx: &Contexto, e: &Elemento) -> Option<RecomendacionVista> {
+    if e.papel.as_deref() == Some("invitados") {
+        wifi::invitada_sin_separar(ctx)
+    } else if e.estado.as_deref() == Some("derivado:estado_dmz") {
+        puertos::dmz_activa(ctx)
+    } else {
+        None
+    }
+}
+
 /// Nota del pie de un elemento, ya traducida.
 pub(super) fn nota(ctx: &Contexto, e: &Elemento) -> Option<String> {
     wifi::nota(ctx, e)
@@ -254,6 +276,8 @@ pub(super) fn dato(
         "conectados" => Ok(wifi::conectados(ctx, e).map(|n| ValorLegible::Texto(n.to_string()))),
         "nombres_ddns" => Ok(internet::nombres_ddns(ctx)),
         "cuentas" => Ok(seguridad::cuentas(ctx)),
+        "abierto_redes" => Ok(super::cortafuegos::abierto_redes(ctx)),
+        "otras_invitadas" => Ok(wifi::otras_invitadas(ctx)),
         otro => Err(Desconocido(otro.to_owned())),
     }
 }
@@ -269,12 +293,15 @@ pub(super) fn estado(
         "estado_red" => Ok(wifi::estado(ctx, e)),
         "estado_dns" => Ok(internet::estado_dns(ctx)),
         "estado_ddns" => Ok(internet::estado_ddns(ctx)),
+        "estado_conexion" => Ok(internet::estado_conexion(ctx)),
         "estado_gestion_remota" => Ok(seguridad::estado_gestion_remota(ctx)),
+        "estado_cortafuegos" => Ok(seguridad::estado_cortafuegos(ctx)),
         "estado_linea" => Ok(telefono::estado_linea(ctx)),
         "estado_voz" => Ok(telefono::estado_voz(ctx)),
         "estado_paso_directo" => Ok(telefono::estado_paso_directo(ctx)),
         "estado_hora" => Ok(sistema::estado_hora(ctx)),
         "estado_diagnostico" => Ok(sistema::estado_diagnostico(ctx)),
+        "estado_dmz" => Ok(puertos::estado_dmz(ctx)),
         "segun_lo_recomendado" => Ok(segun_lo_recomendado(ctx, e)),
         otro => Err(Desconocido(otro.to_owned())),
     }
@@ -299,6 +326,8 @@ mod tests {
             vistas: &[],
             leidas: &leidas,
             apagadas: &apagadas,
+            wan: None,
+            desactivadas: Default::default(),
         };
         for n in DERIVADOS_DATO {
             assert!(dato(n, &ctx, &e).is_ok(), "{n}");

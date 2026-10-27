@@ -4,7 +4,7 @@ panel-solo-lectura = The panel is read-only: the router's firmware has not been 
 
 ## Page
 panel-titulo = Panel settings
-panel-sub = Language, time zone and panel users. They are stored in the panel's database.
+panel-sub = Language, time zone, appearance and who can log in to this panel. They are stored in the panel's database.
 panel-sub-router = The connection to the router is under
 panel-sub-router-enlace = Router settings
 panel-guardar = Save
@@ -46,19 +46,32 @@ panel-tema-claro = Light
 panel-tema-claro-ayuda = Light background and dark text. Easier to read in bright light.
 
 ## Users
-panel-usuarios = Panel users
-panel-usuarios-texto = They can log in to the panel with full permissions. They can also be managed with the panel user command.
+panel-usuarios = Who can log in to this panel
+panel-usuarios-texto = The users that log in to this panel, all with the same permissions. They can also be managed with the panel user command.
+panel-usuarios-no-router = These are not the router's accounts: those are in
+panel-usuarios-no-router-enlace = Settings → Security → Router web accounts
 panel-usuario-tu = (you)
 panel-usuario-borrar = Delete
 panel-usuario-borrar-de = Delete { $usuario }
-panel-usuario-contrasena = Change password
+panel-usuario-no-borrar-tu = It is your user: to delete it, log in with another one.
+panel-usuario-no-borrar-ultimo = It is the only user: nobody would be able to log in to the panel.
+panel-usuario-contrasena = Change the password
 panel-usuario-contrasena-de = Change { $usuario }'s password
-panel-usuario-nuevo = New user
+panel-usuario-nuevo = New panel user
 panel-usuario-nombre = Name
 panel-usuario-clave = Password (at least { $n } characters)
-panel-usuario-crear = Create the user
+panel-usuario-crear = Create the panel user
 panel-usuario-clave-nueva = New password (at least { $n } characters)
-panel-usuario-cambiar = Change
+panel-usuario-cambiar = Change the password
+panel-usuario-cambiar-aviso-tuyo = It is your user: your sessions in other browsers and devices will be closed; you stay logged in here.
+panel-usuario-cambiar-aviso-otro = { $usuario }'s open sessions will be closed: they will have to log in with the new password.
+panel-usuario-borrar-titulo = Delete { $usuario } from the panel?
+panel-usuario-borrar-texto = { $usuario } will no longer be able to log in to this panel and their sessions will be closed. This cannot be undone: to let them back in, the user has to be created again.
+panel-usuario-borrar-router = The router is not touched: its accounts stay the same.
+panel-usuario-borrar-confirmar = Delete { $usuario }
+panel-usuario-creado = User { $usuario } created: they can now log in to the panel.
+panel-usuario-cambiada = { $usuario }'s password changed.
+panel-usuario-borrado = User { $usuario } deleted from the panel.
 panel-cancelar = Cancel
 
 ## Reauthentication

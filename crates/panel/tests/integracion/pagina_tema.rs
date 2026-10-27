@@ -57,8 +57,9 @@ async fn pagina_wifi_con_las_redes_apagadas() {
         assert_eq!(e["interruptor"]["campo"], "activa", "{e}");
         // Encenderla no corta nada: el interruptor no pregunta antes.
         assert!(e["interruptor"]["efecto"].is_null(), "{e}");
-        // Seguridad, contraseña, visible, canal y ancho, aislamiento y
-        // conectados (ninguno en las fixtures).
+        // Seguridad, contraseña, visible, canal y ancho (en invitados, las
+        // otras redes de invitados), aislamiento y conectados (ninguno en
+        // las fixtures).
         assert_eq!(e["datos"].as_array().unwrap().len(), 6, "{e}");
         let conectados = e["datos"]
             .as_array()

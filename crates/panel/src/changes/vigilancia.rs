@@ -6,23 +6,66 @@ impl ChangeManager {
     /// Comprueba el router cada `intervalo` durante `dur`. Error con el
     /// motivo tras `fallos_para_revertir` fallos seguidos. Si el plazo acaba
     /// con fallos pendientes, sigue hasta un acierto o la reversión.
-    pub(super) async fn vigilar(&self, dur: Duration, wan: bool) -> Result<(), Nota> {
+    ///
+    /// Mientras, quien hizo el cambio `id` puede darla por terminada
+    /// ([`ChangeManager::terminar`]): entonces vuelve con su petición, para
+    /// guardar el cambio como aplicado y responderle. Una petición que llega
+    /// mientras falla una comprobación se rechaza.
+    pub(super) async fn vigilar(
+        &self,
+        id: i64,
+        dur: Duration,
+        wan: bool,
+    ) -> Result<Option<terminar::Terminada>, Nota> {
+        use std::sync::atomic::Ordering;
+        use tokio::sync::oneshot::error::TryRecvError;
+        let (contador, rx, _fin_vigilancia) = self.abrir_vigilancia(id);
+        let mut rx = Some(rx);
         let fin = Instant::now() + dur;
         let mut seguidos = 0;
         loop {
-            tokio::time::sleep(self.tiempos.intervalo).await;
+            let pedido = match rx.as_mut() {
+                Some(r) => tokio::select! {
+                    () = tokio::time::sleep(self.tiempos.intervalo) => None,
+                    t = r => Some(t),
+                },
+                None => {
+                    tokio::time::sleep(self.tiempos.intervalo).await;
+                    None
+                }
+            };
+            match pedido {
+                // `terminar` ya comprobó que la última comprobación salió bien.
+                Some(Ok(t)) => return Ok(Some(t)),
+                Some(Err(_)) => rx = None,
+                None => {}
+            }
             match self.salud(wan).await {
                 Ok(()) => seguidos = 0,
                 Err(e) => {
                     seguidos += 1;
+                    contador.store(seguidos, Ordering::SeqCst);
                     tracing::warn!("vigilancia: fallo {seguidos}: {}", e.para_registro());
                     if seguidos >= self.tiempos.fallos_para_revertir {
                         return Err(e);
                     }
                 }
             }
+            contador.store(seguidos, Ordering::SeqCst);
+            // Lo pedido mientras se comprobaba: solo si salió bien.
+            if let Some(r) = rx.as_mut() {
+                match r.try_recv() {
+                    Ok(t) if seguidos == 0 => return Ok(Some(t)),
+                    Ok((_, responder)) => {
+                        let _ = responder.send(Err(terminar::ErrorTerminar::Fallando));
+                        rx = self.rearmar_vigilancia(id);
+                    }
+                    Err(TryRecvError::Empty) => {}
+                    Err(TryRecvError::Closed) => rx = None,
+                }
+            }
             if seguidos == 0 && Instant::now() >= fin {
-                return Ok(());
+                return Ok(None);
             }
         }
     }

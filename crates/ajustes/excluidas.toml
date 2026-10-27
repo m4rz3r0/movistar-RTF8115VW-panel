@@ -131,32 +131,6 @@ motivo = "conexión a internet: depende de la detectada; fase 3"
 funcion = "cbSetDnsRelayServer"
 motivo = "conexión a internet: depende de la detectada; fase 3"
 
-# ---- Cortafuegos.
-
-[[excluida]]
-funcion = "scbidirectionalflt.cmd?action=add"
-motivo = "cortafuegos de la web oculta: formato por validar con el router real; fase 3"
-
-[[excluida]]
-funcion = "scbidirectionalflt.cmd?action=modify"
-motivo = "cortafuegos de la web oculta: formato por validar con el router real; fase 3"
-
-[[excluida]]
-funcion = "scbidirectionalflt.cmd?action=remove"
-motivo = "cortafuegos de la web oculta: formato por validar con el router real; fase 3"
-
-[[excluida]]
-funcion = "scbidirectionalfwl.cmd?action=create"
-motivo = "cortafuegos IPv6 de la web básica: formato por validar con el router real; fase 3"
-
-[[excluida]]
-funcion = "scbidirectionalfwl.cmd?action=delete"
-motivo = "cortafuegos IPv6 de la web básica: formato por validar con el router real; fase 3"
-
-[[excluida]]
-funcion = "scbidirectionalfwl.cmd?action=save"
-motivo = "cortafuegos IPv6 de la web básica: formato por validar con el router real; fase 3"
-
 # ---- Fuera de las familias del plan (ver el informe de la Tarea 5).
 
 [[excluida]]
@@ -173,11 +147,11 @@ motivo = "nombre e icono de un equipo en el mapa de la web básica: no cambia la
 
 [[excluida]]
 funcion = "cbAddUser"
-motivo = "usuarios de la web del router: crear uno fija una contraseña que el panel no puede comprobar ni deshacer; fase 3, con las contraseñas de otros usuarios"
+motivo = "usuarios de la web del router: se gestionan en el componente usuarios_router, con guardas"
 
 [[excluida]]
 funcion = "cbDeleteUser"
-motivo = "usuarios de la web del router: puede borrar el usuario con el que entra el panel y dejarlo fuera; fase 3, con las contraseñas de otros usuarios"
+motivo = "usuarios de la web del router: se gestionan en el componente usuarios_router, con guardas"
 
 [[excluida]]
 funcion = "cbSetWifiWds"
@@ -199,6 +173,8 @@ motivo = "prefijo IPv6 de la red de casa desde la web básica: ningún ajuste lo
 funcion = "te_ipv6.cmd?action=dhcpapply"
 motivo = "modo y rango de DHCPv6 desde la web básica: ningún ajuste lo ofrece en esta fase (red_local.ipv6 solo activa IPv6 y los anuncios); formato por validar con el router real; fase 3"
 
+
+
 [[excluida]]
-funcion = "cbSetNatConfig"
-motivo = "ayudantes de protocolos (puertos.alg, de solo lectura): la escritura exige set_nf_conntrack = 1, que la lectura no devuelve, así que el gestor no podría deshacer el cambio; se revisará con el router real (fase 3)"
+funcion = "cbSetNatPortMapping.dmz"
+motivo = "DMZ (natdmz.asp): sin comprobar en el router real; en Puertos solo se ve y se escribe desde la Biblioteca"

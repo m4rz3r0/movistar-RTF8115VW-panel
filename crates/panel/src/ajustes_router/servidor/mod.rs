@@ -3,9 +3,11 @@
 
 mod acciones;
 mod acciones_lista;
+pub(crate) mod cortafuegos;
 mod derivados;
 mod dns_propios;
 mod foto;
+mod fuentes;
 mod guardar;
 mod historial;
 mod lectura;
@@ -17,12 +19,20 @@ mod red_local;
 mod tests;
 
 pub(super) use acciones::preparar_accion;
+pub(super) use cortafuegos::preparar_sin_ping;
 pub(super) use foto::{comparar_con_partida, preparar_volver_a_partida};
 pub(super) use guardar::{confirmar_ajuste, preparar_ajuste, preparar_elemento};
 pub(super) use historial::deshacer_ajuste;
 pub(crate) use historial::etiquetas_de_campos;
 pub(super) use mejoras::{contar_mejoras, leer_mejoras, preparar_lote};
 pub(super) use pagina::leer_tema;
+
+/// `v` con su token ligado al usuario de la sesión
+/// ([`crate::ui::explorador::servidor::ligar_a_la_sesion`]).
+pub(crate) async fn ligada(v: GrupoVista) -> Result<GrupoVista, ServerFnError> {
+    crate::ui::explorador::servidor::ligar_a_la_sesion(&v.token).await?;
+    Ok(v)
+}
 
 use super::*;
 use crate::{
@@ -38,7 +48,7 @@ use crate::{
     t,
     ui::explorador::{
         MASCARA,
-        servidor::{error_cambio, gestor, riesgo},
+        servidor::{error_cambio, error_con_texto, gestor, riesgo},
     },
 };
 use ajustes::{
@@ -70,8 +80,11 @@ pub(crate) fn clave(a: &Ajuste) -> Clave {
 
 /// Error del gestor al guardar un ajuste, con el mensaje traducido y sin
 /// nombres de la API (el detalle técnico va al registro).
-fn error_ajuste(e: CambioError) -> ServerFnError {
+pub(crate) fn error_ajuste(e: CambioError) -> ServerFnError {
     use CambioError as E;
+    if let Some(r) = error_con_texto(&e) {
+        return r;
+    }
     match e {
         E::SinCambios => fallo(StatusCode::CONFLICT, t!("ajustes-error-sin-cambios")),
         E::EnCurso => fallo(StatusCode::CONFLICT, t!("biblioteca-error-en-curso")),
@@ -132,11 +145,9 @@ fn ajuste_por_id<'a>(state: &'a AppState, id: &str) -> Result<&'a Ajuste, Server
         .ok_or_else(|| fallo(StatusCode::NOT_FOUND, t!("ajustes-error-ajuste")))
 }
 
-/// Un cambio a la vez: con otro aplicándose o vigilándose no se prepara
-/// nada (409), tampoco en otro ajuste que escribe la misma instancia.
+/// Con otro cambio aplicándose o vigilándose se prepara igual: al
+/// confirmarlo espera en la cola. Con la cola llena (o el gestor apartado
+/// por un cambio de credenciales del router), 409.
 fn libre(g: &ChangeManager) -> Result<(), ServerFnError> {
-    match g.activo() {
-        Some(_) => Err(error_ajuste(CambioError::EnCurso)),
-        None => Ok(()),
-    }
+    g.admite_cambio().map_err(error_ajuste)
 }

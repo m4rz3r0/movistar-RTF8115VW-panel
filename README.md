@@ -20,8 +20,10 @@ habla con la web del router:
   máxima», que se revisan y se aplican de una vez, con un solo deshacer; la
   barra lateral cuenta lo que falta.
 - **Biblioteca**: todas las funciones de la API del router, con su
-  descripción. Los cambios se **vigilan**: si el router deja de responder o
-  se pierde internet, se deshacen solos.
+  descripción. Los cambios que pueden cortar el acceso al router o
+  internet se **vigilan**: si el router deja de responder o se pierde
+  internet, se deshacen solos; «Todo bien, terminar» los da por buenos
+  antes. Lo que confirmes mientras tanto espera en una cola (hasta 5).
 - **Historial** de todo lo cambiado, con deshacer.
 - Usuarios propios con contraseña, en español e inglés, tema claro u oscuro
   y usable en el móvil.
@@ -96,11 +98,30 @@ leer»:
   antes; lo demás se aplica al momento, con «Deshacer» en el aviso.
 
 Antes de guardar unos campos, un resumen enseña lo que cambia («antes →
-después»); después, el cambio se vigila y se puede deshacer desde el propio
-resumen o desde el Historial. «Cómo estaba al instalar» compara el router con
-la foto que tomó el asistente y deja volver a cualquier ajuste. Las
-contraseñas van censuradas, con un ojo para verlas; lo demás, en claro. Lo
-que no está en Ajustes se cambia desde la Biblioteca, también con vigilancia.
+después»); después, si puede cortar el acceso, el cambio se vigila (lo que
+guardes mientras espera en la cola, con «Quitar de la cola») y se puede
+deshacer desde el propio resumen o desde el Historial. «Cómo estaba al
+instalar» compara el router con la foto que tomó el asistente y deja volver
+a cualquier ajuste. Las contraseñas van censuradas, con un ojo para verlas;
+lo demás, en claro. Lo que no está en Ajustes se cambia desde la
+Biblioteca, con la misma vigilancia.
+
+Además de los ajustes, en **Sistema** se lee, se filtra y se descarga el
+registro del router (y se enciende, si lo tiene apagado) y se descarga una
+copia de su configuración, con el aviso de que lleva sus contraseñas; en
+**Seguridad**, el cortafuegos completo, con sus filtros y sus reglas; y en
+**Puertos**, los ayudantes de protocolos (ALG), el NAT loopback (entrar a
+tus servicios por tu dominio desde casa) y la DMZ, que solo se ve.
+
+El panel solo escribe lo que se ha comprobado en el router real (una lista
+blanca en el catálogo de funciones; ver
+[funciones-del-panel.md](docs/funciones-del-panel.md)). Lo demás se ve, con
+su valor y sus recomendaciones como información, pero sin interruptor ni
+botón, y la Biblioteca no lo escribe. En este router, además, no se puede
+cambiar la contraseña de otra cuenta de su web (solo la cuenta `1234` entra
+en ella, así que el panel no puede comprobar la nueva: se borra la cuenta y
+se crea de nuevo) ni dejar de responder al ping desde internet (otra regla
+del operador lo sigue permitiendo).
 
 ### Mejoras
 
@@ -115,9 +136,14 @@ y dice, en cada uno, para quién es, qué se gana y qué se pierde:
   consejos sin botón, para lo que el router no deja cambiar desde su web.
 - **Privacidad máxima**: apaga la gestión remota, su aviso, el espejo y el
   envío del registro; reparte a la red de casa unos DNS neutros, con el
-  proveedor a elegir (Quad9, Quad9 sin filtro, DNS4EU, Cloudflare o
-  AdGuard) o, si ya usas unos DNS propios, los mantiene; y, si lo marcas,
-  toma la hora de un servidor neutro.
+  proveedor a elegir (Quad9, Quad9 sin filtro, DNS4EU, Cloudflare, AdGuard o
+  Cloudflare familiar, que filtra webs para adultos) o, si ya usas unos DNS
+  propios, los mantiene; y, si lo marcas, toma la hora de un servidor
+  neutro.
+
+Los lotes solo llevan los pasos que el panel escribe: los que tocan algo sin
+comprobar en el router real (como el UPnP, el espejo o los DNS de la red de
+casa) no salen hasta que se comprueben.
 
 Cada tarjeta dice qué pasos están hechos, cuáles faltan y cuáles no se
 pudieron leer, y la barra lateral cuenta los pendientes. «Revisar y
@@ -150,7 +176,8 @@ Tres vías, cada una con su guía ([`deploy/README.md`](deploy/README.md)):
   con el panel y un proxy Caddy de ejemplo.
 - **Jails de FreeBSD** ([`deploy/freebsd-jail/`](deploy/freebsd-jail/README.md)):
   compila desde el código (no hay releases para FreeBSD) en una jail aparte y
-  se actualiza solo con cada etiqueta.
+  se actualiza solo con cada etiqueta. Si quieres, otro equipo de tu red la
+  compila para FreeBSD y el servidor solo la instala.
 
 La primera vez se termina en el navegador con el asistente de instalación; el
 día a día (usuarios, copias de seguridad, registros, actualizar) está en
@@ -264,11 +291,16 @@ cada 3 hilos de la CPU, entre 1 y 2; en una máquina dedicada, 4; como mucho,
 10; `E2E_WORKERS=1`, en serie). Arranca un panel instalado por worker, cuatro
 recién instalados para el asistente, dos para el recorrido de Ajustes (uno
 por idioma), dos para la rejilla de la WiFi, uno para las demás pestañas en
-rejilla y uno para Mejoras, cada uno con su simulador (`e2e/instancias.ts`),
-en puertos consecutivos a partir de `E2E_PORT` y `E2E_SIM_PORT` (3195 y
-8195; con 4 workers, 3195–3208 y 8195–8208). Cada
-cambio se vigila 10 s en vez de 30 s o 2 min (`RP_E2E_VIGILANCIA_S`, que solo
-atiende el binario de depuración). Usa el Chromium de Playwright
+rejilla, uno para Mejoras, uno para los usuarios del router y uno para la
+vigilancia y la cola, cada uno con su simulador (`e2e/instancias.ts`), en
+puertos consecutivos a partir de `E2E_PORT` y `E2E_SIM_PORT` (3195 y 8195;
+con 4 workers, 3195–3210 y 8195–8210). Contra el simulador todo está
+habilitado, también lo no comprobado en el router real
+(`RP_E2E_HABILITAR_TODO=1`, que solo atiende el binario de depuración).
+Cada cambio vigilado se vigila 10 s en vez de 30 s o 2 min
+(`RP_E2E_VIGILANCIA_S`, que solo atiende el binario de depuración); en el
+panel de la vigilancia, 5 min, para que no acabe sola durante la prueba.
+Usa el Chromium de Playwright
 (`npx playwright install chromium` si no está; o `E2E_CHROMIUM=<ruta>`).
 
 El e2e usa el `target/debug/panel` de `cargo leptos build`, que se compila

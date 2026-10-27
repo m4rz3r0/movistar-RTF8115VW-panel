@@ -24,6 +24,26 @@ pub(crate) const SIN_CAMPOS_ESCRITOS: &str = "nota-sin-campos-escritos";
 pub(crate) const SIN_RELEER: &str = "nota-sin-releer";
 pub(crate) const WAN_CAIDA: &str = "nota-wan-caida";
 pub(crate) const RETOMADA: &str = "nota-retomada";
+/// Aplicado sin vigilancia: no puede cortar el acceso del panel al router.
+pub(crate) const SIN_VIGILANCIA: &str = "nota-sin-vigilancia";
+/// Quien hizo el cambio dio la vigilancia por terminada (`$usuario`).
+pub(crate) const VIGILANCIA_TERMINADA: &str = "nota-vigilancia-terminada";
+/// Un cambio de la cola que no llegó a aplicarse: el anterior se deshizo
+/// (lo revirtió la vigilancia).
+pub(crate) const COLA_ANTERIOR_DESHECHO: &str = "nota-cola-anterior-deshecho";
+/// … el anterior no llegó a aplicarse (falló, o tampoco se aplicó).
+pub(crate) const COLA_ANTERIOR_NO_APLICADO: &str = "nota-cola-anterior-no-aplicado";
+/// … el router ya no está como cuando se revisó.
+pub(crate) const COLA_ROUTER_CAMBIADO: &str = "nota-cola-router-cambiado";
+/// … al llegarle el turno no se pudo preparar (con el motivo detrás).
+pub(crate) const COLA_NO_PREPARADO: &str = "nota-cola-no-preparado";
+/// … `$usuario` lo quitó de la cola.
+pub(crate) const COLA_QUITADO: &str = "nota-cola-quitado";
+/// … el panel se detuvo o se reinició antes de llegarle el turno.
+pub(crate) const COLA_INTERRUMPIDA: &str = "nota-cola-interrumpida";
+/// La reversión automática volvió a crear un usuario borrado con una
+/// contraseña nueva que no se guarda.
+pub(crate) const USUARIO_REVERTIDO: &str = "usuarios-router-nota-revertido";
 /// «paso 2: …», para la nota de un paso de un grupo.
 const PASO: &str = "nota-paso";
 /// «paso 2 (UDP): …», con el nombre del paso.
@@ -93,6 +113,14 @@ impl Nota {
             nombre_paso: None,
             tecnico: None,
         }])
+    }
+
+    /// Una contraseña nueva que no vale, con `max` como máximo
+    /// ([`crate::contrasena_forma::ErrorNueva::clave`]).
+    pub(crate) fn de_contrasena(e: crate::contrasena_forma::ErrorNueva, max: usize) -> Nota {
+        let (clave, n) = e.clave(max);
+        let args: Vec<(&str, String)> = n.map(|n| ("n", n.to_string())).into_iter().collect();
+        Nota::con(clave, &args)
     }
 
     /// El error de un fallo del gestor: el texto legible según su tipo y,
@@ -262,6 +290,7 @@ mod tests {
     fn las_claves_existen_en_los_dos_idiomas() {
         for clave in [
             VERIFICACION_LIMITADA,
+            USUARIO_REVERTIDO,
             REINICIO_SIN_RESPUESTA,
             SIN_CONFIRMAR,
             RELEIDO_APLICADA,

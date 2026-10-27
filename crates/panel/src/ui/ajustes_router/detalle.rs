@@ -3,8 +3,9 @@
 //! Se pinta con lo que ya trajo la página (sin otra petición): una columna
 //! por ajuste del elemento (lo esencial, lo avanzado y lo oculto), cada una
 //! con su ayuda, sus campos, su efecto y sus detalles técnicos plegados. Una
-//! lista sin componente propio se ve como tabla, y la contraseña del router
-//! con el enlace a donde se cambia: se consultan, no se editan aquí.
+//! lista sin componente propio se ve como tabla, la contraseña del router
+//! con el enlace a donde se cambia y los usuarios del router con sus propias
+//! acciones ([`super::usuarios`]): no se editan con «Guardar cambios».
 //! «Guardar cambios» prepara un solo cambio con lo de todas las columnas y
 //! lo abre en el diálogo de revisión. Se cierra con ✕ o con Esc; en el
 //! móvil ocupa la pantalla y vuelve con «‹ WiFi».
@@ -13,7 +14,7 @@ use super::aviso::Seguimiento;
 use super::campo::Campo;
 use super::consulta;
 use super::edicion::Edicion;
-use super::piezas::{ayuda, detalles_tecnicos, dom, enfocar, fila, motivos};
+use super::piezas::{detalles_tecnicos, dom, enfocar, fila, motivos};
 use super::rejilla::Pagina;
 use super::seleccion::nombre;
 use crate::ajustes_router::{
@@ -24,40 +25,15 @@ use crate::ui::comun::Insignia;
 use crate::ui::explorador::texto_error;
 use crate::ui::i18n::traducir;
 use crate::ui::{Estado, IconoEstado};
-use ajustes::Nivel;
 use leptos::{ev, prelude::*, task::spawn_local};
 use std::collections::{BTreeMap, HashMap};
 
+mod cabeza;
+
+use cabeza::cabeza_columna;
+
 /// Id del título del detalle (recibe el foco al abrirlo).
 pub(crate) const ID_TITULO_DETALLE: &str = "detalle-titulo";
-
-/// Título de la columna de un ajuste, por su nivel.
-fn titulo_columna(n: Nivel) -> String {
-    match n {
-        Nivel::Basico => t!("ajustes-detalle-basico"),
-        Nivel::Avanzado => t!("ajustes-nivel-avanzado"),
-        Nivel::Oculto => t!("ajustes-nivel-oculto"),
-    }
-}
-
-/// Título, descripción y ayuda de la columna del ajuste `a` (`id`, el id
-/// de su título). Lo oculto dice qué significa. La única columna de un
-/// elemento se titula «Opciones» (su nivel solo dice algo junto a otras).
-fn cabeza_columna(a: &AjusteVista, id: String, unica: bool) -> impl IntoView + use<> {
-    let titulo = if unica {
-        t!("ajustes-detalle-opciones")
-    } else {
-        titulo_columna(a.nivel)
-    };
-    let oculto = (a.nivel == Nivel::Oculto)
-        .then(|| view! { <p class="detalle-nota-oculto">{t!("ajustes-nivel-oculto-desc")}</p> });
-    view! {
-        <h3 id=id>{titulo}</h3>
-        {oculto}
-        <p class="ajuste-desc">{traducir(&format!("{}-desc", a.clave), None)}</p>
-        {ayuda(a)}
-    }
-}
 
 /// ¿Se editan en el detalle los campos de `a`? Ni una lista (sus campos son
 /// la plantilla de una instancia nueva) ni un ajuste con componente propio.
@@ -65,13 +41,63 @@ fn se_edita(a: &AjusteVista) -> bool {
     !a.lista && a.componente.is_none()
 }
 
-/// La columna de un ajuste que solo se consulta: una lista en una tabla o
-/// el enlace a donde se cambia la contraseña del router.
-fn columna_de_consulta(a: &AjusteVista, unica: bool) -> impl IntoView + use<> {
+/// ¿Acompaña `a` a las conexiones a internet de `e` (la fibra)? Sí si es
+/// un ajuste suelto sin componente en un elemento con ellas.
+fn acompana_a_conexion(a: &AjusteVista, e: &ElementoVista) -> bool {
+    a.componente.is_none()
+        && !a.lista
+        && e.ajustes
+            .iter()
+            .any(|x| x.componente.as_deref() == Some(super::conexion::CONEXION))
+}
+
+/// ¿Se pinta `a` dentro de las conexiones a internet de `e` (la fibra)? Sí
+/// si las acompaña y se leyeron; si no, va en su propia columna.
+fn junto_a_conexion(a: &AjusteVista, e: &ElementoVista) -> bool {
+    acompana_a_conexion(a, e)
+        && e.ajustes.iter().any(|x| {
+            x.componente.as_deref() == Some(super::conexion::CONEXION)
+                && x.estado == EstadoLectura::Leido
+        })
+}
+
+/// La columna de un ajuste que no se edita aquí: una lista en una tabla, el
+/// enlace a donde se cambia la contraseña del router, los usuarios del
+/// router con sus acciones, las reglas del cortafuegos con «No responder
+/// al ping» (del elemento `e`) o las conexiones a internet con la fibra.
+fn columna_de_consulta(a: &AjusteVista, unica: bool, e: &ElementoVista) -> impl IntoView + use<> {
+    let elemento = e.id.as_str();
     let col = format!("{}-columna", dom(a));
     let titulo = col.clone();
     let cuerpo = if a.componente.as_deref() == Some(super::CONTRASENA_ROUTER) {
         consulta::enlace_contrasena_router().into_any()
+    } else if a.componente.as_deref() == Some(super::USUARIOS_ROUTER) {
+        view! {
+            <super::usuarios::Usuarios
+                a=a.clone()
+                elemento=elemento.to_owned()
+                desactivadas=e.desactivadas
+            />
+        }
+        .into_any()
+    } else if a.componente.as_deref() == Some(super::cortafuegos::CORTAFUEGOS) {
+        view! {
+            <super::cortafuegos::Cortafuegos
+                a=a.clone()
+                accion=e.accion_propia.clone()
+                desactivadas=e.desactivadas
+                elemento=elemento.to_owned()
+            />
+        }
+        .into_any()
+    } else if a.componente.as_deref() == Some(super::conexion::CONEXION) {
+        let anexos: Vec<AjusteVista> = e
+            .ajustes
+            .iter()
+            .filter(|x| x.estado == EstadoLectura::Leido && junto_a_conexion(x, e))
+            .cloned()
+            .collect();
+        view! { <super::conexion::Conexion a=a.clone() anexos /> }.into_any()
     } else if a.lista {
         consulta::lista(a).into_any()
     } else {
@@ -79,7 +105,7 @@ fn columna_de_consulta(a: &AjusteVista, unica: bool) -> impl IntoView + use<> {
     };
     view! {
         <section class="detalle-columna" aria-labelledby=col>
-            {cabeza_columna(a, titulo, unica)}
+            {cabeza_columna(a, titulo, unica, false)}
             {cuerpo}
             {detalles_tecnicos(&a.clave, &a.tecnico)}
         </section>
@@ -93,7 +119,7 @@ fn columna(
     ed: Edicion,
     editable: bool,
     bloqueado: Signal<bool>,
-    unica: bool,
+    (unica, acompana): (bool, bool),
 ) -> impl IntoView + use<> {
     let prefijo = dom(a);
     let col = format!("{prefijo}-columna");
@@ -130,7 +156,7 @@ fn columna(
     });
     view! {
         <section class="detalle-columna" aria-labelledby=col>
-            {cabeza_columna(a, col_titulo, unica)}
+            {cabeza_columna(a, col_titulo, unica, acompana)}
             <div class="ajuste-campos">{campos}</div>
             {motivos(&a.campos)}
             {efecto}
@@ -226,7 +252,7 @@ pub(crate) fn Detalle(e: ElementoVista, registro: Registro) -> impl IntoView {
     let leidos: Vec<&AjusteVista> = e
         .ajustes
         .iter()
-        .filter(|a| a.estado == EstadoLectura::Leido)
+        .filter(|a| a.estado == EstadoLectura::Leido && !junto_a_conexion(a, &e))
         .collect();
     // Sin nada que se pueda cambiar (la contraseña del router, una lista de
     // consulta), sin «Guardar cambios».
@@ -244,8 +270,15 @@ pub(crate) fn Detalle(e: ElementoVista, registro: Registro) -> impl IntoView {
     let columnas = leidos
         .iter()
         .map(|a| match ediciones.iter().find(|(id, _, _)| *id == a.id) {
-            Some((_, _, ed)) => columna(a, *ed, editable, preparando.into(), unica).into_any(),
-            None => columna_de_consulta(a, unica).into_any(),
+            Some((_, _, ed)) => columna(
+                a,
+                *ed,
+                editable,
+                preparando.into(),
+                (unica, acompana_a_conexion(a, &e)),
+            )
+            .into_any(),
+            None => columna_de_consulta(a, unica, &e).into_any(),
         })
         .collect_view();
     let eds: Vec<Edicion> = ediciones.iter().map(|(_, _, ed)| *ed).collect();

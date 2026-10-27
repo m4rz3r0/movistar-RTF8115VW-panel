@@ -1,8 +1,9 @@
 //! Sección «Ajustes» (`/ajustes/<tema>`): los ajustes del router agrupados
 //! por temas en lenguaje claro. `/ajustes` lleva a Internet.
 //!
-//! Cada página tiene las pestañas de los siete temas (por debajo de 640 px,
-//! un selector) y el aviso de solo lectura si el panel aún no escribe. La
+//! Cada página tiene la barra de pestañas de los siete temas, con la
+//! lectura del actual a la derecha ([`pestanas`]), y el aviso de solo
+//! lectura si el panel aún no escribe. La
 //! WiFi va en rejilla ([`rejilla`]): la franja de resumen, la barra de lo
 //! marcado, una tarjeta por elemento ([`tarjeta`]) y el detalle del que se
 //! abre ([`detalle`], `/ajustes/<tema>/<elemento>`), con los cambios
@@ -12,19 +13,28 @@
 //! va en una lista con columnas ([`lista`]) bajo las tarjetas, con el
 //! detalle de cada fila en [`puertos`], [`reservas`] y [`dispositivos`]. Un
 //! tema que no existe es
-//! «página no encontrada». Si hay foto de partida, cada tema enlaza a
+//! «página no encontrada». Al pie de Sistema van la copia de la
+//! configuración ([`copia`]) y el registro del router ([`registro`]). Si
+//! hay foto de partida, cada tema enlaza a
 //! «Cómo estaba al instalar» ([`foto`], `/ajustes/foto-de-partida`).
 
 mod aviso;
 mod campo;
+mod conexion;
 mod consulta;
+mod copia;
+mod cortafuegos;
 mod detalle;
 mod dispositivos;
 mod edicion;
 mod foto;
+mod fuentes;
 mod lista;
+mod nota_tema;
+mod pestanas;
 mod piezas;
 mod puertos;
+mod registro;
 mod rejilla;
 mod reservas;
 mod resumen;
@@ -32,6 +42,7 @@ mod seleccion;
 mod sin_guardar;
 mod tarjeta;
 mod tras_borrar;
+mod usuarios;
 
 use crate::ajustes_router::{CADUCIDAD_LECTURAS, leer_tema};
 use crate::t;
@@ -43,8 +54,9 @@ use leptos::prelude::*;
 use leptos_router::{
     NavigateOptions,
     components::{Outlet, Redirect},
-    hooks::{use_location, use_navigate, use_params_map},
+    hooks::{use_location, use_params_map},
 };
+use pestanas::{Lectura, pestanas};
 use rejilla::{ContenidoRejilla, esqueleto};
 use std::{collections::HashSet, time::Duration};
 
@@ -52,6 +64,7 @@ pub(crate) use aviso::{AvisoCambio, ExtraRevision, Seguimiento};
 pub(crate) use campo::partir_motivo;
 pub(crate) use detalle::Borradores;
 pub use foto::{PaginaFoto, RUTA_FOTO};
+pub(crate) use fuentes::de_donde;
 pub(crate) use seleccion::Seleccion;
 
 /// Espera antes de enseñar «Actualizando…»: una lectura más rápida (de la
@@ -75,17 +88,11 @@ pub(crate) const ID_SOLO_LECTURA: &str = "ajustes-solo-lectura";
 #[component]
 pub fn SinVista() -> impl IntoView {}
 
-/// Descripción del tema, enlace a la foto de partida (si la hay) y aviso de
-/// solo lectura (si el panel aún no escribe).
-pub(crate) fn introduccion(tema: &str, foto: bool, solo_lectura: bool) -> impl IntoView + use<> {
+/// Descripción del tema, con el enlace a lo que ha cambiado desde la
+/// instalación si hay foto de partida (`foto`), y aviso de solo lectura (si
+/// el panel aún no escribe).
+pub(crate) fn introduccion(tema: &str, solo_lectura: bool, foto: bool) -> impl IntoView + use<> {
     let desc = traducir(&format!("ajustes-tema-{tema}-desc"), None);
-    let foto = foto.then(|| {
-        view! {
-            <p class="tema-foto">
-                <a href=RUTA_FOTO>{t!("ajustes-foto-enlace")}</a>
-            </p>
-        }
-    });
     let aviso = solo_lectura.then(|| {
         view! {
             <p class="aviso estado-aviso" role="status" id=ID_SOLO_LECTURA>
@@ -98,8 +105,13 @@ pub(crate) fn introduccion(tema: &str, foto: bool, solo_lectura: bool) -> impl I
         }
     });
     view! {
-        <p class="tema-desc">{desc}</p>
-        {foto}
+        <p class="tema-desc">
+            {desc}
+            {foto.then(|| view! {
+                " "
+                <a class="tema-foto" href=RUTA_FOTO>{t!("ajustes-foto-enlace")}</a>
+            })}
+        </p>
         {aviso}
     }
 }
@@ -113,6 +125,9 @@ pub(crate) const PUERTOS: &str = "puertos";
 /// Componente de Seguridad (como [`DISPOSITIVOS`]): un enlace a
 /// «Configuración del router», donde se cambia.
 pub(crate) const CONTRASENA_ROUTER: &str = "contrasena_router";
+/// Componente de Seguridad (como [`DISPOSITIVOS`]): los usuarios de la web
+/// del router con sus acciones ([`usuarios`]).
+pub(crate) const USUARIOS_ROUTER: &str = "usuarios_router";
 
 /// Primera página de la sección (la del menú).
 pub const RUTA_AJUSTES: &str = "/ajustes/internet";
@@ -252,53 +267,6 @@ impl Precarga {
     }
 }
 
-/// Pestañas de los temas y, en pantallas estrechas, el selector que navega.
-fn pestanas(slug: Memo<String>, precarga: Precarga) -> impl IntoView {
-    let enlaces = Tema::TODOS
-        .into_iter()
-        .map(|t| {
-            let actual = move || (slug.get() == t.slug()).then_some("page");
-            view! {
-                <a
-                    href=ruta(t)
-                    aria-current=actual
-                    on:mouseenter=move |_| precarga.programar(t, slug)
-                    on:focus=move |_| precarga.programar(t, slug)
-                    on:mouseleave=move |_| precarga.cancelar()
-                    on:blur=move |_| precarga.cancelar()
-                >
-                    {nombre(t)}
-                </a>
-            }
-        })
-        .collect_view();
-    // `selected` da el valor del HTML del servidor; después manda
-    // `prop:value`, que sigue a la ruta (también al volver atrás).
-    let inicial = slug.get_untracked();
-    let opciones = Tema::TODOS
-        .into_iter()
-        .map(|t| {
-            let elegido = inicial == t.slug();
-            view! { <option value=t.slug() selected=elegido>{nombre(t)}</option> }
-        })
-        .collect_view();
-    let navegar = use_navigate();
-    let cambiar = move |ev: leptos::ev::Event| {
-        if let Some(t) = Tema::from_slug(&event_target_value(&ev)) {
-            navegar(&ruta(t), NavigateOptions::default());
-        }
-    };
-    view! {
-        <nav class="temas" aria-label=t!("ajustes-temas")>{enlaces}</nav>
-        <p class="campo temas-selector">
-            <label for="ajustes-tema">{t!("ajustes-tema-elegir")}</label>
-            <select id="ajustes-tema" prop:value=move || slug.get() on:change=cambiar>
-                {opciones}
-            </select>
-        </p>
-    }
-}
-
 /// Página no encontrada dentro del marco (404 en el servidor).
 fn no_encontrada() -> impl IntoView {
     #[cfg(feature = "ssr")]
@@ -346,6 +314,8 @@ pub fn PaginaTema() -> impl IntoView {
     let foco = Foco(RwSignal::new(None));
     provide_context(foco);
     let precarga = Precarga::nueva();
+    let lectura = Lectura::nueva();
+    provide_context(lectura);
     let recargar = Callback::new(move |()| {
         precarga.olvidar();
         datos.refetch();
@@ -396,7 +366,7 @@ pub fn PaginaTema() -> impl IntoView {
                     <p class="pagina-sub">{t!("ajustes-desc")}</p>
                 </div>
             </header>
-            {pestanas(slug, precarga)}
+            {pestanas(slug, precarga, lectura, pendiente, volver_a_leer)}
             <div class="tema-zona">
                 // Siempre en la página (vacío si no carga) y fuera de la zona
                 // ocupada (`aria-busy` aplaza sus avisos): el lector de
@@ -413,15 +383,21 @@ pub fn PaginaTema() -> impl IntoView {
                 {move || Suspend::new(async move {
                     match datos.await {
                         Ok(Some(p)) => {
-                            let intro = introduccion(&p.tema, p.foto_de_partida, p.solo_lectura);
+                            let intro = introduccion(&p.tema, p.solo_lectura, p.foto_de_partida);
+                            let nota = nota_tema::nota_tema(&p.tema);
                             view! {
                                 {intro}
                                 <ContenidoRejilla p volver_a_leer elemento />
+                                {nota}
                             }
                                 .into_any()
                         }
-                        Ok(None) => ().into_any(),
+                        Ok(None) => {
+                            Lectura::falta();
+                            ().into_any()
+                        }
                         Err(e) => {
+                            Lectura::falta();
                             view! {
                                 <p class="aviso estado-error" role="alert">
                                     <IconoEstado estado=Estado::Error />
@@ -435,6 +411,7 @@ pub fn PaginaTema() -> impl IntoView {
                 </Transition>
                 </div>
             </div>
+            {move || (slug.get() == Tema::Sistema.slug()).then(|| view! { <copia::SeccionCopia /> <registro::SeccionRegistro /> })}
             <AvisoCambio />
             <Outlet />
         }

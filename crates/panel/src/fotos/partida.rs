@@ -14,6 +14,7 @@
 use crate::instalar::lecturas_de_partida;
 use crate::lecturas::Clave;
 use crate::state::AppState;
+use ajustes::Ajuste;
 use hgu::xml::XmlNode;
 use std::collections::BTreeMap;
 
@@ -119,6 +120,21 @@ fn id_param<'a>(state: &'a AppState, nombre: &str) -> Option<&'a str> {
         .map(|l| l.id_param.as_str())
 }
 
+/// ¿Se deja `a` fuera de la foto? La foto guarda un nodo por función, así
+/// que una lista que lee con parámetros la misma función que otra lista
+/// lee sin ellos mezclaría sus instancias con las de la otra: ni se lee
+/// para la foto ni se compara (`solo` y `excluir` no cuentan: filtran
+/// el mismo nodo).
+/// Es por ajuste; `instalar::FUERA_DE_LA_FOTO` deja fuera, por función, lo
+/// que no lee el router (la sesión del propio panel).
+pub fn fuera_de_la_foto(ajustes: &[Ajuste], a: &Ajuste) -> bool {
+    a.lista
+        && !a.leer.params.is_empty()
+        && ajustes.iter().any(|b| {
+            b.id != a.id && b.lista && b.leer.funcion == a.leer.funcion && b.leer.params.is_empty()
+        })
+}
+
 /// Lee la foto de partida del router de `state` (ver el módulo). Quien la
 /// toma de verdad (el asistente) pausa antes el sondeo.
 pub async fn leer_partida(state: &AppState) -> FotoLeida {
@@ -145,7 +161,7 @@ pub async fn leer_partida(state: &AppState) -> FotoLeida {
     }
     for a in state.ajustes.todos() {
         let clave = crate::ajustes_router::servidor::clave(a);
-        if hechas.contains(&clave) {
+        if hechas.contains(&clave) || fuera_de_la_foto(state.ajustes.todos(), a) {
             continue;
         }
         // Nunca una función que el catálogo bloquea (o no conoce), aunque
@@ -169,6 +185,12 @@ pub async fn leer_partida(state: &AppState) -> FotoLeida {
             .map(|(k, v)| (k.as_str(), v.as_str()))
             .collect();
         let leida = match a.busqueda() {
+            // El cortafuegos, de su página (como en Ajustes).
+            None if a.leer.funcion == hgu::cortafuegos::PAGINA_LISTA => {
+                hgu::cortafuegos::leer(&state.hgu)
+                    .await
+                    .map(|f| hgu::cortafuegos::a_xml(&f))
+            }
             Some((posicion, ident)) => {
                 state
                     .hgu
@@ -209,6 +231,22 @@ mod tests {
             text: String::new(),
             children,
         }
+    }
+
+    /// Ningún ajuste del catálogo lee con parámetros una lista que otro lee
+    /// sin ellos: la DMZ sale de la misma lectura que las reglas de puertos
+    /// (`solo`/`excluir`), así que entra en la foto como las reglas, el
+    /// pool de casa y la WiFi.
+    #[test]
+    fn ninguna_lista_queda_fuera_de_la_foto() {
+        let cat = ajustes::CatalogoAjustes::load().unwrap();
+        let todos = cat.todos();
+        let fuera: Vec<&str> = todos
+            .iter()
+            .filter(|a| fuera_de_la_foto(todos, a))
+            .map(|a| a.id.as_str())
+            .collect();
+        assert!(fuera.is_empty(), "{fuera:?}");
     }
 
     /// Una segunda lectura de la misma función añade sus instancias, sin

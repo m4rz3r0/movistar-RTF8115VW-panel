@@ -1,7 +1,7 @@
 # Biblioteca de funciones del router (ruta /explorador): la interfaz. Lo que viene
 # del catálogo (áreas, descripciones, etiquetas) no se traduce.
 biblioteca-titulo = Biblioteca
-biblioteca-inicio-texto = Las lecturas se ejecutan al abrirlas; las contraseñas y claves salen censuradas, con un ojo para verlas. Las escrituras pasan por el gestor de cambios: ves el antes y el después, el panel vigila el router tras aplicarlas y revierte si deja de responder.
+biblioteca-inicio-texto = Las lecturas se ejecutan al abrirlas; las contraseñas y claves salen censuradas, con un ojo para verlas. Las escrituras pasan por el gestor de cambios: ves el antes y el después, el panel vigila el router tras las que pueden cortar la conexión y revierte si deja de responder.
 biblioteca-inicio-total = { $n } funciones del router, de la web básica, la avanzada y las que no enlaza ningún menú.
 biblioteca-buscar = Buscar función
 biblioteca-buscar-placeholder = Nombre o descripción
@@ -44,6 +44,7 @@ biblioteca-riesgo-bajo = Riesgo bajo
 biblioteca-riesgo-medio = Riesgo medio
 biblioteca-riesgo-alto = Riesgo alto
 biblioteca-riesgo-vigilancia = { $riesgo } · vigilancia { $vigilancia }
+biblioteca-riesgo-sin-vigilancia = { $riesgo } · sin vigilancia
 biblioteca-bloqueada = Bloqueada
 biblioteca-bloqueada-motivo = Bloqueada:
 biblioteca-campo-bool = Sí/no
@@ -58,6 +59,8 @@ biblioteca-cambio-aplicado = aplicado
 biblioteca-cambio-revertido = revertido
 biblioteca-cambio-fallido = fallido
 biblioteca-cambio-revertido-parcial = revertido en parte
+biblioteca-cambio-en-cola = en cola
+biblioteca-cambio-cancelado = cancelado
 
 ## Ficha
 biblioteca-pagina-router = Página del router
@@ -138,6 +141,8 @@ biblioteca-dialogo-revisar = Revisar cambios
 biblioteca-dialogo-instancia = , instancia { $i }
 biblioteca-nota-accion = Una acción no se puede revertir. Tras ejecutarla, el panel comprueba el router durante { $vigilancia }.
 biblioteca-nota-cambio = Tras aplicarlo, el panel vigila el router durante { $vigilancia }: si deja de responder o se cae internet, vuelve a los valores anteriores.
+biblioteca-nota-accion-sin-vigilancia = Una acción no se puede revertir. No afecta a la conexión del panel con el router: se da por hecha en cuanto el router la acepta.
+biblioteca-nota-cambio-sin-vigilancia = No afecta a la conexión del panel con el router: queda aplicado en cuanto el router muestra los valores nuevos, sin esperar. Puedes deshacerlo desde el Historial.
 biblioteca-escribe = Escribe
 biblioteca-para-confirmar = para confirmar
 biblioteca-escribe-mayusculas = Escribe { $palabra } en mayúsculas
@@ -159,6 +164,7 @@ biblioteca-aplicar = Aplicar
 biblioteca-error-bloqueada = Función bloqueada: { $motivo }.
 biblioteca-error-sin-cambios = No hay nada que cambiar: los valores coinciden con los del router.
 biblioteca-error-en-curso = Hay otro cambio en curso; espera a que termine y vuelve a intentarlo.
+cambio-error-cola-llena = Ya hay { $max } cambios en cola: espera a que se apliquen o quita alguno.
 biblioteca-error-router = { $detalle }. Comprueba la conexión con el router y vuelve a intentarlo.
 biblioteca-error-verificacion = El router no muestra el cambio ({ $detalle }). No se ha revertido nada: revisa los valores en su página.
 biblioteca-error-palabra = La palabra de confirmación no coincide: escríbela exactamente como se indica.

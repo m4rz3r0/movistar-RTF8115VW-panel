@@ -10,6 +10,12 @@ pub struct Funcion {
     /// Nombre con el que se invoca: `cbGetWifi`, `te_wifi.wl`,
     /// `te_puertos.cmd?action=add`, `restoreinfo.cgi`, `upload/cfgupload.asp`…
     pub name: String,
+    /// La CGI a la que se manda, si no es `name`: la web usa a veces una
+    /// misma CGI para dos cosas con campos distintos (`cbSetQueue`: el
+    /// estado de cada cola y la cola por defecto), que en el catálogo son
+    /// dos funciones.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cgi: Option<String>,
     /// Área del explorador.
     pub area: Area,
     /// De qué parte de la interfaz del router sale.
@@ -30,17 +36,64 @@ pub struct Funcion {
     /// Cómo se enumeran y seleccionan las instancias, si es una lista.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lista: Option<Lista>,
-    /// Riesgo de usarla (determina la vigilancia tras un cambio).
+    /// Riesgo de usarla (determina cuánto dura la vigilancia tras un
+    /// cambio, si se vigila).
     pub riesgo: Riesgo,
+    /// Si puede cortar el acceso del panel al router (o la conexión a
+    /// internet), que es lo que decide si un cambio se vigila. Obligatorio
+    /// en las escrituras y acciones; las lecturas no lo llevan.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acceso: Option<Acceso>,
     /// Motivo por el que el panel no la invoca nunca.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bloqueada: Option<String>,
+    /// Si se ha comprobado en el router real (solo escrituras y acciones):
+    /// la referencia de la prueba (`"E3, cambio 14"`) o `false`. Sin el
+    /// campo, como `false`: el panel no la usa (ver
+    /// [`Funcion::comprobada`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comprobada: Option<Comprobacion>,
+}
+
+/// El campo `comprobada` de una escritura o acción.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Comprobacion {
+    /// Comprobada en el router real: la referencia de la prueba.
+    Referencia(String),
+    /// `false`: sin comprobar. `true` no vale (falta la referencia).
+    Valor(bool),
 }
 
 impl Funcion {
-    /// Parámetro por nombre.
+    /// La CGI a la que se manda: [`Funcion::cgi`] o, sin él, el nombre.
+    pub fn cgi(&self) -> &str {
+        self.cgi.as_deref().unwrap_or(&self.name)
+    }
+
+    /// ¿Se ha comprobado en el router real? Es la lista blanca de lo que el
+    /// panel escribe: falla cerrada, así que sin el campo (o con `false`),
+    /// no. Una lectura no escribe: no cuenta.
+    pub fn comprobada(&self) -> bool {
+        matches!(self.comprobada, Some(Comprobacion::Referencia(_)))
+    }
+
+    /// Parámetro por nombre. El de una ranura (`<nombre>_<i>`,
+    /// [`Parametro::ranuras`]) da el parámetro de sus ranuras.
     pub fn parametro(&self, nombre: &str) -> Option<&Parametro> {
-        self.parametros.iter().find(|p| p.nombre == nombre)
+        self.parametros
+            .iter()
+            .find(|p| p.nombre == nombre)
+            .or_else(|| self.ranura(nombre).map(|(p, _)| p))
+    }
+
+    /// El parámetro de ranuras y el índice de `nombre` (`<nombre>_<i>`, con
+    /// `i` por debajo de [`Parametro::ranuras`]); `None` si no es una ranura.
+    pub fn ranura(&self, nombre: &str) -> Option<(&Parametro, u8)> {
+        let (base, i) = nombre.rsplit_once('_')?;
+        let i: u8 = i.parse().ok().filter(|n: &u8| n.to_string() == i)?;
+        let p = self.parametros.iter().find(|p| p.nombre == base)?;
+        (i < p.ranuras?).then_some((p, i))
     }
 }
 
@@ -133,6 +186,26 @@ pub enum Riesgo {
     Alto,
 }
 
+/// Qué puede hacer una escritura con el acceso del panel al router, que
+/// llega por la red de casa (normalmente por cable). Decide si el gestor de
+/// cambios vigila el cambio: solo tiene sentido vigilar lo que puede dejar
+/// al panel sin router (o la casa sin internet, que la vigilancia también
+/// comprueba). Ante la duda, `PuedeCortar`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Acceso {
+    /// Puede cortar el acceso o la conexión a internet: IP o máscara de la
+    /// red local, DHCP, cortafuegos, rutas, WAN, reinicios… Se vigila.
+    PuedeCortar,
+    /// No toca nada por lo que pase el panel (cuentas de la web del router,
+    /// voz, avisos al operador, nombres, hora…): se da por aplicado en
+    /// cuanto la relectura confirma el valor nuevo, sin vigilancia.
+    NoCorta,
+    /// La WiFi: solo corta el acceso si el panel llega al router por WiFi.
+    /// Se vigila salvo que el panel compruebe que va por cable.
+    Wifi,
+}
+
 /// Parámetro de una función.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -154,6 +227,66 @@ pub struct Parametro {
     /// valor de quien la pide, y no se reenvía nunca desde la lectura.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub tapado: bool,
+    /// Casilla de la página sin `value` (`<input type="checkbox">`): la web
+    /// la manda como `on` si está marcada y no la manda si no lo está, y el
+    /// router la da por marcada si el campo llega, valga lo que valga. El
+    /// panel la lee como `0`/`1` y la escribe igual que la web.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub casilla: Option<Casilla>,
+    /// Valor que la web manda siempre (un campo oculto) y la lectura no da:
+    /// el panel lo envía con este valor y no lo enseña.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fijo: Option<String>,
+    /// El router lo guarda en `ranuras` ranuras, `<nombre>_0` a
+    /// `<nombre>_<ranuras - 1>`, dentro de un elemento anidado de la
+    /// lectura (las IP reservadas de un pool DHCP). La web manda solo la
+    /// ranura que cambia: el panel no reenvía las demás desde la lectura.
+    /// Una ranura libre vale [`RANURA_LIBRE`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ranuras: Option<u8>,
+    /// La web lo desactiva (y `.serialize()` no lo manda) según otro campo:
+    /// el valor de una condición mientras su casilla está desmarcada.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub depende: Option<Depende>,
+}
+
+/// De qué depende que un campo vaya ([`Parametro::depende`]).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Depende {
+    /// El parámetro del que depende.
+    pub de: String,
+    /// Valores de `de` con los que no va (`order` con la posición primera o
+    /// última). Sin ellos, `de` es una casilla y va solo si está marcada.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub salvo: Vec<String>,
+}
+
+impl Depende {
+    /// ¿Va el campo, si `de` vale `v`? Una casilla está marcada con `1` (lo
+    /// leído) o `on` (lo que manda la web).
+    pub fn activo(&self, v: Option<&str>) -> bool {
+        let v = v.map(str::trim);
+        if self.salvo.is_empty() {
+            matches!(v, Some("1" | "on"))
+        } else {
+            v.is_none_or(|v| !self.salvo.iter().any(|s| s == v))
+        }
+    }
+}
+
+/// Valor de una ranura libre ([`Parametro::ranuras`]).
+pub const RANURA_LIBRE: &str = "0.0.0.0";
+
+/// Lo que acompaña a una casilla ([`Parametro::casilla`]).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Casilla {
+    /// Parámetro con el valor de la condición que activa la casilla. Una
+    /// condición activa con ese valor vacío (o una MAC todo ceros) no
+    /// encaja con ningún dispositivo: el panel nunca la deja activa.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub valor: Option<String>,
 }
 
 /// Tipo del valor de un parámetro.
@@ -172,6 +305,9 @@ pub enum TipoParam {
     Int,
     /// Texto libre.
     Text,
+    /// Bytes en hexadecimal, sin espacios (se quitan al escribir y no
+    /// cuentan al comparar, como tampoco las mayúsculas).
+    Hex,
     /// Secreto: nunca se muestra ni se registra.
     Secret,
 }

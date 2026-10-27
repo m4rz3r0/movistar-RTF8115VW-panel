@@ -48,6 +48,7 @@ impl ChangeManager {
                     .collect(),
             },
             riesgo: g.riesgo,
+            vigila: g.vigila,
             palabra,
             funcion: req.funcion.clone(),
             instancia: req.instancia.clone(),
@@ -141,6 +142,37 @@ impl ChangeManager {
         }
     }
 
+    /// Relee lo escrito tras una escritura que el router confirmó. Si la
+    /// relectura no sale (tras algunos cambios, como el del QoS, el router
+    /// rehace su red o su servidor web y tarda en volver), se reintenta cada
+    /// `intervalo` durante el plazo de la vigilancia de su riesgo (al menos
+    /// una vez: la primera relectura pudo agotar ella sola el plazo), sin
+    /// congelar el sondeo; después, lo que dé la última.
+    pub(super) async fn releer_tras_escribir(
+        &self,
+        plan: &Plan,
+        pausa: &mut Option<crate::poller::PauseGuard>,
+    ) -> Comprobacion {
+        let fin = Instant::now() + self.tiempos.vigilancia(plan.funcion.riesgo);
+        let mut reintentos = 0u32;
+        loop {
+            match self.comprobar(plan, Lado::Nuevo).await {
+                Comprobacion::SinLectura(e) if reintentos == 0 || Instant::now() < fin => {
+                    if reintentos == 0 {
+                        tracing::warn!(
+                            funcion = %plan.funcion.name,
+                            "no se puede releer lo escrito; se reintenta: {e}"
+                        );
+                    }
+                    reintentos += 1;
+                    drop(pausa.take());
+                    tokio::time::sleep(self.tiempos.intervalo).await;
+                }
+                c => return c,
+            }
+        }
+    }
+
     /// Motivo por el que `original` ya no se puede deshacer: lo deshizo otro
     /// cambio que está en curso o aplicado.
     /// Si no se puede consultar, también se rechaza (mejor no deshacer que
@@ -217,7 +249,10 @@ impl ChangeManager {
             }
             let plan = self.reconstruir(paso).map_err(CambioError::Invalida)?;
             let etiqueta: Option<String> = paso.get("etiqueta");
-            reqs.push((inversa(&plan).ok_or_else(no_se_puede)?, etiqueta));
+            let mut req = inversa(&plan).ok_or_else(no_se_puede)?;
+            // Un usuario borrado vuelve con una contraseña nueva aleatoria.
+            super::especiales::con_contrasena_nueva(&mut req);
+            reqs.push((req, etiqueta));
         }
         if reqs.is_empty() {
             return Err(no_se_puede());

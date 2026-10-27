@@ -138,3 +138,19 @@
     animation: none;
   }
 }
+
+/* Usuarios de la web del router (Seguridad → Usuarios): las acciones de
+   cada fila, el cambio de otro usuario en la propia fila y el usuario
+   nuevo debajo. */
+.usuarios-router .ajustes-usuario-fila .botones {
+  gap: var(--esp-2);
+}
+
+.usuario-cambio,
+.usuario-nuevo {
+  margin-top: var(--esp-3);
+}
+
+.usuario-nuevo h4 {
+  margin: 0;
+}

@@ -4,7 +4,7 @@
 
 ## Página
 ajustes-titulo = Ajustes del router
-ajustes-desc = Cambia lo que quieras del router en lenguaje claro. Cada cambio se vigila y, si el router deja de responder, se deshace solo.
+ajustes-desc = Cambia lo que quieras del router en lenguaje claro. Lo que puede cortar la conexión se vigila y, si el router deja de responder, se deshace solo.
 ajustes-detalles-tecnicos = Detalles técnicos
 ajustes-detalles-tecnicos-desc = Para quien quiera saber qué funciones del router se usan por debajo.
 ajustes-detalles-lectura = Lectura
@@ -15,7 +15,6 @@ ajustes-valor-desconocido = Valor no reconocido ({ $valor })
 ajustes-valor-desconocido-desc = El router tiene puesto un valor que el panel no conoce. Se conserva tal cual mientras no elijas otro.
 ajustes-efecto = Al aplicarlo
 ajustes-temas = Temas de ajustes
-ajustes-tema-elegir = Tema
 ajustes-actualizando = Actualizando…
 ajustes-volver = Ir a los ajustes de Internet
 ajustes-solo-lectura-aviso = Ahora solo se pueden consultar los ajustes: el firmware del router aún no está probado con el panel.
@@ -26,6 +25,9 @@ ajustes-cancelar = Cancelar
 ajustes-recomendado-valor = Recomendado: { $valor }
 ajustes-recomendado-pros = A favor y en contra
 ajustes-recomendado-marca = A favor:
+ajustes-recomendado-contra-marca = En contra:
+ajustes-recomendado-favor = A favor
+ajustes-recomendado-contra = En contra
 ajustes-secreto-tapado-pedir = El router no deja leer esta clave: escríbela para guardar los cambios.
 ajustes-secreto-sin-leer-desc = El router no deja leer el valor que tiene; si escribes uno, se guarda el nuevo.
 ajustes-hueco = Este ajuste tendrá aquí su propia pantalla; todavía no está lista.
@@ -60,11 +62,11 @@ ajustes-nivel-oculto-desc = No aparece en la web del operador.
 
 ## Riesgos
 ajustes-riesgo-bajo = Riesgo bajo
-ajustes-riesgo-bajo-desc = No corta la conexión. Se vigila unos segundos tras aplicarlo.
+ajustes-riesgo-bajo-desc = No corta la conexión.
 ajustes-riesgo-medio = Riesgo medio
-ajustes-riesgo-medio-desc = Puede cortar un momento la WiFi o algún servicio. Se vigila un par de minutos y se deshace si algo falla.
+ajustes-riesgo-medio-desc = Puede cortar un momento la WiFi o algún servicio.
 ajustes-riesgo-alto = Riesgo alto
-ajustes-riesgo-alto-desc = Puede dejarte sin internet o sin acceso al router. Se vigila varios minutos y se deshace si algo falla.
+ajustes-riesgo-alto-desc = Puede dejarte sin internet o sin acceso al router.
 
 ## Errores
 ajustes-error-tema = Ese tema de ajustes no existe.
@@ -111,6 +113,7 @@ ajustes-grupo-col-antes = Ahora
 ajustes-grupo-col-despues = Después
 ajustes-grupo-vacio = (vacío)
 ajustes-grupo-vigilancia = Tras aplicarlo, el panel vigila el router durante { $plazo } y lo deshace solo si deja de responder o se cae internet.
+ajustes-grupo-sin-vigilancia = No afecta a la conexión del panel con el router: queda aplicado en cuanto el router lo muestra, sin esperar. Puedes deshacerlo después.
 ajustes-grupo-ninguno = Marca al menos un paso para aplicar el cambio.
 ajustes-grupo-aplicar = Aplicar
 ajustes-grupo-borrar = Borrar
@@ -125,6 +128,8 @@ ajustes-grupo-estado-aplicado = Hecho: el router tiene ya el cambio.
 ajustes-grupo-estado-revertido = El router dejó de responder bien y el cambio se ha deshecho solo.
 ajustes-grupo-estado-fallido = No se ha podido aplicar el cambio. El router sigue como estaba.
 ajustes-grupo-estado-parcial = No se ha podido aplicar el cambio y una parte no ha vuelto a como estaba. Revísalo en el Historial.
+ajustes-grupo-estado-en-cola = En cola (puesto { $puesto }): se aplicará cuando el cambio anterior quede aplicado.
+ajustes-grupo-estado-cancelado = No se ha aplicado: el cambio anterior no quedó aplicado o se quitó de la cola. El motivo está en el Historial.
 
 ## Cómo estaba al instalar (foto de partida)
 ajustes-foto-titulo = Cómo estaba al instalar
@@ -251,8 +256,12 @@ ajustes-marcadas = { $n ->
 ajustes-desmarcar-todo = Desmarcar todo
 ajustes-barra-sin-leer = No entra lo que no se ha podido leer: { $nombres }.
 ajustes-barra-ninguna = Ninguna acción vale para todo lo marcado.
+ajustes-tabla-region = Tabla: { $nombre }
 ajustes-insignia-aplicando = Aplicando…
 ajustes-insignia-comprobando = Comprobando…
+ajustes-insignia-en-cola = En cola
+ajustes-aviso-comprobando = Ya está en el router; comprobando que todo sigue bien (quedan { $resto }).
+ajustes-usuario-en-curso-nuevo = Se está creando: la lista lo confirma al terminar la comprobación.
 ajustes-interruptor-si = { $nombre } encendida
 ajustes-interruptor-no = { $nombre } apagada
 ajustes-abrir = Abrir
@@ -302,21 +311,45 @@ ajustes-estado-dns-no = Desactivado
 ajustes-estado-ddns-si = Activo
 ajustes-estado-ddns-no = Desactivado
 ajustes-estado-ddns-sin-usar = Sin usar
+ajustes-estado-conexion-pppoe = Conectada (PPPoE)
+ajustes-estado-conexion-dhcp = Conectada (DHCP)
+ajustes-estado-conexion-fija = Conectada (dirección fija)
+ajustes-estado-conexion-otro = Conectada
+ajustes-estado-conexion-sin = Sin conexión
 ajustes-estado-gestion-remota-si = Encendida
 ajustes-estado-gestion-remota-no = Apagada
+ajustes-estado-cortafuegos-ping = Responde al ping
+ajustes-estado-cortafuegos-sin-ping = No responde al ping
+ajustes-estado-cortafuegos-ping-ipv4 = Responde al ping por IPv4
+ajustes-estado-cortafuegos-ping-ipv6 = Responde al ping por IPv6
+ajustes-estado-cortafuegos-regla-puesta = Regla del panel puesta (IPv4)
 ajustes-estado-linea-si = Activa
 ajustes-estado-linea-no = Apagada
 ajustes-estado-voz-si = Encendido
 ajustes-estado-voz-no = Apagado
+ajustes-estado-voz-registrada = Registrado
+ajustes-estado-voz-sin-registrar = Sin registrar
 ajustes-estado-paso-directo-si = Activado
 ajustes-estado-paso-directo-no = Desactivado
 ajustes-estado-hora-si = Automática
 ajustes-estado-hora-no = Sin corregir
 ajustes-estado-diagnostico-si = Copiando el tráfico
 ajustes-estado-diagnostico-no = Apagada
+ajustes-estado-dmz-activa = Activa
+ajustes-estado-dmz-desactivada = Desactivada
 ajustes-dato-nombres_ddns = Nombres
 ajustes-dato-nombres_ddns-ninguno = Ninguno
 ajustes-dato-cuentas = Cuentas
+ajustes-dato-abierto_redes = Abierto solo desde redes concretas
+ajustes-dato-otras_invitadas = Otras redes de invitados
+ajustes-dato-otras_invitadas-valor = { $n } de { $total } separadas
+ajustes-wifi-invitada-nombre = «{ $nombre }» (red { $id })
+ajustes-wifi-invitada-numero = red { $id }
+ajustes-problema-wifi-invitada-sin-separar = { $n ->
+    [one] La red de invitados { $redes } está encendida y no está separada de la red de casa: quien se conecte a ella llega a tus dispositivos.
+   *[other] Las redes de invitados { $redes } están encendidas y no están separadas de la red de casa: quien se conecte a ellas llega a tus dispositivos.
+}
+ajustes-wifi-invitada-sin-separar-recomendado = Recomendado si esa red es para visitas: el panel todavía no sabe separarla ni apagarla; si la web del router lo permite, sepárala de la red de casa desde allí, o apágala si no la usas. A favor: quien se conecte a ella llega a internet, pero no a tus dispositivos. En contra: desde ella no se ven la impresora ni la tele de casa.
 
 ## Acciones de Seguridad y Sistema
 ajustes-accion-apagar_gestion_remota = Apagar la gestión remota
@@ -326,6 +359,10 @@ ajuste-accion-usar_hora_neutra-titulo = Hora del router, usar un servidor neutro
 
 ## Qué pasa ahora (la recomendación de la tarjeta)
 ajustes-problema-seguridad-activa-encendida = La gestión remota está encendida: el operador puede entrar en el router desde internet y cambiar cualquier ajuste sin preguntarte.
+ajustes-problema-seguridad-cortafuegos-ping = El router responde al ping desde internet: cualquiera puede saber que tu conexión está encendida.
+ajustes-problema-seguridad-cortafuegos-ping-ipv4 = El router responde al ping que llega de internet por IPv4: cualquiera puede saber que tu conexión está encendida.
+ajustes-problema-seguridad-cortafuegos-ping-ipv6 = El router responde al ping que llega de internet por IPv6: cualquiera puede saber que tu conexión está encendida, y la regla del panel es solo para IPv4.
+ajustes-problema-seguridad-cortafuegos-servicios-cualquiera = Abierto desde cualquier sitio de internet: { $servicios }.
 ajustes-problema-sistema-activa-false = El router no se pone en hora por internet: su reloj se va desajustando, y tras un corte de luz puede quedarse con una hora muy distinta.
 ajustes-problema-sistema-servidor_1 = El router se pone en hora con { $valor }: depende de quien gestione ese servidor.
 ajustes-problema-sistema-espejo-true = La copia del tráfico está encendida: quien se enchufe a esa toma puede ver todo lo que hace tu casa en internet.
@@ -333,7 +370,7 @@ ajustes-problema-sistema-envio-true = El router envía su registro a otro equipo
 ajustes-problema-red_local-principal = Tus dispositivos preguntan los nombres de las webs a { $valor }: si es el propio router, tus consultas se resuelven en el operador.
 ajustes-problema-telefono-tonos-en_la_voz = Las teclas que pulsas en una llamada van mezcladas con la voz: si la llamada se oye mal, un menú por teléfono puede no reconocerlas.
 ajustes-problema-telefono-tonos-mensajes = Las teclas que pulsas en una llamada van como mensajes aparte: si el operador no lo admite, los menús por teléfono no las reciben.
-ajustes-problema-telefono-activo-false = El teléfono por internet está apagado: el teléfono fijo no puede llamar ni recibir llamadas.
+ajustes-problema-telefono-activo-true = El teléfono por internet está encendido: el router se conecta al servidor de voz del operador, aunque no tengas un teléfono fijo conectado.
 
 ## Franja de resumen de Internet, Seguridad, Teléfono y Sistema
 ajustes-resumen-internet-conexion = Conexión a internet
@@ -376,8 +413,6 @@ ajustes-interruptor-hora-si = Hora automática activada
 ajustes-interruptor-hora-no = Hora automática desactivada
 ajustes-interruptor-servidores-si = Teléfono por internet encendido
 ajustes-interruptor-servidores-no = Teléfono por internet apagado
-ajustes-interruptor-fax-y-modem-si = Paso directo del fax activado
-ajustes-interruptor-fax-y-modem-no = Paso directo del fax desactivado
 ajustes-detalle-opciones = Opciones
 ajustes-accion-activar_rele = Activar el relé
 ajustes-accion-desactivar_rele = Desactivar el relé
@@ -388,3 +423,39 @@ ajuste-accion-desactivar_rele-titulo = Relé DNS, desactivarlo
 ajuste-accion-encender_voz-titulo = Teléfono por internet, encenderlo
 ajuste-accion-apagar_voz-titulo = Teléfono por internet, apagarlo
 ajustes-problema-sistema-servidor_2 = El servidor de reserva es { $valor }: depende de quien gestione ese servidor.
+
+## DMZ y control parental (Puertos)
+ajustes-problema-puertos-dmz = Todo lo que llega de internet va a { $ip }: ese dispositivo queda expuesto como si no hubiera router delante.
+ajustes-problema-puertos-dmz-sin-ip = Todo lo que llega de internet va a un dispositivo de tu casa: queda expuesto como si no hubiera router delante.
+ajustes-puertos-dmz-recomendado = Recomendado si ese dispositivo no es un router propio que se protege solo: quita la DMZ desde la web del router y abre solo los puertos que necesite; el panel no puede hacerlo. A favor: el dispositivo deja de recibir todo lo que llega de internet y solo queda abierto lo que tú decidas. En contra: lo que dependía de la DMZ, como una consola o un servidor, puede dejar de funcionar hasta que abras sus puertos.
+ajustes-puertos-parental = Este router no tiene control parental: ni horarios de conexión ni filtro de webs. Si necesitas limitar lo que se ve desde casa, hay dos caminos:
+ajustes-puertos-parental-titulo = Control parental
+ajustes-puertos-parental-dns = Un DNS con filtro familiar para toda la red de casa: en Mejoras, al revisar «Privacidad máxima», puedes elegir el DNS familiar, que bloquea las webs para adultos y el malware. Recomendado si basta con bloquear webs para adultos o peligrosas. A favor: no hay que comprar nada y se cambia en un momento. En contra: no pone horarios, filtra también a los adultos y un dispositivo con otro DNS configurado se lo salta.
+ajustes-puertos-parental-router = Un router propio detrás de este. Recomendado si quieres horarios y límites por dispositivo. A favor: hace todo eso, normalmente con su propia aplicación. En contra: hay que comprarlo y configurarlo.
+ajustes-puertos-parental-enlace = Elegir el DNS familiar en las mejoras
+
+## Copia de la configuración (al pie de Sistema)
+copia-router-titulo = Copia de la configuración
+copia-router-desc = Una copia de seguridad de todos los ajustes del router, como la que da su web. Al pulsar el botón, el router guarda la configuración actual, prepara la copia y tu navegador la descarga como un fichero config_<fecha>.tar. Sirve para recuperar los ajustes si un día hay que restaurar el router.
+copia-router-secretos = El fichero lleva todas las contraseñas del router: la de la WiFi, la de su web y las de la conexión a internet. Guárdalo en un sitio seguro y no lo compartas. El panel no se queda con ninguna copia.
+copia-router-descargar = Descargar copia
+copia-router-preparando = Preparando la copia…
+copia-router-hecha = Descargada: { $nombre } ({ $kb } KB).
+copia-router-en-curso = Hay un cambio en curso: espera a que termine y prueba de nuevo.
+copia-router-error = El router no ha dado la copia. Prueba de nuevo dentro de un momento.
+copia-router-sin-router = El panel aún no tiene configurado el router.
+
+## Registro del router (al pie de Sistema)
+registro-router-titulo = Registro del router
+registro-router-desc = Lo que el router va anotando: arranques, conexiones, accesos a su web y avisos. Se lee al pulsar el botón, igual que lo descarga la web del router, y no cambia ningún ajuste.
+registro-router-leer = Leer el registro
+registro-router-volver = Volver a leer
+registro-router-leyendo = Leyendo…
+registro-router-descargar = Descargar
+registro-router-filtrar = Filtrar líneas
+registro-router-recortado = El registro es muy largo: solo se ven sus últimas líneas.
+registro-router-vacio = El registro está vacío.
+registro-router-apagado = El router tiene el registro apagado y no anota nada. Enciéndelo con «Guardar el registro», en «Registro del sistema» de esta pestaña.
+registro-router-sin-coincidencias = Ninguna línea contiene lo que has escrito.
+registro-router-error = El router no ha dado su registro. Prueba de nuevo dentro de un momento.
+registro-router-sin-router = El panel aún no tiene configurado el router.

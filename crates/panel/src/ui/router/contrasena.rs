@@ -129,6 +129,7 @@ pub fn CambiarContrasena(
                         invalido
                         bloqueado=bloqueada
                         error
+                        maxlength=MAX_BYTES
                     />
                     <span class="nota" id="router-contrasena-nueva-ayuda">{ayuda}</span>
                 </div>

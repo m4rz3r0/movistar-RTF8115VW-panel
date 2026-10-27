@@ -31,6 +31,7 @@ tipo = "escritura"
 pagina = "x.asp"
 descripcion = "Escribe X"
 riesgo = "medio"
+acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetX" }
 
 [[funcion.parametro]]
@@ -93,6 +94,7 @@ tipo = "escritura"
 pagina = "te_x.asp"
 descripcion = "Escribe X desde la web básica"
 riesgo = "alto"
+acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetX" }
 
 [[funcion.parametro]]
@@ -141,7 +143,7 @@ escribe = { funcion = "cbSetX", parametro = "seguridad" }
 lee = "seguridad"
 tipo = "opcion"
 opciones = [
-  { valor = "11", clave = "wpa2_wpa3", recomendada = true },
+  { valor = "11", clave = "wpa2_wpa3", recomendada = true, respaldo = "criterio" },
   { valor = "3", clave = "wpa2" },
   { valor = "0", clave = "abierta", aviso = "inseguro" },
 ]
@@ -153,6 +155,7 @@ lee = "oculta"
 tipo = "booleano"
 invertido = true
 recomendado = "true"
+respaldo = "criterio"
 
 [[ajuste.campo]]
 id = "clave"

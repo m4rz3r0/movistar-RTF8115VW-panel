@@ -44,6 +44,8 @@ async fn revertir_la_voz_omite_la_clave_tapada() {
     t.bajo = Duration::from_secs(5);
     t.medio = Duration::from_secs(5);
     let (p, cookie) = PanelPrueba::nuevo().tiempos(t).arrancar_con_gestor().await;
+    // La voz no se vigila: aquí se fuerza, para probar la reversión.
+    p.state.cambios().unwrap().vigilar_siempre();
     let (status, body) = preparar(
         &p,
         &cookie,

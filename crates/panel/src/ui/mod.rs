@@ -8,7 +8,9 @@
 
 pub mod ajustes_router;
 pub mod charts;
+pub mod cola;
 pub mod comun;
+pub mod contrasena_campo;
 pub mod estado;
 pub mod explorador;
 pub mod grupo;
@@ -24,10 +26,20 @@ pub mod router;
 pub mod secreto;
 pub mod table;
 pub mod tema;
+pub mod vigilancia;
 pub mod vista;
 
 use crate::t;
 use leptos::prelude::*;
+
+/// «aplicado» → «Aplicado»: una etiqueta que también va a media frase,
+/// sola en una insignia.
+pub(crate) fn mayuscula_inicial(s: &str) -> String {
+    let mut c = s.chars();
+    c.next()
+        .map(|p| p.to_uppercase().chain(c).collect())
+        .unwrap_or_default()
+}
 
 /// Texto de un error que trae una server function: el código fijo de sesión
 /// caducada ([`crate::auth::ERROR_SESION`]) se traduce aquí; el resto ya

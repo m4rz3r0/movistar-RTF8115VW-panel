@@ -187,7 +187,8 @@ pub(crate) mod servidor {
     use tokio::sync::Mutex;
 
     /// Funciones de lectura que no van en la foto: no leen el router sino la
-    /// sesión del propio panel.
+    /// sesión del propio panel. Es por función; `fotos::fuera_de_la_foto`
+    /// deja fuera, por ajuste, las listas que comparten función con otra.
     const FUERA_DE_LA_FOTO: &[&str] = &["cbCheckSession"];
 
     /// Estado de la instalación en memoria (vive en `AppState`).

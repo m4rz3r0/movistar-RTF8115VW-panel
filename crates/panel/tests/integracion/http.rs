@@ -27,6 +27,7 @@ async fn con_sondeo(p: &mut Panel) {
     cfg.timeout = Duration::from_millis(500);
     cfg.min_gap = Duration::from_millis(1);
     p.state.hgu = hgu::Client::new(cfg);
+    p.app = panel::build_router(p.state.clone());
     let h = Poller::spawn_with(
         p.state.clone(),
         PollerConfig {
@@ -40,12 +41,36 @@ async fn con_sondeo(p: &mut Panel) {
     .await;
 }
 
+/// Un cliente del router nuevo (sin ninguna comunicación aún) en el panel.
+fn cliente_nuevo(p: &mut Panel) {
+    let mut cfg = hgu::ClientConfig::new(&p.sim.base_url, crate::comun::USER, crate::comun::PASS);
+    cfg.timeout = Duration::from_millis(500);
+    cfg.min_gap = Duration::from_millis(1);
+    p.state.hgu = hgu::Client::new(cfg);
+    p.app = panel::build_router(p.state.clone());
+}
+
+/// Sin ninguna comunicación con el router todavía (justo al arrancar), no
+/// se dice que falle: «pendiente».
 #[tokio::test]
-async fn salud_sin_sondeo_es_error() {
-    let p = PanelPrueba::nuevo().arrancar().await;
+async fn salud_sin_comunicacion_es_pendiente() {
+    let mut p = PanelPrueba::nuevo().arrancar().await;
+    cliente_nuevo(&mut p);
     let body = json(get(&p.app, "/salud").await).await;
     assert_eq!(body["ok"], true);
-    assert_eq!(body["router"], "error");
+    assert_eq!(body["router"], "pendiente");
+}
+
+/// `/salud` dice cómo acabó la última comunicación real con el router,
+/// aunque el sondeo no tenga datos (justo después de desplegar, las
+/// lecturas de las páginas iban bien y decía «error»).
+#[tokio::test]
+async fn salud_ok_si_el_panel_lee_el_router_aunque_no_haya_sondeo() {
+    let mut p = PanelPrueba::nuevo().arrancar().await;
+    cliente_nuevo(&mut p);
+    p.state.hgu.call("cbGetSummary", &[]).await.unwrap();
+    let body = json(get(&p.app, "/salud").await).await;
+    assert_eq!(body["router"], "ok", "{body}");
 }
 
 #[tokio::test]
@@ -65,8 +90,16 @@ async fn salud_responde_aunque_el_router_no() {
     let mut p = PanelPrueba::nuevo().arrancar().await;
     con_sondeo(&mut p).await;
     p.sim.control.set_unresponsive(true);
-    // Sin datos nuevos en 3 intervalos (300 ms) deja de estar sano.
-    tokio::time::sleep(Duration::from_millis(400)).await;
+    // En cuanto una petición del sondeo agota su tiempo de espera (500 ms).
+    esperar_hasta(
+        Duration::from_secs(5),
+        "sin el error del router",
+        async || {
+            p.state.hgu.contacto().map(|c| c.estado)
+                == Some(hgu::client::EstadoContacto::SinRespuesta)
+        },
+    )
+    .await;
     let start = std::time::Instant::now();
     let resp = get(&p.app, "/salud").await;
     assert!(

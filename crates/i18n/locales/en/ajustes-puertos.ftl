@@ -74,8 +74,7 @@ ajuste-puertos-upnp-activo-recomendado = Recommended if you prefer to decide whi
 ## Protocol helpers (ALG)
 ajuste-puertos-alg-titulo = Protocol helpers (ALG)
 ajuste-puertos-alg-desc = Router helpers that let some older programs work through it: file transfer, internet calls, private networks and video conferencing.
-ajuste-puertos-alg-ayuda = Each helper adjusts the traffic of one kind of program so it gets through the router properly. Here you can see which ones your router has turned on; for now they cannot be changed from the panel. With one turned off, that kind of program may not work from your network; with the calls helper turned on, the phones or calling apps on your network sometimes fail.
-ajuste-puertos-alg-motivo = For now it can only be viewed: to change it, the router needs a value it does not show when read, so the panel could not undo the change if something went wrong. This will be reviewed when tested with the real router.
+ajuste-puertos-alg-ayuda = Each helper adjusts the traffic of one kind of program so it gets through the router properly. Here you can see which ones your router has turned on and change them. With one turned off, that kind of program may not work from your network; with the calls helper turned on, the phones or calling apps on your network sometimes fail.
 ajuste-puertos-alg-ftp = File transfer (FTP)
 ajuste-puertos-alg-ftp-desc = Makes file transfer programs that use FTP active mode work.
 ajuste-puertos-alg-sip = Internet calls (SIP)
@@ -84,3 +83,20 @@ ajuste-puertos-alg-pptp = Private networks (PPTP)
 ajuste-puertos-alg-pptp-desc = Lets the computers on your network connect to older PPTP private networks (VPN).
 ajuste-puertos-alg-h323 = Video conferencing (H.323)
 ajuste-puertos-alg-h323-desc = Makes older video conferencing equipment that uses H.323 work.
+
+## Exposed device (DMZ), read-only
+ajuste-puertos-dmz-titulo = Exposed device (DMZ)
+ajuste-puertos-dmz-desc = A device in your home that receives everything that arrives from the internet without a port rule.
+ajuste-puertos-dmz-ayuda = With the DMZ on, the router sends that device everything that arrives from the internet and has no rule of its own: it is exposed as if there were no router in front of it. It is sometimes used with a games console or with your own router behind this one. Here you can see whether it is on and which device it points to.
+ajuste-puertos-dmz-motivo = The panel can't change the DMZ: do it from the router's web page.
+ajuste-puertos-dmz-equipo = Device (IP)
+ajuste-puertos-dmz-equipo-desc = The IP address of the device that receives everything that arrives from the internet.
+ajuste-puertos-dmz-activa = On
+ajuste-puertos-dmz-activa-desc = When it is on, that device receives everything that arrives from the internet without a rule.
+
+## NAT loopback
+ajuste-puertos-loopback-titulo = Reach your services from home (NAT loopback)
+ajuste-puertos-loopback-desc = Lets the devices in your home reach a service on your network using your internet address or your domain, the same as from outside.
+ajuste-puertos-loopback-ayuda = It is useful if you have a server at home (a website, a cloud, a camera) with an open port and you reach it with your domain: with this off, it does not load from home but works from outside. If you have nothing like that, it does not matter how it is set.
+ajuste-puertos-loopback-activo = NAT loopback on
+ajuste-puertos-loopback-activo-desc = If you turn it off, you will not be able to reach your services from home with your internet address; from outside they will keep working.

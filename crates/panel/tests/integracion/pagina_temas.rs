@@ -46,7 +46,12 @@ async fn pagina_seguridad_gestion_remota() {
     let pagina = leer(&p, &cookie, "seguridad").await;
     assert_eq!(
         ids(&pagina),
-        ["gestion-remota", "contrasena-router", "usuarios"]
+        [
+            "gestion-remota",
+            "contrasena-router",
+            "usuarios",
+            "cortafuegos"
+        ]
     );
     let e = elemento(&pagina, "gestion-remota");
     assert_eq!(e["estado"], "apagada", "{e}");
@@ -196,12 +201,6 @@ async fn interruptores_glifos_y_acciones() {
             "Teléfono por internet encendido",
             "Teléfono por internet apagado",
         ),
-        (
-            "telefono",
-            "fax-y-modem",
-            "Paso directo del fax activado",
-            "Paso directo del fax desactivado",
-        ),
     ];
     for (tema, id, si, no) in casos {
         let pagina = leer(&p, &cookie, tema).await;
@@ -213,6 +212,8 @@ async fn interruptores_glifos_y_acciones() {
     assert_eq!(voz["encendido"], true, "{voz}");
     assert_eq!(voz["efecto"], "efecto-telefono_corte", "{voz}");
     assert!(elemento(&telefono, "linea")["interruptor"].is_null());
+    // El paso directo es un desplegable (desactivado, automático, siempre).
+    assert!(elemento(&telefono, "fax-y-modem")["interruptor"].is_null());
     let acciones: Vec<&str> = telefono["acciones"]
         .as_array()
         .unwrap()

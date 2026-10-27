@@ -10,6 +10,7 @@ import {
   sinDesbordamiento,
   violacionesGraves,
 } from "./util";
+import { capturaOpcional } from "./util";
 
 // Internet, Seguridad, Teléfono y Sistema en rejilla (como la WiFi), en
 // español a 360 y 1440 px y en los dos temas, contra router-sim: la franja
@@ -58,7 +59,7 @@ const casos: Caso[] = [
   {
     tema: "internet",
     nombre: "Internet",
-    tarjetas: 2,
+    tarjetas: 3,
     elemento: "Relé DNS",
     id: "dns",
     editar: pulsar("Relé DNS activado"),
@@ -66,7 +67,7 @@ const casos: Caso[] = [
   {
     tema: "seguridad",
     nombre: "Seguridad",
-    tarjetas: 3,
+    tarjetas: 4,
     elemento: "Gestión remota del operador",
     id: "gestion-remota",
     editar: async (detalle) => {
@@ -131,7 +132,7 @@ async function rejilla(page: Page, c: Caso, sufijo: string, ancho: number) {
     .evaluateAll((ds) => ds.filter((d) => d.scrollWidth > d.clientWidth).map((d) => d.textContent));
   expect(salen, `${c.tema} ${sufijo}: el resumen se sale`).toEqual([]);
   await quieta(page);
-  await page.screenshot({
+  await capturaOpcional(page, {
     path: `${CAPTURAS}/${c.tema}-${sufijo}.png`,
     fullPage: ancho > 900,
     animations: "disabled",
@@ -174,7 +175,7 @@ for (const ancho of [360, 1440]) {
           await c.editar(detalle, sufijo);
           await sinDesbordamiento(page, `${c.tema} detalle ${sufijo}`);
           await quieta(page);
-          await page.screenshot({
+          await capturaOpcional(page, {
             path: `${CAPTURAS}/${c.tema}-detalle-${sufijo}.png`,
             fullPage: ancho > 900,
             animations: "disabled",
@@ -218,8 +219,8 @@ for (const ancho of [360, 1440]) {
         await expect(remota).toHaveClass(/riesgo/);
         await expect(remota.getByRole("button", { name: t.apagarRemota })).toBeVisible();
         // Teléfono: cada tarjeta con su glifo (no los arcos de la WiFi), el
-        // interruptor del teléfono por internet con su nombre y, con
-        // acciones en lote, la marca redonda.
+        // interruptor del teléfono por internet con su nombre y, como sus
+        // acciones valen cada una para una sola tarjeta, sin marca redonda.
         await page.goto("/ajustes/telefono");
         await asentar(page);
         await expect(page.locator("article.tarjeta-el")).toHaveCount(4);
@@ -230,7 +231,7 @@ for (const ancho of [360, 1440]) {
             name: "Teléfono por internet encendido",
           }),
         ).toBeVisible();
-        await expect(page.locator("article.tarjeta-el .marcar")).toHaveCount(4);
+        await expect(page.locator("article.tarjeta-el .marcar")).toHaveCount(0);
         // La contraseña del router no tiene un estado que decir: sin insignia.
         await page.goto("/ajustes/seguridad");
         await asentar(page);
@@ -300,7 +301,7 @@ test.describe("temas en rejilla: guardados de verdad", () => {
           await c.editar(detalle, sufijo);
           await sinDesbordamiento(page, `${c.tema} detalle ${sufijo}`);
           await quieta(page);
-          await page.screenshot({
+          await capturaOpcional(page, {
             path: `${CAPTURAS}/${c.tema}-detalle-${sufijo}.png`,
             fullPage: ancho > 900,
             animations: "disabled",

@@ -17,6 +17,8 @@ use std::{
     sync::Arc,
 };
 
+mod ranuras;
+
 /// Páginas que disparan acciones al cargarse: nunca se cargan, digan lo
 /// que digan el catálogo o la petición.
 const PAGINAS_PROHIBIDAS: &[&str] = &["syslog.asp", "backup_restore.asp"];
@@ -77,10 +79,30 @@ pub(crate) fn gestor(state: &AppState) -> Result<Arc<ChangeManager>, ServerFnErr
         .ok_or_else(|| interno("el gestor de cambios no está instalado"))
 }
 
+/// Liga el cambio preparado con `token` al usuario de la sesión
+/// ([`ChangeManager::ligar`]): solo él lo confirma. Lo llaman las server
+/// functions que preparan un cambio.
+pub(crate) async fn ligar_a_la_sesion(token: &str) -> Result<(), ServerFnError> {
+    let yo = crate::auth::require_user().await?;
+    gestor(&app_state()?)?.ligar(token, &yo.username);
+    Ok(())
+}
+
+/// El error de un motivo del gestor con texto propio
+/// ([`crate::changes::motivo_con_texto`]), en el idioma de la petición.
+pub(crate) fn error_con_texto(e: &CambioError) -> Option<ServerFnError> {
+    let (codigo, clave) = crate::changes::motivo_con_texto(e)?;
+    let status = StatusCode::from_u16(codigo).unwrap_or(StatusCode::BAD_REQUEST);
+    Some(con_estado(status, crate::ui::i18n::traducir(clave, None)))
+}
+
 /// Error del gestor en el idioma de la petición y con qué hacer. El detalle
 /// que trae el gestor (`m`) está en español.
 pub(crate) fn error_cambio(e: CambioError) -> ServerFnError {
     use CambioError as E;
+    if let Some(r) = error_con_texto(&e) {
+        return r;
+    }
     let (status, msg) = match e {
         E::Bloqueada(m) if m == crate::changes::BLOQUEO_SOLO_LECTURA => {
             (StatusCode::FORBIDDEN, crate::t!("panel-solo-lectura"))
@@ -98,6 +120,10 @@ pub(crate) fn error_cambio(e: CambioError) -> ServerFnError {
             crate::t!("biblioteca-error-sin-cambios"),
         ),
         E::EnCurso => (StatusCode::CONFLICT, crate::t!("biblioteca-error-en-curso")),
+        E::ColaLlena => (
+            StatusCode::CONFLICT,
+            crate::t!("cambio-error-cola-llena", max = crate::changes::MAX_COLA),
+        ),
         E::Router(m) => (
             StatusCode::BAD_GATEWAY,
             crate::t!("biblioteca-error-router", detalle = m),
@@ -166,19 +192,28 @@ fn tipo_campo(t: TipoParam) -> TipoCampo {
         TipoParam::Bool => TipoCampo::Bool,
         TipoParam::Enum => TipoCampo::Enum,
         TipoParam::Int => TipoCampo::Int,
-        TipoParam::Text => TipoCampo::Text,
+        TipoParam::Text | TipoParam::Hex => TipoCampo::Text,
         TipoParam::Secret => TipoCampo::Secret,
     }
 }
 
-/// Motivo por el que el panel no escribe con `f` (catálogo o bloqueos de
-/// la v1 del gestor). Las lecturas solo por el catálogo.
+/// Motivo por el que el panel no escribe con `f` (catálogo, sin comprobar
+/// en el router real o bloqueos de la v1 del gestor). Las lecturas solo
+/// por el catálogo.
 fn bloqueo(state: &AppState, f: &Funcion) -> Option<String> {
     if let Some(m) = &f.bloqueada {
         return Some(m.clone());
     }
     if f.tipo == Tipo::Lectura {
         return None;
+    }
+    // La lista blanca: lo no comprobado en el router real no se escribe
+    // (el gestor también lo rechaza).
+    if !f.comprobada() {
+        return Some(crate::ui::i18n::traducir(
+            crate::validacion_real::SIN_COMPROBAR,
+            None,
+        ));
     }
     match state.cambios().map(|g| g.escribible(&f.name)) {
         Some(Err(CambioError::Bloqueada(m))) => Some(m),
@@ -252,9 +287,12 @@ pub fn detalle(state: &AppState, nombre: &str) -> Result<FuncionDetalle, ServerF
     let f = funcion(state, nombre)?;
     let ident = identidad(f);
     let id_lista = f.lista.as_ref().map(|l| l.id_param.as_str());
+    // Lo que no puede cortar el acceso no se vigila; la WiFi, según por
+    // dónde llegue el panel (aquí se cuenta como si se vigilara).
+    let vigila = f.acceso != Some(catalogo::Acceso::NoCorta);
     let vigilancia_s = state
         .cambios()
-        .map_or(0, |g| g.tiempos().vigilancia(f.riesgo).as_secs());
+        .map_or(0, |g| g.tiempos().plazo(f.riesgo, vigila).as_secs());
     Ok(FuncionDetalle {
         resumen: resumen(state, f),
         etiqueta_area: f.area.etiqueta().to_owned(),
@@ -651,7 +689,16 @@ pub async fn formulario(
     let mut campos = Vec::new();
     let mut omitidos = Vec::new();
     for p in &f.parametros {
-        if ident.contains(&p.nombre) && operacion != Operacion::Accion {
+        // Un campo fijo no se enseña: el panel lo manda siempre igual.
+        if (ident.contains(&p.nombre) && operacion != Operacion::Accion) || p.fijo.is_some() {
+            continue;
+        }
+        // Las ranuras (IP reservadas), solo al editar y todas juntas.
+        if p.ranuras.is_some() {
+            let primera = f.parametros.iter().find(|q| q.ranuras.is_some());
+            if operacion == Operacion::Editar && primera.is_some_and(|q| q.nombre == p.nombre) {
+                campos.extend(ranuras::campos(f, &actual));
+            }
             continue;
         }
         let cur = buscar(&actual, &p.nombre);
@@ -810,6 +857,10 @@ pub(crate) fn campo_cambio(
 pub async fn preparar(state: &AppState, p: Peticion) -> Result<PreparadoVista, ServerFnError> {
     let f = funcion(state, &p.funcion)?;
     let g = gestor(state)?;
+    // Por el nombre, antes que nada: una función bloqueada no se escribe
+    // desde la Biblioteca ni con la carga que el gestor admite a la regla
+    // «sin ping» del cortafuegos (esa solo llega desde Seguridad).
+    g.escribible(&p.funcion).map_err(error_cambio)?;
     // Validación de tipo de los valores nuevos (el gestor vuelve a validar
     // lo que cambia): un MASCARA o un secreto vacío es "sin tocar".
     for (k, v) in &p.valores {
@@ -866,7 +917,7 @@ pub(crate) fn vista_preparado(
         borrar: prep.borrar,
         campos,
         riesgo: riesgo(prep.riesgo),
-        vigilancia_s: g.tiempos().vigilancia(prep.riesgo).as_secs(),
+        vigilancia_s: g.tiempos().plazo(prep.riesgo, prep.vigila).as_secs(),
         palabra: prep.palabra,
         aviso: None,
     }
@@ -894,10 +945,18 @@ pub(crate) fn estado(e: Estado) -> EstadoDeCambio {
         Estado::Revertido => EstadoDeCambio::Revertido,
         Estado::Fallido => EstadoDeCambio::Fallido,
         Estado::RevertidoParcial => EstadoDeCambio::RevertidoParcial,
+        Estado::EnCola => EstadoDeCambio::EnCola,
+        Estado::Cancelado => EstadoDeCambio::Cancelado,
     }
 }
 
-pub async fn estado_cambio(state: &AppState, id: i64) -> Result<CambioVista, ServerFnError> {
+/// El estado del cambio `id` para `usuario` (que es quien puede terminar su
+/// vigilancia, si la hizo él).
+pub async fn estado_cambio(
+    state: &AppState,
+    id: i64,
+    usuario: &str,
+) -> Result<CambioVista, ServerFnError> {
     let g = gestor(state)?;
     let c = g.cambio(id).await.ok_or_else(|| {
         con_estado(
@@ -909,12 +968,22 @@ pub async fn estado_cambio(state: &AppState, id: i64) -> Result<CambioVista, Ser
         let fin = c.updated + g.tiempos().vigilancia(c.riesgo).as_secs() as i64;
         (fin - crate::series::now()).max(0)
     });
+    let cola = g.puesto_en_cola(id);
+    // Le llegó el turno y se está preparando para escribir (su fila sigue
+    // `en_cola` hasta escribir): para quien lo sigue, ya se aplica.
+    let estado_visto = match c.estado {
+        Estado::EnCola if g.activo() == Some(id) => EstadoDeCambio::Aplicando,
+        e => estado(e),
+    };
     Ok(CambioVista {
         id: c.id,
-        estado: estado(c.estado),
+        estado: estado_visto,
         error: c.error.as_deref().map(nota_legible),
         nota: c.nota.as_deref().map(nota_legible),
         restante_s,
+        terminable: c.estado == Estado::Vigilando && g.terminable(id, usuario).await,
+        quitable: cola.as_ref().is_some_and(|(_, quien)| quien == usuario),
+        puesto: cola.map(|(n, _)| n),
     })
 }
 

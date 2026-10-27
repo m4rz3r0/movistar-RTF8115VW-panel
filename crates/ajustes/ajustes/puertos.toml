@@ -6,7 +6,8 @@ tema = "puertos"
 nivel = "basico"
 lista = true
 componente = "puertos"
-leer = { funcion = "cbGetNatPortMapping" }
+# La DMZ es una instancia más de la lista (`desc=DMZ`): no es una regla.
+leer = { funcion = "cbGetNatPortMapping", excluir = { desc = "DMZ" } }
 # Columnas de su lista en la página (el nombre va siempre delante).
 columnas = ["protocolo", "externo", "destino", "activa"]
 
@@ -68,6 +69,7 @@ lee = "adm_state"
 tipo = "booleano"
 # Una regla nueva nace activa (decisión del controlador, Tarea 10).
 recomendado = "true"
+respaldo = "criterio"
 
 [[ajuste]]
 id = "puertos.upnp"
@@ -81,10 +83,12 @@ escribe = { funcion = "cbSetUpnpCfg", parametro = "adm_state" }
 lee = "adm_state"
 tipo = "booleano"
 recomendado = "false"
+fuentes = ["nsa-red-casa", "cisa-red-casa"]
+respaldo = "consenso"
 
-# Solo lectura: al escribir, el router necesita un dato que no devuelve al
-# leer, así que el panel no podría deshacer el cambio (`cbSetNatConfig` está
-# en `excluidas.toml`). Se revisará al probar con el router real (fase 3).
+# Como natalg.asp: casillas por presencia y `set_nf_conntrack=1` fijo, que
+# el catálogo añade al escribir (comprobado en el router real, cambios 62 y
+# 63).
 [[ajuste]]
 id = "puertos.alg"
 tema = "puertos"
@@ -93,27 +97,67 @@ leer = { funcion = "cbGetNatConfig" }
 
 [[ajuste.campo]]
 id = "ftp"
+escribe = { funcion = "cbSetNatConfig", parametro = "ftp_enable" }
 lee = "ftp_enable"
 tipo = "booleano"
-solo_lectura = "ajuste-puertos-alg-motivo"
 
 [[ajuste.campo]]
 id = "sip"
+escribe = { funcion = "cbSetNatConfig", parametro = "sip_enable" }
 lee = "sip_enable"
 tipo = "booleano"
-solo_lectura = "ajuste-puertos-alg-motivo"
 
 [[ajuste.campo]]
 id = "pptp"
+escribe = { funcion = "cbSetNatConfig", parametro = "pptp_enable" }
 lee = "pptp_enable"
 tipo = "booleano"
-solo_lectura = "ajuste-puertos-alg-motivo"
 
 [[ajuste.campo]]
 id = "h323"
+escribe = { funcion = "cbSetNatConfig", parametro = "h323_enable" }
 lee = "h323_enable"
 tipo = "booleano"
-solo_lectura = "ajuste-puertos-alg-motivo"
+
+# DMZ (fase 3), solo de lectura: el equipo que recibe todo lo que llega de
+# internet sin regla. En el router real es una instancia de las
+# redirecciones con `desc=DMZ`, sin protocolo ni puertos (la crea natdmz.asp
+# al aplicar, aunque quede apagada); `dmz=1` no la lee. Activa si está
+# encendida y con un equipo (`derivado:estado_dmz`).
+[[ajuste]]
+id = "puertos.dmz"
+tema = "puertos"
+nivel = "avanzado"
+lista = true
+leer = { funcion = "cbGetNatPortMapping", solo = { desc = "DMZ" } }
+
+[[ajuste.campo]]
+id = "equipo"
+lee = "int_ip_addr"
+tipo = "ip"
+# Ninguna guía consultada habla de la DMZ.
+respaldo = "criterio"
+solo_lectura = "ajuste-puertos-dmz-motivo"
+
+[[ajuste.campo]]
+id = "activa"
+lee = "adm_state"
+tipo = "booleano"
+solo_lectura = "ajuste-puertos-dmz-motivo"
+
+# NAT loopback (natloopback.asp): desde casa, entrar a un servicio propio
+# por la dirección pública. Comprobado en el router real (cambios 75 y 76).
+[[ajuste]]
+id = "puertos.loopback"
+tema = "puertos"
+nivel = "avanzado"
+leer = { funcion = "cbGetNatConfig" }
+
+[[ajuste.campo]]
+id = "activo"
+escribe = { funcion = "cbSetNatConfig.loopback", parametro = "adm_state" }
+lee = "adm_state"
+tipo = "booleano"
 
 # Encima de la lista de reglas, una tarjeta por ajuste que no es lista
 # (spec §4.2); las reglas son los elementos de la lista.
@@ -124,6 +168,22 @@ ajustes = ["puertos.upnp"]
 icono = "puerta"
 interruptor = "puertos.upnp.activo"
 estado = "derivado:segun_lo_recomendado"
+
+# Estado: desactivada (gris) o activa (en ámbar, con una recomendación que
+# solo informa).
+[[elemento]]
+id = "dmz"
+tema = "puertos"
+ajustes = ["puertos.dmz"]
+icono = "puerta"
+estado = "derivado:estado_dmz"
+
+[[elemento]]
+id = "loopback"
+tema = "puertos"
+ajustes = ["puertos.loopback"]
+icono = "puerta"
+interruptor = "puertos.loopback.activo"
 
 [[elemento]]
 id = "alg"

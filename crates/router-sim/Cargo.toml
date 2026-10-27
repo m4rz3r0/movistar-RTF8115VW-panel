@@ -1,6 +1,6 @@
 [package]
 name = "router-sim"
-version = "0.5.1"
+version = "1.0.0"
 description = "Router Askey RTF8115VW simulado para pruebas y desarrollo"
 default-run = "router-sim"
 edition.workspace = true
@@ -13,9 +13,12 @@ hgu = { path = "../hgu" }
 catalogo = { path = "../catalogo" }
 axum.workspace = true
 regex.workspace = true
+serde_json.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
 roxmltree.workspace = true
+# Respuestas en crudo (301 del cortafuegos, descarga de la copia).
+reqwest.workspace = true
 # Las lecturas del catálogo de ajustes se prueban contra el sim.
 ajustes = { path = "../ajustes", features = ["catalogo"] }

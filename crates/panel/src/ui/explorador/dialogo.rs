@@ -160,6 +160,20 @@ pub fn DialogoCambio(
         });
     };
 
+    // Al llegar a un estado final (por el sondeo o por un botón: terminar
+    // la vigilancia, quitarlo de la cola), se avisa una vez.
+    Effect::new(move |_| {
+        let Some(e) = cambio.with(|c| c.as_ref().map(|c| c.estado)) else {
+            return;
+        };
+        if e.final_() && !avisado.get_value() {
+            avisado.set_value(true);
+            if let Some(cb) = on_terminado {
+                cb.run(e);
+            }
+        }
+    });
+
     // Seguimiento: ahora y cada 2 s hasta un estado final.
     Effect::new(move |_| {
         let Fase::Seguimiento(id) = fase.get() else {
@@ -171,16 +185,7 @@ pub fn DialogoCambio(
         let consultar = move || {
             spawn_local(async move {
                 match estado_cambio(id).await {
-                    Ok(c) => {
-                        let e = c.estado;
-                        cambio.set(Some(c));
-                        if e.final_() && !avisado.get_value() {
-                            avisado.set_value(true);
-                            if let Some(cb) = on_terminado {
-                                cb.run(e);
-                            }
-                        }
-                    }
+                    Ok(c) => cambio.set(Some(c)),
                     Err(e) => error.set(Some(texto_error(&e))),
                 }
             });
@@ -214,16 +219,25 @@ pub fn DialogoCambio(
         .map(|i| t!("biblioteca-dialogo-instancia", i = i))
         .unwrap_or_default();
     let vigilancia = duracion(preparado.vigilancia_s);
-    let nota = if preparado.palabra.is_some() {
-        t!("biblioteca-nota-accion", vigilancia = vigilancia.as_str())
-    } else {
-        t!("biblioteca-nota-cambio", vigilancia = vigilancia.as_str())
+    let sin_vigilancia = preparado.vigilancia_s == 0;
+    let nota = match (preparado.palabra.is_some(), sin_vigilancia) {
+        (true, false) => t!("biblioteca-nota-accion", vigilancia = vigilancia.as_str()),
+        (true, true) => t!("biblioteca-nota-accion-sin-vigilancia"),
+        (false, false) => t!("biblioteca-nota-cambio", vigilancia = vigilancia.as_str()),
+        (false, true) => t!("biblioteca-nota-cambio-sin-vigilancia"),
     };
-    let riesgo = t!(
-        "biblioteca-riesgo-vigilancia",
-        riesgo = preparado.riesgo.etiqueta(),
-        vigilancia = vigilancia.as_str()
-    );
+    let riesgo = if sin_vigilancia {
+        t!(
+            "biblioteca-riesgo-sin-vigilancia",
+            riesgo = preparado.riesgo.etiqueta()
+        )
+    } else {
+        t!(
+            "biblioteca-riesgo-vigilancia",
+            riesgo = preparado.riesgo.etiqueta(),
+            vigilancia = vigilancia.as_str()
+        )
+    };
     let campo_palabra = preparado.palabra.clone().map(|w| {
         let w2 = w.clone();
         view! {
@@ -278,9 +292,14 @@ pub fn DialogoCambio(
                                 t!("biblioteca-aplicado-nota", nota = n)
                             }),
                     ),
+                    EstadoDeCambio::EnCola => Some(t!(
+                        "ajustes-grupo-estado-en-cola",
+                        puesto = c.puesto.unwrap_or(1)
+                    )),
                     EstadoDeCambio::Revertido
                     | EstadoDeCambio::Fallido
-                    | EstadoDeCambio::RevertidoParcial => c.error.clone().or(c.nota.clone()),
+                    | EstadoDeCambio::RevertidoParcial
+                    | EstadoDeCambio::Cancelado => c.error.clone().or(c.nota.clone()),
                     _ => None,
                 };
                 let estado = match c.estado {
@@ -301,6 +320,7 @@ pub fn DialogoCambio(
 
     let pie = move || match fase.get() {
         Fase::Seguimiento(_) => view! {
+            <crate::ui::vigilancia::BotonesDelCambio cambio error />
             <button class="b-pri" type="button" on:click=move |_| cerrar()>
                 {t!("biblioteca-cerrar")}
             </button>

@@ -402,6 +402,10 @@ pub enum EstadoDeCambio {
     Fallido,
     /// Un grupo que falló y no se pudo revertir entero.
     RevertidoParcial,
+    /// Espera su turno detrás del cambio en curso.
+    EnCola,
+    /// Estuvo en la cola y no llegó a aplicarse.
+    Cancelado,
 }
 
 impl EstadoDeCambio {
@@ -414,6 +418,8 @@ impl EstadoDeCambio {
             EstadoDeCambio::Revertido => t!("biblioteca-cambio-revertido"),
             EstadoDeCambio::Fallido => t!("biblioteca-cambio-fallido"),
             EstadoDeCambio::RevertidoParcial => t!("biblioteca-cambio-revertido-parcial"),
+            EstadoDeCambio::EnCola => t!("biblioteca-cambio-en-cola"),
+            EstadoDeCambio::Cancelado => t!("biblioteca-cambio-cancelado"),
         }
     }
 
@@ -425,6 +431,7 @@ impl EstadoDeCambio {
                 | EstadoDeCambio::Revertido
                 | EstadoDeCambio::Fallido
                 | EstadoDeCambio::RevertidoParcial
+                | EstadoDeCambio::Cancelado
         )
     }
 
@@ -433,7 +440,7 @@ impl EstadoDeCambio {
         use crate::ui::comun::EstadoVisual;
         match self {
             EstadoDeCambio::Aplicado => EstadoVisual::Emite,
-            EstadoDeCambio::Revertido => EstadoVisual::Atencion,
+            EstadoDeCambio::Revertido | EstadoDeCambio::Cancelado => EstadoVisual::Atencion,
             EstadoDeCambio::Fallido | EstadoDeCambio::RevertidoParcial => EstadoVisual::Peligro,
             _ => EstadoVisual::Proceso,
         }
@@ -449,6 +456,16 @@ pub struct CambioVista {
     pub nota: Option<String>,
     /// Segundos que quedan de vigilancia (solo `vigilando`).
     pub restante_s: Option<i64>,
+    /// Quien pregunta puede terminar ya la vigilancia («Todo bien,
+    /// terminar»): la está vigilando el gestor y la hizo él.
+    #[serde(default)]
+    pub terminable: bool,
+    /// Puesto en la cola (desde 1), mientras espera.
+    #[serde(default)]
+    pub puesto: Option<usize>,
+    /// Quien pregunta puede quitarlo de la cola: lo encoló él.
+    #[serde(default)]
+    pub quitable: bool,
 }
 
 // ------------------------------------------------------------ validación
@@ -559,14 +576,21 @@ pub async fn instancias(
     super::servidor::instancias(&state, &funcion, claves).await
 }
 
-/// Paso 1 del gestor de cambios: diff y token.
+/// Paso 1 del gestor de cambios: diff y token. Crear o borrar usuarios del
+/// router exige reautenticación, como en su tarjeta.
 #[server(endpoint = "preparar_cambio", input = Json)]
 pub async fn preparar_cambio(peticion: Peticion) -> Result<PreparadoVista, ServerFnError> {
     // Lleva los datos sensibles del diff en claro.
     super::servidor::sin_guardar();
-    crate::auth::require_user().await?;
+    if crate::changes::es_de_usuarios(&peticion.funcion) {
+        crate::auth::require_reauth().await?;
+    } else {
+        crate::auth::require_user().await?;
+    }
     let state = super::servidor::app_state()?;
-    super::servidor::preparar(&state, peticion).await
+    let v = super::servidor::preparar(&state, peticion).await?;
+    super::servidor::ligar_a_la_sesion(&v.token).await?;
+    Ok(v)
 }
 
 /// Paso 2: aplica el cambio preparado. Devuelve su id para seguirlo.
@@ -583,9 +607,9 @@ pub async fn confirmar_cambio(
 /// Estado de un cambio.
 #[server(endpoint = "estado_cambio", input = Json)]
 pub async fn estado_cambio(id: i64) -> Result<CambioVista, ServerFnError> {
-    crate::auth::require_user().await?;
+    let user = crate::auth::require_user().await?;
     let state = super::servidor::app_state()?;
-    super::servidor::estado_cambio(&state, id).await
+    super::servidor::estado_cambio(&state, id, &user.username).await
 }
 
 #[cfg(test)]

@@ -1,7 +1,7 @@
 //! Gestor de cambios en las pruebas: tiempos cortos, aplicar y esperar.
 
 use super::{PASS, Panel, PanelPrueba, USER, esperar_hasta, esperar_hasta_con, ok};
-use panel::changes::{Cambio, ChangeManager, ChangeRequest, Estado, Tiempos};
+use panel::changes::{Cambio, CambioError, ChangeManager, ChangeRequest, Estado, Tiempos};
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
@@ -38,6 +38,8 @@ pub async fn panel_rapido(timeout: Duration) -> Panel {
     cfg.timeout = timeout;
     cfg.min_gap = Duration::from_millis(1);
     p.state.hgu = hgu::Client::new(cfg);
+    // Un solo cliente del router para las páginas, `/salud` y el gestor.
+    p.app = panel::build_router(p.state.clone());
     p
 }
 
@@ -109,7 +111,9 @@ pub async fn aplicar_ajuste(p: &Panel, cookie: &str, grupo: &Value) -> i64 {
 pub async fn esperar_final(p: &Panel, cookie: &str, id: i64) -> Value {
     esperar_hasta_con(Duration::from_secs(10), async || {
         let c = ok(p, "estado_cambio", json!({ "id": id }), cookie).await;
-        if ["Aplicado", "Revertido", "Fallido"].contains(&c["estado"].as_str().unwrap()) {
+        if ["Aplicado", "Revertido", "Fallido", "Cancelado"]
+            .contains(&c["estado"].as_str().unwrap())
+        {
             Ok(c)
         } else {
             Err(format!("sin final: {c}"))
@@ -163,5 +167,45 @@ pub fn legible(guardado: &str) -> String {
     match Nota::detalle(guardado, i18n::Idioma::Es) {
         Some(d) => format!("{es} [{d}]"),
         None => es,
+    }
+}
+
+/// Confirmar con el gestor directamente: liga antes el token a `usuario`,
+/// como hacen las server functions (un token sin ligar no se confirma).
+#[allow(async_fn_in_trait)]
+pub trait ConfirmarLigado {
+    async fn confirmar_ligado(
+        &self,
+        token: &str,
+        palabra: Option<&str>,
+        usuario: &str,
+    ) -> Result<i64, CambioError>;
+    async fn confirmar_grupo_ligado(
+        &self,
+        token: &str,
+        desmarcados: &[usize],
+        usuario: &str,
+    ) -> Result<i64, CambioError>;
+}
+
+impl ConfirmarLigado for Arc<ChangeManager> {
+    async fn confirmar_ligado(
+        &self,
+        token: &str,
+        palabra: Option<&str>,
+        usuario: &str,
+    ) -> Result<i64, CambioError> {
+        self.ligar(token, usuario);
+        self.confirmar(token, palabra, usuario).await
+    }
+
+    async fn confirmar_grupo_ligado(
+        &self,
+        token: &str,
+        desmarcados: &[usize],
+        usuario: &str,
+    ) -> Result<i64, CambioError> {
+        self.ligar(token, usuario);
+        self.confirmar_grupo(token, desmarcados, usuario).await
     }
 }

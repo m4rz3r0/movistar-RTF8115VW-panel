@@ -88,7 +88,7 @@ Las operaciones delicadas (credenciales y contraseña del router, la conexión
 de internet, confirmar el firmware y todo lo de usuarios) piden volver a
 escribir la contraseña del panel; durante 5 minutos no se vuelve a pedir en
 esa sesión. Con un cambio aplicándose o vigilándose, las credenciales del
-router no se pueden cambiar (se pide esperar).
+router no se pueden cambiar ni esperan en la cola (se pide esperar).
 
 ## Idioma
 
@@ -147,10 +147,14 @@ contraseña cifrada con la clave maestra. Para cambiarla:
    curl -s http://127.0.0.1:3000/salud   # la dirección de RP_LISTEN
    ```
 
-   Da `"ok":true` y `"router":"ok"` cuando el último sondeo del router (cada
-   10 s) ha ido bien; `"router":"sin_configurar"` si el panel aún no tiene
-   credenciales (asistente sin terminar). Si da error, mira el registro del
-   panel (abajo).
+   Da `"ok":true` y `"router":"ok"` cuando la última comunicación del panel
+   con el router (el sondeo le pregunta cada 10 s) tuvo respuesta y fue hace
+   menos de 2 minutos; `"router":"error"` si no respondió, si rechazó las
+   credenciales o si hace más de eso; `"router":"pendiente"` justo al
+   arrancar, antes de la primera; y `"router":"sin_configurar"` si el panel
+   aún no tiene credenciales (asistente sin terminar). `/salud` no pregunta
+   al router por su cuenta. Si da error, mira el registro del panel (abajo):
+   un error de red lleva su causa completa.
 
 ## La clave maestra y las copias de seguridad
 

@@ -1,0 +1,50 @@
+/* «Registro del router», al pie de Sistema: los botones y la edad de la
+   lectura en una fila que se parte en el móvil, y el texto en un bloque
+   que se desplaza, sin desbordar la página. */
+.registro-router {
+  max-width: none;
+}
+
+.registro-router-barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-2) var(--esp-3);
+  margin: var(--esp-3) 0;
+}
+
+.registro-router-leido {
+  color: var(--tenue);
+  font-size: 0.875rem;
+}
+
+.registro-router .lista-filtro {
+  margin-bottom: var(--esp-3);
+}
+
+.registro-router-nota {
+  margin: var(--esp-2) 0;
+}
+
+.registro-router-texto {
+  max-height: 28rem;
+  margin: 0;
+  padding: var(--esp-3);
+  overflow: auto;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--sup2);
+  color: var(--texto);
+  font-family: var(--fuente-mono);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 639px) {
+  .registro-router-texto {
+    max-height: 60vh;
+    font-size: 0.75rem;
+  }
+}

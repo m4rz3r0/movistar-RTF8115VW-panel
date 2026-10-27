@@ -60,13 +60,13 @@ estado-rango-dia = últimas 24 h
 estado-rango-semana = últimos 7 días
 
 ## Tablas
-estado-clientes-lan = Clientes LAN
+estado-clientes-lan = Dispositivos de la red local
 estado-resumen-hosts = { $conectados } conectados · { $desconectados } desconectados
 estado-lentos = Datos de las { $hora } · se leen cada minuto
 estado-lentos-sin-leer = Aún sin leer: se leen cada minuto
 estado-col-nombre = Nombre
 estado-col-estado = Estado
-estado-col-lease-fijo = Lease fijo
+estado-col-lease-fijo = Reserva fija
 estado-col-interfaz = Interfaz
 estado-col-tipo = Tipo
 estado-col-caduca = Caduca en

@@ -1,0 +1,61 @@
+/* Zonas táctiles: en el móvil, 44 px por lado como mínimo (WCAG 2.5.5,
+   guías de iOS y Android). Va al final de la cascada para mandar sobre los
+   tamaños de escritorio de cada componente. Lo que no debe crecer a la
+   vista (el interruptor, la casilla de marcar, los desplegables de texto)
+   amplía su zona con un pseudoelemento transparente. */
+@media (pointer: coarse), (max-width: 860px) {
+  .b-pri,
+  .b-sec,
+  .b-rec,
+  .b-txt,
+  .b-pel,
+  .campo select,
+  .campo input:not([type="checkbox"], [type="radio"]),
+  .secreto-valor,
+  .campo .secreto-campo .secreto-valor,
+  .campo-ajuste .secreto-campo .secreto-valor:not([type="checkbox"]) {
+    min-height: 44px;
+  }
+
+  .boton-ojo {
+    min-width: 44px;
+  }
+
+  .menu-boton {
+    width: 44px;
+    height: 44px;
+  }
+
+  .lista-ordenar {
+    min-height: 44px;
+  }
+
+  .int::before,
+  .interruptor::before {
+    inset: -11px -2px;
+  }
+
+  .marcar::before {
+    inset: -11px;
+  }
+
+  /* «De dónde sale», «¿Qué hace esto?», «Detalles técnicos»: el texto no
+     crece; la zona que se toca, sí. */
+  /* Solo los de texto (sin clase): las cabeceras del Historial y los
+     chips ya son grandes, y la capa encima taparía su contenido. */
+  summary:not([class]) {
+    position: relative;
+  }
+
+  summary:not([class])::after {
+    content: "";
+    position: absolute;
+    inset: -11px 0;
+  }
+
+  /* Botones de opción y casillas: la etiqueta es parte de la zona. */
+  .opcion,
+  .campo-interruptor {
+    min-height: 44px;
+  }
+}

@@ -245,6 +245,13 @@ impl CacheLecturas {
                 .map(|(k, v)| (k.as_str(), v.as_str()))
                 .collect();
             let r = match &c.busqueda {
+                // El cortafuegos se lee de su página (`var filter`), como un
+                // nodo con una regla por hijo.
+                None if c.funcion == hgu::cortafuegos::PAGINA_LISTA => turno
+                    .pagina(&c.funcion)
+                    .await
+                    .and_then(|html| hgu::cortafuegos::analizar(&html))
+                    .map(|f| hgu::cortafuegos::a_xml(&f)),
                 None => turno.call(&c.funcion, &params).await,
                 Some(b) => {
                     let ident: Vec<(&str, &str)> = b

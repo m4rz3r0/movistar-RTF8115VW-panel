@@ -1,6 +1,7 @@
 //! Preparar, confirmar y verificar cambios: bloqueos, secretos, tokens y reinicio.
 
 use super::*;
+use crate::comun::ConfirmarLigado;
 
 #[tokio::test]
 async fn aplica_y_verifica_static_lease() {
@@ -29,7 +30,10 @@ async fn aplica_y_verifica_static_lease() {
     );
     assert!(campos.contains(&("mac_addr", "", "02:00:00:00:00:99")));
 
-    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    let id = m
+        .confirmar_ligado(&prep.token, None, "admin")
+        .await
+        .unwrap();
     assert_eq!(m.activo(), Some(id));
     let c = esperar_estado(&m, id, Estado::Aplicado).await;
     assert_eq!(c.usuario.as_deref(), Some("admin"));
@@ -56,7 +60,10 @@ async fn edicion_envia_la_instancia_completa() {
         (c.nombre.as_str(), c.antes.as_str(), c.despues.as_str()),
         ("ipv4_addr", "192.168.1.68", "192.168.1.80")
     );
-    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    let id = m
+        .confirmar_ligado(&prep.token, None, "admin")
+        .await
+        .unwrap();
     esperar_estado(&m, id, Estado::Aplicado).await;
     let w = p.sim.control.writes();
     let params: BTreeMap<_, _> = w[0].1.iter().cloned().collect();
@@ -122,7 +129,7 @@ async fn verificacion_falla_si_router_ignora() {
     let (p, m) = preparado().await;
     let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
     p.sim.control.ignore_next_write();
-    let r = m.confirmar(&prep.token, None, "admin").await;
+    let r = m.confirmar_ligado(&prep.token, None, "admin").await;
     let Err(CambioError::Verificacion(fallos)) = r else {
         panic!("{r:?}");
     };
@@ -140,7 +147,7 @@ async fn error_del_router_deja_fallido() {
     let (p, m) = preparado().await;
     let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
     p.sim.control.fail_next_write("no se puede");
-    let r = m.confirmar(&prep.token, None, "admin").await;
+    let r = m.confirmar_ligado(&prep.token, None, "admin").await;
     assert!(
         matches!(&r, Err(CambioError::Router(e)) if e.contains("no se puede")),
         "{r:?}"
@@ -151,8 +158,10 @@ async fn error_del_router_deja_fallido() {
     assert_eq!(m.activo(), None);
 }
 
+/// Dos confirmaciones a la vez: una se aplica y la otra espera en la cola
+/// (no se intercalan: cada una escribe cuando le toca).
 #[tokio::test]
-async fn cambios_concurrentes_no_se_intercalan() {
+async fn cambios_concurrentes_se_ponen_en_cola() {
     let (p, m) = preparado().await;
     let a = m.preparar(lease0("192.168.1.80")).await.unwrap();
     let b = m
@@ -160,37 +169,32 @@ async fn cambios_concurrentes_no_se_intercalan() {
         .await
         .unwrap();
     let (ra, rb) = tokio::join!(
-        m.confirmar(&a.token, None, "admin"),
-        m.confirmar(&b.token, None, "admin")
+        m.confirmar_ligado(&a.token, None, "admin"),
+        m.confirmar_ligado(&b.token, None, "admin")
     );
-    let (ok, otro, token_otro) = match (ra, rb) {
-        (Ok(id), Err(e)) => (id, e, b.token.clone()),
-        (Err(e), Ok(id)) => (id, e, a.token.clone()),
-        r => panic!("se esperaba uno aceptado y otro en curso: {r:?}"),
-    };
-    assert!(matches!(otro, CambioError::EnCurso), "{otro:?}");
-    assert_eq!(p.sim.control.writes().len(), 1);
-    // Mientras se vigila, sigue ocupado.
-    let r = m.confirmar(&token_otro, None, "admin").await;
-    assert!(matches!(r, Err(CambioError::EnCurso)), "{r:?}");
-    esperar_estado(&m, ok, Estado::Aplicado).await;
+    let (ia, ib) = (ra.unwrap(), rb.unwrap());
+    esperar_estado(&m, ia, Estado::Aplicado).await;
+    esperar_estado(&m, ib, Estado::Aplicado).await;
     esperar_libre_gestor(&m).await;
-    // El token rechazado por estar ocupado sigue valiendo.
-    let id = m.confirmar(&token_otro, None, "admin").await.unwrap();
-    esperar_estado(&m, id, Estado::Aplicado).await;
     assert_eq!(p.sim.control.writes().len(), 2);
+    // Los tokens se gastaron.
+    let r = m.confirmar_ligado(&a.token, None, "admin").await;
+    assert_eq!(r, Err(CambioError::TokenInvalido));
 }
 
 #[tokio::test]
 async fn token_de_un_solo_uso() {
     let (_p, m) = preparado().await;
     let prep = m.preparar(lease0("192.168.1.80")).await.unwrap();
-    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    let id = m
+        .confirmar_ligado(&prep.token, None, "admin")
+        .await
+        .unwrap();
     esperar_estado(&m, id, Estado::Aplicado).await;
     esperar_libre_gestor(&m).await;
-    let r = m.confirmar(&prep.token, None, "admin").await;
+    let r = m.confirmar_ligado(&prep.token, None, "admin").await;
     assert!(matches!(r, Err(CambioError::TokenInvalido)), "{r:?}");
-    let r = m.confirmar("inventado", None, "admin").await;
+    let r = m.confirmar_ligado("inventado", None, "admin").await;
     assert!(matches!(r, Err(CambioError::TokenInvalido)), "{r:?}");
 }
 
@@ -216,7 +220,7 @@ async fn pausa_que_no_llega_no_escribe() {
     // El ciclo del sondeo queda colgado esperando al router.
     p.sim.control.set_unresponsive(true);
     tokio::time::sleep(Duration::from_millis(200)).await;
-    let r = m.confirmar(&prep.token, None, "admin").await;
+    let r = m.confirmar_ligado(&prep.token, None, "admin").await;
     assert!(
         matches!(&r, Err(CambioError::Router(e)) if e.contains("el sondeo no se detuvo a tiempo")),
         "{r:?}"
@@ -234,12 +238,12 @@ async fn reboot_exige_palabra() {
     assert_eq!(prep.riesgo, Riesgo::Alto);
     assert_eq!(prep.palabra.as_deref(), Some("REINICIAR"));
     for palabra in [None, Some("reiniciar"), Some("SI")] {
-        let r = m.confirmar(&prep.token, palabra, "admin").await;
+        let r = m.confirmar_ligado(&prep.token, palabra, "admin").await;
         assert!(matches!(r, Err(CambioError::PalabraIncorrecta)), "{r:?}");
     }
     assert!(p.sim.control.writes().is_empty());
     let id = m
-        .confirmar(&prep.token, Some("REINICIAR"), "admin")
+        .confirmar_ligado(&prep.token, Some("REINICIAR"), "admin")
         .await
         .unwrap();
     esperar_estado(&m, id, Estado::Aplicado).await;
@@ -254,7 +258,7 @@ async fn reboot_sin_vuelta_es_fallido() {
     let m = gestor(&p, tiempos_rapidos()).await;
     let prep = m.preparar(req("cbReboot", None, &[])).await.unwrap();
     let id = m
-        .confirmar(&prep.token, Some("REINICIAR"), "admin")
+        .confirmar_ligado(&prep.token, Some("REINICIAR"), "admin")
         .await
         .unwrap();
     // El router no vuelve a responder tras reiniciar.
@@ -320,7 +324,10 @@ async fn historial_en_orden() {
     let mut ids = Vec::new();
     for ip in ["192.168.1.80", "192.168.1.81"] {
         let prep = m.preparar(lease0(ip)).await.unwrap();
-        let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+        let id = m
+            .confirmar_ligado(&prep.token, None, "admin")
+            .await
+            .unwrap();
         esperar_estado(&m, id, Estado::Aplicado).await;
         esperar_libre_gestor(&m).await;
         ids.push(id);
@@ -340,7 +347,7 @@ async fn confirmar_abandonado_termina_igual() {
     // Quien confirma se va (p. ej. se cierra la pestaña) a mitad de camino.
     let r = tokio::time::timeout(
         Duration::from_millis(2),
-        m.confirmar(&prep.token, None, "admin"),
+        m.confirmar_ligado(&prep.token, None, "admin"),
     )
     .await;
     assert!(r.is_err(), "debía abandonarse antes de terminar: {r:?}");

@@ -14,7 +14,7 @@ mejoras-lote-privacidad-titulo = Improvements, maximum privacy
 mejoras-aviso-tr069 = A factory reset or a technician can turn remote management back on. If you call support, they may ask you to turn it on. It is worth turning it on now and then to get the router's updates.
 
 ## Tips without a button
-mejoras-consejo-wpa3 = Use WPA3 and management frame protection if the router ever allows it: this one does not support it.
+mejoras-consejo-wpa3 = This router only offers open WiFi, WPA2 and WPA/WPA2: it has no WPA3. If you ever change routers, choose one with WPA3.
 mejoras-consejo-nombre_y_mac = Do not hide the network name or filter by MAC: they do not protect you, and a hidden name makes phones announce it wherever they go.
 mejoras-consejo-contrasena_admin = Change the admin password printed on the router's label (coming to the panel later).
 mejoras-consejo-reenvios = Check that no port forwarding rule points to the router itself.
@@ -55,6 +55,8 @@ mejoras-dns-cloudflare = Cloudflare
 mejoras-dns-cloudflare-desc = Very fast. It is a United States company.
 mejoras-dns-adguard = AdGuard
 mejoras-dns-adguard-desc = Blocks ads and trackers. It may break some websites.
+mejoras-dns-cloudflare_familiar = Cloudflare for Families
+mejoras-dns-cloudflare_familiar-desc = Recommended if there are children at home and you want a family filter. Pros: it filters adult websites and malware on every device at home, with nothing to install. Cons: it filters for everyone, adults included; changing the device's DNS gets around it, and Cloudflare sees the lookups.
 mejoras-dns-elegir = DNS service for the home network
 
 ## State of the bundles and their review

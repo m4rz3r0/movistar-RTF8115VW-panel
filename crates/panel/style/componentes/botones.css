@@ -110,6 +110,11 @@ button {
   cursor: progress;
 }
 
+/* «Todo bien, terminar» y «Quitar de la cola»: en una sola línea. */
+.b-terminar {
+  white-space: nowrap;
+}
+
 /* En el móvil, zona táctil de 40 px. */
 @media (pointer: coarse), (max-width: 860px) {
   .b-pri,

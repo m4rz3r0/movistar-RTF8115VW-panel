@@ -1,6 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { CONTRASENA, instalado } from "./instancias";
 import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
+import { capturaOpcional } from "./util";
 
 // Sección «Configuración del router»: el enlace de la navegación lleva a
 // «Conexión con el router» y «Atrás» vuelve a la página de antes (sin
@@ -98,7 +99,7 @@ for (const idioma of ["es", "en"] as const) {
         await expect(tarjeta.locator(".red-resumen")).toContainText(t.telefonia);
         await expect(tarjeta.locator("#router-red-conexion option")).toHaveCount(4);
         await sinDesbordamiento(page, `red del router ${idioma} ${ancho}`);
-        await page.screenshot({ path: `capturas/router-red-${idioma}-${ancho}.png`, fullPage: true });
+        await capturaOpcional(page, { path: `capturas/router-red-${idioma}-${ancho}.png`, fullPage: true });
         expect(errores, "errores o avisos en la consola").toEqual([]);
       });
     });
@@ -159,7 +160,7 @@ function sinApiNiClave(texto: string) {
 async function pedirCambio(page: Page, nueva: string) {
   const tarjeta = page.locator("section#router-cambiar-contrasena");
   await tarjeta.locator("#router-contrasena-nueva").fill(nueva);
-  await tarjeta.getByRole("button", { name: /^(Cambiar|Change)$/ }).click();
+  await tarjeta.getByRole("button", { name: /^(Cambiar la contraseña|Change the password)$/ }).click();
   const dialogo = page.locator("dialog[open]");
   await expect(dialogo).toBeVisible();
   if (await dialogo.locator("#reautenticar-contrasena").count()) {
@@ -187,21 +188,23 @@ test.describe("cambiar la contraseña del router", () => {
       expect(await guardada.inputValue()).not.toBe("");
       await sinDesbordamiento(page, `tarjetas ${ancho}`);
       sinApiNiClave(await page.locator("main").innerText());
-      await page.screenshot({ path: `${SDD}/contrasena-tarjetas-es-${ancho}.png`, fullPage: true });
+      await capturaOpcional(page, { path: `${SDD}/contrasena-tarjetas-es-${ancho}.png`, fullPage: true });
 
       // La nueva, con el ojo abierto para comprobarla.
       const nueva = cambio.locator("#router-contrasena-nueva");
       await expect(nueva).toHaveAttribute("autocomplete", "new-password");
       await expect(nueva).toHaveAttribute("data-1p-ignore", "");
+      // Lo más que admite la web oficial del router.
+      await expect(nueva).toHaveAttribute("maxlength", "32");
       await nueva.fill(NUEVA_ROUTER);
       await cambio.getByRole("button", { name: "Mostrar Contraseña nueva" }).click();
       await expect(nueva).toHaveAttribute("type", "text");
       await sinDesbordamiento(page, `ojo ${ancho}`);
-      await cambio.screenshot({ path: `${SDD}/contrasena-ojo-es-${ancho}.png` });
+      await capturaOpcional(cambio, { path: `${SDD}/contrasena-ojo-es-${ancho}.png` });
 
       // Una corta: el error, sin diálogo.
       await nueva.fill("corta");
-      await cambio.getByRole("button", { name: "Cambiar" }).click();
+      await cambio.getByRole("button", { name: "Cambiar la contraseña" }).click();
       await expect(cambio.locator(".error-formulario")).toContainText("demasiado corta");
       await expect(page.locator("dialog[open]")).toHaveCount(0);
 
@@ -211,7 +214,7 @@ test.describe("cambiar la contraseña del router", () => {
       await expect(dialogo).toContainText("también desde su propia web");
       sinApiNiClave(await dialogo.innerText());
       await sinDesbordamiento(page, `diálogo ${ancho}`);
-      await page.screenshot({ path: `${SDD}/contrasena-dialogo-es-${ancho}.png` });
+      await capturaOpcional(page, { path: `${SDD}/contrasena-dialogo-es-${ancho}.png` });
       await dialogo.getByRole("button", { name: "Cancelar" }).click();
       await expect(page.locator("dialog[open]")).toHaveCount(0);
       // No ha cambiado nada.
@@ -237,8 +240,7 @@ test.describe("cambiar la contraseña del router", () => {
     // El simulador no sabe dejar al panel fuera con las dos contraseñas a
     // la vez: la respuesta de un error de verdad (la nueva corta), con el
     // texto del error grave (el de router.ftl en inglés).
-    const corta =
-      "The new password is too short: it needs at least 8 characters. Accented letters and some symbols take up more than one.";
+    const corta = "The new password is too short: it needs at least 8 characters.";
     const grave =
       "The panel cannot log in to the router with either the new password or the previous one. " +
       "To get access back, log in to the router's web interface (try the new one and, if that " +
@@ -260,7 +262,7 @@ test.describe("cambiar la contraseña del router", () => {
     await expect(cambio.locator(".error-formulario")).toHaveText(grave);
     await expect(page.locator("dialog[open]")).toHaveCount(0);
     await sinDesbordamiento(page, "error grave en 1024");
-    await cambio.screenshot({ path: `${SDD}/contrasena-error-grave-en-1024.png` });
+    await capturaOpcional(cambio, { path: `${SDD}/contrasena-error-grave-en-1024.png` });
     await ctx.close();
   });
 
@@ -274,7 +276,7 @@ test.describe("cambiar la contraseña del router", () => {
     await expect(enlace).toBeVisible();
     await expect(page.locator("#router-contrasena-nueva")).toHaveCount(0);
     await sinDesbordamiento(page, "seguridad 360");
-    await enlace.locator("xpath=ancestor::section[contains(@class, 'detalle-columna')]").screenshot({
+    await capturaOpcional(enlace.locator("xpath=ancestor::section[contains(@class, 'detalle-columna')]"), {
       path: `${SDD}/contrasena-enlace-seguridad-es-360.png`,
     });
     await enlace.click();
@@ -420,11 +422,11 @@ test("es a 360 px: en solo lectura la tarjeta se ve desactivada", async ({ page 
   const cambio = page.locator("section#router-cambiar-contrasena");
   await expect(cambio).toContainText("No se puede cambiar mientras el panel esté en solo lectura");
   await expect(cambio.locator("#router-contrasena-nueva")).toBeDisabled();
-  await expect(cambio.getByRole("button", { name: "Cambiar" })).toBeDisabled();
+  await expect(cambio.getByRole("button", { name: "Cambiar la contraseña" })).toBeDisabled();
   // Y se ve apagado, como los botones desactivados.
   await expect(cambio.locator(".secreto-campo")).toHaveCSS("opacity", "0.6");
   await sinDesbordamiento(page, "solo lectura 360");
-  await cambio.screenshot({ path: `${SDD}/contrasena-solo-lectura-es-360.png` });
+  await capturaOpcional(cambio, { path: `${SDD}/contrasena-solo-lectura-es-360.png` });
   await page.evaluate(() => window.scrollTo(0, 0));
-  await page.screenshot({ path: `${SDD}/contrasena-solo-lectura-pagina-es-360.png`, fullPage: true });
+  await capturaOpcional(page, { path: `${SDD}/contrasena-solo-lectura-pagina-es-360.png`, fullPage: true });
 });

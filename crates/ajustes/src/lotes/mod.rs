@@ -10,7 +10,9 @@
 //!   `[[eleccion]]` (un proveedor de DNS, por ejemplo).
 //!
 //! Admite además `si = { campo, valor }` (solo aplica si se cumple) y
-//! `opcional = true` (sale desmarcado en la revisión).
+//! `opcional = true` (sale desmarcado en la revisión). Cada paso, y la
+//! opción por defecto de cada elección, dice de dónde sale: `fuentes` o
+//! `respaldo = "criterio"` (ver [`crate::Fuente`]).
 //!
 //! ```toml
 //! [[paso]]
@@ -29,6 +31,7 @@
 use serde::Deserialize;
 use std::collections::BTreeMap;
 
+use crate::fuentes::Respaldo;
 use crate::modelo::Tema;
 
 mod comprobar;
@@ -85,6 +88,12 @@ pub struct PasoLote {
     /// Id de la `[[eleccion]]` que da los valores.
     #[serde(default)]
     pub elegir: Option<String>,
+    /// Ids de las fuentes de su recomendación (`fuentes.toml`).
+    #[serde(default)]
+    pub fuentes: Vec<String>,
+    /// En qué se apoya su recomendación (`criterio`: sin fuente real).
+    #[serde(default)]
+    pub respaldo: Option<Respaldo>,
 }
 
 /// En qué elementos se repite un paso.
@@ -134,6 +143,12 @@ pub struct OpcionEleccion {
     #[serde(default)]
     pub defecto: bool,
     pub valores: BTreeMap<String, String>,
+    /// Ids de las fuentes de su recomendación (`fuentes.toml`).
+    #[serde(default)]
+    pub fuentes: Vec<String>,
+    /// En qué se apoya su recomendación (`criterio`: sin fuente real).
+    #[serde(default)]
+    pub respaldo: Option<Respaldo>,
 }
 
 /// Un campo que cambia un paso y el valor legible que le pone (`None`: lo

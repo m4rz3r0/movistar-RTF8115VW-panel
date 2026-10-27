@@ -1,6 +1,6 @@
 [package]
 name = "hgu"
-version = "0.5.1"
+version = "1.0.0"
 description = "Utilidades para hablar con el router Askey RTF8115VW"
 edition.workspace = true
 rust-version.workspace = true
@@ -12,9 +12,10 @@ roxmltree.workspace = true
 regex.workspace = true
 thiserror.workspace = true
 reqwest.workspace = true
-tokio = { workspace = true, features = ["sync", "time"] }
+tokio = { workspace = true, features = ["sync", "time", "net"] }
 tracing.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 
 [dev-dependencies]
 axum.workspace = true

@@ -1,8 +1,10 @@
 //! Derivados de Internet: la conexión, el relé DNS, el DNS dinámico y la franja de resumen.
 //!
-//! La conexión no es un ajuste (cambiarla puede cortar el acceso): su
+//! La conexión es de solo lectura (cambiarla puede cortar el acceso): su
 //! estado sale de `cbGetWanIPIntf`, la lectura que usa también la página de
-//! inicio, eligiendo la conexión de internet como la detección del router.
+//! inicio, eligiendo la conexión de internet como el gestor: la del panel
+//! (elegida a mano o detectada) y, sin ella, la de la detección. Las demás
+//! conexiones (voz, servicios) se marcan «del operador».
 
 use super::*;
 use hgu::models::{TipoConexion, WanConn};
@@ -19,11 +21,90 @@ pub(super) fn claves_extra() -> Vec<Clave> {
     vec![clave_conexiones()]
 }
 
+/// Las conexiones leídas en la tanda (ninguna si la lectura falló).
+pub(in crate::ajustes_router::servidor) fn conexiones(
+    leidas: &HashMap<Clave, Result<XmlNode, hgu::Error>>,
+) -> Vec<WanConn> {
+    leidas
+        .get(&clave_conexiones())
+        .and_then(|r| r.as_ref().ok())
+        .map(WanConn::parse_all)
+        .unwrap_or_default()
+}
+
+/// La conexión de internet entre `conns`, como el gestor y el cortafuegos:
+/// la del panel (`wan`, la elegida a mano o la detectada, ver
+/// `RedActual::wan_en`) si existe; si no, la que elige la
+/// detección. `None` si no se sabe cuál es.
+fn de_internet<'a>(conns: &'a [WanConn], wan: Option<&str>) -> Option<&'a WanConn> {
+    wan.and_then(|n| conns.iter().find(|c| c.name == n))
+        .or_else(|| hgu::deteccion::elegir_wan(conns, None))
+}
+
 /// La conexión que lleva internet (`None` si no se pudo leer o no se sabe
 /// cuál es).
 fn conexion(ctx: &Contexto) -> Option<WanConn> {
     let conns = WanConn::parse_all(ctx.leida(&clave_conexiones())?);
-    hgu::deteccion::elegir_wan(&conns, None).cloned()
+    de_internet(&conns, ctx.wan).cloned()
+}
+
+/// Clave de la nota de las conexiones que no son la de internet.
+const DEL_OPERADOR: &str = "ajuste-internet-conexion-del-operador";
+
+/// Clave de la nota de todas las conexiones cuando no se sabe cuál es la de
+/// internet: ninguna se presenta como tal.
+const SIN_IDENTIFICAR: &str = "ajuste-internet-conexion-sin-identificar";
+
+/// Marca «del operador» las conexiones de la tarjeta que no son la de
+/// internet (ver [`de_internet`], con `wan` la del panel) y pone esta
+/// primero. Si no se sabe cuál es, las marca todas «sin identificar».
+pub(in crate::ajustes_router::servidor) fn marcar_conexiones(
+    vistas: &mut [AjusteVista],
+    leidas: &HashMap<Clave, Result<XmlNode, hgu::Error>>,
+    wan: Option<&str>,
+) {
+    let slug = Componente::Conexion.slug();
+    let Some(v) = vistas
+        .iter_mut()
+        .find(|v| v.componente.as_deref() == Some(slug))
+    else {
+        return;
+    };
+    let conns = conexiones(leidas);
+    let internet = de_internet(&conns, wan).map(|c| c.ip_intf_id.as_str());
+    for i in &mut v.instancias {
+        i.nota = match internet {
+            Some(id) => (i.id != id).then(|| DEL_OPERADOR.to_owned()),
+            None => Some(SIN_IDENTIFICAR.to_owned()),
+        };
+    }
+    v.instancias.sort_by_key(|i| i.nota.is_some());
+}
+
+/// `derivado:estado_conexion`: «Conectada (PPPoE)» (o el tipo que sea) si la
+/// conexión de internet está en marcha y con dirección; si no, «Sin
+/// conexión». «Sin leer» si la lectura falló y «Sin datos» si se leyó pero
+/// no se sabe cuál es la de internet.
+pub(super) fn estado_conexion(ctx: &Contexto) -> (EstadoVisual, String) {
+    let (estado, clave) = match conexion(ctx) {
+        None if ctx.leida(&clave_conexiones()).is_none() => {
+            (EstadoVisual::Atencion, "ajustes-estado-sin-leer")
+        }
+        None => (EstadoVisual::Atencion, "comun-sin-datos"),
+        Some(c) if !(c.up && c.ipv4.is_some()) => {
+            (EstadoVisual::Atencion, "ajustes-estado-conexion-sin")
+        }
+        Some(c) => (
+            EstadoVisual::Emite,
+            match c.tipo() {
+                TipoConexion::Pppoe => "ajustes-estado-conexion-pppoe",
+                TipoConexion::Dhcp => "ajustes-estado-conexion-dhcp",
+                TipoConexion::Estatica => "ajustes-estado-conexion-fija",
+                TipoConexion::Otro => "ajustes-estado-conexion-otro",
+            },
+        ),
+    };
+    (estado, clave.to_owned())
 }
 
 /// Cifra y explicación del dato «Conexión»: conectada (tiene dirección y

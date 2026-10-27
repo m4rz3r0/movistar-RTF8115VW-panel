@@ -107,6 +107,37 @@ async fn registro_ida_y_vuelta() {
     );
 }
 
+/// Encender y apagar el registro (`syslog_enable`), como la casilla de
+/// syslog.asp: el router con el registro apagado no anota nada.
+#[tokio::test]
+async fn registro_encendido_ida_y_vuelta() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    escribir(&p, "syslog.asp", "cbSetSyslog", &[("syslog_enable", "0")]).await;
+    let pagina = leer(&p, &cookie, "sistema").await;
+    let e = de_la_pagina(&pagina, "registro");
+    assert!(
+        e.to_string().contains("ajuste-sistema-registro-activado"),
+        "{e}"
+    );
+
+    let g = preparar(
+        &p,
+        &cookie,
+        "sistema.registro",
+        json!({ "activado": "true" }),
+    )
+    .await;
+    let id = aplicar_ajuste(&p, &cookie, &g).await;
+    assert_eq!(del_registro(&p, "syslog_enable").await, "1");
+    assert!(
+        ultima_escritura(&p, "cbSetSyslog")
+            .iter()
+            .all(|(k, _)| k != "export")
+    );
+    deshacer(&p, &cookie, id).await;
+    assert_eq!(del_registro(&p, "syslog_enable").await, "0");
+}
+
 /// Toda escritura del pool DHCP va al de id 0: los demás no se tocan.
 fn solo_pool_0(p: &Panel) {
     for (f, ps) in p.sim.control.writes() {

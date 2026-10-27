@@ -2,6 +2,7 @@
 
 use super::{AjusteVista, DispositivoVista, EstadoLectura};
 use crate::ui::comun::EstadoVisual;
+use crate::validacion_real::Desactivadas;
 use ajustes::ValorLegible;
 use serde::{Deserialize, Serialize};
 use std::net::Ipv4Addr;
@@ -94,6 +95,24 @@ pub struct ElementoVista {
     /// Ids de las acciones de [`PaginaTema::acciones`] que se le pueden
     /// aplicar.
     pub acciones: Vec<String>,
+    /// Una acción propia del elemento que no es un campo («No responder al
+    /// ping desde internet», en el cortafuegos), si la tiene.
+    #[serde(default)]
+    pub accion_propia: Option<AccionPropia>,
+    /// Las funciones de la fase 3 que el servidor tiene desactivadas
+    /// ([`crate::validacion_real`]): sus controles no salen.
+    #[serde(default)]
+    pub desactivadas: Desactivadas,
+}
+
+/// Una acción propia de un elemento, con su componente
+/// ([`ElementoVista::accion_propia`]).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AccionPropia {
+    /// Id de la acción (`sin_ping`).
+    pub id: String,
+    /// Por qué no está disponible, ya traducido; `None`: disponible.
+    pub motivo: Option<String>,
 }
 
 /// El interruptor de la cabecera de un elemento.
@@ -143,6 +162,17 @@ pub struct RecomendacionVista {
     /// (`mejoras-lote-<id>`), en el orden del catálogo.
     #[serde(default)]
     pub lotes: Vec<String>,
+    /// Solo informa: no tiene botón (lo que recomienda se hace con una
+    /// acción propia del elemento, desde su detalle).
+    #[serde(default)]
+    pub informativa: bool,
+    /// De dónde sale: las del campo al que apunta o, si no sale de un
+    /// campo, las del elemento.
+    #[serde(default)]
+    pub fuentes: Vec<super::FuenteVista>,
+    /// Clave de traducción de su respaldo (`fuentes-respaldo-criterio`).
+    #[serde(default)]
+    pub respaldo: Option<String>,
 }
 
 /// El pie de la tarjeta: información viva.

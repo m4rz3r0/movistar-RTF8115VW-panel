@@ -8,7 +8,7 @@ instalar-paso-fin = Listo
 
 ## Administrador
 instalar-admin-texto = Crea el usuario con el que entrarás en el panel.
-instalar-token = Token de instalación
+instalar-token = Código de instalación
 instalar-token-ayuda = Está en el registro del servicio y en el fichero instalar.token, junto a la base de datos del panel. Solo sirve una vez.
 instalar-usuario = Usuario del panel
 instalar-contrasena = Contraseña (al menos { $n } caracteres)
@@ -50,7 +50,7 @@ instalar-red-sin-detectar = No se pudo detectar la red del router: puedes volver
 instalar-ir-estado = Ir al estado
 
 ## Errores
-instalar-error-token = Token de instalación no válido
+instalar-error-token = Código de instalación no válido
 instalar-error-terminada = La instalación ya está hecha
 instalar-error-red = El asistente de instalación solo responde desde la red local
 instalar-error-usuario = Nombre de usuario no válido: de 1 a 64 caracteres, sin espacios

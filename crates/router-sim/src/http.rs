@@ -1,9 +1,12 @@
 //! Rutas HTTP: login, páginas, CGI y middlewares.
 
 use crate::LOGGED_OUT;
+use crate::cortafuegos;
 use crate::escrituras::write;
 use crate::estado::{HangAfterWrite, Inner, Params, SimState};
 use crate::lecturas::read;
+use crate::ofuscado::deshacer as mess_userpass;
+use crate::usuarios;
 use crate::xml::{failure, leaf, response, result_node};
 use axum::{
     body::Bytes,
@@ -12,7 +15,6 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Response},
 };
-use hgu::fmt::mess_userpass;
 use std::{
     collections::HashMap,
     sync::{Arc, atomic::Ordering},
@@ -84,7 +86,13 @@ fn has_basic(st: &SimState, c: &HashMap<String, String>) -> bool {
         .is_some_and(|id| st.basic.contains(id))
 }
 
-/// Cuelga las peticiones mientras el router «no responde» y retarda cada
+/// ¿Traen las cabeceras `headers` una sesión básica abierta?
+pub(crate) fn has_basic_en(st: &SimState, headers: &HeaderMap) -> bool {
+    has_basic(st, &cookies(headers))
+}
+
+/// Cuelga las peticiones mientras el router «no responde» o si llevan una
+/// sesión colgada (`colgar_sesiones`), y retarda cada
 /// respuesta lo fijado con [`SimControl::set_retardo`] (salvo la del propio
 /// ajuste del retardo).
 pub(crate) async fn hang_if_unresponsive(
@@ -94,6 +102,17 @@ pub(crate) async fn hang_if_unresponsive(
 ) -> Response {
     while s.unresponsive.load(Ordering::SeqCst) {
         tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    let c = cookies(req.headers());
+    let colgada = {
+        let st = s.state();
+        ["_httpdSessionId_", "SessionID"]
+            .iter()
+            .filter_map(|k| c.get(*k))
+            .any(|id| st.sesiones_colgadas.contains(id))
+    };
+    if colgada {
+        std::future::pending::<()>().await;
     }
     let ms = s.retardo_ms.load(Ordering::SeqCst);
     if ms > 0 && req.uri().path() != RUTA_RETARDO {
@@ -150,11 +169,15 @@ pub(crate) async fn basic_login(
     body: Bytes,
 ) -> Response {
     let f = form(&body);
-    let rechazada = s.state().login_falla_con.clone();
-    let good = param(&f, "loginUsername") == Some(mess_userpass(&s.user).as_str())
-        && param(&f, "loginPassword") == Some(mess_userpass(&s.password()).as_str())
+    let rechazada = {
+        let mut st = s.state();
+        s.aplicar_contrasena_pendiente(&mut st, true);
+        st.login_falla_con.clone()
+    };
+    let good = credenciales_del_panel(&s, &f)
         && rechazada.is_none_or(|r| param(&f, "loginPassword") != Some(mess_userpass(&r).as_str()));
     if !good {
+        s.state().inicios_fallidos += 1;
         return "<script>location.href = \"/te_acceso_router.asp\"</script>".into_response();
     }
     let mut st = s.state();
@@ -201,6 +224,9 @@ pub(crate) async fn page(
     }
     let key = st.next_token();
     st.session_key = Some(key.clone());
+    if cortafuegos::es_suya(&page) {
+        return cortafuegos::pagina(&st, &page, &key).into_response();
+    }
     let vars: String = PAGE_VARS
         .iter()
         .filter(|(p, _)| *p == page)
@@ -230,7 +256,8 @@ pub const PAGE_VARS: &[(&str, &[(&str, &str)])] = &[(
 )];
 
 /// Escritura de la UI básica: `GET /cgi-bin/<x>.cmd|.cgi|.wl?…&sessionKey=…`.
-/// Se registra en `writes` y responde OK; no cambia el estado simulado.
+/// Se registra en `writes` y responde OK; solo cambia el estado simulado la
+/// del cortafuegos (`scbidirectionalflt.cmd`), que responde 301 a su lista.
 pub(crate) async fn basic_cgi(
     State(s): State<Arc<Inner>>,
     Path(file): Path<String>,
@@ -256,19 +283,41 @@ pub(crate) async fn basic_cgi(
         .into_iter()
         .filter(|(k, _)| k != "sessionKey")
         .collect();
+    let del_cortafuegos = file == cortafuegos::ORDEN;
+    if del_cortafuegos {
+        cortafuegos::escribir(&mut st, &clean);
+    }
     st.writes.push((file, clean));
+    if del_cortafuegos {
+        // Como el router real: 301 a la lista, sin cuerpo.
+        return (
+            StatusCode::MOVED_PERMANENTLY,
+            [(header::LOCATION, cortafuegos::REDIRECCION)],
+        )
+            .into_response();
+    }
     "<html><body>ok</body></html>".into_response()
 }
 
 pub(crate) async fn cgi(
     State(s): State<Arc<Inner>>,
     Path(file): Path<String>,
+    RawQuery(query): RawQuery,
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
     let Some(name) = file.strip_suffix(".xml") else {
         return StatusCode::NOT_FOUND.into_response();
     };
+    if name == crate::copia::DESCARGA {
+        let c = cookies(&headers);
+        let mut st = s.state();
+        let sesion_ok = c.get("SessionStatus").is_some_and(|v| v == "Valid")
+            && c.get("SessionID")
+                .is_some_and(|sid| st.advanced.contains(sid));
+        let q = query.unwrap_or_default();
+        return crate::copia::descargar(&mut st, sesion_ok, &q, &body);
+    }
     let (respuesta, sin_respuesta) = cgi_sync(&s, name, &headers, &body);
     if sin_respuesta {
         std::future::pending::<()>().await;
@@ -309,6 +358,10 @@ fn cgi_sync(s: &Inner, name: &str, headers: &HeaderMap, body: &Bytes) -> (Respon
             st.hang_after_write = HangAfterWrite::Off;
             s.unresponsive.store(true, Ordering::SeqCst);
         }
+        if real && std::mem::take(&mut st.rehacer_red_tras_escritura) {
+            st.colgar_sesiones();
+            crate::conexiones::cortar(&s.epoca);
+        }
         let sin_respuesta = real && std::mem::take(&mut st.no_answer_next);
         (xml(body), sin_respuesta)
     }
@@ -323,14 +376,16 @@ fn advanced_login(
     if !has_basic(st, c) {
         return LOGGED_OUT.into();
     }
-    let good = param(params, "rqUsername") == Some(mess_userpass(&s.user).as_str())
-        && param(params, "rqPasswd") == Some(mess_userpass(&s.password()).as_str())
+    s.aplicar_contrasena_pendiente(st, false);
+    let good = credenciales_validas(s, params, ("rqUsername", "rqPasswd"))
         && st
             .login_falla_con
             .as_deref()
             .is_none_or(|r| param(params, "rqPasswd") != Some(mess_userpass(r).as_str()));
     if !good {
-        return failure("cbCheckLogin", "login");
+        // Como el router real: Result=4 con un usuario o una contraseña
+        // que no valen.
+        return response(&result_node("cbCheckLogin", Vec::new(), "4", "login"));
     }
     let sid = st.next_token();
     st.advanced.insert(sid.clone());
@@ -340,6 +395,29 @@ fn advanced_login(
         "0",
         "",
     ))
+}
+
+/// ¿Vienen en el inicio de sesión básico (`loginUsername`, `loginPassword`,
+/// con XOR 0x1f) las credenciales del usuario fijo de la web? Como en el
+/// router real, su formulario no tiene campo de usuario (va oculto): otro
+/// usuario de la tabla no entra por aquí, solo por `cbCheckLogin`.
+fn credenciales_del_panel(s: &Inner, params: &[(String, String)]) -> bool {
+    match (
+        param(params, "loginUsername"),
+        param(params, "loginPassword"),
+    ) {
+        (Some(u), Some(c)) => mess_userpass(u) == s.user && mess_userpass(c) == s.password(),
+        _ => false,
+    }
+}
+
+/// ¿Vienen en `params` (con XOR 0x1f, en los campos `campos`: usuario y
+/// contraseña) las credenciales de un usuario de la tabla?
+fn credenciales_validas(s: &Inner, params: &[(String, String)], campos: (&str, &str)) -> bool {
+    match (param(params, campos.0), param(params, campos.1)) {
+        (Some(u), Some(c)) => usuarios::entra(&s.usuarios(), &mess_userpass(u), &mess_userpass(c)),
+        _ => false,
+    }
 }
 
 fn is_read(name: &str) -> bool {

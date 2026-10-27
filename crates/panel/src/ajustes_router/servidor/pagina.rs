@@ -46,7 +46,13 @@ pub(in crate::ajustes_router) async fn leer_tema(
         .zip(&claves)
         .map(|(a, c)| vista_leida(&state.catalogo, a, leidas.get(c)))
         .collect();
+    for (a, v) in del_tema.iter().zip(&mut vistas) {
+        super::fuentes::en_ajuste(&state.ajustes, a, v);
+    }
     derivados::marcar(&del_tema, &mut vistas, &nodos, &leidas);
+    marcar_protegidos(&state, &mut vistas).await;
+    let wan = state.wan_en(&derivados::conexiones(&leidas));
+    derivados::marcar_conexiones(&mut vistas, &leidas, wan.as_deref());
     super::dns_propios::aceptar(
         &state.ajustes,
         &mut vistas,
@@ -58,6 +64,8 @@ pub(in crate::ajustes_router) async fn leer_tema(
         vistas: &vistas,
         leidas: &leidas,
         apagadas: &apagadas,
+        wan: wan.as_deref(),
+        desactivadas: crate::validacion_real::del_servidor(&state),
     };
     let (resumen, elementos, acciones) = montar(&state.catalogo, &state.ajustes, tema, &ctx);
     let red =
@@ -72,6 +80,34 @@ pub(in crate::ajustes_router) async fn leer_tema(
         leido_hace_s,
         red,
     })
+}
+
+/// Pone la nota a las filas protegidas de los usuarios del router (el
+/// usuario con el que entra el panel y el del operador): no tienen
+/// acciones. Si no se pueden leer las credenciales, todas llevan nota
+/// ([`crate::usuarios_router::nota_de_fila`]); el servidor las protege igual
+/// al pedir un cambio.
+async fn marcar_protegidos(state: &AppState, vistas: &mut [AjusteVista]) {
+    let slug = Componente::UsuariosRouter.slug();
+    let Some(v) = vistas
+        .iter_mut()
+        .find(|v| v.componente.as_deref() == Some(slug))
+    else {
+        return;
+    };
+    let panel = instancia::leer_credenciales(&state.db, &state.history_key)
+        .await
+        .ok()
+        .flatten()
+        .map(|c| c.usuario);
+    for i in &mut v.instancias {
+        let sistema = i.campos.iter().any(|c| {
+            c.id == "papel" && matches!(&c.valor, ValorLegible::Opcion(o) if o == "operador")
+        });
+        let papel = if sistema { "system" } else { "" };
+        i.nota =
+            crate::usuarios_router::nota_de_fila(&i.id, papel, panel.as_deref()).map(str::to_owned);
+    }
 }
 
 /// Id en la URL del elemento implícito de un ajuste suelto
@@ -105,6 +141,8 @@ pub(super) fn montar(
             datos: Vec::new(),
             estado: None,
             icono: None,
+            fuentes: Vec::new(),
+            respaldo: None,
         })
         .collect();
     del_catalogo.extend(sueltos);
@@ -161,6 +199,9 @@ fn elemento(
         .as_deref()
         .filter(|_| leido)
         .and_then(campo)
+        // Sin interruptor si no se puede escribir (p. ej. sin comprobar en
+        // el router real): solo se ve el estado.
+        .filter(|(_, c)| c.solo_lectura.is_none())
         .and_then(|(v, c)| match c.valor {
             // Apagar corta lo que emite: pregunta antes (con el efecto del
             // ajuste). Encender no corta nada: se aplica sin preguntar.
@@ -181,9 +222,24 @@ fn elemento(
     } else {
         Vec::new()
     };
-    let recomendacion = leido
+    let mut recomendacion = leido
         .then(|| recomendacion(f, cat, acciones, &ajustes))
         .flatten();
+    // El cortafuegos: su recomendación solo informa y «No responder al
+    // ping» es una acción propia.
+    let accion_propia = super::cortafuegos::del_elemento(ctx, e, leido).and_then(|(r, a)| {
+        recomendacion = r;
+        a
+    });
+    // Una red de invitados sin separar de la de casa, o la DMZ activa, pesa
+    // más que lo que recomienden los campos de la tarjeta (es un riesgo y
+    // el panel no puede cambiarlo): solo informa.
+    if let Some(r) = derivados::recomendacion_propia(ctx, e).filter(|_| leido) {
+        recomendacion = Some(r);
+    }
+    if let Some(r) = recomendacion.as_mut() {
+        super::fuentes::en_recomendacion(cat, e, r);
+    }
     let aplicables = acciones
         .iter()
         .filter(|a| leido && se_aplica(a, &ajustes))
@@ -210,12 +266,14 @@ fn elemento(
         ajustes,
         lectura,
         acciones: aplicables,
+        accion_propia,
+        desactivadas: ctx.desactivadas,
     }
 }
 
 /// ¿Se aplica la acción `a` al elemento con los ajustes `ajustes`? La de una
 /// lista, a las instancias de esa lista (si escribe un campo, que se pueda
-/// escribir); la demás, si alguno de sus ajustes que no es lista tiene el
+/// escribir; si borra, que la lista se escriba); la demás, si alguno de sus ajustes que no es lista tiene el
 /// campo y se puede escribir.
 fn se_aplica(a: &ajustes::Accion, ajustes: &[AjusteVista]) -> bool {
     let escribible = |v: &AjusteVista, id: &str| {
@@ -225,7 +283,13 @@ fn se_aplica(a: &ajustes::Accion, ajustes: &[AjusteVista]) -> bool {
     };
     match &a.lista {
         Some(l) => ajustes.iter().any(|v| {
-            v.id == *l && (a.borrar || a.campo.as_deref().is_some_and(|c| escribible(v, c)))
+            v.id == *l
+                && if a.borrar {
+                    // Borra con la misma función que escribe la lista.
+                    crate::validacion_real::escribible(v)
+                } else {
+                    a.campo.as_deref().is_some_and(|c| escribible(v, c))
+                }
         }),
         None => a.campo.as_deref().is_some_and(|c| {
             ajustes

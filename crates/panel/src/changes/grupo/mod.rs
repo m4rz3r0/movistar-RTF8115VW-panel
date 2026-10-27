@@ -20,6 +20,7 @@
 
 mod aplicar;
 mod fallos;
+mod token;
 
 use super::*;
 
@@ -59,6 +60,10 @@ pub struct PreparadoGrupo {
     pub pasos: Vec<PasoPreparado>,
     /// El mayor de los pasos con cambios: marca la vigilancia del grupo.
     pub riesgo: Riesgo,
+    /// Se vigilará tras aplicarlo: algún paso con cambios puede cortar el
+    /// acceso del panel al router (ver `acceso.rs`). Si no, queda aplicado
+    /// en cuanto la relectura muestra lo nuevo.
+    pub vigila: bool,
 }
 
 /// Estado de un paso de un grupo.
@@ -77,6 +82,8 @@ pub enum EstadoPaso {
     Fallido,
     /// Revertido y verificado.
     Revertido,
+    /// El cambio estuvo en la cola y no llegó a aplicarse.
+    Cancelado,
 }
 
 impl EstadoPaso {
@@ -89,6 +96,7 @@ impl EstadoPaso {
             EstadoPaso::Aplicado => "aplicado",
             EstadoPaso::Fallido => "fallido",
             EstadoPaso::Revertido => "revertido",
+            EstadoPaso::Cancelado => "cancelado",
         }
     }
 
@@ -100,6 +108,7 @@ impl EstadoPaso {
             EstadoPaso::Aplicado,
             EstadoPaso::Fallido,
             EstadoPaso::Revertido,
+            EstadoPaso::Cancelado,
         ]
         .into_iter()
         .find(|e| e.as_str() == s)
@@ -140,6 +149,9 @@ pub(super) struct Ejecucion {
     /// El grupo tiene más de un paso (no omitido): el detalle de un fallo
     /// nombra el paso y una reversión a medias es `revertido_parcial`.
     pub(super) multi: bool,
+    /// Se vigila: algún paso puede cortar el acceso del panel, o alguna
+    /// relectura no pudo confirmar lo escrito. Si no, se da por aplicado.
+    pub(super) vigilar: bool,
 }
 
 /// Fallo de un paso al aplicarlo.
@@ -148,6 +160,15 @@ pub(super) struct FalloPaso {
     /// El router pudo quedar con el paso aplicado (en parte): se revierte
     /// con los demás.
     pub(super) revertir: bool,
+}
+
+impl Ejecucion {
+    /// Queda aplicado sin vigilar: nada de lo escrito puede cortar el
+    /// acceso del panel y la relectura lo confirmó. Un reinicio siempre
+    /// espera la vuelta del router.
+    pub(super) fn sin_vigilancia(&self) -> bool {
+        !self.vigilar && matches!(self.base, Base::Wan(_))
+    }
 }
 
 impl FalloPaso {

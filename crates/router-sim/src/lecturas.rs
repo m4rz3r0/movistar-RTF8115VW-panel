@@ -22,6 +22,9 @@ pub(crate) fn read_node(
     name: &str,
     params: &[(String, String)],
 ) -> Result<XmlNode, String> {
+    if name == crate::usuarios::LISTA {
+        return Ok(crate::usuarios::lista(&s.usuarios()));
+    }
     if let Some(viva) = st.listas.get(name)
         && let Some(r) = read_lista(viva, name, params)
     {

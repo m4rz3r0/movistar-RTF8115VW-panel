@@ -16,6 +16,8 @@ use crate::ui::explorador::{
     CambioVista, EstadoDeCambio, RiesgoCambio, duracion, estado_cambio, texto_error,
 };
 use crate::ui::i18n::{idioma_actual, traducir};
+use crate::ui::panel_ajustes::{DialogoReautenticar, Reautenticacion, repetible};
+use crate::ui::vigilancia::BotonesDelCambio;
 use crate::ui::{Estado, IconoEstado};
 use ajustes::TipoCampo;
 use leptos::{ev::SubmitEvent, html, prelude::*, task::spawn_local};
@@ -239,10 +241,10 @@ pub fn DialogoGrupo(
         });
     });
 
-    let deshacer = move |_| {
-        let Fase::Seguimiento(id) = fase.get_untracked() else {
-            return;
-        };
+    // Deshacer un alta o una baja de usuarios del router pide la contraseña
+    // del panel y se repite al darla.
+    let (reauth, dialogo_reauth) = Reautenticacion::de_la_pagina();
+    let deshacer_con = move |id: i64, yo: Callback<()>| {
         error.set(None);
         fase.set(Fase::Preparando);
         spawn_local(async move {
@@ -256,11 +258,17 @@ pub fn DialogoGrupo(
                     enfocar_titulo();
                 }
                 Err(e) => {
-                    error.set(Some(texto_error(&e)));
+                    reauth.tratar(&e, error, yo);
                     fase.set(Fase::Seguimiento(id));
                 }
             }
         });
+    };
+    let deshacer = move |_| {
+        let Fase::Seguimiento(id) = fase.get_untracked() else {
+            return;
+        };
+        repetible(move |yo| deshacer_con(id, yo)).run(());
     };
 
     let cerrar = move || {
@@ -322,9 +330,12 @@ pub fn DialogoGrupo(
             }
         })
     };
-    let vigilancia = move || {
-        let plazo = duracion(grupo.with(|g| g.vigilancia_s));
-        t!("ajustes-grupo-vigilancia", plazo = plazo.as_str())
+    let vigilancia = move || match grupo.with(|g| g.vigilancia_s) {
+        0 => t!("ajustes-grupo-sin-vigilancia"),
+        s => {
+            let plazo = duracion(s);
+            t!("ajustes-grupo-vigilancia", plazo = plazo.as_str())
+        }
     };
 
     let bloqueado = Signal::derive(move || fase.get() != Fase::Revisar);
@@ -359,6 +370,16 @@ pub fn DialogoGrupo(
             EstadoDeCambio::Preparado | EstadoDeCambio::Aplicando => {
                 (EstadoVisual::Proceso, t!("ajustes-grupo-estado-aplicando"))
             }
+            EstadoDeCambio::EnCola => (
+                EstadoVisual::Proceso,
+                t!(
+                    "ajustes-grupo-estado-en-cola",
+                    puesto = c.puesto.unwrap_or(1)
+                ),
+            ),
+            EstadoDeCambio::Cancelado => {
+                (EstadoVisual::Atencion, t!("ajustes-grupo-estado-cancelado"))
+            }
         };
         Some(view! { <div class="estado-cambio"><Insignia estado texto /></div> }.into_any())
     };
@@ -371,6 +392,7 @@ pub fn DialogoGrupo(
             });
             let preparando = fase.get() == Fase::Preparando;
             view! {
+                <BotonesDelCambio cambio error />
                 {puede_deshacer.then(|| view! {
                     <button
                         class="b-sec"
@@ -465,6 +487,9 @@ pub fn DialogoGrupo(
                 <div class="dialogo-pie">{pie}</div>
             </form>
         </dialog>
+        {move || {
+            (dialogo_reauth && reauth.abierto()).then(|| view! { <DialogoReautenticar /> })
+        }}
     }
 }
 

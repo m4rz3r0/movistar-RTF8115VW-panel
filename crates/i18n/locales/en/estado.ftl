@@ -60,13 +60,13 @@ estado-rango-dia = last 24 h
 estado-rango-semana = last 7 days
 
 ## Tables
-estado-clientes-lan = LAN clients
+estado-clientes-lan = Devices on the local network
 estado-resumen-hosts = { $conectados } connected · { $desconectados } disconnected
 estado-lentos = Data from { $hora } · read every minute
 estado-lentos-sin-leer = Not read yet: read every minute
 estado-col-nombre = Name
 estado-col-estado = Status
-estado-col-lease-fijo = Fixed lease
+estado-col-lease-fijo = Fixed reservation
 estado-col-interfaz = Interface
 estado-col-tipo = Type
 estado-col-caduca = Expires in

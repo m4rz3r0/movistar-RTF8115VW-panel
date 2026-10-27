@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
-import { cambiarUpnp, esperarFinal, plazoDeTest } from "./cambios";
+import { cambiarVigilado, esperarFinal, plazoDeTest } from "./cambios";
 import {
   asentar,
   entrar,
@@ -8,6 +8,7 @@ import {
   sinDesbordamiento,
   violacionesGraves,
 } from "./util";
+import { capturaOpcional } from "./util";
 
 // Puertos y Red local en lista con columnas (Tarea 5 del rediseño), en
 // español contra router-sim, a 360 y 1440 px y en los dos temas:
@@ -105,8 +106,9 @@ async function anchoDeLaTabla(page: Page): Promise<number> {
 }
 
 async function captura(page: Page, nombre: string, completa: boolean) {
+  if (!process.env.E2E_CAPTURAS) return;
   await quieta(page);
-  await page.screenshot({
+  await capturaOpcional(page, {
     path: `${CAPTURAS}/${nombre}.png`,
     fullPage: completa,
     animations: "disabled",
@@ -340,12 +342,13 @@ for (const ancho of [360, 1440]) {
   }
 }
 
-// Con otro cambio en curso, el interruptor de una fila no se aplica: el
-// aviso lo dice (409) y la fila vuelve a como estaba. Una sola combinación:
-// cambia UPnP de verdad (y lo deja como estaba).
+// Con otro cambio vigilándose, el interruptor de una fila espera en la
+// cola: el aviso lo dice, con «Quitar de la cola», y al quitarlo la fila
+// vuelve a como estaba. Una sola combinación: cambia una reserva de IP de
+// verdad (y la deja como estaba).
 test.describe("listas: interruptor con otro cambio en curso", () => {
   test.use({ locale: "es-ES", viewport: { width: 1440, height: 900 } });
-  test("la fila vuelve a su estado", async ({ page }) => {
+  test("espera en la cola y se puede quitar", async ({ page }) => {
     test.setTimeout(plazoDeTest(2));
     const errores = recogerErrores(page);
     await entrar(page);
@@ -354,20 +357,19 @@ test.describe("listas: interruptor con otro cambio en curso", () => {
     const fila = filas(page).filter({ hasText: "desc-1" });
     const activa = fila.getByRole("switch", { name: "Regla desc-1 activa" });
     await expect(activa).toHaveAttribute("aria-checked", "true");
-    const cambio = await cambiarUpnp(page);
+    const cambio = await cambiarVigilado(page);
     await activa.click();
-    const error = page.locator(".avisos-cambio [role=alert] .aviso-cambio");
-    await expect(error).toContainText("Hay otro cambio en curso");
+    const aviso = page.locator(".avisos-cambio [role=status] .aviso-cambio");
+    await expect(aviso).toContainText("En cola (puesto 1)");
+    await expect(activa).toHaveAttribute("aria-checked", "false");
+    await aviso.getByRole("button", { name: "Quitar de la cola" }).click();
+    await expect(aviso).toContainText("No se ha aplicado");
     await expect(activa).toHaveAttribute("aria-checked", "true");
     await expect(fila.locator(".lista-estado")).toContainText("Sin dispositivo");
     await esperarFinal(page, cambio);
-    // UPnP como estaba.
-    await esperarFinal(page, await cambiarUpnp(page));
-    // El 409 de la petición rechazada sale en la consola: es lo esperado.
-    expect(
-      errores.filter((e) => !e.includes("409")),
-      "errores o avisos en la consola",
-    ).toEqual([]);
+    // La reserva como estaba.
+    await esperarFinal(page, await cambiarVigilado(page));
+    expect(errores, "errores o avisos en la consola").toEqual([]);
   });
 });
 

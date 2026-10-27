@@ -1,6 +1,7 @@
 //! Secretos en el gestor: la máscara no se escribe y lo nuevo se guarda cifrado.
 
 use super::*;
+use crate::comun::ConfirmarLigado;
 
 #[tokio::test]
 async fn secreto_enmascarado_no_se_escribe() {
@@ -20,7 +21,10 @@ async fn secreto_enmascarado_no_se_escribe() {
         let prep = m.preparar(r).await.unwrap();
         let nombres: Vec<_> = prep.diff.campos.iter().map(|c| c.nombre.as_str()).collect();
         assert_eq!(nombres, ["ssid"], "el secreto sin tocar no es un cambio");
-        let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+        let id = m
+            .confirmar_ligado(&prep.token, None, "admin")
+            .await
+            .unwrap();
         esperar_estado(&m, id, Estado::Aplicado).await;
         esperar_libre_gestor(&m).await;
     }
@@ -63,7 +67,10 @@ async fn secreto_cambiado_se_enmascara_y_se_guarda_cifrado() {
     let c = &prep.diff.campos[0];
     assert!(c.secreto);
     assert_eq!((c.antes.as_str(), c.despues.as_str()), (MASCARA, MASCARA));
-    let id = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    let id = m
+        .confirmar_ligado(&prep.token, None, "admin")
+        .await
+        .unwrap();
     esperar_estado(&m, id, Estado::Aplicado).await;
     esperar_libre_gestor(&m).await;
     // Ni el valor nuevo ni el anterior aparecen en claro en la base de datos.
@@ -82,7 +89,10 @@ async fn secreto_cambiado_se_enmascara_y_se_guarda_cifrado() {
     assert!(!cifrado.windows(15).any(|w| w == b"clave-nueva-123"));
     // El anterior se recupera para deshacer.
     let prep = m.deshacer(id).await.unwrap();
-    let id2 = m.confirmar(&prep.token, None, "admin").await.unwrap();
+    let id2 = m
+        .confirmar_ligado(&prep.token, None, "admin")
+        .await
+        .unwrap();
     esperar_estado(&m, id2, Estado::Aplicado).await;
     let w = p.sim.control.writes();
     let ultimo: BTreeMap<_, _> = w.last().unwrap().1.iter().cloned().collect();

@@ -15,6 +15,9 @@
 # `cargo test`/`cargo nextest` con `--features ssr` dejan en
 # target/debug/panel otro binario, cuyo HTML el wasm no hidrata: con
 # RP_E2E_CARGO_LEPTOS el panel lo detecta y para pidiendo `cargo leptos build`.
+# RP_E2E_HABILITAR_TODO=1 habilita contra el simulador lo que el panel no
+# escribe en el router real (las escrituras sin comprobar del catálogo y las
+# funciones desactivadas): solo lo atiende el binario de depuración.
 set -eu
 cd "$(dirname "$0")/.."
 SIM_PORT=${E2E_SIM_PORT:-8195}
@@ -82,7 +85,7 @@ while :; do
 done
 export RP_DB="$DIR/panel.db" RP_HISTORY_KEY="$DIR/history.key" \
 	RP_TRUSTED_PROXY=127.0.0.1 RP_ORIGIN="http://localhost:$PORT" RP_LOG=warn \
-	RP_E2E_CARGO_LEPTOS=1
+	RP_E2E_CARGO_LEPTOS=1 RP_E2E_HABILITAR_TODO=1
 if [ "$MODO" = instalado ]; then
 	printf 'sim' >"$DIR/router.secret"
 	chmod 600 "$DIR/router.secret"

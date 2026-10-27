@@ -17,8 +17,17 @@ use tokio::{
     time::Instant,
 };
 
+mod contacto;
+mod copia;
+mod entrar;
+mod local;
 mod por_id;
+mod registro;
+pub use contacto::{Contacto, EstadoContacto};
+pub use copia::{CopiaDeConfiguracion, TOPE_COPIA};
+pub use entrar::Credenciales;
 pub use por_id::TOPE_POSICIONES;
+pub use registro::{RegistroDelSistema, TOPE_REGISTRO};
 
 /// Lecturas seguidas como mucho en un [`Turno`] antes de ceder el cerrojo
 /// una vez a quien espera (el sondeo, el gestor de cambios): una tanda
@@ -77,6 +86,9 @@ struct State {
     basic_ok: bool,
     adv_ok: bool,
     last_request: Option<Instant>,
+    /// Mientras hay una [`Exclusiva`]: un error de red no descarta la
+    /// sesión (de ella depende la vuelta atrás de quien la tiene).
+    conservar_sesion: bool,
 }
 
 struct Shared {
@@ -85,6 +97,8 @@ struct Shared {
     configurado: AtomicBool,
     /// Ver [`Client::escrituras`].
     escrituras: AtomicU64,
+    /// Ver [`Client::contacto`].
+    contacto: std::sync::Mutex<Option<Contacto>>,
     state: Mutex<State>,
 }
 
@@ -153,8 +167,13 @@ impl Client {
         let timeout = cfg
             .as_ref()
             .map_or_else(|| ClientConfig::new("", "", "").timeout, |c| c.timeout);
+        // Sin conexiones ociosas: cada petición abre la suya. Una conexión
+        // guardada que el router cortó en silencio (al rehacer su red, p. ej.
+        // tras cambiar el QoS) solo daría un error más; y el router es lento
+        // de todos modos.
         let http = reqwest::Client::builder()
             .timeout(timeout)
+            .pool_max_idle_per_host(0)
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .expect("configuración de reqwest válida");
@@ -163,6 +182,7 @@ impl Client {
                 http,
                 configurado: AtomicBool::new(cfg.is_some()),
                 escrituras: AtomicU64::new(0),
+                contacto: std::sync::Mutex::new(None),
                 state: Mutex::new(State {
                     cfg,
                     ..State::default()
@@ -181,6 +201,7 @@ impl Client {
         Self::invalidate(&mut st);
         st.last_request = None;
         st.cfg = Some(cfg);
+        self.anotar_contacto(None);
         self.shared.configurado.store(true, Ordering::SeqCst);
     }
 
@@ -216,10 +237,9 @@ impl Client {
     /// abierta para volver atrás. Las llamadas por este cliente esperan; las
     /// de otro cliente (otra sesión) no.
     pub async fn en_exclusiva(&self) -> Exclusiva<'_> {
-        Exclusiva {
-            client: self,
-            st: self.shared.state.lock().await,
-        }
+        let mut st = self.shared.state.lock().await;
+        st.conservar_sesion = true;
+        Exclusiva { client: self, st }
     }
 
     /// Si hay un router configurado.
@@ -398,10 +418,17 @@ impl Client {
         }
         match parse_response(name, &raw) {
             Ok(node) if node.result_ok() => Ok(Some(node)),
+            // El texto del error: `ErrorString` o, si no viene, `Msg` (como
+            // responde el router a un alta de usuario que no acepta).
             Ok(node) => Err(Error::CallFailed {
                 name: name.to_owned(),
                 result: node.text_of("Result").unwrap_or("").to_owned(),
-                error: node.text_of("ErrorString").unwrap_or("").to_owned(),
+                error: node
+                    .text_of("ErrorString")
+                    .filter(|e| !e.is_empty())
+                    .or_else(|| node.text_of("Msg"))
+                    .unwrap_or("")
+                    .to_owned(),
             }),
             Err(XmlError::NotResponse) => {
                 Self::invalidate(st);
@@ -412,6 +439,18 @@ impl Client {
     }
 
     async fn page_locked(&self, st: &mut State, path: &str) -> Result<String, Error> {
+        self.pagina_con_tope(st, path, None)
+            .await
+            .map(|(texto, _)| texto)
+    }
+
+    /// Como [`Client::page_locked`], con el `tope` de [`Client::enviar`].
+    async fn pagina_con_tope(
+        &self,
+        st: &mut State,
+        path: &str,
+        tope: Option<usize>,
+    ) -> Result<(String, bool), Error> {
         let path = if path.starts_with('/') {
             path.to_owned()
         } else {
@@ -419,8 +458,8 @@ impl Client {
         };
         for _ in 0..2 {
             self.ensure_basic(st).await?;
-            let body = self.send(st, Method::GET, &path, None).await?;
-            if !looks_logged_out(&body) {
+            let body = self.enviar(st, Method::GET, &path, None, tope).await?;
+            if !looks_logged_out(&body.0) {
                 return Ok(body);
             }
             Self::invalidate(st);
@@ -430,10 +469,13 @@ impl Client {
         )))
     }
 
+    /// El `sessionKey` de `page`: su `var sessionKey` o, si no lo trae, su
+    /// `var sessKey` (las páginas del cortafuegos solo traen este).
     async fn session_key_locked(&self, st: &mut State, page: &str) -> Result<String, Error> {
         let html = self.page_locked(st, page).await?;
-        page_vars(&html)
-            .remove("sessionKey")
+        let mut vars = page_vars(&html);
+        vars.remove("sessionKey")
+            .or_else(|| vars.remove("sessKey"))
             .ok_or_else(|| Error::Unexpected(format!("{page}: no contiene sessionKey")))
     }
 
@@ -441,11 +483,25 @@ impl Client {
         if st.basic_ok {
             return Ok(());
         }
-        tracing::debug!("login básico");
         let (user, password) = {
             let cfg = st.cfg.as_ref().ok_or(Error::NoConfigurado)?;
-            (mess_userpass(&cfg.user), mess_userpass(&cfg.password))
+            (cfg.user.clone(), cfg.password.clone())
         };
+        self.login_basico(st, &user, &password).await
+    }
+
+    /// Inicio de sesión básico (`te_acceso_router.cgi`) con `usuario` y
+    /// `contrasena` (en claro; viajan con [`mess_userpass`]). En el router
+    /// real solo vale el usuario fijo de la web: su formulario no tiene
+    /// campo de usuario.
+    async fn login_basico(
+        &self,
+        st: &mut State,
+        usuario: &str,
+        contrasena: &str,
+    ) -> Result<(), Error> {
+        tracing::debug!("login básico");
+        let (user, password) = (mess_userpass(usuario), mess_userpass(contrasena));
         self.send(st, Method::GET, "/", None).await?;
         let body = form_body(&[
             ("curWebPage", "/te_wifi.asp"),
@@ -464,6 +520,7 @@ impl Client {
             st.basic_ok = true;
             Ok(())
         } else {
+            self.anotar_contacto(Some(EstadoContacto::Rechaza));
             Err(Error::Auth("el router rechazó usuario o contraseña"))
         }
     }
@@ -474,11 +531,26 @@ impl Client {
             return Ok(true);
         }
         self.ensure_basic(st).await?;
-        tracing::debug!("login avanzado");
         let (user, password) = {
             let cfg = st.cfg.as_ref().ok_or(Error::NoConfigurado)?;
-            (mess_userpass(&cfg.user), mess_userpass(&cfg.password))
+            (cfg.user.clone(), cfg.password.clone())
         };
+        self.login_avanzado(st, &user, &password).await
+    }
+
+    /// Inicio de sesión avanzado (`cbCheckLogin`) con `usuario` y
+    /// `contrasena` (en claro; viajan con [`mess_userpass`]), sobre la
+    /// sesión básica que ya haya. `Ok(false)`: la básica había caducado (ya
+    /// invalidada). Un usuario o una contraseña que no valen (el router
+    /// real responde `Result=4`) dan `Auth`.
+    async fn login_avanzado(
+        &self,
+        st: &mut State,
+        usuario: &str,
+        contrasena: &str,
+    ) -> Result<bool, Error> {
+        tracing::debug!("login avanzado");
+        let (user, password) = (mess_userpass(usuario), mess_userpass(contrasena));
         let body = form_body(&[
             ("rqUsername", &user),
             ("rqPasswd", &password),
@@ -497,6 +569,7 @@ impl Client {
         };
         if !node.result_ok() {
             Self::invalidate(st);
+            self.anotar_contacto(Some(EstadoContacto::Rechaza));
             return Err(Error::Auth("el router rechazó usuario o contraseña"));
         }
         let sid = node
@@ -519,6 +592,46 @@ impl Client {
         path: &str,
         body: Option<String>,
     ) -> Result<String, Error> {
+        self.enviar(st, method, path, body, None)
+            .await
+            .map(|(texto, _)| texto)
+    }
+
+    /// Como [`Client::send`]; con `tope`, del cuerpo se guardan como mucho
+    /// sus últimos `tope` bytes (más un trozo) mientras llega, y el segundo
+    /// valor dice si se dejó algo fuera.
+    async fn enviar(
+        &self,
+        st: &mut State,
+        method: Method,
+        path: &str,
+        body: Option<String>,
+        tope: Option<usize>,
+    ) -> Result<(String, bool), Error> {
+        let req = self.peticion(st, method, path, body).await?;
+        let result = async {
+            let resp = req.send().await?;
+            let set = cookies_nuevas(&resp);
+            let status = resp.status();
+            let text = match tope {
+                None => (resp.text().await?, false),
+                Some(tope) => registro::cola(resp, tope).await?,
+            };
+            Ok::<_, reqwest::Error>((status, set, text))
+        }
+        .await;
+        self.recibido(st, path, result)
+    }
+
+    /// La petición `method` a `path`, con las cookies de la sesión, tras
+    /// esperar `min_gap` desde la anterior.
+    async fn peticion(
+        &self,
+        st: &mut State,
+        method: Method,
+        path: &str,
+        body: Option<String>,
+    ) -> Result<reqwest::RequestBuilder, Error> {
         let (base_url, min_gap) = {
             let cfg = st.cfg.as_ref().ok_or(Error::NoConfigurado)?;
             (cfg.base_url.trim_end_matches('/').to_owned(), cfg.min_gap)
@@ -552,22 +665,37 @@ impl Client {
                 .header("Content-Length", b.len())
                 .body(b);
         }
-        let result = async {
-            let resp = req.send().await?;
-            let set: Vec<String> = resp
-                .headers()
-                .get_all("set-cookie")
-                .iter()
-                .filter_map(|v| v.to_str().ok().map(str::to_owned))
-                .collect();
-            let status = resp.status();
-            let text = resp.text().await?;
-            Ok::<_, reqwest::Error>((status, set, text))
-        }
-        .await;
+        Ok(req)
+    }
+
+    /// Lo que queda de una petición: anota el contacto, guarda las cookies
+    /// nuevas y da el cuerpo leído o el error (un error de red descarta la
+    /// sesión; un 4xx o 5xx es [`Error::Unexpected`] sin la consulta).
+    fn recibido<T>(
+        &self,
+        st: &mut State,
+        path: &str,
+        result: Result<(reqwest::StatusCode, Vec<String>, T), reqwest::Error>,
+    ) -> Result<T, Error> {
         st.last_request = Some(Instant::now());
-        let (status, set, text) =
-            result.map_err(|e| Error::Network(e.without_url().to_string()))?;
+        let (status, set, cuerpo) = match result {
+            Ok(r) => {
+                self.anotar_contacto(Some(EstadoContacto::Responde));
+                r
+            }
+            Err(e) => {
+                self.anotar_contacto(Some(EstadoContacto::SinRespuesta));
+                // Nada de lo que no respondió vale para la petición
+                // siguiente: la sesión (y sus cookies) se descarta y la
+                // siguiente vuelve a entrar. Un router que rehízo su red o su
+                // servidor web pudo perder la sesión sin decirlo; mantenerla
+                // viva con el sondeo la haría fallar para siempre.
+                if !st.conservar_sesion {
+                    Self::invalidate(st);
+                }
+                return Err(Error::Network(contacto::cadena(e)));
+            }
+        };
         for c in set {
             if let Some((k, v)) = c.split(';').next().and_then(|nv| nv.split_once('=')) {
                 st.cookies.insert(k.trim().to_owned(), v.trim().to_owned());
@@ -579,8 +707,17 @@ impl Client {
                 sin_consulta(path)
             )));
         }
-        Ok(text)
+        Ok(cuerpo)
     }
+}
+
+/// Las cabeceras `Set-Cookie` de `resp`.
+fn cookies_nuevas(resp: &reqwest::Response) -> Vec<String> {
+    resp.headers()
+        .get_all("set-cookie")
+        .iter()
+        .filter_map(|v| v.to_str().ok().map(str::to_owned))
+        .collect()
 }
 
 /// Turno del cerrojo del cliente para una tanda de lecturas seguidas (ver
@@ -598,14 +735,28 @@ impl Turno<'_> {
     /// [`LECTURAS_POR_TURNO`] lecturas cede el cerrojo y espera a volver a
     /// tenerlo (el `Mutex` de tokio es justo: pasa antes quien esperaba).
     pub async fn call(&mut self, name: &str, params: &[(&str, &str)]) -> Result<XmlNode, Error> {
+        self.ceder_si_toca().await;
+        let st = self.st.as_mut().expect("el turno tiene el cerrojo");
+        self.client.call_locked(st, name, params).await
+    }
+
+    /// Como [`Client::basic_page`], dentro del turno (cuenta como una
+    /// lectura más de [`LECTURAS_POR_TURNO`]).
+    pub async fn pagina(&mut self, path: &str) -> Result<String, Error> {
+        self.ceder_si_toca().await;
+        let st = self.st.as_mut().expect("el turno tiene el cerrojo");
+        self.client.page_locked(st, path).await
+    }
+
+    /// Cuenta una lectura y, cada [`LECTURAS_POR_TURNO`], cede el cerrojo y
+    /// espera a volver a tenerlo.
+    async fn ceder_si_toca(&mut self) {
         if self.hechas >= LECTURAS_POR_TURNO {
             self.st = None;
             self.st = Some(self.client.shared.state.lock().await);
             self.hechas = 0;
         }
         self.hechas += 1;
-        let st = self.st.as_mut().expect("el turno tiene el cerrojo");
-        self.client.call_locked(st, name, params).await
     }
 }
 
@@ -613,6 +764,12 @@ impl Turno<'_> {
 pub struct Exclusiva<'a> {
     client: &'a Client,
     st: MutexGuard<'a, State>,
+}
+
+impl Drop for Exclusiva<'_> {
+    fn drop(&mut self) {
+        self.st.conservar_sesion = false;
+    }
 }
 
 impl Exclusiva<'_> {

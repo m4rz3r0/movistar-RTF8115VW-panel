@@ -49,3 +49,31 @@ async fn la_posicion_no_es_el_id() {
     assert_eq!(pool(&c, "0").await, p("1", "192.168.1.62"));
     assert_eq!(pool(&c, "1").await, p("0", "192.168.1.61"));
 }
+
+/// Una IP reservada se guarda en su ranura, dentro de `<reserved_ipv4>`,
+/// como en el router: no como una hoja suelta del pool.
+#[tokio::test]
+async fn la_ip_reservada_va_en_su_ranura() {
+    let sim = start().await;
+    let c = client(&sim, Duration::from_secs(5));
+    c.write(
+        "dhcp.asp",
+        "cbSetDhcpv4ServerPool",
+        &[
+            (ID, "0"),
+            ("reserved_ipv4_addr_3", "192.168.1.71"),
+            ("reserved_ipv4_mask_3", "255.255.255.255"),
+        ],
+    )
+    .await
+    .unwrap();
+    let n = en(&c, "1").await.unwrap();
+    let pool = n.get("rtm_cfg_dhcpv4_svr_pool").unwrap();
+    assert!(pool.get("reserved_ipv4_addr_3").is_none(), "no va suelta");
+    let r = pool.get("reserved_ipv4").unwrap();
+    assert_eq!(r.text_of("reserved_ipv4_addr_3"), Some("192.168.1.71"));
+    assert_eq!(r.text_of("reserved_ipv4_addr_2"), Some("0.0.0.0"));
+    // El otro pool no cambia.
+    let otro = en(&c, "0").await.unwrap();
+    assert_eq!(valor(&otro, "reserved_ipv4_addr_3").unwrap(), "0.0.0.0");
+}

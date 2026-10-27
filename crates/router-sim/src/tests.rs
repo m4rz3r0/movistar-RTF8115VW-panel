@@ -27,7 +27,7 @@ fn inner_de_prueba() -> Inner {
                  <v>a</v></x><Result>0</Result></cbGetX></Response>";
     Inner {
         user: "u".into(),
-        password: Mutex::new("p".into()),
+        usuarios: Mutex::new(Vec::new()),
         fixtures: HashMap::from([(
             fixture_key("cbGetX", &[("all".into(), "ALL".into())]),
             lista.to_owned(),
@@ -35,6 +35,7 @@ fn inner_de_prueba() -> Inner {
         catalogo: Catalogo::load().unwrap(),
         wan: None,
         unresponsive: AtomicBool::new(false),
+        epoca: Default::default(),
         retardo_ms: AtomicU64::new(0),
         state: Mutex::new(SimState::default()),
     }

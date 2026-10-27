@@ -101,6 +101,30 @@ impl SimControl {
         }
     }
 
+    /// Las conexiones TCP abiertas hasta ahora dejan de responder, sin
+    /// cerrarse: lo que llegue por ellas no tiene respuesta. Las nuevas van
+    /// con normalidad. Como un router que rehace su red.
+    pub fn cortar_conexiones(&self) {
+        crate::conexiones::cortar(&self.inner.epoca);
+    }
+
+    /// Las sesiones abiertas hasta ahora (básicas y avanzadas) dejan de
+    /// responder: sus peticiones se quedan colgadas para siempre, sin
+    /// caducar. Una sesión nueva va con normalidad. Como un router que
+    /// rehace su servidor web y no reconoce ni rechaza las de antes.
+    pub fn colgar_sesiones(&self) {
+        self.inner.state().colgar_sesiones();
+    }
+
+    /// Tras responder a la próxima escritura real, el router rehace su red
+    /// (como al cambiar el QoS en el router real): corta las conexiones
+    /// abiertas ([`SimControl::cortar_conexiones`]) y cuelga las sesiones
+    /// ([`SimControl::colgar_sesiones`]). La respuesta de esa escritura sí
+    /// llega.
+    pub fn rehacer_red_tras_proxima_escritura(&self) {
+        self.inner.state().rehacer_red_tras_escritura = true;
+    }
+
     /// La próxima reserva DHCP nueva (`cbDhcpV4SvrPoolSetStatic` con id -1)
     /// se crea dos veces (dos ids nuevos con los mismos valores).
     pub fn create_twice_next_write(&self) {
@@ -155,17 +179,29 @@ impl SimControl {
     /// Cambia la contraseña que acepta el login (las sesiones abiertas
     /// siguen valiendo).
     pub fn set_password(&self, password: &str) {
-        *self
-            .inner
-            .password
-            .lock()
-            .unwrap_or_else(|e| e.into_inner()) = password.to_owned();
+        self.inner.fijar_password(password.to_owned());
     }
 
     /// El próximo `cbModifyPwd` responde OK sin cambiar nada (el router lo
     /// acepta pero la contraseña sigue siendo la anterior).
     pub fn modify_pwd_sin_efecto(&self) {
         self.inner.state().modify_pwd_sin_efecto = true;
+    }
+
+    /// El próximo `cbModifyPwd` responde OK, pero el router tarda
+    /// `retraso` en aplicarlo: hasta entonces sigue entrando la anterior y
+    /// la nueva no. Lo aplica el primer inicio de sesión después.
+    pub fn modify_pwd_con_retraso(&self, retraso: Duration) {
+        self.inner.state().modify_pwd_retraso = Some(retraso);
+    }
+
+    /// El próximo `cbModifyPwd` responde OK, pero los `inicios` inicios de
+    /// sesión básicos siguientes aún no ven la nueva (entra la anterior); la
+    /// aplica el que va después. Para probar sin carreras un router que la
+    /// aplica justo al acabar el plazo del panel. Manda sobre
+    /// `modify_pwd_con_retraso`.
+    pub fn modify_pwd_tras_inicios(&self, inicios: u32) {
+        self.inner.state().modify_pwd_tras_inicios = Some(inicios);
     }
 
     /// El inicio de sesión (básico y avanzado) con `password` falla aunque
@@ -181,6 +217,132 @@ impl SimControl {
         let st = self.inner.state();
         let nodo = read_node(&self.inner, &st, lectura, &[]).ok()?;
         valor_de(&nodo, campo)
+    }
+
+    /// Usuarios de la web del router como `(nombre, papel)`, en el orden de
+    /// `cbGetUserList` (con lo escrito hasta ahora).
+    pub fn usuarios(&self) -> Vec<(String, String)> {
+        self.inner
+            .usuarios()
+            .iter()
+            .map(|u| (u.nombre.clone(), u.grupo.clone()))
+            .collect()
+    }
+
+    /// Contraseña actual del usuario `nombre` (`None` si no existe).
+    pub fn contrasena_de(&self, nombre: &str) -> Option<String> {
+        self.inner
+            .usuarios()
+            .iter()
+            .find(|u| u.nombre == nombre)
+            .map(|u| u.contrasena.clone())
+    }
+
+    /// Filtros del cortafuegos, con lo escrito hasta ahora.
+    pub fn cortafuegos(&self) -> Vec<hgu::cortafuegos::Filtro> {
+        self.inner.state().cortafuegos.clone()
+    }
+
+    /// Si `on`, la página de la lista del cortafuegos sale sin `var filter`
+    /// (no se puede leer) hasta que se desactive.
+    pub fn cortafuegos_ilegible(&self, on: bool) {
+        self.inner.state().cortafuegos_ilegible = on;
+    }
+
+    /// Inicios de sesión básicos rechazados desde el arranque (para contar
+    /// los intentos con una contraseña que no vale).
+    pub fn inicios_fallidos(&self) -> u32 {
+        self.inner.state().inicios_fallidos
+    }
+
+    /// La próxima baja de una regla (`item=<FID>|<RID>`) borra el filtro
+    /// entero, como si el router hubiera ignorado el `|<RID>`.
+    pub fn cortafuegos_proxima_baja_borra_filtro(&self) {
+        self.inner.state().cortafuegos_baja_de_mas = Some(None);
+    }
+
+    /// La próxima baja de una regla borra también la regla `rid` de su filtro.
+    pub fn cortafuegos_proxima_baja_borra_tambien(&self, rid: &str) {
+        self.inner.state().cortafuegos_baja_de_mas = Some(Some(rid.to_owned()));
+    }
+
+    /// Sustituye la regla `rid` del filtro `fid` por `r` (con el RID de `r`):
+    /// otra regla en su lugar, como si alguien la hubiera cambiado.
+    pub fn cortafuegos_sustituir(&self, fid: &str, rid: &str, r: hgu::cortafuegos::Regla) {
+        let mut st = self.inner.state();
+        if let Some(regla) = st
+            .cortafuegos
+            .iter_mut()
+            .filter(|f| f.fid == fid)
+            .flat_map(|f| f.reglas.iter_mut())
+            .find(|x| x.rid == rid)
+        {
+            *regla = r;
+        }
+    }
+
+    /// Pone `campo` = `valor` en la instancia de la lista de `lectura` cuyo
+    /// `id_param` vale `id`, como si alguien la hubiera cambiado en la web
+    /// del router. `false` si no existe.
+    pub fn fijar_en_lista(
+        &self,
+        lectura: &str,
+        id_param: &str,
+        id: &str,
+        campo: &str,
+        valor: &str,
+    ) -> bool {
+        let mut st = self.inner.state();
+        if crate::escrituras::materializar_lista(&self.inner, &mut st, lectura).is_err() {
+            return false;
+        }
+        let Some(n) = st
+            .listas
+            .get_mut(lectura)
+            .and_then(|l| l.nodos.iter_mut().find(|n| n.text_of(id_param) == Some(id)))
+        else {
+            return false;
+        };
+        crate::xml::set_child(n, campo, valor);
+        true
+    }
+
+    /// Una sesión básica abierta (su cookie `_httpdSessionId_`) y el último
+    /// `sessionKey` dado, para pedir a mano lo que el cliente pide (y ver la
+    /// respuesta en crudo).
+    pub fn sesion_basica_y_clave(&self) -> Option<(String, String)> {
+        let st = self.inner.state();
+        Some((st.basic.iter().next()?.clone(), st.session_key.clone()?))
+    }
+
+    /// Como [`SimControl::sesion_basica_y_clave`], con la sesión avanzada:
+    /// la cabecera `Cookie` entera y el último `sessionKey` dado.
+    pub fn sesion_avanzada_y_clave(&self) -> Option<(String, String)> {
+        let st = self.inner.state();
+        let cookie = format!(
+            "_httpdSessionId_={}; SessionID={}; SessionStatus=Valid",
+            st.basic.iter().next()?,
+            st.advanced.iter().next()?
+        );
+        Some((cookie, st.session_key.clone()?))
+    }
+
+    /// Contenido de la copia de la configuración que da `cbDownloadConfig`
+    /// (en vez del de serie, inventado).
+    pub fn fijar_copia(&self, datos: Vec<u8>) {
+        self.inner.state().copia_fijada = Some(datos);
+    }
+
+    /// Los ficheros de copia descargados (`fileName` de cada
+    /// `cbDownloadConfig` que respondió con el fichero), en orden.
+    pub fn copias_descargadas(&self) -> Vec<String> {
+        self.inner.state().copias_descargadas.clone()
+    }
+
+    /// Texto del registro del sistema que sirve `/syslog.log` tras
+    /// exportarlo (en vez del de serie).
+    pub fn fijar_registro(&self, texto: &str) {
+        self.inner.state().registro = Some(texto.to_owned());
     }
 
     /// Cambia la versión de firmware (`SWVersion`) que da `cbGetSummary`.

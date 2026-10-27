@@ -42,13 +42,6 @@
   line-height: 1.5;
 }
 
-.lote-pros {
-  margin: 0;
-  color: var(--suave);
-  font-size: 13.5px;
-  line-height: 1.55;
-}
-
 /* El motivo del lote, si no se leyó, y «Volver a leer» a la derecha. */
 .lote-sin-leer {
   display: flex;
@@ -143,10 +136,10 @@
 }
 
 /* «Más consejos»: plegados, sin botón. */
+/* Con el triángulo de los demás desplegables: sin él, parecía texto. */
 .lote-consejos summary {
-  display: flex;
-  align-items: center;
-  min-height: 32px;
+  display: list-item;
+  padding: 6px 0;
   color: var(--suave);
   font-weight: 500;
   cursor: pointer;

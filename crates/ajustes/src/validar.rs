@@ -91,6 +91,7 @@ pub fn comprobar(c: &CatalogoAjustes, f: &Catalogo, m: &Mascara) -> Vec<String> 
     comprobar_excluidas(c, f, &mut fallos);
     crate::elementos::comprobar_elementos(c, &mut fallos);
     crate::lotes::comprobar_lotes(c, &mut fallos);
+    crate::fuentes::comprobar_fuentes(c, &mut fallos);
     fallos
 }
 

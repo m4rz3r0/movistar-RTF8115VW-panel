@@ -173,7 +173,7 @@ async fn accion_mas_de_veinte() {
 }
 
 #[tokio::test]
-async fn interruptor_con_cambio_activo() {
+async fn interruptor_con_cambio_activo_se_encola() {
     let mut t = tiempos_rapidos();
     t.bajo = Duration::from_secs(30);
     t.medio = Duration::from_secs(30);
@@ -193,14 +193,24 @@ async fn interruptor_con_cambio_activo() {
     .await;
     let c = ok(&p, "estado_cambio", json!({ "id": id }), &cookie).await;
     assert_eq!(c["estado"], "Vigilando", "{c}");
-    // Otro interruptor o una acción en lote: «hay otro cambio en curso».
+    // Otro interruptor o una acción en lote se preparan igual: al
+    // confirmarlos, esperan en la cola.
     let (status, body) =
         preparar_ajuste(&p, &cookie, "wifi.invitados", json!({ "activa": "true" })).await;
-    assert_eq!(status, 409, "{body}");
-    assert!(body.contains("otro cambio en curso"), "{body}");
+    assert_eq!(status, 200, "{body}");
     let (status, body) = accion(&p, &cookie, "quitar_wps", &["red-5", "invitados"]).await;
-    assert_eq!(status, 409, "{body}");
-    assert!(body.contains("otro cambio en curso"), "{body}");
+    assert_eq!(status, 200, "{body}");
+    let g: Value = serde_json::from_str(&body).unwrap();
+    let id2 = ok(
+        &p,
+        "confirmar_ajuste",
+        json!({ "token": g["token"], "desmarcados": [] }),
+        &cookie,
+    )
+    .await;
+    let c = ok(&p, "estado_cambio", json!({ "id": id2 }), &cookie).await;
+    assert_eq!(c["estado"], "EnCola", "{c}");
+    p.state.cambios().unwrap().detener();
 }
 
 #[tokio::test]

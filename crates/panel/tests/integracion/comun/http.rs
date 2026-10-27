@@ -66,7 +66,7 @@ pub fn set_cookie(resp: &Response<Body>) -> String {
 }
 
 pub async fn body_text(resp: Response<Body>) -> String {
-    let bytes = axum::body::to_bytes(resp.into_body(), 1 << 20)
+    let bytes = axum::body::to_bytes(resp.into_body(), 8 << 20)
         .await
         .unwrap();
     String::from_utf8(bytes.to_vec()).unwrap()

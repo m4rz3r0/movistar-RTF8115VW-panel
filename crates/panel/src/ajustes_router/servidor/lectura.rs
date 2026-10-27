@@ -115,6 +115,18 @@ pub(super) fn vista(f: &Catalogo, a: &Ajuste, nodo: Option<&XmlNode>) -> AjusteV
     }
 }
 
+/// Por qué no se edita `c`: su motivo del catálogo de ajustes o, si lo
+/// escribe una función que no está comprobada en el router real (la lista
+/// blanca de `funciones.toml`), [`crate::validacion_real::SIN_COMPROBAR`],
+/// que la página no enseña: solo se ve el valor.
+fn solo_lectura(f: &Catalogo, c: &Campo) -> Option<String> {
+    c.solo_lectura.clone().or_else(|| {
+        let e = c.escribe.as_ref()?;
+        let comprobada = f.funcion(&e.funcion).is_some_and(|x| x.comprobada());
+        (!comprobada).then(|| crate::validacion_real::SIN_COMPROBAR.to_owned())
+    })
+}
+
 /// Instancias de una lista con sus valores. El id de cada una es el del
 /// router (el elemento de [`id_instancia`]); solo en una lista que no se
 /// escribe (como los usuarios del router) cae a su posición. En una que
@@ -145,13 +157,15 @@ pub(super) fn lista(
                         )
                     })
                     .collect(),
+                nota: None,
             })
             .collect(),
     )
 }
 
 /// Instancias de una lista con su id (ver [`lista`]) y sus elementos tal
-/// cual los da el router.
+/// cual los da el router; solo las que admite su lectura (`solo`,
+/// `excluir`).
 pub(super) fn instancias_con_id(
     f: &Catalogo,
     a: &Ajuste,
@@ -166,8 +180,16 @@ pub(super) fn instancias_con_id(
         .map(String::as_str)
         .collect();
     elementos.extend(id_param);
+    elementos.extend(
+        a.leer
+            .solo
+            .iter()
+            .chain(&a.leer.excluir)
+            .map(|(k, _)| k.as_str()),
+    );
     instancias(n, &elementos)
         .into_iter()
+        .filter(|l| a.leer.admite(l))
         .enumerate()
         .map(|(i, leidos)| {
             let id = match id_param
@@ -264,7 +286,7 @@ pub(super) fn campo(
         max: c.validar.and_then(|v| v.max),
         ascii: c.validar.is_some_and(|v| v.ascii),
         opcional: c.opcional,
-        solo_lectura: c.solo_lectura.clone(),
+        solo_lectura: solo_lectura(f, c),
         tapado: tapado(f, c),
         valor_secreto,
         motivo_recomendado: recomendado.as_ref().map(|_| format!("{clave}-recomendado")),
@@ -273,6 +295,9 @@ pub(super) fn campo(
         requiere: c.requiere.clone(),
         sin_eleccion: c.sin_eleccion.is_some(),
         clave,
+        // Las pone `fuentes::en_ajuste`, solo en la página del tema.
+        fuentes: Vec::new(),
+        respaldo: None,
     }
 }
 
@@ -336,8 +361,23 @@ pub(super) fn instancias(n: &XmlNode, elementos: &[&str]) -> Vec<Leidos> {
 
 /// Elemento que da el id de cada instancia de una lista: el parámetro de
 /// instancia de su función de escritura o, si no escribe, el de su
-/// lectura.
+/// lectura; en los usuarios del router, `UserName`.
 fn id_instancia<'f>(f: &'f Catalogo, a: &Ajuste) -> Option<&'f str> {
+    // Los usuarios del router no traen id: el suyo es el nombre (el que
+    // borra y cambia su componente).
+    if a.componente == Some(Componente::UsuariosRouter) {
+        return Some("UserName");
+    }
+    // Las reglas del cortafuegos, su RID (el que borra el deshacer de la
+    // regla del panel).
+    if a.componente == Some(Componente::Cortafuegos) {
+        return Some("RID");
+    }
+    // Las conexiones a internet, su `ip_intf_id` (el de las rutas y la
+    // detección de la conexión de internet), no su posición.
+    if a.componente == Some(Componente::Conexion) {
+        return Some("ip_intf_id");
+    }
     a.campos
         .iter()
         .filter_map(|c| c.escribe.as_ref())
@@ -380,6 +420,31 @@ fn tecnico(a: &Ajuste) -> DetallesTecnicos {
                 .iter()
                 .map(|ad| (c.id.clone(), ad.parametro.clone())),
         );
+    }
+    // Los usuarios del router y el cortafuegos (la regla «sin ping» y el
+    // editor de filtros y reglas) escriben con su componente, no por campos.
+    if a.componente == Some(Componente::UsuariosRouter) {
+        escrituras = [
+            hgu::fmt::ALTA_USUARIO,
+            hgu::fmt::BAJA_USUARIO,
+            hgu::fmt::CAMBIO_OTRO,
+        ]
+        .map(String::from)
+        .to_vec();
+    }
+    if a.componente == Some(Componente::Cortafuegos) {
+        use hgu::cortafuegos as cf;
+        escrituras = [
+            cf::ALTA,
+            cf::BAJA,
+            cf::ALTA_REGLA,
+            cf::MODIFICAR,
+            cf::ALTA_FILTRO,
+            cf::MODIFICAR_FILTRO,
+            cf::BAJA_FILTRO,
+        ]
+        .map(String::from)
+        .to_vec();
     }
     DetallesTecnicos {
         lectura,

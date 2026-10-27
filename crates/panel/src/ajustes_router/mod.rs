@@ -33,7 +33,7 @@ pub const CADUCIDAD_LECTURAS: std::time::Duration = std::time::Duration::from_se
 /// lectura, 400 si un valor no vale. Exige sesión.
 #[server(endpoint = "preparar_ajuste", input = Json)]
 pub async fn preparar_ajuste(p: PeticionAjuste) -> Result<GrupoVista, ServerFnError> {
-    servidor::preparar_ajuste(p).await
+    servidor::ligada(servidor::preparar_ajuste(p).await?).await
 }
 
 /// Prepara una acción sobre varios elementos del tema (`quitar_wps` en dos
@@ -50,7 +50,7 @@ pub async fn preparar_accion(
     accion: String,
     elementos: Vec<String>,
 ) -> Result<GrupoVista, ServerFnError> {
-    servidor::preparar_accion(tema, accion, elementos).await
+    servidor::ligada(servidor::preparar_accion(tema, accion, elementos).await?).await
 }
 
 /// Prepara el guardado del detalle de un elemento: los cambios de varios
@@ -62,8 +62,144 @@ pub async fn preparar_accion(
 pub async fn preparar_elemento(
     peticiones: Vec<PeticionAjuste>,
 ) -> Result<GrupoVista, ServerFnError> {
-    servidor::preparar_elemento(peticiones).await
+    servidor::ligada(servidor::preparar_elemento(peticiones).await?).await
 }
+
+/// Prepara «No responder al ping desde internet»: la regla propia del panel
+/// en el cortafuegos (ICMP `echo_request` descartado en el filtro de
+/// entrada IPv4 de la conexión a internet), que se confirma con
+/// [`confirmar_ajuste`] y se deshace con [`deshacer_ajuste`] (borra solo su
+/// regla). 409 si el cortafuegos no se puede leer, la regla ya está, la
+/// función espera su validación en el router real o hay otro cambio en
+/// curso; 403 en solo lectura. Exige sesión.
+#[server(endpoint = "preparar_sin_ping", input = Json)]
+pub async fn preparar_sin_ping() -> Result<GrupoVista, ServerFnError> {
+    servidor::ligada(servidor::preparar_sin_ping().await?).await
+}
+
+/// El editor completo del cortafuegos (Ajustes → Seguridad): los filtros
+/// con sus reglas en forma de formulario, lo que se puede elegir y, por
+/// operación, por qué no se puede hacer (`None`: se puede). Exige sesión;
+/// 409 si el cortafuegos no se puede leer.
+#[server(endpoint = "leer_cortafuegos", input = Json)]
+pub async fn leer_cortafuegos() -> Result<EditorCortafuegos, ServerFnError> {
+    cortafuegos_editor::leer().await
+}
+
+/// Prepara un cambio del editor del cortafuegos (una regla o un filtro:
+/// alta, cambio o baja), que se confirma con [`confirmar_ajuste`] y se
+/// deshace con [`deshacer_ajuste`]. 409 si la operación no está comprobada
+/// en el router real, lo que la página enseñaba ya no está igual o hay
+/// otro cambio en curso; 400 si un campo no vale; 403 en solo lectura.
+/// Exige sesión.
+#[server(endpoint = "preparar_cortafuegos", input = Json)]
+pub async fn preparar_cortafuegos(p: PeticionCortafuegos) -> Result<GrupoVista, ServerFnError> {
+    servidor::ligada(cortafuegos_editor::preparar(p).await?).await
+}
+
+/// Valores de una regla o un filtro del cortafuegos en forma de formulario,
+/// por el nombre de su parámetro (`protocol`, `srcaddr`, `name`…): vacío
+/// es «cualquiera» o «no aplica».
+pub type ValoresCortafuegos = std::collections::BTreeMap<String, String>;
+
+/// Lo que lee el editor del cortafuegos ([`leer_cortafuegos`]).
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct EditorCortafuegos {
+    pub filtros: Vec<FiltroEditor>,
+    /// Las interfaces de los filtros que hay: `(IntfID, nombre)`.
+    pub interfaces: Vec<(String, String)>,
+    /// Tipos de mensaje de control (ICMP) por versión: `[IPv4, IPv6]`.
+    pub icmp: [Vec<OpcionEditor>; 2],
+    /// Tipos de rechazo por versión: `[IPv4, IPv6]`.
+    pub rechazo: [Vec<OpcionEditor>; 2],
+    pub bloqueos: BloqueosCortafuegos,
+}
+
+/// Un filtro del cortafuegos para el editor.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct FiltroEditor {
+    pub fid: String,
+    /// `name`, `interface` (su IntfID), `type`, `version` y `default`.
+    pub valores: ValoresCortafuegos,
+    /// Nombre de la interfaz (`ppp0.1`).
+    pub interfaz: String,
+    /// El panel lo sabe volver a escribir igual: se puede cambiar o borrar.
+    pub reescribible: bool,
+    pub reglas: Vec<ReglaEditor>,
+}
+
+/// Una regla del cortafuegos para el editor, en su orden.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ReglaEditor {
+    pub rid: String,
+    pub valores: ValoresCortafuegos,
+    /// El panel la sabe volver a escribir igual: se puede cambiar o borrar.
+    pub reescribible: bool,
+}
+
+/// Una opción de una lista del editor: el valor que se envía y su nombre.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct OpcionEditor {
+    pub valor: String,
+    pub nombre: String,
+}
+
+/// Por qué no se puede hacer cada operación del editor, ya traducido
+/// (`None`: se puede): lo no comprobado en el router real se ve, pero no se
+/// escribe.
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct BloqueosCortafuegos {
+    pub regla_nueva: Option<String>,
+    pub regla_cambiar: Option<String>,
+    pub regla_borrar: Option<String>,
+    pub filtro_nuevo: Option<String>,
+    pub filtro_cambiar: Option<String>,
+    pub filtro_borrar: Option<String>,
+}
+
+/// Un cambio del editor del cortafuegos ([`preparar_cortafuegos`]).
+/// `antes` son los valores que enseñaba la página: si el router ya no los
+/// tiene, no se escribe.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "que", rename_all = "snake_case")]
+pub enum PeticionCortafuegos {
+    /// Una regla nueva al final del filtro `filtro`.
+    ReglaNueva {
+        filtro: String,
+        valores: ValoresCortafuegos,
+    },
+    /// La regla `regla` del filtro `filtro`, entera.
+    ReglaCambiada {
+        filtro: String,
+        regla: String,
+        valores: ValoresCortafuegos,
+        antes: ValoresCortafuegos,
+    },
+    /// Borra la regla `regla` del filtro `filtro`.
+    ReglaBorrada {
+        filtro: String,
+        regla: String,
+        antes: ValoresCortafuegos,
+    },
+    /// Un filtro nuevo, vacío.
+    FiltroNuevo { valores: ValoresCortafuegos },
+    /// El filtro `filtro`, entero.
+    FiltroCambiado {
+        filtro: String,
+        valores: ValoresCortafuegos,
+        antes: ValoresCortafuegos,
+    },
+    /// Borra el filtro `filtro`, que tiene que estar vacío.
+    FiltroBorrado {
+        filtro: String,
+        antes: ValoresCortafuegos,
+    },
+}
+
+/// El lado del servidor del editor del cortafuegos, junto al de la regla
+/// «sin ping».
+#[cfg(feature = "ssr")]
+use servidor::cortafuegos::editor as cortafuegos_editor;
 
 /// Como mucho, elementos en una acción sobre varios.
 pub const MAX_ELEMENTOS_ACCION: usize = 20;
@@ -83,7 +219,7 @@ pub async fn confirmar_ajuste(
 /// devuelve su resumen, que se confirma con [`confirmar_ajuste`].
 #[server(endpoint = "deshacer_ajuste", input = Json)]
 pub async fn deshacer_ajuste(cambio: i64) -> Result<GrupoVista, ServerFnError> {
-    servidor::deshacer_ajuste(cambio).await
+    servidor::ligada(servidor::deshacer_ajuste(cambio).await?).await
 }
 
 /// La página del tema `tema` (`wifi`, `puertos`…) entera: el resumen, los
@@ -128,7 +264,8 @@ pub async fn preparar_volver_a_partida(
     instancia: Option<String>,
     clave: Option<String>,
 ) -> Result<GrupoVista, ServerFnError> {
-    servidor::preparar_volver_a_partida(ajuste, campo, instancia, clave).await
+    servidor::ligada(servidor::preparar_volver_a_partida(ajuste, campo, instancia, clave).await?)
+        .await
 }
 
 #[cfg(test)]
@@ -158,6 +295,8 @@ mod tests {
             aceptados: Vec::new(),
             requiere: None,
             sin_eleccion: false,
+            fuentes: Vec::new(),
+            respaldo: None,
         };
         let d = Diferencia::Valor {
             partida: Box::new(c.clone()),

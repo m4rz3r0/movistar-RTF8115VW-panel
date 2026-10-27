@@ -185,6 +185,8 @@ mod tests {
                 ("principal".to_owned(), principal.to_owned()),
                 ("secundario".to_owned(), secundario.to_owned()),
             ]),
+            fuentes: Vec::new(),
+            respaldo: None,
         };
         let e = Eleccion {
             id: "proveedor_dns".into(),

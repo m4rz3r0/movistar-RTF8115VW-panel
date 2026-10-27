@@ -57,13 +57,30 @@ const TEMAS = 1;
 const MEJORAS = 1;
 
 /**
+ * Panel de los usuarios del router (seguridad-router.spec.ts), detrás del de
+ * Mejoras: crea, borra y deshace usuarios de verdad en serie, sin cambiar
+ * la lista de usuarios ni el Historial de los instalados.
+ */
+const SEGURIDAD = 1;
+
+/**
+ * Panel de la vigilancia y la cola (vigilancia.spec.ts), detrás del de
+ * Seguridad: vigila mucho (VIGILANCIA_LARGA_S) para que se vea «Todo bien,
+ * terminar» y la cola, y sus cambios no ensucian el Historial de los
+ * instalados.
+ */
+const VIGILANCIA = 1;
+
+/**
  * Tope de E2E_WORKERS: los instalados, los nuevos, los del recorrido, los de
- * la rejilla, el de los temas y el de Mejoras ocupan WORKERS + 10 puertos
- * seguidos desde E2E_PORT (y desde E2E_SIM_PORT), y la ventana reservada a
- * cada prueba es de 20 (p. ej. 3710-3729 y 8710-8729).
+ * la rejilla, el de los temas, el de Mejoras, el de Seguridad y el de la
+ * vigilancia ocupan WORKERS + 12 puertos seguidos desde E2E_PORT (y desde
+ * E2E_SIM_PORT), y la ventana reservada a cada prueba es de 20 (p. ej.
+ * 3710-3729 y 8710-8729).
  */
 const VENTANA_DE_PUERTOS = 20;
-const MAX_WORKERS = VENTANA_DE_PUERTOS - NUEVOS - RECORRIDOS - REJILLAS - TEMAS - MEJORAS;
+const MAX_WORKERS =
+  VENTANA_DE_PUERTOS - NUEVOS - RECORRIDOS - REJILLAS - TEMAS - MEJORAS - SEGURIDAD - VIGILANCIA;
 
 /**
  * Workers de Playwright (E2E_WORKERS; 1, en serie). Por defecto, uno por
@@ -83,8 +100,8 @@ function workers(valor: string | undefined): number {
   if (!Number.isInteger(n) || n < 1 || n > MAX_WORKERS) {
     throw new Error(
       `E2E_WORKERS debe ser un entero entre 1 y ${MAX_WORKERS} (con ${NUEVOS} paneles del ` +
-        `asistente, ${RECORRIDOS} del recorrido, ${REJILLAS} de la rejilla, ${TEMAS} de los temas ` +
-        `y ${MEJORAS} de Mejoras; ` +
+        `asistente, ${RECORRIDOS} del recorrido, ${REJILLAS} de la rejilla, ${TEMAS} de los temas, ` +
+        `${MEJORAS} de Mejoras, ${SEGURIDAD} de Seguridad y ${VIGILANCIA} de la vigilancia; ` +
         `${VENTANA_DE_PUERTOS} puertos seguidos ` +
         `desde E2E_PORT): ${valor}`,
     );
@@ -97,9 +114,9 @@ function workers(valor: string | undefined): number {
  * por defecto): la de riesgo bajo y medio; la de alto, el doble (main.rs).
  * Los plazos de los specs salen de aquí (cambios.ts).
  */
-export const VIGILANCIA_S = vigilancia(process.env.RP_E2E_VIGILANCIA_S);
+export const VIGILANCIA_S = segundosDeVigilancia(process.env.RP_E2E_VIGILANCIA_S);
 
-function vigilancia(valor: string | undefined): number {
+function segundosDeVigilancia(valor: string | undefined): number {
   if (valor === undefined || valor === "") return 10;
   const n = Number(valor);
   if (!Number.isInteger(n) || n < 1) {
@@ -214,6 +231,25 @@ export const mejoras = instancia(
   true,
 );
 
+/** El panel de los usuarios del router (seguridad-router.spec.ts). */
+export const seguridad = instancia(
+  "seguridad",
+  "instalado",
+  WORKERS + NUEVOS + RECORRIDOS + REJILLAS + TEMAS + MEJORAS,
+  VIGILANCIA_RECORRIDO_S,
+);
+
+/** Vigilancia del panel de la vigilancia, en segundos: no acaba sola durante la prueba. */
+export const VIGILANCIA_LARGA_S = 300;
+
+/** El panel de la vigilancia y la cola (vigilancia.spec.ts). */
+export const vigilancia = instancia(
+  "vigilancia",
+  "instalado",
+  WORKERS + NUEVOS + RECORRIDOS + REJILLAS + TEMAS + MEJORAS + SEGURIDAD,
+  VIGILANCIA_LARGA_S,
+);
+
 export const todas: Instancia[] = [
   ...instalados,
   ...Object.values(nuevos),
@@ -221,6 +257,8 @@ export const todas: Instancia[] = [
   ...Object.values(rejillas),
   temas,
   mejoras,
+  seguridad,
+  vigilancia,
 ];
 
 /** Usuario del panel «instalado». */

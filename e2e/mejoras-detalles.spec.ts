@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, type Route, test } from "@playwright/test";
-import { asentar, entrar, recogerErrores } from "./util";
+import { asentar, entrar, recogerErrores, violacionesGraves } from "./util";
 
 // Detalles de Mejoras en el panel del worker (no en el de Mejoras, que
 // comparten otros ficheros): lo que el servidor responde se cambia en el
@@ -10,6 +10,8 @@ import { asentar, entrar, recogerErrores } from "./util";
 // - El error de una tarjeta se borra al volver a leer.
 // - Si la lectura de la página falla, la barra lateral no se queda con la
 //   cuenta anterior.
+// - «De dónde sale» de cada paso se abre con sus fuentes, que se abren
+//   aparte y sin referente.
 
 interface Paso {
   clave: string;
@@ -95,6 +97,10 @@ test.describe("Mejoras: detalles de la revisión y de las tarjetas", () => {
     const dialogo = await revisar(page, "Privacidad máxima");
     await expect(dialogo.getByRole("radio", { name: "Cloudflare", exact: true })).toBeChecked();
     await expect(dialogo.getByRole("radio", { name: "Quad9", exact: true })).not.toBeChecked();
+    // El DNS familiar, una opción más con su nota en el formato de siempre.
+    const familiar = dialogo.getByRole("radio", { name: "Cloudflare familiar", exact: true });
+    await expect(familiar).not.toBeChecked();
+    await expect(familiar).toHaveAccessibleDescription(/^Recomendado si .* A favor: .* En contra: /);
     await dialogo.getByRole("button", { name: "Cancelar" }).click();
     await page.unrouteAll({ behavior: "wait" });
     expect(errores, "errores o avisos en la consola").toEqual([]);
@@ -165,5 +171,30 @@ test.describe("Mejoras: detalles de la revisión y de las tarjetas", () => {
     await expect(cuenta).toHaveCount(0);
     await page.unrouteAll({ behavior: "wait" });
     expect(sinErroresDeRed(errores), "errores o avisos en la consola").toEqual([]);
+  });
+
+  test("«De dónde sale» se abre con sus fuentes", async ({ page }) => {
+    const errores = recogerErrores(page);
+    await entrar(page);
+    await irAMejoras(page);
+    const seguridad = tarjeta(page, "Seguridad recomendada");
+    const paso = seguridad.locator("li.paso").filter({ hasText: "Quitar el WPS" }).first();
+    const deDonde = paso.locator("details.de-donde");
+    await expect(deDonde).not.toHaveAttribute("open", "");
+    await deDonde.locator("summary", { hasText: "De dónde sale" }).click();
+    await expect(deDonde).toHaveAttribute("open", "");
+    const enlaces = deDonde.getByRole("link");
+    expect(await enlaces.count()).toBeGreaterThan(0);
+    await expect(deDonde.getByRole("link", { name: /CERT\/CC|VU#723755/ })).toBeVisible();
+    for (const enlace of await enlaces.all()) {
+      await expect(enlace).toHaveAttribute("rel", "noopener noreferrer");
+      await expect(enlace).toHaveAttribute("href", /^https:\/\//);
+    }
+    // Un paso que es criterio del panel lo dice.
+    const espejo = seguridad.locator("li.paso").filter({ hasText: "espejo" }).first();
+    await espejo.locator("details.de-donde > summary").click();
+    await expect(espejo.locator("details.de-donde")).toContainText("Criterio del panel");
+    expect(await violacionesGraves(page), "mejoras con «De dónde sale» abierto").toEqual([]);
+    expect(errores, "errores o avisos en la consola").toEqual([]);
   });
 });

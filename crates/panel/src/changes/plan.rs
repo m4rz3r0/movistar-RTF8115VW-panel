@@ -19,6 +19,7 @@ pub const PALABRA_ACCION: &str = "CONFIRMAR";
 pub(super) const REBOOT: &str = "cbReboot";
 
 mod lectura;
+pub(crate) mod ranuras;
 pub(crate) use lectura::identidad;
 pub(super) use lectura::{Lectura, lectura_de};
 
@@ -135,13 +136,20 @@ pub(crate) fn buscar<'a>(m: &'a BTreeMap<String, String>, nombre: &str) -> Optio
 }
 
 /// Iguales una vez normalizados: sin espacios en los extremos; IP y MAC sin
-/// distinguir mayúsculas.
+/// distinguir mayúsculas; los bytes en hexadecimal, además, sin ningún
+/// espacio.
 pub(super) fn iguales(p: Option<&Parametro>, a: &str, b: &str) -> bool {
     let (a, b) = (a.trim(), b.trim());
     match p.map(|p| p.tipo) {
         Some(TipoParam::Ip | TipoParam::Mac) => a.eq_ignore_ascii_case(b),
+        Some(TipoParam::Hex) => sin_espacios(a).eq_ignore_ascii_case(&sin_espacios(b)),
         _ => a == b,
     }
+}
+
+/// `v` sin ningún espacio (los bytes en hexadecimal, como los manda la web).
+pub(super) fn sin_espacios(v: &str) -> String {
+    v.chars().filter(|c| !c.is_whitespace()).collect()
 }
 
 /// ¿El gestor trata `nombre` como secreto? Lo es por el catálogo o por la
@@ -178,6 +186,10 @@ pub(super) fn validar(p: &Parametro, v: &str, protegido: bool) -> Result<(), Str
         TipoParam::Bool => matches!(v.trim(), "0" | "1"),
         TipoParam::Enum => p.opciones.iter().any(|(o, _)| o == v.trim()),
         TipoParam::Int => v.trim().parse::<i64>().is_ok(),
+        TipoParam::Hex => {
+            let h = sin_espacios(v);
+            h.len().is_multiple_of(2) && h.bytes().all(|b| b.is_ascii_hexdigit())
+        }
         TipoParam::Text | TipoParam::Secret => !v.chars().any(char::is_control),
     };
     if ok {
@@ -198,14 +210,25 @@ pub(super) fn hojas(n: &XmlNode) -> BTreeMap<String, String> {
         .collect()
 }
 
-/// Elementos (hijos con hijos) de una respuesta; si no hay, la propia
-/// respuesta.
+/// Elementos (hijos con hijos) de una respuesta, con las hojas de sus
+/// elementos anidados (las ranuras de las IP reservadas de un pool DHCP,
+/// [`catalogo::Parametro::ranuras`]) sin pisar las suyas; si no hay, la
+/// propia respuesta.
 pub(super) fn elementos(n: &XmlNode) -> Vec<BTreeMap<String, String>> {
+    let con_anidadas = |e: &XmlNode| {
+        let mut m = hojas(e);
+        for a in e.children.iter().filter(|c| !c.children.is_empty()) {
+            for (k, v) in hojas(a) {
+                m.entry(k).or_insert(v);
+            }
+        }
+        m
+    };
     let v: Vec<_> = n
         .children
         .iter()
         .filter(|c| !c.children.is_empty())
-        .map(hojas)
+        .map(con_anidadas)
         .collect();
     if v.is_empty() { vec![hojas(n)] } else { v }
 }
@@ -240,6 +263,81 @@ fn no_reenviable(p: &Parametro, v: &str) -> bool {
     enmascarado(v) || (p.tapado && v.trim().is_empty())
 }
 
+/// ¿Casilla marcada? Así la da la lectura (`1`) o la manda la web (`on`).
+fn marcada(v: &str) -> bool {
+    matches!(v.trim(), "1" | "on")
+}
+
+/// Una condición activa con su valor vacío (o una MAC todo ceros) no
+/// encaja con ningún dispositivo: el router deja de dar IP nueva a todos.
+/// La desactiva en `efectivos`, venga de la petición o de la lectura, y así
+/// sale también en el diff.
+fn desactivar_condiciones_vacias(
+    f: &Funcion,
+    op: Operacion,
+    actual: &BTreeMap<String, String>,
+    efectivos: &mut BTreeMap<String, String>,
+) {
+    let valor = |efectivos: &BTreeMap<String, String>, k: &str| {
+        efectivos
+            .get(k)
+            .map(String::as_str)
+            .or_else(|| {
+                (op == Operacion::Editar)
+                    .then(|| buscar(actual, k))
+                    .flatten()
+            })
+            .map(str::to_owned)
+    };
+    for p in &f.parametros {
+        let Some(vn) = p.casilla.as_ref().and_then(|c| c.valor.as_deref()) else {
+            continue;
+        };
+        if !valor(efectivos, &p.nombre).is_some_and(|v| marcada(&v)) {
+            continue;
+        }
+        if valor_vacio(f, vn, &valor(efectivos, vn).unwrap_or_default()) {
+            efectivos.insert(p.nombre.clone(), "0".to_owned());
+        }
+    }
+}
+
+/// ¿Vacío el valor `v` de la condición `vn`? Sin texto, o una MAC todo
+/// ceros (la que la web pone por defecto).
+fn valor_vacio(f: &Funcion, vn: &str, v: &str) -> bool {
+    let es_mac = f.parametro(vn).is_some_and(|x| x.tipo == TipoParam::Mac);
+    v.trim().is_empty() || (es_mac && v.chars().all(|c| matches!(c, '0' | ':' | '-' | ' ')))
+}
+
+/// Error si la petición activa una condición (una casilla con valor) que
+/// no estaba activa y deja su valor vacío.
+pub(super) fn condicion_vacia(
+    f: &Funcion,
+    actual: &BTreeMap<String, String>,
+    valores: &BTreeMap<String, String>,
+) -> Result<(), String> {
+    for p in &f.parametros {
+        let Some(vn) = p.casilla.as_ref().and_then(|c| c.valor.as_deref()) else {
+            continue;
+        };
+        let activa = valores.get(&p.nombre).is_some_and(|v| marcada(v));
+        let ya_activa = buscar(actual, &p.nombre).is_some_and(marcada);
+        let v = valores
+            .get(vn)
+            .map(String::as_str)
+            .or_else(|| buscar(actual, vn))
+            .unwrap_or_default();
+        if activa && !ya_activa && valor_vacio(f, vn, v) {
+            return Err(format!(
+                "{}: no se puede activar con {vn} vacío; ningún dispositivo encajaría \
+                 y el router dejaría de dar IP nueva",
+                p.nombre
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Une valores de la petición y valores actuales. No hace peticiones.
 ///
 /// `explicito`: los valores son exactos (reversión o deshacer, con valores
@@ -271,16 +369,55 @@ pub(super) fn componer(
         }
         let v = match p.map(|p| p.tipo) {
             Some(TipoParam::Text | TipoParam::Secret) | None => v.clone(),
+            Some(TipoParam::Hex) => sin_espacios(v),
             Some(_) => v.trim().to_owned(),
         };
         efectivos.insert(k.clone(), v);
     }
+    desactivar_condiciones_vacias(f, op, actual, &mut efectivos);
     let mut payload = Vec::new();
     let mut secretos_tapados = Vec::new();
     // Con `explicito` (reversión o deshacer), un secreto que no sirve para
     // reenviarlo se omite: la vuelta atrás no se bloquea nunca por esto.
     let mut omitidos = BTreeSet::new();
+    let cambiadas = ranuras::cambiadas(f, actual, &efectivos);
+    let mut desactivados = Vec::new();
     for p in &f.parametros {
+        // Un campo fijo va siempre con su valor (no se lee ni se cambia).
+        if let Some(fijo) = &p.fijo {
+            payload.push((p.nombre.clone(), fijo.clone()));
+            continue;
+        }
+        // De las ranuras, solo las que cambian, enteras (la web manda solo
+        // esa, con la IP y la máscara).
+        if p.ranuras.is_some() {
+            for i in &cambiadas {
+                let k = ranuras::nombre(p, *i);
+                if let Some(v) = efectivos
+                    .get(&k)
+                    .map(String::as_str)
+                    .or_else(|| buscar(actual, &k))
+                {
+                    payload.push((k, v.to_owned()));
+                }
+            }
+            continue;
+        }
+        // Lo que la web desactiva según otro campo (el valor de una
+        // condición desmarcada) no viaja con el formulario.
+        if let Some(d) = &p.depende
+            && op != Operacion::Borrar
+        {
+            let de = efectivos.get(&d.de).map(String::as_str).or_else(|| {
+                (op == Operacion::Editar)
+                    .then(|| buscar(actual, &d.de))
+                    .flatten()
+            });
+            if !d.activo(de) {
+                desactivados.push(p.nombre.clone());
+                continue;
+            }
+        }
         let (v, leido) = if let Some(v) = efectivos.get(&p.nombre) {
             (v.as_str(), de_la_lectura.contains(&p.nombre))
         } else if op == Operacion::Editar
@@ -305,9 +442,22 @@ pub(super) fn componer(
             }
             secretos_tapados.push(p.nombre.clone());
         }
+        // Una casilla va como la manda la web: `on` si está marcada y fuera
+        // si no (el router la da por marcada si el campo llega).
+        if p.casilla.is_some() {
+            if marcada(v) {
+                payload.push((p.nombre.clone(), "on".to_owned()));
+            }
+            continue;
+        }
         payload.push((p.nombre.clone(), v.to_owned()));
     }
     for k in &omitidos {
+        efectivos.remove(k);
+    }
+    // Lo desactivado no se escribe: tampoco sale en el resumen ni se
+    // comprueba después.
+    for k in &desactivados {
         efectivos.remove(k);
     }
     let secreto =
@@ -333,23 +483,35 @@ pub(super) fn componer(
             }
         }
     } else {
-        for p in &f.parametros {
-            let Some(v) = efectivos.get(&p.nombre) else {
+        // Cada parámetro por su nombre; los de ranuras, por las suyas.
+        let nombres = f.parametros.iter().flat_map(|p| {
+            let de_p: Vec<&str> = if p.ranuras.is_some() {
+                ranuras::en(f, p, &efectivos)
+                    .into_iter()
+                    .map(|(k, _)| k)
+                    .collect()
+            } else {
+                vec![p.nombre.as_str()]
+            };
+            de_p.into_iter().map(move |k| (k, p))
+        });
+        for (nombre, p) in nombres {
+            let Some(v) = efectivos.get(nombre) else {
                 continue;
             };
-            if ident.contains(&p.nombre) && op != Operacion::Accion {
+            if ident.contains(nombre) && op != Operacion::Accion {
                 continue;
             }
-            let cur = buscar(actual, &p.nombre);
+            let cur = buscar(actual, nombre);
             let antes = cur.unwrap_or_default();
             if op != Operacion::Accion && iguales(Some(p), antes, v) {
                 continue;
             }
             campos.push(Campo {
-                nombre: p.nombre.clone(),
+                nombre: nombre.to_owned(),
                 antes: antes.to_owned(),
                 despues: v.clone(),
-                secreto: secreto(&p.nombre, antes, v),
+                secreto: secreto(nombre, antes, v),
                 leido: cur.is_some(),
             });
         }
@@ -394,12 +556,45 @@ pub(super) fn inversa(plan: &Plan) -> Option<ChangeRequest> {
             (None, false)
         }
     };
+    // Un usuario borrado vuelve con `cbAddUser`, aunque el borrado llegase
+    // como `cbDeleteUser` (de la Biblioteca); la contraseña la pone quien
+    // lo deshace (`especiales::con_contrasena_nueva`).
+    // Igual la regla del cortafuegos, cuya baja se anota con la función
+    // que se envía (la de quitar): la «sin ping» vuelve con su alta, una
+    // regla del editor con la suya y un filtro, con el alta de filtros.
+    let funcion = match (plan.operacion, &plan.lectura) {
+        (Operacion::Borrar, Lectura::Usuarios) => hgu::fmt::ALTA_USUARIO.to_owned(),
+        (Operacion::Borrar, Lectura::Cortafuegos) => {
+            use hgu::cortafuegos as cf;
+            if cf::es_de_filtro(&f.name) {
+                cf::ALTA_FILTRO.to_owned()
+            } else if f.name == cf::ALTA_REGLA {
+                cf::ALTA_REGLA.to_owned()
+            } else {
+                cf::ALTA.to_owned()
+            }
+        }
+        _ => f.name.clone(),
+    };
+    // La baja de una regla del cortafuegos va atada al filtro donde se creó
+    // (un filtro no tiene `belong`: sin identidad).
+    let identidad = match (plan.operacion, &plan.lectura) {
+        (Operacion::Crear, Lectura::Cortafuegos) => {
+            let belong = super::especiales::BELONG_CORTAFUEGOS;
+            plan.valores
+                .get(belong)
+                .map(|fid| (belong.to_owned(), fid.clone()))
+                .into_iter()
+                .collect()
+        }
+        _ => BTreeMap::new(),
+    };
     Some(ChangeRequest {
-        funcion: f.name.clone(),
+        funcion,
         instancia,
         valores,
         borrar,
-        identidad: Default::default(),
+        identidad,
     })
 }
 

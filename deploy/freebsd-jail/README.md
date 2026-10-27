@@ -39,6 +39,8 @@ genera ahí `jail.conf`, `pf.conf` (los dos bloques de reglas), `rc.conf`
 | `routerpanel.rc` | `/usr/local/etc/rc.d/routerpanel` en la jail del panel |
 | `actualizar.sh` | `/usr/local/sbin/routerpanel-actualizar` en el **host** |
 | `../lib/git.sh` | `/usr/local/libexec/routerpanel-actualizar/git.sh` en el host |
+| `../lib/precompiladas.sh` | `/usr/local/libexec/routerpanel-actualizar/precompiladas.sh` en el host ([versiones precompiladas](#versiones-precompiladas-el-pc-de-compilación)) |
+| `recibir-precompilada.sh` | `/usr/local/libexec/routerpanel-actualizar/recibir-precompilada.sh` en el host: la orden forzada del usuario del buzón |
 | `doas.conf.snippet` | nada: explica por qué no hace falta regla de doas |
 
 ## Rutas
@@ -57,7 +59,11 @@ En el host:
 - `/var/db/routerpanel-actualizar/fallida` — última etiqueta que falló dos
   veces seguidas (no compiló o no arrancó); no se reintenta hasta que haya
   otra. `intentos` (etiqueta y número) lleva la cuenta del primer fallo. Los
-  `--ref` no tocan ninguno de los dos.
+  `--ref` no tocan ninguno de los dos. `precompilada` (etiqueta y hora) es
+  cuándo se vio la etiqueta sin versión precompilada; solo con
+  `PRECOMPILADAS_ESPERA`.
+- `/var/db/routerpanel-buzon/entrada/<versión>/` — solo con versiones
+  precompiladas: lo que deja el PC de compilación (del usuario `rpentrega`).
 
 En la jail del panel:
 
@@ -191,7 +197,10 @@ Si no hay acceso al repositorio, compila lo que ya tenga el clon.
    mucho 100 caracteres) y el commit, 7–40 cifras hexadecimales; si no, el
    actualizador registra el error y no hace nada (el nombre acaba en rutas
    que root borra).
-3. `cargo leptos build --release --precompress` (como `rpbuild`; la web
+3. Solo con `PRECOMPILADAS_ESPERA` y para una etiqueta: antes de compilar
+   mira el buzón; ver [versiones precompiladas](#versiones-precompiladas-el-pc-de-compilación).
+   Si instala la precompilada, sigue en el paso 5; si no, compila:
+   `cargo leptos build --release --precompress` (como `rpbuild`; la web
    sale también en `.br` y `.gz`, que el panel sirve ya comprimida; si el
    `Cargo.lock` pide otra versión de `wasm-bindgen`, instala antes
    `wasm-bindgen-cli` de esa versión), con prioridad baja y, si se fijó
@@ -253,6 +262,178 @@ y una regla de doas en el host para reiniciar el servicio. No puede funcionar
 (desde una jail no se llega al doas del host), así que el actualizador corre en
 el host y sólo la compilación va dentro de la jail, sin privilegios. No hay
 reglas de doas nuevas (`doas.conf.snippet`).
+
+## Versiones precompiladas (el PC de compilación)
+
+Opcional. Compilar el panel en el servidor lleva sus minutos de CPU y
+bastante memoria. Si hay un PC con Linux más potente (el **PC de
+compilación**), puede compilar la versión para FreeBSD cuando está encendido
+y dejarla en un buzón del servidor; el actualizador la instala en lugar de
+compilarla. Si el PC está apagado (o en otro sistema), el servidor compila
+como siempre pasado un rato. **Sin `PRECOMPILADAS_ESPERA` en la
+configuración, nada de esto se usa** y el actualizador hace exactamente lo
+mismo que antes (lo comprueba `deploy/pruebas/precompiladas.sh`).
+
+### Cómo funciona
+
+1. Tras crear y subir la etiqueta, desde el equipo de trabajo:
+
+   ```sh
+   deploy/cross/lanzar.sh vX.Y.Z
+   ```
+
+   Comprueba que es una etiqueta `v*` y que la copia de trabajo no tiene
+   cambios sin confirmar; manda al PC (`PC_COMPILAR_SSH`) `deploy/cross/`,
+   `deploy/lib/` y un `git bundle` de la etiqueta, y allí
+   `compilar-freebsd.sh --release vX.Y.Z` compila y `entregar.sh` lo sube al
+   buzón (`PRECOMPILADAS_BUZON_SSH`). Si el PC no responde en 5 s, lo dice y
+   sale con 3: el servidor compilará él mismo. `--prueba [REF]` compila
+   cualquier referencia sin entregarla (la versión se llama
+   `prueba-<sha>` y el buzón no la admite).
+2. En el PC, `compilar-freebsd.sh` saca el código del commit de la etiqueta
+   con `git archive` (nunca de una copia de trabajo) a `~/rtf-cross/fuente`
+   (con `target/` dentro: la siguiente compilación es incremental) y ejecuta
+   `cargo leptos build --release --precompress` como el servidor, con la
+   misma versión de `cargo-leptos` (la de `install.sh`, que es la que fija
+   `wasm-bindgen`) y el binario para `x86_64-unknown-freebsd` compilado con
+   [`cross`](https://github.com/cross-rs/cross) (un contenedor de podman con
+   el enlazador y la libc de FreeBSD; SQLite y el resto de C van enlazados
+   dentro del binario). El binario pide las mismas bibliotecas que el que
+   compila el servidor (`libthr`, `libgcc_s`, `libc` y `libm`, todas de la
+   base). La web no depende de la plataforma. Empaqueta, como las releases de
+   Linux, `routerpanel-<versión>-x86_64-unknown-freebsd.tar.gz` (una carpeta
+   con `panel`, `site/`, `COMMIT`, `LICENSE` y `AVISO-LEGAL.md`) y
+   `SHA256SUMS`; con `RP_MINISIGN_SECRETA`, también `SHA256SUMS.minisig`.
+3. `entregar.sh` sube el archivo, la firma y `SHA256SUMS` (el último) por SSH
+   como el usuario `rpentrega` del servidor. Ese usuario solo puede ejecutar
+   `recibir-precompilada.sh`, que guarda cada fichero en
+   `/var/db/routerpanel-buzon/entrada/<versión>/` (con un rename: nunca a
+   medias), solo con los tres nombres admitidos, hasta 300 MB por fichero y
+   las 3 versiones más recientes.
+4. El actualizador (cron, cada 15 min), con una etiqueta nueva:
+   - si en el buzón están el archivo y `SHA256SUMS` (y la firma, con
+     `PRECOMPILADAS_MINISIGN`), lo copia a una carpeta propia y comprueba,
+     sobre la copia: la firma (con clave), el sha256, que el archivo trae
+     solo ficheros y carpetas normales, sin enlaces, en una única carpeta
+     con el nombre de la versión; que `COMMIT` es el commit de la etiqueta
+     en el clon de la jail de compilación y que `panel` es un ejecutable de
+     FreeBSD x86-64. Si todo cuadra, lo deja en `releases/<versión>/`
+     (`panel`, `site/`, `COMMIT`, de root, 755/644) y lo despliega como las
+     suyas (copia de la base de datos, `/salud`, vuelta atrás). Si algo no
+     cuadra, lo registra y compila aquí en la misma ejecución. En los dos
+     casos vacía la carpeta de esa versión del buzón;
+   - si no ha llegado, espera: apunta cuándo vio la etiqueta y termina sin
+     hacer nada, hasta `PRECOMPILADAS_ESPERA` minutos después; a partir de
+     ahí compila aquí como siempre. Con el cron cada 15 minutos, la espera
+     real se redondea hacia arriba (20 min son, como mucho, 30). Con
+     `PRECOMPILADAS_ESPERA=0` no espera nunca, pero usa la precompilada si ya
+     está.
+
+   Si la precompilada no arranca (`/salud`), la vuelta atrás es la de
+   siempre y el siguiente intento ya no la tiene (se borró del buzón):
+   compila aquí. Los `--ref` nunca miran el buzón.
+
+### Por qué así (el PC empuja a una cuenta limitada)
+
+- El PC nunca entra en el servidor con una shell: su clave solo vale para
+  `rpentrega` con `restrict` (sin terminal, reenvíos ni agente),
+  `command=` (la única orden es `recibir-precompilada.sh`) y `from=` (solo
+  desde la IP del PC). No hace falta tocar `sshd_config` (un `sftp` con
+  `chroot` sí lo necesita) y el receptor solo escribe ficheros con nombre
+  conocido, de tamaño limitado, en su carpeta.
+- La alternativa, que el servidor fuera a buscarla al PC, obligaría al
+  actualizador, que corre como root, a guardar una clave para entrar en un
+  equipo de escritorio y a esperar conexiones que fallan cada vez que el PC
+  está apagado.
+- Nada de lo que llega se ejecuta en el host. root lo lee de una copia
+  propia (un `cp` con tiempo máximo, por si alguien pusiera una FIFO) y lo
+  comprueba todo antes de instalarlo, igual que con los artefactos que salen
+  de la jail de compilación.
+
+Confianza: quien controle el PC de compilación (o su clave del buzón) puede
+hacer que se despliegue otro binario en la jail del panel, igual que hoy
+quien pueda crear etiquetas en el repositorio. El commit tiene que ser el de
+la etiqueta, pero el binario no se puede comprobar contra el código. La firma
+de minisign (opcional) añade que solo vale lo firmado con una clave que no
+sale del PC. La jail del panel sigue igual de cerrada (pf: solo el router).
+
+### Instalar (a mano, una vez)
+
+En `deploy/config.local` del equipo de trabajo:
+
+```sh
+PRECOMPILADAS_ESPERA=20
+PC_COMPILAR_SSH=usuario@pc-de-compilacion
+PRECOMPILADAS_BUZON_SSH=rpentrega@<IP del servidor vista desde el PC>
+# Opcional: PRECOMPILADAS_MINISIGN=<la línea de la clave pública>
+```
+
+En el PC de compilación (Linux con `rustup`, `podman`, `cross`, `rsync`,
+`file`; `cargo-leptos` lo instala el guion si falta o es otra versión):
+
+```sh
+ssh-keygen -t ed25519 -N '' -C routerpanel-buzon -f ~/.ssh/routerpanel-buzon
+cat ~/.ssh/routerpanel-buzon.pub     # para el authorized_keys de abajo
+```
+
+En el servidor, como root (`doas`); `IP_DEL_PC` y la clave, los del PC:
+
+```sh
+pw groupadd rpentrega -g 3161
+pw useradd rpentrega -u 3161 -g rpentrega -d /var/db/routerpanel-buzon \
+    -s /bin/sh -w no -c "Buzón de versiones precompiladas del panel"
+install -d -m 755 -o root -g wheel /var/db/routerpanel-buzon /var/db/routerpanel-buzon/.ssh
+install -d -m 750 -o rpentrega -g rpentrega /var/db/routerpanel-buzon/entrada
+printf '%s\n' 'restrict,from="IP_DEL_PC",command="/usr/local/libexec/routerpanel-actualizar/recibir-precompilada.sh" <el contenido de routerpanel-buzon.pub>' \
+    >/var/db/routerpanel-buzon/.ssh/authorized_keys
+chown root:wheel /var/db/routerpanel-buzon/.ssh/authorized_keys
+chmod 644 /var/db/routerpanel-buzon/.ssh/authorized_keys
+sshd -T | grep -Ei '^(allowusers|allowgroups|denyusers|denygroups)'
+```
+
+- El `authorized_keys` es de root: `rpentrega` no puede quitarse las
+  restricciones. `-w no`: sin contraseña. Necesita una shell de verdad
+  (`/bin/sh`) porque sshd ejecuta la orden forzada con ella.
+- Si `sshd -T` muestra `AllowUsers` o `AllowGroups`, añade `rpentrega` en
+  `sshd_config` y `service sshd reload`. Si pf limita quién llega al SSH del
+  host, deja pasar al PC.
+- Con firma: `pkg install minisign` en el host y `PRECOMPILADAS_MINISIGN` en
+  `config.local`. En el PC, `minisign -G -W -s ~/.config/routerpanel/minisign.key -p ~/.config/routerpanel/minisign.pub`
+  y `RP_MINISIGN_SECRETA=~/.config/routerpanel/minisign.key` en el entorno
+  de `lanzar.sh`/`compilar-freebsd.sh` (sin contraseña, `-W`: el PC firma
+  solo).
+
+Después, desde el equipo de trabajo, `deploy/freebsd-jail/install.sh`
+(instala `precompiladas.sh` y `recibir-precompilada.sh` y pasa
+`PRECOMPILADAS_ESPERA` y `PRECOMPILADAS_MINISIGN` a la configuración del
+actualizador). Por último, en el PC, fija la clave del servidor y prueba el
+buzón (`recibir` sin argumentos responde con el uso y no guarda nada):
+
+```sh
+ssh-keyscan -t ed25519 <servidor> >>~/.ssh/known_hosts   # compárala con ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub del servidor
+ssh -i ~/.ssh/routerpanel-buzon -o IdentitiesOnly=yes rpentrega@<servidor> recibir
+```
+
+y una compilación de prueba desde el equipo de trabajo:
+`deploy/cross/lanzar.sh --prueba`.
+
+### Temporizador en el PC (opcional)
+
+En vez de lanzarlo a mano, el PC puede mirar cada 15 minutos, mientras está
+encendido, si hay una etiqueta nueva en el repositorio y compilarla y
+entregarla (`compilar-freebsd.sh --ultima`, que no repite lo ya entregado).
+Necesita llegar al repositorio (`REPO_URL`) desde el PC y los guiones en
+`~/rtf-cross/bin` (los copia `lanzar.sh`). No viene activado:
+
+```sh
+cp deploy/cross/rtf-cross.service deploy/cross/rtf-cross.timer ~/.config/systemd/user/
+printf 'RP_REPO_URL=%s\nRP_BUZON_SSH=%s\n' '<REPO_URL>' 'rpentrega@<servidor>' >~/.config/rtf-cross.env
+systemctl --user daemon-reload
+systemctl --user enable --now rtf-cross.timer
+```
+
+Las unidades de usuario solo corren con la sesión abierta (o con
+`loginctl enable-linger`).
 
 ## Red (pf)
 

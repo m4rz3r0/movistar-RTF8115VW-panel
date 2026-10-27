@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
-import { PLAZO_CAMBIO, cambiarUpnp, esperarFinal, estadoCambio, plazoDeTest } from "./cambios";
+import { PLAZO_CAMBIO, cambiarVigilado, esperarFinal, estadoCambio, plazoDeTest } from "./cambios";
 import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
+import { capturaOpcional } from "./util";
 
 test.describe.configure({ mode: "parallel" });
 
@@ -100,7 +101,8 @@ for (const idioma of ["es", "en"] as const) {
       });
 
       test("el ojo en Ajustes, Teléfono, la Biblioteca y el Historial", async ({ page }) => {
-        // La clave de la voz, un cambio; el de UPnP en curso, dos (lo deshace).
+        // La clave de la voz, un cambio; el de la reserva de IP en curso (se
+        // vigila), dos (lo deshace).
         test.setTimeout(plazoDeTest((guardaLaVoz ? 1 : 0) + (conCambioEnCurso ? 2 : 0)));
         const t = textosSecreto[idioma];
         const errores = recogerErrores(page);
@@ -119,7 +121,7 @@ for (const idioma of ["es", "en"] as const) {
         await expect(campo).toHaveAttribute("autocomplete", "off");
         expect(await aLaVista(page.locator("main"))).not.toContain(CLAVE_5);
         await sinDesbordamiento(page, `secreto censurado ${idioma} ${ancho}`);
-        await page.screenshot({ path: `capturas/secreto-censurado-${idioma}-${ancho}.png` });
+        await capturaOpcional(page, { path: `capturas/secreto-censurado-${idioma}-${ancho}.png` });
 
         // El ojo lo muestra al instante, sin pedir la contraseña del panel
         // (ni abrir el detalle). Su nombre dice de qué campo es.
@@ -131,7 +133,7 @@ for (const idioma of ["es", "en"] as const) {
         await expect(page.locator("dialog[open]")).toHaveCount(0);
         await expect(page.locator(".detalle")).toHaveCount(0);
         await sinDesbordamiento(page, `secreto visible ${idioma} ${ancho}`);
-        await page.screenshot({ path: `capturas/secreto-visible-${idioma}-${ancho}.png` });
+        await capturaOpcional(page, { path: `capturas/secreto-visible-${idioma}-${ancho}.png` });
         // No se oculta solo.
         await page.clock.runFor(60_000);
         await expect(campo).toHaveAttribute("type", "text");
@@ -156,7 +158,7 @@ for (const idioma of ["es", "en"] as const) {
         await detalle.getByRole("button", { name: t.ver }).first().click();
         await expect(editable).toHaveAttribute("type", "text");
         await sinDesbordamiento(page, `secreto editando ${idioma} ${ancho}`);
-        await page.screenshot({ path: `capturas/secreto-editando-${idioma}-${ancho}.png` });
+        await capturaOpcional(page, { path: `capturas/secreto-editando-${idioma}-${ancho}.png` });
         // «Descartar» lo deja como estaba.
         await detalle.getByRole("button", { name: t.descartar, exact: true }).click();
         await expect(editable).toHaveValue(CLAVE_5);
@@ -188,7 +190,7 @@ for (const idioma of ["es", "en"] as const) {
         await expect(lineaEdicion.locator(".campo-error").filter({ hasText: t.pideLaClave })).toBeVisible();
         expect(preparados, "sin la clave no se pide nada al servidor").toBe(0);
         await sinDesbordamiento(page, `clave de la voz ${idioma} ${ancho}`);
-        await page.screenshot({ path: `capturas/secreto-voz-${idioma}-${ancho}.png` });
+        await capturaOpcional(page, { path: `capturas/secreto-voz-${idioma}-${ancho}.png` });
         if (guardaLaVoz) {
           // Con la clave escrita (y la línea como estaba), se guarda.
           await lineaEdicion.getByRole("switch", { name: t.lineaActiva }).click();
@@ -212,7 +214,7 @@ for (const idioma of ["es", "en"] as const) {
           await voz.locator("summary.hist-cabeza .hist-hora").click();
           await expect(voz.locator(".hist-detalle .tabla-scroll")).toContainText(t.claveSinLeer);
           await sinDesbordamiento(page, `historial sin deshacer ${idioma} ${ancho}`);
-          await page.screenshot({ path: `capturas/secreto-sin-deshacer-${idioma}-${ancho}.png`, fullPage: true });
+          await capturaOpcional(page, { path: `capturas/secreto-sin-deshacer-${idioma}-${ancho}.png`, fullPage: true });
         } else {
           await page.locator(".detalle").getByRole("button", { name: t.descartar, exact: true }).click();
           await expect(lineaClave).toHaveValue("");
@@ -229,13 +231,13 @@ for (const idioma of ["es", "en"] as const) {
         await page.locator(".resultado-lectura").getByRole("button", { name: t.ver }).first().click();
         await expect(celda).toHaveAttribute("type", "text");
         await sinDesbordamiento(page, `biblioteca ${idioma} ${ancho}`);
-        await page.screenshot({ path: `capturas/secreto-biblioteca-${idioma}-${ancho}.png` });
+        await capturaOpcional(page, { path: `capturas/secreto-biblioteca-${idioma}-${ancho}.png` });
 
         // Historial: el cambio de la clave de 5 GHz, por su título; al
         // desplegarlo, el valor anterior y el nuevo con el ojo, sin
         // nombres de la API a la vista.
         let enCurso: number | null = null;
-        if (conCambioEnCurso) enCurso = await cambiarUpnp(page);
+        if (conCambioEnCurso) enCurso = await cambiarVigilado(page);
         await page.goto("/historial");
         await asentar(page);
         // Con las filas plegadas, ningún nombre de la API a la vista (los de
@@ -263,17 +265,19 @@ for (const idioma of ["es", "en"] as const) {
           // vigilancia corta del e2e, el cambio podría terminar antes y la
           // espera no probaría nada: sigue vigilándose antes y después.
           expect(await estadoCambio(page, enCurso), "el cambio está en curso").toBe("Vigilando");
-          await page.waitForTimeout(5_000);
+          // El reloj del navegador está instalado: los refrescos de 2 s
+          // saltan sin esperar 5 s de verdad.
+          await page.clock.runFor(5_000);
           expect(await estadoCambio(page, enCurso), "sigue en curso tras la espera").toBe("Vigilando");
           await expect(valores.nth(1)).toHaveAttribute("type", "text");
           await expect(valores.nth(1)).toHaveValue(CLAVE_5);
         }
         await sinDesbordamiento(page, `historial ${idioma} ${ancho}`);
-        await page.screenshot({ path: `capturas/secreto-historial-${idioma}-${ancho}.png`, fullPage: true });
+        await capturaOpcional(page, { path: `capturas/secreto-historial-${idioma}-${ancho}.png`, fullPage: true });
         if (enCurso !== null) {
           // Lo deja como estaba: espera al primero y deshace con otro.
           await esperarFinal(page, enCurso);
-          await esperarFinal(page, await cambiarUpnp(page));
+          await esperarFinal(page, await cambiarVigilado(page));
         }
         expect(errores, "errores o avisos en la consola").toEqual([]);
       });

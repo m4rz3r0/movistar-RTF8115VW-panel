@@ -3,6 +3,7 @@
 //! lecturas de otros intercaladas. Lo que prepara un cambio sigue leyendo el
 //! router.
 
+use crate::comun::ConfirmarLigado;
 use crate::comun::{Panel, PanelPrueba, Registro, esperar_final, esperar_libre, leer, ok, sesion};
 use panel::poller::{Poller, PollerConfig};
 use serde_json::{Value, json};
@@ -478,7 +479,10 @@ async fn comprobar_un_cambio_invalida_lo_guardado() {
     let a = ChangeManager::new(p.state.clone(), lento.clone());
     a.reanudar_pendientes().await;
     let prep = a.preparar(reserva("0", "192.168.1.80")).await.unwrap();
-    let id = a.confirmar(&prep.token, None, "admin").await.unwrap();
+    let id = a
+        .confirmar_ligado(&prep.token, None, "admin")
+        .await
+        .unwrap();
     assert_eq!(a.cambio(id).await.unwrap().estado, Estado::Vigilando);
     // El proceso muere a mitad de la vigilancia.
     a.detener();

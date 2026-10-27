@@ -21,6 +21,12 @@ pub(in crate::changes) enum Lectura {
     Pagina(String),
     /// Sin lectura comprobable.
     Ninguna,
+    /// La lista de usuarios de la web del router (`cbGetUserList`), con el
+    /// nombre como id (ver `changes::especiales`).
+    Usuarios,
+    /// Las reglas del cortafuegos (`var filter` de su página de la lista),
+    /// con el RID como id (ver `changes::especiales::cortafuegos`).
+    Cortafuegos,
 }
 
 /// Instancia de una lista que se lee por su id: la lectura pareada pasa el
@@ -67,6 +73,11 @@ pub(in crate::changes) fn lectura_de(
     valores: &BTreeMap<String, String>,
     instancia: Option<&str>,
 ) -> Result<Lectura, CambioError> {
+    // Antes que la regla de las páginas `.asp`: el cortafuegos se lee de
+    // la suya, pero no son sus variables.
+    if let Some(e) = super::super::especiales::Especial::de(f) {
+        return Ok(e.lectura());
+    }
     let Some(lp) = &f.lectura_pareada else {
         return Ok(Lectura::Ninguna);
     };

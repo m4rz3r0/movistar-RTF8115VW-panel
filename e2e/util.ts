@@ -124,3 +124,15 @@ export async function quieta(page: Page) {
     ),
   );
 }
+
+/**
+ * Captura de pantalla solo con `E2E_CAPTURAS=1`: en la batería normal no se
+ * mira ninguna (ninguna se compara) y las de página entera a 1440 px son
+ * caras. `objetivo` es una página o un localizador.
+ */
+export async function capturaOpcional(
+  objetivo: { screenshot(opciones: object): Promise<unknown> },
+  opciones: object,
+): Promise<void> {
+  if (process.env.E2E_CAPTURAS) await objetivo.screenshot(opciones);
+}

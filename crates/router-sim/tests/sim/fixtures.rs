@@ -23,8 +23,25 @@ fn real_secrets() -> HashSet<String> {
     }
 }
 
+/// Valores inventados que una variante pone a propósito en un secreto, para
+/// probar que no salen del sitio: (fixture, etiqueta, valor). Valen en lugar
+/// de [`sanitize::REDACTED`] solo en esa fixture de
+/// `fixtures-variantes/conexion-secretos` y en esa etiqueta.
+const VALORES_DE_PRUEBA: [(&str, &str, &str); 2] = [
+    (
+        "conexion-secretos/cbGetWanIPIntf.xml",
+        "password",
+        "clave-ppp-de-prueba",
+    ),
+    (
+        "conexion-secretos/cbGetGPONInfo.xml",
+        "GponSerialNumber",
+        "SERIE-DE-PRUEBA",
+    ),
+];
+
 /// Comprueba un valor de la fixture `file` (de un elemento o de un parámetro
-/// del nombre del fichero).
+/// del nombre del fichero; `<variante>/<fichero>` en una variante).
 fn check_value(file: &str, tag: &str, value: &str, secrets: &HashSet<String>) {
     use sanitize::TagClass;
     let class = sanitize::tag_class(tag)
@@ -48,11 +65,14 @@ fn check_value(file: &str, tag: &str, value: &str, secrets: &HashSet<String>) {
             .is_some_and(|n| n.parse::<u32>().is_ok())
     };
     match class {
+        TagClass::Redact if VALORES_DE_PRUEBA.contains(&(file, tag, value)) => {}
         TagClass::Redact => assert_eq!(value, sanitize::REDACTED, "{file}: <{tag}> sin sanear"),
         TagClass::Ssid => assert!(pseudo("RED-"), "{file}: <{tag}> sin sanear"),
         TagClass::Host => assert!(pseudo("host-"), "{file}: <{tag}> sin sanear"),
         TagClass::Desc => assert!(
-            pseudo("desc-") || ["LAN", "Default"].contains(&value) || value.parse::<u64>().is_ok(),
+            pseudo("desc-")
+                || ["LAN", "Default", "DMZ"].contains(&value)
+                || value.parse::<u64>().is_ok(),
             "{file}: <{tag}> sin sanear"
         ),
         TagClass::Keep => assert!(
@@ -95,11 +115,19 @@ fn fixtures_have_no_secrets() {
     assert!(dirs.len() > 1, "faltan las variantes");
     let mut files = 0;
     for dir in dirs {
+        let variante = dir
+            .strip_prefix(&variantes)
+            .ok()
+            .map(|d| d.to_string_lossy().into_owned());
         for entry in std::fs::read_dir(&dir).expect("directorio de fixtures") {
             let path = entry.unwrap().path();
-            let name = path.file_name().unwrap().to_string_lossy().into_owned();
-            let Some(stem) = name.strip_suffix(".xml") else {
+            let file = path.file_name().unwrap().to_string_lossy().into_owned();
+            let Some(stem) = file.strip_suffix(".xml") else {
                 continue;
+            };
+            let name = match &variante {
+                Some(v) => format!("{v}/{file}"),
+                None => file.clone(),
             };
             files += 1;
             for (k, v) in sanitize::split_fixture_name(stem).1 {
@@ -112,4 +140,50 @@ fn fixtures_have_no_secrets() {
         }
     }
     assert!(files > 50, "faltan fixtures ({files})");
+}
+
+/// Los valores de prueba valen solo en su fixture, su etiqueta y tal cual:
+/// ni en otra fixture (de serie o de otra variante), ni en otra etiqueta, ni
+/// cambiados de sitio entre ellos, ni con otras mayúsculas.
+#[test]
+fn valores_de_prueba_solo_en_su_sitio() {
+    let ninguno = HashSet::new();
+    for (i, &(file, tag, value)) in VALORES_DE_PRUEBA.iter().enumerate() {
+        check_value(file, tag, value, &ninguno);
+        let base = file.rsplit('/').next().unwrap();
+        let otra = format!("dhcp-sin-voip/{base}");
+        let (otro_file, otro_tag, _) = VALORES_DE_PRUEBA[1 - i];
+        let mayus = value.to_uppercase();
+        let minus = value.to_lowercase();
+        let distinto = if mayus == value { &minus } else { &mayus };
+        for (f, t, v) in [
+            (base, tag, value),
+            (otra.as_str(), tag, value),
+            (file, "username", value),
+            (otro_file, otro_tag, value),
+            (file, tag, distinto.as_str()),
+        ] {
+            let r = std::panic::catch_unwind(|| check_value(f, t, v, &ninguno));
+            assert!(r.is_err(), "{f} <{t}> admite {v}");
+        }
+    }
+}
+
+/// Cada entrada de la caché ARP tiene su MAC: una MAC repetida en varias IP
+/// haría pasar a un dispositivo por varios.
+#[test]
+fn arp_sin_mac_repetida() {
+    let raw = std::fs::read_to_string(fixtures_dir().join("cbGetArpCache.xml")).unwrap();
+    let doc = roxmltree::Document::parse(&raw).expect("fixture XML válida");
+    let registros = doc
+        .descendants()
+        .filter(|n| n.has_tag_name("arp_record"))
+        .count();
+    let macs: HashSet<&str> = doc
+        .descendants()
+        .filter(|n| n.has_tag_name("hwaddr"))
+        .filter_map(|n| n.text())
+        .collect();
+    assert!(registros > 1, "faltan entradas ARP");
+    assert_eq!(macs.len(), registros, "MAC repetida en la caché ARP");
 }

@@ -3,8 +3,8 @@
 //! usan las páginas por tema.
 
 use ajustes::{
-    Ajuste, Campo, CatalogoAjustes, Componente, Nivel, claves_de_elementos, claves_requeridas,
-    comprobar, prefijo_i18n,
+    Ajuste, Campo, CatalogoAjustes, ClaseFuente, Componente, Nivel, Respaldo, claves_de_elementos,
+    claves_requeridas, comprobar, prefijo_i18n,
 };
 use catalogo::{Catalogo, Tipo, mask::Mascara};
 use i18n::Idioma;
@@ -137,7 +137,7 @@ fn claves_de_elementos_en_los_dos_idiomas() {
 fn ajustes_minimos_presentes() {
     use Nivel::{Avanzado, Basico, Oculto};
     let c = cargar();
-    let filas: [(&str, Nivel, bool, Option<Componente>); 33] = [
+    let filas: [(&str, Nivel, bool, Option<Componente>); 36] = [
         ("wifi.red_24", Basico, false, None),
         ("wifi.red_24_avanzado", Avanzado, false, None),
         ("wifi.red_5", Basico, false, None),
@@ -167,6 +167,13 @@ fn ajustes_minimos_presentes() {
         ("puertos.alg", Oculto, false, None),
         ("internet.dns", Avanzado, false, None),
         ("internet.ddns", Oculto, true, None),
+        (
+            "internet.conexion",
+            Basico,
+            true,
+            Some(Componente::Conexion),
+        ),
+        ("internet.fibra", Avanzado, false, None),
         ("seguridad.gestion_remota", Basico, false, None),
         ("seguridad.gestion_remota_avanzado", Avanzado, false, None),
         ("seguridad.gestion_remota_oculto", Oculto, false, None),
@@ -176,7 +183,18 @@ fn ajustes_minimos_presentes() {
             false,
             Some(Componente::ContrasenaRouter),
         ),
-        ("seguridad.usuarios_router", Avanzado, true, None),
+        (
+            "seguridad.usuarios_router",
+            Avanzado,
+            true,
+            Some(Componente::UsuariosRouter),
+        ),
+        (
+            "seguridad.cortafuegos",
+            Avanzado,
+            true,
+            Some(Componente::Cortafuegos),
+        ),
         ("telefono.linea", Avanzado, false, None),
         ("telefono.linea_oculto", Oculto, false, None),
         ("telefono.sip", Avanzado, false, None),
@@ -220,6 +238,16 @@ fn ajustes_minimos_presentes() {
         "{:#?}",
         usuarios.campos
     );
+    // La conexión a internet y la fibra solo se leen.
+    for id in ["internet.conexion", "internet.fibra"] {
+        let a = c.ajuste(id).unwrap();
+        assert!(
+            a.campos
+                .iter()
+                .all(|x| x.escribe.is_none() && x.solo_lectura.is_some()),
+            "{id}"
+        );
+    }
     // La gestión remota se activa en la parte básica, con su lectura.
     let tr69 = c.ajuste("seguridad.gestion_remota").unwrap();
     let activa = tr69.campo("activa").unwrap();
@@ -337,16 +365,31 @@ fn valores_del_fichero(ruta: &PathBuf) -> Vec<(String, String)> {
 ///   inglesas de uso diario («your WiFi password», «all devices»);
 /// - «isolation»: término corriente al explicar el aislamiento de la WiFi;
 /// - «beamforming»: el nombre de la técnica, que el texto explica;
-/// - «WMM»: el nombre del estándar de la WiFi, en mayúsculas como se escribe.
-const FORMAS_CORRIENTES: [&str; 9] = [
+/// - «WMM»: el nombre del estándar de la WiFi, en mayúsculas como se escribe;
+/// - «name», «Name», «protocol», «Protocol», «version» y «action»: palabras
+///   inglesas de uso diario («Network name», «Protocol») que el cortafuegos
+///   lee con ese nombre (`Name`, `Protocol`, `Version`, `Action`);
+/// - «MTU»: el nombre del dato, en mayúsculas como se escribe (la conexión a
+///   internet lo lee como `mtu`);
+/// - «DMZ»: el nombre corriente de la función, en mayúsculas como se escribe
+///   (Puertos la lee con el parámetro `dmz`).
+const FORMAS_CORRIENTES: [&str; 17] = [
     "account",
     "Account",
+    "DMZ",
+    "action",
     "all",
     "All",
     "beamforming",
     "isolation",
+    "MTU",
+    "name",
+    "Name",
     "password",
     "Password",
+    "protocol",
+    "Protocol",
+    "version",
     "WMM",
 ];
 
@@ -356,6 +399,13 @@ fn nombres_de_la_api(c: &CatalogoAjustes) -> BTreeSet<String> {
     let mut nombres = BTreeSet::new();
     for a in c.todos() {
         nombres.extend(a.leer.params.iter().map(|(k, _)| k.clone()));
+        nombres.extend(
+            a.leer
+                .solo
+                .iter()
+                .chain(&a.leer.excluir)
+                .map(|(k, _)| k.clone()),
+        );
         nombres.extend(a.fijos.keys().cloned());
         for x in &a.campos {
             nombres.insert(x.lee.clone());
@@ -419,6 +469,7 @@ fn detector_de_nombres_de_la_api() {
         "ENABLECWMP",
         "el campo UserName",
         "pon wmm a 1",
+        "el campo desc",
     ] {
         assert!(
             !hallazgos(&patrones, delator).is_empty(),
@@ -429,6 +480,7 @@ fn detector_de_nombres_de_la_api() {
         "Change your WiFi password for all devices.",
         "Turn on isolation and beamforming; All your Account details stay safe.",
         "Activa WMM en la red de casa, por ejemplo hora.example.",
+        "Quita la DMZ desde la web del router.",
     ] {
         assert!(
             hallazgos(&patrones, llano).is_empty(),
@@ -540,6 +592,9 @@ fn sin(c: &Campo, recomendado: bool, opciones: bool) -> Campo {
     let mut c = c.clone();
     if recomendado {
         c.recomendado = None;
+        // Las fuentes son de la recomendación.
+        c.fuentes.clear();
+        c.respaldo = None;
     }
     if opciones {
         c.opciones.clear();
@@ -572,8 +627,9 @@ fn forma(
 /// Las tres redes WiFi tienen los mismos campos, parámetros, validaciones y
 /// opciones; solo difieren la recomendación del aislamiento (sí en
 /// invitados, donde además es de seguridad), la de encender la red
-/// (apagada en invitados) y si está separada de la red de casa (solo en
-/// invitados, y solo se lee). Las dos radios, igual, salvo canales, anchos y modos (propios
+/// (apagada en invitados), con sus fuentes, las fuentes de `separada` (las
+/// del aviso de la red de invitados sin separar) y el motivo de lo que
+/// solo se lee, con el prefijo de su ajuste. Las dos radios, igual, salvo canales, anchos y modos (propios
 /// de cada banda) y la señal dirigida, que solo está en 5 GHz.
 #[test]
 fn redes_y_radios_wifi_iguales_salvo_lo_previsto() {
@@ -583,20 +639,24 @@ fn redes_y_radios_wifi_iguales_salvo_lo_previsto() {
         for otra in ["red_5", "invitados"] {
             let a = c.ajuste(&format!("wifi.{otra}{sufijo}")).unwrap();
             assert_eq!(forma(a), forma(base), "{}", a.id);
-            let quita = |x: &Campo| {
+            // El motivo de un campo de solo lectura lleva el prefijo de su
+            // ajuste: se compara sin él.
+            let quita = |a: &Ajuste, x: &Campo| {
                 let mut x = sin(x, matches!(x.id.as_str(), "aislamiento" | "activa"), false);
                 if x.id == "aislamiento" {
                     x.seguridad = false;
                 }
+                // Las fuentes del aviso de una red de invitados sin separar.
+                if x.id == "separada" {
+                    x.fuentes.clear();
+                }
+                x.solo_lectura = x
+                    .solo_lectura
+                    .map(|m| m.replace(&prefijo_i18n(a), "<ajuste>"));
                 x
             };
-            let campos: Vec<Campo> = a
-                .campos
-                .iter()
-                .filter(|x| !(otra == "invitados" && x.id == "separada"))
-                .map(quita)
-                .collect();
-            let esperados: Vec<Campo> = base.campos.iter().map(quita).collect();
+            let campos: Vec<Campo> = a.campos.iter().map(|x| quita(a, x)).collect();
+            let esperados: Vec<Campo> = base.campos.iter().map(|x| quita(base, x)).collect();
             assert_eq!(campos, esperados, "{}", a.id);
         }
     }
@@ -614,5 +674,239 @@ fn redes_y_radios_wifi_iguales_salvo_lo_previsto() {
             .collect();
         let en_24: Vec<Campo> = r24.campos.iter().map(quita).collect();
         assert_eq!(en_24, comunes, "{}", r24.id);
+    }
+}
+
+/// WiFi avanzado (Tarea 5 de la fase 3): las tres redes leen el PMF, el
+/// bloqueo del WPS y si están separadas de la red de casa, sin escribirlos,
+/// y escriben la renovación de la clave de grupo.
+#[test]
+fn wifi_avanzado_lee_pmf_wps_y_separada() {
+    let c = cargar();
+    for red in ["red_24", "red_5", "invitados"] {
+        let a = c.ajuste(&format!("wifi.{red}_avanzado")).unwrap();
+        let campo = |id: &str| a.campo(id).unwrap_or_else(|| panic!("{}: sin {id}", a.id));
+        for (id, lee) in [
+            ("separada", "guest_networking"),
+            ("pmf", "wifi_pmf"),
+            ("wps_bloqueo", "wps_setup_lock"),
+        ] {
+            let x = campo(id);
+            assert_eq!(x.lee, lee, "{}.{id}", a.id);
+            assert!(
+                x.escribe.is_none() && x.solo_lectura.is_some(),
+                "{}.{id}",
+                a.id
+            );
+        }
+        let pmf: Vec<(&str, &str)> = campo("pmf")
+            .opciones
+            .iter()
+            .map(|o| (o.valor.as_str(), o.clave.as_str()))
+            .collect();
+        assert_eq!(pmf, [("0", "desactivada")], "{}", a.id);
+        assert_eq!(campo("wps_bloqueo").tipo, ajustes::TipoCampo::Booleano);
+        let renovacion = campo("renovacion_clave");
+        let e = renovacion
+            .escribe
+            .as_ref()
+            .expect("renovacion_clave escribe");
+        assert_eq!(
+            (e.funcion.as_str(), e.parametro.as_str()),
+            ("cbSetWifiAccPt", "regen_key_interval"),
+            "{}",
+            a.id
+        );
+        let opciones: Vec<(&str, &str)> = renovacion
+            .opciones
+            .iter()
+            .map(|o| (o.valor.as_str(), o.clave.as_str()))
+            .collect();
+        assert_eq!(
+            opciones,
+            [("0", "nunca"), ("3600", "hora"), ("86400", "dia")],
+            "{}",
+            a.id
+        );
+    }
+}
+
+/// Las fuentes de las recomendaciones: las de la investigación, todas por
+/// https, y cada recomendación con las suyas o como criterio del panel
+/// (también las que solo informan: la DMZ, la red de invitados sin separar y
+/// el cortafuegos; y cada proveedor de DNS, el familiar incluido).
+#[test]
+fn fuentes_del_catalogo_real() {
+    let c = cargar();
+    assert!(c.fuentes().len() >= 30, "{}", c.fuentes().len());
+    for f in c.fuentes() {
+        assert!(f.url.starts_with("https://"), "{}: {}", f.id, f.url);
+    }
+    assert_eq!(
+        c.fuente("nsa-red-casa").map(|f| f.clase),
+        Some(ClaseFuente::Guia)
+    );
+    let campo = |ajuste: &str, campo: &str| -> Campo {
+        c.ajuste(ajuste)
+            .and_then(|a| a.campo(campo))
+            .cloned()
+            .unwrap_or_else(|| panic!("falta {ajuste}.{campo}"))
+    };
+    assert!(
+        campo("wifi.red_24", "wps")
+            .fuentes
+            .iter()
+            .any(|f| f == "cert-wps")
+    );
+    // Lo que solo informa también dice de dónde sale (la DMZ, como criterio).
+    assert_eq!(
+        campo("puertos.dmz", "equipo").respaldo,
+        Some(Respaldo::Criterio)
+    );
+    assert!(
+        !campo("wifi.invitados_avanzado", "separada")
+            .fuentes
+            .is_empty()
+    );
+    let cortafuegos = c
+        .elementos()
+        .iter()
+        .find(|e| e.id == "cortafuegos")
+        .unwrap();
+    assert!(!cortafuegos.fuentes.is_empty());
+    assert_eq!(
+        campo("telefono.sip_oculto", "activo").respaldo,
+        Some(Respaldo::Criterio)
+    );
+    // Cada proveedor de DNS, con la página del suyo.
+    let dns = c.eleccion("proveedor_dns").unwrap();
+    for o in &dns.opciones {
+        assert!(!o.fuentes.is_empty(), "{} sin fuentes", o.id);
+    }
+    let familiar = dns
+        .opciones
+        .iter()
+        .find(|o| o.id == "cloudflare_familiar")
+        .unwrap();
+    assert_eq!(familiar.fuentes, ["cloudflare-familias"]);
+    let fallos = comprobar(&c, &Catalogo::load().unwrap(), &Mascara::load().unwrap());
+    assert!(fallos.is_empty(), "{fallos:#?}");
+    // Los textos de cada clase y cada respaldo, en los dos idiomas.
+    let claves: Vec<String> = ClaseFuente::TODAS
+        .iter()
+        .map(|c| c.clave())
+        .chain(Respaldo::TODOS.iter().map(|r| r.clave()))
+        .chain(["fuentes-titulo".to_owned(), "fuentes-consultada".to_owned()])
+        .collect();
+    for idioma in Idioma::TODOS {
+        let faltan: Vec<&String> = claves.iter().filter(|k| !i18n::existe(idioma, k)).collect();
+        assert!(faltan.is_empty(), "{idioma:?}: {faltan:?}");
+    }
+}
+
+/// Cada recomendación cita solo las fuentes que, leídas el 2026-10-26, dicen
+/// lo que se les atribuye; sin ninguna, es criterio del panel.
+#[test]
+fn fuentes_que_respaldan_de_verdad() {
+    let c = cargar();
+    let campo = |ajuste: &str, campo: &str| -> Campo {
+        c.ajuste(ajuste)
+            .and_then(|a| a.campo(campo))
+            .cloned()
+            .unwrap_or_else(|| panic!("falta {ajuste}.{campo}"))
+    };
+    let wps = ["cert-wps", "cisa-red-casa", "incibe-wifi"];
+    let wpa2 = ["nsa-red-casa", "cisa-red-casa", "incibe-wifi"];
+    for red in ["wifi.red_24", "wifi.red_5", "wifi.invitados"] {
+        assert_eq!(campo(red, "wps").fuentes, wps, "{red}");
+        let seguridad = campo(red, "seguridad");
+        let opcion = seguridad.opciones.iter().find(|o| o.recomendada).unwrap();
+        assert_eq!(opcion.fuentes, wpa2, "{red}");
+        assert!(
+            campo(red, "visible")
+                .fuentes
+                .iter()
+                .any(|f| f == "nsa-red-casa")
+        );
+    }
+    assert_eq!(c.paso("wps").unwrap().fuentes, wps);
+    assert_eq!(c.paso("wpa2").unwrap().fuentes, wpa2);
+    // Aislar los invitados entre sí y la DMZ: ninguna guía lo trata.
+    let aislar = campo("wifi.invitados_avanzado", "aislamiento");
+    let paso = c.paso("aislar_invitados").unwrap();
+    let dmz = campo("puertos.dmz", "equipo");
+    for (donde, fuentes, respaldo) in [
+        ("aislamiento", &aislar.fuentes, aislar.respaldo),
+        ("paso aislar_invitados", &paso.fuentes, paso.respaldo),
+        ("dmz", &dmz.fuentes, dmz.respaldo),
+    ] {
+        assert!(fuentes.is_empty(), "{donde}: {fuentes:?}");
+        assert_eq!(respaldo, Some(Respaldo::Criterio), "{donde}");
+    }
+    assert_eq!(
+        campo("wifi.invitados_avanzado", "separada").fuentes,
+        ["nsa-red-casa"]
+    );
+    let cortafuegos = c
+        .elementos()
+        .iter()
+        .find(|e| e.id == "cortafuegos")
+        .unwrap();
+    assert_eq!(cortafuegos.fuentes, ["nsa-red-casa", "cisa-red-casa"]);
+    assert!(
+        c.paso("gestion_remota")
+            .unwrap()
+            .fuentes
+            .iter()
+            .any(|f| f == "nsa-red-casa")
+    );
+}
+
+/// Los estados habituales de TR-104 de la línea y de la llamada tienen su
+/// texto: tras apagar la voz o durante una llamada no sale inglés crudo.
+#[test]
+fn estados_de_voz_traducidos() {
+    let c = cargar();
+    let valores = |campo: &str| -> BTreeSet<String> {
+        c.ajuste("telefono.linea")
+            .and_then(|a| a.campo(campo))
+            .unwrap_or_else(|| panic!("falta telefono.linea.{campo}"))
+            .opciones
+            .iter()
+            .map(|o| o.valor.clone())
+            .collect()
+    };
+    let linea = valores("en_servicio");
+    for v in [
+        "Up",
+        "Disabled",
+        "Initializing",
+        "Registering",
+        "Unregistering",
+        "Error",
+        "Testing",
+        "Quiescent",
+    ] {
+        assert!(linea.contains(v), "en_servicio sin {v}: {linea:?}");
+    }
+    let llamada = valores("llamada");
+    for v in [
+        "Idle",
+        "Calling",
+        "Ringing",
+        "Connecting",
+        "InCall",
+        "Hold",
+        "Disconnecting",
+    ] {
+        assert!(llamada.contains(v), "llamada sin {v}: {llamada:?}");
+    }
+    // En inglés, «registration», no «sign-up», para el registro de la voz.
+    for ruta in ficheros_ftl("en", |s| s == "ajustes" || s == "ajustes-telefono") {
+        for (k, v) in valores_del_fichero(&ruta) {
+            if k.contains("estado_registro") || k.starts_with("ajustes-estado-voz") {
+                assert!(!v.to_lowercase().contains("sign"), "{k}: {v}");
+            }
+        }
     }
 }

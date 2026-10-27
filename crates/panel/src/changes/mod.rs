@@ -25,8 +25,9 @@
 //!    cambio), la vigilancia solo exige que el router deje entrar: no se
 //!    revierte un intento de arreglar una WAN caída (queda anotado).
 //!
-//! Un único cambio activo a la vez: otro `confirmar` mientras tanto recibe
-//! [`CambioError::EnCurso`]. Al arrancar, [`ChangeManager::reanudar_pendientes`]
+//! Un único cambio activo a la vez: otro `confirmar` mientras tanto espera
+//! su turno en la cola (`cola.rs`; como mucho [`MAX_COLA`], después
+//! [`CambioError::ColaLlena`]). Al arrancar, [`ChangeManager::reanudar_pendientes`]
 //! retoma los cambios que quedaron en `aplicando`/`vigilando`; hasta que
 //! termina, `confirmar` espera. La aplicación corre en su propia tarea: si
 //! quien llamó a `confirmar` se va, el cambio sigue hasta un estado final.
@@ -44,25 +45,41 @@
 //! podría borrar la clave. Los registros (`tracing`) y el historial solo
 //! muestran secretos enmascarados; sus valores anteriores van cifrados.
 
+mod acceso;
+mod cola;
 mod consultas;
+mod especiales;
 mod grupo;
+mod interruptores;
+mod motivos;
 mod nota;
 mod persistencia;
 pub mod plan;
 mod preparar;
 mod reanudar;
 mod router;
+mod terminar;
 mod tipos;
 mod vigilancia;
 
+pub use acceso::Enlace;
+pub use cola::{ErrorQuitar, MAX_COLA};
+/// Motivo (clave i18n) de un 409 cuando la regla «sin ping» del
+/// cortafuegos ya está en el router.
+pub(crate) use especiales::SIN_PING_YA_PUESTA;
+/// La lista de usuarios del router, como la lee el gestor (para el cambio
+/// de otro usuario, que no pasa por él).
+pub(crate) use especiales::{LECTURA_USUARIOS, es_de_usuarios, usuarios_de};
 use grupo::{Ejecucion, PasoGuardado};
 pub use grupo::{EstadoPaso, GrupoRequest, Paso, PasoCambio, PasoPreparado, PreparadoGrupo};
+pub use motivos::*;
 pub use nota::Nota;
 use plan::*;
 pub use plan::{PALABRA_ACCION, PALABRA_REINICIO};
 /// Reglas del gestor que comparte el explorador (qué identifica una
 /// instancia y cómo se busca un campo en una lectura): una sola copia.
 pub(crate) use plan::{buscar, identidad};
+pub use terminar::ErrorTerminar;
 pub use tipos::*;
 
 use crate::{
@@ -97,17 +114,30 @@ const TOKEN_TTL: Duration = Duration::from_secs(10 * 60);
 /// con [`ChangeManager::excluir_cambios`]): no empieza ninguno.
 pub struct Reserva {
     m: Arc<ChangeManager>,
+    /// El hueco ya se vació al acabar la cola (`cola.rs`): al soltarla no
+    /// se toca.
+    suelta: bool,
 }
 
 impl Reserva {
     fn fijar(&self, id: i64) {
-        *lock(&self.m.activo) = Some(Some(id));
+        lock(&self.m.hueco).activo = Some(Some(id));
     }
 }
 
 impl Drop for Reserva {
     fn drop(&mut self) {
-        *lock(&self.m.activo) = None;
+        if !self.suelta {
+            let cola = {
+                let mut h = lock(&self.m.hueco);
+                h.activo = None;
+                h.con_cola = false;
+                std::mem::take(&mut h.cola)
+            };
+            // La tarea se cortó (`detener`) con cambios esperando: no se
+            // aplican.
+            self.m.cancelar_al_cortarse(cola);
+        }
         // Lo leído para mostrar durante el cambio pudo ser de antes de que
         // el router lo aplicase.
         self.m.state.lecturas.invalidar();
@@ -124,14 +154,25 @@ pub struct ChangeManager {
     state: Recursos,
     tiempos: Tiempos,
     pendientes: Mutex<HashMap<String, Pendiente>>,
-    /// Cambio activo: `Some(None)` reservado y aún sin id.
-    activo: Mutex<Option<Option<i64>>>,
+    /// El cambio activo y la cola detrás de él.
+    hueco: Mutex<cola::Hueco>,
     /// Tarea del cambio en curso (aplicación y vigilancia).
     tarea: Mutex<Option<AbortHandle>>,
     /// `true` cuando [`ChangeManager::reanudar_pendientes`] ha terminado.
     listo: watch::Sender<bool>,
     /// `reanudar_pendientes` ya empezó (solo se hace una vez).
     reanudando: std::sync::atomic::AtomicBool,
+    /// Interruptores de la validación real de este gestor
+    /// ([`ChangeManager::desactivadas`]; ver `interruptores.rs`).
+    interruptores: interruptores::Interruptores,
+    /// Por dónde llega el panel al router, y cuándo se averiguó
+    /// ([`ChangeManager::enlace`]).
+    enlace: Mutex<Option<(Instant, Enlace)>>,
+    /// Vigilar todos los cambios ([`ChangeManager::vigilar_siempre`]).
+    siempre: std::sync::atomic::AtomicBool,
+    /// La vigilancia en curso, para terminarla a mano
+    /// ([`ChangeManager::terminar`]).
+    vigilancia: Mutex<Option<terminar::EnVigilancia>>,
 }
 
 /// Hueco de `AppState` para el gestor del servidor.
@@ -155,11 +196,24 @@ impl ChangeManager {
             },
             tiempos,
             pendientes: Mutex::new(HashMap::new()),
-            activo: Mutex::new(None),
+            hueco: Mutex::new(cola::Hueco::default()),
             tarea: Mutex::new(None),
             listo: watch::Sender::new(false),
             reanudando: std::sync::atomic::AtomicBool::new(false),
+            interruptores: interruptores::Interruptores::new(state.cfg.todo_habilitado()),
+            enlace: Mutex::new(None),
+            siempre: std::sync::atomic::AtomicBool::new(false),
+            vigilancia: Mutex::new(None),
         })
+    }
+
+    /// Vigila todos los cambios, también los que no pueden cortar el acceso
+    /// del panel. Solo para las pruebas de la reversión automática: el
+    /// servidor no lo usa nunca.
+    #[doc(hidden)]
+    pub fn vigilar_siempre(&self) {
+        self.siempre
+            .store(true, std::sync::atomic::Ordering::SeqCst);
     }
 
     /// El gestor del servidor: lo crea y lo guarda en `state` la primera vez;
@@ -173,7 +227,7 @@ impl ChangeManager {
 
     /// Id del cambio en curso (aplicándose o vigilándose).
     pub fn activo(&self) -> Option<i64> {
-        lock(&self.activo).flatten()
+        lock(&self.hueco).activo.flatten()
     }
 
     /// ¿Hay un cambio aplicándose o vigilándose, o se están retomando los
@@ -197,7 +251,7 @@ impl ChangeManager {
         if reanudando && !*self.listo.borrow() {
             return Err(CambioError::EnCurso);
         }
-        self.reservar()
+        self.reservar(false)
     }
 
     /// Espera a que el hueco quede libre y lo reserva (al retomar: lo que
@@ -206,7 +260,7 @@ impl ChangeManager {
     async fn esperar_hueco(self: &Arc<Self>, id: i64) -> Reserva {
         let mut avisado = false;
         loop {
-            if let Ok(r) = self.reservar() {
+            if let Ok(r) = self.reservar(false) {
                 return r;
             }
             if !avisado {
@@ -233,12 +287,18 @@ impl ChangeManager {
         &self.tiempos
     }
 
-    fn reservar(self: &Arc<Self>) -> Result<Reserva, CambioError> {
-        let mut a = lock(&self.activo);
-        if a.is_some() {
+    /// Reserva el hueco libre. `con_cola`: lo tiene la tarea de un cambio,
+    /// que sigue con la cola al terminar (se puede encolar detrás).
+    fn reservar(self: &Arc<Self>, con_cola: bool) -> Result<Reserva, CambioError> {
+        let mut h = lock(&self.hueco);
+        if h.activo.is_some() {
             return Err(CambioError::EnCurso);
         }
-        *a = Some(None);
-        Ok(Reserva { m: self.clone() })
+        h.activo = Some(None);
+        h.con_cola = con_cola;
+        Ok(Reserva {
+            m: self.clone(),
+            suelta: false,
+        })
     }
 }

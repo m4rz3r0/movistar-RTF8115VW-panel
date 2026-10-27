@@ -57,6 +57,16 @@ impl Tiempos {
             Riesgo::Alto => self.alto,
         }
     }
+
+    /// Lo que se vigila un cambio de riesgo `riesgo`: nada si no se vigila
+    /// (`vigila`, ver [`PreparadoGrupo::vigila`]).
+    pub fn plazo(&self, riesgo: Riesgo, vigila: bool) -> Duration {
+        if vigila {
+            self.vigilancia(riesgo)
+        } else {
+            Duration::ZERO
+        }
+    }
 }
 
 /// Petición de cambio.
@@ -140,6 +150,8 @@ pub struct Preparado {
     pub token: String,
     pub diff: Diff,
     pub riesgo: Riesgo,
+    /// Se vigilará tras aplicarlo (ver [`PreparadoGrupo::vigila`]).
+    pub vigila: bool,
     /// Palabra que hay que escribir para confirmar (acciones).
     pub palabra: Option<String>,
     /// Lo que se va a escribir: función, instancia y si es un borrado (lo
@@ -163,6 +175,8 @@ pub enum CambioError {
     SinCambios,
     /// Hay otro cambio en curso.
     EnCurso,
+    /// La cola de cambios está llena ([`MAX_COLA`]).
+    ColaLlena,
     /// El router (o el panel) no pudo hacer el cambio.
     Router(String),
     /// El router no muestra lo que se escribió.
@@ -184,6 +198,10 @@ impl std::fmt::Display for CambioError {
             CambioError::Bloqueada(m) => write!(f, "función bloqueada: {m}"),
             CambioError::SinCambios => f.write_str("no hay nada que cambiar"),
             CambioError::EnCurso => f.write_str("hay otro cambio en curso"),
+            CambioError::ColaLlena => write!(
+                f,
+                "ya hay {MAX_COLA} cambios en cola: espera a que se apliquen o quita alguno"
+            ),
             CambioError::Router(e) => write!(f, "{e}"),
             CambioError::Verificacion(v) => {
                 write!(f, "el router no muestra el cambio: {}", v.join("; "))
@@ -213,6 +231,11 @@ pub enum Estado {
     /// Grupo que falló y cuya reversión no se pudo completar: el detalle
     /// (`error`) dice qué pasos siguen aplicados.
     RevertidoParcial,
+    /// Confirmado mientras otro cambio se aplicaba o vigilaba: espera su
+    /// turno en la cola (ver `cola.rs`).
+    EnCola,
+    /// Estuvo en la cola y no llegó a aplicarse (el motivo, en `error`).
+    Cancelado,
 }
 
 impl Estado {
@@ -226,6 +249,8 @@ impl Estado {
             Estado::Revertido => "revertido",
             Estado::Fallido => "fallido",
             Estado::RevertidoParcial => "revertido_parcial",
+            Estado::EnCola => "en_cola",
+            Estado::Cancelado => "cancelado",
         }
     }
 
@@ -238,6 +263,8 @@ impl Estado {
             Estado::Revertido,
             Estado::Fallido,
             Estado::RevertidoParcial,
+            Estado::EnCola,
+            Estado::Cancelado,
         ]
         .into_iter()
         .find(|e| e.as_str() == s)
@@ -287,6 +314,13 @@ pub(super) struct Pendiente {
     pub(super) explicito: bool,
     /// Cambio que deshace, si es un deshacer.
     pub(super) deshace: Option<i64>,
+    /// Usuario del panel que lo preparó ([`ChangeManager::ligar`]): solo él
+    /// lo confirma. `None`: sin ligar, y así no lo confirma nadie.
+    pub(super) usuario: Option<String>,
+    /// Lo que mostró cada paso al preparar (`None`: sin cambios): si el
+    /// cambio espera en la cola, antes de escribir se vuelve a calcular y
+    /// tiene que salir igual (ver `cola.rs`).
+    pub(super) huella: Vec<Option<super::cola::Huella>>,
 }
 
 /// Lo que el gestor usa del estado del servidor (sin el propio gestor, para
@@ -343,6 +377,13 @@ pub(super) const BLOQUEO_IP_LAN: &str = "bloqueada en v1: cambiar la IP del rout
 /// leído): podría borrar esa clave. Es la clave i18n del texto. Se quitará
 /// cuando la fase 3 compruebe qué hace el router real con ese reenvío.
 pub const BLOQUEO_SECRETO_TAPADO: &str = "cambio-error-secreto-tapado";
+/// Motivo de [`CambioError::Bloqueada`] al pedir borrar o cambiar el
+/// usuario del router con el que entra el panel o el del operador
+/// (`system`). Es la clave i18n del texto.
+pub const BLOQUEO_USUARIO_PROTEGIDO: &str = "usuarios-router-error-protegido";
+/// Motivo de [`CambioError::InstanciaCambiada`] al crear un usuario del
+/// router con un nombre que ya tiene otro. Es la clave i18n del texto.
+pub const USUARIO_YA_EXISTE: &str = "usuarios-router-error-existe";
 /// Motivo de [`CambioError::Invalida`] al deshacer un cambio en el que solo
 /// cambió lo que el router no deja leer: no hay valor anterior al que volver.
 pub const DESHACER_SOLO_TAPADOS: &str =

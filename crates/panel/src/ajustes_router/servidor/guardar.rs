@@ -200,7 +200,7 @@ pub(super) fn vista_grupo(
     a: &Ajuste,
     token: String,
     pasos: &[PasoPreparado],
-    r: Riesgo,
+    (r, vigila): (Riesgo, bool),
     completar: &dyn Fn(usize, &str) -> Option<String>,
 ) -> GrupoVista {
     GrupoVista {
@@ -212,7 +212,7 @@ pub(super) fn vista_grupo(
             .collect(),
         riesgo: riesgo(r),
         efecto: a.efecto.as_ref().map(|e| format!("efecto-{e}")),
-        vigilancia_s: g.tiempos().vigilancia(r).as_secs(),
+        vigilancia_s: g.tiempos().plazo(r, vigila).as_secs(),
         detalle: None,
         aviso: None,
         borra: false,
@@ -311,9 +311,14 @@ pub(in crate::ajustes_router) async fn preparar_ajuste(
     let pedidos: Vec<BTreeMap<String, String>> =
         grupo.pasos.iter().map(|p| p.req.valores.clone()).collect();
     let prep = g.preparar_grupo(grupo).await.map_err(error_ajuste)?;
-    let mut vista = vista_grupo(&g, a, prep.token, &prep.pasos, prep.riesgo, &|i, param| {
-        buscar(&pedidos[i], param).map(str::to_owned)
-    });
+    let mut vista = vista_grupo(
+        &g,
+        a,
+        prep.token,
+        &prep.pasos,
+        (prep.riesgo, prep.vigila),
+        &|i, param| buscar(&pedidos[i], param).map(str::to_owned),
+    );
     titular_partes(&mut vista.pasos, &titulos, &prefijo_i18n(a));
     Ok(GrupoVista {
         detalle,
@@ -369,7 +374,7 @@ pub(in crate::ajustes_router) async fn preparar_elemento(
         &de_cada_paso,
         prep.token,
         &prep.pasos,
-        prep.riesgo,
+        (prep.riesgo, prep.vigila),
         &|i, param| buscar(&pedidos[i], param).map(str::to_owned),
     ))
 }

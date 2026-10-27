@@ -53,6 +53,15 @@ impl ChangeManager {
         a_cambio(&f, &self.filas_pasos(id).await)
     }
 
+    /// ¿Crea o borra usuarios del router el cambio `id`? Deshacerlo también
+    /// los toca, así que exige reautenticación, como hacerlo.
+    pub async fn es_de_usuarios_el_cambio(&self, id: i64) -> bool {
+        self.cambio(id).await.is_some_and(|c| {
+            super::es_de_usuarios(&c.funcion)
+                || c.pasos.iter().any(|p| super::es_de_usuarios(&p.funcion))
+        })
+    }
+
     /// Los secretos que cambiaron en cada paso del cambio `id`, con su valor
     /// anterior y el nuevo en claro: `(orden, parámetro, antes, después,
     /// tapado)` (`None` si ese lado no se guardó: al crear no hay anterior;

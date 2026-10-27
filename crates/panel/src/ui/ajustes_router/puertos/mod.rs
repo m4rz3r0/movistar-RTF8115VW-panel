@@ -143,6 +143,8 @@ fn campo_propio(id: &str, tipo: TipoCampo, opcional: bool) -> CampoVista {
         aceptados: Vec::new(),
         requiere: None,
         sin_eleccion: false,
+        fuentes: Vec::new(),
+        respaldo: None,
     }
 }
 

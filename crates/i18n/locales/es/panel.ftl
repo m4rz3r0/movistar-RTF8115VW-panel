@@ -4,7 +4,7 @@ panel-solo-lectura = El panel está en solo lectura: el firmware del router no s
 
 ## Página
 panel-titulo = Ajustes del panel
-panel-sub = Idioma, zona horaria y usuarios del panel. Se guardan en la base de datos del panel.
+panel-sub = Idioma, zona horaria, aspecto y quién entra en este panel. Se guardan en la base de datos del panel.
 panel-sub-router = La conexión con el router está en
 panel-sub-router-enlace = Configuración del router
 panel-guardar = Guardar
@@ -46,19 +46,32 @@ panel-tema-claro = Claro
 panel-tema-claro-ayuda = Fondo claro y texto oscuro. Se lee mejor con mucha luz.
 
 ## Usuarios
-panel-usuarios = Usuarios del panel
-panel-usuarios-texto = Pueden entrar en el panel con todos los permisos. También se gestionan con la orden panel user.
+panel-usuarios = Quién entra en este panel
+panel-usuarios-texto = Los usuarios con los que se entra en este panel, todos con los mismos permisos. También se gestionan con la orden panel user.
+panel-usuarios-no-router = No son las cuentas del router: esas están en
+panel-usuarios-no-router-enlace = Ajustes → Seguridad → Cuentas de la web del router
 panel-usuario-tu = (tú)
 panel-usuario-borrar = Borrar
 panel-usuario-borrar-de = Borrar a { $usuario }
+panel-usuario-no-borrar-tu = Es tu usuario: para borrarlo, entra con otro.
+panel-usuario-no-borrar-ultimo = Es el único usuario: el panel se quedaría sin nadie que pueda entrar.
 panel-usuario-contrasena = Cambiar la contraseña
 panel-usuario-contrasena-de = Cambiar la contraseña de { $usuario }
-panel-usuario-nuevo = Usuario nuevo
+panel-usuario-nuevo = Usuario nuevo del panel
 panel-usuario-nombre = Nombre
 panel-usuario-clave = Contraseña (al menos { $n } caracteres)
-panel-usuario-crear = Crear el usuario
+panel-usuario-crear = Crear el usuario del panel
 panel-usuario-clave-nueva = Contraseña nueva (al menos { $n } caracteres)
-panel-usuario-cambiar = Cambiar
+panel-usuario-cambiar = Cambiar la contraseña
+panel-usuario-cambiar-aviso-tuyo = Es tu usuario: se cerrarán tus sesiones en otros navegadores y dispositivos; en este sigues dentro.
+panel-usuario-cambiar-aviso-otro = Se cerrarán las sesiones abiertas de { $usuario }: tendrá que entrar con la contraseña nueva.
+panel-usuario-borrar-titulo = ¿Borrar a { $usuario } del panel?
+panel-usuario-borrar-texto = { $usuario } dejará de poder entrar en este panel y se cerrarán sus sesiones. No se puede deshacer: para que vuelva a entrar, habrá que crear el usuario otra vez.
+panel-usuario-borrar-router = No toca el router: sus cuentas siguen igual.
+panel-usuario-borrar-confirmar = Borrar a { $usuario }
+panel-usuario-creado = Usuario { $usuario } creado: ya puede entrar en el panel.
+panel-usuario-cambiada = Contraseña de { $usuario } cambiada.
+panel-usuario-borrado = Usuario { $usuario } borrado del panel.
 panel-cancelar = Cancelar
 
 ## Reautenticación

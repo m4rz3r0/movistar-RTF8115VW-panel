@@ -52,6 +52,7 @@ pub(in crate::ajustes_router) async fn deshacer_ajuste(
     cambio: i64,
 ) -> Result<GrupoVista, ServerFnError> {
     let (state, _) = preparar().await?;
+    crate::ui::historial::servidor::exigir_reauth_si_usuarios(&state, cambio).await?;
     let g = gestor(&state)?;
     // De un ajuste o de una acción sobre varios elementos (un paso por
     // elemento, cada uno con el título de su ajuste).
@@ -102,6 +103,34 @@ pub(in crate::ajustes_router) async fn deshacer_ajuste(
             .ok_or_else(|| fallo(StatusCode::NOT_FOUND, t!("ajustes-error-cambio")))?;
         return Ok(GrupoVista { aviso, ..vista });
     };
+    // Los usuarios del router tienen su propio resumen. Un deshacer que
+    // vuelve a crear un usuario borrado le da una contraseña nueva.
+    if a.componente == Some(Componente::UsuariosRouter) {
+        let recrea = prep
+            .pasos
+            .iter()
+            .any(|p| p.diff.campos.iter().any(|c| c.nombre == "rqPwd"));
+        let borra = prep.borrar;
+        let detalle = prep.instancia.clone().or(instancia);
+        let vista = crate::usuarios_router::servidor::vista(
+            &g,
+            prep.token,
+            &prep.pasos,
+            (prep.riesgo, prep.vigila),
+        );
+        return Ok(GrupoVista {
+            aviso: aviso.or_else(|| recrea.then(|| t!("usuarios-router-aviso-deshacer"))),
+            borra,
+            detalle,
+            ..vista
+        });
+    }
+    // La regla «sin ping» del cortafuegos, también: su deshacer la quita.
+    if a.componente == Some(Componente::Cortafuegos) {
+        let vista =
+            super::cortafuegos::vista(&g, prep.token, &prep.pasos, (prep.riesgo, prep.vigila));
+        return Ok(GrupoVista { aviso, ..vista });
+    }
     // El ajuste de cada paso (el detalle de un elemento guarda varios en un
     // cambio: cada paso lleva el título del suyo) y lo que no cambia en
     // él, como lo muestra ahora el router (una lectura por paso con
@@ -127,7 +156,14 @@ pub(in crate::ajustes_router) async fn deshacer_ajuste(
     }
     let completar = |i: usize, param: &str| buscar(&actuales[i], param).map(str::to_owned);
     let vista = if de_cada_paso.iter().all(|x| x.id == a.id) {
-        vista_grupo(&g, a, prep.token, &prep.pasos, prep.riesgo, &completar)
+        vista_grupo(
+            &g,
+            a,
+            prep.token,
+            &prep.pasos,
+            (prep.riesgo, prep.vigila),
+            &completar,
+        )
     } else {
         super::acciones::vista_por_pasos(
             &g,
@@ -135,7 +171,7 @@ pub(in crate::ajustes_router) async fn deshacer_ajuste(
             &de_cada_paso,
             prep.token,
             &prep.pasos,
-            prep.riesgo,
+            (prep.riesgo, prep.vigila),
             &completar,
         )
     };

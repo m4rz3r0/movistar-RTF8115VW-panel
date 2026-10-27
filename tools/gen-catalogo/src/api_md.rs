@@ -1,7 +1,7 @@
 //! `docs/api.md`: el catálogo revisado en formato legible.
 
 use catalogo::{
-    Area, Catalogo, Funcion, Origen, Riesgo, Tipo, TipoParam,
+    Acceso, Area, Catalogo, Funcion, Origen, Riesgo, Tipo, TipoParam,
     mask::{Mascara, Nivel},
 };
 use regex::Regex;
@@ -32,6 +32,14 @@ fn riesgo(r: Riesgo) -> &'static str {
     }
 }
 
+fn acceso(a: Acceso) -> &'static str {
+    match a {
+        Acceso::PuedeCortar => "se vigila",
+        Acceso::NoCorta => "sin vigilancia",
+        Acceso::Wifi => "se vigila si el panel va por WiFi",
+    }
+}
+
 fn tipo_param(t: TipoParam) -> &'static str {
     match t {
         TipoParam::Ip => "ip",
@@ -40,6 +48,7 @@ fn tipo_param(t: TipoParam) -> &'static str {
         TipoParam::Enum => "enum",
         TipoParam::Int => "int",
         TipoParam::Text => "text",
+        TipoParam::Hex => "hex",
         TipoParam::Secret => "secret",
     }
 }
@@ -81,12 +90,31 @@ fn funcion(md: &mut String, f: &Funcion, m: &Mascara, fixtures: &Path) {
         origen(f.origen),
         riesgo(f.riesgo)
     );
+    if let Some(a) = f.acceso {
+        let _ = write!(linea, " · {}", acceso(a));
+    }
     if let Some(p) = &f.pagina {
         let _ = write!(linea, " · página `{p}`");
+    }
+    if let Some(c) = &f.cgi {
+        let _ = write!(linea, " · se manda a `{c}`");
     }
     let _ = writeln!(md, "{linea}\n\n{}\n", f.descripcion);
     if let Some(b) = &f.bloqueada {
         let _ = writeln!(md, "**Bloqueada:** {b}\n");
+    }
+    if f.tipo != Tipo::Lectura {
+        match &f.comprobada {
+            Some(catalogo::Comprobacion::Referencia(r)) => {
+                let _ = writeln!(md, "**Comprobada en el router real:** {r}\n");
+            }
+            _ => {
+                let _ = writeln!(
+                    md,
+                    "**Sin comprobar en el router real:** el panel no la escribe.\n"
+                );
+            }
+        }
     }
     if let Some(lp) = &f.lectura_pareada {
         let params: Vec<String> = lp
@@ -121,6 +149,9 @@ fn funcion(md: &mut String, f: &Funcion, m: &Mascara, fixtures: &Path) {
             let mut t = tipo_param(p.tipo).to_owned();
             if let Some(pt) = p.partido {
                 let _ = write!(t, " ({:?})", pt);
+            }
+            if let Some(n) = p.ranuras {
+                let _ = write!(t, ", {n} ranuras `{}_0…{}`", p.nombre, n - 1);
             }
             if p.tipo != TipoParam::Secret && m.es_secreto(&p.nombre) {
                 t.push_str(" ⚠");
@@ -184,6 +215,12 @@ pub fn generar(cat: &Catalogo, fixtures: &Path) -> Result<String, String> {
          - Riesgo: vigilancia tras el cambio de 30 s (bajo), 2 min (medio) o 5 min\n  \
            (alto). Las lecturas no tienen riesgo. Las funciones **bloqueadas** no se\n  \
            invocan nunca desde el panel.\n\
+         - Lista blanca: el panel solo escribe con las escrituras y acciones\n  \
+           **comprobadas en el router real** (`comprobada` en `funciones.toml`).\n\
+         - Vigilancia: solo se vigila lo que puede cortar el acceso del panel al\n  \
+           router o la conexión a internet («se vigila»); lo demás se da por\n  \
+           aplicado en cuanto la relectura muestra lo nuevo («sin vigilancia»).\n  \
+           La WiFi se vigila salvo que el panel compruebe que llega por cable.\n\
          - En la lectura pareada, `{param}` es el valor de ese parámetro en la\n  \
            escritura. Los elementos marcados con 🔒 son secretos (en pantalla,\n  \
            censurados con el ojo) y los marcados «(sensible)», datos personales\n  \

@@ -5,66 +5,32 @@
 //! las credenciales guardadas, y justo esas son las que cambian. El flujo
 //! propio ([`cambiar_contrasena_router`]) aparta el gestor, para el sondeo,
 //! escribe la nueva y prueba a entrar con ella antes de quedársela; si no
-//! entra, comprueba si sigue valiendo la anterior y, si tampoco, vuelve a
-//! poner la anterior por la sesión que sigue abierta. Cada intento acaba en
+//! entra, comprueba si sigue valiendo la anterior: si vale, el router puede
+//! estar aplicándola con retraso y se reintenta con la nueva, pocas veces
+//! y con espera creciente, hasta
+//! `plazo_rechazada` (en el estado del servidor);
+//! si tampoco, vuelve a poner la anterior por la sesión que sigue abierta.
+//! Los valores viajan en XOR, como en la web oficial
+//! ([`hgu::fmt::codificar_cambio_contrasena`]). Cada intento acaba en
 //! el Historial (`seguridad.contrasena_router`) sin ningún valor y sin
 //! «Deshacer».
 //!
 //! Exige reautenticación. Las contraseñas no salen nunca en el registro, en
 //! los errores ni en el Historial; las respuestas van con `no-store`.
+//!
+//! TODO(E4): `cbModifyPwd` no está comprobada en el router real
+//! (`comprobada = false` en el catálogo) y, aun así, este flujo sigue
+//! activo: no pasa por la lista blanca del gestor, está protegido (prueba la
+//! nueva, restaura la anterior y avisa) y la E4 se hace con él. Tras la E4,
+//! su referencia en el catálogo o, si falla, desactivar el flujo.
 
 use leptos::prelude::*;
 use leptos::server_fn::codec::Json;
 
-/// Longitud mínima de la contraseña nueva, en bytes.
-pub const MIN_BYTES: usize = 8;
-/// Longitud máxima de la contraseña nueva, en bytes.
-pub const MAX_BYTES: usize = 64;
-
-/// Por qué no vale la contraseña nueva.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ErrorNueva {
-    Corta,
-    Larga,
-    /// Lleva caracteres de control (saltos de línea, tabuladores…).
-    Control,
-    /// Es la que ya tiene el router.
-    Igual,
-}
-
-/// Comprueba la forma de la contraseña nueva: de [`MIN_BYTES`] a
-/// [`MAX_BYTES`] bytes y sin caracteres de control. Qué caracteres admite el
-/// router de verdad queda para la fase 3: aquí no se inventan más reglas.
-pub fn validar_forma(nueva: &str) -> Result<(), ErrorNueva> {
-    if nueva.len() < MIN_BYTES {
-        Err(ErrorNueva::Corta)
-    } else if nueva.len() > MAX_BYTES {
-        Err(ErrorNueva::Larga)
-    } else if nueva.chars().any(char::is_control) {
-        Err(ErrorNueva::Control)
-    } else {
-        Ok(())
-    }
-}
-
-/// Como [`validar_forma`], y además distinta de la actual.
-pub fn validar_nueva(nueva: &str, actual: &str) -> Result<(), ErrorNueva> {
-    validar_forma(nueva)?;
-    if nueva == actual {
-        return Err(ErrorNueva::Igual);
-    }
-    Ok(())
-}
-
-/// Texto de un [`ErrorNueva`] en el idioma de la página.
-pub fn texto_error_nueva(e: ErrorNueva) -> String {
-    match e {
-        ErrorNueva::Corta => crate::t!("contrasena-router-error-corta", n = MIN_BYTES),
-        ErrorNueva::Larga => crate::t!("contrasena-router-error-larga", n = MAX_BYTES),
-        ErrorNueva::Control => crate::t!("contrasena-router-error-control"),
-        ErrorNueva::Igual => crate::t!("contrasena-router-error-igual"),
-    }
-}
+pub use crate::contrasena_forma::{
+    ErrorNueva, MAX_BYTES, MIN_BYTES, texto_error_nueva, validar_forma, validar_forma_hasta,
+    validar_nueva,
+};
 
 /// Comprueba, antes de pedir la confirmación, que se puede cambiar a
 /// `nueva`: reautenticación y la contraseña válida (también distinta de la
@@ -81,6 +47,9 @@ pub async fn comprobar_contrasena_router(nueva: String) -> Result<(), ServerFnEr
 pub async fn cambiar_contrasena_router(nueva: String) -> Result<(), ServerFnError> {
     servidor::cambiar(nueva).await
 }
+
+#[cfg(feature = "ssr")]
+mod reintentos;
 
 #[cfg(feature = "ssr")]
 pub(crate) mod servidor {
@@ -134,15 +103,11 @@ pub(crate) mod servidor {
     /// pinta en el idioma de quien lo mira. Las claves quedan guardadas en
     /// la base de datos: no se renombran ni se borran.
     fn nota(f: &Fallo) -> Nota {
-        let n = |clave: &str, n: usize| Nota::con(clave, &[("n", n.to_string())]);
         match f {
             Fallo::EnCurso => Nota::clave("contrasena-router-error-en-curso"),
             Fallo::SinRouter => Nota::clave("contrasena-router-error-sin-router"),
             Fallo::SoloLectura => Nota::clave("panel-solo-lectura"),
-            Fallo::Nueva(ErrorNueva::Corta) => n("contrasena-router-error-corta", MIN_BYTES),
-            Fallo::Nueva(ErrorNueva::Larga) => n("contrasena-router-error-larga", MAX_BYTES),
-            Fallo::Nueva(ErrorNueva::Control) => Nota::clave("contrasena-router-error-control"),
-            Fallo::Nueva(ErrorNueva::Igual) => Nota::clave("contrasena-router-error-igual"),
+            Fallo::Nueva(e) => Nota::de_contrasena(*e, MAX_BYTES),
             Fallo::Sondeo => Nota::clave("contrasena-router-error-sondeo"),
             Fallo::Rechazada => Nota::clave("contrasena-router-error-rechazada"),
             Fallo::Restaurada => Nota::clave("contrasena-router-error-restaurada"),
@@ -228,7 +193,20 @@ pub(crate) mod servidor {
             .await
             .map_err(|_| Fallo::Sondeo)?;
         let r = en_el_router(state, &actual, nueva).await;
-        anotar(state, usuario, &r).await;
+        let resultado = match &r {
+            // La clave, no el texto: el Historial la pinta en el idioma de
+            // quien lo mira.
+            Ok(()) => Ok(Nota::clave("contrasena-router-historial-nota")),
+            Err(f) => Err(nota(f)),
+        };
+        anotar(
+            state,
+            usuario,
+            hgu::fmt::CAMBIO_CONTRASENA,
+            TITULO,
+            resultado,
+        )
+        .await;
         // Lo leído para mostrar pudo ser con la sesión de antes.
         state.lecturas.invalidar();
         r
@@ -307,28 +285,66 @@ pub(crate) mod servidor {
             contrasena: nueva.to_owned(),
             ..actual.clone()
         };
-        if entra(state, &c).await {
-            if let Err(e) = instancia::guardar_credenciales(&state.db, &state.history_key, &c).await
-            {
-                // El router ya tiene la nueva, pero el panel seguiría con la
-                // anterior: se vuelve a poner la anterior.
-                tracing::error!("contraseña del router cambiada pero sin guardar: {e}");
-                let restaurada = restaurar(state, &mut sesion, actual, nueva).await;
-                return Err(Fallo::NoGuardada { restaurada });
+        if !entra(state, &c).await {
+            if !entra(state, actual).await {
+                return restaurar_o_grave(state, &mut sesion, actual, nueva).await;
             }
-            drop(sesion);
-            state.hgu.reconfigurar(c.client_config(&state.cfg)).await;
-            state.poller.despertar();
-            tracing::info!("contraseña del router cambiada: el panel ya entra con la nueva");
-            return Ok(());
+            if !aplicada_tarde(state, &c).await {
+                // Agotado el plazo, se confirma que la anterior sigue
+                // entrando: el router pudo aplicar la nueva justo después
+                // del último reintento.
+                if entra(state, actual).await {
+                    tracing::warn!(
+                        "el router no aceptó la contraseña nueva: sigue con la anterior y el \
+                         panel también"
+                    );
+                    return Err(Fallo::Rechazada);
+                }
+                if !entra(state, &c).await {
+                    return restaurar_o_grave(state, &mut sesion, actual, nueva).await;
+                }
+            }
+            tracing::info!("el router ha aplicado la contraseña nueva con retraso");
         }
-        if entra(state, actual).await {
-            tracing::warn!(
-                "el router no aceptó la contraseña nueva: sigue con la anterior y el panel también"
-            );
-            return Err(Fallo::Rechazada);
+        if let Err(e) = instancia::guardar_credenciales(&state.db, &state.history_key, &c).await {
+            // El router ya tiene la nueva, pero el panel seguiría con la
+            // anterior: se vuelve a poner la anterior.
+            tracing::error!("contraseña del router cambiada pero sin guardar: {e}");
+            let restaurada = restaurar(state, &mut sesion, actual, nueva).await;
+            return Err(Fallo::NoGuardada { restaurada });
         }
-        if restaurar(state, &mut sesion, actual, nueva).await {
+        drop(sesion);
+        state.hgu.reconfigurar(c.client_config(&state.cfg)).await;
+        state.poller.despertar();
+        tracing::info!("contraseña del router cambiada: el panel ya entra con la nueva");
+        Ok(())
+    }
+
+    /// El router respondió al cambio, la nueva no entra y la anterior sí:
+    /// puede que aún la esté aplicando. Se reintenta entrar con `nueva` unas
+    /// pocas veces con espera creciente dentro de
+    /// [`AppState::plazo_rechazada`] ([`super::reintentos::pausas`]: cada
+    /// intento fallido acerca el bloqueo por intentos del router); dice si
+    /// llegó a entrar. Si no, `en_el_router` aún comprueba la anterior.
+    async fn aplicada_tarde(state: &AppState, nueva: &CredencialesRouter) -> bool {
+        for pausa in super::reintentos::pausas(state.plazo_rechazada) {
+            tokio::time::sleep(pausa).await;
+            if entra(state, nueva).await {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// No se entra ni con la nueva ni con la anterior: se vuelve a poner la
+    /// anterior y, si tampoco entra con ella, es grave.
+    async fn restaurar_o_grave(
+        state: &AppState,
+        sesion: &mut Exclusiva<'_>,
+        actual: &CredencialesRouter,
+        nueva: &str,
+    ) -> Result<(), Fallo> {
+        if restaurar(state, sesion, actual, nueva).await {
             tracing::warn!(
                 "el panel no pudo entrar con la contraseña nueva del router: se ha vuelto a poner \
                  la anterior"
@@ -344,30 +360,29 @@ pub(crate) mod servidor {
     }
 
     /// Riesgo del cambio en el Historial: el de la función en el catálogo.
-    fn riesgo(state: &AppState) -> &'static str {
-        match state
-            .catalogo
-            .funcion(hgu::fmt::CAMBIO_CONTRASENA)
-            .map(|f| f.riesgo)
-        {
+    fn riesgo(state: &AppState, funcion: &str) -> &'static str {
+        match state.catalogo.funcion(funcion).map(|f| f.riesgo) {
             Some(catalogo::Riesgo::Bajo) => "bajo",
             Some(catalogo::Riesgo::Alto) => "alto",
             _ => "medio",
         }
     }
 
-    /// Apunta el intento en el Historial: aplicado o fallido con el motivo,
-    /// sin ningún valor y sin nada que deshacer (sin pasos).
-    async fn anotar(state: &AppState, usuario: &str, r: &Result<(), Fallo>) {
+    /// Apunta en el Historial un intento de `funcion` (un cambio que no pasa
+    /// por el gestor), con el título `titulo`: aplicado con su nota o
+    /// fallido con el motivo, sin ningún valor y sin nada que deshacer (sin
+    /// pasos). Lo usan este cambio y el de la contraseña de otro usuario
+    /// (`usuarios_router`).
+    pub(crate) async fn anotar(
+        state: &AppState,
+        usuario: &str,
+        funcion: &str,
+        titulo: &str,
+        r: Result<Nota, Nota>,
+    ) {
         let (estado, error, nota) = match r {
-            Ok(()) => (
-                "aplicado",
-                None,
-                // La clave, no el texto: el Historial la pinta en el idioma
-                // de quien lo mira.
-                Some(Nota::clave("contrasena-router-historial-nota").guardar()),
-            ),
-            Err(f) => ("fallido", Some(nota(f).guardar()), None),
+            Ok(n) => ("aplicado", None, Some(n.guardar())),
+            Err(n) => ("fallido", Some(n.guardar()), None),
         };
         let ahora = crate::series::now();
         let fila = sqlx::query(
@@ -380,50 +395,16 @@ pub(crate) mod servidor {
         .bind(ahora)
         .bind(usuario)
         .bind(usuario)
-        .bind(hgu::fmt::CAMBIO_CONTRASENA)
-        .bind(riesgo(state))
+        .bind(funcion)
+        .bind(riesgo(state, funcion))
         .bind(estado)
         .bind(error)
         .bind(nota)
-        .bind(TITULO)
+        .bind(titulo)
         .execute(&state.db)
         .await;
         if let Err(e) = fila {
-            tracing::error!("no se puede apuntar en el Historial el cambio de contraseña: {e}");
+            tracing::error!("no se puede apuntar en el Historial el cambio ({funcion}): {e}");
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn valida_la_contrasena_nueva() {
-        assert_eq!(validar_forma("1234567"), Err(ErrorNueva::Corta));
-        assert_eq!(validar_forma(""), Err(ErrorNueva::Corta));
-        assert_eq!(validar_forma("12345678"), Ok(()));
-        assert_eq!(validar_forma(&"a".repeat(MAX_BYTES)), Ok(()));
-        assert_eq!(
-            validar_forma(&"a".repeat(MAX_BYTES + 1)),
-            Err(ErrorNueva::Larga)
-        );
-        // En bytes: 32 «ñ» son 64 bytes; 33, demasiados.
-        assert_eq!(validar_forma(&"ñ".repeat(32)), Ok(()));
-        assert_eq!(validar_forma(&"ñ".repeat(33)), Err(ErrorNueva::Larga));
-        // 4 «ñ» son 8 bytes (4 caracteres).
-        assert_eq!(validar_forma("ññññ"), Ok(()));
-        for c in ["clave\nde-prueba", "clave\tde-prueba", "clave\u{7f}prueba"] {
-            assert_eq!(validar_forma(c), Err(ErrorNueva::Control), "{c:?}");
-        }
-        assert_eq!(validar_forma("clave con espacios"), Ok(()));
-        assert_eq!(
-            validar_nueva("clave-de-prueba-1", "clave-de-prueba-1"),
-            Err(ErrorNueva::Igual)
-        );
-        assert_eq!(
-            validar_nueva("clave-nueva-de-prueba", "clave-de-prueba-1"),
-            Ok(())
-        );
     }
 }

@@ -600,10 +600,16 @@ static HOJA: LazyLock<Regex> =
 
 /// Elementos hoja de una fixture que no están saneados según su clase en
 /// `crates/router-sim/fixtures-tags.txt` (la misma comprobación que la prueba
-/// `fixtures_have_no_secrets`), o cuya etiqueta no tiene clase.
-pub(crate) fn regla_fixture(linea: &str, _p: &Permitidos) -> Vec<&'static str> {
+/// `fixtures_have_no_secrets`), o cuya etiqueta no tiene clase. En un secreto
+/// solo vale un valor de `prueba` de `p` declarado para esa fixture (`ruta`) y
+/// esa etiqueta; un `valor` permitido no basta.
+pub(crate) fn regla_fixture(ruta: &str, linea: &str, p: &Permitidos) -> Vec<&'static str> {
     HOJA.captures_iter(linea)
         .filter(|c| c[1] == c[3])
+        .filter(|c| {
+            !(matches!(sanitize::tag_class(&c[1]), Some(TagClass::Redact))
+                && p.valor_de_prueba(ruta, &c[1], c[2].trim()))
+        })
         .filter_map(|c| valor_sin_sanear(&c[1], c[2].trim()))
         .collect()
 }
@@ -639,7 +645,7 @@ fn valor_sin_sanear(etiqueta: &str, valor: &str) -> Option<&'static str> {
         TagClass::Host => (seudonimo("host-"), "host sin sanear"),
         TagClass::Desc => (
             seudonimo("desc-")
-                || ["LAN", "Default"].contains(&valor)
+                || ["LAN", "Default", "DMZ"].contains(&valor)
                 || valor.parse::<u64>().is_ok(),
             "desc sin sanear",
         ),

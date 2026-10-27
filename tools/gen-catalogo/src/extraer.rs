@@ -2,8 +2,8 @@
 //! scripts capturados del router.
 
 use catalogo::{
-    Area, Funcion, LecturaPareada, Lista, Origen, Parametro, Partido, Riesgo, Tipo, TipoParam,
-    mask::Mascara,
+    Acceso, Area, Funcion, LecturaPareada, Lista, Origen, Parametro, Partido, Riesgo, Tipo,
+    TipoParam, mask::Mascara,
 };
 use regex::Regex;
 use std::{
@@ -789,6 +789,12 @@ fn tipo_de(name: &str) -> Tipo {
     }
 }
 
+/// En el borrador, toda escritura o acción puede cortar el acceso del panel
+/// (ante la duda, se vigila): la revisión a mano decide cuáles no.
+fn acceso_de(f: &Funcion) -> Option<Acceso> {
+    (f.tipo != Tipo::Lectura).then_some(Acceso::PuedeCortar)
+}
+
 fn riesgo_de(f: &Funcion) -> Riesgo {
     if f.tipo == Tipo::Lectura {
         return Riesgo::Bajo;
@@ -838,6 +844,10 @@ fn parametro(c: &Campo) -> Parametro {
         opciones: c.opciones.clone(),
         partido: c.partido,
         tapado: false,
+        casilla: None,
+        fijo: None,
+        ranuras: None,
+        depende: None,
     }
 }
 
@@ -910,6 +920,10 @@ pub fn extraer(dir: &Path) -> Result<Vec<Funcion>, String> {
                         opciones: Vec::new(),
                         partido: None,
                         tapado: false,
+                        casilla: None,
+                        fijo: None,
+                        ranuras: None,
+                        depende: None,
                     },
                     &mut params,
                 );
@@ -972,9 +986,13 @@ pub fn extraer(dir: &Path) -> Result<Vec<Funcion>, String> {
             lectura_pareada: None,
             lista,
             riesgo: Riesgo::Bajo,
+            acceso: None,
             bloqueada: None,
+            comprobada: None,
+            cgi: None,
         };
         f.riesgo = riesgo_de(&f);
+        f.acceso = acceso_de(&f);
         out.push(f);
     }
 
@@ -991,6 +1009,10 @@ pub fn extraer(dir: &Path) -> Result<Vec<Funcion>, String> {
                 opciones: Vec::new(),
                 partido: None,
                 tapado: false,
+                casilla: None,
+                fijo: None,
+                ranuras: None,
+                depende: None,
             })
             .collect();
         if let Some(&i) = vistas.get(&u.nombre) {
@@ -1012,9 +1034,13 @@ pub fn extraer(dir: &Path) -> Result<Vec<Funcion>, String> {
             lectura_pareada: None,
             lista: None,
             riesgo: Riesgo::Bajo,
+            acceso: None,
             bloqueada: None,
+            comprobada: None,
+            cgi: None,
         };
         f.riesgo = riesgo_de(&f);
+        f.acceso = acceso_de(&f);
         vistas.insert(u.nombre, out.len());
         out.push(f);
     }
@@ -1028,6 +1054,7 @@ pub fn extraer(dir: &Path) -> Result<Vec<Funcion>, String> {
         }
         let mut func = Funcion {
             name: f.ruta.clone(),
+            cgi: None,
             area: area_de_pagina(&f.ruta),
             origen: if f.ruta.starts_with("te_") {
                 Origen::Basica
@@ -1051,9 +1078,12 @@ pub fn extraer(dir: &Path) -> Result<Vec<Funcion>, String> {
             lectura_pareada: None,
             lista: None,
             riesgo: Riesgo::Bajo,
+            acceso: None,
             bloqueada: peligrosa.map(|(_, m)| m.to_string()),
+            comprobada: None,
         };
         func.riesgo = riesgo_de(&func);
+        func.acceso = acceso_de(&func);
         if !out.iter().any(|g| g.name == func.name) {
             out.push(func);
         }

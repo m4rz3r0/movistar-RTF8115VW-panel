@@ -13,6 +13,7 @@ use comun::*;
 mod campos;
 mod carga;
 mod elementos;
+mod fuentes;
 mod lotes;
 mod por_id;
 mod sensibles;

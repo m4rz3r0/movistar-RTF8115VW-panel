@@ -15,10 +15,15 @@ use panel::{
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 mod aplicar;
+mod cola;
+mod cola_api;
 mod deshacer;
 mod reanudar;
+mod red;
 mod reintentos;
 mod secretos;
+mod sin_vigilancia;
+mod terminar;
 mod vigilancia;
 
 const LEASES: &str = "cbDhcpV4SvrPoolSetStatic";

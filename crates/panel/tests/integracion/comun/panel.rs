@@ -42,6 +42,7 @@ pub struct PanelPrueba<'a> {
     ajustar: Option<Ajustar<'a>>,
     ajustes: Option<String>,
     tiempos: Option<Tiempos>,
+    sin_comprobar: Vec<&'static str>,
 }
 
 impl<'a> PanelPrueba<'a> {
@@ -52,6 +53,7 @@ impl<'a> PanelPrueba<'a> {
             ajustar: None,
             ajustes: None,
             tiempos: None,
+            sin_comprobar: Vec::new(),
         }
     }
 
@@ -87,6 +89,13 @@ impl<'a> PanelPrueba<'a> {
     /// funciones, que pide cubrir todas las escrituras).
     pub fn ajustes(mut self, toml: &str) -> Self {
         self.ajustes = Some(toml.to_owned());
+        self
+    }
+
+    /// La función del catálogo `nombre`, como no comprobada en el router
+    /// real (para las pruebas de la 1.0, que necesitan una fija).
+    pub fn sin_comprobar(mut self, nombre: &'static str) -> Self {
+        self.sin_comprobar.push(nombre);
         self
     }
 
@@ -154,6 +163,14 @@ impl<'a> PanelPrueba<'a> {
             state,
             _dir: dir,
         };
+        if !self.sin_comprobar.is_empty() {
+            let mut cat = (*p.state.catalogo).clone();
+            for nombre in &self.sin_comprobar {
+                assert!(cat.quitar_comprobada(nombre), "no existe {nombre}");
+            }
+            p.state.catalogo = std::sync::Arc::new(cat);
+            p.app = panel::build_router(p.state.clone());
+        }
         if let Some(toml) = self.ajustes {
             let c = ajustes::CatalogoAjustes::from_toml(&[("prueba", &toml)], "").unwrap();
             p.state.ajustes = std::sync::Arc::new(c);
@@ -193,6 +210,9 @@ pub fn config_en(dir: &Path) -> Config {
         install_nets: Vec::new(),
         router_min_gap: Duration::from_millis(1),
         espera_deteccion: Duration::from_millis(200),
+        // Contra router-sim se prueba todo, también lo no comprobado en el
+        // router real; las pruebas de lo que hace la 1.0 lo apagan.
+        habilitar_todo: true,
     }
 }
 

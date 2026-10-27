@@ -57,9 +57,9 @@ router-error-conexion-no-existe = The router has no connection named { $nombre }
 contrasena-router-titulo = Change the router password
 contrasena-router-texto = Changes the password of the router's web interface. From then on, the panel logs in with the new one and you will need it too to log in to the router. The panel tries the new one before keeping it and, if anything fails, puts the previous one back.
 contrasena-router-nueva = New password
-contrasena-router-nueva-ayuda = { $min } to { $max } characters. Accented letters and some symbols take up more than one. Press the eye to check what you have typed.
+contrasena-router-nueva-ayuda = { $min } to { $max } characters: unaccented letters, digits, spaces and the symbols on an English keyboard, except "`". No space at the start or the end, and never two in a row. Press the eye to check what you have typed.
 contrasena-router-solo-lectura = It cannot be changed while the panel is read-only: first confirm the firmware in the "Firmware" card.
-contrasena-router-cambiar = Change
+contrasena-router-cambiar = Change the password
 contrasena-router-cambiando = Changing…
 contrasena-router-cambiada = Router password changed: the panel now logs in with the new one. Use the new one too to log in to the router's web interface yourself.
 contrasena-router-confirmar-titulo = Change the router password?
@@ -70,9 +70,11 @@ contrasena-router-confirmar-boton = Change the password
 # (and panel-solo-lectura and comun-error-interno, in their files) are
 # stored in each installation's database, in the History: never rename or
 # delete them (only change their text).
-contrasena-router-error-corta = The new password is too short: it needs at least { $n } characters. Accented letters and some symbols take up more than one.
-contrasena-router-error-larga = The new password is too long: { $n } characters at most. Accented letters and some symbols take up more than one.
+contrasena-router-error-corta = The new password is too short: it needs at least { $n } characters.
+contrasena-router-error-larga = The new password is too long: { $n } characters at most.
 contrasena-router-error-control = The new password cannot contain line breaks, tabs or other invisible characters.
+contrasena-router-error-caracter = The new password can only contain unaccented letters, digits, spaces and the symbols on an English keyboard, except "`": no accented letters or other symbols.
+contrasena-router-error-espacios = The new password cannot start or end with a space, or have two spaces in a row.
 contrasena-router-error-igual = The new password is the same one the router already has.
 contrasena-router-error-en-curso = Another change is in progress on the router: wait for it to finish before changing the password.
 contrasena-router-error-sin-router = The panel does not know how to log in to the router yet: save its address, username and password first.
@@ -84,3 +86,35 @@ contrasena-router-error-grave = The panel cannot log in to the router with eithe
 contrasena-router-historial-nota = This change cannot be undone from here: to set another password, change it again in Router settings.
 contrasena-router-enlace = Change the router password
 contrasena-router-enlace-texto = It is changed in Router settings, next to the password the panel logs in with.
+
+## Router web users (Settings → Security → Users)
+# The keys usuarios-router-error-* and usuarios-router-historial-nota are
+# stored in the History: never rename or delete them.
+usuarios-router-contrasena = Password
+usuarios-router-protegido-panel = It is the user this panel logs in with: it cannot be deleted or changed from here.
+usuarios-router-protegido-sistema = It is the operator's account: it cannot be deleted or changed from here.
+usuarios-router-sin-credenciales = The panel does not know which user it logs in to the router with: no account can be changed from here.
+usuarios-router-aviso-borrar = If you undo the deletion later, the user comes back with a new password: the current one cannot be recovered. The new one will only be visible with the eye, in the change's details in the History. If the panel brings it back by itself (because the change fails), that password is not stored: the History will tell you.
+usuarios-router-aviso-deshacer = The user comes back with a new password: the previous one cannot be recovered. You will see it with the eye in this change's details, in the History.
+usuarios-router-error-protegido = This user is protected: it is the one the panel uses to log in to the router, or the operator's account. It cannot be deleted or changed from here.
+usuarios-router-error-existe = The router already has a user with that name.
+usuarios-router-error-nombre = The name must have 4 to 20 unaccented letters, digits or "_", with no spaces.
+usuarios-router-error-no-existe = That user is no longer on the router: read the list again.
+usuarios-router-error-en-curso = Another change is in progress on the router: wait for it to finish.
+usuarios-router-error-rechazado = The router did not accept the change: the user stays as it was.
+usuarios-router-error-no-entra = The router answered, but the user cannot log in with the new password. Try again or change it from the router's web interface.
+usuarios-router-error-grupo = The user now logs in with the new password, but the router does not show the account type asked for. Read the list again.
+usuarios-router-historial-nota = The new password is not stored in the panel: this change cannot be undone from here.
+usuarios-router-error-uno-cada-vez = Users are deleted one at a time.
+usuarios-router-error-nombre-baja = That name cannot be deleted from the panel: it contains ":" or control characters.
+usuarios-router-error-grupo-sistema = That account type is the operator's: choose Administrator or User.
+usuarios-router-error-grupo-no-valido = Choose an account type: Administrator or User.
+usuarios-router-nota-revertido = The deleted user was created again with a new password that the panel does not store. On this router that account cannot log in to the web; if you need another password, delete it and create it again.
+usuarios-router-no-panel = These are not this panel's users: those are in
+usuarios-router-no-panel-enlace = Panel settings → Who can log in to this panel
+
+## Features this router does not allow from the panel
+funcion-sin-comprobar = This feature has not been checked on this router: the panel does not use it.
+funcion-no-disponible-usuarios = On this router, the panel does not create or delete web accounts.
+funcion-no-disponible-contrasena-otro = On this router only the 1234 account can log in to the web, so the panel cannot check that the new password works. To change it, delete the account and create it again.
+funcion-no-disponible-sin-ping = On this router, turning off the ping reply is not enough: another operator rule still allows it.

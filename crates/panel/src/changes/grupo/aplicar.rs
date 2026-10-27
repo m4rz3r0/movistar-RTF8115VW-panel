@@ -29,7 +29,7 @@ impl ChangeManager {
         }
         if g.pasos.len() > 1 {
             for p in &g.pasos {
-                if self.funcion_escribible(&p.req.funcion)?.tipo == Tipo::Accion {
+                if self.funcion_escribible_para(&p.req)?.tipo == Tipo::Accion {
                     return Err(CambioError::Invalida(format!(
                         "{}: una acción solo puede ir sola (no se podría revertir si falla otro \
                          paso)",
@@ -40,16 +40,21 @@ impl ChangeManager {
         }
         let mut pasos = Vec::with_capacity(g.pasos.len());
         let mut riesgo: Option<Riesgo> = None;
+        let mut huella = Vec::with_capacity(g.pasos.len());
         for (indice, p) in g.pasos.iter().enumerate() {
             let (diff, sin_cambios) = match self.planificar(&p.req, explicito).await {
                 Ok(plan) => {
                     riesgo = riesgo.max(Some(plan.funcion.riesgo));
+                    huella.push(Some(cola::Huella::de(&plan)));
                     (
                         para_mostrar(&plan.funcion, &self.state.mascara, &plan.campos),
                         false,
                     )
                 }
-                Err(CambioError::SinCambios) => (Diff::default(), true),
+                Err(CambioError::SinCambios) => {
+                    huella.push(None);
+                    (Diff::default(), true)
+                }
                 Err(e) => return Err(e),
             };
             pasos.push(PasoPreparado {
@@ -63,6 +68,14 @@ impl ChangeManager {
         let Some(riesgo) = riesgo else {
             return Err(CambioError::SinCambios);
         };
+        let vigila = self
+            .se_vigila(
+                pasos
+                    .iter()
+                    .filter(|p| !p.sin_cambios)
+                    .map(|p| p.funcion.as_str()),
+            )
+            .await;
         let token = nuevo_token();
         let mut pend = lock(&self.pendientes);
         let ahora = Instant::now();
@@ -76,31 +89,22 @@ impl ChangeManager {
                 caduca: ahora + TOKEN_TTL,
                 explicito,
                 deshace,
+                usuario: None,
+                huella,
             },
         );
         Ok(PreparadoGrupo {
             token,
             pasos,
             riesgo,
-        })
-    }
-
-    /// ¿Se quedaría sin escribir nada el grupo preparado con `token` sin los
-    /// pasos de `desmarcados`? Es decir, todos los pasos con cambios llegan
-    /// desmarcados. No consume el token; con uno que no vale, `false` (lo
-    /// dice [`ChangeManager::confirmar_grupo`]).
-    pub fn nada_que_aplicar(&self, token: &str, desmarcados: &[usize]) -> bool {
-        lock(&self.pendientes).get(token).is_some_and(|v| {
-            v.sin_cambios
-                .iter()
-                .enumerate()
-                .all(|(i, sin)| *sin || desmarcados.contains(&i))
+            vigila,
         })
     }
 
     /// Aplica el grupo preparado con `token` sin los pasos de `desmarcados`
     /// (índices): escribe y verifica cada paso en orden y deja la vigilancia
-    /// en marcha. Devuelve el id del cambio (en `vigilando`). Si un paso
+    /// en marcha. Devuelve el id del cambio (en `vigilando`, o `en_cola` si
+    /// otro se estaba aplicando o vigilando: ver `cola.rs`). Si un paso
     /// falla, revierte los anteriores antes de volver con el error.
     ///
     /// Las acciones piden palabra: van por [`ChangeManager::confirmar`].
@@ -122,17 +126,23 @@ impl ChangeManager {
         desmarcados: &[usize],
         usuario: &str,
     ) -> Result<i64, CambioError> {
-        let funciones: Vec<String> = {
+        // Cada petición entera: la regla «sin ping» del cortafuegos solo se
+        // escribe con su carga exacta (ver `especiales`).
+        let peticiones: Vec<ChangeRequest> = {
             let p = lock(&self.pendientes);
             match p.get(token) {
+                // Sin ligar o de otro usuario del panel: no vale y no se gasta.
+                Some(v) if v.usuario.as_deref() != Some(usuario) => {
+                    return Err(CambioError::TokenInvalido);
+                }
                 Some(v) if v.caduca > Instant::now() => {
-                    v.pasos.iter().map(|p| p.req.funcion.clone()).collect()
+                    v.pasos.iter().map(|p| p.req.clone()).collect()
                 }
                 _ => return Err(CambioError::TokenInvalido),
             }
         };
-        for nombre in &funciones {
-            let f = self.funcion_escribible(nombre)?;
+        for req in &peticiones {
+            let f = self.funcion_escribible_para(req)?;
             if let Some(esperada) = palabra_requerida(f)
                 && palabra != Some(esperada)
             {
@@ -149,30 +159,26 @@ impl ChangeManager {
                 "el gestor aún está retomando cambios pendientes; inténtalo de nuevo".into(),
             ));
         }
-        let reserva = self.reservar()?;
+        // El hueco o, con otro cambio en curso, un sitio en la cola.
+        let entrada = self.entrar()?;
         let Some(pendiente) = lock(&self.pendientes).remove(token) else {
+            if let cola::Entrada::Cola = entrada {
+                self.devolver_sitio();
+            }
             return Err(CambioError::TokenInvalido);
         };
+        let turno = cola::Turno {
+            fila: None,
+            pendiente,
+            desmarcados: desmarcados.to_vec(),
+            usuario: usuario.to_owned(),
+        };
+        let reserva = match entrada {
+            cola::Entrada::Ahora(r) => r,
+            cola::Entrada::Cola => return self.encolar(turno).await,
+        };
         let (tx, rx) = oneshot::channel();
-        let m = self.clone();
-        let usuario = usuario.to_owned();
-        let desmarcados = desmarcados.to_vec();
-        let h = tokio::spawn(async move {
-            match m
-                .aplicar_grupo(&pendiente, &desmarcados, &usuario, &reserva)
-                .await
-            {
-                Ok(ej) => {
-                    let _ = tx.send(Ok(ej.id));
-                    m.seguir(ej).await;
-                }
-                Err(e) => {
-                    let _ = tx.send(Err(e));
-                }
-            }
-            drop(reserva);
-        });
-        *lock(&self.tarea) = Some(h.abort_handle());
+        self.lanzar(reserva, turno, Some(tx));
         rx.await.unwrap_or_else(|_| {
             Err(CambioError::Router(
                 "la aplicación del cambio se interrumpió".into(),
@@ -190,15 +196,21 @@ impl ChangeManager {
     }
 
     /// Escribe y verifica los pasos en orden (con el sondeo en pausa).
-    /// Devuelve lo necesario para vigilar el grupo.
-    async fn aplicar_grupo(
+    /// Devuelve lo necesario para vigilar el grupo. `fila`: la de un cambio
+    /// que esperó en la cola (antes de escribir se comprueba que el router
+    /// sigue como cuando se revisó).
+    pub(in crate::changes) async fn aplicar_grupo(
         &self,
         p: &Pendiente,
         desmarcados: &[usize],
         usuario: &str,
         reserva: &Reserva,
+        fila: Option<i64>,
     ) -> Result<Ejecucion, CambioError> {
         let mut pausa = Some(self.pausar().await?);
+        if fila.is_some() {
+            self.comprobar_huella(p, desmarcados).await?;
+        }
         if let Some(o) = p.deshace
             && let Some(e) = self.ya_deshecho(o).await
         {
@@ -251,6 +263,15 @@ impl ChangeManager {
             .filter_map(|i| self.state.catalogo.funcion(&p.pasos[i].req.funcion))
             .map(|f| f.riesgo)
             .fold(plan0.funcion.riesgo, Riesgo::max);
+        // Antes de escribir nada: después, un cambio de la WiFi podría haber
+        // dejado al panel sin saber por dónde llega.
+        let mut vigilar = self
+            .se_vigila(
+                (i0..n)
+                    .filter(|i| !omitir(*i))
+                    .map(|i| p.pasos[i].req.funcion.as_str()),
+            )
+            .await;
         let id = self
             .insertar(&NuevoGrupo {
                 principal: (i0, &plan0),
@@ -261,6 +282,7 @@ impl ChangeManager {
                 usuario,
                 base,
                 deshace: p.deshace,
+                fila,
             })
             .await
             .map_err(|e| CambioError::Router(format!("no se puede guardar el cambio: {e}")))?;
@@ -268,8 +290,8 @@ impl ChangeManager {
         tracing::info!(
             cambio = id,
             pasos = n,
-            funcion = %plan0.funcion.name,
-            instancia = plan0.instancia.as_deref().unwrap_or("-"),
+            funcion = %crate::changes::especiales::funcion_enviada(&plan0),
+            instancia = crate::changes::especiales::instancia_en_registro(&plan0),
             usuario,
             diff = %resumen(&plan0.campos),
             "cambio aplicándose"
@@ -306,7 +328,9 @@ impl ChangeManager {
                 .escribir_paso(id, i, &mut plan, &mut pausa, multi)
                 .await
             {
-                Ok(nota) => {
+                Ok((nota, confirmado)) => {
+                    // Sin confirmar lo escrito, se vigila igualmente.
+                    vigilar |= !confirmado;
                     self.marcar_paso(id, i, EstadoPaso::Aplicado, None).await;
                     if let Some(nota) = nota {
                         notas.push(if multi { nota.del_paso(i) } else { nota });
@@ -335,18 +359,30 @@ impl ChangeManager {
                 }
             }
         }
-        let nota = Nota::juntar(notas);
-        self.marcar(id, Estado::Vigilando, None, nota.as_ref())
-            .await;
-        drop(pausa);
-        Ok(Ejecucion {
+        let ej = Ejecucion {
             id,
             pasos: escritos,
             base,
-            nota,
+            nota: Nota::juntar(notas),
             riesgo,
             multi,
-        })
+            vigilar,
+        };
+        // Lo que no puede cortar el acceso queda aplicado ya.
+        if ej.sin_vigilancia() {
+            let nota = Nota::juntar(
+                ej.nota
+                    .clone()
+                    .into_iter()
+                    .chain([Nota::clave(nota::SIN_VIGILANCIA)]),
+            );
+            self.marcar(id, Estado::Aplicado, None, nota.as_ref()).await;
+        } else {
+            self.marcar(id, Estado::Vigilando, None, ej.nota.as_ref())
+                .await;
+        }
+        drop(pausa);
+        Ok(ej)
     }
 
     /// Planifica el paso `i` (no el primero) y lo guarda en `aplicando`.
@@ -384,15 +420,16 @@ impl ChangeManager {
         tracing::info!(
             cambio = id,
             paso = i + 1,
-            funcion = %plan.funcion.name,
-            instancia = plan.instancia.as_deref().unwrap_or("-"),
+            funcion = %crate::changes::especiales::funcion_enviada(&plan),
+            instancia = crate::changes::especiales::instancia_en_registro(&plan),
             diff = %resumen(&plan.campos),
             "paso aplicándose"
         );
         Ok(Some(plan))
     }
 
-    /// Escribe un paso y lo verifica. Devuelve la nota del paso.
+    /// Escribe un paso y lo verifica. Devuelve la nota del paso y si la
+    /// relectura confirmó lo escrito (si no, el cambio se vigila).
     async fn escribir_paso(
         &self,
         id: i64,
@@ -400,10 +437,10 @@ impl ChangeManager {
         plan: &mut Plan,
         pausa: &mut Option<PauseGuard>,
         multi: bool,
-    ) -> Result<Option<Nota>, FalloPaso> {
+    ) -> Result<(Option<Nota>, bool), FalloPaso> {
         let mut nota = None;
         let comprobacion = match self.enviar(plan).await {
-            Ok(()) => self.comprobar(plan, Lado::Nuevo).await,
+            Ok(()) => self.releer_tras_escribir(plan, pausa).await,
             // El router rechazó la escritura: no se aplicó nada.
             Err(e @ hgu::Error::CallFailed { .. }) => {
                 return Err(FalloPaso::no_aplicado(CambioError::Router(e.to_string())));
@@ -439,6 +476,7 @@ impl ChangeManager {
                 }
             },
         };
+        let confirmado = matches!(comprobacion, Comprobacion::Coincide(_));
         match comprobacion {
             Comprobacion::Coincide(nueva) => {
                 if let Some(n) = nueva {
@@ -460,6 +498,6 @@ impl ChangeManager {
                     .await);
             }
         }
-        Ok(nota)
+        Ok((nota, confirmado))
     }
 }

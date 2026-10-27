@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { PLAZO_CAMBIO, plazoDeTest } from "./cambios";
 import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
+import { capturaOpcional } from "./util";
 
 // Red local (/ajustes/red_local) a 360 y 1440 px, en español y en inglés,
 // contra router-sim: la tarjeta del reparto de direcciones (DHCP), su
@@ -84,26 +85,20 @@ for (const idioma of ["es", "en"] as const) {
         const errores = recogerErrores(page);
         await entrar(page);
 
-        // 1. Abrir Red local (en móvil, con el selector de temas).
-        if (ancho < 640) {
-          await page.goto("/ajustes/puertos");
-          await asentar(page);
-          await expect(page.locator("nav.temas")).toBeHidden();
-          await page.locator("#ajustes-tema").selectOption("red_local");
-          await page.waitForURL((u) => u.pathname === "/ajustes/red_local");
-        } else {
-          await page.goto("/ajustes/red_local");
-          await asentar(page);
-          await expect(page.locator("#ajustes-tema")).toBeHidden();
-          await expect(page.locator("nav.temas a[aria-current=page]")).toHaveAttribute(
-            "href",
-            "/ajustes/red_local",
-          );
-        }
+        // 1. Abrir Red local con su pestaña (en el móvil, la barra se
+        // desplaza de lado: la pestaña se alcanza igual).
+        await page.goto("/ajustes/puertos");
+        await asentar(page);
+        await page.locator('nav.temas a[href="/ajustes/red_local"]').click();
+        await page.waitForURL((u) => u.pathname === "/ajustes/red_local");
+        await expect(page.locator("nav.temas a[aria-current=page]")).toHaveAttribute(
+          "href",
+          "/ajustes/red_local",
+        );
         const dhcp = tarjeta(page, t.dhcp);
         await expect(dhcp).toBeVisible();
         await sinDesbordamiento(page, `red local ${idioma} ${ancho}`);
-        await page.screenshot({
+        await capturaOpcional(page, {
           path: `capturas/ajustes-red-local-${idioma}-${ancho}.png`,
           fullPage: true,
         });
@@ -142,7 +137,7 @@ for (const idioma of ["es", "en"] as const) {
         await expect(cambio.locator("td").nth(1)).toHaveText(despues);
         sinApi(await dialogo.innerText());
         await sinDesbordamiento(page, `diálogo ${idioma} ${ancho}`);
-        await page.screenshot({ path: `capturas/ajustes-dialogo-${idioma}-${ancho}.png` });
+        await capturaOpcional(page, { path: `capturas/ajustes-dialogo-${idioma}-${ancho}.png` });
 
         const aviso = page.locator(".avisos-cambio [role=status] .aviso-cambio");
         if (aplicaDeVerdad) {
@@ -179,12 +174,8 @@ for (const idioma of ["es", "en"] as const) {
         await page.locator(".detalle :is(.detalle-cerrar, .detalle-volver):visible").click();
         await page.waitForURL((u) => u.pathname === "/ajustes/red_local");
 
-        // 6. Las pestañas (o el selector en móvil) llevan a otro tema.
-        if (ancho < 640) {
-          await page.locator("#ajustes-tema").selectOption("puertos");
-        } else {
-          await page.locator("nav.temas").getByRole("link", { name: t.puertos }).click();
-        }
+        // 6. Las pestañas llevan a otro tema.
+        await page.locator("nav.temas").getByRole("link", { name: t.puertos }).click();
         await page.waitForURL((u) => u.pathname === "/ajustes/puertos");
         await expect(page.locator("section.lista-seccion").first()).toBeVisible();
         await sinDesbordamiento(page, `puertos ${idioma} ${ancho}`);

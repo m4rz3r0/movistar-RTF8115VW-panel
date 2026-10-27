@@ -1,11 +1,12 @@
 //! Escrituras avanzadas reflejadas en sus lecturas pareadas.
 
-use crate::estado::{Edicion, HangAfterWrite, Inner, ListaViva, Params, SimState};
+use crate::estado::{Aplazada, Edicion, HangAfterWrite, Inner, ListaViva, Params, SimState};
 use crate::http::param;
 use crate::lecturas::{all_instances, aplicar_campos};
+use crate::ofuscado;
 use crate::xml::{failure, leaf, ok, response, result_node, set_child};
 use catalogo::Lista;
-use hgu::{fmt::codificar_cambio_contrasena, xml::XmlNode};
+use hgu::xml::XmlNode;
 use std::{collections::BTreeMap, time::Instant};
 
 pub(crate) fn write(
@@ -60,8 +61,12 @@ pub(crate) fn write(
     }
     let result = match name {
         "cbModifyPwd" => modify_pwd(s, st, &clean),
+        n if crate::usuarios::es_suya(n) => {
+            return crate::usuarios::escribir(&mut s.usuarios(), n, &clean);
+        }
         "cbReboot" => {
             st.invalidate_sessions();
+            st.registro_exportado = false;
             st.rebooted = Some(Instant::now());
             return response(&result_node(
                 name,
@@ -69,6 +74,30 @@ pub(crate) fn write(
                 "0",
                 "",
             ));
+        }
+        // Exportar el registro no cambia ningún ajuste: lo demás que venga
+        // con `export` se aplica como siempre.
+        "cbSetSyslog" if crate::registro::pide_exportar(&clean) => {
+            crate::registro::exportar(st);
+            let resto: Params = clean
+                .iter()
+                .filter(|(k, _)| k != "export")
+                .cloned()
+                .collect();
+            if resto.is_empty() {
+                Ok(())
+            } else {
+                escritura_generica(s, st, name, &resto)
+            }
+        }
+        "cbSaveConfig" => return crate::copia::guardar(st, &clean),
+        "cbSetQueue" if param(&clean, "default_traffic_class") == Some("-1") => {
+            cola_por_defecto(s, st, &clean)
+        }
+        // El formulario del NAT loopback va a la CGI del ALG con su id: son
+        // otras casillas (`adm_state`), las de su variante del catálogo.
+        "cbSetNatConfig" if param(&clean, "rtm_cfg_nat_lb_intf_id").is_some() => {
+            escritura_generica(s, st, "cbSetNatConfig.loopback", &clean)
         }
         _ => escritura_generica(s, st, name, &clean),
     };
@@ -79,11 +108,12 @@ pub(crate) fn write(
 }
 
 /// Cambia la contraseña del usuario del sim (`rqUser`, `rqOPwd`, `rqNPwd`,
-/// leídos con la misma codificación con la que los manda el panel:
-/// [`codificar_cambio_contrasena`]). Las sesiones abiertas siguen valiendo,
-/// como en el router.
+/// leídos con la copia propia del `mess_userpass` del router:
+/// [`ofuscado::deshacer`]). Las sesiones abiertas siguen valiendo,
+/// como en el router. Con `modify_pwd_con_retraso` o
+/// `modify_pwd_tras_inicios`, la nueva queda pendiente hasta que toca.
 fn modify_pwd(s: &Inner, st: &mut SimState, p: &[(String, String)]) -> Result<(), String> {
-    let leer = |k: &str| param(p, k).map(codificar_cambio_contrasena);
+    let leer = |k: &str| param(p, k).map(ofuscado::deshacer);
     let nueva = leer("rqNPwd").ok_or("falta rqNPwd")?;
     let actual = s.password();
     if leer("rqUser").as_deref() != Some(s.user.as_str())
@@ -91,8 +121,20 @@ fn modify_pwd(s: &Inner, st: &mut SimState, p: &[(String, String)]) -> Result<()
     {
         return Err("usuario o contraseña actual incorrectos".to_owned());
     }
-    if !std::mem::take(&mut st.modify_pwd_sin_efecto) {
-        *s.password.lock().unwrap_or_else(|e| e.into_inner()) = nueva;
+    if std::mem::take(&mut st.modify_pwd_sin_efecto) {
+        return Ok(());
+    }
+    let aplazada = match (
+        st.modify_pwd_retraso.take(),
+        st.modify_pwd_tras_inicios.take(),
+    ) {
+        (_, Some(n)) => Some(Aplazada::TrasInicios(n)),
+        (Some(retraso), None) => Some(Aplazada::Desde(Instant::now() + retraso)),
+        (None, None) => None,
+    };
+    match aplazada {
+        Some(a) => st.pwd_pendiente = Some((nueva, a)),
+        None => s.fijar_password(nueva),
     }
     Ok(())
 }
@@ -112,6 +154,13 @@ fn escritura_generica(
         return Ok(());
     };
     let lectura = pareada.funcion.as_str();
+    let casillas;
+    let p = if param(p, "del") == Some("DEL") {
+        p
+    } else {
+        casillas = como_casillas(f, p);
+        casillas.as_slice()
+    };
     if let Some(lista) = &f.lista {
         if name == "cbDhcpV4SvrPoolSetStatic" {
             let p = validar_reserva(s, st, lectura, p)?;
@@ -138,6 +187,36 @@ fn escritura_generica(
         None => st.ediciones.push(Edicion {
             lectura: lectura.to_owned(),
             ident,
+            campos,
+        }),
+    }
+    Ok(())
+}
+
+/// La cola por defecto, como la web (`default_traffic_class=-1` con el id
+/// de la cola): todas las colas toman como clase de tráfico por defecto la
+/// de esa cola.
+fn cola_por_defecto(s: &Inner, st: &mut SimState, p: &[(String, String)]) -> Result<(), String> {
+    const LECTURA: &str = "cbGetQueue";
+    let id = param(p, "dpm_cfg_queue_id").ok_or("falta dpm_cfg_queue_id")?;
+    let colas = crate::lecturas::read_node(s, st, LECTURA, &[])?;
+    let clase = colas
+        .all("dpm_cfg_queue")
+        .into_iter()
+        .find(|c| c.text_of("dpm_cfg_queue_id") == Some(id))
+        .and_then(|c| c.text_of("traffic_class"))
+        .ok_or("no existe esa cola")?
+        .to_owned();
+    let campos = BTreeMap::from([("default_traffic_class".to_owned(), clase)]);
+    match st
+        .ediciones
+        .iter_mut()
+        .find(|e| e.lectura == LECTURA && e.ident.is_empty())
+    {
+        Some(e) => e.campos.extend(campos),
+        None => st.ediciones.push(Edicion {
+            lectura: LECTURA.to_owned(),
+            ident: Params::new(),
             campos,
         }),
     }
@@ -191,6 +270,22 @@ fn validar_reserva(
         }
     }
     Ok(p)
+}
+
+/// Las casillas de `f` ([`catalogo::Parametro::casilla`]) como las guarda el
+/// router: marcada (`1`) si el campo llega, valga lo que valga, y
+/// desmarcada (`0`) si no llega.
+fn como_casillas(f: &catalogo::Funcion, p: &[(String, String)]) -> Params {
+    let mut out: Params = p
+        .iter()
+        .filter(|(k, _)| f.parametro(k).is_none_or(|x| x.casilla.is_none()))
+        .cloned()
+        .collect();
+    for c in f.parametros.iter().filter(|x| x.casilla.is_some()) {
+        let marcada = param(p, &c.nombre).is_some();
+        out.push((c.nombre.clone(), if marcada { "1" } else { "0" }.to_owned()));
+    }
+    out
 }
 
 /// Parámetros que llevan valor a la instancia (todos menos los de control y
@@ -263,7 +358,11 @@ pub(crate) fn escribir_lista(
 
 /// Crea la lista viva de `lectura` (si no existe) a partir de la fixture `all=ALL` (o, sin
 /// ella, la de sin parámetros o la suma de las fixtures por instancia).
-fn materializar_lista(s: &Inner, st: &mut SimState, lectura: &str) -> Result<(), String> {
+pub(crate) fn materializar_lista(
+    s: &Inner,
+    st: &mut SimState,
+    lectura: &str,
+) -> Result<(), String> {
     if !st.listas.contains_key(lectura) {
         let viva = construir_lista(s, lectura)?;
         st.listas.insert(lectura.to_owned(), viva);

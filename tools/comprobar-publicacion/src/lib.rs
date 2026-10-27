@@ -215,7 +215,7 @@ pub fn revisar_texto(ruta: &str, texto: &str, p: &Permitidos, l: &ListasLocales)
                 anotar(n, regla, d.to_owned());
             }
             if clase == Clase::Fixture {
-                for d in reglas::regla_fixture(linea, p) {
+                for d in reglas::regla_fixture(ruta, linea, p) {
                     anotar(n, Regla::Fixture, d.to_owned());
                 }
             }

@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { PLAZO_CAMBIO, plazoDeTest } from "./cambios";
 import { asentar, entrar, recogerErrores, sinDesbordamiento } from "./util";
+import { capturaOpcional } from "./util";
 
 // Puertos abiertos (/ajustes/puertos) a 360, 768, 1024, 1280 y 1440 px, en
 // español y en inglés, contra router-sim:
@@ -168,7 +169,7 @@ for (const idioma of ["es", "en"] as const) {
         await expect(desc1).toContainText("TCP");
         await sinDesbordamiento(page, `puertos ${idioma} ${ancho}`);
         sinApi(await reglas(page, t).innerText());
-        await page.screenshot({ path: `capturas/puertos-${idioma}-${ancho}.png`, fullPage: true });
+        await capturaOpcional(page, { path: `capturas/puertos-${idioma}-${ancho}.png`, fullPage: true });
         // Su detalle dice qué hacer.
         const detalle1 = await abrir(page, t, "desc-1");
         await expect(detalle1).toContainText(t.queHacer);
@@ -295,7 +296,7 @@ for (const idioma of ["es", "en"] as const) {
           await expect(pasos.nth(0).getByText("192.168.1.62")).toBeVisible();
           sinApi(await dialogo.innerText());
           await sinDesbordamiento(page, `diálogo ${idioma} ${ancho}`);
-          await page.screenshot({ path: `capturas/puertos-dialogo-${idioma}-${ancho}.png` });
+          await capturaOpcional(page, { path: `capturas/puertos-dialogo-${idioma}-${ancho}.png` });
           await dialogo.getByRole("button", { name: t.cancelar }).click();
           await expect(page.locator("dialog[open]")).toHaveCount(0);
         }
@@ -303,4 +304,59 @@ for (const idioma of ["es", "en"] as const) {
       });
     });
   }
+}
+
+// La DMZ (solo de lectura: con las fixtures, desactivada) y la nota sobre
+// el control parental, que lleva a Mejoras, a 360 px en los dos idiomas.
+const dmzTextos = {
+  es: {
+    dmz: "Dispositivo expuesto (DMZ)",
+    desactivada: "Desactivada",
+    titulo: "Control parental",
+    parental: "control parental",
+    mejoras: "Elegir el DNS familiar en las mejoras",
+  },
+  en: {
+    dmz: "Exposed device (DMZ)",
+    desactivada: "Off",
+    titulo: "Parental controls",
+    parental: "parental controls",
+    mejoras: "Choose the family DNS in the improvements",
+  },
+} as const;
+
+for (const idioma of ["es", "en"] as const) {
+  test.describe(`dmz y control parental ${idioma} a 360 px`, () => {
+    test.use({
+      locale: idioma === "es" ? "es-ES" : "en-GB",
+      viewport: { width: 360, height: 900 },
+    });
+
+    test("tarjeta de la DMZ y nota del control parental", async ({ page }) => {
+      const t = dmzTextos[idioma];
+      const errores = recogerErrores(page);
+      await entrar(page);
+      await page.goto("/ajustes/puertos");
+      await asentar(page);
+      const dmz = page.locator("article.tarjeta-el").filter({
+        has: page.getByRole("heading", { level: 2, name: t.dmz, exact: true }),
+      });
+      await expect(dmz).toBeVisible();
+      await expect(dmz.locator(".tarjeta-insignia")).toContainText(t.desactivada);
+      sinApi(await dmz.innerText());
+      // Una región con nombre: su encabezado.
+      const nota = page.getByRole("region", { name: t.titulo, exact: true });
+      await expect(nota).toHaveClass(/tema-nota/);
+      await expect(nota).toContainText(t.parental);
+      const enlace = nota.getByRole("link", { name: t.mejoras });
+      await expect(enlace).toHaveAttribute("href", "/mejoras");
+      await expect(enlace).toHaveClass(/b-txt/);
+      // Se distingue del texto sin pasar el ratón: subrayado.
+      await expect(enlace).toHaveCSS("text-decoration-line", "underline");
+      await sinDesbordamiento(page, `dmz ${idioma} 360`);
+      await enlace.click();
+      await page.waitForURL((u) => u.pathname === "/mejoras");
+      expect(errores).toEqual([]);
+    });
+  });
 }
