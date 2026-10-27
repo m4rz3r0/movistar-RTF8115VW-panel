@@ -1,7 +1,7 @@
 # Imagen del panel. Se construye desde la raíz del repositorio (el contexto
 # es el repositorio entero; .dockerignore deja fuera target/, git y lo local):
 #
-#   docker build -f deploy/docker/Dockerfile -t routerpanel .
+#   podman build -f deploy/docker/Dockerfile -t routerpanel .   (o docker build)
 #
 # o con deploy/docker/compose.yaml. Etapas:
 #   herramientas  Rust, cargo-leptos, wasm-bindgen-cli (la versión de

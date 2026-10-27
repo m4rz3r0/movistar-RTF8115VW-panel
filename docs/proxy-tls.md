@@ -5,20 +5,24 @@ El panel escucha en HTTP sin cifrar (`RP_LISTEN`, por defecto
 
 1. **sirva HTTPS.** La cookie de sesión (`__Host-rp_session`) es `Secure`: el
    navegador solo la guarda por HTTPS (o por `http://localhost`, para
-   desarrollar);
+   desarrollar). El panel manda además HSTS (`max-age` de un año, sin
+   `includeSubDomains`): tras entrar una vez por HTTPS, el navegador ya no usa
+   HTTP con ese nombre;
 2. **deje entrar solo a la red local** (o a la VPN). El panel cambia la
    configuración del router: no lo publiques en internet;
 3. **pase la IP del cliente en `X-Forwarded-For`**, poniendo la IP de la
-   conexión y no la que traiga el cliente. El panel la usa para frenar
-   intentos de acceso por IP y para que el asistente de instalación solo
-   responda desde la red local.
+   conexión y no la que traiga el cliente. El panel la usa para frenar los
+   intentos de acceso de cada dispositivo y para que el asistente de
+   instalación solo responda desde la red local.
 
 En el panel:
 
 - `RP_ORIGIN`: la dirección del panel tal como la escribe el navegador
   (`https://panel.home.arpa`, con `:puerto` si no es el 443). Varias,
   separadas por comas, si se entra por más de un nombre. El panel rechaza
-  las peticiones que cambian algo si el `Origin` no es uno de ellos.
+  las peticiones que cambian algo y no vienen de su propia web: manda
+  `Sec-Fetch-Site` si el navegador lo envía y, si no, `Origin` tiene que ser
+  uno de ellos.
 - `RP_TRUSTED_PROXY`: las IPs o redes de los proxies (separadas por comas;
   por defecto `127.0.0.1`). Solo se lee `X-Forwarded-For` cuando la conexión
   viene de una de ellas; si no, cuenta la IP de la conexión. Pon solo el
@@ -108,7 +112,7 @@ Para comprobarlo, entra por `RP_ORIGIN`:
 
 - si tras entrar vuelves a la página de acceso, el navegador no guarda la
   cookie: falta HTTPS;
-- si cambiar algo da «Origen no permitido», el nombre o el puerto no
-  coinciden con `RP_ORIGIN`;
+- si cambiar algo da «Origen no permitido», el navegador no manda
+  `Sec-Fetch-Site` y el nombre o el puerto no coinciden con `RP_ORIGIN`;
 - si el asistente de instalación responde 403 desde la red local, el panel
   no ve la IP del cliente: revisa `RP_TRUSTED_PROXY` y `X-Forwarded-For`.

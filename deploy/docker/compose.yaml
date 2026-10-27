@@ -1,8 +1,8 @@
-# Panel del router con Compose (docker compose o podman compose), desde la
+# Panel del router con Compose (podman compose o docker compose), desde la
 # raíz del repositorio:
 #
 #   RP_ORIGIN=https://panel.home.arpa PANEL_DOMINIO=panel.home.arpa \
-#     docker compose -f deploy/docker/compose.yaml up -d --build
+#     podman compose -f deploy/docker/compose.yaml up -d --build
 #
 # Variables (en el entorno o en un .env junto a este fichero):
 #   RP_ORIGIN          obligatoria: la dirección del panel tal como la escribe

@@ -1,10 +1,11 @@
 # Instalación en Linux con systemd
 
-El panel es un binario (`panel`) y su web (`site/`). Las releases para Linux
-(`routerpanel-<versión>-<objetivo>.tar.gz`, con `x86_64-unknown-linux-gnu` o
-`aarch64-unknown-linux-gnu`) los traen ya compilados junto a esta carpeta.
-Se compilan en Ubuntu 22.04 y piden glibc 2.35 o posterior: valen para
-Debian 12, Ubuntu 22.04 y Raspberry Pi OS de 64 bits (bookworm) en adelante.
+El panel es un binario (`panel`) y su web (`site/`). Cada release para Linux
+(`routerpanel-<versión>-<objetivo>.tar.gz`, para `x86_64-unknown-linux-gnu`
+o `aarch64-unknown-linux-gnu`) los trae ya compilados, junto con esta
+carpeta. Se compilan en Ubuntu 22.04 y piden glibc 2.35 o posterior, así que
+valen para Debian 12, Ubuntu 22.04, Raspberry Pi OS de 64 bits (bookworm) y
+versiones más nuevas.
 
 ## Ficheros
 
@@ -17,11 +18,11 @@ Debian 12, Ubuntu 22.04 y Raspberry Pi OS de 64 bits (bookworm) en adelante.
 
 ## Rutas
 
-- `/opt/routerpanel/releases/<versión>/{panel,site/,…}` — versiones (root).
-- `/opt/routerpanel/current` → `releases/<versión>` — la desplegada.
-- `/etc/routerpanel/env` — configuración (`RP_*`; ver `env.example`).
+- `/opt/routerpanel/releases/<versión>/{panel,site/,…}`: versiones (root).
+- `/opt/routerpanel/current` → `releases/<versión>`: la desplegada.
+- `/etc/routerpanel/env`: configuración (`RP_*`; ver `env.example`).
 - `/var/lib/routerpanel/` (en realidad `/var/lib/private/routerpanel`, por
-  `DynamicUser`) — `panel.db`, `history.key` y, mientras no hay
+  `DynamicUser`): `panel.db`, `history.key` y, mientras no hay
   administrador, `instalar.token`. Es lo único donde el servicio escribe.
 
 `history.key` cifra las credenciales del router y los secretos del
@@ -30,10 +31,21 @@ datos sin la clave no sirve, y las dos juntas lo descifran todo.
 
 ## Instalación
 
-Como root, con la release desempaquetada en la carpeta actual:
+Descarga la release de tu arquitectura desde
+<https://github.com/m4rz3r0/movistar-RTF8115VW-panel/releases> junto con
+`SHA256SUMS`, comprueba la suma y desempaquétala:
 
 ```sh
 v=v1.2.3   # la versión que instalas
+o=x86_64-unknown-linux-gnu   # o aarch64-unknown-linux-gnu (Raspberry Pi)
+sha256sum --ignore-missing -c SHA256SUMS
+tar xzf routerpanel-$v-$o.tar.gz
+cd routerpanel-$v-$o
+```
+
+Luego, como root y desde esa carpeta:
+
+```sh
 install -d /opt/routerpanel/releases
 cp -r . /opt/routerpanel/releases/$v
 ln -sfn releases/$v /opt/routerpanel/current
@@ -130,7 +142,7 @@ a la anterior con la base de datos de antes. Conserva 3 versiones. Necesita
 ```sh
 install -m 755 deploy/linux/actualizar-release.sh /usr/local/sbin/routerpanel-actualizar
 cat >/etc/routerpanel/actualizar.env <<'EOF'
-RP_RELEASES_URL=https://github.com/<usuario>/<repo>/releases
+RP_RELEASES_URL=https://github.com/m4rz3r0/movistar-RTF8115VW-panel/releases
 RP_OBJETIVO=x86_64-unknown-linux-gnu
 #RP_MINISIGN_CLAVE=RW...
 EOF

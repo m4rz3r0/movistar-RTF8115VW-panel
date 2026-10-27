@@ -64,7 +64,9 @@ only to say which router the panel works with.
 
 - It contains no code, firmware or pages from the router. The panel talks to
   each user's own router web interface, on their own network, as a browser
-  does.
+  does. The tests use a minimal extract of the firewall list
+  (`crates/hgu/fixtures/paginas/`): only the two data variables the panel
+  reads, with made-up values, without the page's HTML or JavaScript.
 - It publishes no third-party credentials: the panel uses the ones each user
   types for their router and stores them encrypted in their own installation.
   Nor does it publish default values that would let anyone into other people's
