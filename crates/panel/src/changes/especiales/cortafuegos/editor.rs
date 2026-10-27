@@ -91,7 +91,9 @@ fn filtro_reescribible(actual: &Valores, fid: &str) -> Result<(), CambioError> {
     })
 }
 
-/// La regla `rid` y su filtro.
+/// La regla `rid` y su filtro, buscada en todos los filtros (como los RID
+/// del alta); el cambio y la baja comprueban después que está en el filtro
+/// (`belong`) que la petición esperaba.
 fn buscar_regla<'a>(filtros: &'a [Filtro], rid: &str) -> Option<(&'a Filtro, &'a Regla)> {
     filtros
         .iter()
@@ -148,7 +150,9 @@ fn invalida(e: cf::CampoMal) -> CambioError {
 }
 
 /// ¿Sigue igual en el router lo que la página enseñaba (`identidad`)? Si
-/// no, `InstanciaCambiada` sin escribir.
+/// no, `InstanciaCambiada` sin escribir. Una identidad vacía no compara
+/// nada: es la del deshacer de un cambio (`plan::inversa`), que vuelve a
+/// escribir lo leído antes; la página siempre manda la suya.
 fn misma_identidad(
     identidad: &BTreeMap<String, String>,
     actual: &Valores,
