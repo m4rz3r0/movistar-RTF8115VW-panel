@@ -1,4 +1,4 @@
-//! La regla «sin ping» del cortafuegos en el gestor: la exención del bloqueo, las guardas, el plan, la baja y la comprobación.
+//! El cortafuegos en el gestor: la regla «sin ping» (la exención del bloqueo, las guardas, el plan, la baja y la comprobación) y la puerta del editor completo ([`editor`]).
 //!
 //! Las funciones del cortafuegos están bloqueadas en el catálogo (la
 //! Biblioteca no las escribe: `escribible` comprueba solo el nombre). El
@@ -17,10 +17,17 @@
 //!   `scbidirectionalflt.cmd?action=remove` con `item=<FID>|<RID>` y
 //!   `escape=true`: nunca un FID suelto, que borraría el filtro entero.
 //!
-//! `modify` y las aperturas IPv6 (`scbidirectionalfwl`) no se eximen nunca.
+//! El editor completo de reglas y filtros ([`editor`]) va por sus
+//! funciones del catálogo (`add.regla`, `modify`, `add.filtro`,
+//! `modify.filtro` y `remove.filtro`), que se eximen solo con la forma de
+//! la web ([`editor::exento`]); la lista blanca (`comprobada`) las sigue
+//! frenando fuera de las pruebas. Las aperturas IPv6
+//! (`scbidirectionalfwl`) no se eximen nunca.
 
 use super::*;
 use hgu::cortafuegos::{self as cf, ALTA, BAJA, Filtro};
+
+mod editor;
 
 /// Motivo de `InstanciaCambiada` cuando la regla «sin ping» ya está en el
 /// router. Es la clave i18n del texto (dice «ya puesta»).
@@ -58,11 +65,12 @@ fn es_numero(s: &str) -> bool {
 }
 
 /// ¿Se escribe `req` aunque su función esté bloqueada? Solo el alta de la
-/// regla «sin ping» con su carga exacta o la baja de una regla por su RID
-/// (ver el módulo).
+/// regla «sin ping» con su carga exacta o la baja de una regla por su RID,
+/// y las peticiones del editor completo con la forma de la web (ver el
+/// módulo).
 pub(crate) fn exento_de_bloqueo(req: &ChangeRequest) -> bool {
     if req.funcion != ALTA {
-        return false;
+        return editor::exento(req);
     }
     match (req.borrar, req.instancia.as_deref()) {
         (false, None) => es_carga_sin_ping(&req.valores),
@@ -85,6 +93,18 @@ pub(in crate::changes) fn baja(
         BAJA,
         vec![
             ("item".to_owned(), cf::item(fid, rid)),
+            ("escape".to_owned(), "true".to_owned()),
+        ],
+    )
+}
+
+/// Función y parámetros de la baja del filtro `fid`, que tiene que estar
+/// vacío (lo comprueba el plan): `item=<FID>` sin regla y `escape=true`.
+pub(in crate::changes) fn baja_de_filtro(fid: &str) -> (&'static str, Vec<(String, String)>) {
+    (
+        BAJA,
+        vec![
+            ("item".to_owned(), fid.to_owned()),
             ("escape".to_owned(), "true".to_owned()),
         ],
     )
@@ -249,12 +269,16 @@ impl ChangeManager {
         self.filtros_e_internet().await.map(|(_, f)| f)
     }
 
-    /// Plan del alta o de la baja de la regla «sin ping» (ver el módulo).
+    /// Plan del alta o de la baja de la regla «sin ping» o, con otra
+    /// función, de una petición del editor completo (ver el módulo).
     pub(in crate::changes) async fn planificar_cortafuegos(
         &self,
         f: &Funcion,
         req: &ChangeRequest,
     ) -> Result<Plan, CambioError> {
+        if req.funcion != ALTA {
+            return self.planificar_editor(f, req).await;
+        }
         if !exento_de_bloqueo(req) {
             return Err(CambioError::Invalida(format!(
                 "{}: solo la regla «sin ping» del panel",
@@ -333,6 +357,9 @@ impl ChangeManager {
         plan: &Plan,
         lado: Lado,
     ) -> Comprobacion {
+        if plan.funcion.name != ALTA {
+            return self.comprobar_editor(plan, lado).await;
+        }
         let filtros = match self.filtros().await {
             Ok(f) => f,
             Err(e) => return Comprobacion::SinLectura(e.to_string()),

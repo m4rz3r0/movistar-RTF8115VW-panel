@@ -412,8 +412,8 @@ fn tecnico(a: &Ajuste) -> DetallesTecnicos {
                 .map(|ad| (c.id.clone(), ad.parametro.clone())),
         );
     }
-    // Los usuarios del router y la regla del cortafuegos escriben con su
-    // componente, no por campos.
+    // Los usuarios del router y el cortafuegos (la regla «sin ping» y el
+    // editor de filtros y reglas) escriben con su componente, no por campos.
     if a.componente == Some(Componente::UsuariosRouter) {
         escrituras = [
             hgu::fmt::ALTA_USUARIO,
@@ -424,9 +424,18 @@ fn tecnico(a: &Ajuste) -> DetallesTecnicos {
         .to_vec();
     }
     if a.componente == Some(Componente::Cortafuegos) {
-        escrituras = [hgu::cortafuegos::ALTA, hgu::cortafuegos::BAJA]
-            .map(String::from)
-            .to_vec();
+        use hgu::cortafuegos as cf;
+        escrituras = [
+            cf::ALTA,
+            cf::BAJA,
+            cf::ALTA_REGLA,
+            cf::MODIFICAR,
+            cf::ALTA_FILTRO,
+            cf::MODIFICAR_FILTRO,
+            cf::BAJA_FILTRO,
+        ]
+        .map(String::from)
+        .to_vec();
     }
     DetallesTecnicos {
         lectura,

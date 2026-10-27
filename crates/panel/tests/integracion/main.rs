@@ -23,6 +23,7 @@ mod contrasena_router;
 mod contrasena_router_plazo;
 mod contraste;
 mod cortafuegos;
+mod cortafuegos_editor;
 mod dmz;
 mod estado;
 mod estaticos;

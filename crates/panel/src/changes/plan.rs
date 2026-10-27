@@ -560,13 +560,24 @@ pub(super) fn inversa(plan: &Plan) -> Option<ChangeRequest> {
     // como `cbDeleteUser` (de la Biblioteca); la contraseña la pone quien
     // lo deshace (`especiales::con_contrasena_nueva`).
     // Igual la regla del cortafuegos, cuya baja se anota con la función
-    // que se envía (la de quitar).
+    // que se envía (la de quitar): la «sin ping» vuelve con su alta, una
+    // regla del editor con la suya y un filtro, con el alta de filtros.
     let funcion = match (plan.operacion, &plan.lectura) {
         (Operacion::Borrar, Lectura::Usuarios) => hgu::fmt::ALTA_USUARIO.to_owned(),
-        (Operacion::Borrar, Lectura::Cortafuegos) => hgu::cortafuegos::ALTA.to_owned(),
+        (Operacion::Borrar, Lectura::Cortafuegos) => {
+            use hgu::cortafuegos as cf;
+            if cf::es_de_filtro(&f.name) {
+                cf::ALTA_FILTRO.to_owned()
+            } else if f.name == cf::ALTA_REGLA {
+                cf::ALTA_REGLA.to_owned()
+            } else {
+                cf::ALTA.to_owned()
+            }
+        }
         _ => f.name.clone(),
     };
-    // La baja de la regla «sin ping» va atada al filtro donde se creó.
+    // La baja de una regla del cortafuegos va atada al filtro donde se creó
+    // (un filtro no tiene `belong`: sin identidad).
     let identidad = match (plan.operacion, &plan.lectura) {
         (Operacion::Crear, Lectura::Cortafuegos) => {
             let belong = super::especiales::BELONG_CORTAFUEGOS;

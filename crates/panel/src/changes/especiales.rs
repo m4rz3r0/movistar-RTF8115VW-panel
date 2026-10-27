@@ -19,8 +19,8 @@
 //! `^\w{4,20}$` y sin repetir, la contraseña de 8 a 16 caracteres y, al
 //! borrar, un nombre sin «:» ni caracteres de control.
 //!
-//! La regla «sin ping» del cortafuegos tiene su propio módulo
-//! ([`cortafuegos`]).
+//! El cortafuegos (la regla «sin ping» y el editor completo de reglas y
+//! filtros) tiene su propio módulo ([`cortafuegos`]).
 
 use super::*;
 use crate::validacion_real::Funcion3;
@@ -50,9 +50,12 @@ const SISTEMA: &str = "system";
 pub(super) enum Especial {
     /// Alta y baja de usuarios de la web del router.
     Usuarios,
-    /// La regla «sin ping» del cortafuegos (alta y su baja), con el RID como
-    /// id.
+    /// Las reglas del cortafuegos: la «sin ping» (alta y su baja) y las del
+    /// editor completo (alta, edición y baja), con el RID como id.
     Cortafuegos,
+    /// Los filtros del cortafuegos del editor completo (alta, edición y
+    /// baja de uno vacío), con el FID como id.
+    FiltroCortafuegos,
 }
 
 /// ¿Es `funcion` una de las de usuarios del router ([`Especial::Usuarios`])?
@@ -66,7 +69,11 @@ impl Especial {
     pub(super) fn de(f: &Funcion) -> Option<Especial> {
         match f.name.as_str() {
             n if es_de_usuarios(n) => Some(Especial::Usuarios),
-            hgu::cortafuegos::ALTA | hgu::cortafuegos::BAJA => Some(Especial::Cortafuegos),
+            hgu::cortafuegos::ALTA
+            | hgu::cortafuegos::BAJA
+            | hgu::cortafuegos::ALTA_REGLA
+            | hgu::cortafuegos::MODIFICAR => Some(Especial::Cortafuegos),
+            n if hgu::cortafuegos::es_de_filtro(n) => Some(Especial::FiltroCortafuegos),
             _ => None,
         }
     }
@@ -75,7 +82,7 @@ impl Especial {
     pub(super) fn lectura(self) -> Lectura {
         match self {
             Especial::Usuarios => Lectura::Usuarios,
-            Especial::Cortafuegos => Lectura::Cortafuegos,
+            Especial::Cortafuegos | Especial::FiltroCortafuegos => Lectura::Cortafuegos,
         }
     }
 
@@ -84,11 +91,13 @@ impl Especial {
         match self {
             Especial::Usuarios => "rqUser",
             Especial::Cortafuegos => "RID",
+            Especial::FiltroCortafuegos => "FID",
         }
     }
 
     /// Función y parámetros que borran la instancia `id` (con los valores
-    /// del plan, `valores`: el filtro de una regla del cortafuegos).
+    /// del plan, `valores`: el filtro de una regla del cortafuegos; un
+    /// filtro, por su FID).
     pub(super) fn baja(
         self,
         id: &str,
@@ -100,6 +109,7 @@ impl Especial {
                 vec![("rqDelList".to_owned(), lista_de_baja(&[id]))],
             ),
             Especial::Cortafuegos => cortafuegos::baja(id, valores),
+            Especial::FiltroCortafuegos => cortafuegos::baja_de_filtro(id),
         }
     }
 }
@@ -188,7 +198,9 @@ pub(super) fn sin_texto_del_router(e: hgu::Error) -> hgu::Error {
 pub(super) fn instancia_en_registro(plan: &Plan) -> &str {
     match Especial::de(&plan.funcion) {
         Some(Especial::Usuarios) => MASCARA,
-        Some(Especial::Cortafuegos) | None => plan.instancia.as_deref().unwrap_or("-"),
+        Some(Especial::Cortafuegos | Especial::FiltroCortafuegos) | None => {
+            plan.instancia.as_deref().unwrap_or("-")
+        }
     }
 }
 
@@ -214,11 +226,15 @@ impl ChangeManager {
     ) -> Result<Plan, CambioError> {
         // El interruptor de la validación real vale aquí, venga de donde
         // venga la petición (tarjeta, Biblioteca o fabricada). El deshacer y
-        // la reversión (`explicito`) siguen: vuelven a lo que ya había.
+        // la reversión (`explicito`) siguen: vuelven a lo que ya había. El
+        // editor completo del cortafuegos no tiene interruptor: lo frena la
+        // lista blanca del catálogo.
         let interruptor = match e {
             Especial::Usuarios => Some(Funcion3::Usuarios),
-            Especial::Cortafuegos if !req.borrar => Some(Funcion3::SinPing),
-            Especial::Cortafuegos => None,
+            Especial::Cortafuegos if req.funcion == hgu::cortafuegos::ALTA && !req.borrar => {
+                Some(Funcion3::SinPing)
+            }
+            Especial::Cortafuegos | Especial::FiltroCortafuegos => None,
         };
         if let Some(m) = interruptor
             .filter(|_| !explicito)
@@ -226,7 +242,7 @@ impl ChangeManager {
         {
             return Err(CambioError::Bloqueada(m.into()));
         }
-        if e == Especial::Cortafuegos {
+        if matches!(e, Especial::Cortafuegos | Especial::FiltroCortafuegos) {
             return self.planificar_cortafuegos(f, req).await;
         }
         for k in req.valores.keys() {
@@ -381,9 +397,18 @@ impl ChangeManager {
 
 /// La función que de verdad se envía con `plan`, la que se anota: la baja
 /// de una instancia especial es otra escritura (`cbDeleteUser`, o la baja
-/// de la regla del cortafuegos; ver [`Especial::baja`]).
+/// de la regla «sin ping» del cortafuegos; ver [`Especial::baja`]). Las
+/// del editor completo del cortafuegos se anotan con su nombre del
+/// catálogo (`add.regla`, `modify.filtro`…): varias comparten la misma
+/// escritura y el deshacer necesita saber cuál fue; lo enviado queda en la
+/// solicitud del paso.
 pub(super) fn funcion_enviada(plan: &Plan) -> &str {
     match Especial::de(&plan.funcion) {
+        Some(Especial::Cortafuegos | Especial::FiltroCortafuegos)
+            if plan.funcion.name != hgu::cortafuegos::ALTA =>
+        {
+            plan.funcion.name.as_str()
+        }
         Some(e) if plan.operacion == Operacion::Borrar => {
             e.baja(plan.instancia.as_deref().unwrap_or_default(), &plan.valores)
                 .0

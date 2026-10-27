@@ -1,17 +1,19 @@
-//! Cortafuegos en el detalle de su elemento: las reglas en una tabla y «No responder al ping desde internet» ([`Cortafuegos`]).
+//! Cortafuegos en el detalle de su elemento: el editor de filtros y reglas ([`editor::Editor`]) y «No responder al ping desde internet» ([`Cortafuegos`]).
 //!
-//! Las reglas solo se consultan. La acción propia del elemento prepara la
-//! regla del panel y la abre en el diálogo de revisión; se deshace desde el
-//! aviso del cambio o el Historial. Si no está disponible (el cortafuegos
-//! sin leer, la regla ya puesta o el panel en solo lectura), el botón sale
-//! desactivado con el motivo. Si el servidor tiene la función desactivada
-//! en este router ([`crate::validacion_real`]), no sale: solo las reglas y
-//! una nota de una línea con el motivo. Va dentro del formulario del
-//! detalle: botón `type="button"`.
+//! El editor enseña los filtros con sus reglas en orden y prepara cada
+//! alta, cambio o baja en el diálogo de revisión; mientras lee (o si no
+//! puede), queda la tabla de reglas de siempre. La acción propia del
+//! elemento prepara la regla del panel «sin ping» y la abre en el mismo
+//! diálogo; se deshace desde el aviso del cambio o el Historial. Si no está
+//! disponible (el cortafuegos sin leer, la regla ya puesta o el panel en
+//! solo lectura), el botón sale desactivado con el motivo. Si el servidor
+//! tiene «sin ping» desactivada en este router
+//! ([`crate::validacion_real`]), no sale: solo el editor y una nota de una
+//! línea con el motivo. Va dentro del formulario del detalle: botones
+//! `type="button"`.
 
 use super::ID_SOLO_LECTURA;
 use super::aviso::Seguimiento;
-use super::consulta;
 use super::rejilla::Pagina;
 use crate::ajustes_router::{AccionPropia, AjusteVista, preparar_sin_ping};
 use crate::t;
@@ -19,6 +21,8 @@ use crate::ui::explorador::texto_error;
 use crate::ui::i18n::traducir;
 use crate::validacion_real::{Desactivadas, Funcion3};
 use leptos::{prelude::*, task::spawn_local};
+
+mod editor;
 
 /// Componente del ajuste de las reglas.
 pub(crate) const CORTAFUEGOS: &str = "cortafuegos";
@@ -42,9 +46,14 @@ pub(crate) fn Cortafuegos(
     elemento: String,
     desactivadas: Desactivadas,
 ) -> impl IntoView {
+    let reglas = view! {
+        <div class="cortafuegos-reglas">
+            <editor::Editor a=a elemento=elemento.clone() />
+        </div>
+    };
     if let Some(m) = desactivadas.motivo(Funcion3::SinPing) {
         return view! {
-            <div class="cortafuegos-reglas">{consulta::lista(&a)}</div>
+            {reglas}
             <p class="nota">{traducir(m, None)}</p>
         }
         .into_any();
@@ -79,7 +88,7 @@ pub(crate) fn Cortafuegos(
         });
     };
     view! {
-        <div class="cortafuegos-reglas">{consulta::lista(&a)}</div>
+        {reglas}
         <section class="formulario cortafuegos-sin-ping" aria-labelledby="cortafuegos-sin-ping-titulo">
             <h4 id="cortafuegos-sin-ping-titulo">{t!("ajuste-seguridad-cortafuegos-sin-ping")}</h4>
             <p class="ayuda">{t!("ajuste-seguridad-cortafuegos-sin-ping-ayuda")}</p>

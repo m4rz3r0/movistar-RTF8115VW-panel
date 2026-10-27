@@ -205,3 +205,24 @@ fn coincide_con_direcciones_escritas_de_otra_forma() {
     let c = v(&[("srcaddr", "2001:db8::2"), ("enabled", "1")]);
     assert!(!coincide(&a, &c, &["srcaddr"]));
 }
+
+/// Las reglas y los filtros de la página se pueden volver a escribir igual;
+/// una regla con el protocolo 0 («todos», que el editor no ofrece) o un
+/// filtro con un nombre que la web no deja poner, no.
+#[test]
+fn reescribible_solo_lo_que_el_editor_sabe_escribir() {
+    let mut f = super::super::analizar(include_str!(
+        "../../../fixtures/paginas/scbidirectionalflt_ls.asp"
+    ))
+    .unwrap();
+    assert!(f.iter().all(filtro_reescribible));
+    assert!(
+        f.iter()
+            .all(|x| x.reglas.iter().all(|r| regla_reescribible(x, r)))
+    );
+    let mut todos = f[0].reglas[0].clone();
+    todos.protocol = "0".into();
+    assert!(!regla_reescribible(&f[0], &todos));
+    f[0].name = "un nombre larguísimo de más".into();
+    assert!(!filtro_reescribible(&f[0]));
+}

@@ -264,8 +264,9 @@ impl ChangeManager {
         let f = &plan.funcion;
         let pagina = f.pagina.as_deref().unwrap_or_default();
         // Borrar una instancia especial es otra escritura (un usuario:
-        // `cbDeleteUser` con su nombre; la regla del cortafuegos, la baja
-        // de la UI básica con `item=<FID>|<RID>`, desde su lista).
+        // `cbDeleteUser` con su nombre; una regla del cortafuegos, la baja
+        // de la UI básica con `item=<FID>|<RID>`, y un filtro vacío, con
+        // `item=<FID>`, desde su lista).
         if plan.operacion == Operacion::Borrar
             && let Some(e) = Especial::de(f)
         {
@@ -277,7 +278,7 @@ impl ChangeManager {
                 .collect();
             let c = &self.state.hgu;
             return match e {
-                Especial::Cortafuegos => c
+                Especial::Cortafuegos | Especial::FiltroCortafuegos => c
                     .basic_write(hgu::cortafuegos::PAGINA_LISTA, funcion, &p)
                     .await
                     .map(drop),

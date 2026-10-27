@@ -3,7 +3,7 @@
 
 mod acciones;
 mod acciones_lista;
-mod cortafuegos;
+pub(crate) mod cortafuegos;
 mod derivados;
 mod dns_propios;
 mod foto;

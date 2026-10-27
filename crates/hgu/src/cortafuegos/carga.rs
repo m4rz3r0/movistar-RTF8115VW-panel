@@ -502,6 +502,20 @@ pub fn carga_filtro(v: &Valores, id: Option<&str>) -> Vec<(&'static str, String)
     out
 }
 
+/// ¿Se puede volver a escribir `r` del filtro `f` tal como está, con las
+/// cargas de la web? No con lo que el editor no ofrece (el protocolo 0,
+/// «todos», de algunas reglas del operador) o un campo que no encaja: un
+/// deshacer no podría dejarla igual.
+pub fn regla_reescribible(f: &Filtro, r: &Regla) -> bool {
+    normalizar_regla(&vista_regla(f, r), &f.version).is_ok()
+}
+
+/// ¿Se puede volver a escribir el filtro `f` tal como está (su nombre,
+/// interfaz y demás valen para la web)?
+pub fn filtro_reescribible(f: &Filtro) -> bool {
+    normalizar_filtro(&vista_filtro(f)).is_ok()
+}
+
 /// ¿Coincide `leido` (forma de formulario) con `esperado` en los campos
 /// `campos`? Las direcciones IP se comparan como direcciones (el router
 /// puede escribirlas de otra forma); lo demás, sin espacios ni mayúsculas.

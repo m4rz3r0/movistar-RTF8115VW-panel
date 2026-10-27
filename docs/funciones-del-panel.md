@@ -320,3 +320,34 @@ que el registro está en `/syslog.log` y se sirve con la sesión del panel
 `/syslog.log` antes de la primera exportación. El simulador supone que el
 fichero no existe (404) hasta la primera exportación desde el arranque y
 que después se sirve hasta el siguiente reinicio.
+
+## Cortafuegos: editor de filtros y reglas
+
+En Ajustes → Seguridad, el detalle del cortafuegos enseña los filtros con
+sus reglas en el orden en que el router las mira (sentido, direcciones,
+interfaz y qué hace por defecto cada filtro) y permite, como el editor de
+la web oculta (`scbidirectionalflt_ed.asp`):
+
+- **Reglas:** añadir una al final de un filtro, cambiarla entera o
+  borrarla. La carga es la de la web: el alta lleva `escape=true`; lo que
+  la web deshabilita no viaja (el tipo de rechazo solo con «rechazar», el
+  tipo ICMP solo con ICMP, los puertos solo con TCP o UDP, la máscara solo
+  con dirección). La baja es `item=<FID>|<RID>`, nunca un FID suelto.
+- **Filtros:** añadir uno vacío, cambiarlo (con reglas no cambia de
+  versión de IP) o borrarlo, solo si está vacío: `item=<FID>` borraría
+  también sus reglas y el deshacer no podría devolverlas.
+
+Cada cambio va por la cola: diálogo de revisión, relectura de la lista de
+filtros para comprobarlo, vigilancia (puede cortar el acceso) y deshacer
+desde el aviso o el Historial. Antes de escribir, lo que enseñaba la página
+tiene que seguir igual en el router; si no, no se toca. Solo se cambian o
+borran las reglas y los filtros que el panel sabe volver a escribir igual
+(una regla del operador con el protocolo «todos», que el editor no ofrece,
+se ve pero no se toca). Deshacer el borrado de una regla la vuelve a crear
+con sus valores al final de su filtro, como la web.
+
+Las funciones del catálogo (`add.regla`, `modify`, `add.filtro`,
+`modify.filtro`, `remove.filtro`) no están comprobadas en el router real:
+en la 1.0 el editor se ve con los botones desactivados y el motivo, y el
+servidor no las escribe. «No responder al ping» sigue con su carga
+comprobada, sin `escape`.

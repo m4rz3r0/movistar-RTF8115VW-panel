@@ -6,6 +6,8 @@
 //! calcula, con la lectura de la página, si el router responde al ping, la
 //! recomendación (solo informa) y si la acción está disponible.
 
+pub(crate) mod editor;
+
 use super::derivados::Contexto;
 use super::*;
 use crate::ajustes_router::{AccionPropia, CambioLegible, PasoVista, RecomendacionVista};
@@ -287,7 +289,8 @@ pub(super) fn del_elemento(
 }
 
 /// Resumen de un cambio de la regla «sin ping» (también el de su
-/// deshacer): un paso que la pone o la quita. Quitarla no es «borrar» algo
+/// deshacer): un paso que la pone o la quita. Los del editor completo
+/// tienen el suyo ([`editor::vista`]). Quitarla no es «borrar» algo
 /// de la página (`borra`, que cerraría el detalle del elemento): es volver
 /// a como estaba.
 pub(crate) fn vista(
@@ -296,6 +299,10 @@ pub(crate) fn vista(
     pasos: &[PasoPreparado],
     (r, vigila): (Riesgo, bool),
 ) -> GrupoVista {
+    // Lo que no es la regla «sin ping» es del editor completo.
+    if pasos.iter().any(|p| p.funcion != ALTA) {
+        return editor::vista(g, token, pasos, (r, vigila));
+    }
     GrupoVista {
         token,
         titulo: TITULO.into(),
