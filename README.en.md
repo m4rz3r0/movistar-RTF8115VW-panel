@@ -104,6 +104,13 @@ are masked, with an eye to reveal them; everything else is shown in clear.
 Whatever is not in Settings is changed from the Library, also with
 watching.
 
+Besides the settings, **System** reads, filters and downloads the router's
+log (and turns it on if it is off) and downloads a copy of its
+configuration, with a warning that it holds its passwords; **Security**
+has the full firewall, with its filters and rules; and **Ports** has the
+protocol helpers (ALG), NAT loopback (reaching your services by your
+domain from home) and the DMZ, which is only shown.
+
 The panel only writes what has been checked on the real router (an
 allowlist in the function catalogue; see
 [funciones-del-panel.md](docs/funciones-del-panel.md), in Spanish). The rest
@@ -169,7 +176,8 @@ Spanish):
   with the panel and an example Caddy proxy.
 - **FreeBSD jails** ([`deploy/freebsd-jail/`](deploy/freebsd-jail/README.md)):
   builds from source (there are no FreeBSD releases) in a separate jail and
-  updates itself with each tag.
+  updates itself with each tag. Optionally, another computer on your
+  network builds it for FreeBSD and the server only installs it.
 
 The first time, you finish in the browser with the installation wizard;
 day-to-day operation (users, backups, logs, updating) is in

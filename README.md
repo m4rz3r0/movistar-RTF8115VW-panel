@@ -106,6 +106,13 @@ a cualquier ajuste. Las contraseñas van censuradas, con un ojo para verlas;
 lo demás, en claro. Lo que no está en Ajustes se cambia desde la
 Biblioteca, con la misma vigilancia.
 
+Además de los ajustes, en **Sistema** se lee, se filtra y se descarga el
+registro del router (y se enciende, si lo tiene apagado) y se descarga una
+copia de su configuración, con el aviso de que lleva sus contraseñas; en
+**Seguridad**, el cortafuegos completo, con sus filtros y sus reglas; y en
+**Puertos**, los ayudantes de protocolos (ALG), el NAT loopback (entrar a
+tus servicios por tu dominio desde casa) y la DMZ, que solo se ve.
+
 El panel solo escribe lo que se ha comprobado en el router real (una lista
 blanca en el catálogo de funciones; ver
 [funciones-del-panel.md](docs/funciones-del-panel.md)). Lo demás se ve, con
@@ -169,7 +176,8 @@ Tres vías, cada una con su guía ([`deploy/README.md`](deploy/README.md)):
   con el panel y un proxy Caddy de ejemplo.
 - **Jails de FreeBSD** ([`deploy/freebsd-jail/`](deploy/freebsd-jail/README.md)):
   compila desde el código (no hay releases para FreeBSD) en una jail aparte y
-  se actualiza solo con cada etiqueta.
+  se actualiza solo con cada etiqueta. Si quieres, otro equipo de tu red la
+  compila para FreeBSD y el servidor solo la instala.
 
 La primera vez se termina en el navegador con el asistente de instalación; el
 día a día (usuarios, copias de seguridad, registros, actualizar) está en
