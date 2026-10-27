@@ -115,11 +115,12 @@ mod server {
     /// router (una petición propia competiría con la sesión del panel):
     /// `router` dice cómo acabó la última comunicación real con él
     /// ([`crate::salud::router_en_salud`]). `ok` es siempre `true`: el panel funciona.
+    /// Sin la versión: responde a cualquiera, y la versión diría qué arreglos
+    /// le faltan al panel.
     async fn salud(State(state): State<AppState>) -> Json<Value> {
         let router = crate::salud::router_en_salud(&state.hgu);
         Json(json!({
             "ok": true,
-            "version": env!("CARGO_PKG_VERSION"),
             "router": router,
         }))
     }

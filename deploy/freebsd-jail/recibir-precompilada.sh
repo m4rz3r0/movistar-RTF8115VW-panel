@@ -23,10 +23,18 @@ set -u
 set -f
 umask 027
 
-LIB=${RP_BUZON_LIB:-/usr/local/libexec/routerpanel-actualizar/precompiladas.sh}
-BUZON=${RP_BUZON:-/var/db/routerpanel-buzon/entrada}
+LIB=/usr/local/libexec/routerpanel-actualizar/precompiladas.sh
+BUZON=/var/db/routerpanel-buzon/entrada
 # 300 MB: el archivo pesa unas decenas.
-MAXIMO=${RP_BUZON_MAXIMO:-314572800}
+MAXIMO=314572800
+# Las variables RP_BUZON* solo valen fuera de SSH (pruebas, o a mano): por SSH
+# las rutas son fijas, aunque un AcceptEnv permisivo en sshd_config dejara al
+# cliente ponerlas y cargar otro script.
+if [ -z "${SSH_CONNECTION:-}" ]; then
+	LIB=${RP_BUZON_LIB:-$LIB}
+	BUZON=${RP_BUZON:-$BUZON}
+	MAXIMO=${RP_BUZON_MAXIMO:-$MAXIMO}
+fi
 CONSERVAR=3
 
 error()

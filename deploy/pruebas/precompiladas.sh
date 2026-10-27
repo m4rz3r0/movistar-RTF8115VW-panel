@@ -263,6 +263,13 @@ if printf '' | recibir "recibir v2.0.0 SHA256SUMS"; then fallo "el receptor acep
 if head -c 2000 /dev/zero | recibir "recibir v2.0.0 SHA256SUMS"; then
 	fallo "el receptor acepta un fichero de más de RP_BUZON_MAXIMO"
 fi
+# Por SSH de verdad (SSH_CONNECTION) no valen las rutas de las variables: con
+# un AcceptEnv permisivo en sshd_config, el cliente podría cargar otro script.
+if echo x | SSH_CONNECTION="192.0.2.1 50000 192.0.2.2 22" SSH_ORIGINAL_COMMAND="recibir v4.0.0 SHA256SUMS" \
+	RP_BUZON=$R RP_BUZON_LIB=$LIB RP_BUZON_MAXIMO=1000 sh "$RECIBIR" >"$TMP/salida" 2>&1 ||
+	[ -e "$R/v4.0.0/SHA256SUMS" ]; then
+	fallo "el receptor usa RP_BUZON/RP_BUZON_LIB por SSH: $(cat "$TMP/salida")"
+fi
 [ -z "$(find "$R" -name '.*' -type f)" ] || fallo "el receptor deja temporales"
 [ ! -e "$R/v2.0.0/SHA256SUMS" ] || fallo "el receptor guarda un fichero rechazado"
 [ ! -e "$R/x" ] && [ ! -e "$TMP/x" ] || fallo "el receptor escribe fuera de su versión"

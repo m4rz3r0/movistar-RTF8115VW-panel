@@ -256,16 +256,20 @@ pub(crate) mod servidor {
         let mut bytes = [0u8; 32];
         getrandom::fill(&mut bytes).expect("generador aleatorio del sistema");
         let token = URL_SAFE_NO_PAD.encode(bytes);
-        if let Err(e) = escribir_fichero(&fichero, &token) {
-            tracing::warn!(
-                "no se puede escribir el token de instalación en {}: {e}",
+        // El token va al fichero (600) y no al registro, que en Docker o
+        // journald lee más gente. Solo si el fichero no se puede escribir
+        // sale en el registro: sin él no habría forma de instalar.
+        match escribir_fichero(&fichero, &token) {
+            Ok(()) => tracing::info!(
+                "panel sin usuarios: abre /instalar; el token de instalación está en {}",
                 fichero.display()
-            );
+            ),
+            Err(e) => tracing::warn!(
+                "panel sin usuarios: abre /instalar; no se puede escribir el token de \
+                 instalación en {} ({e}); token: {token}",
+                fichero.display()
+            ),
         }
-        tracing::info!(
-            "panel sin usuarios: abre /instalar; token de instalación: {token} (también en {})",
-            fichero.display()
-        );
         let mut fase = state.instalacion.fase.lock().await;
         fase.token = Some(token.clone());
         fase.en_curso = true;
@@ -432,13 +436,13 @@ pub(crate) mod servidor {
         Ok(())
     }
 
-    /// URL base del router: `http(s)://anfitrión[:puerto]`, sin ruta ni
-    /// consulta, sin la barra final.
+    /// URL base del router: `http://anfitrión[:puerto]`, sin ruta ni
+    /// consulta, sin la barra final. Solo `http`: el router no sirve HTTPS y
+    /// el cliente se compila sin TLS, así que `https` fallaría después con un
+    /// error confuso.
     pub(crate) fn validar_url(url: &str) -> Option<String> {
         let url = url.trim().trim_end_matches('/');
-        let resto = url
-            .strip_prefix("http://")
-            .or_else(|| url.strip_prefix("https://"))?;
+        let resto = url.strip_prefix("http://")?;
         let valido = !resto.is_empty()
             && resto
                 .chars()
@@ -759,11 +763,12 @@ pub(crate) mod servidor {
                 Some("http://192.168.1.1")
             );
             assert_eq!(
-                validar_url("https://router.home.arpa:8443").as_deref(),
-                Some("https://router.home.arpa:8443")
+                validar_url("http://router.home.arpa:8080").as_deref(),
+                Some("http://router.home.arpa:8080")
             );
             for mala in [
                 "",
+                "https://router.home.arpa:8443",
                 "192.168.1.1",
                 "ftp://x",
                 "http://",

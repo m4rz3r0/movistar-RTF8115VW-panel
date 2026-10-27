@@ -81,7 +81,8 @@ async fn salud_ok() {
     assert_eq!(resp.status(), StatusCode::OK);
     assert_eq!(
         json(resp).await,
-        serde_json::json!({"ok": true, "version": env!("CARGO_PKG_VERSION"), "router": "ok"})
+        // Sin la versión: /salud no pide sesión y no debe decir qué parches faltan.
+        serde_json::json!({"ok": true, "router": "ok"})
     );
 }
 
@@ -118,6 +119,7 @@ fn assert_cabeceras_fijas(resp: &Response<Body>, uri: &str) {
     assert_eq!(h["referrer-policy"], "same-origin", "{uri}");
     assert_eq!(h["x-content-type-options"], "nosniff", "{uri}");
     assert_eq!(h["x-frame-options"], "DENY", "{uri}");
+    assert_eq!(h["strict-transport-security"], "max-age=31536000", "{uri}");
 }
 
 #[tokio::test]

@@ -52,10 +52,9 @@ Para compilarlo tú (`cargo leptos build --release`), lo que se instala es
 ### Primer arranque: el asistente
 
 Sin usuarios, el panel solo sirve `/instalar` y pide un token de un solo uso
-que genera al arrancar. Está en el registro y en un fichero:
+que genera al arrancar. Está en un fichero (el registro solo dice dónde):
 
 ```sh
-journalctl -u routerpanel | grep 'token de instalación'
 cat /var/lib/routerpanel/instalar.token
 ```
 

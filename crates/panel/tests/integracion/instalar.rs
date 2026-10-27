@@ -691,3 +691,21 @@ async fn url_sugerida_exige_token() {
         "{v}"
     );
 }
+
+/// El token no se escribe en el registro, que en Docker o journald lee más
+/// gente que el fichero (600): el registro solo dice dónde está.
+#[tokio::test]
+async fn el_token_no_sale_en_el_registro() {
+    let registro = crate::comun::registro_global();
+    let p = recien_instalado().await;
+    let token = std::fs::read_to_string(fichero_token(&p)).unwrap();
+    let texto = registro.texto();
+    assert!(
+        !texto.contains(token.trim()),
+        "el token sale en el registro"
+    );
+    assert!(
+        texto.contains(&fichero_token(&p).display().to_string()),
+        "el registro dice dónde está el token"
+    );
+}

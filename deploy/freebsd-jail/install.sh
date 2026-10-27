@@ -474,7 +474,7 @@ aviso_asistente()
 		_n=$((_n + 1))
 	done
 	if [ -e "$RJ$TOKEN" ]; then
-		say "panel sin usuarios: abre ${PANEL_ORIGEN%%,*}/instalar con el token de $RJ$TOKEN (doas cat …; también en el registro del panel)"
+		say "panel sin usuarios: abre ${PANEL_ORIGEN%%,*}/instalar con el token de $RJ$TOKEN (doas cat …)"
 	fi
 }
 

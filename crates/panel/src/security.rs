@@ -30,12 +30,16 @@ pub fn csp(nonce: Option<&str>) -> String {
 static CSP_SIN_NONCE: LazyLock<HeaderValue> =
     LazyLock::new(|| HeaderValue::from_str(&csp(None)).expect("CSP válida como cabecera"));
 
-const OTHER_HEADERS: [(HeaderName, &str); 3] = [
+const OTHER_HEADERS: [(HeaderName, &str); 4] = [
     // `same-origin` y no `no-referrer`: con `no-referrer` los navegadores mandan
     // `Origin: null` en los POST del propio panel.
     (header::REFERRER_POLICY, "same-origin"),
     (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
     (header::X_FRAME_OPTIONS, "DENY"),
+    // Los navegadores solo la hacen caso si llega por HTTPS (la del proxy):
+    // por HTTP no cambia nada. Sin `includeSubDomains`, para no obligar a
+    // otros servicios del mismo dominio.
+    (header::STRICT_TRANSPORT_SECURITY, "max-age=31536000"),
 ];
 
 /// Capa que añade las cabeceras de seguridad a cada respuesta. Respeta la CSP

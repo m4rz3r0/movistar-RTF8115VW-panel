@@ -46,10 +46,10 @@ Todo lo del panel está en el volumen `datos` (`/data` en el contenedor):
 ## Primer arranque: el token del asistente
 
 Sin usuarios, el panel solo sirve `/instalar` y pide un token de un solo uso
-que genera al arrancar. Está en el registro y en `/data/instalar.token`:
+que genera al arrancar. Está en `/data/instalar.token` (el registro solo dice
+dónde, para que no lo vea quien pueda leer `docker logs`):
 
 ```sh
-docker compose -f deploy/docker/compose.yaml logs panel | grep 'token de instalación'
 docker compose -f deploy/docker/compose.yaml exec panel cat /data/instalar.token
 ```
 
