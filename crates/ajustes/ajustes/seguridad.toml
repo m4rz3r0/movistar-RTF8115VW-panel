@@ -90,8 +90,8 @@ lee = "connectionRequestPassword"
 tipo = "secreto"
 validar = { min = 1, max = 256 }
 
-# Contraseña de la web del router: la cambia su propio componente (Tarea
-# 12), fuera del gestor de cambios. Se registra con la lista de usuarios.
+# Contraseña de la web del router: la cambia su propio componente, fuera
+# del gestor de cambios. Se registra con la lista de usuarios.
 [[ajuste]]
 id = "seguridad.contrasena_router"
 tema = "seguridad"
@@ -99,7 +99,7 @@ nivel = "basico"
 componente = "contrasena_router"
 leer = { funcion = "cbGetUserList" }
 
-# Usuarios de la web del router: su componente (fase 3) crea y borra por el
+# Usuarios de la web del router: su componente crea y borra por el
 # gestor de cambios y cambia la contraseña o el grupo de otro usuario por su
 # flujo propio, con guardas: nunca el usuario con el que entra el panel ni
 # el del operador (system). El id de cada fila es su nombre. La respuesta
@@ -129,7 +129,7 @@ opciones = [
   { valor = "user", clave = "usuario" },
 ]
 
-# Cortafuegos (fase 3): las reglas de la web oculta del router, solo de
+# Cortafuegos: las reglas de la web oculta del router, solo de
 # lectura. Se leen de la página de la lista (`var filter`), una instancia
 # por regla (su id es el RID). La única escritura es la regla propia del
 # panel, «No responder al ping desde internet», con su componente y por el

@@ -1,4 +1,4 @@
-//! Usuarios de la web del router (Tarea 2 de la fase 3): crear y borrar por
+//! Usuarios de la web del router: crear y borrar por
 //! el gestor, con deshacer; cambiar la contraseña o el grupo de otro
 //! usuario por el flujo propio; y las guardas del usuario del panel y del
 //! `system` del operador, también desde la Biblioteca.

@@ -1,6 +1,6 @@
 //! Pruebas de «Ajustes del panel» (`/panel`) y «Configuración del router»
 //! (`/router/conexion`): credenciales del router, parámetros de la instancia
-//! (también los que usarán las recomendaciones de la fase 4), usuarios y
+//! (también los que usarán las recomendaciones futuras), usuarios y
 //! ventana de reautenticación.
 
 use crate::comun::{

@@ -67,7 +67,7 @@ id = "activa"
 escribe = { funcion = "cbSetNatPortMapping", parametro = "adm_state" }
 lee = "adm_state"
 tipo = "booleano"
-# Una regla nueva nace activa (decisión del controlador, Tarea 10).
+# Una regla nueva nace activa, como en la web del router.
 recomendado = "true"
 respaldo = "criterio"
 
@@ -87,8 +87,7 @@ fuentes = ["nsa-red-casa", "cisa-red-casa"]
 respaldo = "consenso"
 
 # Como natalg.asp: casillas por presencia y `set_nf_conntrack=1` fijo, que
-# el catálogo añade al escribir (comprobado en el router real, cambios 62 y
-# 63).
+# el catálogo añade al escribir (comprobado en el router real).
 [[ajuste]]
 id = "puertos.alg"
 tema = "puertos"
@@ -119,7 +118,7 @@ escribe = { funcion = "cbSetNatConfig", parametro = "h323_enable" }
 lee = "h323_enable"
 tipo = "booleano"
 
-# DMZ (fase 3), solo de lectura: el equipo que recibe todo lo que llega de
+# DMZ, solo de lectura: el equipo que recibe todo lo que llega de
 # internet sin regla. En el router real es una instancia de las
 # redirecciones con `desc=DMZ`, sin protocolo ni puertos (la crea natdmz.asp
 # al aplicar, aunque quede apagada); `dmz=1` no la lee. Activa si está
@@ -146,7 +145,7 @@ tipo = "booleano"
 solo_lectura = "ajuste-puertos-dmz-motivo"
 
 # NAT loopback (natloopback.asp): desde casa, entrar a un servicio propio
-# por la dirección pública. Comprobado en el router real (cambios 75 y 76).
+# por la dirección pública. Comprobado en el router real.
 [[ajuste]]
 id = "puertos.loopback"
 tema = "puertos"

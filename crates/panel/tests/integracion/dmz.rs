@@ -1,4 +1,4 @@
-//! DMZ de solo lectura y nota sobre el control parental en Puertos (Tarea 6 de la fase 3).
+//! DMZ de solo lectura y nota sobre el control parental en Puertos.
 //! En el router real la DMZ es una instancia más de las redirecciones, con
 //! `desc=DMZ` (la crea natdmz.asp): `puertos.dmz` se queda con ella y
 //! `puertos.reglas` la deja fuera.
@@ -137,7 +137,7 @@ async fn dmz_activa_sin_ip() {
     );
 }
 
-/// Ruling M′: marcada encendida pero con el equipo 0.0.0.0 (ninguno) no
+/// Marcada encendida pero con el equipo 0.0.0.0 (ninguno) no
 /// manda nada a ningún dispositivo: «Desactivada» y sin recomendación, para
 /// no dar una falsa alarma.
 #[tokio::test]

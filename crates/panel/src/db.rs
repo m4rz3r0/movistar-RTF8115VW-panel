@@ -20,7 +20,7 @@ pub async fn open(path: &Path) -> Result<SqlitePool, sqlx::Error> {
         .connect_with(options)
         .await?;
     // La migración 0012 (columnas `ajuste` y `cambio_id` de `reveals`) se
-    // quedó sin uso en la Tarea 11, cuando ver un secreto dejó de anotarse;
+    // quedó sin uso cuando ver un secreto dejó de anotarse;
     // no se quita porque las bases que ya la aplicaron no arrancarían sin
     // ella (y no se toca su texto: `sqlx` comprueba su suma).
     sqlx::migrate!("./migrations").run(&pool).await?;

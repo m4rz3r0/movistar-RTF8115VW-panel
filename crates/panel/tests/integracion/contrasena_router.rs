@@ -1,4 +1,4 @@
-//! Cambiar la contraseña del router (Tarea 12): el flujo propio con prueba
+//! Cambiar la contraseña del router: el flujo propio con prueba
 //! de acceso y restauración, contra el simulador. Y la tarjeta de las
 //! credenciales, que llega con la contraseña guardada (censurada con el ojo)
 //! y no la envía si no se toca.

@@ -59,13 +59,13 @@ fn sanitizes_consistently() {
     let a = s
         .sanitize(
             "<R><ssid>Casa</ssid><key_phrase>secreta1</key_phrase><mac_addr>AA:BB:CC:00:11:22</mac_addr>\
-             <ipaddr>9.9.9.9</ipaddr><gw_addr>192.168.1.5</gw_addr><pre_shared_key></pre_shared_key><desc>LAN</desc></R>",
+             <ipaddr>9.9.9.9</ipaddr><gw_addr>192.168.1.60</gw_addr><pre_shared_key></pre_shared_key><desc>LAN</desc></R>",
         )
         .unwrap();
     assert_eq!(
         a,
         "<R><ssid>RED-1</ssid><key_phrase>X-REDACTED-X</key_phrase><mac_addr>02:00:00:00:00:01</mac_addr>\
-         <ipaddr>203.0.113.1</ipaddr><gw_addr>192.168.1.5</gw_addr><pre_shared_key></pre_shared_key><desc>LAN</desc></R>"
+         <ipaddr>203.0.113.1</ipaddr><gw_addr>192.168.1.60</gw_addr><pre_shared_key></pre_shared_key><desc>LAN</desc></R>"
     );
     let b = s
         .sanitize(
@@ -171,7 +171,7 @@ fn renumera_lan_en_orden_y_conserva_router() {
     let b = n
         .neutralizar(
             "cbGetLanHostList.xml",
-            "<R><ip>192.168.1.5</ip><rango>192.168.1.77-192.168.1.255</rango></R>",
+            "<R><ip>192.168.1.97</ip><rango>192.168.1.77-192.168.1.255</rango></R>",
         )
         .unwrap();
     assert_eq!(
@@ -183,11 +183,11 @@ fn renumera_lan_en_orden_y_conserva_router() {
 #[test]
 fn renumerar_mas_de_40_equipos_es_error_sin_el_valor() {
     let mut n = Neutralizador::new();
-    let xml: String = (2..=42)
+    let xml: String = (60..=100)
         .map(|x| format!("<ip>192.168.1.{x}</ip>"))
         .collect();
     let e = n.neutralizar("cbGetArpCache.xml", &xml).unwrap_err();
-    assert!(!e.contains("192.168.1.42"), "{e}");
+    assert!(!e.contains("192.168.1.100"), "{e}");
 }
 
 #[test]
@@ -196,8 +196,8 @@ fn operador_a_10_255() {
     let out = n
         .neutralizar(
             "cbGetWanIPIntf.xml",
-            "<R><ip>10.31.0.9</ip><gw>192.168.144.1</gw><r>172.20.1.2</r>\
-             <c>100.70.0.1</c><ip2>10.31.0.9</ip2><m>255.255.224.0</m></R>",
+            "<R><ip>10.255.0.200</ip><gw>192.168.144.1</gw><r>172.16.0.1</r>\
+             <c>100.64.0.1</c><ip2>10.255.0.200</ip2><m>255.255.224.0</m></R>",
         )
         .unwrap();
     assert_eq!(
@@ -213,8 +213,8 @@ fn pool_y_reenvio_neutros() {
     let pool = n
         .neutralizar(
             "cbGetDhcpv4ServerPool__rtm_cfg_dhcpv4_svr_pool_0i=0.xml",
-            "<R><ipv4_addr_min>192.168.1.2</ipv4_addr_min><ipv4_addr_max>192.168.1.250</ipv4_addr_max>\
-             <ipv4_dns_addr_0>192.168.1.10</ipv4_dns_addr_0><ipv4_dns_addr_1>203.0.113.2</ipv4_dns_addr_1>\
+            "<R><ipv4_addr_min>192.168.1.64</ipv4_addr_min><ipv4_addr_max>192.168.1.250</ipv4_addr_max>\
+             <ipv4_dns_addr_0>192.168.1.65</ipv4_dns_addr_0><ipv4_dns_addr_1>203.0.113.2</ipv4_dns_addr_1>\
              <ipv4_dns_addr_2>0.0.0.0</ipv4_dns_addr_2><ipv4_dns_addr_3></ipv4_dns_addr_3>\
              <ipv4_gw_addr>192.168.1.1</ipv4_gw_addr></R>",
         )
@@ -229,9 +229,9 @@ fn pool_y_reenvio_neutros() {
     let nat = n
         .neutralizar(
             "cbGetNatPortMapping.xml",
-            "<R><ext_l4_port_min>1</ext_l4_port_min><ext_l4_port_min_value>2222</ext_l4_port_min_value>\
-             <ext_l4_port_max_value>2223</ext_l4_port_max_value><int_ip_addr>192.168.1.30</int_ip_addr>\
-             <int_l4_port_min_value>22</int_l4_port_min_value><int_l4_port_max_value>23</int_l4_port_max_value></R>",
+            "<R><ext_l4_port_min>1</ext_l4_port_min><ext_l4_port_min_value>8081</ext_l4_port_min_value>\
+             <ext_l4_port_max_value>8082</ext_l4_port_max_value><int_ip_addr>192.168.1.70</int_ip_addr>\
+             <int_l4_port_min_value>80</int_l4_port_min_value><int_l4_port_max_value>81</int_l4_port_max_value></R>",
         )
         .unwrap();
     assert_eq!(
@@ -257,25 +257,25 @@ fn neutralizar_es_idempotente() {
     let fixtures = [
         (
             "cbDhcpV4SvrPoolGetStatic.xml",
-            "<R><ip>192.168.1.21</ip><ip>192.168.1.77</ip></R>",
+            "<R><ip>192.168.1.90</ip><ip>192.168.1.77</ip></R>",
         ),
         (
             "cbGetArpCache.xml",
-            "<R><ip>192.168.1.11</ip><ip>192.168.1.21</ip><gw>10.1.0.1</gw></R>",
+            "<R><ip>192.168.1.91</ip><ip>192.168.1.90</ip><gw>10.255.0.200</gw></R>",
         ),
         (
             "cbGetDhcpv4ServerPool.xml",
-            "<R><ipv4_addr_min>192.168.1.2</ipv4_addr_min><ipv4_addr_max>192.168.1.250</ipv4_addr_max>\
-             <ipv4_dns_addr_0>192.168.1.10</ipv4_dns_addr_0></R>",
+            "<R><ipv4_addr_min>192.168.1.64</ipv4_addr_min><ipv4_addr_max>192.168.1.250</ipv4_addr_max>\
+             <ipv4_dns_addr_0>192.168.1.65</ipv4_dns_addr_0></R>",
         ),
         (
             "cbGetNatPortMapping.xml",
-            "<R><int_ip_addr>192.168.1.30</int_ip_addr><ext_l4_port_min_value>2222</ext_l4_port_min_value></R>",
+            "<R><int_ip_addr>192.168.1.92</int_ip_addr><ext_l4_port_min_value>8081</ext_l4_port_min_value></R>",
         ),
         ("cbGetSummary.xml", "<R><SysTime>1700000000</SysTime></R>"),
         (
             "cbGetWanIPIntf.xml",
-            "<R><ip>172.16.5.5</ip><gw>10.1.0.1</gw></R>",
+            "<R><ip>172.16.0.1</ip><gw>10.255.0.200</gw></R>",
         ),
     ];
     let pasar = |entrada: &[(&str, String)]| -> Vec<(String, String)> {

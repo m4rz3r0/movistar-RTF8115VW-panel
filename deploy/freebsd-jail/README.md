@@ -257,10 +257,11 @@ newsyslog…) sólo los instala `install.sh`: si una versión cambia algo de
 vuelve a pasar por el interruptor de pf si cambian las reglas). Hasta
 entonces el servidor sigue con los de antes, aunque el panel ya sea el nuevo.
 
-**Diferencia con el diseño**: el diseño ponía el cron en la jail de compilación
-y una regla de doas en el host para reiniciar el servicio. No puede funcionar
-(desde una jail no se llega al doas del host), así que el actualizador corre en
-el host y sólo la compilación va dentro de la jail, sin privilegios. No hay
+**Por qué el actualizador corre en el host**: con el cron en la jail de
+compilación haría falta una regla de doas en el host para reiniciar el
+servicio, y desde una jail no se llega al doas del host. Por eso el
+actualizador corre en el host y sólo la compilación va dentro de la jail, sin
+privilegios. No hay
 reglas de doas nuevas (`doas.conf.snippet`).
 
 ## Versiones precompiladas (el PC de compilación)

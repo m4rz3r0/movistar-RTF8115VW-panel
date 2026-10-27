@@ -34,9 +34,9 @@ lee = "auth_password"
 tipo = "secreto"
 validar = { min = 1 }
 
-# Estado de la línea, solo de lectura. Con el router real (fase 3): `Up` y
+# Estado de la línea, solo de lectura. Comprobado en el router real: `Up` e
 # `Idle` con la línea activa y sin llamada. Los demás son los estados
-# habituales de TR-104 (sin ver aún en este router); uno que no esté aquí se
+# habituales de TR-104 (aún sin ver en este modelo); uno que no esté aquí se
 # enseña tal cual.
 [[ajuste.campo]]
 id = "en_servicio"
@@ -149,7 +149,7 @@ recomendado = "false"
 respaldo = "criterio"
 
 # Si el router está registrado en el servidor de voz del operador (solo de
-# lectura; con el router real, 1 aunque no haya teléfono conectado).
+# lectura; en el router real vale 1 aunque no haya ningún teléfono conectado).
 [[ajuste.campo]]
 id = "estado_registro"
 lee = "net_status"
@@ -242,8 +242,9 @@ opciones = [
   { valor = "2", clave = "siempre" },
 ]
 
-# El puerto de teléfono en servicio (solo de lectura). Con el router real
-# sale en servicio también sin teléfono conectado: no dice si hay uno.
+# El puerto de teléfono en servicio (solo de lectura). En el router real
+# sale en servicio aunque no haya ningún teléfono conectado: no dice si hay
+# uno.
 [[ajuste.campo]]
 id = "puerto"
 lee = "opr_status"

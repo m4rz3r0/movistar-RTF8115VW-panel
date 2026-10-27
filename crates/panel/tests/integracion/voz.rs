@@ -1,4 +1,4 @@
-//! Voz en Teléfono: el estado real leído y «Apagar la línea de voz» (Tarea 7 de la fase 3).
+//! Voz en Teléfono: el estado real leído y «Apagar la línea de voz».
 
 use crate::comun::{Panel, PanelPrueba, aplicar_ajuste, elemento, leer, llamar, ok, variante};
 use serde_json::{Value, json};

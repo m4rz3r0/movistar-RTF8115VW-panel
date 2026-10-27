@@ -10,8 +10,8 @@
 //!
 //! Opciones comunes:
 //! - `--sin-locales`: no lee las listas locales del dueño (CI);
-//! - `--listas DIR` (o `$RP_PUBLICACION_LISTAS`): dónde están `.superpowers/`
-//!   y `deploy/config.local`. Por defecto, la raíz del repositorio principal
+//! - `--listas DIR` (o `$RP_PUBLICACION_LISTAS`): dónde están las listas de
+//!   secretos locales y `deploy/config.local`. Por defecto, la raíz del repositorio principal
 //!   (el padre de `git rev-parse --git-common-dir`), que también vale desde un
 //!   worktree enlazado; fuera de un repositorio, el directorio revisado;
 //! - `--exigir-listas` (el gancho `pre-push`): si falta una lista obligatoria

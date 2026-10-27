@@ -85,10 +85,10 @@ const MAX_WORKERS =
 /**
  * Workers de Playwright (E2E_WORKERS; 1, en serie). Por defecto, uno por
  * cada 3 hilos de la CPU, entre 1 y 2: cada worker mueve un Chromium, un
- * panel y un simulador, y lo que limita en un portátil (memoria, calor, lo
- * que corre a la vez) no se ve en los hilos. Con 2, el portátil tarda unos
- * 5,3 min; en una máquina dedicada, E2E_WORKERS=4 (unos 3,2 min en el
- * sobremesa). La CI (4 vCPU) sigue con 1.
+ * panel y un simulador, y lo que limita en un equipo modesto (memoria,
+ * calor, lo que corre a la vez) no se ve en los hilos. Con 2, la batería
+ * tarda unos 5 min; en una máquina dedicada, E2E_WORKERS=4 (unos 3 min).
+ * La CI (4 vCPU) sigue con 1.
  */
 export const WORKERS = workers(process.env.E2E_WORKERS);
 

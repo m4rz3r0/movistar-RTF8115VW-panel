@@ -1,4 +1,4 @@
-//! WiFi avanzado (Tarea 5 de la fase 3): renovación de la clave de grupo, PMF y separación leídos en cada red, y las otras redes de invitados.
+//! WiFi avanzado: renovación de la clave de grupo, PMF y separación leídos en cada red, y las otras redes de invitados.
 
 use crate::comun::{Panel, PanelPrueba, ajustes_de, aplicar_ajuste, leer, llamar, ok, variante};
 use serde_json::{Value, json};

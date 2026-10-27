@@ -222,7 +222,7 @@ fn ajustes_minimos_presentes() {
     );
     let upnp = c.ajuste("puertos.upnp").unwrap();
     assert_eq!(upnp.campos[0].recomendado.as_deref(), Some("false"));
-    // La contraseña del router la escribe su componente (Tarea 12), fuera
+    // La contraseña del router la escribe su propio componente, fuera
     // del gestor: el ajuste solo se registra con su lectura.
     let pwd = c.ajuste("seguridad.contrasena_router").unwrap();
     assert!(pwd.campos.is_empty());
@@ -267,7 +267,7 @@ fn ajustes_minimos_presentes() {
         opciones,
         [("1", "encendida", false), ("0", "apagada", true)]
     );
-    // El relé DNS va sin recomendación hasta que la fase 3 compruebe qué
+    // El relé DNS va sin recomendación hasta comprobar qué
     // cambia al encenderlo en este router.
     let dns = c.ajuste("internet.dns").unwrap();
     assert_eq!(dns.campo("rele").unwrap().recomendado, None);
@@ -277,7 +277,7 @@ fn ajustes_minimos_presentes() {
 /// que el catálogo de funciones la marca como tapada y solo se escribe
 /// pidiéndola (un campo `secreto` en cada ajuste que reenvía la línea). Sin
 /// valor anterior de verdad, la reversión y el deshacer la omiten (lo
-/// comprueba el gestor). Antes de la Tarea 11 no se editaba en ningún sitio.
+/// comprueba el gestor).
 #[test]
 fn contrasena_de_la_voz_solo_pedida() {
     let c = cargar();
@@ -309,7 +309,7 @@ fn contrasena_de_la_voz_solo_pedida() {
 
 /// Cada función de escritura que no está bloqueada en el catálogo de
 /// funciones la escribe algún campo o está en `excluidas.toml` con su motivo.
-/// Las acciones (reinicio, guardado…) son de los prestablecidos (fase 4).
+/// Las acciones (reinicio, guardado…) irán con los prestablecidos.
 #[test]
 fn cobertura_de_escrituras() {
     let c = cargar();
@@ -677,7 +677,7 @@ fn redes_y_radios_wifi_iguales_salvo_lo_previsto() {
     }
 }
 
-/// WiFi avanzado (Tarea 5 de la fase 3): las tres redes leen el PMF, el
+/// WiFi avanzado: las tres redes leen el PMF, el
 /// bloqueo del WPS y si están separadas de la red de casa, sin escribirlos,
 /// y escriben la renovación de la clave de grupo.
 #[test]

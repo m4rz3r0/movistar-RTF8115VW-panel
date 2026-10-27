@@ -118,7 +118,7 @@ pub fn App() -> impl IntoView {
                     <Route path=StaticSegment("mejoras") view=PaginaMejoras />
                     <Route path=StaticSegment("historial") view=PaginaHistorial />
                     <Route path=StaticSegment("panel") view=PaginaPanel />
-                    // Vuelve en la fase 4 con sus tarjetas.
+                    // Volverá con sus tarjetas en una versión futura.
                     <ParentRoute path=StaticSegment("recomendaciones") view=Outlet>
                         <Route path=StaticSegment("") view=RecomendacionesAlEstado />
                         <Route path=StaticSegment("preferencias") view=RecomendacionesAlEstado />

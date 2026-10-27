@@ -2,7 +2,7 @@
 # DNS y el DNS dinámico. La conexión no se cambia desde el panel: depende de
 # la detectada y cambiarla puede cortar el acceso (ver `excluidas.toml`).
 
-# Conexión a internet (fase 3): una instancia por conexión del router, con
+# Conexión a internet: una instancia por conexión del router, con
 # su id (`ip_intf_id`, el de las rutas). La de internet es la que elige la
 # detección del router; las demás (voz, servicios) se marcan «del operador».
 [[ajuste]]
@@ -138,7 +138,7 @@ id = "rele"
 escribe = { funcion = "cbSetDnsRelay", parametro = "dns_relay_adm_state" }
 lee = "dns_relay_adm_state"
 tipo = "booleano"
-# Sin recomendación hasta que la fase 3 compruebe con el router real qué
+# Sin recomendación hasta comprobar con el router real qué
 # cambia al encender el relé (con él apagado, el router ya contesta al DNS).
 
 # Cuenta y contraseña: secretos de la web avanzada, editables.

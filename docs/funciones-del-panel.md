@@ -5,7 +5,7 @@ web unas *server functions* de Leptos: `POST /api/<nombre>` con un cuerpo JSON, 
 cookie de sesión (todas la exigen) y la protección CSRF del panel. Los errores
 llevan el mensaje ya traducido al idioma de la sesión. Las que devuelven
 secretos van con `Cache-Control: no-store`. Aquí están las de Ajustes,
-Mejoras, el Historial y la contraseña del router (fase 2), no todas: el resto
+Mejoras, el Historial y la contraseña del router, no todas: el resto
 (Estado, la Biblioteca, el asistente, los usuarios) se documenta en su
 código, junto a cada `#[server(endpoint = "…")]`.
 
@@ -293,7 +293,7 @@ funciones tiene el primero (ni `cbSetWifiAccPt`), así que «Separada de la
 red de casa» se enseña, pero solo se lee.
 
 Todo esto se ha probado contra el simulador (`router-sim`). Lo pendiente de
-comprobar en el router real (fase 3): que el descodificador no usa el pool
+comprobar en el router real: que el descodificador no usa el pool
 de casa; que `cbSetSyslog` sin `export` cambia `syslog_mode` y que cargar
 `syslog.asp` no exporta el registro; que guardar «no enviar» con el puerto
 remoto vacío o `0` no falla; que la televisión y el teléfono siguen tras

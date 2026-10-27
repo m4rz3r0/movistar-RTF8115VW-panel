@@ -249,8 +249,8 @@ async fn escritura_del_registro_se_lee() {
     assert_eq!(valor(&n, "remote_ip").as_deref(), Some("192.0.2.5"));
 }
 
-/// La renovación de la clave de grupo de un punto de acceso (Tarea 5 de la
-/// fase 3): lo escrito se lee tal cual.
+/// La renovación de la clave de grupo de un punto de acceso: lo escrito se
+/// lee tal cual.
 #[tokio::test]
 async fn escritura_de_la_renovacion_de_clave_se_lee() {
     let sim = start().await;

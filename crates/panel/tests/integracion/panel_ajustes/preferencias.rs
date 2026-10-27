@@ -147,7 +147,7 @@ async fn leer_preferencias_exige_sesion() {
 }
 
 /// Los parámetros que usarán las recomendaciones no están en «Ajustes del
-/// panel», y su subtítulo no enlaza con Recomendaciones (vuelve en la fase 4
+/// panel», y su subtítulo no enlaza con Recomendaciones (volverá en una versión futura
 /// con sus tarjetas).
 #[tokio::test]
 async fn preferencias_fuera_de_ajustes_del_panel() {

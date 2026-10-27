@@ -130,8 +130,8 @@ fn solo_lectura(f: &Catalogo, c: &Campo) -> Option<String> {
 /// Instancias de una lista con sus valores. El id de cada una es el del
 /// router (el elemento de [`id_instancia`]); solo en una lista que no se
 /// escribe (como los usuarios del router) cae a su posición. En una que
-/// se escribe, `None` si alguna instancia no trae el suyo: la Tarea 7
-/// escribe por ese id, y una posición tomada por id editaría o borraría
+/// se escribe, `None` si alguna instancia no trae el suyo: la escritura
+/// va por ese id, y una posición tomada por id editaría o borraría
 /// otra instancia.
 pub(super) fn lista(
     f: &Catalogo,

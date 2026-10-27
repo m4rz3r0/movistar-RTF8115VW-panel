@@ -1,4 +1,4 @@
-//! Cortafuegos (Tarea 3 de la fase 3): la tarjeta de Seguridad con las reglas, «No responder al ping desde internet» y su deshacer, que borra solo su regla.
+//! Cortafuegos: la tarjeta de Seguridad con las reglas, «No responder al ping desde internet» y su deshacer, que borra solo su regla.
 
 use crate::comun::{Panel, ajustes_de};
 use crate::comun::{PanelPrueba, aplicar_ajuste, esperar_final, leer, llamar, ok};
@@ -263,7 +263,7 @@ fn abierto_redes(e: &Value) -> Option<String> {
         .map(str::to_owned)
 }
 
-/// Ruling J: la web, el SSH y la gestión remota del operador abiertos solo
+/// La web, el SSH y la gestión remota del operador abiertos solo
 /// desde redes concretas (el estado de serie) son un dato de la tarjeta, no
 /// algo pendiente; si una regla los abre a cualquiera, sí lo son.
 #[tokio::test]

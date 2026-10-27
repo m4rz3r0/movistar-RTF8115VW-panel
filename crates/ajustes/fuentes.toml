@@ -1,5 +1,4 @@
-# Fuentes de las recomendaciones del panel (spec de la fase 3, §7 de la
-# investigación de los lotes). Cada recomendación de `ajustes/*.toml` y de
+# Fuentes de las recomendaciones del panel. Cada recomendación de `ajustes/*.toml` y de
 # `ajustes/lotes.toml` cita las suyas por id en `fuentes`, o lleva
 # `respaldo = "criterio"` si no hay una fuente real detrás.
 #
@@ -269,7 +268,7 @@ url = "https://bandaancha.eu/articulos/cloudflare-lleva-tribunal-constitucional-
 consultada = "2026-10-22"
 clase = "prensa"
 
-# DNS familiar (Ruling N de la fase 3): la variante de Cloudflare que filtra
+# DNS familiar: la variante de Cloudflare que filtra
 # malware y contenido para adultos.
 
 [[fuente]]

@@ -12,3 +12,6 @@ node_modules/
 instalar.token
 real-secrets*.txt
 /docs/superpowers/
+# Notas locales de trabajo.
+/odd/
+/.atl/

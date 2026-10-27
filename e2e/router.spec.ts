@@ -141,14 +141,14 @@ test.describe("elegir la conexión a internet", () => {
   });
 });
 
-// Cambiar la contraseña del router (Tarea 12): en «Conexión con el router»,
+// Cambiar la contraseña del router: en «Conexión con el router»,
 // junto a la tarjeta de la contraseña con la que entra el panel (rellena,
 // censurada y con el ojo). Pide la contraseña del panel y confirma con un
 // diálogo propio. Solo una prueba cambia de verdad la del simulador; las
 // demás cancelan en el diálogo.
 
 const NUEVA_ROUTER = "clave-nueva-de-prueba";
-const SDD = "capturas";
+const CARPETA_CAPTURAS = "capturas";
 
 function sinApiNiClave(texto: string) {
   expect(texto).not.toMatch(/\bcb[A-Z]\w+/);
@@ -188,7 +188,7 @@ test.describe("cambiar la contraseña del router", () => {
       expect(await guardada.inputValue()).not.toBe("");
       await sinDesbordamiento(page, `tarjetas ${ancho}`);
       sinApiNiClave(await page.locator("main").innerText());
-      await capturaOpcional(page, { path: `${SDD}/contrasena-tarjetas-es-${ancho}.png`, fullPage: true });
+      await capturaOpcional(page, { path: `${CARPETA_CAPTURAS}/contrasena-tarjetas-es-${ancho}.png`, fullPage: true });
 
       // La nueva, con el ojo abierto para comprobarla.
       const nueva = cambio.locator("#router-contrasena-nueva");
@@ -200,7 +200,7 @@ test.describe("cambiar la contraseña del router", () => {
       await cambio.getByRole("button", { name: "Mostrar Contraseña nueva" }).click();
       await expect(nueva).toHaveAttribute("type", "text");
       await sinDesbordamiento(page, `ojo ${ancho}`);
-      await capturaOpcional(cambio, { path: `${SDD}/contrasena-ojo-es-${ancho}.png` });
+      await capturaOpcional(cambio, { path: `${CARPETA_CAPTURAS}/contrasena-ojo-es-${ancho}.png` });
 
       // Una corta: el error, sin diálogo.
       await nueva.fill("corta");
@@ -214,7 +214,7 @@ test.describe("cambiar la contraseña del router", () => {
       await expect(dialogo).toContainText("también desde su propia web");
       sinApiNiClave(await dialogo.innerText());
       await sinDesbordamiento(page, `diálogo ${ancho}`);
-      await capturaOpcional(page, { path: `${SDD}/contrasena-dialogo-es-${ancho}.png` });
+      await capturaOpcional(page, { path: `${CARPETA_CAPTURAS}/contrasena-dialogo-es-${ancho}.png` });
       await dialogo.getByRole("button", { name: "Cancelar" }).click();
       await expect(page.locator("dialog[open]")).toHaveCount(0);
       // No ha cambiado nada.
@@ -262,7 +262,7 @@ test.describe("cambiar la contraseña del router", () => {
     await expect(cambio.locator(".error-formulario")).toHaveText(grave);
     await expect(page.locator("dialog[open]")).toHaveCount(0);
     await sinDesbordamiento(page, "error grave en 1024");
-    await capturaOpcional(cambio, { path: `${SDD}/contrasena-error-grave-en-1024.png` });
+    await capturaOpcional(cambio, { path: `${CARPETA_CAPTURAS}/contrasena-error-grave-en-1024.png` });
     await ctx.close();
   });
 
@@ -277,7 +277,7 @@ test.describe("cambiar la contraseña del router", () => {
     await expect(page.locator("#router-contrasena-nueva")).toHaveCount(0);
     await sinDesbordamiento(page, "seguridad 360");
     await capturaOpcional(enlace.locator("xpath=ancestor::section[contains(@class, 'detalle-columna')]"), {
-      path: `${SDD}/contrasena-enlace-seguridad-es-360.png`,
+      path: `${CARPETA_CAPTURAS}/contrasena-enlace-seguridad-es-360.png`,
     });
     await enlace.click();
     await page.waitForURL((url) => url.pathname === "/router/conexion");
@@ -426,7 +426,7 @@ test("es a 360 px: en solo lectura la tarjeta se ve desactivada", async ({ page 
   // Y se ve apagado, como los botones desactivados.
   await expect(cambio.locator(".secreto-campo")).toHaveCSS("opacity", "0.6");
   await sinDesbordamiento(page, "solo lectura 360");
-  await capturaOpcional(cambio, { path: `${SDD}/contrasena-solo-lectura-es-360.png` });
+  await capturaOpcional(cambio, { path: `${CARPETA_CAPTURAS}/contrasena-solo-lectura-es-360.png` });
   await page.evaluate(() => window.scrollTo(0, 0));
-  await capturaOpcional(page, { path: `${SDD}/contrasena-solo-lectura-pagina-es-360.png`, fullPage: true });
+  await capturaOpcional(page, { path: `${CARPETA_CAPTURAS}/contrasena-solo-lectura-pagina-es-360.png`, fullPage: true });
 });

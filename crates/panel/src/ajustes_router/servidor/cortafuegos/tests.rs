@@ -86,7 +86,7 @@ fn ping_de_redes(f: &mut [Filtro], v4: bool, v6: bool) {
     }
 }
 
-/// Ruling J: solo es pendiente lo abierto a cualquiera; la web, el SSH
+/// Solo es pendiente lo abierto a cualquiera; la web, el SSH
 /// y la gestión del operador de serie (solo desde sus redes) son un
 /// dato, no un problema.
 #[test]

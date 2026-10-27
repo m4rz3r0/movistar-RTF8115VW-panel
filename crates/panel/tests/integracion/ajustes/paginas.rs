@@ -144,7 +144,7 @@ async fn pagina_tema_sin_nombres_de_api_fuera_de_detalles() {
     }
 }
 
-/// Desde la Tarea 11 (decisión del usuario), la página lleva el valor de sus
+/// La página lleva el valor de sus
 /// secretos para el campo censurado con el ojo: solo en el `value` de ese
 /// campo (y en los datos de la página), nunca como texto a la vista.
 #[tokio::test]

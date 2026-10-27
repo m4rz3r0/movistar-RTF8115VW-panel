@@ -60,7 +60,7 @@ async fn historial_lista_cambios_en_orden() {
 
     let a = alta_reserva(&p, &cookie, "192.168.1.91", "02:00:00:00:00:91").await;
     let b = alta_reserva(&p, &cookie, "192.168.1.92", "02:00:00:00:00:92").await;
-    // Un revelado entre los dos (a mano: así se anotaban antes de la Tarea 11).
+    // Un revelado entre los dos (a mano: así se anotaban en versiones antiguas).
     sqlx::query("UPDATE changes SET ts = 1000 WHERE id = ?")
         .bind(a)
         .execute(&p.state.db)
@@ -240,7 +240,7 @@ async fn secretos_enmascarados_y_deshacer_los_restaura() {
 #[tokio::test]
 async fn revelados_listados_sin_valor() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
-    // Un revelado antiguo (antes de la Tarea 11 se anotaba cada uno).
+    // Un revelado antiguo (las versiones antiguas anotaban cada uno).
     sqlx::query(
         "INSERT INTO reveals (ts, user_id, funcion, campo, instancia) \
          VALUES (2000, (SELECT id FROM users LIMIT 1), 'te_wifi.asp', 'wlWpaPsk', NULL)",
@@ -376,7 +376,7 @@ async fn grupo_es_una_fila_con_sus_pasos() {
     assert_eq!(pasos[0]["etiqueta"], "Deshacer");
     assert_eq!(pasos[0]["funcion"], "cbSetUpnpCfg");
     assert_eq!(pasos[0]["estado"], "Aplicado");
-    // Sin etiqueta, un texto genérico (Tarea 11): nunca el nombre de la
+    // Sin etiqueta, un texto genérico: nunca el nombre de la
     // función, que sigue en los datos para los detalles técnicos.
     assert_eq!(pasos[1]["etiqueta"], "Cambio en el router");
     assert_eq!(pasos[1]["funcion"], LEASES);

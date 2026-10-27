@@ -526,7 +526,7 @@ fn gpon_sin_falso_positivo_de_fecha() {
     assert_eq!(reglas("a", &serie), [Regla::Identificador]);
 }
 
-// --- Tarea 3: arrastrados de la Tarea 2 --------------------------------------
+// --- Ronda de correcciones 3 ------------------------------------------------
 
 #[test]
 fn mac_permitida_no_tapa_una_real_que_la_solapa() {

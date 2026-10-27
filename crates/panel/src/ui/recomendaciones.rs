@@ -1,4 +1,4 @@
-//! Sección «Recomendaciones» (`/recomendaciones/*`): vuelve en la fase 4 con
+//! Sección «Recomendaciones» (`/recomendaciones/*`): volverá en una versión futura con
 //! sus tarjetas, que piden en contexto solo lo que necesitan. Mientras tanto
 //! no sale en el menú, y sus rutas antiguas (`/recomendaciones` y
 //! `/recomendaciones/preferencias`) llevan al Estado para no romper enlaces

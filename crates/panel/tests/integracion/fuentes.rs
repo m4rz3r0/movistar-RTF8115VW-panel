@@ -1,4 +1,4 @@
-//! De dónde sale cada recomendación (Tarea 8 de la fase 3): las fuentes, o
+//! De dónde sale cada recomendación: las fuentes, o
 //! «criterio del panel», viajan con el campo, el paso de Mejoras y la
 //! recomendación de la tarjeta.
 

@@ -1,4 +1,4 @@
-//! Interruptores de las funciones de la fase 3 que dependían de una prueba en el router real.
+//! Interruptores de las funciones que dependían de una prueba en el router real.
 //!
 //! Con una función desactivada ([`Desactivadas::motivo`] da `Some(clave)`),
 //! la interfaz no la ofrece (solo enseña el valor y una nota con el
@@ -38,14 +38,14 @@ use serde::{Deserialize, Serialize};
 /// comprobada en el router real (`comprobada` en el catálogo).
 pub const SIN_COMPROBAR: &str = "funcion-sin-comprobar";
 
-/// Funciones de la fase 3 que dependían de la validación real.
+/// Funciones que dependían de la validación en el router real.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Funcion3 {
-    /// Crear y borrar usuarios de la web del router (E3).
+    /// Crear y borrar usuarios de la web del router.
     Usuarios,
-    /// Cambiar la contraseña o el grupo de otro usuario (E3).
+    /// Cambiar la contraseña o el grupo de otro usuario.
     ContrasenaOtro,
-    /// «No responder al ping desde internet» (E5, Tarea 3).
+    /// «No responder al ping desde internet».
     SinPing,
 }
 
@@ -78,7 +78,7 @@ pub const fn motivo(f: Funcion3) -> &'static str {
     }
 }
 
-/// Qué funciones de la fase 3 tiene desactivadas un proceso del panel. La
+/// Qué funciones pendientes de validar tiene desactivadas un proceso del panel. La
 /// calcula el servidor y viaja a la interfaz; sin ella (`Default`), las de
 /// la versión.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

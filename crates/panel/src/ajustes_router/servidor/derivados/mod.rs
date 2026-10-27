@@ -38,7 +38,8 @@ pub(super) struct Contexto<'a> {
     /// La conexión a internet del panel entre las leídas (la elegida a mano
     /// o la detectada), si hay.
     pub wan: Option<&'a str>,
-    /// Las funciones de la fase 3 que el servidor tiene desactivadas.
+    /// Las funciones pendientes de validar en el router real que el servidor
+    /// tiene desactivadas.
     pub desactivadas: crate::validacion_real::Desactivadas,
 }
 

@@ -1,7 +1,7 @@
 //! Componentes comunes del sistema visual: [`Insignia`], [`Interruptor`],
 //! [`IconoEmision`], [`Glifo`] y [`ProsContras`], y el [`EstadoVisual`] que comparten.
 //!
-//! Cada color tiene un único significado (spec del rediseño, §3.1): verde,
+//! Cada color tiene un único significado: verde,
 //! encendida y emite; gris, apagada; ámbar, requiere atención; rojo, errores
 //! y lo destructivo. El estado va siempre también en texto.
 

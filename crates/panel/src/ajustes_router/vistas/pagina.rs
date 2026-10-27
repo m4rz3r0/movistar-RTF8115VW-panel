@@ -99,7 +99,7 @@ pub struct ElementoVista {
     /// ping desde internet», en el cortafuegos), si la tiene.
     #[serde(default)]
     pub accion_propia: Option<AccionPropia>,
-    /// Las funciones de la fase 3 que el servidor tiene desactivadas
+    /// Las funciones pendientes de validar que el servidor tiene desactivadas
     /// ([`crate::validacion_real`]): sus controles no salen.
     #[serde(default)]
     pub desactivadas: Desactivadas,

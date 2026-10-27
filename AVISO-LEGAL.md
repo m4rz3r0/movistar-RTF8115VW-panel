@@ -23,7 +23,10 @@ decir con qué router funciona el panel.
 ## Qué contiene y qué no
 
 - No incluye código, firmware ni páginas del router. El panel habla con la web
-  del router de cada usuario, en su propia red, igual que el navegador.
+  del router de cada usuario, en su propia red, igual que el navegador. Las
+  pruebas usan un extracto mínimo de la lista del cortafuegos
+  (`crates/hgu/fixtures/paginas/`): solo las dos variables de datos que lee el
+  panel, con valores inventados, sin el HTML ni el JavaScript de la página.
 - No publica credenciales de terceros: el panel usa las que cada usuario
   escribe para su router y las guarda cifradas en su propia instalación.
   Tampoco publica valores por defecto que permitan entrar en routers ajenos.

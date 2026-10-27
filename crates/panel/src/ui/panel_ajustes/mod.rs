@@ -4,7 +4,7 @@
 //! con el nombre de usuario. Lo del router está en «Configuración del
 //! router» ([`super::router`]). Los demás parámetros de la instancia (DNS
 //! preferidos, dispositivos de confianza…) los pedirán en contexto las
-//! recomendaciones de la fase 4.
+//! recomendaciones futuras.
 //!
 //! Lo delicado (usuarios aquí; credenciales y firmware en «Configuración del
 //! router») pide la contraseña del panel si no se ha escrito en los últimos

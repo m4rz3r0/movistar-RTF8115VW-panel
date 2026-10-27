@@ -3,7 +3,7 @@
 //! router» (`/router/conexion`: credenciales del router, confirmación del
 //! firmware y red detectada, con la conexión a internet elegida a mano) y el
 //! guardado de los parámetros de la instancia, que también usarán las
-//! recomendaciones de la fase 4 ([`crate::preferencias`]).
+//! recomendaciones futuras ([`crate::preferencias`]).
 //!
 //! Todas exigen sesión. Las delicadas (cambiar las credenciales del router,
 //! confirmar el firmware, elegir la conexión a internet, volver a detectar la
@@ -83,7 +83,7 @@ pub struct AjustesPanel {
 
 /// Parámetros de la instancia que se guardan: solo los presentes (`Some`);
 /// cada página manda los suyos («Ajustes del panel», idioma y zona; las
-/// recomendaciones de la fase 4, el resto). En `mantenimiento` y
+/// recomendaciones futuras, el resto). En `mantenimiento` y
 /// `servidor_propio`, vacío quita el valor.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CamposInstancia {

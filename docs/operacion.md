@@ -104,8 +104,10 @@ el idioma del navegador (`Accept-Language`); si no, español.
   local ([`proxy-tls.md`](proxy-tls.md)). Un usuario y su contraseña del
   panel; no es la del router.
 - La sesión caduca a los 30 minutos sin uso y, como mucho, a las 12 horas.
-- Tras varios intentos fallidos el panel hace esperar (hasta 60 s) por IP y por
-  usuario; la respuesta no dice si el usuario existe.
+- Tras varios intentos fallidos el panel hace esperar (hasta 60 s) al equipo
+  que falla (su IP, o su red /64 en IPv6), sea cual sea el usuario: desde otro
+  equipo se sigue entrando, así que nadie de la red puede bloquear a un
+  usuario. La respuesta no dice si el usuario existe.
 
 Los usuarios se gestionan en «Ajustes del panel» o con el propio binario:
 `panel user add <usuario>` (alta) y `panel user passwd <usuario>` (cambio de

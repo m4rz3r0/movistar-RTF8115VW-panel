@@ -11,7 +11,7 @@ const ACTIVA: &str = "activa";
 
 /// Las instancias activas de la DMZ (`None` si no se pudo leer). El router
 /// del usuario no tiene DMZ, así que el formato de una activa es una
-/// suposición (Rulings M y M′): cuenta toda instancia que no venga marcada
+/// suposición: cuenta toda instancia que no venga marcada
 /// como apagada (una DMZ apagada pero guardada no es una DMZ activa) ni
 /// traiga el equipo 0.0.0.0 (ninguno: no manda nada a ningún dispositivo).
 fn activas<'a>(ctx: &Contexto<'a>) -> Option<Vec<&'a InstanciaVista>> {

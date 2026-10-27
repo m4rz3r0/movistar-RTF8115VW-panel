@@ -1,6 +1,5 @@
-//! Internet, Seguridad, Teléfono y Sistema en rejilla (Tarea 4 del
-//! rediseño): sus elementos, su estado, su recomendación principal y su
-//! franja de resumen.
+//! Internet, Seguridad, Teléfono y Sistema en rejilla: sus elementos, su
+//! estado, su recomendación principal y su franja de resumen.
 
 use crate::comun::{Panel, PanelPrueba, aplicar_ajuste, leer, ok, sesion};
 use serde_json::{Value, json};

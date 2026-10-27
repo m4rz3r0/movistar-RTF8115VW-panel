@@ -42,17 +42,16 @@ tracing-subscriber = { version = "0.3", default-features = false, features = ["f
 
 # Pruebas y desarrollo con información de depuración mínima: enlazar los
 # binarios de pruebas con la completa necesitaba varios GB por enlace y, en
-# paralelo, agotaba la memoria del servidor que compila las versiones.
+# paralelo, podía agotar la memoria de una máquina modesta.
 [profile.dev]
 debug = "line-tables-only"
 # La información de depuración en ficheros aparte (.dwo junto a los objetos de
 # target/debug/deps), no dentro de cada binario: los nombres de función de
 # Leptos y Axum dejaban ~400 MB de .debug_str en cada uno de los binarios de
-# pruebas, y tocar la biblioteca reescribía ~15 GB. Medido en el sobremesa
-# (2026-10-21, cargo test -p panel --features ssr --no-run, cada variante con
-# su target): en frío, 146 → 117 s; tras cambiar un literal de
-# changes/mod.rs, 147 y 132 → 13 y 36 s; target, 22 → 12 GB; un binario de
-# pruebas, 636 → 235 MB. Los backtraces siguen dando fichero y línea. Un
+# pruebas, y tocar la biblioteca reescribía ~15 GB. Medido con
+# `cargo test -p panel --features ssr --no-run`, cada variante con su target:
+# en frío, 146 → 117 s; tras cambiar un literal de changes/mod.rs, 147 y
+# 132 → 13 y 36 s; target, 22 → 12 GB; un binario de pruebas, 636 → 235 MB. Los backtraces siguen dando fichero y línea. Un
 # binario copiado a otro equipo los pierde (los .dwo se quedan aquí).
 split-debuginfo = "unpacked"
 
@@ -73,7 +72,7 @@ opt-level = 3
 
 [profile.release]
 # LTO completo y una unidad de codegen. Medido con LTO "thin" y 16 unidades
-# en un portátil multinúcleo: el reloj baja de 8m34s a 3m54s, pero la CPU
+# en un equipo multinúcleo: el reloj baja de 8m34s a 3m54s, pero la CPU
 # total sube de 19m06s a 23m37s y el binario pasa de 37 a 65 MB. Inferencia
 # (no medida): en un equipo con pocos núcleos cuenta la CPU total, así que
 # no compensa.

@@ -77,7 +77,7 @@ async fn secretos_solo_en_su_campo() {
     escribir_red_24(&p, &[("key_phrase", clave)]).await;
     let (status, body) = llamar(&p, "leer_tema", json!({ "tema": "wifi" }), Some(&cookie)).await;
     assert_eq!(status, 200, "{body}");
-    // Desde la Tarea 11, el valor de un secreto viaja con la página, pero
+    // El valor de un secreto viaja con la página, pero
     // solo en su campo aparte (para el campo censurado con el ojo).
     assert_eq!(body.matches(clave).count(), 1, "{body}");
     let tema: Value = serde_json::from_str(&body).unwrap();

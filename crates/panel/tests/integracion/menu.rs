@@ -74,7 +74,7 @@ async fn menu_en_orden() {
         ]
     );
     assert!(!html.contains(r#"href="/prestablecidos""#), "{html}");
-    // Recomendaciones vuelve con sus tarjetas (fase 4).
+    // Recomendaciones volverá con sus tarjetas en una versión futura.
     assert!(!html.contains(r#"href="/recomendaciones"#), "{html}");
 }
 
@@ -122,7 +122,7 @@ async fn seccion_marcada_en_subrutas() {
     );
 }
 
-/// Las rutas de Recomendaciones (sin contenido hasta la fase 4) llevan al
+/// Las rutas de Recomendaciones (todavía sin contenido) llevan al
 /// Estado: los enlaces guardados no se rompen.
 #[tokio::test]
 async fn recomendaciones_lleva_al_estado() {

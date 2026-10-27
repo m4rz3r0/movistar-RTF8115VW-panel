@@ -15,7 +15,7 @@
 # posición, que no tiene por qué ser el id con que se escriben.
 #
 # Encender o apagar una red es `activa` (`adm_state`), en la tarjeta básica.
-# Comprobado en el router real (2026-10-22): con las redes apagadas, todos
+# Comprobado en el router real: con las redes apagadas, todos
 # los puntos de acceso traen `adm_state=0` y `opr_status=0` mientras las
 # radios siguen con `radio_adm_state=1` y `radio_opr_status=1`: `adm_state`
 # enciende o apaga la red y `opr_status` dice si de verdad emite (de ahí la
@@ -129,8 +129,8 @@ validar = { min = 1, max = 64 }
 
 # Protección de las tramas de gestión. Solo se lee hasta que una escritura
 # con `validation_only = 1` sobre una red apagada confirme qué valores
-# acepta (validación E2 del controlador): no entra en el catálogo de
-# escritura, porque viajaría en toda escritura de la red.
+# acepta el router real: no entra en el catálogo de escritura, porque
+# viajaría en toda escritura de la red.
 [[ajuste.campo]]
 id = "pmf"
 lee = "wifi_pmf"
@@ -149,8 +149,7 @@ solo_lectura = "ajuste-wifi-red_24_avanzado-wps_bloqueo-motivo"
 
 # Cada cuánto renueva el router la clave de grupo, en segundos. Ya viajaba
 # en toda escritura de la red con su valor leído; aquí se puede elegir.
-# Pendiente de la validación E1 del controlador: si falla, pasa a
-# `solo_lectura` con su motivo.
+# Si el router real no lo acepta, pasa a `solo_lectura` con su motivo.
 [[ajuste.campo]]
 id = "renovacion_clave"
 escribe = { funcion = "cbSetWifiAccPt", parametro = "regen_key_interval" }
@@ -270,8 +269,8 @@ validar = { min = 1, max = 64 }
 
 # Protección de las tramas de gestión. Solo se lee hasta que una escritura
 # con `validation_only = 1` sobre una red apagada confirme qué valores
-# acepta (validación E2 del controlador): no entra en el catálogo de
-# escritura, porque viajaría en toda escritura de la red.
+# acepta el router real: no entra en el catálogo de escritura, porque
+# viajaría en toda escritura de la red.
 [[ajuste.campo]]
 id = "pmf"
 lee = "wifi_pmf"
@@ -290,8 +289,7 @@ solo_lectura = "ajuste-wifi-red_5_avanzado-wps_bloqueo-motivo"
 
 # Cada cuánto renueva el router la clave de grupo, en segundos. Ya viajaba
 # en toda escritura de la red con su valor leído; aquí se puede elegir.
-# Pendiente de la validación E1 del controlador: si falla, pasa a
-# `solo_lectura` con su motivo.
+# Si el router real no lo acepta, pasa a `solo_lectura` con su motivo.
 [[ajuste.campo]]
 id = "renovacion_clave"
 escribe = { funcion = "cbSetWifiAccPt", parametro = "regen_key_interval" }
@@ -416,8 +414,8 @@ validar = { min = 1, max = 64 }
 
 # Protección de las tramas de gestión. Solo se lee hasta que una escritura
 # con `validation_only = 1` sobre una red apagada confirme qué valores
-# acepta (validación E2 del controlador): no entra en el catálogo de
-# escritura, porque viajaría en toda escritura de la red.
+# acepta el router real: no entra en el catálogo de escritura, porque
+# viajaría en toda escritura de la red.
 [[ajuste.campo]]
 id = "pmf"
 lee = "wifi_pmf"
@@ -436,8 +434,7 @@ solo_lectura = "ajuste-wifi-invitados_avanzado-wps_bloqueo-motivo"
 
 # Cada cuánto renueva el router la clave de grupo, en segundos. Ya viajaba
 # en toda escritura de la red con su valor leído; aquí se puede elegir.
-# Pendiente de la validación E1 del controlador: si falla, pasa a
-# `solo_lectura` con su motivo.
+# Si el router real no lo acepta, pasa a `solo_lectura` con su motivo.
 [[ajuste.campo]]
 id = "renovacion_clave"
 escribe = { funcion = "cbSetWifiAccPt", parametro = "regen_key_interval" }

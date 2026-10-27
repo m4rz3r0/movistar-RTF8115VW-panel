@@ -1,7 +1,7 @@
 # Funciones de escritura que ningún ajuste cubre, y por qué. Junto con los
 # campos de `ajustes/*.toml`, cubren todas las escrituras no bloqueadas del
 # catálogo de funciones (prueba `cobertura_de_escrituras`). Las acciones
-# (reinicio, guardado…) no entran: son de los prestablecidos (fase 4).
+# (reinicio, guardado…) no entran: irán con los prestablecidos.
 
 # ---- Duplicados de la web básica: el ajuste usa la función de la avanzada.
 # Las de IPv6 de la web básica (`te_ipv6.cmd`) no son duplicados: van con
@@ -9,11 +9,11 @@
 
 [[excluida]]
 funcion = "te_wifi.wl"
-motivo = "duplicado de la web básica de wifi.red_24 y wifi.radio_24, salvo el filtro por MAC, que ningún ajuste ofrece (formato por validar con el router real; fase 3)"
+motivo = "duplicado de la web básica de wifi.red_24 y wifi.radio_24, salvo el filtro por MAC, que ningún ajuste ofrece (formato por validar con el router real)"
 
 [[excluida]]
 funcion = "te_wifi_5ghz.wl"
-motivo = "duplicado de la web básica de wifi.red_5 y wifi.radio_5, salvo el filtro por MAC, que ningún ajuste ofrece (formato por validar con el router real; fase 3)"
+motivo = "duplicado de la web básica de wifi.red_5 y wifi.radio_5, salvo el filtro por MAC, que ningún ajuste ofrece (formato por validar con el router real)"
 
 [[excluida]]
 funcion = "te_wifi_guest.wl"
@@ -113,33 +113,33 @@ motivo = "configuración del operador (VLAN, IPTV, VoIP, rutas, QoS, multicast):
 
 [[excluida]]
 funcion = "cbSetWanIPIntf"
-motivo = "conexión a internet: depende de la detectada; fase 3"
+motivo = "conexión a internet: depende de la detectada"
 
 [[excluida]]
 funcion = "te_mm.cmd?action=Apply"
-motivo = "conexión a internet: depende de la detectada; fase 3"
+motivo = "conexión a internet: depende de la detectada"
 
 [[excluida]]
 funcion = "te_mrl.cmd?action=wanApply"
-motivo = "conexión a internet: depende de la detectada; fase 3"
+motivo = "conexión a internet: depende de la detectada"
 
 [[excluida]]
 funcion = "cbSetNatIntf"
-motivo = "conexión a internet: depende de la detectada; fase 3"
+motivo = "conexión a internet: depende de la detectada"
 
 [[excluida]]
 funcion = "cbSetDnsRelayServer"
-motivo = "conexión a internet: depende de la detectada; fase 3"
+motivo = "conexión a internet: depende de la detectada"
 
-# ---- Fuera de las familias del plan (ver el informe de la Tarea 5).
+# ---- Fuera de las familias de ajustes del panel.
 
 [[excluida]]
 funcion = "te_wifi.cmd?action=save"
-motivo = "filtro por MAC de la WiFi: solo en la web básica, formato por validar con el router real; fase 3"
+motivo = "filtro por MAC de la WiFi: solo en la web básica, formato por validar con el router real"
 
 [[excluida]]
 funcion = "te_wifi_5ghz.cmd?action=save"
-motivo = "filtro por MAC de la WiFi: solo en la web básica, formato por validar con el router real; fase 3"
+motivo = "filtro por MAC de la WiFi: solo en la web básica, formato por validar con el router real"
 
 [[excluida]]
 funcion = "te_mrl.cmd?action=setpc"
@@ -167,11 +167,11 @@ motivo = "restos sin terminar de la web del router: responde 404"
 
 [[excluida]]
 funcion = "te_ipv6.cmd?action=lanapply"
-motivo = "prefijo IPv6 de la red de casa desde la web básica: ningún ajuste lo ofrece en esta fase (red_local.ipv6 solo activa IPv6 y los anuncios); formato por validar con el router real; fase 3"
+motivo = "prefijo IPv6 de la red de casa desde la web básica: ningún ajuste lo ofrece todavía (red_local.ipv6 solo activa IPv6 y los anuncios); formato por validar con el router real"
 
 [[excluida]]
 funcion = "te_ipv6.cmd?action=dhcpapply"
-motivo = "modo y rango de DHCPv6 desde la web básica: ningún ajuste lo ofrece en esta fase (red_local.ipv6 solo activa IPv6 y los anuncios); formato por validar con el router real; fase 3"
+motivo = "modo y rango de DHCPv6 desde la web básica: ningún ajuste lo ofrece todavía (red_local.ipv6 solo activa IPv6 y los anuncios); formato por validar con el router real"
 
 
 

@@ -1,4 +1,4 @@
-//! Conexión a internet (Tarea 4 de la fase 3): la tarjeta de solo lectura de Internet con las conexiones, sus secretos y la fibra.
+//! Conexión a internet: la tarjeta de solo lectura de Internet con las conexiones, sus secretos y la fibra.
 
 use crate::ajustes_secretos::llamada;
 use crate::comun::{Panel, ajustes_de};

@@ -12,7 +12,7 @@
 //!   de escrituras del cliente con que se lee ([`hgu::Client::escrituras`],
 //!   que cambia con cualquier escritura o reconfiguración). Si cualquiera de las dos cambió,
 //!   la entrada no vale (ni se guarda una lectura que empezó antes).
-//! - **Con los secretos, solo en memoria.** Desde la Tarea 11 las páginas
+//! - **Con los secretos, solo en memoria.** Las páginas
 //!   de Ajustes muestran el valor de sus secretos (censurado, con un ojo):
 //!   la respuesta se guarda tal cual la da el router, en memoria del
 //!   proceso y como mucho [`CADUCIDAD_LECTURAS`]. Nunca va a disco ni al

@@ -115,7 +115,7 @@ mod tests {
         for c in [" clave-de-prueba", "clave-de-prueba ", "clave  de-prueba"] {
             assert_eq!(validar_forma(c), Err(ErrorNueva::Espacios), "{c:?}");
         }
-        // Con otro máximo (la Tarea 2, con 16).
+        // Con otro máximo (16, el de los usuarios del router).
         assert_eq!(validar_forma_hasta(&"a".repeat(16), 16), Ok(()));
         assert_eq!(
             validar_forma_hasta(&"a".repeat(17), 16),

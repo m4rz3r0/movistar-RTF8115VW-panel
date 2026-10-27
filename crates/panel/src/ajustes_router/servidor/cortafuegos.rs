@@ -127,7 +127,7 @@ pub(super) fn enumerar(nombres: &[String]) -> String {
     }
 }
 
-/// Lo pendiente (Ruling J): el ping abierto a cualquiera, por versión, y
+/// Lo pendiente: el ping abierto a cualquiera, por versión, y
 /// los demás servicios (la web, el SSH o la gestión remota del operador)
 /// abiertos desde cualquier sitio. Lo abierto solo desde redes concretas no
 /// cuenta: va en el dato [`abierto_redes`]. Vacío si no hay nada pendiente.

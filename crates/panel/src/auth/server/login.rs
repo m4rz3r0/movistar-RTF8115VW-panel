@@ -45,7 +45,7 @@ pub async fn reauthenticate(
     password: &str,
 ) -> Result<(), LoginError> {
     let _turn = state.login_lock.lock().await;
-    check_throttled(state, ip, Account::Id(user.id, &user.username), password)
+    check_throttled(state, ip, Account::Id(user.id), password)
         .await
         .map(drop)
 }
@@ -54,8 +54,8 @@ pub async fn reauthenticate(
 pub(super) enum Account<'a> {
     /// Por nombre (login): puede no existir.
     Name(&'a str),
-    /// Usuario de la sesión: id y nombre.
-    Id(i64, &'a str),
+    /// Usuario de la sesión, por su id.
+    Id(i64),
 }
 
 /// Comprueba la contraseña con el freno de fuerza bruta; devuelve el id
@@ -86,7 +86,7 @@ pub(super) async fn check_throttled(
                 .fetch_optional(db)
                 .await?
         }
-        Account::Id(id, _) => {
+        Account::Id(id) => {
             sqlx::query_as("SELECT id, password_hash FROM users WHERE id = ?")
                 .bind(id)
                 .fetch_optional(db)

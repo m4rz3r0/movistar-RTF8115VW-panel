@@ -5,9 +5,9 @@
 //!
 //! Fuentes:
 //!
-//! 1. `<raiz>/.superpowers/sdd/*/real-secrets.txt` (`lista-secretos`): cada
-//!    línea no vacía es una entrada; `N` cuenta las líneas de todos los
-//!    ficheros, en orden.
+//! 1. Los `real-secrets.txt` del directorio de notas local de `<raiz>` (ver
+//!    [`ficheros_de_secretos`]; `lista-secretos`): cada línea no vacía es una
+//!    entrada; `N` cuenta las líneas de todos los ficheros, en orden.
 //! 2. `$RP_PUBLICACION_PROHIBIDOS`, o `$XDG_CONFIG_HOME/routerpanel/
 //!    publicacion-prohibidos.txt`, o `~/.config/routerpanel/
 //!    publicacion-prohibidos.txt` (`lista-prohibidos`): una entrada por línea;
@@ -277,7 +277,8 @@ fn asignacion(linea: &str) -> Option<(&str, &str)> {
     (!valor.is_empty()).then_some((clave, valor))
 }
 
-/// `<raiz>/.superpowers/sdd/*/real-secrets.txt`, en orden.
+/// Los `real-secrets.txt` de cada subdirectorio del directorio de notas
+/// local de `raiz` (sin versionar), en orden.
 fn ficheros_de_secretos(raiz: &Path) -> Vec<PathBuf> {
     let Ok(dirs) = fs::read_dir(raiz.join(".superpowers/sdd")) else {
         return Vec::new();

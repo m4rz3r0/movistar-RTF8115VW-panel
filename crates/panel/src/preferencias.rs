@@ -2,7 +2,7 @@
 //! (DNS preferidos, dispositivos de confianza, horario de mantenimiento y
 //! servidor propio) y de los equipos que ve el router.
 //!
-//! Hoy no la usa ninguna página: la usan las recomendaciones (fase 4), cuyas
+//! Hoy no la usa ninguna página: la usarán las recomendaciones, cuyas
 //! tarjetas piden en contexto, al aplicarse, solo lo que necesitan y parten
 //! de lo ya guardado. Se conserva con sus pruebas porque es también la única
 //! forma de leer lo que guarda

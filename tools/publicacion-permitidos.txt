@@ -86,10 +86,10 @@ ruta tools/publicacion-permitidos.txt clave — las sumas sha256 de los binarios
 
 # Pruebas de split_mac: una MAC sintética de siete grupos cuya cola parece una MAC.
 ruta crates/hgu/src/fmt.rs mac — solo MACs sintéticas en las pruebas de split_mac
-ruta crates/hgu/fixtures/paginas/*.asp fixture — páginas HTML del router saneadas a mano (sin datos reales): sus etiquetas son de HTML, no hojas XML con clase; las reglas genéricas siguen aplicándose
+ruta crates/hgu/fixtures/paginas/*.asp fixture — extractos mínimos de páginas del router (solo sus variables de datos, inventados): sus etiquetas son de HTML, no hojas XML con clase; las reglas genéricas siguen aplicándose
 
 # Secretos inventados que una variante pone para probar que no salen del
-# sitio (Tarea 4 de la fase 3: la contraseña PPP y la serie GPON).
+# sitio (la contraseña PPP y la serie GPON).
 prueba crates/hgu/fixtures-variantes/conexion-secretos/cbGetWanIPIntf.xml password clave-ppp-de-prueba — contraseña PPP inventada a propósito para probar que no sale del sitio; fixtures_have_no_secrets (router-sim) solo la admite en esa fixture y en su etiqueta
 prueba crates/hgu/fixtures-variantes/conexion-secretos/cbGetGPONInfo.xml GponSerialNumber SERIE-DE-PRUEBA — número de serie GPON inventado a propósito para probar que no sale del sitio; fixtures_have_no_secrets (router-sim) solo lo admite en esa fixture y en su etiqueta
 
@@ -98,6 +98,7 @@ red 192.168.1.60/30 — equipos de la LAN renumerados en las fixtures (.60–.99
 red 192.168.1.64/27 — equipos de la LAN renumerados en las fixtures (.60–.99) y en las pruebas
 red 192.168.1.96/30 — equipos de la LAN renumerados en las fixtures (.60–.99) y en las pruebas
 valor 192.168.1.0 — red LAN de fábrica del router
+valor 192.168.1.255 — difusión de la LAN de fábrica del router (el saneador la conserva, como .0 y .1)
 valor 192.168.1.100 — inicio del pool DHCP neutro de las fixtures; IP de ejemplo de la biblioteca y del explorador
 valor 192.168.1.199 — fin del pool DHCP neutro de las fixtures
 valor 192.168.1.230 — inicio del rango de fábrica del pool DHCP de otros dispositivos del operador (id 1) en las fixtures
@@ -107,7 +108,7 @@ valor 172.16.0.1 — ejemplo genérico de red privada 172.16/12 en las pruebas
 valor 10.0.0.0 — red privada 10/8 (RFC 1918) del ejemplo de nginx de docs/proxy-tls.md
 valor 172.16.0.0 — red privada 172.16/12 (RFC 1918) del ejemplo de nginx de docs/proxy-tls.md
 valor 192.168.0.0 — red privada 192.168/16 (RFC 1918) del ejemplo de nginx de docs/proxy-tls.md
-ruta crates/router-sim/src/sanitize/tests.rs ipv4 — entradas sintéticas de las pruebas del saneador (LAN y operador sin renumerar)
+valor 100.64.0.1 — primera dirección del rango CGNAT (RFC 6598): entrada inventada de las pruebas del saneador, que debe renumerarse
 
 # Commits de las acciones fijadas en .github/workflows (la versión va en el
 # comentario de cada «uses:»).
