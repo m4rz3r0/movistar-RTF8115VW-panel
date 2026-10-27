@@ -8,6 +8,9 @@
 # - una configuración sin ROUTER_IP falla y el mensaje nombra la clave;
 # - TRABAJOS_COMPILACION (opcional) llega a actualizador.conf y un valor que
 #   no es un entero positivo falla nombrando la clave.
+# - PRECOMPILADAS_ESPERA y PRECOMPILADAS_MINISIGN (opcionales) llegan a
+#   actualizador.conf, vacías con el ejemplo; una espera que no es 0 ni un
+#   entero positivo falla nombrando la clave.
 #
 # Uso: deploy/pruebas/plantillas.sh (desde cualquier sitio). El comprobador
 # se toma de $COMPROBAR (ruta al binario) o, si no, de «cargo run».
@@ -27,12 +30,24 @@ fallo()
 }
 
 # --- sintaxis ---------------------------------------------------------------
+# Los de deploy/cross/ son de bash (corren en el PC de compilación, Linux).
 for f in "$DEPLOY"/*/*.sh "$DEPLOY"/freebsd-jail/routerpanel.rc; do
-	sh -n "$f" || fallo "sh -n: ${f#"$RAIZ"/}"
+	case $f in
+	"$DEPLOY"/cross/*) bash -n "$f" || fallo "bash -n: ${f#"$RAIZ"/}" ;;
+	*) sh -n "$f" || fallo "sh -n: ${f#"$RAIZ"/}" ;;
+	esac
 done
 if command -v shellcheck >/dev/null 2>&1; then
-	shellcheck -s sh "$DEPLOY"/*/*.sh "$DEPLOY"/freebsd-jail/routerpanel.rc ||
+	set --
+	for f in "$DEPLOY"/*/*.sh; do
+		case $f in
+		"$DEPLOY"/cross/*) ;;
+		*) set -- "$@" "$f" ;;
+		esac
+	done
+	shellcheck -s sh "$@" "$DEPLOY"/freebsd-jail/routerpanel.rc ||
 		fallo "shellcheck"
+	shellcheck -s bash "$DEPLOY"/cross/*.sh || fallo "shellcheck de deploy/cross"
 else
 	echo "aviso: no hay shellcheck; solo sh -n" >&2
 fi
@@ -97,6 +112,33 @@ for malo in x 0 -2; do
 	elif ! grep -q TRABAJOS_COMPILACION "$TMP/salida"; then
 		cat "$TMP/salida" >&2
 		fallo "el error de TRABAJOS_COMPILACION=$malo no nombra la clave"
+	fi
+done
+
+# --- versiones precompiladas -------------------------------------------------
+for k in PRECOMPILADAS_ESPERA PRECOMPILADAS_MINISIGN; do
+	grep -q "^$k=''" "$TMP/plantillas/actualizador.conf" 2>/dev/null ||
+		fallo "actualizador.conf no lleva $k vacía con el ejemplo"
+done
+for bueno in 0 20; do
+	{ cat "$DEPLOY/config.example"; echo "PRECOMPILADAS_ESPERA=$bueno"; } >"$TMP/precompiladas.conf"
+	if sh "$DEPLOY/freebsd-jail/install.sh" --config "$TMP/precompiladas.conf" \
+		--plantillas "$TMP/precompiladas" >"$TMP/salida" 2>&1; then
+		grep -q "^PRECOMPILADAS_ESPERA='$bueno'" "$TMP/precompiladas/actualizador.conf" ||
+			fallo "PRECOMPILADAS_ESPERA=$bueno no llega a actualizador.conf"
+	else
+		cat "$TMP/salida" >&2
+		fallo "install.sh --plantillas con PRECOMPILADAS_ESPERA=$bueno"
+	fi
+done
+for malo in x 020 -5 '1 2'; do
+	{ cat "$DEPLOY/config.example"; echo "PRECOMPILADAS_ESPERA='$malo'"; } >"$TMP/precompiladas.conf"
+	if sh "$DEPLOY/freebsd-jail/install.sh" --config "$TMP/precompiladas.conf" \
+		--plantillas "$TMP/precompiladas-malo" >"$TMP/salida" 2>&1; then
+		fallo "PRECOMPILADAS_ESPERA=$malo no falla"
+	elif ! grep -q PRECOMPILADAS_ESPERA "$TMP/salida"; then
+		cat "$TMP/salida" >&2
+		fallo "el error de PRECOMPILADAS_ESPERA=$malo no nombra la clave"
 	fi
 done
 

@@ -176,7 +176,7 @@ generar_plantillas()
 	} >"$_dst/rc.conf"
 	echo "nameserver $DNS_IP" >"$_dst/resolv.conf"
 	volcar_config JAILS_RAIZ JAIL_PANEL JAIL_COMPILAR REPO_URL TRABAJOS_COMPILACION \
-		>"$_dst/actualizador.conf"
+		PRECOMPILADAS_ESPERA PRECOMPILADAS_MINISIGN >"$_dst/actualizador.conf"
 	# SSH del usuario que compila: sólo su clave de despliegue, y la clave del
 	# servidor git fijada (la de REPO_HOST_CLAVE o, sin ella, la primera que
 	# presente).
@@ -231,7 +231,8 @@ as_builder()
 
 check_syntax()
 {
-	for f in "$DIR/install.sh" "$DIR/actualizar.sh" "$DIR/routerpanel.rc" "$DEPLOY_DIR"/lib/*.sh; do
+	for f in "$DIR/install.sh" "$DIR/actualizar.sh" "$DIR/recibir-precompilada.sh" \
+		"$DIR/routerpanel.rc" "$DEPLOY_DIR"/lib/*.sh; do
 		sh -n "$f" || die "error de sintaxis en $(basename "$f")"
 	done
 }
@@ -415,6 +416,8 @@ setup_updater()
 	install -m 0755 -o root -g wheel "$DIR/actualizar.sh" /usr/local/sbin/routerpanel-actualizar
 	install -d -m 0755 -o root -g wheel "$ACTUALIZADOR_LIB"
 	install -m 0644 -o root -g wheel "$DEPLOY_DIR/lib/git.sh" "$ACTUALIZADOR_LIB/git.sh"
+	install -m 0644 -o root -g wheel "$DEPLOY_DIR/lib/precompiladas.sh" "$ACTUALIZADOR_LIB/precompiladas.sh"
+	install -m 0755 -o root -g wheel "$DIR/recibir-precompilada.sh" "$ACTUALIZADOR_LIB/recibir-precompilada.sh"
 	install -m 0600 -o root -g wheel "$PLANTILLAS/actualizador.conf" "$ACTUALIZADOR_CONF"
 	mkdir -p /usr/local/etc/cron.d /usr/local/etc/newsyslog.conf.d
 	cat >/usr/local/etc/cron.d/routerpanel <<-'EOF'
@@ -685,7 +688,8 @@ instalar()
 	generar_plantillas "$_tmp/plantillas"
 	rm -rf "$_tmp/plantillas"
 	mkdir -p "$_tmp/freebsd-jail" "$_tmp/lib"
-	cp "$DIR"/install.sh "$DIR"/actualizar.sh "$DIR"/routerpanel.rc "$DIR"/*.plantilla "$_tmp/freebsd-jail/"
+	cp "$DIR"/install.sh "$DIR"/actualizar.sh "$DIR"/recibir-precompilada.sh \
+		"$DIR"/routerpanel.rc "$DIR"/*.plantilla "$_tmp/freebsd-jail/"
 	cp "$DEPLOY_DIR"/lib/*.sh "$_tmp/lib/"
 	# La configuración ya resuelta: en el servidor no hace falta config.example.
 	volcar_config >"$_tmp/config.local"

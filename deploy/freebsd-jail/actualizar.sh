@@ -29,6 +29,15 @@
 # Registro: /var/log/routerpanel-update.log (salida de cargo de la última
 # compilación en /var/log/routerpanel-build.log).
 #
+# Versiones precompiladas (opcional, PRECOMPILADAS_ESPERA en $CONF): para una
+# etiqueta nueva, antes de compilar se espera hasta PRECOMPILADAS_ESPERA
+# minutos a que el PC de compilación deje la versión ya compilada en el buzón
+# ($BUZON, deploy/cross/ y recibir-precompilada.sh); si llega y cuadra
+# (sha256, firma de minisign si hay PRECOMPILADAS_MINISIGN, commit de la
+# etiqueta, ejecutable de FreeBSD), se instala como las propias; si no llega
+# a tiempo o no cuadra, se compila aquí como siempre. Sin PRECOMPILADAS_ESPERA
+# no se mira el buzón.
+#
 # Todo lo que hay bajo la jail de compilación lo controla el código del
 # repositorio (build.rs, macros), así que este guion, que corre como
 # root, nunca abre rutas de esa jail desde el host: los artefactos salen como
@@ -46,6 +55,7 @@ JEXEC=/usr/sbin/jexec
 GIT=/usr/local/bin/git
 CONF=/usr/local/etc/routerpanel-actualizar.conf
 GIT_SH=/usr/local/libexec/routerpanel-actualizar/git.sh
+PRECOMPILADAS_SH=/usr/local/libexec/routerpanel-actualizar/precompiladas.sh
 # Valores por defecto; los de la instalación vienen de $CONF.
 JAILS_RAIZ=/usr/local/jails/containers
 JAIL_PANEL=routerpanel
@@ -53,6 +63,11 @@ JAIL_COMPILAR=routerpanel-build
 REPO_URL=
 # Trabajos de cargo a la vez; vacía, los que cargo decida (uno por núcleo).
 TRABAJOS_COMPILACION=
+# Minutos de espera a la versión precompilada; vacía, no se usa el buzón.
+PRECOMPILADAS_ESPERA=
+# Clave pública de minisign de las precompiladas; vacía, sin firma.
+PRECOMPILADAS_MINISIGN=
+BUZON=/var/db/routerpanel-buzon/entrada
 if [ -f "$CONF" ]; then
 	# shellcheck source=/dev/null
 	. "$CONF"
@@ -320,10 +335,62 @@ extract_release()
 	fi
 	mv "$_dst/release/panel" "$_dst/panel" && rmdir "$_dst/release" || return 1
 	in_build_git 'git rev-parse HEAD' >"$_dst/COMMIT" || return 1
-	chown -R root:wheel "$_dst" &&
-		find "$_dst" -type d -exec chmod 755 {} + &&
-		find "$_dst" -type f -exec chmod 644 {} + &&
-		chmod 755 "$_dst/panel"
+	asentar_release "$_dst"
+}
+
+# Deja la versión $1 de root, con 755/644 (el binario, 755).
+asentar_release()
+{
+	chown -R root:wheel "$1" &&
+		find "$1" -type d -exec chmod 755 {} + &&
+		find "$1" -type f -exec chmod 644 {} + &&
+		chmod 755 "$1/panel"
+}
+
+# Versión precompilada de la etiqueta $1 (deploy/lib/precompiladas.sh). Deja
+# en FUENTE «instalada» (ya está en releases/$1), «esperar» (aún no ha
+# llegado y no ha pasado PRECOMPILADAS_ESPERA) o «compilar».
+precompilada()
+{
+	FUENTE=compilar
+	_et=$1
+	if [ ! -f "$PRECOMPILADAS_SH" ]; then
+		log "ERROR: falta $PRECOMPILADAS_SH (se instala con install.sh); se compila aquí"
+		return 0
+	fi
+	# shellcheck source=../lib/precompiladas.sh
+	. "$PRECOMPILADAS_SH"
+	_llegada=no
+	if precompilada_llegada "$BUZON" "$_et" "$PRECOMPILADAS_MINISIGN"; then
+		_llegada=si
+	fi
+	case $(decidir_precompilada "$STATE/precompilada" "$_et" "$(date +%s)" \
+		"$PRECOMPILADAS_ESPERA" "$_llegada") in
+	esperar)
+		FUENTE=esperar
+		log "esperando la versión precompilada de $_et (hasta $PRECOMPILADAS_ESPERA min desde que se vio la etiqueta)"
+		return 0
+		;;
+	compilar)
+		log "no ha llegado la versión precompilada de $_et; se compila aquí"
+		return 0
+		;;
+	esac
+	# El commit de la etiqueta, del clon (ya validado: 40 cifras hex).
+	_commit=$(in_build_git 'git rev-parse "$1^{commit}"' "refs/tags/$_et")
+	_tmp=$RELEASES/.$_et.tmp
+	rm -rf "$_tmp"
+	if ! valid_sha "$_commit" || [ "${#_commit}" -ne 40 ]; then
+		log "ERROR: git no da un commit válido para $_et; se compila aquí"
+	elif _err=$(preparar_precompilada "$BUZON" "$_et" "$_commit" \
+		"$PRECOMPILADAS_MINISIGN" "$_tmp" 2>&1) &&
+		asentar_release "$_tmp" && mv "$_tmp" "$RELEASES/$_et"; then
+		FUENTE=instalada
+		log "instalada la versión precompilada de $_et ($(echo "$_commit" | cut -c1-12))"
+	else
+		log "ERROR: versión precompilada de $_et rechazada: $(printf '%s' "${_err:-no se puede instalar}" | head -n 1); se compila aquí"
+	fi
+	rm -rf "$_tmp" "${BUZON:?}/$_et"
 }
 
 # Borra las versiones más antiguas; nunca la desplegada.
@@ -520,9 +587,18 @@ main()
 
 	# «fallida» sólo guarda etiquetas (lo que mira el cron): un --ref que falla
 	# no debe pisar una etiqueta fallida y hacer que se reintente.
-	if [ ! -d "$RELEASES/$_name" ] && ! build_release "$_ref" "$_name"; then
-		tag_failed "$_tag"
-		exit 1
+	if [ ! -d "$RELEASES/$_name" ]; then
+		FUENTE=compilar
+		if [ -n "$_tag" ] && [ -n "$PRECOMPILADAS_ESPERA" ]; then
+			precompilada "$_tag"
+		fi
+		if [ "$FUENTE" = esperar ]; then
+			exit 0
+		fi
+		if [ "$FUENTE" = compilar ] && ! build_release "$_ref" "$_name"; then
+			tag_failed "$_tag"
+			exit 1
+		fi
 	fi
 	if ! deploy "$_name"; then
 		tag_failed "$_tag"

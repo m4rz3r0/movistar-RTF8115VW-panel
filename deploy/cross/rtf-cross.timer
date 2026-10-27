@@ -1,0 +1,14 @@
+# Temporizador de usuario (opcional) de rtf-cross.service: mientras el PC de
+# compilación está encendido, mira cada 15 minutos si hay una etiqueta nueva.
+# No se activa solo: systemctl --user enable --now rtf-cross.timer.
+
+[Unit]
+Description=Mirar cada 15 minutos si hay una versión del panel que compilar
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=15min
+Persistent=false
+
+[Install]
+WantedBy=timers.target

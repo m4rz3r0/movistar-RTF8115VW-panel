@@ -17,6 +17,9 @@ Otros ficheros:
 - [`config.example`](config.example): la configuración de la vía de FreeBSD
   (se copia a `config.local`, que git ignora).
 - `lib/`: funciones de sh compartidas por los instaladores y actualizadores.
+- `cross/`: compilar la versión de FreeBSD en otro equipo con Linux (el PC
+  de compilación) y entregarla al buzón del servidor, que así no compila
+  ([versiones precompiladas](freebsd-jail/README.md#versiones-precompiladas-el-pc-de-compilación)).
 - `pruebas/`: pruebas de cada vía que no tocan ningún servidor
   (`plantillas.sh`, `linux.sh`, `docker.sh`, `release-local.sh`,
-  `historial-reescrito.sh`).
+  `historial-reescrito.sh`, `precompiladas.sh`).
