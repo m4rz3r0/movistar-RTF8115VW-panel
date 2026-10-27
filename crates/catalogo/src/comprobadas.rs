@@ -3,7 +3,7 @@
 //! El panel solo escribe con lo comprobado en el router real
 //! ([`Funcion::comprobada`]): lo demás solo se lee. Marcar una función como
 //! comprobada es cambiar su línea en `funciones.toml`
-//! (`comprobada = false` → `comprobada = "E3, cambio 14"`). Falla cerrada:
+//! (`comprobada = false` → `comprobada = "ida y vuelta"`). Falla cerrada:
 //! sin el campo, no está comprobada (y un test pide que toda escritura lo
 //! lleve, para que se decida a propósito).
 //!

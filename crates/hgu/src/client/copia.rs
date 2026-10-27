@@ -73,7 +73,7 @@ fn nombre_de_disposicion(v: &str) -> Option<String> {
 
 /// Lee el cuerpo de `resp` hasta `tope` bytes; el segundo valor dice si
 /// era mayor (y se dejó de leer).
-async fn con_tope(
+pub(super) async fn con_tope(
     mut resp: reqwest::Response,
     tope: usize,
 ) -> Result<(Vec<u8>, bool), reqwest::Error> {

@@ -9,7 +9,7 @@ pub mod mask;
 mod model;
 
 pub use model::{
-    Acceso, Area, Casilla, Comprobacion, Depende, Funcion, LecturaPareada, Lista, Origen,
+    Acceso, Area, Casilla, Comprobacion, Depende, Funcion, LecturaPareada, Lista, Longitud, Origen,
     Parametro, Partido, RANURA_LIBRE, Riesgo, Tipo, TipoParam,
 };
 
@@ -134,6 +134,12 @@ impl Catalogo {
                         return Err(mal(f, format!("{} tiene opciones sin ser enum", p.nombre)));
                     }
                     _ => {}
+                }
+                if p.longitud.is_some() && !matches!(p.tipo, TipoParam::Text | TipoParam::Secret) {
+                    return Err(mal(
+                        f,
+                        format!("{}: longitud solo de un text o un secret", p.nombre),
+                    ));
                 }
                 // Una ranura libre es `0.0.0.0`: solo hay ranuras de IP.
                 if p.ranuras.is_some_and(|n| n == 0)
@@ -320,6 +326,15 @@ riesgo = "bajo"
             "{buena}\n[[funcion.parametro]]\nnombre = \"del\"\netiqueta = \"D\"\ntipo = \"text\"\n"
         );
         assert!(Catalogo::from_toml(&del_editable).is_err());
+        // `longitud`, solo en un text o un secret.
+        let con_longitud = |tipo: &str| {
+            format!(
+                "{buena}\n[[funcion.parametro]]\nnombre = \"n\"\netiqueta = \"N\"\n\
+                 tipo = \"{tipo}\"\nlongitud = {{ max = 3 }}\n"
+            )
+        };
+        assert!(Catalogo::from_toml(&con_longitud("text")).is_ok());
+        assert!(Catalogo::from_toml(&con_longitud("int")).is_err());
         // Sin acceso, una escritura no vale; una lectura no lo lleva.
         let sin_acceso = buena.replace("acceso = \"puede_cortar\"\n", "");
         assert!(Catalogo::from_toml(&sin_acceso).is_err());
@@ -425,7 +440,7 @@ riesgo = "bajo"
 
     /// El registro del sistema se configura como un ajuste más: su escritura
     /// se lee con su lectura pareada y nunca lleva `export`, que exporta el
-    /// registro (spec de mejoras, §5.2).
+    /// registro.
     #[test]
     fn set_syslog_es_escritura_sin_export() {
         let c = cat();

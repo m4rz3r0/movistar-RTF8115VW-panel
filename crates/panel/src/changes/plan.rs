@@ -170,10 +170,11 @@ pub(super) fn es_credencial(f: &Funcion, m: &Mascara, nombre: &str) -> bool {
         || m.es_secreto(nombre)
 }
 
-/// Comprueba el valor nuevo de un parámetro. Con `protegido` (un secreto o
-/// un dato sensible, [`es_secreto_param`]) o un `secret` del catálogo, el
-/// error no lleva el valor: acaba en la respuesta y puede acabar en un
-/// registro.
+/// Comprueba el valor nuevo de un parámetro, con su
+/// [`longitud`](catalogo::Parametro::longitud) si la tiene. Con `protegido`
+/// (un secreto o un dato sensible, [`es_secreto_param`]) o un `secret` del
+/// catálogo, el error no lleva el valor: acaba en la respuesta y puede
+/// acabar en un registro.
 pub(super) fn validar(p: &Parametro, v: &str, protegido: bool) -> Result<(), String> {
     let n = &p.nombre;
     let ok = match p.tipo {
@@ -192,9 +193,18 @@ pub(super) fn validar(p: &Parametro, v: &str, protegido: bool) -> Result<(), Str
         }
         TipoParam::Text | TipoParam::Secret => !v.chars().any(char::is_control),
     };
+    let protegido = protegido || p.tipo == TipoParam::Secret;
+    if let Some(l) = p.longitud.as_ref().filter(|l| ok && !l.admite(v)) {
+        // La longitud, aunque sea de un secreto, no lo descubre.
+        return Err(if protegido {
+            format!("{n}: debe tener {}", l.describir())
+        } else {
+            format!("{n}: «{v}» no vale: debe tener {}", l.describir())
+        });
+    }
     if ok {
         Ok(())
-    } else if protegido || p.tipo == TipoParam::Secret {
+    } else if protegido {
         Err(format!("{n}: contiene caracteres no válidos"))
     } else {
         Err(format!("{n}: «{v}» no es un valor válido"))

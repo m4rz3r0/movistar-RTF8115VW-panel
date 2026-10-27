@@ -92,7 +92,7 @@ Elementos de la respuesta: `accept_ra`, `adm_state`, `ip_intf_id`, `rip_intf_0i`
 
 Activa RIP y el envío/recepción de anuncios en una interfaz.
 
-**Comprobada en el router real:** pruebas del 2026-10-26, cambios 35 y 36
+**Comprobada en el router real:** ida y vuelta
 
 Lectura pareada: `cbGetRipIntf` con `rip_intf_0i={rip_intf_id}`
 
@@ -356,7 +356,7 @@ Elementos de la respuesta: `adm_state`, `ipv4_addr`, `mac_addr`, `rtm_dhcpv4_svr
 
 Crea, modifica o borra una reserva DHCP (IP fija por MAC).
 
-**Comprobada en el router real:** pruebas del 2026-10-26, cambios 41 a 45 (crear, editar y borrar)
+**Comprobada en el router real:** crear, editar y borrar
 
 Lectura pareada: `cbDhcpV4SvrPoolGetStatic` con `rtm_cfg_dhcpv4_svr_pool_id={rtm_cfg_dhcpv4_svr_pool_id}`, `rtm_dhcpv4_svr_pool_static_id={rtm_dhcpv4_svr_pool_static_id}`
 
@@ -398,7 +398,7 @@ Elementos de la respuesta: `adm_state`, `dhcpv4_opt60`, `dhcpv4_opt60_ex`, `dhcp
 
 Configura un pool DHCPv4 (rango, máscara, puerta de enlace, DNS, concesión, IP reservadas y condiciones).
 
-**Comprobada en el router real:** T12 del 2026-10-27, cambios 77 a 79 (pool id 0; tras reiniciar, un dispositivo nuevo toma IP)
+**Comprobada en el router real:** pool id 0; tras reiniciar, un dispositivo nuevo toma IP
 
 Lectura pareada: `cbGetDhcpv4ServerPool` con `rtm_cfg_dhcpv4_svr_pool_0i={rtm_cfg_dhcpv4_svr_pool_id}`
 
@@ -678,7 +678,7 @@ Elementos de la respuesta: `adm_bandwidth`, `adm_channel`, `adm_guard_interval`,
 
 Configura una radio WiFi: activación, país, estándar, canal, ancho, potencia y opciones avanzadas. Los valores válidos dependen de la banda.
 
-**Comprobada en el router real:** pruebas del 2026-10-26, cambios 48 a 51
+**Comprobada en el router real:** ida y vuelta
 
 Lectura pareada: `cbGetWifi` con `dpm_cfg_wifi_0i={dpm_cfg_wifi_id}`
 
@@ -743,7 +743,7 @@ Elementos de la respuesta: `adm_state`, `authentication`, `bssid`, `dpm_cfg_wifi
 
 Configura un punto de acceso: SSID, ocultación, seguridad y clave, clientes máximos, WMM, aislamiento y WPS. Con `validation_only=1` solo valida.
 
-**Comprobada en el router real:** fase 3, cambios 6 y 7 (clave) y E1, cambios 9 y 10
+**Comprobada en el router real:** ida y vuelta de la clave y de los demás campos
 
 Lectura pareada: `cbGetWifiAccPt` con `dpm_cfg_wifi_acc_pt_id={dpm_cfg_wifi_acc_pt_id}`
 
@@ -1008,7 +1008,7 @@ Elementos de la respuesta: `adm_state`, `ftp_enable`, `h323_enable`, `ip_intf_id
 
 Activa o desactiva los ALG de FTP, H.323, PPTP y SIP (formulario NatAlgForm de natalg.asp): son casillas que van por presencia, y la web manda siempre `set_nf_conntrack=1`, que la lectura no devuelve.
 
-**Comprobada en el router real:** T12 del 2026-10-27, cambios 62 y 63 (h323 apagado y vuelta)
+**Comprobada en el router real:** h323 apagado y vuelta
 
 Lectura pareada: `cbGetNatConfig`
 
@@ -1026,7 +1026,7 @@ Lectura pareada: `cbGetNatConfig`
 
 Activa o desactiva el NAT loopback (formulario NatLoopbackForm de natloopback.asp): `adm_state` es una casilla que va por presencia, con el id leído del loopback.
 
-**Comprobada en el router real:** T12 del 2026-10-27, cambios 75 y 76
+**Comprobada en el router real:** ida y vuelta
 
 Lectura pareada: `cbGetNatConfig`
 
@@ -1080,7 +1080,7 @@ Elementos de la respuesta: `adm_state`, `desc`, `ext_l4_port_max`, `ext_l4_port_
 
 Crea, modifica o borra una redirección de puertos o el host DMZ.
 
-**Comprobada en el router real:** pruebas del 2026-10-26, cambios 54 y 55
+**Comprobada en el router real:** ida y vuelta
 
 Lectura pareada: `cbGetNatPortMapping` con `nat_port_mapping_0i={nat_port_mapping_id}`
 
@@ -1134,7 +1134,7 @@ Elementos de la respuesta: `adm_state`, `upnp_cfg`
 
 Activa o desactiva UPnP.
 
-**Comprobada en el router real:** pruebas del 2026-10-26, cambios 22 y 23
+**Comprobada en el router real:** ida y vuelta
 
 Lectura pareada: `cbGetUpnpCfg`
 
@@ -1276,7 +1276,7 @@ Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalida
 
 **Bloqueada:** el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo
 
-**Comprobada en el router real:** E5, cambio 11 (la regla se pone; «sin ping» no basta en este router)
+**Comprobada en el router real:** la regla se pone; «sin ping» no basta en este router
 
 Lectura pareada: `scbidirectionalflt_ls.asp`
 
@@ -1308,7 +1308,7 @@ Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalida
 
 **Bloqueada:** el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo
 
-**Comprobada en el router real:** T12 del 2026-10-27, cambio 67
+**Comprobada en el router real:** ida y vuelta
 
 Lectura pareada: `scbidirectionalflt_ls.asp`
 
@@ -1340,7 +1340,7 @@ Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalida
 
 **Bloqueada:** el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo
 
-**Comprobada en el router real:** T12 del 2026-10-27, cambio 68
+**Comprobada en el router real:** ida y vuelta
 
 Lectura pareada: `scbidirectionalflt_ls.asp`
 
@@ -1372,7 +1372,7 @@ Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalida
 
 **Bloqueada:** el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo
 
-**Comprobada en el router real:** E5, cambio 12
+**Comprobada en el router real:** ida y vuelta
 
 Lectura pareada: `scbidirectionalflt_ls.asp`
 
@@ -1389,7 +1389,7 @@ Añade un filtro (una entrada) vacío: nombre, interfaz, entrada o salida, versi
 
 **Bloqueada:** el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo
 
-**Comprobada en el router real:** T12 del 2026-10-27, cambio 70
+**Comprobada en el router real:** ida y vuelta
 
 Lectura pareada: `scbidirectionalflt_ls.asp`
 
@@ -1410,7 +1410,7 @@ Cambia un filtro (`id=<FID>&target=entry&…`), como la web. El router responde 
 
 **Bloqueada:** el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo
 
-**Comprobada en el router real:** T12 del 2026-10-27, cambio 71
+**Comprobada en el router real:** ida y vuelta
 
 Lectura pareada: `scbidirectionalflt_ls.asp`
 
@@ -1432,7 +1432,7 @@ Borra un filtro (`item=<FID>&escape=true`, sin `|`): el router lo borra con toda
 
 **Bloqueada:** el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo
 
-**Comprobada en el router real:** T12 del 2026-10-27, cambio 72
+**Comprobada en el router real:** ida y vuelta
 
 Lectura pareada: `scbidirectionalflt_ls.asp`
 
@@ -1492,7 +1492,7 @@ Elementos de la respuesta: `dns_relay_adm_state`, `rtm_cfg_igd`
 
 Activa o desactiva el relé DNS.
 
-**Comprobada en el router real:** pruebas del 2026-10-26, cambios 37 y 38
+**Comprobada en el router real:** ida y vuelta
 
 Lectura pareada: `cbGetDnsRelay`
 
@@ -1549,7 +1549,7 @@ Elementos de la respuesta: `adm_state`, `dhcpv6_mode`, `dhcpv6_svr_adm_state`, `
 
 Configura IPv6 en la LAN: activación, prefijo delegado, ULA, RA y DHCPv6.
 
-**Comprobada en el router real:** pruebas del 2026-10-26, cambios 46 y 47
+**Comprobada en el router real:** ida y vuelta
 
 Lectura pareada: `cbGetLanIPv6Config`
 
@@ -1688,7 +1688,7 @@ Elementos de la respuesta: `br_id`, `eth_link_id`, `igmp_last_mbr_qry_count`, `i
 
 Configura los parámetros de IGMP.
 
-**Comprobada en el router real:** pruebas del 2026-10-26, cambios 24 y 25
+**Comprobada en el router real:** ida y vuelta
 
 Lectura pareada: `cbGetMcastIgmpSetting`
 
@@ -1714,7 +1714,7 @@ Elementos de la respuesta: `adm_state`, `ip_intf_id`, `rtm_cfg_ip_mcast_intf`, `
 
 Activa multicast y la versión de IGMP en una interfaz.
 
-**Comprobada en el router real:** pruebas del 2026-10-26, cambios 29 y 30
+**Comprobada en el router real:** ida y vuelta
 
 Lectura pareada: `cbGetMcastIntf` con `rtm_ip_mcast_intf_0i={rtm_ip_mcast_intf_id}`
 
@@ -1759,7 +1759,7 @@ Elementos de la respuesta: `adm_state`, `cls_dscp`, `cls_dscp_value`, `cls_dst_i
 
 Crea, modifica o borra una regla de clasificación de QoS (condiciones y remarcado DSCP/802.1p).
 
-**Comprobada en el router real:** T12 del 2026-10-27, cambios 65 y 66
+**Comprobada en el router real:** ida y vuelta
 
 Lectura pareada: `cbGetClassification` con `rtm_cfg_qos_cls_0i={rtm_cfg_qos_cls_id}`
 
@@ -1938,7 +1938,7 @@ Elementos de la respuesta: `adm_state`, `fax_passthrough_adm_state`, `fxs_0i`, `
 
 Configura un puerto de teléfono (ganancias, fax y módem).
 
-**Comprobada en el router real:** pruebas del 2026-10-26, cambios 31 y 32
+**Comprobada en el router real:** ida y vuelta
 
 Lectura pareada: `cbGetVoicePhysical`
 
@@ -1964,7 +1964,7 @@ Elementos de la respuesta: `adm_state`, `alt_outbound_proxy_cfg` (sensible), `al
 
 Configura SIP (servidores, puertos, tiempos, DTMF, T.38). Puede dejar sin teléfono.
 
-**Comprobada en el router real:** E6, cambio 13
+**Comprobada en el router real:** ida y vuelta
 
 Lectura pareada: `cbGetVoiceSip`
 
@@ -2013,7 +2013,7 @@ Elementos de la respuesta: `acs_URL` (sensible), `acs_password` 🔒, `acs_usern
 
 Configura TR-069 (ACS, credenciales, Inform). Desde cwmp.asp (oculta). Desactivarlo corta la gestión remota del operador.
 
-**Comprobada en el router real:** fase 3, cambios 1 y 2
+**Comprobada en el router real:** ida y vuelta
 
 Lectura pareada: `cbGetTr69Config`
 
@@ -2036,7 +2036,7 @@ Lectura pareada: `cbGetTr69Config`
 
 Crea un usuario de la interfaz web con su grupo (user, admin; system solo si la sesión es system). Usuario, contraseña y grupo van en claro.
 
-**Comprobada en el router real:** E3, cambio 14
+**Comprobada en el router real:** ida y vuelta
 
 Lectura pareada: `cbGetUserList`
 
@@ -2084,7 +2084,7 @@ Comprueba la sesión: devuelve LoginRole y AccessMask. Todas las páginas avanza
 
 Borra usuarios de la interfaz web (lista de nombres, cada uno seguido de «:»).
 
-**Comprobada en el router real:** E3, cambio 16
+**Comprobada en el router real:** ida y vuelta
 
 Lectura pareada: `cbGetUserList`
 
@@ -2193,7 +2193,7 @@ Descarga el fichero de copia generado por cbSaveConfig (backup=1): POST sin cuer
 
 **Bloqueada:** la copia lleva todas las contraseñas: se descarga desde Ajustes → Sistema → Copia de la configuración (guarda, la genera y la descarga), no desde la Biblioteca
 
-**Comprobada en el router real:** T12 del 2026-10-27, copia de ~50 KB descargada
+**Comprobada en el router real:** ida y vuelta
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
@@ -2232,7 +2232,7 @@ Elementos de la respuesta: `diagnosis_config`, `dst_lan_port`, `wan_mirror`
 
 Activa o desactiva el espejo de la WAN hacia un puerto LAN.
 
-**Comprobada en el router real:** pruebas del 2026-10-26, cambios 26 y 27
+**Comprobada en el router real:** ida y vuelta
 
 Lectura pareada: `cbGetDiagConfig`
 
@@ -2271,7 +2271,7 @@ Elementos de la respuesta: `bind_interface`, `remote_ip`, `remote_port`, `remote
 
 Configura el registro del sistema (destino local o remoto, servidor y severidad). El router también exporta el registro si recibe `export=EXPORT` (lo que syslog.asp hace al cargarse): el panel nunca lo envía, porque solo manda los parámetros de este catálogo.
 
-**Comprobada en el router real:** fase 3, cambios 4 y 5
+**Comprobada en el router real:** ida y vuelta
 
 Lectura pareada: `cbGetSyslog`
 
@@ -2290,7 +2290,7 @@ Lectura pareada: `cbGetSyslog`
 
 Reinicia el router. El panel vigila su vuelta hasta 5 minutos.
 
-**Comprobada en el router real:** pruebas del 2026-10-26, cambio 57 (el router se reinició y volvió en menos de 5 min)
+**Comprobada en el router real:** el router se reinició y volvió en menos de 5 min
 
 ### `cbRestoreConfig`
 
@@ -2308,7 +2308,7 @@ Restaura la configuración de fábrica y reinicia el router (restore_default.asp
 
 Con `save=1` graba la configuración en flash; con `backup=1` genera el fichero de copia (lo que hace backup_restore.asp al cargarse).
 
-**Comprobada en el router real:** T12 del 2026-10-27, copia de ~50 KB descargada
+**Comprobada en el router real:** ida y vuelta
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
@@ -2393,7 +2393,7 @@ Recibe un fichero de configuración desde la UI básica y lo aplica.
 
 Fija la hora del router a mano (ntp.asp, oculta). Como la web, la fecha y la hora del router se mandan en segundos desde 1970 (UTC), con la zona que da cbGetSummary; también vale el número de segundos. Sin lectura que la compruebe: acción.
 
-**Comprobada en el router real:** T12 del 2026-10-27, cambios 73 y 74 (el router toma la hora pedida)
+**Comprobada en el router real:** el router toma la hora pedida
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
@@ -2413,7 +2413,7 @@ Elementos de la respuesta: `adm_state`, `ever_synced`, `ip_intf_id`, `ntp_state`
 
 Configura NTP: activación, interfaz y servidores. Desde ntp.asp (oculta).
 
-**Comprobada en el router real:** fase 3, cambio 3
+**Comprobada en el router real:** ida y vuelta
 
 Lectura pareada: `cbGetTimeNtp`
 

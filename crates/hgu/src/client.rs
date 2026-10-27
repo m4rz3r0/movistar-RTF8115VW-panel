@@ -29,6 +29,11 @@ pub use entrar::Credenciales;
 pub use por_id::TOPE_POSICIONES;
 pub use registro::{RegistroDelSistema, TOPE_REGISTRO};
 
+/// Lo más que se lee de cualquier otra respuesta del router (páginas y
+/// llamadas `.xml`): las mayores capturadas no llegan a 64 KiB. Una
+/// respuesta mayor es un error y deja de leerse en cuanto pasa el tope.
+pub const TOPE_RESPUESTA: usize = 4 * 1024 * 1024;
+
 /// Lecturas seguidas como mucho en un [`Turno`] antes de ceder el cerrojo
 /// una vez a quien espera (el sondeo, el gestor de cambios): una tanda
 /// larga no los deja sin turno. Un tema de Ajustes hace hasta 5.
@@ -599,7 +604,8 @@ impl Client {
 
     /// Como [`Client::send`]; con `tope`, del cuerpo se guardan como mucho
     /// sus últimos `tope` bytes (más un trozo) mientras llega, y el segundo
-    /// valor dice si se dejó algo fuera.
+    /// valor dice si se dejó algo fuera. Sin `tope`, un cuerpo mayor que
+    /// [`TOPE_RESPUESTA`] es un error.
     async fn enviar(
         &self,
         st: &mut State,
@@ -614,13 +620,24 @@ impl Client {
             let set = cookies_nuevas(&resp);
             let status = resp.status();
             let text = match tope {
-                None => (resp.text().await?, false),
+                None => {
+                    let (datos, excedido) = copia::con_tope(resp, TOPE_RESPUESTA).await?;
+                    (String::from_utf8_lossy(&datos).into_owned(), excedido)
+                }
                 Some(tope) => registro::cola(resp, tope).await?,
             };
             Ok::<_, reqwest::Error>((status, set, text))
         }
         .await;
-        self.recibido(st, path, result)
+        let (texto, excedido) = self.recibido(st, path, result)?;
+        if excedido && tope.is_none() {
+            return Err(Error::Unexpected(format!(
+                "{}: la respuesta es demasiado grande (más de {} MiB)",
+                sin_consulta(path),
+                TOPE_RESPUESTA / (1024 * 1024)
+            )));
+        }
+        Ok((texto, excedido))
     }
 
     /// La petición `method` a `path`, con las cookies de la sesión, tras

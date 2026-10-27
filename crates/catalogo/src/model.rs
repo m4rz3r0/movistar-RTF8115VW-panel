@@ -48,7 +48,7 @@ pub struct Funcion {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bloqueada: Option<String>,
     /// Si se ha comprobado en el router real (solo escrituras y acciones):
-    /// la referencia de la prueba (`"E3, cambio 14"`) o `false`. Sin el
+    /// la referencia de la prueba (`"ida y vuelta"`) o `false`. Sin el
     /// campo, como `false`: el panel no la usa (ver
     /// [`Funcion::comprobada`]).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -248,6 +248,76 @@ pub struct Parametro {
     /// el valor de una condición mientras su casilla está desmarcada.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub depende: Option<Depende>,
+    /// Longitudes que admite un `text` o un `secret`, como las pone la web
+    /// oficial (`maxlength` y sus comprobaciones) o, sin página, el estándar.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub longitud: Option<Longitud>,
+}
+
+/// Longitudes de un texto ([`Parametro::longitud`]), en bytes: un SSID son
+/// 32 bytes, no 32 letras.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Longitud {
+    /// Lo más corto que admite.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min: Option<usize>,
+    /// Lo más largo que admite.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<usize>,
+    /// Solo estas longitudes (una clave WEP: 5 o 13 caracteres).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exactas: Vec<usize>,
+    /// También vale con exactamente tantas cifras hexadecimales como una de
+    /// estas (una clave WPA de 64; una WEP de 10 o 26).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hex: Vec<usize>,
+    /// Solo caracteres ASCII imprimibles (del espacio a `~`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub ascii: bool,
+}
+
+impl Longitud {
+    /// ¿Admite `v`?
+    pub fn admite(&self, v: &str) -> bool {
+        let n = v.len();
+        let en_hex = self.hex.contains(&n) && v.bytes().all(|b| b.is_ascii_hexdigit());
+        let en_texto = self.min.is_none_or(|m| n >= m)
+            && self.max.is_none_or(|m| n <= m)
+            && (self.exactas.is_empty() || self.exactas.contains(&n))
+            && (!self.ascii || v.bytes().all(|b| (0x20..=0x7e).contains(&b)));
+        en_hex || en_texto
+    }
+
+    /// Lo que admite, para el mensaje de error: «de 8 a 63 caracteres ASCII
+    /// o 64 cifras hexadecimales».
+    pub fn describir(&self) -> String {
+        let lista = |v: &[usize]| {
+            let v: Vec<String> = v.iter().map(usize::to_string).collect();
+            match v.split_last() {
+                Some((u, [])) => u.clone(),
+                Some((u, resto)) => format!("{} o {u}", resto.join(", ")),
+                None => String::new(),
+            }
+        };
+        let unidad = if self.ascii {
+            "caracteres ASCII"
+        } else {
+            "bytes"
+        };
+        let texto = match (self.exactas.as_slice(), self.min, self.max) {
+            ([], Some(a), Some(b)) => format!("de {a} a {b} {unidad}"),
+            ([], Some(a), None) => format!("al menos {a} {unidad}"),
+            ([], None, Some(b)) => format!("como mucho {b} {unidad}"),
+            ([], None, None) => format!("solo {unidad}"),
+            (e, ..) => format!("{} {unidad}", lista(e)),
+        };
+        if self.hex.is_empty() {
+            texto
+        } else {
+            format!("{texto} o {} cifras hexadecimales", lista(&self.hex))
+        }
+    }
 }
 
 /// De qué depende que un campo vaya ([`Parametro::depende`]).
@@ -348,4 +418,46 @@ pub struct Lista {
     /// Admite `del=DEL` para borrar una instancia.
     #[serde(default)]
     pub del: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Longitud;
+
+    #[test]
+    fn longitud_admite_y_se_describe() {
+        let wpa = Longitud {
+            min: Some(8),
+            max: Some(63),
+            hex: vec![64],
+            ascii: true,
+            ..Longitud::default()
+        };
+        assert!(wpa.admite("12345678") && wpa.admite(&"a".repeat(63)));
+        assert!(wpa.admite(&"0f".repeat(32)));
+        assert!(!wpa.admite("1234567") && !wpa.admite(&"g".repeat(64)));
+        assert!(!wpa.admite("clave-con-ñ"));
+        assert_eq!(
+            wpa.describir(),
+            "de 8 a 63 caracteres ASCII o 64 cifras hexadecimales"
+        );
+        let wep = Longitud {
+            exactas: vec![5, 13],
+            hex: vec![10, 26],
+            ascii: true,
+            ..Longitud::default()
+        };
+        assert!(wep.admite("abcde") && wep.admite("0123456789") && !wep.admite("abcdef"));
+        assert_eq!(
+            wep.describir(),
+            "5 o 13 caracteres ASCII o 10 o 26 cifras hexadecimales"
+        );
+        let ssid = Longitud {
+            min: Some(1),
+            max: Some(32),
+            ..Longitud::default()
+        };
+        assert!(ssid.admite(&"ñ".repeat(16)) && !ssid.admite(&"ñ".repeat(17)));
+        assert_eq!(ssid.describir(), "de 1 a 32 bytes");
+    }
 }

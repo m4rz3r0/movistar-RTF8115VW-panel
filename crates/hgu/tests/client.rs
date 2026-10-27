@@ -183,11 +183,17 @@ async fn dhcp_page(State(s): State<S>) -> String {
     format!("<html><script>\nvar sessionKey='{key}';\n</script></html>")
 }
 
+/// Una página un byte mayor que [`hgu::client::TOPE_RESPUESTA`].
+async fn enorme() -> String {
+    "x".repeat(hgu::client::TOPE_RESPUESTA + 1)
+}
+
 async fn start() -> (String, S) {
     let state: S = Arc::new(Fake::default());
     let app = Router::new()
         .route("/", get(root))
         .route("/dhcp.asp", get(dhcp_page))
+        .route("/enorme.asp", get(enorme))
         .route("/cgi-bin/te_acceso_router.cgi", post(basic_login))
         .route("/cgi-bin/cbCheckLogin.xml", post(adv_login))
         .route("/cgi-bin/{name}", post(api).get(basic_cgi))
@@ -561,4 +567,21 @@ async fn sesskey_vale_como_sessionkey() {
     let p: Vec<(&str, &str)> = carga.iter().map(|(k, v)| (*k, v.as_str())).collect();
     c.basic_write(PAGINA_EDITOR, ALTA, &p).await.unwrap();
     assert_eq!(sim.control.cortafuegos()[0].reglas.len(), 11);
+}
+
+/// Una respuesta mayor que el tope se corta con un error que lo dice; las
+/// páginas normales se siguen leyendo enteras.
+#[tokio::test]
+async fn respuesta_enorme_se_corta_con_error() {
+    let (url, _) = start().await;
+    let c = client(&url, PASS);
+    let Err(e) = c.basic_page("enorme.asp").await else {
+        panic!("una respuesta mayor que el tope no da error");
+    };
+    assert!(
+        matches!(&e, Error::Unexpected(m) if m.contains("/enorme.asp") && m.contains("demasiado grande")),
+        "{e:?}"
+    );
+    let html = c.basic_page("dhcp.asp").await.unwrap();
+    assert!(html.contains("var sessionKey="), "{html}");
 }

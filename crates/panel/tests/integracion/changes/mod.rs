@@ -18,6 +18,7 @@ mod aplicar;
 mod cola;
 mod cola_api;
 mod deshacer;
+mod longitudes;
 mod reanudar;
 mod red;
 mod reintentos;
