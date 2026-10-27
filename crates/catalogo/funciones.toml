@@ -3219,6 +3219,7 @@ tipo = "int"
 nombre = "ss_ipv6_prefix_adm_state"
 etiqueta = "Prefijo ULA"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "ss_ipv6_prefix"
@@ -3245,16 +3246,19 @@ opciones = [["0", "Desactivado"], ["1", "Sin estado"], ["2", "Con estado"]]
 nombre = "iana_manual_addr_min"
 etiqueta = "Primer id de interfaz"
 tipo = "int"
+depende = { de = "dhcpv6_mode", salvo = ["0"] }
 
 [[funcion.parametro]]
 nombre = "iana_manual_addr_max"
 etiqueta = "Último id de interfaz"
 tipo = "int"
+depende = { de = "dhcpv6_mode", salvo = ["0"] }
 
 [[funcion.parametro]]
 nombre = "lease_time"
 etiqueta = "Duración de la concesión (s)"
 tipo = "int"
+depende = { de = "dhcpv6_mode", salvo = ["0"] }
 
 [[funcion.parametro]]
 nombre = "ip_intf_id"

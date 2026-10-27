@@ -133,3 +133,41 @@ async fn deshacer_el_loopback_vuelve_con_su_variante() {
     .await;
     assert_eq!(campo(&f, "adm_state").unwrap()["valor"], antes.as_str());
 }
+
+/// El prefijo ULA de la red local es una casilla, como en la web: el router
+/// toma cualquier valor como marcado (con `0` siguió en `1`), así que
+/// desmarcado no se manda.
+#[tokio::test]
+async fn prefijo_ula_por_presencia() {
+    const IPV6: &str = "cbSetLanIPv6Config";
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    // Marcada en el router, como el del usuario.
+    p.state
+        .hgu
+        .write("ipv6.asp", IPV6, &[("ss_ipv6_prefix_adm_state", "1")])
+        .await
+        .unwrap();
+    p.state.lecturas.invalidar();
+    let valores = [("ss_ipv6_prefix_adm_state", "0")];
+    let prep = ok(
+        &p,
+        "preparar_cambio",
+        json!({ "peticion": { "funcion": IPV6, "instancia": null,
+                              "valores": valores, "borrar": false } }),
+        &cookie,
+    )
+    .await;
+    confirmar(&p, &cookie, &prep).await;
+    let (_, ps) = p
+        .sim
+        .control
+        .writes()
+        .into_iter()
+        .rev()
+        .find(|(n, _)| n == IPV6)
+        .unwrap();
+    assert!(
+        ps.iter().all(|(k, _)| k != "ss_ipv6_prefix_adm_state"),
+        "{ps:?}"
+    );
+}
