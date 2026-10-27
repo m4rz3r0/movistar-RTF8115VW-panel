@@ -413,8 +413,14 @@ async fn la_1_0_solo_lo_ensena() {
     assert_eq!(e["filtros"].as_array().unwrap().len(), 2);
     assert!(!e["icmp"][0].as_array().unwrap().is_empty());
 
+    // Fijas como no comprobadas: la compilación de pruebas las habilita.
     let (p, cookie) = PanelPrueba::nuevo()
         .config(|c| c.habilitar_todo = false)
+        .sin_comprobar("scbidirectionalflt.cmd?action=add.regla")
+        .sin_comprobar("scbidirectionalflt.cmd?action=modify")
+        .sin_comprobar("scbidirectionalflt.cmd?action=add.filtro")
+        .sin_comprobar("scbidirectionalflt.cmd?action=modify.filtro")
+        .sin_comprobar("scbidirectionalflt.cmd?action=remove.filtro")
         .arrancar_con_gestor()
         .await;
     reautenticar(&p, &cookie).await;
