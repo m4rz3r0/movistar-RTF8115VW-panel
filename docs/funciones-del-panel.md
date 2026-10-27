@@ -276,6 +276,16 @@ pasa el id como posición (`X_0i = {X_id}`), para comprobar y para el
 «antes» del deshacer. El simulador tiene los dos pools en el orden del
 router real.
 
+**DMZ.** En el router real la DMZ no tiene lectura propia (`cbGetNatPortMapping`
+con `dmz=1` vuelve vacío): es una instancia más de las redirecciones de
+puertos, con `desc=DMZ` y sin protocolo ni puertos, que natdmz.asp crea al
+aplicar aunque quede apagada. Los dos ajustes leen la misma lista y la
+reparten con `solo` y `excluir` en su `leer` (en una lista, solo las
+instancias con esos valores, o todas menos ellas): «DMZ» se queda con
+`desc=DMZ` y las reglas de puertos, con las demás. Se escribe con
+`cbSetNatPortMapping.dmz` (la misma CGI, con los cinco campos de la web y
+`desc` fijo), sin comprobar en el router real: en Puertos solo se ve.
+
 **Red de invitados.** Tiene dos valores: si está separada de la red de casa
 (`guest_networking`) y si aísla entre sí a sus dispositivos (`isolation`).
 El panel solo sabe cambiar el segundo: ninguna escritura del catálogo de

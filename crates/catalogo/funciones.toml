@@ -2349,6 +2349,47 @@ tipo = "ip"
 partido = "ip4"
 
 [[funcion]]
+name = "cbSetNatPortMapping.dmz"
+cgi = "cbSetNatPortMapping"
+area = "nat"
+origen = "avanzada"
+tipo = "escritura"
+pagina = "natdmz.asp"
+descripcion = "Enciende, apaga o cambia el host DMZ (natdmz.asp): todo lo que llega de internet sin regla va a ese equipo. En el router es una instancia más de las redirecciones, con `desc=DMZ` y sin protocolo ni puertos; la web la crea (id -1) al aplicar si no existe."
+riesgo = "alto"
+acceso = "no_corta"
+lectura_pareada = { funcion = "cbGetNatPortMapping", params = [["nat_port_mapping_0i", "{nat_port_mapping_id}"]] }
+lista = { id_param = "nat_port_mapping_id", all = false, del = true }
+comprobada = false
+
+[[funcion.parametro]]
+nombre = "adm_state"
+etiqueta = "Estado"
+tipo = "enum"
+opciones = [["1", "Activado"], ["0", "Desactivado"]]
+
+[[funcion.parametro]]
+nombre = "int_ip_addr"
+etiqueta = "Equipo de la DMZ"
+tipo = "ip"
+
+[[funcion.parametro]]
+nombre = "nat_port_mapping_id"
+etiqueta = "Instancia (id; -1 = nueva)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "ip_intf_id"
+etiqueta = "Interfaz IP (id)"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "desc"
+etiqueta = "Descripción (siempre DMZ)"
+tipo = "text"
+fijo = "DMZ"
+
+[[funcion]]
 name = "cbGetUpnpCfg"
 area = "nat"
 origen = "avanzada"

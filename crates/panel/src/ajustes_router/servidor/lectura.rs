@@ -164,7 +164,8 @@ pub(super) fn lista(
 }
 
 /// Instancias de una lista con su id (ver [`lista`]) y sus elementos tal
-/// cual los da el router.
+/// cual los da el router; solo las que admite su lectura (`solo`,
+/// `excluir`).
 pub(super) fn instancias_con_id(
     f: &Catalogo,
     a: &Ajuste,
@@ -179,8 +180,16 @@ pub(super) fn instancias_con_id(
         .map(String::as_str)
         .collect();
     elementos.extend(id_param);
+    elementos.extend(
+        a.leer
+            .solo
+            .iter()
+            .chain(&a.leer.excluir)
+            .map(|(k, _)| k.as_str()),
+    );
     instancias(n, &elementos)
         .into_iter()
+        .filter(|l| a.leer.admite(l))
         .enumerate()
         .map(|(i, leidos)| {
             let id = match id_param

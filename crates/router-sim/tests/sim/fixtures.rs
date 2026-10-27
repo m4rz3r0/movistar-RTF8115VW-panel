@@ -70,7 +70,9 @@ fn check_value(file: &str, tag: &str, value: &str, secrets: &HashSet<String>) {
         TagClass::Ssid => assert!(pseudo("RED-"), "{file}: <{tag}> sin sanear"),
         TagClass::Host => assert!(pseudo("host-"), "{file}: <{tag}> sin sanear"),
         TagClass::Desc => assert!(
-            pseudo("desc-") || ["LAN", "Default"].contains(&value) || value.parse::<u64>().is_ok(),
+            pseudo("desc-")
+                || ["LAN", "Default", "DMZ"].contains(&value)
+                || value.parse::<u64>().is_ok(),
             "{file}: <{tag}> sin sanear"
         ),
         TagClass::Keep => assert!(

@@ -121,9 +121,10 @@ fn id_param<'a>(state: &'a AppState, nombre: &str) -> Option<&'a str> {
 }
 
 /// ¿Se deja `a` fuera de la foto? La foto guarda un nodo por función, así
-/// que una lista que lee con un filtro la misma función que otra lista lee
-/// sin él (la DMZ, con `dmz=1`, frente a las reglas de puertos) mezclaría
-/// sus instancias con las de la otra: ni se lee para la foto ni se compara.
+/// que una lista que lee con parámetros la misma función que otra lista
+/// lee sin ellos mezclaría sus instancias con las de la otra: ni se lee
+/// para la foto ni se compara (`solo` y `excluir` no cuentan: filtran
+/// el mismo nodo).
 /// Es por ajuste; `instalar::FUERA_DE_LA_FOTO` deja fuera, por función, lo
 /// que no lee el router (la sesión del propio panel).
 pub fn fuera_de_la_foto(ajustes: &[Ajuste], a: &Ajuste) -> bool {
@@ -232,10 +233,12 @@ mod tests {
         }
     }
 
-    /// La DMZ lee con un filtro la función de las reglas de puertos: queda
-    /// fuera de la foto. Las reglas, el pool de casa y la WiFi, no.
+    /// Ningún ajuste del catálogo lee con parámetros una lista que otro lee
+    /// sin ellos: la DMZ sale de la misma lectura que las reglas de puertos
+    /// (`solo`/`excluir`), así que entra en la foto como las reglas, el
+    /// pool de casa y la WiFi.
     #[test]
-    fn la_dmz_queda_fuera_de_la_foto() {
+    fn ninguna_lista_queda_fuera_de_la_foto() {
         let cat = ajustes::CatalogoAjustes::load().unwrap();
         let todos = cat.todos();
         let fuera: Vec<&str> = todos
@@ -243,7 +246,7 @@ mod tests {
             .filter(|a| fuera_de_la_foto(todos, a))
             .map(|a| a.id.as_str())
             .collect();
-        assert_eq!(fuera, ["puertos.dmz"]);
+        assert!(fuera.is_empty(), "{fuera:?}");
     }
 
     /// Una segunda lectura de la misma función añade sus instancias, sin

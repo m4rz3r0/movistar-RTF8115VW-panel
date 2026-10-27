@@ -69,7 +69,7 @@ const NUMERIC_EXACT: &[&str] = &[
 const ROLE_NAMES: &[&str] = &["admin", "system", "user"];
 
 /// Descripciones del sistema que no son datos personales.
-const SYSTEM_DESC: &[&str] = &["LAN", "Default"];
+const SYSTEM_DESC: &[&str] = &["LAN", "Default", "DMZ"];
 
 /// Longitud mínima de un secreto para buscarlo dentro de otros valores.
 const EMBEDDED_MIN: usize = 8;

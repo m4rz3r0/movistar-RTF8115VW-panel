@@ -44,7 +44,7 @@ Las funciones del propio panel (`/api/…`) están en
 | [WAN](#wan) | 14 | 8 | 6 | 0 | 0 |
 | [LAN/DHCP](#landhcp) | 22 | 12 | 10 | 0 | 0 |
 | [WiFi](#wifi) | 20 | 11 | 8 | 1 | 0 |
-| [NAT](#nat) | 17 | 6 | 11 | 0 | 0 |
+| [NAT](#nat) | 18 | 6 | 12 | 0 | 0 |
 | [Cortafuegos](#cortafuegos) | 8 | 1 | 7 | 0 | 8 |
 | [DNS](#dns) | 6 | 3 | 3 | 0 | 0 |
 | [IPv6](#ipv6) | 8 | 2 | 6 | 0 | 3 |
@@ -1099,6 +1099,26 @@ Lista: instancia por `nat_port_mapping_id`; `del=DEL` borra
 | `int_l4_port_min_value` | Puerto interno desde | int |  |
 | `int_l4_port_max_value` | Puerto interno hasta | int |  |
 | `rmt_ip_addr` | IP remota permitida | ip (Ip4) |  |
+
+### `cbSetNatPortMapping.dmz`
+
+*escritura* · UI avanzada · riesgo alto · sin vigilancia · página `natdmz.asp` · se manda a `cbSetNatPortMapping`
+
+Enciende, apaga o cambia el host DMZ (natdmz.asp): todo lo que llega de internet sin regla va a ese equipo. En el router es una instancia más de las redirecciones, con `desc=DMZ` y sin protocolo ni puertos; la web la crea (id -1) al aplicar si no existe.
+
+**Sin comprobar en el router real:** el panel no la escribe.
+
+Lectura pareada: `cbGetNatPortMapping` con `nat_port_mapping_0i={nat_port_mapping_id}`
+
+Lista: instancia por `nat_port_mapping_id`; `del=DEL` borra
+
+| Parámetro | Etiqueta | Tipo | Opciones |
+|---|---|---|---|
+| `adm_state` | Estado | enum | `1` Activado, `0` Desactivado |
+| `int_ip_addr` | Equipo de la DMZ | ip |  |
+| `nat_port_mapping_id` | Instancia (id; -1 = nueva) | int |  |
+| `ip_intf_id` | Interfaz IP (id) | int |  |
+| `desc` | Descripción (siempre DMZ) | text |  |
 
 ### `cbGetUpnpCfg`
 

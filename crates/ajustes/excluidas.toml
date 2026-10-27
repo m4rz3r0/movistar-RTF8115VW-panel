@@ -180,3 +180,7 @@ motivo = "ayudantes de protocolos (puertos.alg, de solo lectura): la escritura e
 [[excluida]]
 funcion = "cbSetNatConfig.loopback"
 motivo = "NAT loopback (natloopback.asp): sin comprobar en el router real; solo en la Biblioteca"
+
+[[excluida]]
+funcion = "cbSetNatPortMapping.dmz"
+motivo = "DMZ (natdmz.asp): sin comprobar en el router real; en Puertos solo se ve y se escribe desde la Biblioteca"

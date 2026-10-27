@@ -399,6 +399,13 @@ fn nombres_de_la_api(c: &CatalogoAjustes) -> BTreeSet<String> {
     let mut nombres = BTreeSet::new();
     for a in c.todos() {
         nombres.extend(a.leer.params.iter().map(|(k, _)| k.clone()));
+        nombres.extend(
+            a.leer
+                .solo
+                .iter()
+                .chain(&a.leer.excluir)
+                .map(|(k, _)| k.clone()),
+        );
         nombres.extend(a.fijos.keys().cloned());
         for x in &a.campos {
             nombres.insert(x.lee.clone());
@@ -462,7 +469,7 @@ fn detector_de_nombres_de_la_api() {
         "ENABLECWMP",
         "el campo UserName",
         "pon wmm a 1",
-        "el parámetro dmz",
+        "el campo desc",
     ] {
         assert!(
             !hallazgos(&patrones, delator).is_empty(),

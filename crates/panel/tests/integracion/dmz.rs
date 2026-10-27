@@ -1,7 +1,10 @@
 //! DMZ de solo lectura y nota sobre el control parental en Puertos (Tarea 6 de la fase 3).
+//! En el router real la DMZ es una instancia más de las redirecciones, con
+//! `desc=DMZ` (la crea natdmz.asp): `puertos.dmz` se queda con ella y
+//! `puertos.reglas` la deja fuera.
 
-use crate::comun::{Panel, PanelPrueba, leer, pagina, variante};
-use serde_json::Value;
+use crate::comun::{Panel, PanelPrueba, esperar_final, leer, ok, pagina, variante};
+use serde_json::{Value, json};
 
 /// El elemento `dmz` de la página de Puertos.
 async fn dmz(p: &Panel, cookie: &str) -> Value {
@@ -155,11 +158,92 @@ async fn dmz_con_ip_cero_no_cuenta_como_activa() {
 #[tokio::test]
 async fn dmz_sin_leer_no_se_da_por_desactivada() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
-    p.sim
-        .control
-        .fail_reads_con("cbGetNatPortMapping", "dmz", "1", true);
+    p.sim.control.fail_reads("cbGetNatPortMapping", true);
     let e = dmz(&p, &cookie).await;
     assert_eq!(e["texto_estado"], "Sin leer", "{e}");
     assert_ne!(e["estado"], "apagada", "{e}");
     assert!(e["recomendacion"].is_null(), "{e}");
+}
+
+/// La instancia de la DMZ no es una regla: la lista de reglas no la enseña.
+#[tokio::test]
+async fn la_dmz_no_sale_entre_las_reglas() {
+    let (p, cookie) = PanelPrueba::nuevo()
+        .capa(&variante("dmz-activa"))
+        .arrancar_con_gestor()
+        .await;
+    let tema = leer(&p, &cookie, "puertos").await;
+    let reglas: Vec<&Value> = tema["elementos"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|e| e["ajustes"].as_array().unwrap())
+        .filter(|a| a["id"] == "puertos.reglas")
+        .flat_map(|a| a["instancias"].as_array().unwrap())
+        .collect();
+    assert_eq!(reglas.len(), 1, "{tema}");
+    assert!(!tema.to_string().contains(r#""DMZ""#), "{tema}");
+}
+
+/// Aplica `prep` (de la Biblioteca o un deshacer) y devuelve el id.
+async fn confirmar(p: &Panel, cookie: &str, prep: &Value) -> i64 {
+    let id = ok(
+        p,
+        "confirmar_cambio",
+        json!({ "token": prep["token"], "palabra": null }),
+        cookie,
+    )
+    .await
+    .as_i64()
+    .unwrap();
+    assert_eq!(esperar_final(p, cookie, id).await["estado"], "Aplicado");
+    id
+}
+
+/// La DMZ se crea como natdmz.asp: la CGI de las redirecciones con sus
+/// cinco campos y `desc=DMZ`; sale en la DMZ, no entre las reglas, y su
+/// deshacer la borra.
+#[tokio::test]
+async fn crear_la_dmz_como_la_web_y_deshacerla() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    let prep = ok(
+        &p,
+        "preparar_cambio",
+        json!({ "peticion": { "funcion": "cbSetNatPortMapping.dmz", "instancia": null,
+                              "valores": [["adm_state", "1"], ["int_ip_addr", "192.168.1.75"],
+                                          ["ip_intf_id", "2"]],
+                              "borrar": false } }),
+        &cookie,
+    )
+    .await;
+    let id = confirmar(&p, &cookie, &prep).await;
+    let (cgi, ps) = p.sim.control.writes().pop().unwrap();
+    assert_eq!(cgi, "cbSetNatPortMapping");
+    let mut claves: Vec<&str> = ps.iter().map(|(k, _)| k.as_str()).collect();
+    claves.sort_unstable();
+    assert_eq!(
+        claves,
+        [
+            "adm_state",
+            "desc",
+            "int_ip_addr",
+            "ip_intf_id",
+            "nat_port_mapping_id"
+        ],
+        "{ps:?}"
+    );
+    assert!(
+        ps.contains(&("desc".to_owned(), "DMZ".to_owned())),
+        "{ps:?}"
+    );
+    p.state.lecturas.invalidar();
+    let e = dmz(&p, &cookie).await;
+    assert_eq!(instancias(&e), 1, "{e}");
+    assert_eq!(e["texto_estado"], "Activa", "{e}");
+
+    let deshacer = ok(&p, "deshacer", json!({ "change_id": id }), &cookie).await;
+    confirmar(&p, &cookie, &deshacer).await;
+    p.state.lecturas.invalidar();
+    let e = dmz(&p, &cookie).await;
+    assert_eq!(instancias(&e), 0, "{e}");
 }

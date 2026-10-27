@@ -6,7 +6,8 @@ tema = "puertos"
 nivel = "basico"
 lista = true
 componente = "puertos"
-leer = { funcion = "cbGetNatPortMapping" }
+# La DMZ es una instancia más de la lista (`desc=DMZ`): no es una regla.
+leer = { funcion = "cbGetNatPortMapping", excluir = { desc = "DMZ" } }
 # Columnas de su lista en la página (el nombre va siempre delante).
 columnas = ["protocolo", "externo", "destino", "activa"]
 
@@ -119,15 +120,16 @@ tipo = "booleano"
 solo_lectura = "ajuste-puertos-alg-motivo"
 
 # DMZ (fase 3), solo de lectura: el equipo que recibe todo lo que llega de
-# internet sin regla. El router real del usuario no tiene DMZ, así que el
-# formato de una DMZ activa es una suposición: cualquier respuesta con
-# instancias se da por activa (`derivado:estado_dmz`).
+# internet sin regla. En el router real es una instancia de las
+# redirecciones con `desc=DMZ`, sin protocolo ni puertos (la crea natdmz.asp
+# al aplicar, aunque quede apagada); `dmz=1` no la lee. Activa si está
+# encendida y con un equipo (`derivado:estado_dmz`).
 [[ajuste]]
 id = "puertos.dmz"
 tema = "puertos"
 nivel = "avanzado"
 lista = true
-leer = { funcion = "cbGetNatPortMapping", params = { dmz = "1" } }
+leer = { funcion = "cbGetNatPortMapping", solo = { desc = "DMZ" } }
 
 [[ajuste.campo]]
 id = "equipo"

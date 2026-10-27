@@ -221,6 +221,29 @@ mod catalogo_toml {
         /// posición 1). Se recorren las posiciones hasta dar con ella.
         #[serde(default)]
         pub buscar: Option<String>,
+        /// En una lista, solo las instancias con estos valores (la DMZ:
+        /// `solo = { desc = "DMZ" }`, una instancia más de las
+        /// redirecciones de puertos).
+        #[serde(default, deserialize_with = "tabla_a_pares")]
+        pub solo: Vec<(String, String)>,
+        /// En una lista, fuera las instancias con estos valores (las reglas
+        /// de puertos sin la DMZ).
+        #[serde(default, deserialize_with = "tabla_a_pares")]
+        pub excluir: Vec<(String, String)>,
+    }
+
+    impl Lectura {
+        /// ¿Va `leidos` (los elementos de una instancia) en la lista, según
+        /// `solo` y `excluir`?
+        pub fn admite(&self, leidos: &std::collections::BTreeMap<String, String>) -> bool {
+            let casa = |pares: &[(String, String)]| {
+                pares
+                    .iter()
+                    .all(|(k, v)| leidos.get(k).is_some_and(|x| x == v))
+            };
+            (self.solo.is_empty() || casa(&self.solo))
+                && (self.excluir.is_empty() || !casa(&self.excluir))
+        }
     }
 
     impl Ajuste {
