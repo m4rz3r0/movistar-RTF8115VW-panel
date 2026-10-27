@@ -31,6 +31,8 @@ código, junto a cada `#[server(endpoint = "…")]`.
 | `comprobar_contrasena_router` | Comprueba, sin escribir nada, que se puede cambiar la contraseña del router a la nueva. Exige reautenticación. |
 | `cambiar_contrasena_router` | Cambia la contraseña del router y el panel pasa a usarla si entra con ella. Exige reautenticación; 409 con otro cambio en curso. |
 | `leer_registro_router` | El registro del sistema del router (`texto`, con lo más nuevo al final, y `recortado`): lo exporta y lo lee como la web (ver «Registro del router»). Solo lectura: no pasa por el gestor ni cambia ningún ajuste. 503 sin router configurado; 502 si el router no lo da. `no-store`. |
+| `estado_copia_router` | Por qué no se puede hacer ahora la copia de la configuración: la clave del motivo (`funcion-sin-comprobar` o `panel-solo-lectura`) o `null` si se puede. |
+| `descargar_copia_router` | Guarda la configuración del router, genera la copia y la descarga como la web (ver «Copia de la configuración»): `nombre` (`config_<fecha>.tar`) y `datos` (el fichero en base64). 403 en solo lectura; 409 sin comprobar o con un cambio en curso; 503 sin router configurado; 502 si el router no la da. `no-store`. |
 
 ## Lo que el panel escribe: solo lo comprobado en el router real
 
@@ -290,6 +292,40 @@ significa `guest_networking = 1` (se lee como «separada»); y si la
 posición de `cbGetWifi` coincide con el id de la radio, porque las
 lecturas de estado de la WiFi (`hgu::read::wifi` y la detección de radios)
 aún toman la posición como id.
+
+## Copia de la configuración (descargar)
+
+Al pie de Ajustes → Sistema, «Copia de la configuración» descarga la copia
+de seguridad de la configuración del router, como la página de copia y
+restauración de su web avanzada (`backup_restore.asp`). Al pulsar
+«Descargar copia» (`descargar_copia_router`), el panel hace lo mismo que la
+web y en un mismo turno de la sesión con el router
+(`hgu::Client::copia_de_configuracion`): guarda la configuración
+(`cbSaveConfig` con `save=1`, como `save.asp`, porque la copia solo lleva lo
+último guardado), genera la copia (`cbSaveConfig` con `backup=1`, que da el
+nombre del fichero) y la descarga (`POST /cgi-bin/cbDownloadConfig.xml` con
+`fileName` y `sessionKey` en la URL y el cuerpo vacío). El navegador la
+guarda con el nombre que da el router (`config_<fecha>.tar`), y la sección
+dice el nombre y el tamaño.
+
+El fichero lleva todas las contraseñas del router, y la sección lo avisa. El
+panel no lo anota en el registro, no lo guarda (ni en la base de datos ni en
+disco) y no enseña su contenido: la página se lo pasa al navegador en cuanto
+llega y lo suelta. Como guarda la configuración, se trata como una
+escritura: exige sesión, no se hace con el panel en solo lectura (403) ni con
+un cambio en curso (409), y solo con `cbSaveConfig` y `cbDownloadConfig`
+comprobadas en el router real; si no, el botón se ve desactivado con el
+motivo (`estado_copia_router`) y el servidor responde 409 sin mandar nada al
+router. No pasa por el gestor de cambios ni queda en el Historial. La
+Biblioteca sigue sin ofrecer ninguna de las dos funciones.
+
+**Pendiente de comprobar en el router real (T12).** Las dos funciones
+están sin comprobar, así que en la versión normal el botón sale
+desactivado; las pruebas contra router-sim lo habilitan todo. Falta ver en
+el router real que el guardado y la generación responden bien con el
+`sessionKey` de su página, que la descarga da el fichero entero y su
+tamaño típico (el panel no acepta más de 16 MiB,
+`hgu::client::TOPE_COPIA`).
 
 ## Registro del router (ver y descargar)
 

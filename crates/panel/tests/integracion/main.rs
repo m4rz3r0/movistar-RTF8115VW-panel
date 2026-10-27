@@ -22,6 +22,7 @@ mod conexion;
 mod contrasena_router;
 mod contrasena_router_plazo;
 mod contraste;
+mod copia_router;
 mod cortafuegos;
 mod cortafuegos_editor;
 mod dmz;

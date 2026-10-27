@@ -1,0 +1,36 @@
+/* «Copia de la configuración», al pie de Sistema: el aviso de las
+   contraseñas con su icono, y el botón y lo descargado en una fila que se
+   parte en el móvil. */
+.copia-router {
+  max-width: none;
+}
+
+.copia-router-aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--esp-2);
+}
+
+.copia-router-aviso > svg {
+  flex: none;
+  margin-top: 0.15em;
+}
+
+.copia-router-barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-2) var(--esp-3);
+  margin: var(--esp-3) 0;
+}
+
+.copia-router-hecha {
+  color: var(--tenue);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+.copia-router-nota {
+  margin: var(--esp-2) 0;
+  color: var(--tenue);
+}

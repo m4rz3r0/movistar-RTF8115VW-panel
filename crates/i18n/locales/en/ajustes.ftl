@@ -434,6 +434,17 @@ ajustes-puertos-parental-dns = A DNS service with a family filter for the whole 
 ajustes-puertos-parental-router = Your own router behind this one. Recommended if you want schedules and limits per device. Pros: it does all of that, usually with its own app. Cons: you have to buy it and set it up.
 ajustes-puertos-parental-enlace = Choose the family DNS in the improvements
 
+## Configuration backup (at the foot of System)
+copia-router-titulo = Configuration backup
+copia-router-desc = A backup of every router setting, like the one its web interface gives. When you press the button, the router saves its current configuration, prepares the backup and your browser downloads it as a config_<date>.tar file. Use it to get your settings back if the router ever has to be restored.
+copia-router-secretos = The file holds every router password: the WiFi one, the one for its web interface and the ones for the internet connection. Keep it somewhere safe and do not share it. The panel does not keep any copy.
+copia-router-descargar = Download backup
+copia-router-preparando = Preparing the backup…
+copia-router-hecha = Downloaded: { $nombre } ({ $kb } KB).
+copia-router-en-curso = A change is in progress: wait for it to finish and try again.
+copia-router-error = The router did not give the backup. Try again in a moment.
+copia-router-sin-router = The panel does not have the router set up yet.
+
 ## Router log (at the foot of System)
 registro-router-titulo = Router log
 registro-router-desc = What the router keeps a note of: restarts, connections, logins to its web interface and warnings. It is read when you press the button, the same way the router's web interface downloads it, and no setting changes.

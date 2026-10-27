@@ -434,6 +434,17 @@ ajustes-puertos-parental-dns = Un DNS con filtro familiar para toda la red de ca
 ajustes-puertos-parental-router = Un router propio detrás de este. Recomendado si quieres horarios y límites por dispositivo. A favor: hace todo eso, normalmente con su propia aplicación. En contra: hay que comprarlo y configurarlo.
 ajustes-puertos-parental-enlace = Elegir el DNS familiar en las mejoras
 
+## Copia de la configuración (al pie de Sistema)
+copia-router-titulo = Copia de la configuración
+copia-router-desc = Una copia de seguridad de todos los ajustes del router, como la que da su web. Al pulsar el botón, el router guarda la configuración actual, prepara la copia y tu navegador la descarga como un fichero config_<fecha>.tar. Sirve para recuperar los ajustes si un día hay que restaurar el router.
+copia-router-secretos = El fichero lleva todas las contraseñas del router: la de la WiFi, la de su web y las de la conexión a internet. Guárdalo en un sitio seguro y no lo compartas. El panel no se queda con ninguna copia.
+copia-router-descargar = Descargar copia
+copia-router-preparando = Preparando la copia…
+copia-router-hecha = Descargada: { $nombre } ({ $kb } KB).
+copia-router-en-curso = Hay un cambio en curso: espera a que termine y prueba de nuevo.
+copia-router-error = El router no ha dado la copia. Prueba de nuevo dentro de un momento.
+copia-router-sin-router = El panel aún no tiene configurado el router.
+
 ## Registro del router (al pie de Sistema)
 registro-router-titulo = Registro del router
 registro-router-desc = Lo que el router va anotando: arranques, conexiones, accesos a su web y avisos. Se lee al pulsar el botón, igual que lo descarga la web del router, y no cambia ningún ajuste.
