@@ -179,4 +179,4 @@ motivo = "ayudantes de protocolos (puertos.alg, de solo lectura): la escritura e
 
 [[excluida]]
 funcion = "cbSetNatConfig.loopback"
-motivo = "NAT loopback: la web de este firmware no lo ofrece y sus campos no están comprobados; solo en la Biblioteca"
+motivo = "NAT loopback (natloopback.asp): sin comprobar en el router real; solo en la Biblioteca"

@@ -1022,9 +1022,9 @@ Lectura pareada: `cbGetNatConfig`
 
 ### `cbSetNatConfig.loopback`
 
-*escritura* · UI avanzada · riesgo bajo · sin vigilancia · página `natalg.asp` · se manda a `cbSetNatConfig`
+*escritura* · UI avanzada · riesgo bajo · sin vigilancia · página `natloopback.asp` · se manda a `cbSetNatConfig`
 
-Activa o desactiva el NAT loopback. Más que la web: js/natcfg.js envía el formulario NatLoopbackForm, pero este firmware no lo tiene en natalg.asp; los campos salen de esa función y de la lectura.
+Activa o desactiva el NAT loopback (formulario NatLoopbackForm de natloopback.asp): `adm_state` es una casilla que va por presencia, con el id leído del loopback.
 
 **Sin comprobar en el router real:** el panel no la escribe.
 
@@ -1266,7 +1266,7 @@ Lectura pareada: `scbidirectionalflt_ls.asp`
 | `escape` | Escapar (true) | text |  |
 | `target` | Objetivo (entry/rule) | text |  |
 | `belong` | Entrada a la que pertenece | int |  |
-| `version` | Versión de IGMP | int |  |
+| `version` | Versión de IP | int |  |
 | `enabled` | Activada | bool |  |
 | `protocol` | Protocolo | text |  |
 | `specificAction` | Acción | text |  |
@@ -1303,7 +1303,7 @@ Lectura pareada: `scbidirectionalflt.cmd?action=view`
 | `escape` | Escapar (true) | text |  |
 | `target` | Objetivo (entry/rule) | text |  |
 | `belong` | Entrada a la que pertenece | int |  |
-| `version` | Versión de IGMP | int |  |
+| `version` | Versión de IP | int |  |
 | `enabled` | Activada | bool |  |
 | `protocol` | Protocolo | text |  |
 | `specificAction` | Acción | text |  |

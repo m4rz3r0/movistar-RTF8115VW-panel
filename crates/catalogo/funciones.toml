@@ -2200,8 +2200,8 @@ cgi = "cbSetNatConfig"
 area = "nat"
 origen = "avanzada"
 tipo = "escritura"
-pagina = "natalg.asp"
-descripcion = "Activa o desactiva el NAT loopback. Más que la web: js/natcfg.js envía el formulario NatLoopbackForm, pero este firmware no lo tiene en natalg.asp; los campos salen de esa función y de la lectura."
+pagina = "natloopback.asp"
+descripcion = "Activa o desactiva el NAT loopback (formulario NatLoopbackForm de natloopback.asp): `adm_state` es una casilla que va por presencia, con el id leído del loopback."
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetNatConfig", params = [] }
@@ -2211,6 +2211,7 @@ comprobada = false
 nombre = "adm_state"
 etiqueta = "Activado"
 tipo = "bool"
+casilla = {}
 
 [[funcion.parametro]]
 nombre = "rtm_cfg_nat_lb_intf_id"
@@ -2611,7 +2612,7 @@ tipo = "int"
 
 [[funcion.parametro]]
 nombre = "version"
-etiqueta = "Versión de IGMP"
+etiqueta = "Versión de IP"
 tipo = "int"
 
 [[funcion.parametro]]
@@ -2734,7 +2735,7 @@ tipo = "int"
 
 [[funcion.parametro]]
 nombre = "version"
-etiqueta = "Versión de IGMP"
+etiqueta = "Versión de IP"
 tipo = "int"
 
 [[funcion.parametro]]
