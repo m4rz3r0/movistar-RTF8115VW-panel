@@ -121,7 +121,7 @@ Elementos de la respuesta: `adm_state`, `desc`, `dst_addr`, `dst_mask`, `fwd_pol
 
 ### `cbSetRoutingV4Rule`
 
-*escritura* · UI avanzada · riesgo alto · se vigila · página `default_gateway.asp`
+*escritura* · UI avanzada · riesgo alto · se vigila · página `routing_rules.asp`
 
 Crea, modifica o borra una ruta IPv4 o la puerta de enlace por defecto.
 
@@ -133,14 +133,14 @@ Lista: instancia por `rtm_rulev4_id`; `del=DEL` borra
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
-| `ip_intf_id` | Interfaz IP | int |  |
-| `rtm_rulev4_id` | Ruta (id; -1 = nueva) | int |  |
 | `adm_state` | Activado | enum | `1` Activado, `0` Desactivado |
-| `metric` | Métrica | int |  |
-| `fwd_policy` | Política | text |  |
 | `dst_addr` | Destino | ip (Ip4) |  |
 | `dst_mask` | Máscara de destino | ip (Ip4) |  |
 | `gw_addr` | Puerta de enlace | ip (Ip4) |  |
+| `ip_intf_id` | Interfaz IP | int |  |
+| `metric` | Métrica | int |  |
+| `fwd_policy` | Política | text |  |
+| `rtm_rulev4_id` | Ruta (id; -1 = nueva) | int |  |
 
 ### `cbGetRoutingV6Rule`
 
@@ -232,15 +232,15 @@ Lista: instancia por `ip_intf_id`; `del=DEL` borra
 | `dhcpv4_req_opt61_value` | Opción 61 enviada | text |  |
 | `dhcpv4_req_opt77_value` | Opción 77 enviada | text |  |
 | `dns_override` | DNS manuales | bool |  |
+| `static_ipv4_addr` | IP estática | ip (Ip4) |  |
+| `static_ipv4_mask` | Máscara estática | ip (Ip4) |  |
+| `static_ipv4_gw` | Puerta de enlace estática | ip (Ip4) |  |
+| `dnsv4_svr0` | DNS primario | ip (Ip4) |  |
+| `dnsv4_svr1` | DNS secundario | ip (Ip4) |  |
 | `ipv6_type` | IPv6 | enum | `0` Doble pila, `1` Solo IPv6, `2` Desactivado |
 | `ipv6_unnumbered` | IPv6 sin numerar | enum | `1` Activado, `0` Desactivado |
 | `ipv6_addr_type` | Direccionamiento IPv6 | enum | `1` SLAAC, `0` DHCP |
 | `ip_intf_id` | Interfaz IP | int |  |
-| `dnsv4_svr0` | DNS primario | ip (Ip4) |  |
-| `dnsv4_svr1` | DNS secundario | ip (Ip4) |  |
-| `static_ipv4_addr` | IP estática | ip (Ip4) |  |
-| `static_ipv4_gw` | Puerta de enlace estática | ip (Ip4) |  |
-| `static_ipv4_mask` | Máscara estática | ip (Ip4) |  |
 
 ### `te_mm.cmd?action=Apply`
 

@@ -117,7 +117,7 @@ name = "cbSetRoutingV4Rule"
 area = "wan"
 origen = "avanzada"
 tipo = "escritura"
-pagina = "default_gateway.asp"
+pagina = "routing_rules.asp"
 descripcion = "Crea, modifica o borra una ruta IPv4 o la puerta de enlace por defecto."
 riesgo = "alto"
 acceso = "puede_cortar"
@@ -126,30 +126,10 @@ lista = { id_param = "rtm_rulev4_id", all = false, del = true }
 comprobada = false
 
 [[funcion.parametro]]
-nombre = "ip_intf_id"
-etiqueta = "Interfaz IP"
-tipo = "int"
-
-[[funcion.parametro]]
-nombre = "rtm_rulev4_id"
-etiqueta = "Ruta (id; -1 = nueva)"
-tipo = "int"
-
-[[funcion.parametro]]
 nombre = "adm_state"
 etiqueta = "Activado"
 tipo = "enum"
 opciones = [["1", "Activado"], ["0", "Desactivado"]]
-
-[[funcion.parametro]]
-nombre = "metric"
-etiqueta = "Métrica"
-tipo = "int"
-
-[[funcion.parametro]]
-nombre = "fwd_policy"
-etiqueta = "Política"
-tipo = "text"
 
 [[funcion.parametro]]
 nombre = "dst_addr"
@@ -168,6 +148,26 @@ nombre = "gw_addr"
 etiqueta = "Puerta de enlace"
 tipo = "ip"
 partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "ip_intf_id"
+etiqueta = "Interfaz IP"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "metric"
+etiqueta = "Métrica"
+tipo = "int"
+
+[[funcion.parametro]]
+nombre = "fwd_policy"
+etiqueta = "Política"
+tipo = "text"
+
+[[funcion.parametro]]
+nombre = "rtm_rulev4_id"
+etiqueta = "Ruta (id; -1 = nueva)"
+tipo = "int"
 
 [[funcion]]
 name = "cbGetRoutingV6Rule"
@@ -367,6 +367,36 @@ tipo = "bool"
 casilla = {}
 
 [[funcion.parametro]]
+nombre = "static_ipv4_addr"
+etiqueta = "IP estática"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "static_ipv4_mask"
+etiqueta = "Máscara estática"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "static_ipv4_gw"
+etiqueta = "Puerta de enlace estática"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "dnsv4_svr0"
+etiqueta = "DNS primario"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
+nombre = "dnsv4_svr1"
+etiqueta = "DNS secundario"
+tipo = "ip"
+partido = "ip4"
+
+[[funcion.parametro]]
 nombre = "ipv6_type"
 etiqueta = "IPv6"
 tipo = "enum"
@@ -382,42 +412,13 @@ opciones = [["1", "Activado"], ["0", "Desactivado"]]
 nombre = "ipv6_addr_type"
 etiqueta = "Direccionamiento IPv6"
 tipo = "enum"
+depende = { de = "ipv6_type", salvo = ["2"] }
 opciones = [["1", "SLAAC"], ["0", "DHCP"]]
 
 [[funcion.parametro]]
 nombre = "ip_intf_id"
 etiqueta = "Interfaz IP"
 tipo = "int"
-
-[[funcion.parametro]]
-nombre = "dnsv4_svr0"
-etiqueta = "DNS primario"
-tipo = "ip"
-partido = "ip4"
-
-[[funcion.parametro]]
-nombre = "dnsv4_svr1"
-etiqueta = "DNS secundario"
-tipo = "ip"
-partido = "ip4"
-
-[[funcion.parametro]]
-nombre = "static_ipv4_addr"
-etiqueta = "IP estática"
-tipo = "ip"
-partido = "ip4"
-
-[[funcion.parametro]]
-nombre = "static_ipv4_gw"
-etiqueta = "Puerta de enlace estática"
-tipo = "ip"
-partido = "ip4"
-
-[[funcion.parametro]]
-nombre = "static_ipv4_mask"
-etiqueta = "Máscara estática"
-tipo = "ip"
-partido = "ip4"
 
 [[funcion]]
 name = "te_mm.cmd?action=Apply"
