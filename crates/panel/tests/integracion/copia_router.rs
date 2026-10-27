@@ -66,8 +66,8 @@ async fn guarda_genera_y_devuelve_el_fichero_del_router() {
     assert!(!texto.contains(r["datos"].as_str().unwrap()), "{texto}");
 }
 
-/// En la versión normal, sin comprobar en el router real: ni se ofrece ni
-/// se hace, y no se manda nada al router.
+/// Si una de las dos no estuviera comprobada en el router real: ni se
+/// ofrece ni se hace, y no se manda nada al router.
 #[tokio::test]
 async fn sin_comprobar_no_se_hace() {
     for funcion in ["cbDownloadConfig", "cbSaveConfig"] {

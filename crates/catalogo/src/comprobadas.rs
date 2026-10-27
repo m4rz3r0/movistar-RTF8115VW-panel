@@ -111,6 +111,17 @@ mod tests {
             "cbSetWifi",
             "cbSetNatPortMapping",
             "cbReboot",
+            "cbSetNatConfig",
+            "cbSetNatConfig.loopback",
+            "scbidirectionalflt.cmd?action=add.regla",
+            "scbidirectionalflt.cmd?action=modify",
+            "scbidirectionalflt.cmd?action=add.filtro",
+            "scbidirectionalflt.cmd?action=modify.filtro",
+            "scbidirectionalflt.cmd?action=remove.filtro",
+            "cbSetClassification",
+            "cbSetLocalTime",
+            "cbSaveConfig",
+            "cbDownloadConfig",
         ];
         let mut vistas = nombres.clone();
         esperadas.sort_unstable();

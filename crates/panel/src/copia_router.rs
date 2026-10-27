@@ -13,8 +13,6 @@
 //! curso, y solo con `cbSaveConfig` y `cbDownloadConfig` comprobadas en el
 //! router real (la lista blanca del catálogo); si no, 409 con
 //! [`crate::validacion_real::SIN_COMPROBAR`].
-//!
-//! TODO(T12): sin comprobar en el router real.
 
 use leptos::prelude::*;
 use leptos::server_fn::codec::Json;

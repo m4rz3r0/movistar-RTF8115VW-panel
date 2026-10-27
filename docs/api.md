@@ -1008,7 +1008,7 @@ Elementos de la respuesta: `adm_state`, `ftp_enable`, `h323_enable`, `ip_intf_id
 
 Activa o desactiva los ALG de FTP, H.323, PPTP y SIP (formulario NatAlgForm de natalg.asp): son casillas que van por presencia, y la web manda siempre `set_nf_conntrack=1`, que la lectura no devuelve.
 
-**Sin comprobar en el router real:** el panel no la escribe.
+**Comprobada en el router real:** T12 del 2026-10-27, cambios 62 y 63 (h323 apagado y vuelta)
 
 Lectura pareada: `cbGetNatConfig`
 
@@ -1026,7 +1026,7 @@ Lectura pareada: `cbGetNatConfig`
 
 Activa o desactiva el NAT loopback (formulario NatLoopbackForm de natloopback.asp): `adm_state` es una casilla que va por presencia, con el id leído del loopback.
 
-**Sin comprobar en el router real:** el panel no la escribe.
+**Comprobada en el router real:** T12 del 2026-10-27, cambios 75 y 76
 
 Lectura pareada: `cbGetNatConfig`
 
@@ -1288,7 +1288,7 @@ Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalida
 
 **Bloqueada:** el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo
 
-**Sin comprobar en el router real:** el panel no la escribe.
+**Comprobada en el router real:** T12 del 2026-10-27, cambio 67
 
 Lectura pareada: `scbidirectionalflt_ls.asp`
 
@@ -1320,7 +1320,7 @@ Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalida
 
 **Bloqueada:** el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo
 
-**Sin comprobar en el router real:** el panel no la escribe.
+**Comprobada en el router real:** T12 del 2026-10-27, cambio 68
 
 Lectura pareada: `scbidirectionalflt_ls.asp`
 
@@ -1369,7 +1369,7 @@ Añade un filtro (una entrada) vacío: nombre, interfaz, entrada o salida, versi
 
 **Bloqueada:** el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo
 
-**Sin comprobar en el router real:** el panel no la escribe.
+**Comprobada en el router real:** T12 del 2026-10-27, cambio 70
 
 Lectura pareada: `scbidirectionalflt_ls.asp`
 
@@ -1390,7 +1390,7 @@ Cambia un filtro (`id=<FID>&target=entry&…`), como la web. El router responde 
 
 **Bloqueada:** el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo
 
-**Sin comprobar en el router real:** el panel no la escribe.
+**Comprobada en el router real:** T12 del 2026-10-27, cambio 71
 
 Lectura pareada: `scbidirectionalflt_ls.asp`
 
@@ -1412,7 +1412,7 @@ Borra un filtro (`item=<FID>&escape=true`, sin `|`): el router lo borra con toda
 
 **Bloqueada:** el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo
 
-**Sin comprobar en el router real:** el panel no la escribe.
+**Comprobada en el router real:** T12 del 2026-10-27, cambio 72
 
 Lectura pareada: `scbidirectionalflt_ls.asp`
 
@@ -1739,7 +1739,7 @@ Elementos de la respuesta: `adm_state`, `cls_dscp`, `cls_dscp_value`, `cls_dst_i
 
 Crea, modifica o borra una regla de clasificación de QoS (condiciones y remarcado DSCP/802.1p).
 
-**Sin comprobar en el router real:** el panel no la escribe.
+**Comprobada en el router real:** T12 del 2026-10-27, cambios 65 y 66
 
 Lectura pareada: `cbGetClassification` con `rtm_cfg_qos_cls_0i={rtm_cfg_qos_cls_id}`
 
@@ -2173,7 +2173,7 @@ Descarga el fichero de copia generado por cbSaveConfig (backup=1): POST sin cuer
 
 **Bloqueada:** la copia lleva todas las contraseñas: se descarga desde Ajustes → Sistema → Copia de la configuración (guarda, la genera y la descarga), no desde la Biblioteca
 
-**Sin comprobar en el router real:** el panel no la escribe.
+**Comprobada en el router real:** T12 del 2026-10-27, copia de ~50 KB descargada
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
@@ -2288,7 +2288,7 @@ Restaura la configuración de fábrica y reinicia el router (restore_default.asp
 
 Con `save=1` graba la configuración en flash; con `backup=1` genera el fichero de copia (lo que hace backup_restore.asp al cargarse).
 
-**Sin comprobar en el router real:** el panel no la escribe.
+**Comprobada en el router real:** T12 del 2026-10-27, copia de ~50 KB descargada
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
@@ -2373,7 +2373,7 @@ Recibe un fichero de configuración desde la UI básica y lo aplica.
 
 Fija la hora del router a mano (ntp.asp, oculta). Como la web, la fecha y la hora del router se mandan en segundos desde 1970 (UTC), con la zona que da cbGetSummary; también vale el número de segundos. Sin lectura que la compruebe: acción.
 
-**Sin comprobar en el router real:** el panel no la escribe.
+**Comprobada en el router real:** T12 del 2026-10-27, cambios 73 y 74 (el router toma la hora pedida)
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|

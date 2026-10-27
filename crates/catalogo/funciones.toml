@@ -2162,7 +2162,7 @@ lectura_pareada = { funcion = "cbGetNatConfig", params = [] }
 # 2026-10-26, cambio 28: el router acepta h323_enable pero no lo aplica.
 # Causa (natalg.asp): las ALG son casillas sin value (presencia) y la web
 # manda siempre set_nf_conntrack=1, que la lectura no da.
-comprobada = false
+comprobada = "T12 del 2026-10-27, cambios 62 y 63 (h323 apagado y vuelta)"
 
 [[funcion.parametro]]
 nombre = "ftp_enable"
@@ -2205,7 +2205,7 @@ descripcion = "Activa o desactiva el NAT loopback (formulario NatLoopbackForm de
 riesgo = "bajo"
 acceso = "no_corta"
 lectura_pareada = { funcion = "cbGetNatConfig", params = [] }
-comprobada = false
+comprobada = "T12 del 2026-10-27, cambios 75 y 76"
 
 [[funcion.parametro]]
 nombre = "adm_state"
@@ -2689,7 +2689,7 @@ acceso = "puede_cortar"
 bloqueada = "el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo"
 lectura_pareada = { funcion = "scbidirectionalflt_ls.asp", params = [] }
 # Sin comprobar con esta carga: el cambio 11 de la E5 se hizo sin `escape=true`.
-comprobada = false
+comprobada = "T12 del 2026-10-27, cambio 67"
 
 [[funcion.parametro]]
 nombre = "escape"
@@ -2789,7 +2789,7 @@ riesgo = "alto"
 acceso = "puede_cortar"
 bloqueada = "el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo"
 lectura_pareada = { funcion = "scbidirectionalflt_ls.asp", params = [] }
-comprobada = false
+comprobada = "T12 del 2026-10-27, cambio 68"
 
 [[funcion.parametro]]
 nombre = "id"
@@ -2914,7 +2914,7 @@ riesgo = "alto"
 acceso = "puede_cortar"
 bloqueada = "el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo"
 lectura_pareada = { funcion = "scbidirectionalflt_ls.asp", params = [] }
-comprobada = false
+comprobada = "T12 del 2026-10-27, cambio 70"
 
 [[funcion.parametro]]
 nombre = "target"
@@ -2959,7 +2959,7 @@ riesgo = "alto"
 acceso = "puede_cortar"
 bloqueada = "el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo"
 lectura_pareada = { funcion = "scbidirectionalflt_ls.asp", params = [] }
-comprobada = false
+comprobada = "T12 del 2026-10-27, cambio 71"
 
 [[funcion.parametro]]
 nombre = "id"
@@ -3009,7 +3009,7 @@ riesgo = "alto"
 acceso = "puede_cortar"
 bloqueada = "el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo"
 lectura_pareada = { funcion = "scbidirectionalflt_ls.asp", params = [] }
-comprobada = false
+comprobada = "T12 del 2026-10-27, cambio 72"
 
 [[funcion.parametro]]
 nombre = "item"
@@ -3571,7 +3571,7 @@ riesgo = "bajo"
 acceso = "puede_cortar"
 lectura_pareada = { funcion = "cbGetClassification", params = [["rtm_cfg_qos_cls_0i", "{rtm_cfg_qos_cls_id}"]] }
 lista = { id_param = "rtm_cfg_qos_cls_id", all = false, del = true }
-comprobada = false
+comprobada = "T12 del 2026-10-27, cambios 65 y 66"
 
 [[funcion.parametro]]
 nombre = "order_p"
@@ -4560,7 +4560,7 @@ descripcion = "Descarga el fichero de copia generado por cbSaveConfig (backup=1)
 riesgo = "bajo"
 acceso = "no_corta"
 bloqueada = "la copia lleva todas las contraseñas: se descarga desde Ajustes → Sistema → Copia de la configuración (guarda, la genera y la descarga), no desde la Biblioteca"
-comprobada = false
+comprobada = "T12 del 2026-10-27, copia de ~50 KB descargada"
 
 [[funcion.parametro]]
 nombre = "fileName"
@@ -4746,7 +4746,7 @@ pagina = "save.asp"
 descripcion = "Con `save=1` graba la configuración en flash; con `backup=1` genera el fichero de copia (lo que hace backup_restore.asp al cargarse)."
 riesgo = "bajo"
 acceso = "no_corta"
-comprobada = false
+comprobada = "T12 del 2026-10-27, copia de ~50 KB descargada"
 
 [[funcion.parametro]]
 nombre = "backup"
@@ -4857,7 +4857,7 @@ pagina = "ntp.asp"
 descripcion = "Fija la hora del router a mano (ntp.asp, oculta). Como la web, la fecha y la hora del router se mandan en segundos desde 1970 (UTC), con la zona que da cbGetSummary; también vale el número de segundos. Sin lectura que la compruebe: acción."
 riesgo = "bajo"
 acceso = "no_corta"
-comprobada = false
+comprobada = "T12 del 2026-10-27, cambios 73 y 74 (el router toma la hora pedida)"
 
 [[funcion.parametro]]
 nombre = "SysTime"

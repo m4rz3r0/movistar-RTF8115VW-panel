@@ -1,4 +1,4 @@
-//! Editor completo del cortafuegos (T13b): reglas y filtros (alta, cambio y baja) por la cola de cambios, con la carga de la web, la relectura y el deshacer; sin comprobar en el router real, la 1.0 solo los enseña.
+//! Editor completo del cortafuegos (T13b): reglas y filtros (alta, cambio y baja) por la cola de cambios, con la carga de la web, la relectura y el deshacer; lo que no esté comprobado en el router real solo se enseña.
 
 use crate::comun::{Panel, PanelPrueba, aplicar_ajuste, llamar, ok, reautenticar};
 use hgu::cortafuegos::{Filtro, es_sin_ping};
