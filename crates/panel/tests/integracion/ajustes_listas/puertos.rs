@@ -260,7 +260,7 @@ async fn editar_o_borrar_regla_con_esperados() {
     assert_eq!(status, 200, "{body}");
 }
 
-// ------------------------------------------- ronda de corrección 1 (T10)
+// ------------------------------------------- ronda de corrección 1
 
 /// «TCP y UDP» con la segunda escritura fallida: el gestor revierte la
 /// primera (borra la regla TCP recién creada) y el grupo queda fallido; la

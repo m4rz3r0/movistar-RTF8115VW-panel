@@ -163,7 +163,7 @@ mod tests {
         };
         assert_eq!(comprobada(""), Ok(false));
         assert_eq!(comprobada("comprobada = false"), Ok(false));
-        assert_eq!(comprobada("comprobada = \"E9, cambio 1\""), Ok(true));
+        assert_eq!(comprobada("comprobada = \"ida y vuelta\""), Ok(true));
         assert!(comprobada("comprobada = true").is_err());
         assert!(comprobada("comprobada = \" \"").is_err());
         let lectura = escritura("").replace(

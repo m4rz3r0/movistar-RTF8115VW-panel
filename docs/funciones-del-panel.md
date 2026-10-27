@@ -81,15 +81,15 @@ Probadas y descartadas (2026-10-26):
 
 Arreglada y pendiente de comprobar otra vez:
 
-- `cbSetDhcpv4ServerPool` (el grupo DHCP de casa). Los cambios 39 y 40
+- `cbSetDhcpv4ServerPool` (el grupo DHCP de casa). Dos cambios
   cambiaron y deshicieron la concesión y el router los dio por aplicados,
   pero dejaron activas, con el valor vacío, las cuatro condiciones del
-  grupo (opción 60, 61, 77 y MAC). Tras el reinicio del cambio 57 el router
+  grupo (opción 60, 61, 77 y MAC). Tras reiniciar, el router
   dejó de dar IP nueva a cualquier dispositivo: ninguno encaja en esas
   condiciones. La causa: en la web del router son casillas sin `value`; la
   web las manda como `on` si están marcadas y no las manda si no lo están,
   y el router las da por marcadas si el campo llega, valga lo que valga
-  (captura del 2026-10-26). El panel mandaba `dhcpv4_opt60=0`, y así con
+  (captura de la web oficial). El panel mandaba `dhcpv4_opt60=0`, y así con
   las cuatro. Ahora el catálogo las marca como `casilla`: el panel manda
   `on` o nada, como la web, y nunca deja activa una condición con el valor
   vacío (o una MAC todo ceros): si ya lo estaba, la desactiva, y el diff
@@ -155,9 +155,9 @@ Lo demás solo se ve:
   la petición de donde venga. El deshacer y la reversión de lo ya hecho
   siguen funcionando.
 
-La contraseña del propio router (`cbModifyPwd`) está pendiente de la E4 y
-sigue activa: su flujo no pasa por el gestor, está protegido (prueba la
-nueva, vuelve a la anterior y avisa) y la E4 se hace con él (TODO en el
+La contraseña del propio router (`cbModifyPwd`) está pendiente de
+comprobar y sigue activa: su flujo no pasa por el gestor, está protegido (prueba la
+nueva, vuelve a la anterior y avisa) y la prueba en el router real se hará con él (TODO en el
 catálogo y en `contrasena_router.rs`).
 
 Aparte, dos funciones del panel están desactivadas en este router
@@ -329,7 +329,7 @@ motivo (`estado_copia_router`) y el servidor responde 409 sin mandar nada al
 router. No pasa por el gestor de cambios ni queda en el Historial. La
 Biblioteca sigue sin ofrecer ninguna de las dos funciones.
 
-**Pendiente de comprobar en el router real (T12).** Las dos funciones
+**Pendiente de comprobar en el router real.** Las dos funciones
 están sin comprobar, así que en la versión normal el botón sale
 desactivado; las pruebas contra router-sim lo habilitan todo. Falta ver en
 el router real que el guardado y la generación responden bien con el
@@ -364,7 +364,7 @@ registro apagado, el router no anota nada, y la sección lo dice y remite a
 «Guardar el registro», el campo de «Registro del sistema» en esta misma
 pestaña (la casilla de `syslog.asp`, `syslog_enable` de `cbSetSyslog`).
 
-**Pendiente de comprobar en el router real (T12).** Que `cbSetSyslog` con
+**Pendiente de comprobar en el router real.** Que `cbSetSyslog` con
 solo `export=EXPORT` responde bien y no cambia lo que da `cbGetSyslog`;
 que el registro está en `/syslog.log` y se sirve con la sesión del panel
 (y con qué tipo de contenido); qué tamaño tiene; y qué responde

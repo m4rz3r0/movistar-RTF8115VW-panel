@@ -90,8 +90,8 @@ async fn confirmar(p: &crate::comun::Panel, cookie: &str, prep: &serde_json::Val
 }
 
 /// El loopback se manda a la CGI del ALG, pero el historial anota la
-/// variante del catálogo: deshacerlo vuelve con sus campos (el cambio 75
-/// del router real fallaba con «parámetro desconocido adm_state»).
+/// variante del catálogo: deshacerlo vuelve con sus campos (en el router
+/// real, antes, fallaba con «parámetro desconocido adm_state»).
 #[tokio::test]
 async fn deshacer_el_loopback_vuelve_con_su_variante() {
     const LOOPBACK: &str = "cbSetNatConfig.loopback";
@@ -202,7 +202,7 @@ async fn deshacer_ajuste(p: &crate::comun::Panel, cookie: &str, id: i64) {
     aplicar_ajuste(p, cookie, &d).await;
 }
 
-/// Comprobados en el router real (cambios 62 y 63), los ALG se cambian
+/// Comprobados en el router real, los ALG se cambian
 /// desde Ajustes → Puertos, como en natalg.asp.
 #[tokio::test]
 async fn alg_desde_ajustes_ida_y_vuelta() {
@@ -220,7 +220,7 @@ async fn alg_desde_ajustes_ida_y_vuelta() {
     assert_eq!(del_nat(&p, "h323_enable").await, antes);
 }
 
-/// El NAT loopback (cambios 75 y 76), en Ajustes → Puertos.
+/// El NAT loopback, comprobado en el router real, en Ajustes → Puertos.
 #[tokio::test]
 async fn loopback_desde_ajustes_ida_y_vuelta() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;

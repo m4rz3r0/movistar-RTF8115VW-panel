@@ -2193,7 +2193,7 @@ Descarga el fichero de copia generado por cbSaveConfig (backup=1): POST sin cuer
 
 **Bloqueada:** la copia lleva todas las contraseñas: se descarga desde Ajustes → Sistema → Copia de la configuración (guarda, la genera y la descarga), no desde la Biblioteca
 
-**Comprobada en el router real:** ida y vuelta
+**Comprobada en el router real:** copia de unos 50 KB descargada
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
@@ -2308,7 +2308,7 @@ Restaura la configuración de fábrica y reinicia el router (restore_default.asp
 
 Con `save=1` graba la configuración en flash; con `backup=1` genera el fichero de copia (lo que hace backup_restore.asp al cargarse).
 
-**Comprobada en el router real:** ida y vuelta
+**Comprobada en el router real:** copia de unos 50 KB descargada
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
