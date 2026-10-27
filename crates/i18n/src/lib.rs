@@ -49,6 +49,7 @@ locales!(
     "ajustes-seguridad",
     "ajustes-telefono",
     "ajustes-sistema",
+    "cortafuegos",
     "mejoras",
     "fuentes"
 );
