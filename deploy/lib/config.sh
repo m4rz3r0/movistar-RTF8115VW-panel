@@ -39,7 +39,11 @@ cargar_config()
 	for _k in $CLAVES_OBLIGATORIAS $CLAVES_OPCIONALES; do
 		unset "$_k"
 	done
+	# La usa el fichero de configuración que se lee a continuación.
+	# shellcheck disable=SC2034
 	CONFIG_EJEMPLO=$DEPLOY_DIR/config.example
+	# La configuración la elige quien instala: shellcheck no puede seguirla.
+	# shellcheck disable=SC1090
 	case $_config in
 	*/*) . "$_config" ;;
 	*) . "./$_config" ;;

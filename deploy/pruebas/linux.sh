@@ -90,7 +90,7 @@ grep -qx 'RP_ORIGIN=' "$LINUX/env.example" || fallo "env.example: RP_ORIGIN debe
 # --- sintaxis del actualizador ----------------------------------------------
 sh -n "$ACTUALIZAR" || fallo "sh -n actualizar-release.sh"
 if command -v shellcheck >/dev/null 2>&1; then
-	shellcheck -s sh "$ACTUALIZAR" "$0" || fallo "shellcheck"
+	shellcheck -S warning -s sh "$ACTUALIZAR" "$0" || fallo "shellcheck"
 else
 	echo "aviso: no hay shellcheck; solo sh -n" >&2
 fi

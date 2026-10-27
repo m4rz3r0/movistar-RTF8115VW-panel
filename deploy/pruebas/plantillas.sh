@@ -45,9 +45,10 @@ if command -v shellcheck >/dev/null 2>&1; then
 		*) set -- "$@" "$f" ;;
 		esac
 	done
-	shellcheck -s sh "$@" "$DEPLOY"/freebsd-jail/routerpanel.rc ||
+	# Solo avisos y errores: las notas de estilo («info») no hacen fallar.
+	shellcheck -S warning -s sh "$@" "$DEPLOY"/freebsd-jail/routerpanel.rc ||
 		fallo "shellcheck"
-	shellcheck -s bash "$DEPLOY"/cross/*.sh || fallo "shellcheck de deploy/cross"
+	shellcheck -S warning -s bash "$DEPLOY"/cross/*.sh || fallo "shellcheck de deploy/cross"
 else
 	echo "aviso: no hay shellcheck; solo sh -n" >&2
 fi

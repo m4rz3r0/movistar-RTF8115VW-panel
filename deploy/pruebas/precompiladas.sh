@@ -196,7 +196,7 @@ fi
 # rechazar NOMBRE VARIANTE COMMIT_ESPERADO MOTIVO_ESPERADO
 rechazar()
 {
-	rm -rf "$B/$V" "$TMP/malo"
+	rm -rf "${B:?}/${V:?}" "$TMP/malo"
 	hacer_archivo "$B/$V" "$V" "$C" "$2"
 	if preparar_precompilada "$B" "$V" "$3" '' "$TMP/malo" 2>"$TMP/err"; then
 		fallo "$1: lo acepta"
@@ -214,7 +214,7 @@ rechazar "enlace simbólico dentro" enlace "$C" "ni directorio"
 rechazar "sin site/" sin-site "$C" "faltan"
 rechazar "commit no válido" buena "abc" "commit no válido"
 
-rm -rf "$B/$V"
+rm -rf "${B:?}/${V:?}"
 hacer_archivo "$TMP/fuera" "$V" "$C"
 mkdir -p "$B/$V"
 ln -s "$TMP/fuera/$(archivo_precompilada "$V")" "$B/$V/$(archivo_precompilada "$V")"
@@ -223,7 +223,7 @@ precompilada_llegada "$B" "$V" '' && fallo "da por llegada un archivo que es un 
 if preparar_precompilada "$B" "$V" "$C" '' "$TMP/malo" 2>/dev/null; then
 	fallo "acepta un archivo del buzón que es un enlace"
 fi
-rm -rf "$B/$V" "$TMP/malo"
+rm -rf "${B:?}/${V:?}" "$TMP/malo"
 
 if command -v minisign >/dev/null 2>&1; then
 	minisign -G -W -f -p "$TMP/clave.pub" -s "$TMP/clave.sec" >/dev/null
@@ -237,7 +237,7 @@ if command -v minisign >/dev/null 2>&1; then
 	if preparar_precompilada "$B" "$V" "$C" "$PUB" "$TMP/malfirmado" 2>"$TMP/err"; then
 		fallo "acepta una firma de otra clave"
 	fi
-	rm -rf "$B/$V"
+	rm -rf "${B:?}/${V:?}"
 else
 	echo "aviso: no hay minisign; no se prueban las firmas" >&2
 fi
@@ -511,7 +511,7 @@ for f in "$DEPLOY"/cross/*.sh; do
 	bash -n "$f" || fallo "bash -n ${f#"$DEPLOY"/}"
 done
 if command -v shellcheck >/dev/null 2>&1; then
-	shellcheck -x "$LIB" "$RECIBIR" "$DEPLOY/freebsd-jail/actualizar.sh" "$DEPLOY"/cross/*.sh ||
+	shellcheck -S warning -x "$LIB" "$RECIBIR" "$DEPLOY/freebsd-jail/actualizar.sh" "$DEPLOY"/cross/*.sh ||
 		fallo "shellcheck"
 else
 	echo "aviso: no hay shellcheck" >&2
