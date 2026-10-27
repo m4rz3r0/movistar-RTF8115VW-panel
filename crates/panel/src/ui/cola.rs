@@ -49,7 +49,9 @@ pub fn QuitarDeLaCola(
             match quitar_de_la_cola(id).await {
                 Ok(c) => {
                     error.try_set(None);
-                    al_quitar.run(c);
+                    // Como en «Todo bien, terminar»: quien lo pidió puede
+                    // haberse desmontado ya.
+                    al_quitar.try_run(c);
                 }
                 Err(e) => {
                     error.try_set(Some(texto_error(&e)));

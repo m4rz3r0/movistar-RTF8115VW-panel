@@ -645,7 +645,7 @@ fn valor_sin_sanear(etiqueta: &str, valor: &str) -> Option<&'static str> {
         TagClass::Host => (seudonimo("host-"), "host sin sanear"),
         TagClass::Desc => (
             seudonimo("desc-")
-                || ["LAN", "Default"].contains(&valor)
+                || ["LAN", "Default", "DMZ"].contains(&valor)
                 || valor.parse::<u64>().is_ok(),
             "desc sin sanear",
         ),

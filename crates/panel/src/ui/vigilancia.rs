@@ -52,7 +52,9 @@ pub fn TerminarVigilancia(
             match terminar_vigilancia(id).await {
                 Ok(c) => {
                     error.try_set(None);
-                    al_terminar.run(c);
+                    // Si el aviso ya se ha vuelto a pintar, quien lo
+                    // pidió no está: el sondeo trae el estado nuevo.
+                    al_terminar.try_run(c);
                 }
                 Err(e) => {
                     error.try_set(Some(texto_error(&e)));

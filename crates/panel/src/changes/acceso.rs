@@ -179,26 +179,26 @@ mod tests {
             active,
         };
         let hosts = vec![
-            host("192.0.2.10", "02:00:00:00:00:0A", true),
-            host("192.168.1.76", "02:00:00:00:00:0B", true),
-            host("192.168.1.60", "02:00:00:00:00:0C", false),
+            host("192.168.1.61", "02:00:00:00:00:0A", true),
+            host("192.168.1.62", "02:00:00:00:00:0B", true),
+            host("192.168.1.63", "02:00:00:00:00:0C", false),
         ];
         let wifi: HashSet<String> = ["02:00:00:00:00:0b".to_owned()].into();
         let ip = |s: &str| Some(s.parse::<IpAddr>().unwrap());
         let e = |i| enlace_de(i, Some(&hosts), Some(&wifi));
-        assert_eq!(e(ip("192.0.2.10")), Enlace::Cable);
-        assert_eq!(e(ip("192.168.1.76")), Enlace::Wifi);
+        assert_eq!(e(ip("192.168.1.61")), Enlace::Cable);
+        assert_eq!(e(ip("192.168.1.62")), Enlace::Wifi);
         // Desconectado o fuera de la lista (127.0.0.1 con el simulador).
-        assert_eq!(e(ip("192.168.1.60")), Enlace::Desconocido);
+        assert_eq!(e(ip("192.168.1.63")), Enlace::Desconocido);
         assert_eq!(e(ip("127.0.0.1")), Enlace::Desconocido);
         assert_eq!(e(None), Enlace::Desconocido);
         // Sin la lista de la WiFi no se sabe si va por cable.
         assert_eq!(
-            enlace_de(ip("192.0.2.10"), Some(&hosts), None),
+            enlace_de(ip("192.168.1.61"), Some(&hosts), None),
             Enlace::Desconocido
         );
         assert_eq!(
-            enlace_de(ip("192.0.2.10"), None, Some(&wifi)),
+            enlace_de(ip("192.168.1.61"), None, Some(&wifi)),
             Enlace::Desconocido
         );
     }

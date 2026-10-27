@@ -61,7 +61,7 @@ async fn la_ip_reservada_va_en_su_ranura() {
         "cbSetDhcpv4ServerPool",
         &[
             (ID, "0"),
-            ("reserved_ipv4_addr_3", "192.168.1.30"),
+            ("reserved_ipv4_addr_3", "192.168.1.71"),
             ("reserved_ipv4_mask_3", "255.255.255.255"),
         ],
     )
@@ -71,7 +71,7 @@ async fn la_ip_reservada_va_en_su_ranura() {
     let pool = n.get("rtm_cfg_dhcpv4_svr_pool").unwrap();
     assert!(pool.get("reserved_ipv4_addr_3").is_none(), "no va suelta");
     let r = pool.get("reserved_ipv4").unwrap();
-    assert_eq!(r.text_of("reserved_ipv4_addr_3"), Some("192.168.1.30"));
+    assert_eq!(r.text_of("reserved_ipv4_addr_3"), Some("192.168.1.71"));
     assert_eq!(r.text_of("reserved_ipv4_addr_2"), Some("0.0.0.0"));
     // El otro pool no cambia.
     let otro = en(&c, "0").await.unwrap();

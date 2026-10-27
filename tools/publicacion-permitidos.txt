@@ -128,3 +128,4 @@ binario docs/capturas/configuracion-escritorio.png 1583344aa01e9f6b461d285794db1
 binario docs/capturas/ajustes-wifi-escritorio.png 2619e06cd6c5f683967317f90dffbdb0a1ae6ef36be5f4ff78637cc349d0b013 — captura del README (ajustes-wifi-escritorio), del simulador con datos inventados
 binario docs/capturas/ajustes-puertos-claro.png b362522e3409434944c36476e2d3d38e8d7e5cab30b95f363804bd1986d603b8 — captura del README (ajustes-puertos-claro), del simulador con datos inventados
 binario docs/capturas/mejoras-escritorio.png afcaeb2fe63abd80026383afdc8cc3de296ed8a73ac7ee22946588443259bd89 — captura del README (mejoras-escritorio), del simulador con datos inventados
+ruta crates/router-sim/src/registro.rs dominio — prioridades de syslog (facilidad punto nivel) en el registro inventado del simulador, no dominios

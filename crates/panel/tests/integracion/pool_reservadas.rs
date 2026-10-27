@@ -144,11 +144,11 @@ fn lleva_todo_el_pool(ps: &[(String, String)]) {
 #[tokio::test]
 async fn el_formulario_ensena_las_reservadas_y_una_nueva() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
-    con_reservada(&p, 2, "192.168.1.69");
+    con_reservada(&p, 2, "192.168.1.70");
     let f = formulario(&p, &cookie).await;
     assert_eq!(
         campo(&f, "reserved_ipv4_addr_2").unwrap()["valor"],
-        "192.168.1.69"
+        "192.168.1.70"
     );
     assert_eq!(
         campo(&f, "reserved_ipv4_mask_2").unwrap()["valor"],
@@ -162,16 +162,16 @@ async fn el_formulario_ensena_las_reservadas_y_una_nueva() {
 #[tokio::test]
 async fn una_reservada_nueva_va_en_la_ranura_siguiente_con_todo_el_pool() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
-    con_reservada(&p, 2, "192.168.1.69");
+    con_reservada(&p, 2, "192.168.1.70");
     let antes = pool(&p, CASA).await;
     let otro = pool(&p, OTRO).await;
-    aplicar_pool(&p, &cookie, &[(IP, "192.168.1.30"), (MASCARA, "")]).await;
+    aplicar_pool(&p, &cookie, &[(IP, "192.168.1.71"), (MASCARA, "")]).await;
 
     let ps = escritura_del_pool(&p);
     assert_eq!(
         reservadas_enviadas(&ps),
         [
-            ("reserved_ipv4_addr_3", "192.168.1.30"),
+            ("reserved_ipv4_addr_3", "192.168.1.71"),
             ("reserved_ipv4_mask_3", "255.255.255.255")
         ],
         "sin máscara, una sola dirección: {ps:?}"
@@ -180,7 +180,7 @@ async fn una_reservada_nueva_va_en_la_ranura_siguiente_con_todo_el_pool() {
     let despues = pool(&p, CASA).await;
     assert_eq!(
         distintos(&antes, &despues),
-        [("reserved_ipv4_addr_3", "0.0.0.0", "192.168.1.30")]
+        [("reserved_ipv4_addr_3", "0.0.0.0", "192.168.1.71")]
     );
     assert_eq!(pool(&p, OTRO).await, otro, "el otro pool no se toca");
 }
@@ -188,7 +188,7 @@ async fn una_reservada_nueva_va_en_la_ranura_siguiente_con_todo_el_pool() {
 #[tokio::test]
 async fn borrar_una_reservada_como_la_web() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
-    con_reservada(&p, 2, "192.168.1.69");
+    con_reservada(&p, 2, "192.168.1.70");
     let antes = pool(&p, CASA).await;
     let otro = pool(&p, OTRO).await;
     aplicar_pool(&p, &cookie, &[("reserved_ipv4_addr_2", "0.0.0.0")]).await;
@@ -207,7 +207,7 @@ async fn borrar_una_reservada_como_la_web() {
     assert_eq!(
         distintos(&antes, &despues),
         [
-            ("reserved_ipv4_addr_2", "192.168.1.69", "0.0.0.0"),
+            ("reserved_ipv4_addr_2", "192.168.1.70", "0.0.0.0"),
             ("reserved_ipv4_mask_2", "255.255.255.255", "0.0.0.0")
         ]
     );
@@ -218,7 +218,7 @@ async fn borrar_una_reservada_como_la_web() {
 async fn deshacer_una_reservada_nueva_deja_libre_su_ranura() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
     let antes = pool(&p, CASA).await;
-    let id = aplicar_pool(&p, &cookie, &[(IP, "192.168.1.30"), (MASCARA, "")]).await;
+    let id = aplicar_pool(&p, &cookie, &[(IP, "192.168.1.71"), (MASCARA, "")]).await;
     let prep = ok(&p, "deshacer", json!({ "change_id": id }), &cookie).await;
     let nuevo = ok(
         &p,
@@ -260,7 +260,7 @@ async fn una_reservada_que_no_es_una_ip_no_vale() {
 #[tokio::test]
 async fn cambiar_la_concesion_no_envia_las_reservadas() {
     let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
-    con_reservada(&p, 2, "192.168.1.69");
+    con_reservada(&p, 2, "192.168.1.70");
     let g = preparar(&p, &cookie, "red_local.dhcp", json!({ "concesion": "dia" })).await;
     aplicar_ajuste(&p, &cookie, &g).await;
     let ps = escritura_del_pool(&p);
