@@ -67,19 +67,15 @@ pub(super) async fn check_throttled(
     password: &str,
 ) -> Result<i64, LoginError> {
     let db = &state.db;
-    let ip_key = ip.to_string();
-    let username = match account {
-        Account::Name(n) | Account::Id(_, n) => n,
-    };
-    let user_key: String = username.chars().take(MAX_USERNAME_CHARS).collect();
+    let ip_key = clave_ip(ip);
 
-    let wait = wait_ms(db, &ip_key, &user_key).await?;
+    let wait = wait_ms(db, &ip_key).await?;
     if wait > 0 {
         return Err(LoginError::Throttled((wait + 999) / 1000));
     }
 
     if password.len() > MAX_PASSWORD_BYTES {
-        record_failure(db, &ip_key, &user_key).await?;
+        record_failure(db, &ip_key).await?;
         return Err(LoginError::BadCredentials);
     }
 
@@ -108,11 +104,11 @@ pub(super) async fn check_throttled(
 
     match user_id {
         Some(id) if ok => {
-            clear_failures(db, &ip_key, &user_key).await?;
+            clear_failures(db, &ip_key).await?;
             Ok(id)
         }
         _ => {
-            record_failure(db, &ip_key, &user_key).await?;
+            record_failure(db, &ip_key).await?;
             Err(LoginError::BadCredentials)
         }
     }

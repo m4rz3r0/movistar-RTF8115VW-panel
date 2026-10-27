@@ -11,23 +11,20 @@ async fn login_mal_incrementa_retardo() {
     assert_eq!(status, 401, "{body}");
     assert!(body.contains("Usuario o contraseña incorrectos"), "{body}");
     assert_eq!(fallos(&p, "ip", "127.0.0.1").await, Some(1));
-    assert_eq!(fallos(&p, "user", PANEL_USER).await, Some(1));
+    // No hay freno por usuario: desde otro equipo nadie puede bloquearlo.
+    assert_eq!(fallos(&p, "user", PANEL_USER).await, None);
 
     // Durante la espera se rechaza incluso la contraseña buena, sin contar
     // un fallo más.
     let (status, body) = login_desde(&p, PANEL_USER, PANEL_PASS, "127.0.0.1").await;
     assert_eq!(status, 429, "{body}");
     assert!(body.contains("Demasiados intentos, espera 1 s"), "{body}");
-    assert_eq!(fallos(&p, "user", PANEL_USER).await, Some(1));
-
-    // El freno por usuario se aplica también desde otra IP.
-    let (status, _) = login_desde(&p, PANEL_USER, PANEL_PASS, "192.0.2.2").await;
-    assert_eq!(status, 429);
+    assert_eq!(fallos(&p, "ip", "127.0.0.1").await, Some(1));
 
     retrasar_fallos(&p, 1).await;
     let (status, _) = login_desde(&p, PANEL_USER, "otra mala", "127.0.0.1").await;
     assert_eq!(status, 401);
-    assert_eq!(fallos(&p, "user", PANEL_USER).await, Some(2));
+    assert_eq!(fallos(&p, "ip", "127.0.0.1").await, Some(2));
     let (status, body) = login_desde(&p, PANEL_USER, PANEL_PASS, "127.0.0.1").await;
     assert_eq!(status, 429);
     assert!(body.contains("espera 2 s"), "{body}");
@@ -37,7 +34,39 @@ async fn login_mal_incrementa_retardo() {
     let (status, body) = login_desde(&p, PANEL_USER, PANEL_PASS, "127.0.0.1").await;
     assert_eq!(status, 200, "{body}");
     assert_eq!(fallos(&p, "ip", "127.0.0.1").await, None);
-    assert_eq!(fallos(&p, "user", PANEL_USER).await, None);
+}
+
+/// Los fallos de un equipo no frenan al mismo usuario en otro: nadie de la
+/// red puede dejar al administrador sin entrar.
+#[tokio::test]
+async fn fallos_de_otra_ip_no_bloquean_al_usuario() {
+    let p = PanelPrueba::nuevo().arrancar().await;
+    crear_usuario(&p).await;
+    for _ in 0..3 {
+        retrasar_fallos(&p, 60).await;
+        let (status, _) = login_desde(&p, PANEL_USER, "mala", "192.0.2.2").await;
+        assert_eq!(status, 401);
+    }
+    let (status, _) = login_desde(&p, PANEL_USER, PANEL_PASS, "192.0.2.2").await;
+    assert_eq!(status, 429, "el equipo que falla sí queda frenado");
+    let (status, body) = login_desde(&p, PANEL_USER, PANEL_PASS, "127.0.0.1").await;
+    assert_eq!(status, 200, "{body}");
+    // El login bueno de un equipo no limpia el freno del otro.
+    assert_eq!(fallos(&p, "ip", "192.0.2.2").await, Some(3));
+}
+
+/// En IPv6 cuenta el prefijo /64: cambiar de dirección dentro de la misma
+/// red (SLAAC, direcciones temporales) no se salta el freno.
+#[tokio::test]
+async fn ipv6_cuenta_por_prefijo_64() {
+    let p = PanelPrueba::nuevo().arrancar().await;
+    let (status, _) = login_desde(&p, "x", "mala", "[2001:db8:0:1::a]").await;
+    assert_eq!(status, 401);
+    let (status, _) = login_desde(&p, "y", "mala", "[2001:db8:0:1::b]").await;
+    assert_eq!(status, 429);
+    assert_eq!(fallos(&p, "ip", "2001:db8:0:1::/64").await, Some(1));
+    let (status, _) = login_desde(&p, "x", "mala", "[2001:db8:0:2::a]").await;
+    assert_eq!(status, 401, "otra /64 tiene su propio contador");
 }
 
 #[tokio::test]
@@ -50,7 +79,7 @@ async fn retardo_maximo_60_s() {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_millis() as i64;
-    sqlx::query("INSERT INTO login_attempts VALUES ('user', 'x', 40, ?)")
+    sqlx::query("INSERT INTO login_attempts VALUES ('ip', '127.0.0.1', 40, ?)")
         .bind(ahora_ms)
         .execute(&p.state.db)
         .await

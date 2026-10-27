@@ -59,7 +59,7 @@ async fn usuario_inexistente_mismo_error() {
     let (status, body) = login_desde(&p, "nadie", "contraseña cualquiera", "127.0.0.1").await;
     assert_eq!(status, 401);
     assert!(body.contains("Usuario o contraseña incorrectos"), "{body}");
-    assert_eq!(fallos(&p, "user", "nadie").await, Some(1));
+    assert_eq!(fallos(&p, "ip", "127.0.0.1").await, Some(1));
 }
 
 #[tokio::test]
@@ -90,7 +90,7 @@ async fn contrasena_enorme_es_un_fallo_normal() {
     let (status, body) = login_desde(&p, PANEL_USER, &enorme, "127.0.0.1").await;
     assert_eq!(status, 401, "{body}");
     assert!(body.contains("Usuario o contraseña incorrectos"), "{body}");
-    assert_eq!(fallos(&p, "user", PANEL_USER).await, Some(1));
+    assert_eq!(fallos(&p, "ip", "127.0.0.1").await, Some(1));
 }
 
 #[tokio::test]
