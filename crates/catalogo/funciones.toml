@@ -693,7 +693,7 @@ lista = { id_param = "rtm_cfg_dhcpv4_svr_pool_id", all = false, del = true }
 # reinicio del cambio 57 el router dejó de dar IP nueva. Las casillas de
 # condición son checkbox sin value en dhcp.asp: por el JS, el router las da
 # por marcadas si el campo llega, valga lo que valga (falta confirmarlo).
-comprobada = false
+comprobada = "T12 del 2026-10-27, cambios 77 a 79 (pool id 0; tras reiniciar, un dispositivo nuevo toma IP)"
 
 [[funcion.parametro]]
 nombre = "rtm_cfg_dhcpv4_svr_pool_id"

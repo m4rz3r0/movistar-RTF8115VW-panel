@@ -398,7 +398,7 @@ Elementos de la respuesta: `adm_state`, `dhcpv4_opt60`, `dhcpv4_opt60_ex`, `dhcp
 
 Configura un pool DHCPv4 (rango, máscara, puerta de enlace, DNS, concesión, IP reservadas y condiciones).
 
-**Sin comprobar en el router real:** el panel no la escribe.
+**Comprobada en el router real:** T12 del 2026-10-27, cambios 77 a 79 (pool id 0; tras reiniciar, un dispositivo nuevo toma IP)
 
 Lectura pareada: `cbGetDhcpv4ServerPool` con `rtm_cfg_dhcpv4_svr_pool_0i={rtm_cfg_dhcpv4_svr_pool_id}`
 

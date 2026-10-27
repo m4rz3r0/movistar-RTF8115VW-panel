@@ -122,6 +122,7 @@ mod tests {
             "cbSetLocalTime",
             "cbSaveConfig",
             "cbDownloadConfig",
+            "cbSetDhcpv4ServerPool",
         ];
         let mut vistas = nombres.clone();
         esperadas.sort_unstable();
