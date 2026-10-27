@@ -72,3 +72,64 @@ async fn apagar_y_encender_una_alg_como_la_web() {
     assert_eq!(enviado("h323_enable"), esperado, "{ps:?}");
     assert_eq!(campo(&form().await, "h323_enable").unwrap()["valor"], nuevo);
 }
+
+/// Prepara y aplica `peticion` (de la Biblioteca o un deshacer ya
+/// preparado); devuelve el id del cambio aplicado.
+async fn confirmar(p: &crate::comun::Panel, cookie: &str, prep: &serde_json::Value) -> i64 {
+    let id = ok(
+        p,
+        "confirmar_cambio",
+        json!({ "token": prep["token"], "palabra": null }),
+        cookie,
+    )
+    .await
+    .as_i64()
+    .unwrap();
+    assert_eq!(esperar_final(p, cookie, id).await["estado"], "Aplicado");
+    id
+}
+
+/// El loopback se manda a la CGI del ALG, pero el historial anota la
+/// variante del catálogo: deshacerlo vuelve con sus campos (el cambio 75
+/// del router real fallaba con «parámetro desconocido adm_state»).
+#[tokio::test]
+async fn deshacer_el_loopback_vuelve_con_su_variante() {
+    const LOOPBACK: &str = "cbSetNatConfig.loopback";
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    let f = ok(
+        &p,
+        "formulario",
+        json!({ "funcion": LOOPBACK, "instancia": null, "claves": [] }),
+        &cookie,
+    )
+    .await;
+    let antes = campo(&f, "adm_state").unwrap()["valor"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let nuevo = if antes == "1" { "0" } else { "1" };
+    let mut valores = valores_de(&f);
+    fijar(&mut valores, "adm_state", nuevo);
+    let prep = ok(
+        &p,
+        "preparar_cambio",
+        json!({ "peticion": { "funcion": LOOPBACK, "instancia": null,
+                              "valores": valores, "borrar": false } }),
+        &cookie,
+    )
+    .await;
+    let id = confirmar(&p, &cookie, &prep).await;
+
+    let deshacer = ok(&p, "deshacer", json!({ "change_id": id }), &cookie).await;
+    confirmar(&p, &cookie, &deshacer).await;
+    let (_, ps) = p.sim.control.writes().pop().unwrap();
+    assert!(ps.iter().all(|(k, _)| k != "h323_enable"), "{ps:?}");
+    let f = ok(
+        &p,
+        "formulario",
+        json!({ "funcion": LOOPBACK, "instancia": null, "claves": [] }),
+        &cookie,
+    )
+    .await;
+    assert_eq!(campo(&f, "adm_state").unwrap()["valor"], antes.as_str());
+}

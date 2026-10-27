@@ -94,6 +94,11 @@ pub(crate) fn write(
         "cbSetQueue" if param(&clean, "default_traffic_class") == Some("-1") => {
             cola_por_defecto(s, st, &clean)
         }
+        // El formulario del NAT loopback va a la CGI del ALG con su id: son
+        // otras casillas (`adm_state`), las de su variante del catálogo.
+        "cbSetNatConfig" if param(&clean, "rtm_cfg_nat_lb_intf_id").is_some() => {
+            escritura_generica(s, st, "cbSetNatConfig.loopback", &clean)
+        }
         _ => escritura_generica(s, st, name, &clean),
     };
     match result {

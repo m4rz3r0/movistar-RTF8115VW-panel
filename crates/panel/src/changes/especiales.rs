@@ -395,13 +395,13 @@ impl ChangeManager {
     }
 }
 
-/// La función que de verdad se envía con `plan`, la que se anota: la baja
-/// de una instancia especial es otra escritura (`cbDeleteUser`, o la baja
-/// de la regla «sin ping» del cortafuegos; ver [`Especial::baja`]). Las
-/// del editor completo del cortafuegos se anotan con su nombre del
-/// catálogo (`add.regla`, `modify.filtro`…): varias comparten la misma
-/// escritura y el deshacer necesita saber cuál fue; lo enviado queda en la
-/// solicitud del paso.
+/// La función del catálogo con la que se anota `plan`: la baja de una
+/// instancia especial es otra escritura (`cbDeleteUser`, o la baja de la
+/// regla «sin ping» del cortafuegos; ver [`Especial::baja`]). Lo demás se
+/// anota con su nombre del catálogo, no con su CGI: varias funciones
+/// comparten la misma escritura (`cbSetNatConfig.loopback`, `add.regla`,
+/// `modify.filtro`…) y el deshacer necesita saber cuál fue; lo enviado
+/// queda en la solicitud del paso.
 pub(super) fn funcion_enviada(plan: &Plan) -> &str {
     match Especial::de(&plan.funcion) {
         Some(Especial::Cortafuegos | Especial::FiltroCortafuegos)
@@ -413,7 +413,7 @@ pub(super) fn funcion_enviada(plan: &Plan) -> &str {
             e.baja(plan.instancia.as_deref().unwrap_or_default(), &plan.valores)
                 .0
         }
-        _ => plan.funcion.cgi(),
+        _ => plan.funcion.name.as_str(),
     }
 }
 
