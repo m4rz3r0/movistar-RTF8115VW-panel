@@ -30,6 +30,7 @@ código, junto a cada `#[server(endpoint = "…")]`.
 | `secretos_del_cambio` | El valor anterior y el nuevo de los secretos de un cambio, para su detalle desplegado. `no-store`. |
 | `comprobar_contrasena_router` | Comprueba, sin escribir nada, que se puede cambiar la contraseña del router a la nueva. Exige reautenticación. |
 | `cambiar_contrasena_router` | Cambia la contraseña del router y el panel pasa a usarla si entra con ella. Exige reautenticación; 409 con otro cambio en curso. |
+| `leer_registro_router` | El registro del sistema del router (`texto`, con lo más nuevo al final, y `recortado`): lo exporta y lo lee como la web (ver «Registro del router»). Solo lectura: no pasa por el gestor ni cambia ningún ajuste. 503 sin router configurado; 502 si el router no lo da. `no-store`. |
 
 ## Lo que el panel escribe: solo lo comprobado en el router real
 
@@ -289,3 +290,33 @@ significa `guest_networking = 1` (se lee como «separada»); y si la
 posición de `cbGetWifi` coincide con el id de la radio, porque las
 lecturas de estado de la WiFi (`hgu::read::wifi` y la detección de radios)
 aún toman la posición como id.
+
+## Registro del router (ver y descargar)
+
+Al pie de Ajustes → Sistema, «Registro del router» enseña el registro del
+sistema del router, como la página Syslog de su web avanzada
+(`syslog.asp`), que al cargarse lo exporta y deja descargarlo. Solo se lee
+al pulsar «Leer el registro» (`leer_registro_router`): el panel pide al
+router que lo exporte (`cbSetSyslog` con **solo** `export=EXPORT` y el
+`sessionKey` de `syslog.asp`, sin ningún parámetro de configuración) y lo
+lee de `GET /syslog.log` con la misma sesión
+(`hgu::Client::registro_del_sistema`). La exportación no cambia ningún
+ajuste: no pasa por el gestor de cambios, no queda en el Historial y no
+invalida la caché de lecturas. La Biblioteca sigue sin ofrecer `export` ni
+abrir `syslog.asp`.
+
+El texto se ve en un bloque que se desplaza, con lo más nuevo abajo, con un
+filtro de líneas (cada palabra, sin mayúsculas) y «Leído hace…».
+«Descargar» guarda el registro entero (no solo lo filtrado) como
+`registro-router-AAAAMMDD-HHMM.log`, con la hora de la lectura. Si el
+registro pasa de 2 MiB (`hgu::client::TOPE_REGISTRO`), solo llegan sus
+últimas líneas enteras y la sección lo dice; el panel nunca guarda en
+memoria mucho más que eso mientras lo lee.
+
+**Pendiente de comprobar en el router real (T12).** Que `cbSetSyslog` con
+solo `export=EXPORT` responde bien y no cambia lo que da `cbGetSyslog`;
+que el registro está en `/syslog.log` y se sirve con la sesión del panel
+(y con qué tipo de contenido); qué tamaño tiene; y qué responde
+`/syslog.log` antes de la primera exportación. El simulador supone que el
+fichero no existe (404) hasta la primera exportación desde el arranque y
+que después se sirve hasta el siguiente reinicio.

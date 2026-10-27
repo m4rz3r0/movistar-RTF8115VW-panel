@@ -66,6 +66,7 @@ pub(crate) fn write(
         }
         "cbReboot" => {
             st.invalidate_sessions();
+            st.registro_exportado = false;
             st.rebooted = Some(Instant::now());
             return response(&result_node(
                 name,
@@ -73,6 +74,21 @@ pub(crate) fn write(
                 "0",
                 "",
             ));
+        }
+        // Exportar el registro no cambia ningún ajuste: lo demás que venga
+        // con `export` se aplica como siempre.
+        "cbSetSyslog" if crate::registro::pide_exportar(&clean) => {
+            crate::registro::exportar(st);
+            let resto: Params = clean
+                .iter()
+                .filter(|(k, _)| k != "export")
+                .cloned()
+                .collect();
+            if resto.is_empty() {
+                Ok(())
+            } else {
+                escritura_generica(s, st, name, &resto)
+            }
         }
         "cbSetQueue" if param(&clean, "default_traffic_class") == Some("-1") => {
             cola_por_defecto(s, st, &clean)

@@ -16,6 +16,7 @@ pub mod contrasena_router;
 pub mod instalar;
 pub mod panel_ajustes;
 pub mod preferencias;
+pub mod registro_router;
 pub mod tema;
 pub mod ui;
 pub mod usuarios_router;

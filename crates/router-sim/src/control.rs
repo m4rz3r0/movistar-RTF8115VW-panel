@@ -307,6 +307,12 @@ impl SimControl {
         true
     }
 
+    /// Texto del registro del sistema que sirve `/syslog.log` tras
+    /// exportarlo (en vez del de serie).
+    pub fn fijar_registro(&self, texto: &str) {
+        self.inner.state().registro = Some(texto.to_owned());
+    }
+
     /// Cambia la versión de firmware (`SWVersion`) que da `cbGetSummary`.
     pub fn set_firmware(&self, firmware: &str) {
         self.inner.state().firmware = Some(firmware.to_owned());

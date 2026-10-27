@@ -86,6 +86,11 @@ fn has_basic(st: &SimState, c: &HashMap<String, String>) -> bool {
         .is_some_and(|id| st.basic.contains(id))
 }
 
+/// ¿Traen las cabeceras `headers` una sesión básica abierta?
+pub(crate) fn has_basic_en(st: &SimState, headers: &HeaderMap) -> bool {
+    has_basic(st, &cookies(headers))
+}
+
 /// Cuelga las peticiones mientras el router «no responde» o si llevan una
 /// sesión colgada (`colgar_sesiones`), y retarda cada
 /// respuesta lo fijado con [`SimControl::set_retardo`] (salvo la del propio

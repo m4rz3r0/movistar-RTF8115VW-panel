@@ -16,6 +16,7 @@ mod listas;
 mod modelo;
 mod pools;
 mod red;
+mod registro;
 mod reservas;
 mod sesion;
 mod usuarios;

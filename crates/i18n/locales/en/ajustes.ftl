@@ -433,3 +433,17 @@ ajustes-puertos-parental-titulo = Parental controls
 ajustes-puertos-parental-dns = A DNS service with a family filter for the whole home network: in the improvements, when you review "Maximum privacy", you can pick the family DNS, which blocks adult websites and malware. Recommended if blocking adult or dangerous websites is enough. Pros: nothing to buy and it takes a moment to change. Cons: it sets no schedules, it filters the adults too, and a device with a different DNS configured gets around it.
 ajustes-puertos-parental-router = Your own router behind this one. Recommended if you want schedules and limits per device. Pros: it does all of that, usually with its own app. Cons: you have to buy it and set it up.
 ajustes-puertos-parental-enlace = Choose the family DNS in the improvements
+
+## Router log (at the foot of System)
+registro-router-titulo = Router log
+registro-router-desc = What the router keeps a note of: restarts, connections, logins to its web interface and warnings. It is read when you press the button, the same way the router's web interface downloads it, and no setting changes.
+registro-router-leer = Read the log
+registro-router-volver = Read again
+registro-router-leyendo = Reading…
+registro-router-descargar = Download
+registro-router-filtrar = Filter lines
+registro-router-recortado = The log is very long: only its last lines are shown.
+registro-router-vacio = The log is empty.
+registro-router-sin-coincidencias = No line contains what you typed.
+registro-router-error = The router did not return its log. Try again in a moment.
+registro-router-sin-router = The panel does not have the router configured yet.

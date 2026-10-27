@@ -433,3 +433,17 @@ ajustes-puertos-parental-titulo = Control parental
 ajustes-puertos-parental-dns = Un DNS con filtro familiar para toda la red de casa: en Mejoras, al revisar «Privacidad máxima», puedes elegir el DNS familiar, que bloquea las webs para adultos y el malware. Recomendado si basta con bloquear webs para adultos o peligrosas. A favor: no hay que comprar nada y se cambia en un momento. En contra: no pone horarios, filtra también a los adultos y un dispositivo con otro DNS configurado se lo salta.
 ajustes-puertos-parental-router = Un router propio detrás de este. Recomendado si quieres horarios y límites por dispositivo. A favor: hace todo eso, normalmente con su propia aplicación. En contra: hay que comprarlo y configurarlo.
 ajustes-puertos-parental-enlace = Elegir el DNS familiar en las mejoras
+
+## Registro del router (al pie de Sistema)
+registro-router-titulo = Registro del router
+registro-router-desc = Lo que el router va anotando: arranques, conexiones, accesos a su web y avisos. Se lee al pulsar el botón, igual que lo descarga la web del router, y no cambia ningún ajuste.
+registro-router-leer = Leer el registro
+registro-router-volver = Volver a leer
+registro-router-leyendo = Leyendo…
+registro-router-descargar = Descargar
+registro-router-filtrar = Filtrar líneas
+registro-router-recortado = El registro es muy largo: solo se ven sus últimas líneas.
+registro-router-vacio = El registro está vacío.
+registro-router-sin-coincidencias = Ninguna línea contiene lo que has escrito.
+registro-router-error = El router no ha dado su registro. Prueba de nuevo dentro de un momento.
+registro-router-sin-router = El panel aún no tiene configurado el router.

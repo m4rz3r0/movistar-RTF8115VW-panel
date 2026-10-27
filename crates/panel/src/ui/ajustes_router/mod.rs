@@ -13,7 +13,8 @@
 //! va en una lista con columnas ([`lista`]) bajo las tarjetas, con el
 //! detalle de cada fila en [`puertos`], [`reservas`] y [`dispositivos`]. Un
 //! tema que no existe es
-//! «página no encontrada». Si hay foto de partida, cada tema enlaza a
+//! «página no encontrada». Al pie de Sistema va el registro del router
+//! ([`registro`]). Si hay foto de partida, cada tema enlaza a
 //! «Cómo estaba al instalar» ([`foto`], `/ajustes/foto-de-partida`).
 
 mod aviso;
@@ -31,6 +32,7 @@ mod nota_tema;
 mod pestanas;
 mod piezas;
 mod puertos;
+mod registro;
 mod rejilla;
 mod reservas;
 mod resumen;
@@ -407,6 +409,7 @@ pub fn PaginaTema() -> impl IntoView {
                 </Transition>
                 </div>
             </div>
+            {move || (slug.get() == Tema::Sistema.slug()).then(|| view! { <registro::SeccionRegistro /> })}
             <AvisoCambio />
             <Outlet />
         }

@@ -185,6 +185,10 @@ pub(crate) struct SimState {
     /// `Some(None)` el filtro entero o `Some(Some(rid))` otra regla del
     /// mismo filtro (`cortafuegos_proxima_baja_*`).
     pub(crate) cortafuegos_baja_de_mas: Option<Option<String>>,
+    /// Se ha exportado el registro desde el arranque (ver `registro`).
+    pub(crate) registro_exportado: bool,
+    /// Texto del registro fijado con `fijar_registro` (`None`: el de serie).
+    pub(crate) registro: Option<String>,
 }
 
 impl SimState {

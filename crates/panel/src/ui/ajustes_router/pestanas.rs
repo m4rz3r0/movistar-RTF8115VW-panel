@@ -36,7 +36,7 @@ impl Lectura {
 }
 
 /// «Leído hace N s» (o «… min») a partir de `edad_s` segundos.
-fn leido_hace(s: u64) -> String {
+pub(super) fn leido_hace(s: u64) -> String {
     if s < 60 {
         t!("ajustes-leido-hace", s = s)
     } else {

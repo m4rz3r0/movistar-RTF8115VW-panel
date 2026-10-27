@@ -6,7 +6,7 @@
 //! catálogo (`catalogo`), con listas (crear, editar y borrar), `cbModifyPwd`,
 //! los usuarios de su web (`usuarios`: alta, baja, cambio de otro y lista) y
 //! el cortafuegos (`cortafuegos`: sus dos páginas y el alta y la baja de
-//! reglas).
+//! reglas) y el registro del sistema (`registro`: exportarlo y servirlo).
 
 mod conexiones;
 mod control;
@@ -17,6 +17,7 @@ mod fixtures;
 mod http;
 mod lecturas;
 mod ofuscado;
+mod registro;
 pub mod sanitize;
 #[cfg(test)]
 mod tests;
@@ -155,6 +156,7 @@ impl Sim {
             .route("/cgi-bin/te_acceso_router.cgi", post(basic_login))
             .route("/cgi-bin/te_logout.cgi", get(logout))
             .route("/cgi-bin/{file}", post(cgi).get(basic_cgi))
+            .route(registro::RUTA, get(registro::servir))
             .route("/{page}", get(page))
             .route(RUTA_RETARDO, post(fijar_retardo))
             .layer(middleware::from_fn_with_state(

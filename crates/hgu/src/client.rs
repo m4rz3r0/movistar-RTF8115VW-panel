@@ -21,9 +21,11 @@ mod contacto;
 mod entrar;
 mod local;
 mod por_id;
+mod registro;
 pub use contacto::{Contacto, EstadoContacto};
 pub use entrar::Credenciales;
 pub use por_id::TOPE_POSICIONES;
+pub use registro::{RegistroDelSistema, TOPE_REGISTRO};
 
 /// Lecturas seguidas como mucho en un [`Turno`] antes de ceder el cerrojo
 /// una vez a quien espera (el sondeo, el gestor de cambios): una tanda
@@ -435,6 +437,18 @@ impl Client {
     }
 
     async fn page_locked(&self, st: &mut State, path: &str) -> Result<String, Error> {
+        self.pagina_con_tope(st, path, None)
+            .await
+            .map(|(texto, _)| texto)
+    }
+
+    /// Como [`Client::page_locked`], con el `tope` de [`Client::enviar`].
+    async fn pagina_con_tope(
+        &self,
+        st: &mut State,
+        path: &str,
+        tope: Option<usize>,
+    ) -> Result<(String, bool), Error> {
         let path = if path.starts_with('/') {
             path.to_owned()
         } else {
@@ -442,8 +456,8 @@ impl Client {
         };
         for _ in 0..2 {
             self.ensure_basic(st).await?;
-            let body = self.send(st, Method::GET, &path, None).await?;
-            if !looks_logged_out(&body) {
+            let body = self.enviar(st, Method::GET, &path, None, tope).await?;
+            if !looks_logged_out(&body.0) {
                 return Ok(body);
             }
             Self::invalidate(st);
@@ -576,6 +590,22 @@ impl Client {
         path: &str,
         body: Option<String>,
     ) -> Result<String, Error> {
+        self.enviar(st, method, path, body, None)
+            .await
+            .map(|(texto, _)| texto)
+    }
+
+    /// Como [`Client::send`]; con `tope`, del cuerpo se guardan como mucho
+    /// sus últimos `tope` bytes (más un trozo) mientras llega, y el segundo
+    /// valor dice si se dejó algo fuera.
+    async fn enviar(
+        &self,
+        st: &mut State,
+        method: Method,
+        path: &str,
+        body: Option<String>,
+        tope: Option<usize>,
+    ) -> Result<(String, bool), Error> {
         let (base_url, min_gap) = {
             let cfg = st.cfg.as_ref().ok_or(Error::NoConfigurado)?;
             (cfg.base_url.trim_end_matches('/').to_owned(), cfg.min_gap)
@@ -618,7 +648,10 @@ impl Client {
                 .filter_map(|v| v.to_str().ok().map(str::to_owned))
                 .collect();
             let status = resp.status();
-            let text = resp.text().await?;
+            let text = match tope {
+                None => (resp.text().await?, false),
+                Some(tope) => registro::cola(resp, tope).await?,
+            };
             Ok::<_, reqwest::Error>((status, set, text))
         }
         .await;

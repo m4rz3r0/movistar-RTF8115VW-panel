@@ -53,6 +53,7 @@ mod pool_por_id;
 mod pool_reservadas;
 mod qos_dependientes;
 mod red;
+mod registro_router;
 mod registro_y_dns;
 mod seleccion;
 mod sensibles;
