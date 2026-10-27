@@ -1,5 +1,7 @@
 # Comprobaciones de cada push y pull request: las de README.md
-# («Comprobaciones»), el comprobador de publicación y los e2e.
+# («Comprobaciones») y el comprobador de publicación. Los e2e tardan unos 40
+# minutos, así que solo se lanzan a mano (Actions → CI → Run workflow), antes
+# de cerrar una versión.
 #
 # Forgejo Actions también lee esta carpeta si no hay .forgejo/workflows; sin
 # runner, no se lanza nada.
@@ -12,6 +14,7 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -123,6 +126,7 @@ jobs:
         run: cargo run -p comprobar-publicacion -- --arbol --sin-locales
 
   e2e:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
