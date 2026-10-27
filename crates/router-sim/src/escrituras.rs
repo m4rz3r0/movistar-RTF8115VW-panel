@@ -90,6 +90,7 @@ pub(crate) fn write(
                 escritura_generica(s, st, name, &resto)
             }
         }
+        "cbSaveConfig" => return crate::copia::guardar(st, &clean),
         "cbSetQueue" if param(&clean, "default_traffic_class") == Some("-1") => {
             cola_por_defecto(s, st, &clean)
         }

@@ -257,7 +257,7 @@ pub const PAGE_VARS: &[(&str, &[(&str, &str)])] = &[(
 
 /// Escritura de la UI básica: `GET /cgi-bin/<x>.cmd|.cgi|.wl?…&sessionKey=…`.
 /// Se registra en `writes` y responde OK; solo cambia el estado simulado la
-/// del cortafuegos (`scbidirectionalflt.cmd`).
+/// del cortafuegos (`scbidirectionalflt.cmd`), que responde 301 a su lista.
 pub(crate) async fn basic_cgi(
     State(s): State<Arc<Inner>>,
     Path(file): Path<String>,
@@ -283,22 +283,41 @@ pub(crate) async fn basic_cgi(
         .into_iter()
         .filter(|(k, _)| k != "sessionKey")
         .collect();
-    if file == cortafuegos::ORDEN {
+    let del_cortafuegos = file == cortafuegos::ORDEN;
+    if del_cortafuegos {
         cortafuegos::escribir(&mut st, &clean);
     }
     st.writes.push((file, clean));
+    if del_cortafuegos {
+        // Como el router real: 301 a la lista, sin cuerpo.
+        return (
+            StatusCode::MOVED_PERMANENTLY,
+            [(header::LOCATION, cortafuegos::REDIRECCION)],
+        )
+            .into_response();
+    }
     "<html><body>ok</body></html>".into_response()
 }
 
 pub(crate) async fn cgi(
     State(s): State<Arc<Inner>>,
     Path(file): Path<String>,
+    RawQuery(query): RawQuery,
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
     let Some(name) = file.strip_suffix(".xml") else {
         return StatusCode::NOT_FOUND.into_response();
     };
+    if name == crate::copia::DESCARGA {
+        let c = cookies(&headers);
+        let mut st = s.state();
+        let sesion_ok = c.get("SessionStatus").is_some_and(|v| v == "Valid")
+            && c.get("SessionID")
+                .is_some_and(|sid| st.advanced.contains(sid));
+        let q = query.unwrap_or_default();
+        return crate::copia::descargar(&mut st, sesion_ok, &q, &body);
+    }
     let (respuesta, sin_respuesta) = cgi_sync(&s, name, &headers, &body);
     if sin_respuesta {
         std::future::pending::<()>().await;

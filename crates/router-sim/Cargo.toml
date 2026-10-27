@@ -18,5 +18,7 @@ tokio.workspace = true
 
 [dev-dependencies]
 roxmltree.workspace = true
+# Respuestas en crudo (301 del cortafuegos, descarga de la copia).
+reqwest.workspace = true
 # Las lecturas del catálogo de ajustes se prueban contra el sim.
 ajustes = { path = "../ajustes", features = ["catalogo"] }

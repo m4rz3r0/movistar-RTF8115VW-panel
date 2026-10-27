@@ -189,6 +189,15 @@ pub(crate) struct SimState {
     pub(crate) registro_exportado: bool,
     /// Texto del registro fijado con `fijar_registro` (`None`: el de serie).
     pub(crate) registro: Option<String>,
+    /// Veces que se ha guardado la configuración (`cbSaveConfig save=1`).
+    pub(crate) guardados: u32,
+    /// El fichero de copia generado con `cbSaveConfig backup=1` y cuántos
+    /// guardados llevaba entonces (la copia es de lo último guardado).
+    pub(crate) copia: Option<(String, u32)>,
+    /// Contenido fijado de la copia (`fijar_copia`).
+    pub(crate) copia_fijada: Option<Vec<u8>>,
+    /// `fileName` de cada copia descargada.
+    pub(crate) copias_descargadas: Vec<String>,
 }
 
 impl SimState {

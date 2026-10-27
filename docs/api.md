@@ -45,7 +45,7 @@ Las funciones del propio panel (`/api/…`) están en
 | [LAN/DHCP](#landhcp) | 22 | 12 | 10 | 0 | 0 |
 | [WiFi](#wifi) | 20 | 11 | 8 | 1 | 0 |
 | [NAT](#nat) | 17 | 6 | 11 | 0 | 0 |
-| [Cortafuegos](#cortafuegos) | 4 | 1 | 3 | 0 | 4 |
+| [Cortafuegos](#cortafuegos) | 8 | 1 | 7 | 0 | 8 |
 | [DNS](#dns) | 6 | 3 | 3 | 0 | 0 |
 | [IPv6](#ipv6) | 8 | 2 | 6 | 0 | 3 |
 | [Multicast/IGMP](#multicastigmp) | 5 | 3 | 2 | 0 | 0 |
@@ -1252,9 +1252,9 @@ Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalida
 
 *escritura* · oculta · riesgo alto · se vigila · página `scbidirectionalflt_ed.asp`
 
-Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Añade una entrada (interfaz, versión, acción por defecto) o una regla (protocolo, origen, destino, puertos, acción).
+Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Añade una regla al final de un filtro. El panel la usa para su regla «sin ping» (Ajustes → Seguridad), con la carga comprobada: `target=rule&belong&version&enabled&protocol&specificAction&icmpType`, sin `escape`. El editor completo, como la web, va en `scbidirectionalflt.cmd?action=add.regla`.
 
-**Bloqueada:** cortafuegos sin lectura comprobable: la Biblioteca no lo escribe
+**Bloqueada:** el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo
 
 **Comprobada en el router real:** E5, cambio 11 (la regla se pone; «sin ping» no basta en este router)
 
@@ -1262,16 +1262,15 @@ Lectura pareada: `scbidirectionalflt_ls.asp`
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
-| `id` | Id | int |  |
 | `escape` | Escapar (true) | text |  |
-| `target` | Objetivo (entry/rule) | text |  |
-| `belong` | Entrada a la que pertenece | int |  |
-| `version` | Versión de IP | int |  |
+| `target` | Objetivo (rule) | text |  |
+| `belong` | Filtro al que pertenece (FID) | int |  |
+| `version` | Versión de IP (la del filtro: 0 IPv4, 1 IPv6) | int |  |
 | `enabled` | Activada | bool |  |
-| `protocol` | Protocolo | text |  |
-| `specificAction` | Acción | text |  |
-| `rejectType` | Tipo de rechazo | text |  |
-| `icmpType` | Tipo ICMP | text |  |
+| `protocol` | Protocolo (1 ICMP, 2 TCP, 3 UDP) | text |  |
+| `specificAction` | Acción (0 descartar, 1 rechazar, 2 permitir) | text |  |
+| `rejectType` | Tipo de rechazo (solo al rechazar) | text |  |
+| `icmpType` | Tipo ICMP (solo con ICMP) | text |  |
 | `srcaddr` | IP de origen | text |  |
 | `srcmask` | Máscara de origen | text |  |
 | `srcportstart` | Puerto de origen desde | text |  |
@@ -1280,35 +1279,62 @@ Lectura pareada: `scbidirectionalflt_ls.asp`
 | `dstmask` | Máscara de destino | text |  |
 | `dstportstart` | Puerto de destino desde | text |  |
 | `dstportend` | Puerto de destino hasta | text |  |
-| `name` | Nombre | text |  |
-| `interface` | Interfaz | text |  |
-| `type` | Tipo | text |  |
-| `default` | Acción por defecto | text |  |
+
+### `scbidirectionalflt.cmd?action=add.regla`
+
+*escritura* · oculta · riesgo alto · se vigila · página `scbidirectionalflt_ed.asp` · se manda a `scbidirectionalflt.cmd?action=add`
+
+Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Añade una regla al final de un filtro (protocolo, origen, destino, puertos, acción), como la web: `escape=true&target=rule&…`; lo que no aplica no viaja. El router responde 301 a la lista.
+
+**Bloqueada:** el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo
+
+**Sin comprobar en el router real:** el panel no la escribe.
+
+Lectura pareada: `scbidirectionalflt_ls.asp`
+
+| Parámetro | Etiqueta | Tipo | Opciones |
+|---|---|---|---|
+| `escape` | Escapar (true) | text |  |
+| `target` | Objetivo (rule) | text |  |
+| `belong` | Filtro al que pertenece (FID) | int |  |
+| `version` | Versión de IP (la del filtro: 0 IPv4, 1 IPv6) | int |  |
+| `enabled` | Activada | bool |  |
+| `protocol` | Protocolo (1 ICMP, 2 TCP, 3 UDP) | text |  |
+| `specificAction` | Acción (0 descartar, 1 rechazar, 2 permitir) | text |  |
+| `rejectType` | Tipo de rechazo (solo al rechazar) | text |  |
+| `icmpType` | Tipo ICMP (solo con ICMP) | text |  |
+| `srcaddr` | IP de origen | text |  |
+| `srcmask` | Máscara de origen | text |  |
+| `srcportstart` | Puerto de origen desde | text |  |
+| `srcportend` | Puerto de origen hasta | text |  |
+| `dstaddr` | IP de destino | text |  |
+| `dstmask` | Máscara de destino | text |  |
+| `dstportstart` | Puerto de destino desde | text |  |
+| `dstportend` | Puerto de destino hasta | text |  |
 
 ### `scbidirectionalflt.cmd?action=modify`
 
 *escritura* · oculta · riesgo alto · se vigila · página `scbidirectionalflt_ed.asp`
 
-Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Modifica una entrada o regla.
+Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Cambia una regla entera (`id=<RID>&target=rule&…`, sin `escape`), como la web: el panel manda la regla leída con lo cambiado. El router responde 301 a la lista.
 
-**Bloqueada:** cortafuegos sin lectura comprobable: la Biblioteca no lo escribe
+**Bloqueada:** el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo
 
 **Sin comprobar en el router real:** el panel no la escribe.
 
-Lectura pareada: `scbidirectionalflt.cmd?action=view`
+Lectura pareada: `scbidirectionalflt_ls.asp`
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
-| `id` | Id | int |  |
-| `escape` | Escapar (true) | text |  |
-| `target` | Objetivo (entry/rule) | text |  |
-| `belong` | Entrada a la que pertenece | int |  |
-| `version` | Versión de IP | int |  |
+| `id` | Regla (RID) | int |  |
+| `target` | Objetivo (rule) | text |  |
+| `belong` | Filtro al que pertenece (FID) | int |  |
+| `version` | Versión de IP (la del filtro: 0 IPv4, 1 IPv6) | int |  |
 | `enabled` | Activada | bool |  |
-| `protocol` | Protocolo | text |  |
-| `specificAction` | Acción | text |  |
-| `rejectType` | Tipo de rechazo | text |  |
-| `icmpType` | Tipo ICMP | text |  |
+| `protocol` | Protocolo (1 ICMP, 2 TCP, 3 UDP) | text |  |
+| `specificAction` | Acción (0 descartar, 1 rechazar, 2 permitir) | text |  |
+| `rejectType` | Tipo de rechazo (solo al rechazar) | text |  |
+| `icmpType` | Tipo ICMP (solo con ICMP) | text |  |
 | `srcaddr` | IP de origen | text |  |
 | `srcmask` | Máscara de origen | text |  |
 | `srcportstart` | Puerto de origen desde | text |  |
@@ -1317,18 +1343,14 @@ Lectura pareada: `scbidirectionalflt.cmd?action=view`
 | `dstmask` | Máscara de destino | text |  |
 | `dstportstart` | Puerto de destino desde | text |  |
 | `dstportend` | Puerto de destino hasta | text |  |
-| `name` | Nombre | text |  |
-| `interface` | Interfaz | text |  |
-| `type` | Tipo | text |  |
-| `default` | Acción por defecto | text |  |
 
 ### `scbidirectionalflt.cmd?action=remove`
 
 *escritura* · oculta · riesgo alto · se vigila · página `scbidirectionalflt_ls.asp`
 
-Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Borra una entrada o regla.
+Editor de cortafuegos que solo se enlaza desde un texto de te_otras_funcionalidades.asp. Borra una regla (`item=<FID>|<RID>&escape=true`, como `removeClick`). El router responde 301 a la lista.
 
-**Bloqueada:** cortafuegos sin lectura comprobable: la Biblioteca no lo escribe
+**Bloqueada:** el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo
 
 **Comprobada en el router real:** E5, cambio 12
 
@@ -1336,7 +1358,67 @@ Lectura pareada: `scbidirectionalflt_ls.asp`
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
-| `item` | Elemento a borrar | text |  |
+| `item` | Regla a borrar (FID\|RID) | text |  |
+| `escape` | Escapar (true) | text |  |
+
+### `scbidirectionalflt.cmd?action=add.filtro`
+
+*escritura* · oculta · riesgo alto · se vigila · página `scbidirectionalflt_ed.asp` · se manda a `scbidirectionalflt.cmd?action=add`
+
+Añade un filtro (una entrada) vacío: nombre, interfaz, entrada o salida, versión de IP y acción por defecto (`target=entry&…`, sin `escape`), como la web. El router responde 301 a la lista.
+
+**Bloqueada:** el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo
+
+**Sin comprobar en el router real:** el panel no la escribe.
+
+Lectura pareada: `scbidirectionalflt_ls.asp`
+
+| Parámetro | Etiqueta | Tipo | Opciones |
+|---|---|---|---|
+| `target` | Objetivo (entry) | text |  |
+| `name` | Nombre | text |  |
+| `interface` | Interfaz (IntfID) | text |  |
+| `type` | Tipo (0 entrada, 1 salida) | text |  |
+| `version` | Versión de IP (0 IPv4, 1 IPv6) | text |  |
+| `default` | Acción por defecto (0 descartar, 1 permitir) | text |  |
+
+### `scbidirectionalflt.cmd?action=modify.filtro`
+
+*escritura* · oculta · riesgo alto · se vigila · página `scbidirectionalflt_ed.asp` · se manda a `scbidirectionalflt.cmd?action=modify`
+
+Cambia un filtro (`id=<FID>&target=entry&…`), como la web. El router responde 301 a la lista.
+
+**Bloqueada:** el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo
+
+**Sin comprobar en el router real:** el panel no la escribe.
+
+Lectura pareada: `scbidirectionalflt_ls.asp`
+
+| Parámetro | Etiqueta | Tipo | Opciones |
+|---|---|---|---|
+| `id` | Filtro (FID) | int |  |
+| `target` | Objetivo (entry) | text |  |
+| `name` | Nombre | text |  |
+| `interface` | Interfaz (IntfID) | text |  |
+| `type` | Tipo (0 entrada, 1 salida) | text |  |
+| `version` | Versión de IP (0 IPv4, 1 IPv6) | text |  |
+| `default` | Acción por defecto (0 descartar, 1 permitir) | text |  |
+
+### `scbidirectionalflt.cmd?action=remove.filtro`
+
+*escritura* · oculta · riesgo alto · se vigila · página `scbidirectionalflt_ls.asp` · se manda a `scbidirectionalflt.cmd?action=remove`
+
+Borra un filtro (`item=<FID>&escape=true`, sin `|`): el router lo borra con todas sus reglas; el panel solo borra filtros vacíos, para poder deshacerlo. El router responde 301 a la lista.
+
+**Bloqueada:** el cortafuegos se edita desde Ajustes → Seguridad, que lo lee de su página; la Biblioteca no sabe leerlo
+
+**Sin comprobar en el router real:** el panel no la escribe.
+
+Lectura pareada: `scbidirectionalflt_ls.asp`
+
+| Parámetro | Etiqueta | Tipo | Opciones |
+|---|---|---|---|
+| `item` | Filtro a borrar (FID) | text |  |
 | `escape` | Escapar (true) | text |  |
 
 ## DNS
@@ -2087,15 +2169,15 @@ Página de copia y restauración de la configuración.
 
 *acción* · UI avanzada · riesgo bajo · sin vigilancia · página `backup_restore.asp`
 
-Descarga el fichero de copia generado por cbSaveConfig (backup=1).
+Descarga el fichero de copia generado por cbSaveConfig (backup=1): POST sin cuerpo con `fileName` y `sessionKey` en la URL; responde `application/octet-stream` con el fichero (`config_<fecha>.tar`).
 
-**Bloqueada:** descarga la configuración completa con todas las contraseñas y claves en claro
+**Bloqueada:** la copia lleva todas las contraseñas: se descarga desde Ajustes → Sistema → Copia de la configuración (guarda, la genera y la descarga), no desde la Biblioteca
 
 **Sin comprobar en el router real:** el panel no la escribe.
 
 | Parámetro | Etiqueta | Tipo | Opciones |
 |---|---|---|---|
-| `fileName` | Fichero | text |  |
+| `fileName` | Fichero (va en la URL) | text |  |
 
 ### `cbFWUpgradeByFTP`
 

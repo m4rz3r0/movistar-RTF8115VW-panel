@@ -8,12 +8,16 @@
 //!
 //! Se escribe por GET con la carga del editor (`scbidirectionalflt_ed.asp`,
 //! `btnApplyRule`): el alta, [`carga_sin_ping`] en [`ALTA`]; la baja,
-//! `item=<FID>|<RID>` ([`item`]) en [`BAJA`], como `removeClick`.
+//! `item=<FID>|<RID>` ([`item`]) en [`BAJA`], como `removeClick`. Las demás
+//! cargas (reglas y filtros, altas y ediciones) están en [`carga`].
 
 use crate::client::Client;
 use crate::error::Error;
 use crate::xml::XmlNode;
 use serde::{Deserialize, Serialize};
+
+mod carga;
+pub use carga::*;
 
 /// Página con la lista de filtros (`var sessKey` y `var filter`).
 pub const PAGINA_LISTA: &str = "scbidirectionalflt_ls.asp";
@@ -229,9 +233,10 @@ pub fn filtro_de_entrada_v4<'a>(f: &'a [Filtro], ip_intf_id: &str) -> Option<&'a
         .find(|x| x.tipo == "0" && x.version == "0" && x.intf_id == intf)
 }
 
-/// Carga del alta de la regla «sin ping» en `filtro`, la de `btnApplyRule`
-/// del editor y en su orden: activa, ICMP, descartar y `echo_request`, sin
-/// id, puertos ni direcciones (con ICMP no se envían).
+/// Carga del alta de la regla «sin ping» en `filtro`, la comprobada en el
+/// router real (E5, cambio 11): activa, ICMP, descartar y `echo_request`,
+/// sin `escape`, id, puertos ni direcciones (con ICMP no se envían). El
+/// editor completo, como la web, la manda con [`carga_regla`].
 pub fn carga_sin_ping(filtro: &Filtro) -> Vec<(&'static str, String)> {
     [
         ("target", "rule"),

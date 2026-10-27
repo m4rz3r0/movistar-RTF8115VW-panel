@@ -10,6 +10,7 @@
 
 mod conexiones;
 mod control;
+mod copia;
 mod cortafuegos;
 mod escrituras;
 mod estado;

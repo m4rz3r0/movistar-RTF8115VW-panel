@@ -307,6 +307,38 @@ impl SimControl {
         true
     }
 
+    /// Una sesión básica abierta (su cookie `_httpdSessionId_`) y el último
+    /// `sessionKey` dado, para pedir a mano lo que el cliente pide (y ver la
+    /// respuesta en crudo).
+    pub fn sesion_basica_y_clave(&self) -> Option<(String, String)> {
+        let st = self.inner.state();
+        Some((st.basic.iter().next()?.clone(), st.session_key.clone()?))
+    }
+
+    /// Como [`SimControl::sesion_basica_y_clave`], con la sesión avanzada:
+    /// la cabecera `Cookie` entera y el último `sessionKey` dado.
+    pub fn sesion_avanzada_y_clave(&self) -> Option<(String, String)> {
+        let st = self.inner.state();
+        let cookie = format!(
+            "_httpdSessionId_={}; SessionID={}; SessionStatus=Valid",
+            st.basic.iter().next()?,
+            st.advanced.iter().next()?
+        );
+        Some((cookie, st.session_key.clone()?))
+    }
+
+    /// Contenido de la copia de la configuración que da `cbDownloadConfig`
+    /// (en vez del de serie, inventado).
+    pub fn fijar_copia(&self, datos: Vec<u8>) {
+        self.inner.state().copia_fijada = Some(datos);
+    }
+
+    /// Los ficheros de copia descargados (`fileName` de cada
+    /// `cbDownloadConfig` que respondió con el fichero), en orden.
+    pub fn copias_descargadas(&self) -> Vec<String> {
+        self.inner.state().copias_descargadas.clone()
+    }
+
     /// Texto del registro del sistema que sirve `/syslog.log` tras
     /// exportarlo (en vez del de serie).
     pub fn fijar_registro(&self, texto: &str) {

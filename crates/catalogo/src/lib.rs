@@ -384,8 +384,8 @@ riesgo = "bajo"
         }
     }
 
-    /// El cortafuegos no tiene lectura comprobable: la Biblioteca no lo
-    /// escribe (el panel solo pone y quita su propia regla desde Seguridad).
+    /// La Biblioteca no escribe el cortafuegos: no sabe leer sus filtros (se
+    /// edita desde Seguridad, que lo lee de su página).
     /// El NAT de una interfaz puede dejar la casa sin internet: riesgo alto.
     #[test]
     fn cortafuegos_bloqueado_en_la_biblioteca() {
@@ -394,6 +394,10 @@ riesgo = "bajo"
             "scbidirectionalflt.cmd?action=add",
             "scbidirectionalflt.cmd?action=modify",
             "scbidirectionalflt.cmd?action=remove",
+            "scbidirectionalflt.cmd?action=add.regla",
+            "scbidirectionalflt.cmd?action=add.filtro",
+            "scbidirectionalflt.cmd?action=modify.filtro",
+            "scbidirectionalflt.cmd?action=remove.filtro",
             "scbidirectionalfwl.cmd?action=create",
             "scbidirectionalfwl.cmd?action=delete",
             "scbidirectionalfwl.cmd?action=save",

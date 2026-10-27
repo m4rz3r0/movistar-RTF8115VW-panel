@@ -8,6 +8,7 @@ mod comun;
 use comun::*;
 
 mod control;
+mod copia;
 mod cortafuegos;
 mod escrituras;
 mod fixtures;

@@ -18,11 +18,13 @@ use tokio::{
 };
 
 mod contacto;
+mod copia;
 mod entrar;
 mod local;
 mod por_id;
 mod registro;
 pub use contacto::{Contacto, EstadoContacto};
+pub use copia::{CopiaDeConfiguracion, TOPE_COPIA};
 pub use entrar::Credenciales;
 pub use por_id::TOPE_POSICIONES;
 pub use registro::{RegistroDelSistema, TOPE_REGISTRO};
@@ -606,6 +608,30 @@ impl Client {
         body: Option<String>,
         tope: Option<usize>,
     ) -> Result<(String, bool), Error> {
+        let req = self.peticion(st, method, path, body).await?;
+        let result = async {
+            let resp = req.send().await?;
+            let set = cookies_nuevas(&resp);
+            let status = resp.status();
+            let text = match tope {
+                None => (resp.text().await?, false),
+                Some(tope) => registro::cola(resp, tope).await?,
+            };
+            Ok::<_, reqwest::Error>((status, set, text))
+        }
+        .await;
+        self.recibido(st, path, result)
+    }
+
+    /// La petición `method` a `path`, con las cookies de la sesión, tras
+    /// esperar `min_gap` desde la anterior.
+    async fn peticion(
+        &self,
+        st: &mut State,
+        method: Method,
+        path: &str,
+        body: Option<String>,
+    ) -> Result<reqwest::RequestBuilder, Error> {
         let (base_url, min_gap) = {
             let cfg = st.cfg.as_ref().ok_or(Error::NoConfigurado)?;
             (cfg.base_url.trim_end_matches('/').to_owned(), cfg.min_gap)
@@ -639,24 +665,20 @@ impl Client {
                 .header("Content-Length", b.len())
                 .body(b);
         }
-        let result = async {
-            let resp = req.send().await?;
-            let set: Vec<String> = resp
-                .headers()
-                .get_all("set-cookie")
-                .iter()
-                .filter_map(|v| v.to_str().ok().map(str::to_owned))
-                .collect();
-            let status = resp.status();
-            let text = match tope {
-                None => (resp.text().await?, false),
-                Some(tope) => registro::cola(resp, tope).await?,
-            };
-            Ok::<_, reqwest::Error>((status, set, text))
-        }
-        .await;
+        Ok(req)
+    }
+
+    /// Lo que queda de una petición: anota el contacto, guarda las cookies
+    /// nuevas y da el cuerpo leído o el error (un error de red descarta la
+    /// sesión; un 4xx o 5xx es [`Error::Unexpected`] sin la consulta).
+    fn recibido<T>(
+        &self,
+        st: &mut State,
+        path: &str,
+        result: Result<(reqwest::StatusCode, Vec<String>, T), reqwest::Error>,
+    ) -> Result<T, Error> {
         st.last_request = Some(Instant::now());
-        let (status, set, text) = match result {
+        let (status, set, cuerpo) = match result {
             Ok(r) => {
                 self.anotar_contacto(Some(EstadoContacto::Responde));
                 r
@@ -685,8 +707,17 @@ impl Client {
                 sin_consulta(path)
             )));
         }
-        Ok(text)
+        Ok(cuerpo)
     }
+}
+
+/// Las cabeceras `Set-Cookie` de `resp`.
+fn cookies_nuevas(resp: &reqwest::Response) -> Vec<String> {
+    resp.headers()
+        .get_all("set-cookie")
+        .iter()
+        .filter_map(|v| v.to_str().ok().map(str::to_owned))
+        .collect()
 }
 
 /// Turno del cerrojo del cliente para una tanda de lecturas seguidas (ver
