@@ -38,6 +38,25 @@ async fn exporta_y_devuelve_el_registro_sin_cambiar_nada() {
     assert_eq!(p.state.hgu.call("cbGetSyslog", &[]).await.unwrap(), antes);
 }
 
+/// Con el registro apagado en el router (`syslog_enable=0`) no hay nada que
+/// leer: se dice, para que no parezca un registro vacío sin más.
+#[tokio::test]
+async fn con_el_registro_apagado_lo_dice() {
+    let p = PanelPrueba::nuevo().arrancar().await;
+    let cookie = sesion(&p).await;
+    let r = ok(&p, LEER, json!({}), &cookie).await;
+    assert_eq!(r["apagado"], false, "{r}");
+    p.state
+        .hgu
+        .write("syslog.asp", "cbSetSyslog", &[("syslog_enable", "0")])
+        .await
+        .unwrap();
+    p.sim.control.fijar_registro("");
+    let r = ok(&p, LEER, json!({}), &cookie).await;
+    assert_eq!(r["apagado"], true, "{r}");
+    assert_eq!(r["texto"], "", "{r}");
+}
+
 #[tokio::test]
 async fn un_registro_enorme_llega_recortado() {
     let p = PanelPrueba::nuevo().arrancar().await;

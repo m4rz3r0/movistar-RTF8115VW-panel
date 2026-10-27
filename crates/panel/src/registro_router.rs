@@ -4,10 +4,8 @@
 //! Solo lectura: pide al router que exporte el registro (`cbSetSyslog` con
 //! solo `export=EXPORT`, que no cambia ningún ajuste) y lo lee de
 //! `/syslog.log` ([`hgu::Client::registro_del_sistema`]). No pasa por el
-//! gestor de cambios ni deja nada en el Historial.
-//!
-//! TODO(T12): sin comprobar en el router real (la exportación, la ruta del
-//! fichero y su tamaño).
+//! gestor de cambios ni deja nada en el Historial. Vacío, mira si el
+//! router lo tiene apagado (`syslog_enable` de `cbGetSyslog`).
 
 use leptos::prelude::*;
 use leptos::server_fn::codec::Json;
@@ -21,6 +19,10 @@ pub struct RegistroRouter {
     /// Era muy largo: solo llegan sus últimas líneas
     /// (`hgu::client::TOPE_REGISTRO`).
     pub recortado: bool,
+    /// El router tiene el registro apagado (`syslog_enable=0`): no anota
+    /// nada. Solo se mira si el texto llega vacío.
+    #[serde(default)]
+    pub apagado: bool,
 }
 
 /// Exporta y lee el registro del sistema del router (ver el módulo). Exige
@@ -40,10 +42,14 @@ mod servidor {
     pub(super) async fn leer() -> Result<RegistroRouter, ServerFnError> {
         let (state, _) = preparar().await?;
         match state.hgu.registro_del_sistema().await {
-            Ok(r) => Ok(RegistroRouter {
-                texto: r.texto,
-                recortado: r.recortado,
-            }),
+            Ok(r) => {
+                let apagado = r.texto.trim().is_empty() && apagado(&state).await;
+                Ok(RegistroRouter {
+                    texto: r.texto,
+                    recortado: r.recortado,
+                    apagado,
+                })
+            }
             Err(hgu::Error::NoConfigurado) => Err(fallo(
                 StatusCode::SERVICE_UNAVAILABLE,
                 t!("registro-router-sin-router"),
@@ -51,6 +57,23 @@ mod servidor {
             Err(e) => {
                 tracing::warn!("registro del router: {e}");
                 Err(fallo(StatusCode::BAD_GATEWAY, t!("registro-router-error")))
+            }
+        }
+    }
+    /// El texto del primer elemento `nombre`, a cualquier profundidad.
+    fn campo<'a>(n: &'a hgu::xml::XmlNode, nombre: &str) -> Option<&'a str> {
+        n.text_of(nombre)
+            .or_else(|| n.children.iter().find_map(|c| campo(c, nombre)))
+    }
+
+    /// Si el router tiene el registro apagado. Sin poder leerlo, no se
+    /// sabe: se da por encendido y queda el «vacío» de siempre.
+    async fn apagado(state: &crate::state::AppState) -> bool {
+        match state.hgu.call("cbGetSyslog", &[]).await {
+            Ok(n) => campo(&n, "syslog_enable") == Some("0"),
+            Err(e) => {
+                tracing::warn!("registro del router, cbGetSyslog: {e}");
+                false
             }
         }
     }

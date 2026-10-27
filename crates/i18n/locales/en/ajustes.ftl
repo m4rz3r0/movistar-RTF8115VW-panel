@@ -455,6 +455,7 @@ registro-router-descargar = Download
 registro-router-filtrar = Filter lines
 registro-router-recortado = The log is very long: only its last lines are shown.
 registro-router-vacio = The log is empty.
+registro-router-apagado = The router has its log turned off and writes nothing down. Turn it on with «Keep the log», in «System log» on this tab.
 registro-router-sin-coincidencias = No line contains what you typed.
 registro-router-error = The router did not return its log. Try again in a moment.
 registro-router-sin-router = The panel does not have the router configured yet.

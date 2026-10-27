@@ -84,6 +84,14 @@ tema = "sistema"
 nivel = "avanzado"
 leer = { funcion = "cbGetSyslog" }
 
+# Si el router guarda su registro (la casilla de syslog.asp): apagado no
+# anota nada y «Registro del router» sale vacío.
+[[ajuste.campo]]
+id = "activado"
+escribe = { funcion = "cbSetSyslog", parametro = "syslog_enable" }
+lee = "syslog_enable"
+tipo = "booleano"
+
 [[ajuste.campo]]
 id = "envio"
 escribe = { funcion = "cbSetSyslog", parametro = "syslog_mode" }
@@ -132,7 +140,7 @@ tema = "sistema"
 ajustes = ["sistema.registro"]
 icono = "registro"
 interruptor = "sistema.registro.envio"
-datos = ["sistema.registro.servidor", "sistema.registro.puerto"]
+datos = ["sistema.registro.activado", "sistema.registro.servidor", "sistema.registro.puerto"]
 estado = "derivado:segun_lo_recomendado"
 
 # Acciones (spec §5.5).

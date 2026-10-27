@@ -2,7 +2,8 @@
 //! router ([`leer_registro_router`]) en un bloque de texto que se desplaza,
 //! con lo más nuevo abajo, un filtro de líneas y «Descargar» (el registro
 //! entero, como `registro-router-AAAAMMDD-HHMM.log`). Solo se lee al
-//! pulsar el botón: cada lectura le pide al router que lo exporte.
+//! pulsar el botón: cada lectura le pide al router que lo exporte. Vacío
+//! porque el router lo tiene apagado, lo dice.
 
 use super::pestanas::leido_hace;
 use crate::registro_router::{LeerRegistroRouter, RegistroRouter};
@@ -219,7 +220,10 @@ pub(crate) fn SeccionRegistro() -> impl IntoView {
                         let vacio = leido.with(|l| {
                             l.as_ref().is_some_and(|l| l.registro.texto.trim().is_empty())
                         });
-                        let msg = if vacio {
+                        let apagado = leido.with(|l| l.as_ref().is_some_and(|l| l.registro.apagado));
+                        let msg = if vacio && apagado {
+                            t!("registro-router-apagado")
+                        } else if vacio {
                             t!("registro-router-vacio")
                         } else {
                             t!("registro-router-sin-coincidencias")

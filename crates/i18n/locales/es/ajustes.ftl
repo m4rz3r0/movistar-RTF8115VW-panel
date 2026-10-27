@@ -455,6 +455,7 @@ registro-router-descargar = Descargar
 registro-router-filtrar = Filtrar líneas
 registro-router-recortado = El registro es muy largo: solo se ven sus últimas líneas.
 registro-router-vacio = El registro está vacío.
+registro-router-apagado = El router tiene el registro apagado y no anota nada. Enciéndelo con «Guardar el registro», en «Registro del sistema» de esta pestaña.
 registro-router-sin-coincidencias = Ninguna línea contiene lo que has escrito.
 registro-router-error = El router no ha dado su registro. Prueba de nuevo dentro de un momento.
 registro-router-sin-router = El panel aún no tiene configurado el router.

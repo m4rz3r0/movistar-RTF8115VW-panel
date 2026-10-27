@@ -30,7 +30,7 @@ código, junto a cada `#[server(endpoint = "…")]`.
 | `secretos_del_cambio` | El valor anterior y el nuevo de los secretos de un cambio, para su detalle desplegado. `no-store`. |
 | `comprobar_contrasena_router` | Comprueba, sin escribir nada, que se puede cambiar la contraseña del router a la nueva. Exige reautenticación. |
 | `cambiar_contrasena_router` | Cambia la contraseña del router y el panel pasa a usarla si entra con ella. Exige reautenticación; 409 con otro cambio en curso. |
-| `leer_registro_router` | El registro del sistema del router (`texto`, con lo más nuevo al final, y `recortado`): lo exporta y lo lee como la web (ver «Registro del router»). Solo lectura: no pasa por el gestor ni cambia ningún ajuste. 503 sin router configurado; 502 si el router no lo da. `no-store`. |
+| `leer_registro_router` | El registro del sistema del router (`texto`, con lo más nuevo al final, `recortado` y `apagado`: vacío porque el router tiene el registro apagado, `syslog_enable=0` en `cbGetSyslog`): lo exporta y lo lee como la web (ver «Registro del router»). Solo lectura: no pasa por el gestor ni cambia ningún ajuste. 503 sin router configurado; 502 si el router no lo da. `no-store`. |
 | `estado_copia_router` | Por qué no se puede hacer ahora la copia de la configuración: la clave del motivo (`funcion-sin-comprobar` o `panel-solo-lectura`) o `null` si se puede. |
 | `descargar_copia_router` | Guarda la configuración del router, genera la copia y la descarga como la web (ver «Copia de la configuración»): `nombre` (`config_<fecha>.tar`) y `datos` (el fichero en base64). 403 en solo lectura; 409 sin comprobar o con un cambio en curso; 503 sin router configurado; 502 si el router no la da. `no-store`. |
 
@@ -348,6 +348,11 @@ filtro de líneas (cada palabra, sin mayúsculas) y «Leído hace…».
 registro pasa de 2 MiB (`hgu::client::TOPE_REGISTRO`), solo llegan sus
 últimas líneas enteras y la sección lo dice; el panel nunca guarda en
 memoria mucho más que eso mientras lo lee.
+
+Si llega vacío, el panel mira `syslog_enable` en `cbGetSyslog`: con el
+registro apagado, el router no anota nada, y la sección lo dice y remite a
+«Guardar el registro», el campo de «Registro del sistema» en esta misma
+pestaña (la casilla de `syslog.asp`, `syslog_enable` de `cbSetSyslog`).
 
 **Pendiente de comprobar en el router real (T12).** Que `cbSetSyslog` con
 solo `export=EXPORT` responde bien y no cambia lo que da `cbGetSyslog`;
