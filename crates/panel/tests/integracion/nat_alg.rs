@@ -4,7 +4,7 @@
 //! la escritura y no cambiaba nada. El NAT loopback va por la misma CGI
 //! con otros campos: es otra función (`cbSetNatConfig.loopback`).
 
-use crate::comun::{PanelPrueba, campo, esperar_final, fijar, ok, valores_de};
+use crate::comun::{PanelPrueba, aplicar_ajuste, campo, esperar_final, fijar, ok, valores_de};
 use serde_json::json;
 
 const FUNCION: &str = "cbSetNatConfig";
@@ -170,4 +170,66 @@ async fn prefijo_ula_por_presencia() {
         ps.iter().all(|(k, _)| k != "ss_ipv6_prefix_adm_state"),
         "{ps:?}"
     );
+}
+
+/// Elemento `nombre` de la lectura del NAT en el simulador.
+async fn del_nat(p: &crate::comun::Panel, nombre: &str) -> String {
+    let n = p.state.hgu.call("cbGetNatConfig", &[]).await.unwrap();
+    crate::comun::elemento(&n, nombre).unwrap_or_else(|| panic!("falta {nombre}"))
+}
+
+/// Prepara en Ajustes `valores` del ajuste `ajuste`, lo aplica y devuelve
+/// el id del cambio.
+async fn ajuste(
+    p: &crate::comun::Panel,
+    cookie: &str,
+    ajuste: &str,
+    valores: serde_json::Value,
+) -> i64 {
+    let g = ok(
+        p,
+        "preparar_ajuste",
+        json!({ "p": { "ajuste": ajuste, "instancia": null, "borrar": false, "valores": valores } }),
+        cookie,
+    )
+    .await;
+    aplicar_ajuste(p, cookie, &g).await
+}
+
+/// Lo deshace desde Ajustes.
+async fn deshacer_ajuste(p: &crate::comun::Panel, cookie: &str, id: i64) {
+    let d = ok(p, "deshacer_ajuste", json!({ "cambio": id }), cookie).await;
+    aplicar_ajuste(p, cookie, &d).await;
+}
+
+/// Comprobados en el router real (cambios 62 y 63), los ALG se cambian
+/// desde Ajustes → Puertos, como en natalg.asp.
+#[tokio::test]
+async fn alg_desde_ajustes_ida_y_vuelta() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    let antes = del_nat(&p, "h323_enable").await;
+    let nuevo = if antes == "1" { "false" } else { "true" };
+    let id = ajuste(&p, &cookie, "puertos.alg", json!({ "h323": nuevo })).await;
+    assert_ne!(del_nat(&p, "h323_enable").await, antes);
+    let (_, ps) = p.sim.control.writes().pop().unwrap();
+    assert!(
+        ps.contains(&("set_nf_conntrack".to_owned(), "1".to_owned())),
+        "{ps:?}"
+    );
+    deshacer_ajuste(&p, &cookie, id).await;
+    assert_eq!(del_nat(&p, "h323_enable").await, antes);
+}
+
+/// El NAT loopback (cambios 75 y 76), en Ajustes → Puertos.
+#[tokio::test]
+async fn loopback_desde_ajustes_ida_y_vuelta() {
+    let (p, cookie) = PanelPrueba::nuevo().arrancar_con_gestor().await;
+    let antes = del_nat(&p, "adm_state").await;
+    let nuevo = if antes == "1" { "false" } else { "true" };
+    let id = ajuste(&p, &cookie, "puertos.loopback", json!({ "activo": nuevo })).await;
+    assert_ne!(del_nat(&p, "adm_state").await, antes);
+    let (_, ps) = p.sim.control.writes().pop().unwrap();
+    assert!(ps.iter().all(|(k, _)| k != "h323_enable"), "{ps:?}");
+    deshacer_ajuste(&p, &cookie, id).await;
+    assert_eq!(del_nat(&p, "adm_state").await, antes);
 }
