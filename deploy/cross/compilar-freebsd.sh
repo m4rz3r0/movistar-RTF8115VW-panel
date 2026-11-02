@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Compila el panel para FreeBSD (x86_64-unknown-freebsd) en el PC de
 # compilación, un Linux con rustup, podman y cross, y lo empaqueta para el
-# buzón del servidor (deploy/freebsd-jail/recibir-precompilada.sh). Así el
-# servidor no tiene que compilar: su actualizador instala lo que llega
-# (deploy/freebsd-jail/README.md, «Versiones precompiladas»).
+# buzón del servidor (deploy/freebsd-jail/recibir-precompilada.sh). El
+# servidor nunca compila: su actualizador instala lo que llega aquí o a la
+# release de GitHub (deploy/freebsd-jail/README.md).
 #
 #   compilar-freebsd.sh --release vX.Y.Z [--bundle FICHERO] [--repo URL] [--entregar DESTINO]
 #   compilar-freebsd.sh --ultima --repo URL [--entregar DESTINO]
@@ -13,7 +13,7 @@
 #             una rama ni un commit) y deja en salida/<versión>/ el archivo
 #             routerpanel-<versión>-x86_64-unknown-freebsd.tar.gz y su
 #             SHA256SUMS (más SHA256SUMS.minisig con RP_MINISIGN_SECRETA).
-# --ultima    trae las etiquetas de --repo y compila la v* más reciente
+# --ultima    trae las etiquetas de --repo y compila la vX.Y.Z más reciente
 #             (sort -V, como el actualizador) si aún no se ha entregado;
 #             para el temporizador opcional (rtf-cross.timer).
 # --prueba    compila REF (por defecto HEAD del bundle o del clon) para probar
@@ -32,14 +32,14 @@
 # una copia de trabajo: un cambio sin confirmar no puede acabar en una
 # versión.
 #
-# Cómo se compila: cargo leptos build --release --precompress, igual que el
-# servidor, pero con el binario para FreeBSD (LEPTOS_BIN_TARGET_TRIPLE) y
+# Cómo se compila: cargo leptos build --release --precompress, como la
+# release de GitHub, con el binario para FreeBSD (LEPTOS_BIN_TARGET_TRIPLE)
 # compilado con cross (LEPTOS_BIN_CARGO_COMMAND=cross: un contenedor con el
 # enlazador y la libc de FreeBSD; las dependencias de C, como SQLite, se
 # compilan dentro y van enlazadas en el binario). La web (wasm, JS y CSS) no
-# depende de la plataforma y la hace cargo-leptos como en el servidor, con
-# la misma versión de cargo-leptos (la de install.sh), que es la que fija
-# wasm-bindgen.
+# depende de la plataforma y la hace cargo-leptos, con la misma versión de
+# cargo-leptos que la release de GitHub (CARGO_LEPTOS_VERSION, aquí abajo),
+# que es la que fija wasm-bindgen.
 
 set -euo pipefail
 
@@ -147,7 +147,7 @@ fi
 if [ "$modo" = ultima ]; then
 	ref=$(git -C "$REPO" tag -l 'v*' | ultima_version)
 	[ -n "$ref" ] || {
-		echo "no hay ninguna etiqueta v*"
+		echo "no hay ninguna etiqueta vX.Y.Z"
 		exit 0
 	}
 	if [ -f "$BASE/salida/$ref/.entregada" ]; then
@@ -191,7 +191,9 @@ FUENTE=$BASE/fuente
 cd "$FUENTE"
 
 # --- herramientas --------------------------------------------------------------
-quiere=$(sed -n 's/^CARGO_LEPTOS_VERSION=//p' deploy/freebsd-jail/install.sh 2>/dev/null | head -n 1)
+# La de la etiqueta que se compila: en las antiguas estaba en install.sh; en
+# las nuevas, en este mismo guion (la lee también la release de GitHub).
+quiere=$(sed -n 's/^CARGO_LEPTOS_VERSION=//p' deploy/freebsd-jail/install.sh deploy/cross/compilar-freebsd.sh 2>/dev/null | head -n 1)
 quiere=${quiere:-$CARGO_LEPTOS_VERSION}
 tiene=$(cargo leptos --version 2>/dev/null | cut -d' ' -f2 || true)
 if [ "$quiere" != "$tiene" ]; then
@@ -214,49 +216,22 @@ echo "compilado en $(($(date +%s) - inicio)) s"
 
 PANEL=$FUENTE/target/$OBJ/release/panel
 SITE=$FUENTE/target/site
-[ -f "$PANEL" ] || error "falta $PANEL"
-case $(file -b "$PANEL") in
-ELF\ 64-bit*x86-64*FreeBSD*) ;;
-*) error "el binario no es de FreeBSD x86-64: $(file -b "$PANEL")" ;;
-esac
 # Con el objetivo de FreeBSD, cargo-leptos deja hash.txt junto a la carpeta
 # del binario (hash-file-name es relativo a target/<objetivo>/release); el
 # panel lo busca dentro de site/.
 if [ -f "$FUENTE/target/$OBJ/site/hash.txt" ]; then
 	cp "$FUENTE/target/$OBJ/site/hash.txt" "$SITE/hash.txt"
 fi
-[ -f "$SITE/hash.txt" ] || error "falta site/hash.txt"
-for ext in js wasm css; do
-	h=$(sed -n "s/^$ext: *//p" "$SITE/hash.txt")
-	[ -f "$SITE/pkg/panel.$h.$ext" ] || error "falta site/pkg/panel.$h.$ext"
-done
 
 # --- archivo -------------------------------------------------------------------
+# El mismo empaquetado que la release de GitHub (empaquetar-freebsd.sh), que
+# además comprueba el binario y la web.
 NOMBRE=$(archivo_precompilada "$version")
 NOMBRE=${NOMBRE%.tar.gz}
 SALIDA=$BASE/salida/$version
-TRABAJO=$(mktemp -d)
-trap 'rm -rf "$TRABAJO"' EXIT
-D=$TRABAJO/$NOMBRE
-mkdir -p "$D"
-cp "$PANEL" "$D/panel"
-# Solo lo que corresponde a esta compilación: sin restos de otras.
-cp -R "$SITE" "$D/site"
-echo "$commit" >"$D/COMMIT"
-for f in LICENSE AVISO-LEGAL.md; do
-	if [ -f "$FUENTE/$f" ]; then cp "$FUENTE/$f" "$D/$f"; fi
-done
-chmod -R u=rwX,go=rX "$D"
-chmod 755 "$D/panel"
-if [ -n "$(find "$D" ! -type f ! -type d)" ]; then
-	error "site/ trae algo que no es fichero ni directorio"
-fi
-SOURCE_DATE_EPOCH=$(git -C "$REPO" log -1 --format=%ct "$commit")
 rm -rf "$SALIDA"
-mkdir -p "$SALIDA"
-tar --sort=name --format=gnu --owner=0 --group=0 --numeric-owner \
-	--mtime="@$SOURCE_DATE_EPOCH" -C "$TRABAJO" -cf - "$NOMBRE" |
-	gzip -n -9 >"$SALIDA/$NOMBRE.tar.gz"
+SOURCE_DATE_EPOCH=$(git -C "$REPO" log -1 --format=%ct "$commit") \
+	bash "$AQUI/empaquetar-freebsd.sh" "$version" "$commit" "$PANEL" "$SITE" "$FUENTE" "$SALIDA" >/dev/null
 (cd "$SALIDA" && LC_ALL=C sha256sum -- "$NOMBRE.tar.gz" >SHA256SUMS)
 if [ -n "${RP_MINISIGN_SECRETA:-}" ]; then
 	command -v minisign >/dev/null 2>&1 || error "RP_MINISIGN_SECRETA está puesta pero no hay minisign"

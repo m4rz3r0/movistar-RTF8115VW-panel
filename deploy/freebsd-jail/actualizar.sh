@@ -1,57 +1,62 @@
 #!/bin/sh
-# shellcheck disable=SC2016 # los guiones de in_build se expanden en la jail
+# shellcheck disable=SC2016 # los guiones de in_run se expanden en la jail
 #
 # Actualizador del panel del router. Corre EN EL HOST como root; se instala
 # como /usr/local/sbin/routerpanel-actualizar y lo lanza cron cada 15 minutos
 # (/usr/local/etc/cron.d/routerpanel).
 #
-#   routerpanel-actualizar              despliega la etiqueta v* más reciente
-#   routerpanel-actualizar --ref REF    compila y despliega REF (rama o commit);
-#                                       para el primer despliegue, antes de que
-#                                       exista ninguna etiqueta
+#   routerpanel-actualizar           despliega la última etiqueta vX.Y.Z en
+#                                    cuanto hay una versión precompilada que
+#                                    pasa las comprobaciones
+#   routerpanel-actualizar --ayuda   esta ayuda
 #
-# Pasos: trae el repositorio (REPO_URL) en la jail de compilación (usuario sin
-# privilegios rpbuild) con traer_ultima_etiqueta (deploy/lib/git.sh: nunca
-# hace merge, así que tolera un historial reescrito en el remoto); si la
-# última v* (sort -V) no es la desplegada, cargo leptos build --release
-# --precompress (la web, también en .br y .gz; solo compila: las pruebas se
-# pasan en el equipo de desarrollo antes de crear la etiqueta); copia binario
-# y web a releases/<versión>; cambia el enlace «current» de la jail del panel;
-# reinicia el servicio y espera a que /salud responda 200 (60 s como mucho).
-# Si no responde, vuelve a la versión anterior. Se conservan las 3 últimas
-# versiones.
+# El servidor nunca compila: no llama a cargo ni a rustc, ni tiene jail de
+# compilación. Pasos:
+#
+# 1. La última etiqueta vX.Y.Z (sort -V) y su commit, con
+#    `git ls-remote --tags REPO_URL` desde el host (ultima_etiqueta_remota,
+#    deploy/lib/git.sh): sin clon ni checkout, y sin ejecutar nada del
+#    repositorio. Por SSH, con la clave de despliegue de solo lectura
+#    (CLAVE_DESPLIEGUE) y la clave del servidor git fijada (HOSTS_CONOCIDOS).
+# 2. Si ya está desplegada, o ya falló, termina.
+# 3. La versión, ya compilada, de la primera fuente que la tenga y pase las
+#    comprobaciones (deploy/lib/precompiladas.sh):
+#    - el buzón ($BUZON), donde la deja el PC de compilación (deploy/cross/ y
+#      recibir-precompilada.sh): sha256, firma de minisign si hay
+#      PRECOMPILADAS_MINISIGN, COMMIT igual al commit de la etiqueta y panel
+#      ejecutable de FreeBSD x86-64;
+#    - la release de GitHub (si hay GITHUB_REPO): sha256 de SHA256SUMS,
+#      atestación de origen (gh attestation verify: de GITHUB_REPO, de
+#      refs/tags/vX.Y.Z y de .github/workflows/release.yml) y lo mismo que
+#      el buzón salvo la firma.
+#    Si ninguna la tiene todavía, registra una vez por etiqueta «esperando la
+#    versión precompilada de vX.Y.Z» y sale con 0: lo vuelve a mirar en la
+#    siguiente pasada, sin límite de tiempo y sin contarlo como fallo. Lo que
+#    no cuadra se rechaza (nunca se instala nada sin comprobar) y cuenta como
+#    un fallo de la etiqueta.
+# 4. La deja en releases/<versión>, de root; cambia el enlace «current» de la
+#    jail del panel, reinicia el servicio y espera a que /salud responda 200
+#    (60 s como mucho). Si no responde, vuelve a la versión anterior. Se
+#    conservan las 3 últimas versiones.
 #
 # Configuración: /usr/local/etc/routerpanel-actualizar.conf (JAILS_RAIZ,
-# JAIL_PANEL, JAIL_COMPILAR, REPO_URL; la escribe install.sh) y
-# deploy/lib/git.sh en /usr/local/libexec/routerpanel-actualizar. La URL de
-# /salud sale de routerpanel_listen en el rc.conf de la jail del panel.
+# JAIL_PANEL, REPO_URL, CLAVE_DESPLIEGUE, HOSTS_CONOCIDOS, GITHUB_REPO,
+# PRECOMPILADAS_MINISIGN; la escribe install.sh) y deploy/lib/git.sh y
+# deploy/lib/precompiladas.sh en /usr/local/libexec/routerpanel-actualizar.
+# La URL de /salud sale de routerpanel_listen en el rc.conf de la jail del
+# panel. Las claves de instalaciones anteriores (JAIL_COMPILAR,
+# TRABAJOS_COMPILACION, PRECOMPILADAS_ESPERA) se ignoran.
 #
-# Registro: /var/log/routerpanel-update.log (salida de cargo de la última
-# compilación en /var/log/routerpanel-build.log).
-#
-# Versiones precompiladas (opcional, PRECOMPILADAS_ESPERA en $CONF): para una
-# etiqueta nueva, antes de compilar se espera hasta PRECOMPILADAS_ESPERA
-# minutos a que el PC de compilación deje la versión ya compilada en el buzón
-# ($BUZON, deploy/cross/ y recibir-precompilada.sh); si llega y cuadra
-# (sha256, firma de minisign si hay PRECOMPILADAS_MINISIGN, commit de la
-# etiqueta, ejecutable de FreeBSD), se instala como las propias; si no llega
-# a tiempo o no cuadra, se compila aquí como siempre. Sin PRECOMPILADAS_ESPERA
-# no se mira el buzón.
-#
-# Todo lo que hay bajo la jail de compilación lo controla el código del
-# repositorio (build.rs, macros), así que este guion, que corre como
-# root, nunca abre rutas de esa jail desde el host: los artefactos salen como
-# un tar que se genera DENTRO de la jail, y del lado del host sólo se aceptan
-# ficheros y directorios normales. Lo mismo con la base de datos del panel:
-# la copia previa y su restauración se hacen dentro de la jail como el
-# usuario del servicio.
+# Registro: /var/log/routerpanel-update.log.
 
 set -u
 umask 027
 
+# cron da un PATH corto: gh y jq están en /usr/local/bin.
+PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
+export PATH
+
 JEXEC=/usr/sbin/jexec
-# git por ruta absoluta en todo lo que el host usa: ~rpbuild/.cargo/bin (lo
-# primero del PATH de la compilación) lo puede escribir cualquier build.rs.
 GIT=/usr/local/bin/git
 CONF=/usr/local/etc/routerpanel-actualizar.conf
 GIT_SH=/usr/local/libexec/routerpanel-actualizar/git.sh
@@ -59,23 +64,21 @@ PRECOMPILADAS_SH=/usr/local/libexec/routerpanel-actualizar/precompiladas.sh
 # Valores por defecto; los de la instalación vienen de $CONF.
 JAILS_RAIZ=/usr/local/jails/containers
 JAIL_PANEL=routerpanel
-JAIL_COMPILAR=routerpanel-build
 REPO_URL=
-# Trabajos de cargo a la vez; vacía, los que cargo decida (uno por núcleo).
-TRABAJOS_COMPILACION=
-# Minutos de espera a la versión precompilada; vacía, no se usa el buzón.
-PRECOMPILADAS_ESPERA=
-# Clave pública de minisign de las precompiladas; vacía, sin firma.
+# Clave de despliegue (de solo lectura en el servidor git) y known_hosts con
+# la clave del servidor git: de root, en el host.
+CLAVE_DESPLIEGUE=/usr/local/etc/routerpanel-actualizar/id_ed25519
+HOSTS_CONOCIDOS=/usr/local/etc/routerpanel-actualizar/known_hosts
+# «propietario/nombre» del repositorio en GitHub; vacía, no se mira GitHub.
+GITHUB_REPO=
+# Clave pública de minisign de las versiones del buzón; vacía, sin firma.
 PRECOMPILADAS_MINISIGN=
 BUZON=/var/db/routerpanel-buzon/entrada
 if [ -f "$CONF" ]; then
 	# shellcheck source=/dev/null
 	. "$CONF"
 fi
-BUILD_JAIL=$JAIL_COMPILAR
 RUN_JAIL=$JAIL_PANEL
-BUILD_USER=rpbuild
-SRC=/home/rpbuild/panel
 RUN_USER=routerpanel
 RELEASES=/usr/local/routerpanel/releases
 CURRENT=$JAILS_RAIZ/$RUN_JAIL/usr/local/routerpanel/current
@@ -86,13 +89,35 @@ DB_DIR=/var/db/routerpanel
 DB_BACKUP=$DB_DIR/antes-de-actualizar
 STATE=/var/db/routerpanel-actualizar
 LOG=/var/log/routerpanel-update.log
-BUILD_LOG=/var/log/routerpanel-build.log
 LOCK=/var/run/routerpanel-actualizar.lock
 KEEP=3
 # Fallos seguidos de una etiqueta antes de darla por fallida.
 MAX_TRIES=2
 
-# Una sola ejecución a la vez: una compilación puede durar más de 15 minutos.
+ayuda()
+{
+	sed -n '/^#   routerpanel-actualizar/s/^#   //p' "$0"
+}
+
+case "${1:-}" in
+"") ;;
+--ayuda | -h | --help)
+	ayuda
+	exit 0
+	;;
+--ref)
+	echo "--ref ya no existe: el servidor no compila. Crea una etiqueta vX.Y.Z y deja" \
+		"su versión precompilada en el buzón (deploy/cross/) o en la release de GitHub." >&2
+	exit 2
+	;;
+*)
+	ayuda >&2
+	exit 2
+	;;
+esac
+
+# Una sola ejecución a la vez: una descarga o un despliegue pueden durar más
+# que el intervalo del cron.
 if [ -z "${ROUTERPANEL_LOCKED:-}" ]; then
 	ROUTERPANEL_LOCKED=1 exec /usr/bin/lockf -s -t 0 "$LOCK" "$0" "$@"
 fi
@@ -106,39 +131,6 @@ log()
 	fi
 }
 
-# Ejecuta el guion $2 en la jail de compilación como $BUILD_USER, dentro del
-# clon y con PATH=$1; el resto de argumentos le llegan como $1, $2…
-in_jail_sh()
-{
-	_path=$1
-	_script=$2
-	shift 2
-	"$JEXEC" -l -U "$BUILD_USER" "$BUILD_JAIL" /bin/sh -c "
-		PATH=$_path
-		GIT_SSH_COMMAND='ssh -o BatchMode=yes -o ConnectTimeout=15'
-		export PATH GIT_SSH_COMMAND
-		cd $SRC || exit 1
-		$_script" sh "$@"
-}
-
-# Para compilar: con ~/.cargo/bin delante.
-in_build()
-{
-	in_jail_sh "\$HOME/.cargo/bin:/usr/local/bin:/usr/bin:/bin" "$@"
-}
-
-# Para lo que el host usa (nombres, commits): PATH del sistema y `git` es
-# siempre $GIT. Aun así, la salida no es de fiar (el clon lo puede tocar el
-# código que se compila): el host valida todo lo que sale de aquí antes de
-# usarlo en una ruta (valid_name, valid_sha).
-in_build_git()
-{
-	_script=$1
-	shift
-	in_jail_sh /usr/local/bin:/usr/bin:/bin "git() { $GIT \"\$@\"; }
-		$_script" "$@"
-}
-
 # Nombre de versión aceptable como componente de ruta bajo $RELEASES: empieza
 # por letra o cifra, sólo [A-Za-z0-9._-], sin «..» y como mucho 100 caracteres
 # (los saltos de línea caen en la clase prohibida).
@@ -150,19 +142,42 @@ valid_name()
 	[ "${#1}" -le 100 ]
 }
 
-# Commit abreviado o completo: 7 a 40 cifras hexadecimales en minúscula.
-valid_sha()
+# Ruta que se puede poner tal cual en GIT_SSH_COMMAND (lo interpreta un sh):
+# absoluta y solo con [A-Za-z0-9/._-].
+ruta_simple()
 {
 	case "$1" in
-	'' | *[!0-9a-f]*) return 1 ;;
+	/*) ;;
+	*) return 1 ;;
 	esac
-	[ "${#1}" -ge 7 ] && [ "${#1}" -le 40 ]
+	case "$1" in
+	*[!A-Za-z0-9/._-]*) return 1 ;;
+	esac
+	return 0
 }
 
 deployed()
 {
 	_t=$(readlink "$CURRENT" 2>/dev/null) || return 0
 	basename "$_t"
+}
+
+# `git ls-remote --tags REPO_URL` desde el host, sin clon. Por SSH: solo la
+# clave de despliegue, la clave del servidor git tiene que estar ya en
+# HOSTS_CONOCIDOS (nunca se acepta una nueva) y sin preguntar nada. Sin la
+# configuración de git ni la de ssh de root (-F /dev/null), y sin
+# transportes que ejecuten órdenes (ext::).
+ls_remote()
+{
+	_ssh="ssh -F /dev/null -o BatchMode=yes -o ConnectTimeout=15 -o IdentitiesOnly=yes"
+	_ssh="$_ssh -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOSTS_CONOCIDOS"
+	if [ -f "$CLAVE_DESPLIEGUE" ]; then
+		_ssh="$_ssh -i $CLAVE_DESPLIEGUE"
+	fi
+	GIT_SSH_COMMAND=$_ssh GIT_SSH_VARIANT=ssh GIT_TERMINAL_PROMPT=0 \
+		GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null \
+		GIT_ALLOW_PROTOCOL=https:http:ssh:git:file \
+		timeout 120 "$GIT" ls-remote --tags -- "$REPO_URL"
 }
 
 # Dirección de escucha del panel (routerpanel_listen en el rc.conf de su
@@ -173,9 +188,9 @@ listen_addr()
 	echo "${_l:-127.0.0.1:3000}"
 }
 
-# URL de /salud a partir de routerpanel_listen. Se pregunta desde la jail de
-# compilación: si el panel escucha en 0.0.0.0 o en 127.0.0.1 (que en una
-# jail es su propia IP), se usa la IP de la jail del panel.
+# URL de /salud a partir de routerpanel_listen. Si el panel escucha en
+# 0.0.0.0 o en 127.0.0.1 (que en una jail es su propia IP), se usa la IP de
+# la jail del panel.
 health_url()
 {
 	_l=$(listen_addr)
@@ -206,10 +221,10 @@ healthy()
 	_deadline=$(($(date +%s) + HEALTH_TIMEOUT))
 	_url=$(health_url)
 	while [ "$(date +%s)" -lt "$_deadline" ]; do
-		# Desde la jail de compilación: pf sólo deja llegar al panel desde
-		# los proxies y desde ella. fetch falla con cualquier respuesta que
-		# no sea 2xx.
-		if /usr/sbin/jexec -U "$BUILD_USER" "$BUILD_JAIL" \
+		# Desde dentro de la jail del panel, como el usuario del servicio: pf
+		# solo deja llegar a su puerto a los proxies y a la propia jail.
+		# fetch falla con cualquier respuesta que no sea 2xx.
+		if "$JEXEC" -U "$RUN_USER" "$RUN_JAIL" \
 			/usr/bin/fetch -T 2 -qo - "$_url" 2>/dev/null |
 			grep -q '"ok":true' && serving "$1"; then
 			return 0
@@ -221,13 +236,13 @@ healthy()
 
 service_ctl()
 {
-	/usr/sbin/jexec "$RUN_JAIL" /usr/sbin/service routerpanel "$1" >>"$LOG" 2>&1
+	"$JEXEC" "$RUN_JAIL" /usr/sbin/service routerpanel "$1" >>"$LOG" 2>&1
 }
 
 # Guion $1 en la jail del panel como el usuario del servicio, en $DB_DIR.
 in_run()
 {
-	/usr/sbin/jexec -U "$RUN_USER" "$RUN_JAIL" /bin/sh -c "cd $DB_DIR || exit 1
+	"$JEXEC" -U "$RUN_USER" "$RUN_JAIL" /bin/sh -c "cd $DB_DIR || exit 1
 		$1" sh "$DB_BACKUP"
 }
 
@@ -252,92 +267,6 @@ restore_db()
 		done'
 }
 
-# Compila $1 (referencia de git) y deja el resultado en releases/$2.
-build_release()
-{
-	_ref=$1
-	_name=$2
-	if ! in_build_git 'git -c advice.detachedHead=false checkout --quiet --force --detach "$1" &&
-		git clean -fdxq -e target' "$_ref" >"$BUILD_LOG" 2>&1; then
-		log "ERROR: no se puede sacar $_ref del repositorio (ver $BUILD_LOG)"
-		return 1
-	fi
-	log "compilando $_name ($(in_build_git 'git rev-parse --short HEAD'))"
-	# wasm-bindgen-cli tiene que ser exactamente la versión de wasm-bindgen
-	# del Cargo.lock; si el repositorio la cambia, se instala la nueva.
-	if ! in_build '
-		want=$(awk "/^name = \"wasm-bindgen\"\$/ { getline; gsub(/version = |\"/, \"\"); print; exit }" Cargo.lock)
-		have=$(wasm-bindgen --version 2>/dev/null | cut -d" " -f2)
-		if [ "$want" != "$have" ]; then
-			echo "instalando wasm-bindgen-cli $want (había: ${have:-ninguno})"
-			cargo install --locked wasm-bindgen-cli --version "$want" || exit 1
-		fi
-		# Trabajos a la vez (TRABAJOS_COMPILACION, si se fijó; menos trabajos,
-		# menos memoria) y prioridad baja, para que el resto de servicios del
-		# servidor no lo note.
-		case $1 in
-		"") ;;
-		*[!0-9]* | 0*) echo "TRABAJOS_COMPILACION no es válida; se usa el valor de cargo" ;;
-		*)
-			CARGO_BUILD_JOBS=$1
-			export CARGO_BUILD_JOBS
-			;;
-		esac
-		renice -n 15 $$ >/dev/null 2>&1
-		# Solo se compila; las pruebas no corren aquí (se pasan antes de crear
-		# la etiqueta). --precompress: el panel sirve el wasm, el JS y el CSS
-		# ya comprimidos (con hash en el nombre y target/site/hash.txt, que va
-		# con la web). Red de seguridad: un compilador colgado no deja el
-		# actualizador esperando para siempre (con lockf, tampoco correría el
-		# siguiente); falla como cualquier error de compilación.
-		timeout -k 60 3600 cargo leptos build --release --precompress' "$TRABAJOS_COMPILACION" >>"$BUILD_LOG" 2>&1; then
-		log "ERROR: falló la compilación de $_name (ver $BUILD_LOG)"
-		return 1
-	fi
-	_tmp=$RELEASES/.$_name.tmp
-	rm -rf "$_tmp"
-	if ! extract_release "$_tmp"; then
-		log "ERROR: no se pueden copiar los artefactos de $_name a $RELEASES"
-		rm -rf "$_tmp"
-		return 1
-	fi
-	mv "$_tmp" "$RELEASES/$_name"
-}
-
-# Saca target/release/panel y target/site de la jail de compilación a $1. El
-# tar se genera dentro de la jail (los enlaces que haya ahí se resuelven, si
-# acaso, dentro de la jail); bsdtar no extrae rutas absolutas ni con «..»; y
-# después se rechaza todo lo que no sea fichero o directorio normal.
-extract_release()
-{
-	_dst=$1
-	mkdir -m 755 "$_dst" || return 1
-	# pipefail (en un subshell, para no cambiar el resto del guion): si el tar
-	# de la jail falla a medias, el del host puede terminar bien con lo que
-	# le llegó, y la versión quedaría incompleta.
-	if ! (
-		# shellcheck disable=SC3040 # el sh de FreeBSD (14+) tiene pipefail
-		set -o pipefail
-		in_build 'tar -cf - -C target release/panel site' |
-			tar -xf - -C "$_dst" --no-same-owner --no-same-permissions
-	); then
-		log "ERROR: falló el tar de los artefactos (en la jail o en el host)"
-		return 1
-	fi
-	if [ -n "$(find "$_dst" ! -type f ! -type d)" ]; then
-		log "ERROR: los artefactos traen algo que no es fichero ni directorio"
-		return 1
-	fi
-	if [ ! -f "$_dst/release/panel" ] || [ ! -d "$_dst/site" ] ||
-		[ "$(find "$_dst" -type f -links +1)" ]; then
-		log "ERROR: faltan release/panel o site/, o hay enlaces duros"
-		return 1
-	fi
-	mv "$_dst/release/panel" "$_dst/panel" && rmdir "$_dst/release" || return 1
-	in_build_git 'git rev-parse HEAD' >"$_dst/COMMIT" || return 1
-	asentar_release "$_dst"
-}
-
 # Deja la versión $1 de root, con 755/644 (el binario, 755).
 asentar_release()
 {
@@ -347,50 +276,62 @@ asentar_release()
 		chmod 755 "$1/panel"
 }
 
-# Versión precompilada de la etiqueta $1 (deploy/lib/precompiladas.sh). Deja
-# en FUENTE «instalada» (ya está en releases/$1), «esperar» (aún no ha
-# llegado y no ha pasado PRECOMPILADAS_ESPERA) o «compilar».
-precompilada()
+# Deja en releases/$1 la versión de la etiqueta $1 (commit $2) de la primera
+# fuente que la tenga. Pone FUENTE a «instalada», «esperar» (ninguna fuente
+# la tiene aún) o «rechazada» (alguna la tenía y no cuadraba; no se instala
+# nada).
+obtener()
 {
-	FUENTE=compilar
 	_et=$1
-	if [ ! -f "$PRECOMPILADAS_SH" ]; then
-		log "ERROR: falta $PRECOMPILADAS_SH (se instala con install.sh); se compila aquí"
-		return 0
-	fi
-	# shellcheck source=../lib/precompiladas.sh
-	. "$PRECOMPILADAS_SH"
-	_llegada=no
-	if precompilada_llegada "$BUZON" "$_et" "$PRECOMPILADAS_MINISIGN"; then
-		_llegada=si
-	fi
-	case $(decidir_precompilada "$STATE/precompilada" "$_et" "$(date +%s)" \
-		"$PRECOMPILADAS_ESPERA" "$_llegada") in
-	esperar)
-		FUENTE=esperar
-		log "esperando la versión precompilada de $_et (hasta $PRECOMPILADAS_ESPERA min desde que se vio la etiqueta)"
-		return 0
-		;;
-	compilar)
-		log "no ha llegado la versión precompilada de $_et; se compila aquí"
-		return 0
-		;;
-	esac
-	# El commit de la etiqueta, del clon (ya validado: 40 cifras hex).
-	_commit=$(in_build_git 'git rev-parse "$1^{commit}"' "refs/tags/$_et")
+	_commit=$2
 	_tmp=$RELEASES/.$_et.tmp
-	rm -rf "$_tmp"
-	if ! valid_sha "$_commit" || [ "${#_commit}" -ne 40 ]; then
-		log "ERROR: git no da un commit válido para $_et; se compila aquí"
-	elif _err=$(preparar_precompilada "$BUZON" "$_et" "$_commit" \
-		"$PRECOMPILADAS_MINISIGN" "$_tmp" 2>&1) &&
-		asentar_release "$_tmp" && mv "$_tmp" "$RELEASES/$_et"; then
-		FUENTE=instalada
-		log "instalada la versión precompilada de $_et ($(echo "$_commit" | cut -c1-12))"
-	else
-		log "ERROR: versión precompilada de $_et rechazada: $(printf '%s' "${_err:-no se puede instalar}" | head -n 1); se compila aquí"
+	FUENTE=esperar
+	_motivo_github=
+
+	if precompilada_llegada "$BUZON" "$_et" "$PRECOMPILADAS_MINISIGN"; then
+		rm -rf "$_tmp"
+		if _err=$(preparar_precompilada "$BUZON" "$_et" "$_commit" \
+			"$PRECOMPILADAS_MINISIGN" "$_tmp" 2>&1) &&
+			asentar_release "$_tmp" && mv "$_tmp" "$RELEASES/$_et"; then
+			FUENTE=instalada
+			log "instalada la versión precompilada de $_et del buzón ($(echo "$_commit" | cut -c1-12))"
+		else
+			FUENTE=rechazada
+			log "ERROR: versión precompilada de $_et rechazada: $(printf '%s' "${_err:-no se puede instalar}" | head -n 1)"
+		fi
+		rm -rf "$_tmp" "${BUZON:?}/$_et"
+		if [ "$FUENTE" = instalada ]; then
+			return 0
+		fi
 	fi
-	rm -rf "$_tmp" "${BUZON:?}/$_et"
+
+	if [ -n "$GITHUB_REPO" ]; then
+		rm -rf "$_tmp"
+		_err=$(preparar_github "$GITHUB_REPO" "$_et" "$_commit" "$_tmp" 2>&1)
+		_rg=$?
+		_err=$(printf '%s' "${_err:-no se puede instalar}" | head -n 1)
+		if [ "$_rg" -eq 0 ] && asentar_release "$_tmp" && mv "$_tmp" "$RELEASES/$_et"; then
+			FUENTE=instalada
+			log "instalada la versión de GitHub de $_et ($GITHUB_REPO, atestación comprobada)"
+			return 0
+		fi
+		rm -rf "$_tmp"
+		if [ "$_rg" -eq 1 ]; then
+			_motivo_github=$_err
+		else
+			FUENTE=rechazada
+			log "ERROR: versión de GitHub de $_et rechazada: $_err"
+		fi
+	fi
+
+	# Una vez por etiqueta: el cron vuelve a mirar cada 15 minutos.
+	if [ "$FUENTE" = esperar ] && [ "$(cat "$STATE/esperando" 2>/dev/null)" != "$_et" ]; then
+		echo "$_et" >"$STATE/esperando"
+		log "esperando la versión precompilada de $_et (no está en el buzón${GITHUB_REPO:+ ni en GitHub}; se vuelve a mirar en cada ejecución)"
+		if [ -n "$_motivo_github" ]; then
+			log "GitHub: $_motivo_github"
+		fi
+	fi
 }
 
 # Borra las versiones más antiguas; nunca la desplegada.
@@ -416,30 +357,15 @@ set_current()
 # Despliega releases/$1; si /salud no responde, vuelve a la anterior con la
 # base de datos de antes y borra la versión fallida.
 #
-# Casos sin versión anterior a la que volver:
-# - $1 ya es la desplegada (sólo con --ref y el mismo commit): no se cambia
-#   nada; se reinicia el servicio y se comprueba /salud. Si no responde, se
-#   queda como está (en marcha; daemon -r la relanza) y no se borra: es la
-#   que estaba funcionando, y lo normal es que falle otra cosa (el router).
-# - Primer despliegue (o «current» apunta a una versión que ya no existe): si
-#   falla, el servicio queda parado, se quita «current» (rc.d se niega a
-#   arrancar sin versión, también al reiniciar el host) y se borra la versión
-#   fallida, igual que cuando hay vuelta atrás. Nunca queda «current»
-#   apuntando a una versión que no respondió.
+# Primer despliegue (o «current» apunta a una versión que ya no existe): si
+# falla, el servicio queda parado, se quita «current» (rc.d se niega a
+# arrancar sin versión, también al reiniciar el host) y se borra la versión
+# fallida, igual que cuando hay vuelta atrás. Nunca queda «current»
+# apuntando a una versión que no respondió.
 deploy()
 {
 	_name=$1
 	_prev=$(deployed)
-	if [ "$_name" = "$_prev" ]; then
-		log "$_name ya está desplegada; se reinicia"
-		service_ctl restart
-		if healthy "$_name"; then
-			log "reiniciada $_name"
-			return 0
-		fi
-		log "ERROR: $_name no responde en /salud tras reiniciarla; sigue desplegada (no hay otra a la que volver)"
-		return 1
-	fi
 	service_ctl stop
 	if ! backup_db; then
 		log "ERROR: no se puede copiar la base de datos; no se despliega $_name"
@@ -474,13 +400,12 @@ deploy()
 	return 1
 }
 
-# Un fallo de la etiqueta $1 (nada si está vacía: --ref). Un fallo suelto
-# puede ser transitorio (red, falta de memoria): la etiqueta sólo
-# queda en «fallida» (y el cron deja de intentarlo) tras $MAX_TRIES fallos
-# seguidos; hasta entonces se reintenta en la ejecución siguiente.
+# Un fallo de la etiqueta $1. Un fallo suelto puede ser transitorio (una
+# entrega a medias, la red): la etiqueta sólo queda en «fallida» (y el cron
+# deja de intentarlo) tras $MAX_TRIES fallos seguidos; hasta entonces se
+# reintenta en la ejecución siguiente. Esperar a la versión no cuenta.
 tag_failed()
 {
-	[ -n "$1" ] || return 0
 	_n=1
 	if [ -f "$STATE/intentos" ] && [ "$(sed -n 1p "$STATE/intentos")" = "$1" ]; then
 		_n=$(($(sed -n 2p "$STATE/intentos" | tr -cd '0-9') + 1))
@@ -500,111 +425,69 @@ main()
 	mkdir -p "$STATE" "$RELEASES"
 	# Restos de una ejecución cortada a medias.
 	find "$RELEASES" -maxdepth 1 -name '.*.tmp' -exec rm -rf {} +
-	_ref=
-	_tag=
-	case "${1:-}" in
-	--ref)
-		_ref=${2:?falta la referencia tras --ref}
-		;;
-	"") ;;
-	*)
-		echo "uso: $0 [--ref REF]" >&2
-		exit 2
-		;;
-	esac
 
-	if ! in_build 'true' 2>/dev/null; then
-		log "ERROR: no existe el clon $SRC en $BUILD_JAIL; sin acceso al repositorio"
-		exit 0
-	fi
 	if [ -z "$REPO_URL" ]; then
 		log "ERROR: falta REPO_URL en $CONF"
 		exit 1
 	fi
-	if [ ! -f "$GIT_SH" ]; then
-		log "ERROR: falta $GIT_SH (se instala con deploy/freebsd-jail/install.sh)"
+	for _f in "$GIT_SH" "$PRECOMPILADAS_SH"; do
+		if [ ! -f "$_f" ]; then
+			log "ERROR: falta $_f (se instala con deploy/freebsd-jail/install.sh)"
+			exit 1
+		fi
+	done
+	if ! ruta_simple "$CLAVE_DESPLIEGUE" || ! ruta_simple "$HOSTS_CONOCIDOS"; then
+		log "ERROR: CLAVE_DESPLIEGUE y HOSTS_CONOCIDOS tienen que ser rutas absolutas con solo [A-Za-z0-9/._-]"
 		exit 1
 	fi
-	# Funciones de git.sh: se mandan a la jail como texto (el host nunca
-	# ejecuta nada del clon). Sin --ref, traer_ultima_etiqueta trae y deja
-	# el clon en la última v*; con --ref, sólo se traen las referencias.
-	_git_sh=$(cat "$GIT_SH")
-	if [ -n "$_ref" ]; then
-		_traer=traer_referencias
-	else
-		_traer=traer_ultima_etiqueta
-	fi
-	_err=$(mktemp)
-	if ! _salida=$(in_build_git "$_git_sh
-		git remote set-url origin \"\$1\" && $_traer ." "$REPO_URL" 2>"$_err"); then
-		log "sin acceso al repositorio: $(head -n 1 "$_err")"
+	# shellcheck source=../lib/git.sh
+	. "$GIT_SH"
+	# shellcheck source=../lib/precompiladas.sh
+	. "$PRECOMPILADAS_SH"
+
+	_err=$(mktemp) || exit 1
+	if ! _remoto=$(ls_remote 2>"$_err"); then
+		log "sin acceso al repositorio: $(grep -v '^[[:space:]]*$' "$_err" | tail -n 1 | cut -c1-200)"
 		rm -f "$_err"
-		if [ -z "$_ref" ]; then
-			exit 0
-		fi
-		log "se compila $_ref con lo que ya hay en el clon"
+		exit 0
 	fi
 	rm -f "$_err"
-
-	if [ -n "$_ref" ]; then
-		# Las ramas se toman del remoto si existe; si no, la local.
-		if in_build_git 'git rev-parse --verify --quiet "origin/$1^{commit}"' "$_ref" >/dev/null; then
-			_ref=origin/$_ref
-		fi
-		_sha=$(in_build_git 'git rev-parse --short "$1^{commit}"' "$_ref") || {
-			log "ERROR: $_ref no existe en el repositorio"
-			exit 1
-		}
-		if ! valid_sha "$_sha"; then
-			log "ERROR: git devolvió un commit no válido para $_ref; no se hace nada"
-			exit 1
-		fi
-		_name=$(printf '%s' "${_ref#origin/}" | tr -c 'A-Za-z0-9._-' '_')-$_sha
-	else
-		_tag=$(printf '%s\n' "$_salida" | tail -n 1)
-		if [ -z "$_tag" ]; then
-			exit 0
-		fi
-		_name=$_tag
-		_ref=refs/tags/$_tag
+	_ultima=$(printf '%s\n' "$_remoto" | ultima_etiqueta_remota)
+	if [ -z "$_ultima" ]; then
+		exit 0
 	fi
-	# Lo que sale de la jail de compilación no es de fiar: el nombre acaba en
-	# rutas que root borra (rm -rf "$RELEASES/$_name").
-	if ! valid_name "$_name"; then
-		log "ERROR: nombre de versión no válido ($(printf '%s' "$_name" | head -c 100 | tr -c 'A-Za-z0-9._-' '?')); no se hace nada"
+	_tag=${_ultima% *}
+	_commit=${_ultima#* }
+	# ultima_etiqueta_remota ya lo garantiza, pero el nombre acaba en rutas
+	# que root borra (rm -rf "$RELEASES/$_tag").
+	if ! valid_name "$_tag" || ! version_final "$_tag"; then
+		log "ERROR: nombre de versión no válido ($(printf '%s' "$_tag" | head -c 100 | tr -c 'A-Za-z0-9._-' '?')); no se hace nada"
 		exit 1
 	fi
-	if [ -n "$_tag" ]; then
-		if [ "$_name" = "$(deployed)" ]; then
-			exit 0
-		fi
-		# Una etiqueta que ya falló no se recompila cada 15 minutos.
-		if [ "$_name" = "$(cat "$STATE/fallida" 2>/dev/null)" ]; then
-			exit 0
-		fi
-		log "etiqueta nueva $_tag (desplegada: $(deployed))"
+	if [ "$_tag" = "$(deployed)" ]; then
+		exit 0
+	fi
+	# Una etiqueta que ya falló no se reintenta cada 15 minutos.
+	if [ "$_tag" = "$(cat "$STATE/fallida" 2>/dev/null)" ]; then
+		exit 0
 	fi
 
-	# «fallida» sólo guarda etiquetas (lo que mira el cron): un --ref que falla
-	# no debe pisar una etiqueta fallida y hacer que se reintente.
-	if [ ! -d "$RELEASES/$_name" ]; then
-		FUENTE=compilar
-		if [ -n "$_tag" ] && [ -n "$PRECOMPILADAS_ESPERA" ]; then
-			precompilada "$_tag"
-		fi
-		if [ "$FUENTE" = esperar ]; then
-			exit 0
-		fi
-		if [ "$FUENTE" = compilar ] && ! build_release "$_ref" "$_name"; then
+	if [ ! -d "$RELEASES/$_tag" ]; then
+		obtener "$_tag" "$_commit"
+		case $FUENTE in
+		esperar) exit 0 ;;
+		rechazada)
 			tag_failed "$_tag"
 			exit 1
-		fi
+			;;
+		esac
 	fi
-	if ! deploy "$_name"; then
+	log "etiqueta nueva $_tag (desplegada: $(deployed))"
+	if ! deploy "$_tag"; then
 		tag_failed "$_tag"
 		exit 1
 	fi
-	if [ -n "$_tag" ]; then rm -f "$STATE/fallida" "$STATE/intentos"; fi
+	rm -f "$STATE/fallida" "$STATE/intentos" "$STATE/esperando"
 	prune
 }
 

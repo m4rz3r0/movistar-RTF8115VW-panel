@@ -1,11 +1,15 @@
 #!/bin/sh
-# traer_ultima_etiqueta (deploy/lib/git.sh) con un remoto cuyo historial se
-# reescribe: el clon tiene que acabar en la etiqueta nueva y sin la vieja,
-# sin merge ni conflicto.
+# ultima_etiqueta_remota (deploy/lib/git.sh) con `git ls-remote --tags`, como
+# la usa el actualizador, contra un remoto cuyo historial se reescribe: sin
+# clon, la etiqueta y el commit son siempre los que el remoto tiene ahora.
 #
-#   1. remoto con v0.1.0; se clona y se trae la última etiqueta;
-#   2. el remoto se reescribe (rama huérfana con v0.2.0; v0.1.0 desaparece);
-#   3. se vuelve a traer: el clon está en v0.2.0 y ya no tiene v0.1.0.
+#   1. remoto con v0.1.0 (anotada): da v0.1.0 y el commit de la etiqueta
+#      (la línea pelada ^{}, no el objeto de la etiqueta);
+#   2. el remoto se reescribe (rama huérfana con v0.2.0; v0.1.0 desaparece):
+#      da v0.2.0 y su commit;
+#   3. una etiqueta ligera (sin ^{}) da el commit al que apunta;
+#   4. sort -V (v0.10.0 va después de v0.9.0) y solo vX.Y.Z: ni v1.0.0-rc1,
+#      ni «v2», ni otras; sin ninguna vX.Y.Z no da nada.
 #
 # Uso: deploy/pruebas/historial-reescrito.sh (solo necesita git y sh).
 
@@ -32,15 +36,19 @@ fallo()
 	exit 1
 }
 
+ultima()
+{
+	git ls-remote --tags "$1" | ultima_etiqueta_remota
+}
+
 git init -q -b main "$TMP/remoto"
 echo uno >"$TMP/remoto/fichero"
 git -C "$TMP/remoto" add fichero
 git -C "$TMP/remoto" commit -q -m uno
 git -C "$TMP/remoto" tag -a -m v0.1.0 v0.1.0
 
-git clone -q "$TMP/remoto" "$TMP/clon"
-etiqueta=$(traer_ultima_etiqueta "$TMP/clon") || fallo "primera vez: traer_ultima_etiqueta falla"
-[ "$etiqueta" = v0.1.0 ] || fallo "primera vez: etiqueta «$etiqueta», se esperaba v0.1.0"
+[ "$(ultima "$TMP/remoto")" = "v0.1.0 $(git -C "$TMP/remoto" rev-parse 'v0.1.0^{commit}')" ] ||
+	fallo "primera vez: «$(ultima "$TMP/remoto")», se esperaba v0.1.0 y su commit"
 
 # Historial reescrito: rama huérfana, la rama principal apunta a ella y la
 # etiqueta vieja desaparece.
@@ -54,11 +62,27 @@ git -C "$TMP/remoto" tag -d v0.1.0 >/dev/null
 git -C "$TMP/remoto" tag -a -m v0.2.0 v0.2.0
 git -C "$TMP/remoto" gc -q --prune=now
 
-etiqueta=$(traer_ultima_etiqueta "$TMP/clon") || fallo "tras reescribir: traer_ultima_etiqueta falla"
-[ "$etiqueta" = v0.2.0 ] || fallo "tras reescribir: etiqueta «$etiqueta», se esperaba v0.2.0"
-[ "$(git -C "$TMP/clon" rev-parse HEAD)" = "$(git -C "$TMP/remoto" rev-parse 'v0.2.0^{commit}')" ] ||
-	fallo "el clon no está en el commit de v0.2.0"
-[ -z "$(git -C "$TMP/clon" tag -l v0.1.0)" ] || fallo "el clon conserva v0.1.0"
-[ -f "$TMP/clon/otro" ] && [ ! -e "$TMP/clon/fichero" ] || fallo "el árbol del clon no es el de v0.2.0"
+[ "$(ultima "$TMP/remoto")" = "v0.2.0 $(git -C "$TMP/remoto" rev-parse 'v0.2.0^{commit}')" ] ||
+	fallo "tras reescribir: «$(ultima "$TMP/remoto")», se esperaba v0.2.0 y su commit"
+
+# Etiqueta ligera: sin línea pelada.
+git -C "$TMP/remoto" tag v0.3.0
+[ "$(ultima "$TMP/remoto")" = "v0.3.0 $(git -C "$TMP/remoto" rev-parse HEAD)" ] ||
+	fallo "etiqueta ligera: «$(ultima "$TMP/remoto")»"
+
+# Orden y nombres.
+for t in v0.9.0 v0.10.0 v1.0.0-rc1 v2 otra; do
+	git -C "$TMP/remoto" tag "$t"
+done
+[ "$(ultima "$TMP/remoto" | cut -d' ' -f1)" = v0.10.0 ] ||
+	fallo "orden: «$(ultima "$TMP/remoto")», se esperaba v0.10.0"
+git init -q -b main "$TMP/sin"
+git -C "$TMP/sin" commit -q --allow-empty -m nada
+git -C "$TMP/sin" tag otra
+git -C "$TMP/sin" tag v1.0.0-rc1
+[ -z "$(ultima "$TMP/sin")" ] || fallo "sin vX.Y.Z da «$(ultima "$TMP/sin")»"
+# Líneas raras (commit corto, mayúsculas, espacios de más) no cuentan.
+[ -z "$(printf 'abc\trefs/tags/v9.9.9\n%s\trefs/tags/v9.9.9 x\n' "$(printf '%040d' 0 | tr 0 A)" | ultima_etiqueta_remota)" ] ||
+	fallo "acepta líneas que no son de ls-remote"
 
 echo "historial reescrito: ok"

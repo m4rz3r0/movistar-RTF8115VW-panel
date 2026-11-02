@@ -1,31 +1,35 @@
 # shellcheck shell=sh
 #
-# Clon del repositorio que sigue al remoto por etiquetas. Se carga con «.»;
-# solo usa git y sort, así que el actualizador también puede mandar este
-# fichero tal cual a la jail de compilación.
+# La última versión del repositorio sin clonarlo: el actualizador
+# (deploy/freebsd-jail/actualizar.sh) lanza `git ls-remote --tags` contra
+# REPO_URL desde el host y le pasa la salida a ultima_etiqueta_remota. No hay
+# clon ni checkout, y no se ejecuta nada del repositorio. Se carga con «.»;
+# solo funciones, sin efectos al cargarse.
 #
-# Nunca hace merge: el clon se pone en la etiqueta con checkout --detach, así
-# que da igual que el remoto haya reescrito su historial (rama huérfana,
-# etiquetas borradas o movidas).
+# Cada pasada lee lo que el remoto tiene en ese momento, así que da igual que
+# haya reescrito su historial (rama huérfana, etiquetas borradas o movidas).
 
-# Trae ramas y etiquetas de origin al clon $1: --force acepta etiquetas
-# movidas y --prune/--prune-tags borran las que el remoto ya no tiene.
-traer_referencias()
+# Lee por la entrada estándar la salida de `git ls-remote --tags` («<commit>
+# TAB refs/tags/<nombre>», más «refs/tags/<nombre>^{}» en las anotadas) y
+# escribe «<etiqueta> <commit>» de la última vX.Y.Z (solo cifras, por
+# sort -V: la misma que ultima_version de deploy/lib/precompiladas.sh). El
+# commit es el de la línea pelada (^{}) si la etiqueta es anotada y, si no,
+# el de la propia referencia; siempre 40 cifras hexadecimales en minúscula.
+# Sin ninguna vX.Y.Z no escribe nada.
+ultima_etiqueta_remota()
 {
-	git -C "$1" fetch --quiet --force --prune --prune-tags --tags origin
-}
-
-# Trae las referencias, pone el clon $1 en la última etiqueta v* (sort -V) y
-# la escribe en la salida estándar. Sin ninguna etiqueta v* no escribe nada
-# ni cambia el clon. Sale con error si no se puede traer o sacar.
-traer_ultima_etiqueta()
-{
-	traer_referencias "$1" || return 1
-	_etiqueta=$(git -C "$1" tag -l 'v*' | sort -V | tail -n 1)
-	if [ -z "$_etiqueta" ]; then
-		return 0
-	fi
-	git -C "$1" -c advice.detachedHead=false checkout --quiet --force --detach \
-		"refs/tags/$_etiqueta" || return 1
-	echo "$_etiqueta"
+	awk '
+		function sha(s) { return length(s) == 40 && s !~ /[^0-9a-f]/ }
+		NF == 2 && sha($1) && $2 ~ /^refs\/tags\/v[0-9]+\.[0-9]+\.[0-9]+(\^\{\})?$/ {
+			n = substr($2, 11)
+			if (n ~ /\^\{\}$/) {
+				pelada[substr(n, 1, length(n) - 3)] = $1
+			} else {
+				directa[n] = $1
+			}
+		}
+		END {
+			for (n in directa) print n, (n in pelada ? pelada[n] : directa[n])
+		}
+	' | sort -V | tail -n 1
 }
