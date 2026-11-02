@@ -17,9 +17,10 @@ Otros ficheros:
 - [`config.example`](config.example): la configuración de la instalación en
   FreeBSD. Se copia a `config.local`, que git ignora.
 - `lib/`: funciones de sh que comparten los instaladores y los actualizadores.
-- `cross/`: compila la versión de FreeBSD en otro equipo con Linux y la
-  entrega al buzón del servidor, que nunca compila
-  ([el PC de compilación](freebsd-jail/README.md#el-pc-de-compilación-buzón)).
+- `cross/`: compila la versión de FreeBSD en otro equipo con Linux, el
+  runner de Forgejo Actions del PC, y la publica como la release de la
+  etiqueta en Forgejo; el servidor nunca compila
+  ([el runner de Actions del PC](freebsd-jail/README.md#el-runner-de-actions-del-pc)).
   `empaquetar-freebsd.sh` es también el que usa la release de GitHub.
 - `pruebas/`: pruebas de cada forma de instalación que no tocan ningún
   servidor.

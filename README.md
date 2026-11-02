@@ -102,8 +102,8 @@ Hay tres formas; cada una tiene su guía en [`deploy/`](deploy/README.md):
   Incluye el panel y un proxy Caddy de ejemplo.
 - **Jails de FreeBSD** ([`deploy/freebsd-jail/`](deploy/freebsd-jail/README.md)).
   El servidor no compila: se actualiza solo con cada etiqueta, con la
-  versión ya compilada (la release de GitHub, con su atestación, o un PC de
-  compilación).
+  versión ya compilada (la release de Forgejo, que publica el runner de
+  Actions de un PC de compilación, o la de GitHub, con su atestación).
 
 El panel no habla HTTPS. Necesita delante un **proxy inverso con HTTPS**
 (Caddy, nginx…) limitado a la red local, que le pase la IP del cliente en

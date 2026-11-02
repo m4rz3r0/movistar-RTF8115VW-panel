@@ -213,8 +213,8 @@ vuelven solos a la versión anterior si la nueva no responde en `/salud`.
   que quieras) y ejecuta `compose up -d --build`.
 - **FreeBSD**: el actualizador del host mira cada 15 minutos la última
   etiqueta `vX.Y.Z` y la instala en cuanto su versión ya compilada está en la
-  release de GitHub (comprueba su atestación) o en el buzón del PC de
-  compilación; el servidor nunca compila
+  release de Forgejo (la publica el runner de Actions del PC) o en la de
+  GitHub (comprueba su atestación); el servidor nunca compila
   ([`deploy/freebsd-jail/`](../deploy/freebsd-jail/README.md#actualizador)).
   Los cambios en `deploy/` no los despliega el actualizador: hay que repetir
   `install.sh`.

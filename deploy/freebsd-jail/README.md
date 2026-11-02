@@ -8,12 +8,13 @@ El panel corre en un servidor FreeBSD (probado en 15.x) en una jail PkgBase:
 
 El servidor nunca compila: no tiene Rust, ni jail de compilación, ni ejecuta
 nada del repositorio. Su actualizador instala versiones ya compiladas para
-`x86_64-unknown-freebsd`, de una de estas dos fuentes:
+`x86_64-unknown-freebsd`, de una de estas dos fuentes, en este orden:
 
-- la [release de GitHub](#la-release-de-github) de cada etiqueta `vX.Y.Z`,
-  que publica `.github/workflows/release.yml` con su atestación de origen;
-- el [buzón](#el-pc-de-compilación-buzón) del servidor, donde las deja un PC
-  con Linux (`deploy/cross/`).
+- la [release de Forgejo](#el-runner-de-actions-del-pc) de cada etiqueta
+  `vX.Y.Z`, que compila y publica un PC con Linux con un runner de Forgejo
+  Actions (`.forgejo/workflows/freebsd.yml` y `deploy/cross/`);
+- la [release de GitHub](#la-release-de-github), que publica
+  `.github/workflows/release.yml` con su atestación de origen.
 
 Se entra por un proxy inverso con HTTPS (`PROXIES_CONFIANZA`) en
 `PANEL_ORIGEN`. Con el módulo `caddyfile`, `install.sh` imprime el sitio para
@@ -46,7 +47,6 @@ Deja ahí `jail.conf`, `pf.conf`, `rc.conf` (las variables del servicio),
 | `routerpanel.rc` | `/usr/local/etc/rc.d/routerpanel` en la jail del panel |
 | `actualizar.sh` | `/usr/local/sbin/routerpanel-actualizar` en el host |
 | `../lib/git.sh`, `../lib/precompiladas.sh` | `/usr/local/libexec/routerpanel-actualizar/` en el host |
-| `recibir-precompilada.sh` | `/usr/local/libexec/routerpanel-actualizar/` en el host ([buzón](#el-pc-de-compilación-buzón)) |
 | `doas.conf.snippet` | nada: explica por qué no hace falta ninguna regla de doas |
 
 ## Rutas
@@ -59,16 +59,17 @@ En el host:
 - `/usr/local/etc/routerpanel-actualizar.conf` (600): configuración del
   actualizador.
 - `/usr/local/etc/routerpanel-actualizar/` (700): `id_ed25519` (la clave de
-  despliegue, de solo lectura en el servidor git) y `known_hosts` (la clave
-  del servidor git).
+  despliegue, de solo lectura en el servidor git), `known_hosts` (la clave
+  del servidor git) y `forgejo-token` (600, el token de solo lectura de
+  Forgejo; lo pones tú, `install.sh` no lo crea).
 - `/usr/local/etc/cron.d/routerpanel`: el actualizador cada 15 minutos.
 - `/var/log/routerpanel-update.log`, rotado por
   `/usr/local/etc/newsyslog.conf.d/routerpanel.conf`.
 - `/var/db/routerpanel-actualizar/`: `fallida` (la última etiqueta que falló
-  dos veces seguidas; no se reintenta hasta que haya otra) y `esperando` (la
-  etiqueta cuya versión precompilada se espera).
-- `/var/db/routerpanel-buzon/entrada/<versión>/`: lo que deja el PC de
-  compilación, si lo usas.
+  dos veces seguidas; no se reintenta hasta que haya otra), `esperando` (la
+  etiqueta cuya versión precompilada se espera) y `rechazada-<fuente>` y
+  `no-disponible-<fuente>` (la etiqueta de la que ya se registró un rechazo
+  o una fuente no disponible, para no repetirlo en cada pasada).
 
 En la jail del panel:
 
@@ -171,7 +172,8 @@ una clave nueva.
 ### Primer despliegue
 
 No hay despliegue a mano: crea la primera etiqueta `vX.Y.Z` y, en cuanto su
-versión precompilada esté en GitHub o en el buzón, el actualizador la
+versión precompilada esté en la release de Forgejo o en la de GitHub, el
+actualizador la
 instala (como mucho 15 minutos después). Para no esperar al cron:
 
 ```sh
@@ -193,17 +195,23 @@ muestra el uso; no tiene más opciones. En cada ejecución:
    (por `sort -V`) y su commit. Como lee el remoto en cada pasada, no le
    afecta que reescriba su historial.
 2. Si esa etiqueta ya está desplegada, o ya falló, termina.
-3. Busca la versión ya compilada, primero en el buzón y después en GitHub
-   (si hay `GITHUB_REPO`), y la instala de la primera que la tenga y pase
-   todas las comprobaciones (abajo). La deja en `releases/<versión>/`, de
-   root.
-   - Si ninguna la tiene todavía, registra una sola vez «esperando la
-     versión precompilada de vX.Y.Z» y termina sin error. La vuelve a buscar
-     en cada ejecución, sin límite de tiempo, y esperar no cuenta como fallo.
+3. Busca la versión ya compilada, primero en la release de Forgejo (si hay
+   `FORGEJO_URL` y `FORGEJO_REPO`) y después en la de GitHub (si hay
+   `GITHUB_REPO`), y la instala de la primera que la tenga y pase todas las
+   comprobaciones (abajo). La deja en `releases/<versión>/`, de root.
+   - Si ninguna la tiene todavía (Forgejo responde 404 porque el PC aún no
+     la ha compilado), registra una sola vez «esperando la versión
+     precompilada de vX.Y.Z» y termina sin error. La vuelve a buscar en cada
+     ejecución, sin límite de tiempo, y esperar no cuenta como fallo.
    - Si alguna la tiene pero algo no cuadra, la rechaza (lo registra con el
-     motivo y vacía esa carpeta del buzón) y vuelve a esperar: una entrega
+     motivo, una vez por etiqueta y fuente) y vuelve a esperar: una release
      rechazada no cuenta como fallo de la etiqueta, para que una buena
-     posterior se pueda instalar. Nunca se instala nada sin comprobar.
+     posterior (el runner repite el trabajo, o sale la de GitHub) se pueda
+     instalar. Nunca se instala nada sin comprobar.
+   - Sin `FORGEJO_URL` o `FORGEJO_REPO`, lo registra una vez y no mira
+     Forgejo. Si el token no existe, no es de root o lo pueden leer el grupo
+     u otros, Forgejo no está disponible (lo registra una vez por etiqueta)
+     y el token no se usa.
 4. Para el servicio y copia `panel.db` a
    `/var/db/routerpanel/antes-de-actualizar/`.
 5. Cambia `current`, arranca y espera como mucho 60 s a que `/salud`
@@ -249,7 +257,14 @@ Además, según la fuente:
   `--repo GITHUB_REPO`, `--source-ref refs/tags/vX.Y.Z` y
   `--signer-workflow GITHUB_REPO/.github/workflows/release.yml`: el archivo
   lo compiló el flujo de release de ese repositorio para esa etiqueta.
-- **Buzón**: con `PRECOMPILADAS_MINISIGN`, la firma de `SHA256SUMS`.
+- **Forgejo**: la release existe
+  (`GET FORGEJO_URL/api/v1/repos/FORGEJO_REPO/releases/tags/vX.Y.Z`) y los
+  ficheros se descargan con sus nombres de
+  `FORGEJO_URL/FORGEJO_REPO/releases/download/vX.Y.Z/`: la URL sale de la
+  configuración, nunca de la respuesta, y curl no sigue redirecciones, así
+  que el token solo va a `FORGEJO_URL`. curl lee la cabecera con el token de
+  su entrada estándar (`-K -`), nunca de sus argumentos. Con
+  `PRECOMPILADAS_MINISIGN`, además, la firma de `SHA256SUMS`.
 
 Nada de lo que llega se ejecuta antes de desplegarlo: `jq` y `gh` solo lo
 leen.
@@ -276,133 +291,155 @@ Para comprobar a mano una versión publicada:
 gh attestation verify routerpanel-vX.Y.Z-x86_64-unknown-freebsd.tar.gz --repo <GITHUB_REPO>
 ```
 
-## El PC de compilación (buzón)
+## El runner de Actions del PC
 
-Es opcional. Un PC con Linux compila la versión para FreeBSD y la deja en un
-buzón del servidor; el actualizador la instala de ahí. Sirve sin GitHub, o
-para tener la versión antes de que termine la release. Si el PC está
-apagado, el servidor no compila: espera a GitHub o a que el PC la entregue.
+Un PC con Linux compila cada etiqueta para FreeBSD y la publica como la
+release de esa etiqueta en Forgejo; el actualizador la instala de ahí. Si el
+PC está apagado, el servidor no compila: el trabajo espera en la cola de
+Forgejo hasta que el runner vuelve (como mucho `ABANDONED_JOB_TIMEOUT` de la
+sección `[actions]` de `app.ini`; con `720h`, 30 días), y el actualizador
+espera a la release, o usa antes la de GitHub si sale primero.
 
 ### Cómo funciona
 
-1. Después de crear y subir la etiqueta, desde el equipo de trabajo:
-
-   ```sh
-   deploy/cross/lanzar.sh vX.Y.Z
-   ```
-
-   Comprueba que es una etiqueta `vX.Y.Z` y que no hay cambios sin
-   confirmar, y manda al PC (`PC_COMPILAR_SSH`) los guiones y un `git bundle`
-   de la etiqueta. Allí `compilar-freebsd.sh` compila y `entregar.sh` lo sube
-   al buzón (`PRECOMPILADAS_BUZON_SSH`). Si el PC no responde en 5 s, lo dice
-   y sale con 3. `--prueba [REF]` compila cualquier referencia sin
-   entregarla.
-2. El PC saca el código del commit de la etiqueta con `git archive` a
-   `~/rtf-cross/fuente`, nunca de una copia de trabajo. Compila con la misma
-   versión de `cargo-leptos` que la release de GitHub, y el binario para
-   `x86_64-unknown-freebsd` con `cross`. Empaqueta con
+1. Al empujar una etiqueta `v*`, Forgejo lanza
+   `.forgejo/workflows/freebsd.yml` en un runner con la etiqueta `pc`. Que
+   exista `.forgejo/workflows/` hace que Forgejo no ejecute los flujos de
+   `.github/workflows/`, que son los de GitHub.
+2. El trabajo trae la etiqueta con `git fetch --depth 1` (el token del
+   trabajo va en `GIT_CONFIG_*` como `http.extraheader`, nunca en la URL) y
+   lanza `deploy/cross/publicar-forgejo.sh`. No usa acciones de terceros.
+3. `publicar-forgejo.sh` compila con
+   `compilar-freebsd.sh --release vX.Y.Z --repo <Forgejo>/<repo>.git`: el
+   código sale del commit de la etiqueta con `git archive` a
+   `~/rtf-cross/fuente`, nunca de una copia de trabajo, y la compilación es
+   incremental entre etiquetas. Usa la misma versión de `cargo-leptos` que la
+   release de GitHub y `cross` para el binario. Empaqueta con
    `empaquetar-freebsd.sh` (el mismo archivo que GitHub) y escribe
    `SHA256SUMS`; con `RP_MINISIGN_SECRETA`, también `SHA256SUMS.minisig`.
-3. `entregar.sh` sube los ficheros por SSH como el usuario `rpentrega` del
-   servidor, que solo puede ejecutar `recibir-precompilada.sh`. Este guarda
-   cada fichero en `/var/db/routerpanel-buzon/entrada/<versión>/`, solo con
-   los nombres admitidos, hasta 300 MB por fichero y las 3 versiones más
-   recientes.
-4. Cuando el actualizador ve la etiqueta, mira el buzón antes que GitHub y,
-   si la versión está y pasa las comprobaciones, la despliega. En los dos
-   casos (instalada o rechazada) vacía esa carpeta del buzón.
+4. Trae la release de la etiqueta o, si no existe, la crea con el commit en
+   la descripción, y sube el archivo y, el último, `SHA256SUMS`. Si el
+   trabajo se repite, sustituye los adjuntos que ya estaban.
 
-### Seguridad del buzón
+### Seguridad
 
-La clave del PC solo vale para `rpentrega`, con `restrict` (sin terminal,
-reenvíos ni agente), `command=` (la única orden es
-`recibir-precompilada.sh`) y `from=` (solo desde la IP del PC). No hay que
-tocar `sshd_config`. Nada de lo que llega se ejecuta en el host: root lo
-comprueba todo sobre una copia propia antes de instalarlo.
+Quien controle el PC (o pueda crear etiquetas en el repositorio) puede
+desplegar otro binario en la jail del panel: el commit tiene que ser el de
+la etiqueta, pero el binario no se puede comprobar contra el código. Con
+minisign solo vale lo firmado con una clave que no sale del PC. Las
+versiones de GitHub no tienen ese problema: su atestación dice qué flujo y
+qué etiqueta las compilaron.
 
-Quien controle el PC de compilación o su clave del buzón puede desplegar
-otro binario en la jail del panel, igual que quien pueda crear etiquetas en
-el repositorio: el commit tiene que ser el de la etiqueta, pero el binario no
-se puede comprobar contra el código. Con minisign solo vale lo firmado con
-una clave que no sale del PC. Las versiones de GitHub no tienen ese
-problema: su atestación dice qué flujo y qué etiqueta las compilaron.
+El servidor entra en Forgejo con un token de solo lectura propio, no con el
+del trabajo. El runner corre como tu usuario (ejecutor host), así que solo
+debe atender a repositorios tuyos: regístralo en tu usuario o en tu
+organización, no en toda la instancia.
 
-### Instalar (a mano, una vez)
+### Instalar el runner (una vez)
 
-En `deploy/config.local` del equipo de trabajo:
+En el PC hace falta Linux con `rustup`, `git`, `podman`, `cross`, `rsync`,
+`file`, `flock`, `curl` y `jq`. Si falta `cargo-leptos` o tiene otra
+versión, `compilar-freebsd.sh` lo instala.
 
-```sh
-PC_COMPILAR_SSH=usuario@pc-de-compilacion
-PRECOMPILADAS_BUZON_SSH=rpentrega@<IP del servidor vista desde el PC>
-# Opcional: PRECOMPILADAS_MINISIGN=<la línea de la clave pública>
-```
+1. En Forgejo, activa Actions (`[actions] ENABLED = true` en `app.ini`, con
+   `ABANDONED_JOB_TIMEOUT = 720h` para que las etiquetas esperen al PC) y la
+   unidad «Actions» en los ajustes del repositorio.
+2. Instala `forgejo-runner` en el PC (el paquete de tu distribución o el
+   binario publicado por Forgejo) y regístralo con la etiqueta `pc:host`
+   (ejecutor host: corre directamente en el PC, no en un contenedor). Saca el
+   token de registro de los ajustes de Actions de tu usuario u organización
+   («Runners», «Crear nuevo runner»):
 
-En el PC de compilación hace falta Linux con `rustup`, `git`, `podman`,
-`cross`, `rsync`, `file` y `flock`. Si falta `cargo-leptos` o tiene otra
-versión, el guion lo instala. Crea la clave del buzón:
+   ```sh
+   mkdir -p ~/.config/forgejo-runner && cd ~/.config/forgejo-runner
+   forgejo-runner register --no-interactive --instance https://forge.example \
+       --token <token de registro> --name pc --labels pc:host
+   ```
 
-```sh
-ssh-keygen -t ed25519 -N '' -C routerpanel-buzon -f ~/.ssh/routerpanel-buzon
-cat ~/.ssh/routerpanel-buzon.pub     # para el authorized_keys de abajo
-```
+3. Arráncalo como servicio de usuario, con el `PATH` en el que estén
+   `cargo`, `cross` y `podman`:
 
-En el servidor, como root (`doas`), con la IP y la clave del PC:
+   ```ini
+   # ~/.config/systemd/user/forgejo-runner.service
+   [Unit]
+   Description=Runner de Forgejo Actions
+   After=network-online.target
 
-```sh
-pw groupadd rpentrega -g 3161
-pw useradd rpentrega -u 3161 -g rpentrega -d /var/db/routerpanel-buzon \
-    -s /bin/sh -w no -c "Buzón de versiones precompiladas del panel"
-install -d -m 755 -o root -g wheel /var/db/routerpanel-buzon /var/db/routerpanel-buzon/.ssh
-install -d -m 750 -o rpentrega -g rpentrega /var/db/routerpanel-buzon/entrada
-printf '%s\n' 'restrict,from="IP_DEL_PC",command="/usr/local/libexec/routerpanel-actualizar/recibir-precompilada.sh" <el contenido de routerpanel-buzon.pub>' \
-    >/var/db/routerpanel-buzon/.ssh/authorized_keys
-chown root:wheel /var/db/routerpanel-buzon/.ssh/authorized_keys
-chmod 644 /var/db/routerpanel-buzon/.ssh/authorized_keys
-sshd -T | grep -Ei '^(allowusers|allowgroups|denyusers|denygroups)'
-```
+   [Service]
+   WorkingDirectory=%h/.config/forgejo-runner
+   Environment=PATH=%h/.cargo/bin:/usr/local/bin:/usr/bin:/bin
+   ExecStart=/usr/bin/forgejo-runner daemon
+   Restart=on-failure
 
-- El `authorized_keys` es de root para que `rpentrega` no pueda quitarse las
-  restricciones. `-w no` lo deja sin contraseña. Necesita `/bin/sh` porque
-  sshd ejecuta la orden forzada con su shell.
-- Si `sshd -T` muestra `AllowUsers` o `AllowGroups`, añade `rpentrega` en
-  `sshd_config` y haz `service sshd reload`. Si pf limita quién llega al SSH
-  del host, deja pasar al PC.
+   [Install]
+   WantedBy=default.target
+   ```
+
+   ```sh
+   systemctl --user daemon-reload
+   systemctl --user enable --now forgejo-runner
+   loginctl enable-linger    # para que corra sin la sesión abierta
+   ```
+
+4. En el servidor, como root, el token de solo lectura del actualizador
+   (créalo en Forgejo, en «Ajustes», «Aplicaciones», con permiso
+   `read:repository`):
+
+   ```sh
+   install -m 600 -o root -g wheel /dev/null /usr/local/etc/routerpanel-actualizar/forgejo-token
+   vi /usr/local/etc/routerpanel-actualizar/forgejo-token    # el token, en una línea
+   ```
+
+   y en `deploy/config.local` del equipo de trabajo `FORGEJO_URL` y
+   `FORGEJO_REPO`; repite `deploy/freebsd-jail/install.sh`, que los pasa al
+   actualizador e instala `curl` en el host.
+
 - Para firmar: `pkg install minisign` en el host y `PRECOMPILADAS_MINISIGN`
   en `config.local`. En el PC,
   `minisign -G -W -s ~/.config/routerpanel/minisign.key -p ~/.config/routerpanel/minisign.pub`
-  y `RP_MINISIGN_SECRETA=~/.config/routerpanel/minisign.key` en el entorno de
-  `lanzar.sh` o `compilar-freebsd.sh`. Con `-W` la clave no lleva contraseña
-  y el PC firma solo.
+  y `RP_MINISIGN_SECRETA=~/.config/routerpanel/minisign.key` en el entorno
+  del servicio del runner. Con `-W` la clave no lleva contraseña y el PC
+  firma solo.
 
-Después repite `deploy/freebsd-jail/install.sh` desde el equipo de trabajo,
-que pasa `PRECOMPILADAS_MINISIGN` al actualizador. Por último, en el PC, fija
-la clave del servidor y prueba el buzón (`recibir` sin argumentos responde
-con el uso y no guarda nada):
+Para probar la compilación sin publicar nada, en el PC:
+`deploy/cross/compilar-freebsd.sh --prueba [REF]`.
 
-```sh
-ssh-keyscan -t ed25519 <servidor> >>~/.ssh/known_hosts   # compárala con ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub del servidor
-ssh -i ~/.ssh/routerpanel-buzon -o IdentitiesOnly=yes rpentrega@<servidor> recibir
-```
+### Migrar desde el buzón
 
-Y una compilación de prueba desde el equipo de trabajo:
-`deploy/cross/lanzar.sh --prueba`.
+Antes, el PC entregaba la versión por SSH a un buzón del servidor
+(`deploy/cross/lanzar.sh`, `entregar.sh`, el temporizador `rtf-cross` y el
+usuario `rpentrega`). Ya no existe. Para pasar al runner:
 
-### Temporizador en el PC (opcional)
+1. Instala el runner y pon el token del servidor (arriba).
+2. En el PC, apaga el temporizador y borra lo que usaba:
 
-En vez de lanzarlo a mano, el PC puede mirar cada 15 minutos, mientras está
-encendido, si hay una etiqueta nueva, compilarla y entregarla. No repite lo
-ya entregado. Necesita llegar al repositorio (`REPO_URL`) y tener los guiones
-en `~/rtf-cross/bin`, que copia `lanzar.sh`. No viene activado:
+   ```sh
+   systemctl --user disable --now rtf-cross.timer
+   rm ~/.config/systemd/user/rtf-cross.service ~/.config/systemd/user/rtf-cross.timer \
+       ~/.config/rtf-cross.env ~/.ssh/routerpanel-buzon ~/.ssh/routerpanel-buzon.pub
+   rm -r ~/rtf-cross/bin
+   systemctl --user daemon-reload
+   ```
 
-```sh
-cp deploy/cross/rtf-cross.service deploy/cross/rtf-cross.timer ~/.config/systemd/user/
-printf 'RP_REPO_URL=%s\nRP_BUZON_SSH=%s\n' '<REPO_URL>' 'rpentrega@<servidor>' >~/.config/rtf-cross.env
-systemctl --user daemon-reload
-systemctl --user enable --now rtf-cross.timer
-```
+   `~/rtf-cross` (el clon y `target/`) se queda: el runner lo reutiliza.
+   Quita `PC_COMPILAR_SSH` y `PRECOMPILADAS_BUZON_SSH` de
+   `deploy/config.local`; ya no hacen nada.
+3. En el servidor, como root, borra el usuario del buzón, su carpeta y el
+   receptor:
 
-Las unidades de usuario solo corren con la sesión abierta, salvo que
-actives `loginctl enable-linger`.
+   ```sh
+   pw userdel rpentrega
+   pw groupdel rpentrega 2>/dev/null || true
+   rm -r /var/db/routerpanel-buzon
+   rm -f /usr/local/libexec/routerpanel-actualizar/recibir-precompilada.sh
+   sshd -T | grep -Ei '^(allowusers|allowgroups)'
+   ```
+
+   Si `rpentrega` estaba en `AllowUsers` o `AllowGroups` de `sshd_config`,
+   quítalo y haz `service sshd reload`; si pf dejaba al PC llegar al SSH del
+   host solo para el buzón, quita esa regla.
+4. Repite `deploy/freebsd-jail/install.sh` y comprueba el registro del
+   actualizador tras la próxima etiqueta.
 
 ## Migrar una instalación existente
 
@@ -411,8 +448,9 @@ Las instalaciones anteriores tenían una jail de compilación
 clonaba el repositorio y compilaba. Ya no se usa. Para pasar a la
 instalación sin compilar:
 
-1. En `deploy/config.local`, pon `GITHUB_REPO=propietario/nombre` si vas a
-   usar la release de GitHub (o prepara el [buzón](#el-pc-de-compilación-buzón)).
+1. En `deploy/config.local`, pon `FORGEJO_URL` y `FORGEJO_REPO` (con el
+   [runner del PC](#el-runner-de-actions-del-pc)) o
+   `GITHUB_REPO=propietario/nombre` si vas a usar la release de GitHub.
    Las claves de la jail de compilación (`JAIL_COMPILAR`,
    `JAIL_COMPILAR_IP`, `UID_COMPILAR`, `RED_LAN`, `RED_VPN`, `DNS_IP`,
    `TRABAJOS_COMPILACION`, `PRECOMPILADAS_ESPERA`) ya no hacen nada; puedes
@@ -453,8 +491,8 @@ instalación sin compilar:
 - La jail del panel solo puede salir a la web del router (`ROUTER_IP`, tcp
   80).
 - El actualizador corre en el host: necesita llegar al repositorio
-  (`REPO_URL`) y, con `GITHUB_REPO`, a GitHub por HTTPS (las descargas de
-  la release y `api.github.com`). Eso lo deciden las reglas del propio
+  (`REPO_URL`), con `FORGEJO_URL` a Forgejo y, con `GITHUB_REPO`, a GitHub
+  por HTTPS (las descargas de la release y `api.github.com`). Eso lo deciden las reglas del propio
   host, no estas.
 
 Como la jail del panel no tiene red ni `pkg`, no se actualiza con `pkg -j`.
