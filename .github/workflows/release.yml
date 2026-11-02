@@ -1,11 +1,17 @@
-# Releases para Linux: al subir una etiqueta vX.Y.Z (solo cifras: las únicas
-# versiones; ver deploy/linux/actualizar-release.sh), compila el panel para
-# x86_64 y aarch64, empaqueta cada uno con tools/empaquetar-release.sh y los
-# publica con SHA256SUMS en la release de la etiqueta, que pasa a ser la
-# última (latest). Es lo que descarga el actualizador, con <base> =
-# <repo>/releases:
+# Releases: al subir una etiqueta vX.Y.Z (solo cifras: las únicas versiones;
+# ver deploy/linux/actualizar-release.sh), compila el panel para Linux
+# x86_64 y aarch64 (empaquetados con tools/empaquetar-release.sh) y para
+# FreeBSD x86_64 (con cross, empaquetado con
+# deploy/cross/empaquetar-freebsd.sh), y los publica con SHA256SUMS en la
+# release de la etiqueta, que pasa a ser la última (latest). Es lo que
+# descargan los actualizadores, con <base> = <repo>/releases:
 #   <base>/latest/download/SHA256SUMS
 #   <base>/download/<versión>/routerpanel-<versión>-<objetivo>.tar.gz
+#
+# Atestaciones de procedencia (SLSA, firmadas con Sigstore) de cada archivo:
+# el actualizador de FreeBSD (deploy/freebsd-jail/actualizar.sh) no instala
+# nada de aquí sin comprobar con «gh attestation verify» que viene de este
+# repositorio, de la etiqueta y de este flujo (release.yml).
 #
 # Firma opcional: si el repositorio tiene el secreto MINISIGN_CLAVE_SECRETA
 # (el contenido de una clave secreta de minisign sin contraseña, de
@@ -15,7 +21,11 @@
 # o posterior, así que valen para Debian 12, Ubuntu 22.04 y Raspberry Pi OS
 # de 64 bits (bookworm) en adelante.
 #
-# No hay compilación para FreeBSD: la jail compila desde el código (README).
+# FreeBSD se compila con cross, como en el PC de compilación (deploy/cross/):
+# un contenedor con el enlazador y la libc de FreeBSD; la web la hace
+# cargo-leptos igual que en Linux. El archivo es el que acepta el buzón del
+# servidor, con COMMIT (el commit de la etiqueta) dentro.
+#
 # Forgejo Actions también lee esta carpeta, pero la publicación usa gh y la
 # API de GitHub.
 
@@ -116,12 +126,61 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  freebsd:
+    needs: version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      OBJETIVO: x86_64-unknown-freebsd
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Toolchain (rust-toolchain.toml) y objetivo de FreeBSD
+        run: |
+          rustup toolchain install
+          rustup target add "$OBJETIVO"
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+        with:
+          tool: cross@0.2.5
+      # La misma versión que el PC de compilación (CARGO_LEPTOS_VERSION).
+      - name: Instalar cargo-leptos
+        run: |
+          v=$(sed -n 's/^CARGO_LEPTOS_VERSION=//p' deploy/cross/compilar-freebsd.sh | head -n 1)
+          test -n "$v"
+          cargo install --locked cargo-leptos --version "$v"
+      - name: Compilar (cross)
+        env:
+          LEPTOS_BIN_TARGET_TRIPLE: x86_64-unknown-freebsd
+          LEPTOS_BIN_CARGO_COMMAND: cross
+        run: cargo leptos build --release --precompress
+      # Con el objetivo de FreeBSD, cargo-leptos deja hash.txt junto a la
+      # carpeta del binario; el panel lo busca dentro de site/.
+      - name: Empaquetar
+        run: |
+          if [ -f "target/$OBJETIVO/site/hash.txt" ]; then
+            cp "target/$OBJETIVO/site/hash.txt" target/site/hash.txt
+          fi
+          commit=$(git rev-parse 'HEAD^{commit}')
+          SOURCE_DATE_EPOCH=$(git log -1 --format=%ct "$commit") \
+            bash deploy/cross/empaquetar-freebsd.sh "$VERSION" "$commit" \
+            "target/$OBJETIVO/release/panel" target/site . dist
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: routerpanel-x86_64-unknown-freebsd
+          path: dist/routerpanel-*.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
   publicar:
-    needs: [version, compilar]
+    needs: [version, compilar, freebsd]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     env:
       VERSION: ${{ needs.version.outputs.version }}
     steps:
@@ -136,8 +195,12 @@ jobs:
       - name: SHA256SUMS
         run: |
           tools/empaquetar-release.sh --sumas dist
-          test "$(wc -l <dist/SHA256SUMS)" -eq 2
+          test "$(wc -l <dist/SHA256SUMS)" -eq 3
           cat dist/SHA256SUMS
+      # Una atestación por archivo de SHA256SUMS (con su sha256).
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-checksums: dist/SHA256SUMS
       - name: Firmar SHA256SUMS (si hay MINISIGN_CLAVE_SECRETA)
         env:
           MINISIGN_CLAVE_SECRETA: ${{ secrets.MINISIGN_CLAVE_SECRETA }}
