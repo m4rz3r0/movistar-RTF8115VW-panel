@@ -1,50 +1,54 @@
 #!/bin/sh
 # Pruebas de las versiones precompiladas para FreeBSD (deploy/cross/,
-# deploy/lib/precompiladas.sh, deploy/freebsd-jail/recibir-precompilada.sh y
-# la parte del actualizador), sin servidor, sin PC de compilación y sin tocar
-# el sistema: todo bajo una carpeta temporal.
+# deploy/lib/precompiladas.sh y la parte del actualizador), sin servidor, sin
+# PC de compilación, sin Forgejo y sin tocar el sistema: todo bajo una
+# carpeta temporal.
 #
-# 1. Nombres: archivo_precompilada, version_precompilable, fichero_de_buzon.
-# 2. ultima_version (lo que compila el PC) elige la misma etiqueta que
-#    ultima_etiqueta_remota (deploy/lib/git.sh, lo que busca el servidor con
-#    git ls-remote) en un repositorio de verdad: la última vX.Y.Z, sin rc.
+# 1. Nombres: archivo_precompilada, version_precompilable,
+#    repo_forgejo_valido y url_forgejo_valida.
+# 2. ultima_version elige la misma etiqueta que ultima_etiqueta_remota
+#    (deploy/lib/git.sh, lo que busca el servidor con git ls-remote) en un
+#    repositorio de verdad: la última vX.Y.Z, sin rc.
 # 3. preparar_github con fetch y gh de mentira (jq de verdad): acepta una
 #    release buena (sha256, atestación de este repositorio, de
 #    refs/tags/vX.Y.Z y de release.yml, y COMMIT de la etiqueta) y distingue
 #    «aún no se puede usar» (sale con 1: sin publicar, sin atestaciones, sin
 #    gh) de «rechazada» (sale con 2: sha256, atestación de otra etiqueta o de
 #    otro flujo, otro commit, repositorio no válido), sin dejar nada.
-# 4. preparar_precompilada acepta un archivo bueno (deja solo panel, site/ y
+# 4. preparar_forgejo con un Forgejo de mentira (curl en $FALSOS): acepta
+#    una release buena; sale con 1 si la release no existe (404) o le falta
+#    SHA256SUMS, con 2 si SHA256SUMS no cuadra y con 3 si el token no vale
+#    (no es de root, lo leen otros, no existe), sin llamar a curl. El token
+#    va siempre por la entrada estándar de curl, nunca en sus argumentos.
+# 5. preparar_precompilada acepta un archivo bueno (deja solo panel, site/ y
 #    COMMIT) y rechaza, sin dejar nada: sha256 que no cuadra, otro commit, un
 #    binario de Linux, carpeta con otro nombre o algo más al lado, un enlace
-#    simbólico dentro, sin site/, un enlace en el buzón y, con minisign (si
-#    está instalado), una firma mala. precompilada_llegada no da por llegada
-#    una versión sin SHA256SUMS ni, con clave, sin firma.
-# 5. recibir-precompilada.sh guarda lo admitido y rechaza versiones y
-#    nombres no válidos, órdenes con más argumentos, ficheros vacíos o
-#    demasiado grandes (sin dejar restos); conserva 3 versiones.
+#    simbólico dentro, sin site/, un enlace en la carpeta y, con minisign (si
+#    está instalado), una firma mala.
 # 6. actualizar.sh de verdad, con jexec, service, /salud, sockstat, ps,
-#    fetch y gh de mentira, y cargo, rustc y una jail de compilación que
-#    apuntan si alguien los llama (nadie debe hacerlo):
-#    a. sin nada en el buzón ni en GitHub, espera: lo dice una sola vez por
-#       etiqueta, no despliega ni cuenta un fallo;
-#    b. con la versión en el buzón, la instala y vacía el buzón;
-#    c. con una versión de otro commit en el buzón, la rechaza, la borra,
-#       no despliega y cuenta un fallo;
-#    d. con GITHUB_REPO y la release publicada, la instala de GitHub;
-#    e. con una atestación de otra etiqueta, la rechaza y no despliega;
-#    f. con GITHUB_REPO y la release aún sin publicar, espera sin fallo;
-#    g. sin acceso al repositorio, lo registra y sale con 0;
-#    h. --ref ya no existe: sale con 2 sin tocar nada;
+#    fetch, curl y gh de mentira, y cargo, rustc y una jail de compilación
+#    que apuntan si alguien los llama (nadie debe hacerlo):
+#    a. sin la release en Forgejo (404) ni en GitHub, espera: lo dice una
+#       sola vez por etiqueta, sale con 0, no despliega ni cuenta un fallo;
+#    b. con la release en Forgejo, la instala;
+#    c. con un SHA256SUMS que no cuadra en Forgejo, la rechaza sin contar un
+#       fallo y lo registra una sola vez en dos pasadas;
+#    d. con una release de otro commit en Forgejo, la rechaza;
+#    e. sin la release en Forgejo, la instala de GitHub;
+#    f. con el token de Forgejo en modo 0644, Forgejo no está disponible (lo
+#       dice una vez), no se manda el token y se instala de GitHub;
+#    g. sin FORGEJO_URL, lo dice una sola vez y usa GitHub;
+#    h. con una atestación de otra etiqueta en GitHub, la rechaza;
+#    i. con GITHUB_REPO y la release aún sin publicar, espera sin fallo;
+#    j. sin acceso al repositorio, lo registra y sale con 0;
+#    k. --ref ya no existe: sale con 2 sin tocar nada;
 #    y en ninguno se ha llamado a cargo, rustc ni a la jail de compilación.
-# 7. Lo que corre fuera del servidor se niega antes de compilar nada:
-#    lanzar.sh con algo que no es una etiqueta v*, con la copia de trabajo
-#    sucia o sin PRECOMPILADAS_BUZON_SSH; compilar-freebsd.sh --release con
-#    una rama (aunque se llame como una versión) y --prueba con --entregar;
-#    entregar.sh con una versión de --prueba. Con un PC que no responde,
-#    lanzar.sh sale con 3 y lo dice. empaquetar-freebsd.sh (el que usan el
-#    PC y la release de GitHub) deja un archivo que preparar_precompilada
-#    acepta.
+# 7. Lo que corre en el PC: compilar-freebsd.sh se niega con una rama
+#    (aunque se llame como una versión) y ya no conoce --entregar ni
+#    --ultima; publicar-forgejo.sh crea la release si falta, sube el archivo
+#    y SHA256SUMS, al repetir sustituye los que ya estaban, y el token nunca
+#    está en los argumentos de curl ni en el entorno de la compilación.
+#    empaquetar-freebsd.sh deja un archivo que preparar_precompilada acepta.
 # 8. sh -n de todo y shellcheck (si está).
 #
 # Uso: deploy/pruebas/precompiladas.sh (desde cualquier sitio; necesita git,
@@ -55,7 +59,6 @@ set -eu
 
 DEPLOY=$(cd "$(dirname "$0")/.." && pwd)
 LIB=$DEPLOY/lib/precompiladas.sh
-RECIBIR=$DEPLOY/freebsd-jail/recibir-precompilada.sh
 ACTUALIZAR=${RP_PRUEBA_ACTUALIZAR:-$DEPLOY/freebsd-jail/actualizar.sh}
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
@@ -99,7 +102,7 @@ elf()
 	head -c 40 /dev/zero
 }
 
-# Construye en $1 (carpeta del buzón para la versión $2) un archivo con
+# Construye en $1 (la carpeta de la versión $2) un archivo con
 # COMMIT $3. Variantes ($4): buena, linux, otro-nombre, extra, enlace,
 # sin-site, sha-malo.
 hacer_archivo()
@@ -146,12 +149,20 @@ for v in '' 1.2.3 prueba-abc v1/../x 'v1 2' va.b ../v1 "$largo" 'v1
 x'; do
 	if version_precompilable "$v"; then fallo "version_precompilable acepta «$v»"; fi
 done
-for f in routerpanel-v1.2.3-x86_64-unknown-freebsd.tar.gz SHA256SUMS SHA256SUMS.minisig; do
-	fichero_de_buzon v1.2.3 "$f" || fallo "fichero_de_buzon rechaza $f"
+for r in dueno/panel Dueno.x/mi_panel-2 a/b; do
+	repo_forgejo_valido "$r" || fallo "repo_forgejo_valido rechaza $r"
 done
-for f in routerpanel-v1.2.4-x86_64-unknown-freebsd.tar.gz routerpanel-v1.2.3-x86_64-unknown-linux-gnu.tar.gz \
-	panel ../SHA256SUMS .SHA256SUMS; do
-	if fichero_de_buzon v1.2.3 "$f"; then fallo "fichero_de_buzon acepta $f"; fi
+for r in '' dueno dueno/ /panel dueno/panel/x .dueno/panel dueno/-panel 'dueno/pa nel' 'dueno/$(id)' dueno/..; do
+	if repo_forgejo_valido "$r"; then fallo "repo_forgejo_valido acepta «$r»"; fi
+done
+for u in https://forge.example http://forge.example:3000 https://forge.example/git; do
+	url_forgejo_valida "$u" || fallo "url_forgejo_valida rechaza $u"
+done
+# La arroba aparte: no es un correo.
+ARROBA=@
+for u in '' forge.example https://forge.example/ "https://u${ARROBA}forge.example" 'https://forge.example?x' \
+	https:// ftp://forge.example 'https://forge.example/a b' https://forge.example/../x; do
+	if url_forgejo_valida "$u"; then fallo "url_forgejo_valida acepta «$u»"; fi
 done
 
 # --- 2. la misma última versión que el servidor ---------------------------------
@@ -279,17 +290,233 @@ PATH=$TMP/sin-gh preparar_github "$REPO_GH" v1.2.3 "$C" "$TMP/gh-destino" 2>"$TM
 [ "$rc" = 1 ] && grep -q "falta gh" "$TMP/err" || fallo "github sin gh: sale con $rc: $(cat "$TMP/err")"
 rm -rf "$TMP/gh-destino"
 
-# --- 4. comprobar un archivo ----------------------------------------------------
-B=$TMP/buzon
+# --- 4. la release de Forgejo -----------------------------------------------------
+# Un Forgejo de mentira: curl (en $FALSOS) atiende la API de releases
+# (/api/v1/repos/<repo>/releases…) y las descargas
+# (/<repo>/releases/download/<etiqueta>/<fichero>) de $FORJA_URL desde
+# $FORJA/<etiqueta>/ (id: el de la release; adjuntos/: los ficheros;
+# adjuntos.ids: «<id> <nombre>»). Solo responde con la cabecera
+# «Authorization: token <$TMP/token-esperado>» leída de -K -; si no, 401.
+# Apunta sus argumentos en $TMP/curl-argv, lo que lee por -K - en
+# $TMP/curl-entrada y lo que cambia en $TMP/forja-log.
+FORJA=$TMP/forja
+FORJA_URL=https://forge.example
+REPO_FJ=dueno/panel
+mkdir -p "$FORJA"
+cat >"$FALSOS/curl" <<EOF
+#!/bin/sh
+FORJA=$FORJA
+TMP=$TMP
+EOF
+cat >>"$FALSOS/curl" <<'EOF'
+printf '%s\n' "$*" >>"$TMP/curl-argv"
+metodo=
+salida=-
+formato=
+datos=
+adjunto=
+url=
+conf=
+while [ "$#" -gt 0 ]; do
+	case $1 in
+	-K)
+		[ "$2" = - ] && conf=$(cat)
+		shift 2
+		;;
+	-X) metodo=$2 && shift 2 ;;
+	-o) salida=$2 && shift 2 ;;
+	-w) formato=$2 && shift 2 ;;
+	--data-binary) datos=${2#@} && shift 2 ;;
+	-F) adjunto=${2#attachment=@} && shift 2 ;;
+	-H | --connect-timeout | --max-time | --max-filesize | --max-redirs | --proto | --proto-redir) shift 2 ;;
+	http://* | https://*) url=$1 && shift ;;
+	*) shift ;;
+	esac
+done
+if [ -z "$metodo" ]; then
+	if [ -n "$datos$adjunto" ]; then metodo=POST; else metodo=GET; fi
+fi
+printf '%s\n' "$conf" >>"$TMP/curl-entrada"
+codigo=404
+cuerpo='{"message":"not found"}'
+ruta=${url#https://forge.example}
+api=/api/v1/repos/dueno/panel
+etiqueta_de_id()
+{
+	for _d in "$FORJA"/*/; do
+		[ "$(cat "$_d/id" 2>/dev/null)" = "$1" ] && basename "$_d" && return 0
+	done
+	return 1
+}
+if [ "$conf" != "header = \"Authorization: token $(cat "$TMP/token-esperado")\"" ]; then
+	codigo=401
+	cuerpo='{"message":"token"}'
+else
+	case "$metodo $ruta" in
+	"GET $api/releases/tags/"*)
+		t=${ruta##*/}
+		if [ -f "$FORJA/$t/id" ]; then
+			codigo=200
+			cuerpo="{\"id\":$(cat "$FORJA/$t/id"),\"tag_name\":\"$t\"}"
+		fi
+		;;
+	"POST $api/releases")
+		t=$(jq -r .tag_name "$datos")
+		if [ -f "$FORJA/$t/id" ]; then
+			codigo=409
+		else
+			n=$(($(find "$FORJA" -name id | wc -l) + 1))
+			mkdir -p "$FORJA/$t/adjuntos"
+			echo "$n" >"$FORJA/$t/id"
+			: >"$FORJA/$t/adjuntos.ids"
+			jq -r .body "$datos" >"$FORJA/$t/cuerpo"
+			echo "creada $t" >>"$TMP/forja-log"
+			codigo=201
+			cuerpo="{\"id\":$n}"
+		fi
+		;;
+	"GET $api/releases/"*/assets)
+		r=${ruta#"$api/releases/"}
+		if t=$(etiqueta_de_id "${r%/assets}"); then
+			codigo=200
+			cuerpo=$(while read -r i nom; do printf '{"id":%s,"name":"%s"}\n' "$i" "$nom"; done \
+				<"$FORJA/$t/adjuntos.ids" | jq -s -c .)
+		fi
+		;;
+	"DELETE $api/releases/"*/assets/*)
+		r=${ruta#"$api/releases/"}
+		a=${r##*/}
+		if t=$(etiqueta_de_id "${r%%/*}") && nom=$(awk -v a="$a" '$1 == a { print $2 }' "$FORJA/$t/adjuntos.ids") &&
+			[ -n "$nom" ]; then
+			rm -f "$FORJA/$t/adjuntos/$nom"
+			awk -v a="$a" '$1 != a' "$FORJA/$t/adjuntos.ids" >"$FORJA/$t/ids.tmp"
+			mv "$FORJA/$t/ids.tmp" "$FORJA/$t/adjuntos.ids"
+			echo "borrado $nom" >>"$TMP/forja-log"
+			codigo=204
+			cuerpo=
+		fi
+		;;
+	"POST $api/releases/"*/assets\?name=*)
+		r=${ruta#"$api/releases/"}
+		nom=${r#*\?name=}
+		if t=$(etiqueta_de_id "${r%%/*}") && [ -f "$adjunto" ]; then
+			if grep -q " $nom\$" "$FORJA/$t/adjuntos.ids"; then
+				codigo=409
+			else
+				cp "$adjunto" "$FORJA/$t/adjuntos/$nom"
+				n=$(($(cat "$TMP/forja-contador" 2>/dev/null || echo 100) + 1))
+				echo "$n" >"$TMP/forja-contador"
+				echo "$n $nom" >>"$FORJA/$t/adjuntos.ids"
+				echo "subido $nom" >>"$TMP/forja-log"
+				codigo=201
+				cuerpo="{\"id\":$n,\"name\":\"$nom\"}"
+			fi
+		fi
+		;;
+	"GET /dueno/panel/releases/download/"*)
+		r=${ruta#/dueno/panel/releases/download/}
+		if [ -f "$FORJA/${r%%/*}/adjuntos/${r#*/}" ]; then
+			codigo=200
+			cuerpo=
+			if [ "$salida" = - ]; then
+				cat "$FORJA/${r%%/*}/adjuntos/${r#*/}"
+			else
+				cp "$FORJA/${r%%/*}/adjuntos/${r#*/}" "$salida"
+			fi
+			salida=
+		fi
+		;;
+	esac
+fi
+if [ -n "$salida" ]; then
+	if [ "$salida" = - ]; then
+		printf '%s' "$cuerpo"
+	else
+		printf '%s' "$cuerpo" >"$salida"
+	fi
+fi
+case $formato in
+*http_code*) printf '%s' "$codigo" ;;
+esac
+[ "$codigo" -lt 400 ] || exit 22
+EOF
+chmod 755 "$FALSOS/curl"
+TOKEN_FJ=$(printf '%040d' 0 | tr 0 7)
+printf '%s' "$TOKEN_FJ" >"$TMP/token-esperado"
+mkdir -p "$TMP/claves-fj"
+printf '%s\n' "$TOKEN_FJ" >"$TMP/claves-fj/token"
+chmod 600 "$TMP/claves-fj/token"
+YO=$(id -u)
+
+# Publica en el Forgejo de mentira la release $1 con COMMIT $2; $3: variante
+# de hacer_archivo; «sin-sumas» la deja sin SHA256SUMS.
+publicar_forgejo()
+{
+	_d=$FORJA/$1
+	rm -rf "$_d"
+	hacer_archivo "$_d/adjuntos" "$1" "$2" "${3:-buena}"
+	if [ "${3:-}" = sin-sumas ]; then rm -f "$_d/adjuntos/SHA256SUMS"; fi
+	echo "$(($(find "$FORJA" -name id | wc -l) + 1))" >"$_d/id"
+	(cd "$_d/adjuntos" && ls | awk '{ print NR + 10, $0 }') >"$_d/adjuntos.ids"
+}
+# forjar ESPERADO MOTIVO VERSION [FICHERO_TOKEN]: preparar_forgejo sale con
+# ESPERADO y, si no es 0, dice MOTIVO y no deja $TMP/fj-destino.
+forjar()
+{
+	rm -rf "$TMP/fj-destino"
+	_rc=0
+	PATH="$FALSOS:$PATH" preparar_forgejo "$FORJA_URL" "$REPO_FJ" "${4:-$TMP/claves-fj/token}" "$YO" \
+		"$3" "$C" '' "$TMP/fj-destino" 2>"$TMP/err" || _rc=$?
+	if [ "$_rc" != "$1" ]; then
+		fallo "forgejo ($2): sale con $_rc, no con $1: $(cat "$TMP/err")"
+	elif [ "$1" != 0 ] && ! grep -q "$2" "$TMP/err"; then
+		fallo "forgejo: el motivo no dice «$2»: $(cat "$TMP/err")"
+	elif [ "$1" != 0 ] && [ -e "$TMP/fj-destino" ]; then
+		fallo "forgejo ($2): deja la carpeta de destino"
+	fi
+}
+publicar_forgejo v1.2.3 "$C"
+forjar 0 bien v1.2.3
+[ "$(find "$TMP/fj-destino" -mindepth 1 -maxdepth 1 -printf '%f\n' 2>/dev/null | sort | tr '\n' ' ')" = "COMMIT panel site " ] ||
+	fallo "forgejo: la versión no queda solo con panel, site/ y COMMIT"
+grep -q "/dueno/panel/releases/download/v1.2.3/SHA256SUMS" "$TMP/curl-argv" ||
+	fallo "forgejo: no descarga de FORGEJO_URL/FORGEJO_REPO/releases/download"
+forjar 1 "aún no está publicada" v9.9.9
+publicar_forgejo v1.2.4 "$C" sin-sumas
+forjar 1 SHA256SUMS v1.2.4
+publicar_forgejo v1.2.5 "$C" sha-malo
+forjar 2 sha256 v1.2.5
+publicar_forgejo v1.2.6 "$C" linux
+forjar 2 FreeBSD v1.2.6
+forjar 2 "no válida" v1.2
+# El token: sin fichero, de otro dueño o legible por otros, no se usa.
+: >"$TMP/curl-argv"
+forjar 3 "no existe" v1.2.3 "$TMP/claves-fj/no-existe"
+cp "$TMP/claves-fj/token" "$TMP/claves-fj/abierto"
+chmod 644 "$TMP/claves-fj/abierto"
+forjar 3 "0600" v1.2.3 "$TMP/claves-fj/abierto"
+chmod 640 "$TMP/claves-fj/abierto"
+forjar 3 "0600" v1.2.3 "$TMP/claves-fj/abierto"
+rc=0
+PATH="$FALSOS:$PATH" preparar_forgejo "$FORJA_URL" "$REPO_FJ" "$TMP/claves-fj/token" $((YO + 1)) \
+	v1.2.3 "$C" '' "$TMP/fj-destino" 2>"$TMP/err" || rc=$?
+[ "$rc" = 3 ] && grep -q "dueño" "$TMP/err" || fallo "forgejo con un token de otro dueño: sale con $rc: $(cat "$TMP/err")"
+printf 'a b\n' >"$TMP/claves-fj/raro"
+chmod 600 "$TMP/claves-fj/raro"
+forjar 3 "no es válido" v1.2.3 "$TMP/claves-fj/raro"
+[ ! -s "$TMP/curl-argv" ] || fallo "forgejo llama a curl con un token que no vale: $(cat "$TMP/curl-argv")"
+# Con el token bueno, pero el servidor lo rechaza (otro token): no se puede usar.
+printf '%s\n' "$(printf '%040d' 0 | tr 0 8)" >"$TMP/claves-fj/otro"
+chmod 600 "$TMP/claves-fj/otro"
+forjar 1 "HTTP 401" v1.2.3 "$TMP/claves-fj/otro"
+if grep -q "$TOKEN_FJ" "$TMP/curl-argv"; then fallo "el token de Forgejo aparece en los argumentos de curl"; fi
+grep -q "Authorization: token $TOKEN_FJ" "$TMP/curl-entrada" || fallo "forgejo no manda el token por -K -"
+
+# --- 5. comprobar un archivo ----------------------------------------------------
+B=$TMP/carpeta
 V=v1.2.3
 
-precompilada_llegada "$B" "$V" '' && fallo "llegada sin nada en el buzón"
 hacer_archivo "$B/$V" "$V" "$C"
-rm -f "$B/$V/SHA256SUMS"
-precompilada_llegada "$B" "$V" '' && fallo "llegada sin SHA256SUMS"
-hacer_archivo "$B/$V" "$V" "$C"
-precompilada_llegada "$B" "$V" '' || fallo "no da por llegada una versión completa"
-precompilada_llegada "$B" "$V" 'RWQclave' && fallo "llegada sin firma, con clave"
 
 if preparar_precompilada "$B" "$V" "$C" '' "$TMP/bueno" 2>"$TMP/err"; then
 	[ "$(find "$TMP/bueno" -mindepth 1 -maxdepth 1 -printf '%f\n' | sort | tr '\n' ' ')" = "COMMIT panel site " ] ||
@@ -325,9 +552,8 @@ hacer_archivo "$TMP/fuera" "$V" "$C"
 mkdir -p "$B/$V"
 ln -s "$TMP/fuera/$(archivo_precompilada "$V")" "$B/$V/$(archivo_precompilada "$V")"
 cp "$TMP/fuera/SHA256SUMS" "$B/$V/"
-precompilada_llegada "$B" "$V" '' && fallo "da por llegada un archivo que es un enlace"
 if preparar_precompilada "$B" "$V" "$C" '' "$TMP/malo" 2>/dev/null; then
-	fallo "acepta un archivo del buzón que es un enlace"
+	fallo "acepta un archivo de la carpeta que es un enlace"
 fi
 rm -rf "${B:?}/${V:?}" "$TMP/malo"
 
@@ -348,45 +574,6 @@ else
 	echo "aviso: no hay minisign; no se prueban las firmas" >&2
 fi
 
-# --- 5. el receptor del buzón ---------------------------------------------------
-R=$TMP/receptor
-mkdir -p "$R"
-recibir()
-{
-	SSH_ORIGINAL_COMMAND=$1 RP_BUZON=$R RP_BUZON_LIB=$LIB RP_BUZON_MAXIMO=${MAXIMO:-1000} \
-		sh "$RECIBIR" >"$TMP/salida" 2>&1
-}
-ARCH=$(archivo_precompilada "$V")
-echo contenido | recibir "recibir $V $ARCH" || fallo "el receptor rechaza $ARCH: $(cat "$TMP/salida")"
-[ "$(cat "$R/$V/$ARCH" 2>/dev/null)" = contenido ] || fallo "el receptor no guarda $ARCH"
-echo sumas | recibir "recibir $V SHA256SUMS" || fallo "el receptor rechaza SHA256SUMS"
-for orden in "recibir ../x SHA256SUMS" "recibir $V panel" "recibir $V ../SHA256SUMS" \
-	"recibir $V SHA256SUMS extra" "borrar $V SHA256SUMS" "recibir $V" \
-	"recibir v1.0.0;id SHA256SUMS" "recibir \$(id) SHA256SUMS" "recibir * *"; do
-	if echo x | recibir "$orden"; then fallo "el receptor acepta «$orden»"; fi
-done
-if printf '' | recibir "recibir v2.0.0 SHA256SUMS"; then fallo "el receptor acepta un fichero vacío"; fi
-if head -c 2000 /dev/zero | recibir "recibir v2.0.0 SHA256SUMS"; then
-	fallo "el receptor acepta un fichero de más de RP_BUZON_MAXIMO"
-fi
-# Por SSH de verdad (SSH_CONNECTION) no valen las rutas de las variables: con
-# un AcceptEnv permisivo en sshd_config, el cliente podría cargar otro script.
-if echo x | SSH_CONNECTION="192.0.2.1 50000 192.0.2.2 22" SSH_ORIGINAL_COMMAND="recibir v4.0.0 SHA256SUMS" \
-	RP_BUZON=$R RP_BUZON_LIB=$LIB RP_BUZON_MAXIMO=1000 sh "$RECIBIR" >"$TMP/salida" 2>&1 ||
-	[ -e "$R/v4.0.0/SHA256SUMS" ]; then
-	fallo "el receptor usa RP_BUZON/RP_BUZON_LIB por SSH: $(cat "$TMP/salida")"
-fi
-[ -z "$(find "$R" -name '.*' -type f)" ] || fallo "el receptor deja temporales"
-[ ! -e "$R/v2.0.0/SHA256SUMS" ] || fallo "el receptor guarda un fichero rechazado"
-[ ! -e "$R/x" ] && [ ! -e "$TMP/x" ] || fallo "el receptor escribe fuera de su versión"
-for v in v3.0.0 v3.0.1 v3.0.2 v3.0.3; do
-	sleep 1
-	echo s | recibir "recibir $v SHA256SUMS" || fallo "el receptor rechaza $v"
-done
-quedan=$(find "$R" -mindepth 1 -maxdepth 1 -type d -name 'v3*' | wc -l)
-[ "$quedan" -eq 3 ] && [ ! -e "$R/v3.0.0" ] && [ ! -e "$R/$V" ] ||
-	fallo "el receptor no deja solo las 3 versiones más recientes ($(ls "$R" | tr '\n' ' '))"
-
 # --- 6. el actualizador ----------------------------------------------------------
 # Un «servidor» bajo $H: el actualizador con sus rutas cambiadas por sed (y
 # las órdenes de BSD por las de GNU), el remoto con la etiqueta, las releases
@@ -399,7 +586,7 @@ preparar_servidor()
 	H=$TMP/servidor
 	rm -rf "$H"
 	mkdir -p "$H/bin" "$H/libexec" "$H/releases" "$H/db" \
-		"$H/state" "$H/log" "$H/run" "$H/buzon/entrada" "$H/jails/routerpanel/usr/local/routerpanel"
+		"$H/state" "$H/log" "$H/run" "$H/claves" "$H/jails/routerpanel/usr/local/routerpanel"
 	ln -s "$H/releases" "$H/jails/routerpanel/usr/local/routerpanel/releases"
 	cp "$DEPLOY/lib/git.sh" "$LIB" "$H/libexec/"
 	sed -e "s|/usr/sbin/jexec|$H/bin/jexec|g" \
@@ -411,7 +598,7 @@ preparar_servidor()
 		-e "s|^RELEASES=/usr/local/routerpanel/releases|RELEASES=$H/releases|" \
 		-e "s|^DB_DIR=/var/db/routerpanel\$|DB_DIR=$H/db|" \
 		-e "s|^STATE=/var/db/routerpanel-actualizar|STATE=$H/state|" \
-		-e "s|^BUZON=/var/db/routerpanel-buzon/entrada|BUZON=$H/buzon/entrada|" \
+		-e "s|^DUENO_TOKEN=0\$|DUENO_TOKEN=$YO|" \
 		-e "s|/var/log/|$H/log/|g" -e "s|/var/run/|$H/run/|g" \
 		-e "s|/usr/sbin/sysrc|$H/bin/sysrc|" -e "s|/usr/sbin/jls|$H/bin/jls|" \
 		-e 's|ln -sfh|ln -sfn|g' -e 's|mv -fh|mv -fT|g' \
@@ -463,7 +650,26 @@ preparar_servidor()
 		echo "JAILS_RAIZ='$H/jails'"
 		echo "REPO_URL='$H/origen'"
 	} >"$H/actualizar.conf"
-	rm -rf "$WEB/github.com/$REPO_GH/releases/download/v1.0.0"
+	rm -rf "$WEB/github.com/$REPO_GH/releases/download/v1.0.0" "$FORJA/v1.0.0"
+	: >"$TMP/curl-argv"
+	: >"$TMP/curl-entrada"
+}
+
+# Configura en el servidor la release de Forgejo, con su token (de quien
+# corre las pruebas, que hace de root, y 0600).
+con_forgejo()
+{
+	{
+		echo "FORGEJO_URL='$FORJA_URL'"
+		echo "FORGEJO_REPO='$REPO_FJ'"
+	} >>"$H/actualizar.conf"
+	printf '%s\n' "$TOKEN_FJ" >"$H/claves/forgejo-token"
+	chmod 600 "$H/claves/forgejo-token"
+}
+
+con_github()
+{
+	echo "GITHUB_REPO='$REPO_GH'" >>"$H/actualizar.conf"
 }
 
 # Ejecuta el actualizador; su salida, en $H/salida, y su código, en $RC.
@@ -491,20 +697,26 @@ sin_compilar()
 	fi
 }
 
-# a. Nada en el buzón ni en GitHub: espera, lo dice una vez, sin fallo.
+# a. Ni en Forgejo (404) ni en GitHub: espera, lo dice una vez, sin fallo.
 preparar_servidor
+con_forgejo
+con_github
 actualizar
 [ "$RC" = 0 ] || fallo "a: sale con $RC: $(cat "$H/salida")"
 [ -z "$(desplegada)" ] || fallo "a: despliega algo mientras espera"
 actualizar
+[ "$RC" = 0 ] || fallo "a: la segunda pasada sale con $RC"
 [ "$(registro | grep -c 'esperando la versión precompilada de v1.0.0')" = 1 ] ||
 	fallo "a: no dice una sola vez que espera: $(registro)"
+registro | grep -q 'no está en Forgejo ni en GitHub' || fallo "a: no dice dónde ha mirado: $(registro)"
 if grep -q service "$H/llamadas" 2>/dev/null; then fallo "a: toca el servicio mientras espera"; fi
 [ ! -e "$H/state/intentos" ] && [ ! -e "$H/state/fallida" ] || fallo "a: esperar cuenta como fallo"
 sin_compilar a
 
-# b. Con la versión en el buzón: la instala y vacía el buzón.
-hacer_archivo "$H/buzon/entrada/v1.0.0" v1.0.0 "$COMMIT_ETIQUETA"
+# b. Con la release en Forgejo: la instala.
+preparar_servidor
+con_forgejo
+publicar_forgejo v1.0.0 "$COMMIT_ETIQUETA"
 actualizar
 [ "$RC" = 0 ] || fallo "b: sale con $RC: $(cat "$H/salida") $(registro)"
 [ "$(desplegada)" = v1.0.0 ] || fallo "b: no despliega v1.0.0"
@@ -513,76 +725,131 @@ file -b "$H/releases/v1.0.0/panel" 2>/dev/null | grep -q FreeBSD || fallo "b: lo
 [ -d "$H/releases/v1.0.0/site" ] && [ ! -e "$H/releases/v1.0.0/LICENSE" ] ||
 	fallo "b: la versión no tiene solo panel, site/ y COMMIT"
 [ "$(stat -c %a "$H/releases/v1.0.0/panel")" = 755 ] || fallo "b: el binario no queda 755"
-[ ! -e "$H/buzon/entrada/v1.0.0" ] || fallo "b: no vacía el buzón"
-registro | grep -q 'instalada la versión precompilada de v1.0.0' || fallo "b: no lo registra"
+registro | grep -q 'instalada la versión de Forgejo de v1.0.0' || fallo "b: no lo registra: $(registro)"
 grep -q 'service start' "$H/llamadas" || fallo "b: no arranca el servicio"
+if grep -q "$TOKEN_FJ" "$TMP/curl-argv"; then fallo "b: el token aparece en los argumentos de curl"; fi
 # Ya desplegada: no hace nada.
 : >"$H/llamadas"
 actualizar
 [ "$RC" = 0 ] && ! grep -q service "$H/llamadas" || fallo "b: con la versión ya desplegada hace algo"
 sin_compilar b
 
-# c. Del buzón, pero de otro commit: rechazada y borrada, sin contar fallo.
+# c. SHA256SUMS que no cuadra en Forgejo: rechazada, sin contar fallo, y
+# registrada una sola vez en dos pasadas.
 preparar_servidor
-hacer_archivo "$H/buzon/entrada/v1.0.0" v1.0.0 "$OTRO"
+con_forgejo
+publicar_forgejo v1.0.0 "$COMMIT_ETIQUETA" sha-malo
 actualizar
 [ "$RC" = 1 ] || fallo "c: sale con $RC, no con 1"
+actualizar
 [ -z "$(desplegada)" ] || fallo "c: despliega una versión rechazada"
 [ ! -e "$H/releases/v1.0.0" ] || fallo "c: deja la versión rechazada en releases"
-registro | grep -q 'rechazada: el archivo es de otro commit' || fallo "c: no dice por qué la rechaza: $(registro)"
-[ ! -e "$H/buzon/entrada/v1.0.0" ] || fallo "c: deja la precompilada mala en el buzón"
-[ ! -e "$H/state/intentos" ] && [ ! -e "$H/state/fallida" ] || fallo "c: cuenta la entrega rechazada como fallo"
+[ "$(registro | grep -c 'versión de Forgejo de v1.0.0 rechazada: el sha256')" = 1 ] ||
+	fallo "c: no registra el rechazo una sola vez: $(registro)"
+[ ! -e "$H/state/intentos" ] && [ ! -e "$H/state/fallida" ] || fallo "c: cuenta la release rechazada como fallo"
+# Arreglada la release, se instala en la pasada siguiente.
+publicar_forgejo v1.0.0 "$COMMIT_ETIQUETA"
+actualizar
+[ "$RC" = 0 ] && [ "$(desplegada)" = v1.0.0 ] || fallo "c: no instala la release arreglada: $(registro)"
 sin_compilar c
 
-# d. De GitHub, con su atestación.
+# d. En Forgejo, pero de otro commit: rechazada.
 preparar_servidor
-echo "GITHUB_REPO='$REPO_GH'" >>"$H/actualizar.conf"
-publicar_github "$REPO_GH" v1.0.0 "$COMMIT_ETIQUETA"
+con_forgejo
+publicar_forgejo v1.0.0 "$OTRO"
 actualizar
-[ "$RC" = 0 ] || fallo "d: sale con $RC: $(cat "$H/salida") $(registro)"
-[ "$(desplegada)" = v1.0.0 ] || fallo "d: no despliega v1.0.0 de GitHub"
-[ "$(cat "$H/releases/v1.0.0/COMMIT" 2>/dev/null)" = "$COMMIT_ETIQUETA" ] || fallo "d: COMMIT no es el de la etiqueta"
-registro | grep -q "instalada la versión de GitHub de v1.0.0" || fallo "d: no lo registra: $(registro)"
+[ "$RC" = 1 ] || fallo "d: sale con $RC, no con 1"
+[ -z "$(desplegada)" ] || fallo "d: despliega una versión de otro commit"
+registro | grep -q 'rechazada: el archivo es de otro commit' || fallo "d: no dice por qué la rechaza: $(registro)"
+[ ! -e "$H/state/intentos" ] && [ ! -e "$H/state/fallida" ] || fallo "d: cuenta la release rechazada como fallo"
 sin_compilar d
 
-# e. De GitHub, con la atestación de otra etiqueta: rechazada.
+# e. Sin la release en Forgejo: la instala de GitHub, con su atestación.
 preparar_servidor
-echo "GITHUB_REPO='$REPO_GH'" >>"$H/actualizar.conf"
-publicar_github "$REPO_GH" v1.0.0 "$COMMIT_ETIQUETA" refs/tags/v0.9.0
+con_forgejo
+con_github
+publicar_github "$REPO_GH" v1.0.0 "$COMMIT_ETIQUETA"
 actualizar
-[ "$RC" = 1 ] || fallo "e: sale con $RC, no con 1"
-[ -z "$(desplegada)" ] || fallo "e: despliega una versión con la atestación de otra etiqueta"
-registro | grep -q 'versión de GitHub de v1.0.0 rechazada: la atestación' || fallo "e: no dice por qué: $(registro)"
+[ "$RC" = 0 ] || fallo "e: sale con $RC: $(cat "$H/salida") $(registro)"
+[ "$(desplegada)" = v1.0.0 ] || fallo "e: no despliega v1.0.0 de GitHub"
+[ "$(cat "$H/releases/v1.0.0/COMMIT" 2>/dev/null)" = "$COMMIT_ETIQUETA" ] || fallo "e: COMMIT no es el de la etiqueta"
+registro | grep -q "instalada la versión de GitHub de v1.0.0" || fallo "e: no lo registra: $(registro)"
+grep -q "releases/tags/v1.0.0" "$TMP/curl-argv" || fallo "e: no mira Forgejo antes que GitHub"
 sin_compilar e
 
-# f. GitHub configurado pero la release aún no está: espera, sin fallo.
+# f. Token de Forgejo legible por otros: Forgejo no disponible (dicho una
+# vez), el token no se manda y se instala de GitHub.
 preparar_servidor
-echo "GITHUB_REPO='$REPO_GH'" >>"$H/actualizar.conf"
+con_forgejo
+chmod 644 "$H/claves/forgejo-token"
+con_github
 actualizar
-[ "$RC" = 0 ] || fallo "f: sale con $RC: $(cat "$H/salida")"
-[ -z "$(desplegada)" ] || fallo "f: despliega algo sin release"
-registro | grep -q 'esperando la versión precompilada de v1.0.0' || fallo "f: no dice que espera: $(registro)"
-[ ! -e "$H/state/intentos" ] || fallo "f: esperar a GitHub cuenta como fallo"
+actualizar
+[ "$RC" = 0 ] || fallo "f: sale con $RC: $(registro)"
+[ "$(registro | grep -c 'Forgejo no está disponible')" = 1 ] || fallo "f: no dice una vez que Forgejo no está disponible: $(registro)"
+[ ! -s "$TMP/curl-argv" ] && [ ! -s "$TMP/curl-entrada" ] || fallo "f: llama a curl con un token que no vale"
+publicar_github "$REPO_GH" v1.0.0 "$COMMIT_ETIQUETA"
+publicar_forgejo v1.0.0 "$COMMIT_ETIQUETA"
+actualizar
+[ "$(desplegada)" = v1.0.0 ] && registro | grep -q "instalada la versión de GitHub de v1.0.0" ||
+	fallo "f: no instala de GitHub: $(registro)"
+[ ! -s "$TMP/curl-entrada" ] || fallo "f: manda el token de Forgejo"
 sin_compilar f
 
-# g. Sin acceso al repositorio.
+# g. Sin FORGEJO_URL: lo dice una sola vez y mira GitHub.
+preparar_servidor
+con_github
+actualizar
+actualizar
+[ "$RC" = 0 ] || fallo "g: sale con $RC"
+[ "$(registro | grep -c 'Forgejo: sin FORGEJO_URL o FORGEJO_REPO')" = 1 ] || fallo "g: no lo dice una sola vez: $(registro)"
+[ ! -s "$TMP/curl-argv" ] || fallo "g: llama a curl sin Forgejo configurado"
+publicar_github "$REPO_GH" v1.0.0 "$COMMIT_ETIQUETA"
+actualizar
+[ "$(desplegada)" = v1.0.0 ] || fallo "g: no instala de GitHub: $(registro)"
+sin_compilar g
+
+# h. De GitHub, con la atestación de otra etiqueta: rechazada, una vez.
+preparar_servidor
+con_github
+publicar_github "$REPO_GH" v1.0.0 "$COMMIT_ETIQUETA" refs/tags/v0.9.0
+actualizar
+[ "$RC" = 1 ] || fallo "h: sale con $RC, no con 1"
+actualizar
+[ -z "$(desplegada)" ] || fallo "h: despliega una versión con la atestación de otra etiqueta"
+[ "$(registro | grep -c 'versión de GitHub de v1.0.0 rechazada: la atestación')" = 1 ] ||
+	fallo "h: no dice una sola vez por qué: $(registro)"
+[ ! -e "$H/state/intentos" ] || fallo "h: el rechazo cuenta como fallo"
+sin_compilar h
+
+# i. GitHub configurado pero la release aún no está: espera, sin fallo.
+preparar_servidor
+con_github
+actualizar
+[ "$RC" = 0 ] || fallo "i: sale con $RC: $(cat "$H/salida")"
+[ -z "$(desplegada)" ] || fallo "i: despliega algo sin release"
+registro | grep -q 'esperando la versión precompilada de v1.0.0' || fallo "i: no dice que espera: $(registro)"
+[ ! -e "$H/state/intentos" ] || fallo "i: esperar a GitHub cuenta como fallo"
+sin_compilar i
+
+# j. Sin acceso al repositorio.
 preparar_servidor
 echo "REPO_URL='$H/no-existe'" >>"$H/actualizar.conf"
 actualizar
-[ "$RC" = 0 ] || fallo "g: sale con $RC"
-registro | grep -q 'sin acceso al repositorio' || fallo "g: no lo dice: $(registro)"
-sin_compilar g
+[ "$RC" = 0 ] || fallo "j: sale con $RC"
+registro | grep -q 'sin acceso al repositorio' || fallo "j: no lo dice: $(registro)"
+sin_compilar j
 
-# h. --ref ya no existe.
+# k. --ref ya no existe.
 preparar_servidor
 actualizar --ref main
-[ "$RC" = 2 ] || fallo "h: --ref sale con $RC, no con 2"
-grep -q 'no compila' "$H/salida" || fallo "h: --ref no explica por qué: $(cat "$H/salida")"
-[ -z "$(desplegada)" ] && [ ! -e "$H/llamadas" ] || fallo "h: --ref toca algo"
-sin_compilar h
+[ "$RC" = 2 ] || fallo "k: --ref sale con $RC, no con 2"
+grep -q 'no compila' "$H/salida" || fallo "k: --ref no explica por qué: $(cat "$H/salida")"
+[ -z "$(desplegada)" ] && [ ! -e "$H/llamadas" ] || fallo "k: --ref toca algo"
+sin_compilar k
 
-# --- 7. negativas fuera del servidor ---------------------------------------------
-L=$TMP/lanzar
+# --- 7. lo que corre en el PC ------------------------------------------------------
+L=$TMP/repo-pc
 mkdir -p "$L"
 cp -R "$DEPLOY" "$L/deploy"
 git init -q -b main "$L"
@@ -590,38 +857,6 @@ git -C "$L" add deploy
 git -C "$L" commit -q -m deploy
 git -C "$L" tag v1.0.0
 git -C "$L" branch v2.0.0
-# Destinos SSH de mentira (la arroba aparte: no son correos).
-ARROBA=@
-PC_FALSO=nadie${ARROBA}pc.invalid
-BUZON_FALSO=rpentrega${ARROBA}servidor.invalid
-printf '. "$CONFIG_EJEMPLO"\nPC_COMPILAR_SSH=%s\nPRECOMPILADAS_BUZON_SSH=%s\n' "$PC_FALSO" "$BUZON_FALSO" >"$TMP/lanzar.conf"
-lanzar()
-{
-	RP_CONFIG=$TMP/lanzar.conf bash "$L/deploy/cross/lanzar.sh" "$@" >"$TMP/salida" 2>&1
-}
-# negar MOTIVO_ESPERADO ARGUMENTOS…
-negar()
-{
-	_motivo=$1
-	shift
-	if lanzar "$@"; then
-		fallo "lanzar.sh $*: no se niega"
-	elif ! grep -q "$_motivo" "$TMP/salida"; then
-		fallo "lanzar.sh $*: el motivo no dice «$_motivo»: $(cat "$TMP/salida")"
-	fi
-}
-negar "no es una etiqueta" v2.0.0
-negar "no es una versión" main
-negar "no es una etiqueta" v9.9.9
-echo cambio >>"$L/deploy/README.md"
-negar "copia sucia" v1.0.0
-git -C "$L" checkout -q -- deploy/README.md
-st=0
-lanzar v1.0.0 || st=$?
-[ "$st" -eq 3 ] && grep -q "no responde" "$TMP/salida" ||
-	fallo "lanzar.sh con el PC apagado: sale con $st: $(cat "$TMP/salida")"
-printf '. "$CONFIG_EJEMPLO"\nPC_COMPILAR_SSH=%s\n' "$PC_FALSO" >"$TMP/lanzar.conf"
-negar PRECOMPILADAS_BUZON_SSH v1.0.0
 
 # compilar-freebsd.sh con cross, podman y compañía de mentira (no llega a
 # compilar: se niega antes).
@@ -644,17 +879,82 @@ fi
 if compilar --release main --bundle "$TMP/l.bundle"; then
 	fallo "compilar-freebsd.sh --release main: no se niega"
 fi
-if compilar --prueba --entregar "$BUZON_FALSO"; then
-	fallo "compilar-freebsd.sh --prueba --entregar: no se niega"
-fi
-mkdir -p "$TMP/prueba-abc"
-: >"$TMP/clave-falsa"
-if RP_BUZON_CLAVE=$TMP/clave-falsa bash "$DEPLOY/cross/entregar.sh" --destino "$BUZON_FALSO" \
-	"$TMP/prueba-abc" >"$TMP/salida" 2>&1 || ! grep -q "no es una versión" "$TMP/salida"; then
-	fallo "entregar.sh con una versión de --prueba: $(cat "$TMP/salida")"
-fi
+# El buzón ya no existe: ni --entregar ni --ultima.
+for opcion in "--release v1.0.0 --entregar x" "--ultima --repo $L"; do
+	st=0
+	# shellcheck disable=SC2086 # opciones separadas por espacios
+	compilar $opcion || st=$?
+	[ "$st" = 2 ] || fallo "compilar-freebsd.sh $opcion: sale con $st, no con 2: $(cat "$TMP/salida")"
+done
 
-# empaquetar-freebsd.sh (el PC y la release de GitHub): lo que deja lo acepta
+# publicar-forgejo.sh con el Forgejo de mentira y una compilación de
+# mentira (RP_COMPILAR) que deja en RP_CROSS_DIR/salida/<versión>/ lo de
+# $TMP/pub-fuente/<versión>/ y apunta sus argumentos y su entorno.
+P=$TMP/rtf-pub
+mkdir -p "$P"
+cat >"$TMP/compilar-falso.sh" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >"$TMP/compilar-argv"
+env >"$TMP/compilar-env"
+mkdir -p "\$RP_CROSS_DIR/salida"
+rm -rf "\$RP_CROSS_DIR/salida/\$2"
+cp -R "$TMP/pub-fuente/\$2" "\$RP_CROSS_DIR/salida/\$2"
+EOF
+publicar()
+{
+	FORGEJO_TOKEN=$TOKEN_FJ FORGEJO_SERVER=$FORJA_URL FORGEJO_REPOSITORY=$REPO_FJ FORGEJO_TAG=$1 \
+		RP_CROSS_DIR=$P RP_COMPILAR=$TMP/compilar-falso.sh PATH="$FALSOS:$PATH" \
+		bash "$DEPLOY/cross/publicar-forgejo.sh" >"$TMP/salida" 2>&1
+}
+ARCH2=$(archivo_precompilada v2.0.0)
+rm -rf "$FORJA/v2.0.0" "$TMP/pub-fuente"
+: >"$TMP/curl-argv"
+: >"$TMP/forja-log"
+hacer_archivo "$TMP/pub-fuente/v2.0.0" v2.0.0 "$C"
+if publicar v2.0.0; then
+	grep -qx "creada v2.0.0" "$TMP/forja-log" || fallo "publicar-forgejo.sh no crea la release que falta: $(cat "$TMP/forja-log")"
+	[ "$(grep '^subido' "$TMP/forja-log" | tr '\n' ' ')" = "subido $ARCH2 subido SHA256SUMS " ] ||
+		fallo "publicar-forgejo.sh no sube el archivo y, el último, SHA256SUMS: $(cat "$TMP/forja-log")"
+	cmp -s "$FORJA/v2.0.0/adjuntos/$ARCH2" "$TMP/pub-fuente/v2.0.0/$ARCH2" ||
+		fallo "publicar-forgejo.sh no sube el archivo compilado"
+	grep -q "$C" "$FORJA/v2.0.0/cuerpo" || fallo "la release no dice de qué commit es: $(cat "$FORJA/v2.0.0/cuerpo")"
+	[ "$(cat "$TMP/compilar-argv")" = "--release v2.0.0 --repo $FORJA_URL/$REPO_FJ.git" ] ||
+		fallo "publicar-forgejo.sh compila con otros argumentos: $(cat "$TMP/compilar-argv")"
+	grep -qx "GIT_CONFIG_VALUE_0=Authorization: token $TOKEN_FJ" "$TMP/compilar-env" &&
+		grep -qx "GIT_CONFIG_KEY_0=http.extraheader" "$TMP/compilar-env" ||
+		fallo "publicar-forgejo.sh no pasa a git el token por GIT_CONFIG_*"
+	if grep -q '^FORGEJO_TOKEN=' "$TMP/compilar-env"; then
+		fallo "FORGEJO_TOKEN llega al entorno de la compilación"
+	fi
+else
+	fallo "publicar-forgejo.sh falla: $(cat "$TMP/salida")"
+fi
+# Otra vez (el runner repite el trabajo): la misma release, los adjuntos
+# sustituidos.
+: >"$TMP/forja-log"
+hacer_archivo "$TMP/pub-fuente/v2.0.0" v2.0.0 "$OTRO"
+if publicar v2.0.0; then
+	if grep -q '^creada' "$TMP/forja-log"; then fallo "publicar-forgejo.sh crea otra vez la release"; fi
+	grep -qx "borrado $ARCH2" "$TMP/forja-log" && grep -qx "borrado SHA256SUMS" "$TMP/forja-log" ||
+		fallo "publicar-forgejo.sh no borra los adjuntos que ya estaban: $(cat "$TMP/forja-log")"
+	cmp -s "$FORJA/v2.0.0/adjuntos/$ARCH2" "$TMP/pub-fuente/v2.0.0/$ARCH2" ||
+		fallo "publicar-forgejo.sh no sustituye el archivo"
+	[ "$(awk '{ print $2 }' "$FORJA/v2.0.0/adjuntos.ids" | sort | tr '\n' ' ')" = "$ARCH2 SHA256SUMS " ] ||
+		fallo "la release no queda con un archivo y un SHA256SUMS: $(cat "$FORJA/v2.0.0/adjuntos.ids")"
+else
+	fallo "publicar-forgejo.sh falla al repetir: $(cat "$TMP/salida")"
+fi
+if grep -q "$TOKEN_FJ" "$TMP/curl-argv" "$TMP/compilar-argv"; then
+	fallo "el token aparece en los argumentos de curl o de la compilación"
+fi
+grep -q "Authorization: token $TOKEN_FJ" "$TMP/curl-entrada" || fallo "publicar-forgejo.sh no manda el token por -K -"
+# Lo que no es una versión no se compila.
+rm -f "$TMP/compilar-argv"
+if publicar main; then fallo "publicar-forgejo.sh publica «main»"; fi
+grep -q "no es una versión" "$TMP/salida" || fallo "publicar-forgejo.sh main: $(cat "$TMP/salida")"
+[ ! -e "$TMP/compilar-argv" ] || fallo "publicar-forgejo.sh compila «main»"
+
+# empaquetar-freebsd.sh (el runner del PC y la release de GitHub): lo que deja lo acepta
 # preparar_precompilada, y se niega con un binario que no es de FreeBSD.
 E=$TMP/empaquetar
 mkdir -p "$E/site/pkg" "$E/fuente" "$E/salida"
@@ -679,14 +979,14 @@ if bash "$DEPLOY/cross/empaquetar-freebsd.sh" v3.2.2 "$C" "$E/panel" "$E/site" "
 fi
 
 # --- 8. sintaxis ------------------------------------------------------------------
-for f in "$LIB" "$DEPLOY/lib/git.sh" "$RECIBIR" "$DEPLOY/freebsd-jail/actualizar.sh"; do
+for f in "$LIB" "$DEPLOY/lib/git.sh" "$DEPLOY/freebsd-jail/actualizar.sh"; do
 	sh -n "$f" || fallo "sh -n ${f#"$DEPLOY"/}"
 done
 for f in "$DEPLOY"/cross/*.sh; do
 	bash -n "$f" || fallo "bash -n ${f#"$DEPLOY"/}"
 done
 if command -v shellcheck >/dev/null 2>&1; then
-	shellcheck -S warning -x "$LIB" "$DEPLOY/lib/git.sh" "$RECIBIR" "$DEPLOY/freebsd-jail/actualizar.sh" "$DEPLOY"/cross/*.sh ||
+	shellcheck -S warning -x "$LIB" "$DEPLOY/lib/git.sh" "$DEPLOY/freebsd-jail/actualizar.sh" "$DEPLOY"/cross/*.sh ||
 		fallo "shellcheck"
 else
 	echo "aviso: no hay shellcheck" >&2

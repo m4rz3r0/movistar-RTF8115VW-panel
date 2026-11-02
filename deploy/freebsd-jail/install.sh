@@ -3,8 +3,8 @@
 #
 # Instala el panel del router en una jail de un servidor FreeBSD, con su
 # actualizador en el host. El servidor nunca compila: las versiones llegan ya
-# compiladas (buzón del PC de compilación o release de GitHub). Desde el
-# equipo de trabajo, en el repositorio:
+# compiladas (la release de Forgejo, que publica el runner del PC, o la de
+# GitHub). Desde el equipo de trabajo, en el repositorio:
 #
 #   deploy/freebsd-jail/install.sh [--config FICHERO]
 #   deploy/freebsd-jail/install.sh [--config FICHERO] --plantillas DIR
@@ -140,9 +140,10 @@ generar_plantillas()
 		echo "routerpanel_trusted_proxy=$PROXIES_CONFIANZA"
 	} >"$_dst/rc.conf"
 	{
-		volcar_config JAILS_RAIZ JAIL_PANEL REPO_URL GITHUB_REPO PRECOMPILADAS_MINISIGN
+		volcar_config JAILS_RAIZ JAIL_PANEL REPO_URL FORGEJO_URL FORGEJO_REPO GITHUB_REPO PRECOMPILADAS_MINISIGN
 		echo "CLAVE_DESPLIEGUE='$ACTUALIZADOR_CLAVES/id_ed25519'"
 		echo "HOSTS_CONOCIDOS='$ACTUALIZADOR_CLAVES/known_hosts'"
+		echo "FORGEJO_TOKEN_FICHERO='$ACTUALIZADOR_CLAVES/forgejo-token'"
 	} >"$_dst/actualizador.conf"
 	# La clave del servidor git fijada: la de REPO_HOST_CLAVE o, sin ella, la
 	# primera que presente (setup_updater).
@@ -177,7 +178,7 @@ generar_plantillas()
 
 check_syntax()
 {
-	for f in "$DIR/install.sh" "$DIR/actualizar.sh" "$DIR/recibir-precompilada.sh" \
+	for f in "$DIR/install.sh" "$DIR/actualizar.sh" \
 		"$DIR/routerpanel.rc" "$DEPLOY_DIR"/lib/*.sh; do
 		sh -n "$f" || die "error de sintaxis en $(basename "$f")"
 	done
@@ -332,11 +333,15 @@ setup_clave_despliegue()
 	fi
 }
 
-# Herramientas del host que necesita el actualizador: git siempre; gh y jq
-# solo con GITHUB_REPO (comprobar la atestación de la release).
+# Herramientas del host que necesita el actualizador: git siempre; curl con
+# Forgejo (la API y las descargas con el token); gh y jq solo con
+# GITHUB_REPO (comprobar la atestación de la release).
 setup_paquetes_host()
 {
 	_p=git
+	if [ -n "$FORGEJO_URL" ] && [ -n "$FORGEJO_REPO" ]; then
+		_p="$_p curl"
+	fi
 	if [ -n "$GITHUB_REPO" ]; then
 		_p="$_p gh jq"
 	fi
@@ -358,6 +363,15 @@ aviso_jail_compilar()
 	fi
 }
 
+# El token de Forgejo no lo crea install.sh: lo pone quien administra, de
+# solo lectura (README, «El runner de Actions del PC»). Si falta, lo dice.
+aviso_token_forgejo()
+{
+	if [ -n "$FORGEJO_URL" ] && [ -n "$FORGEJO_REPO" ] && [ ! -f "$ACTUALIZADOR_CLAVES/forgejo-token" ]; then
+		say "actualizador: falta el token de Forgejo. Crea en Forgejo un token de solo lectura (read:repository) y guárdalo en $ACTUALIZADOR_CLAVES/forgejo-token (root, 0600); hasta entonces no se mira la release de Forgejo"
+	fi
+}
+
 setup_updater()
 {
 	setup_paquetes_host
@@ -366,8 +380,8 @@ setup_updater()
 	install -d -m 0755 -o root -g wheel "$ACTUALIZADOR_LIB"
 	install -m 0644 -o root -g wheel "$DEPLOY_DIR/lib/git.sh" "$ACTUALIZADOR_LIB/git.sh"
 	install -m 0644 -o root -g wheel "$DEPLOY_DIR/lib/precompiladas.sh" "$ACTUALIZADOR_LIB/precompiladas.sh"
-	install -m 0755 -o root -g wheel "$DIR/recibir-precompilada.sh" "$ACTUALIZADOR_LIB/recibir-precompilada.sh"
 	install -m 0600 -o root -g wheel "$PLANTILLAS/actualizador.conf" "$ACTUALIZADOR_CONF"
+	aviso_token_forgejo
 	mkdir -p /usr/local/etc/cron.d /usr/local/etc/newsyslog.conf.d
 	cat >/usr/local/etc/cron.d/routerpanel <<-'EOF'
 		# Actualizador del panel del router (repositorio movistar-RTF8115VW-panel,
@@ -630,7 +644,7 @@ instalar()
 	generar_plantillas "$_tmp/plantillas"
 	rm -rf "$_tmp/plantillas"
 	mkdir -p "$_tmp/freebsd-jail" "$_tmp/lib"
-	cp "$DIR"/install.sh "$DIR"/actualizar.sh "$DIR"/recibir-precompilada.sh \
+	cp "$DIR"/install.sh "$DIR"/actualizar.sh \
 		"$DIR"/routerpanel.rc "$DIR"/*.plantilla "$_tmp/freebsd-jail/"
 	cp "$DEPLOY_DIR"/lib/*.sh "$_tmp/lib/"
 	# La configuración ya resuelta: en el servidor no hace falta config.example.

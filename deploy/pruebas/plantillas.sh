@@ -9,13 +9,16 @@
 # - sin jail de compilación: jail.conf solo trae la del panel, pf.conf no
 #   tiene reglas de compilación y deja a la jail del panel llegar a su
 #   propio puerto (/salud); no se genera resolv.conf ni ssh_config;
-# - actualizador.conf lleva REPO_URL, CLAVE_DESPLIEGUE y HOSTS_CONOCIDOS (en
-#   el host), y GITHUB_REPO y PRECOMPILADAS_MINISIGN, vacías con el ejemplo;
-#   un GITHUB_REPO que no es «propietario/nombre» falla nombrando la clave;
+# - actualizador.conf lleva REPO_URL, CLAVE_DESPLIEGUE, HOSTS_CONOCIDOS y
+#   FORGEJO_TOKEN_FICHERO (en el host), y FORGEJO_URL, FORGEJO_REPO,
+#   GITHUB_REPO y PRECOMPILADAS_MINISIGN, vacías con el ejemplo; un
+#   GITHUB_REPO o FORGEJO_REPO que no es «propietario/nombre», o una
+#   FORGEJO_URL que no es una URL base, falla nombrando la clave;
 #   REPO_HOST_CLAVE acaba en known_hosts;
 # - una configuración de antes, con las claves de la jail de compilación
-#   (JAIL_COMPILAR, TRABAJOS_COMPILACION, PRECOMPILADAS_ESPERA…), sigue
-#   valiendo y no las pasa al actualizador.
+#   (JAIL_COMPILAR, TRABAJOS_COMPILACION, PRECOMPILADAS_ESPERA…) o del buzón
+#   (PC_COMPILAR_SSH, PRECOMPILADAS_BUZON_SSH), sigue valiendo y no las pasa
+#   al actualizador.
 #
 # Uso: deploy/pruebas/plantillas.sh (desde cualquier sitio). El comprobador
 # se toma de $COMPROBAR (ruta al binario) o, si no, de «cargo run».
@@ -110,7 +113,7 @@ for f in resolv.conf ssh_config; do
 done
 
 # --- actualizador.conf -------------------------------------------------------
-for k in GITHUB_REPO PRECOMPILADAS_MINISIGN; do
+for k in FORGEJO_URL FORGEJO_REPO GITHUB_REPO PRECOMPILADAS_MINISIGN; do
 	grep -q "^$k=''" "$P/actualizador.conf" 2>/dev/null ||
 		fallo "actualizador.conf no lleva $k vacía con el ejemplo"
 done
@@ -119,7 +122,39 @@ grep -q "^REPO_URL='https://git.example/routerpanel.git'" "$P/actualizador.conf"
 grep -q "^CLAVE_DESPLIEGUE='/usr/local/etc/routerpanel-actualizar/id_ed25519'" "$P/actualizador.conf" &&
 	grep -q "^HOSTS_CONOCIDOS='/usr/local/etc/routerpanel-actualizar/known_hosts'" "$P/actualizador.conf" ||
 	fallo "actualizador.conf no lleva CLAVE_DESPLIEGUE y HOSTS_CONOCIDOS del host"
+grep -q "^FORGEJO_TOKEN_FICHERO='/usr/local/etc/routerpanel-actualizar/forgejo-token'" "$P/actualizador.conf" ||
+	fallo "actualizador.conf no lleva FORGEJO_TOKEN_FICHERO del host"
+if grep -qi 'buzon\|PC_COMPILAR' "$P/actualizador.conf"; then
+	fallo "actualizador.conf habla todavía del buzón"
+fi
 [ ! -e "$P/known_hosts" ] || fallo "sin REPO_HOST_CLAVE se genera known_hosts"
+{
+	cat "$DEPLOY/config.example"
+	echo 'FORGEJO_URL=https://forge.example'
+	echo 'FORGEJO_REPO=dueno/panel'
+} >"$TMP/forgejo.conf"
+if sh "$DEPLOY/freebsd-jail/install.sh" --config "$TMP/forgejo.conf" \
+	--plantillas "$TMP/forgejo" >"$TMP/salida" 2>&1; then
+	grep -q "^FORGEJO_URL='https://forge.example'" "$TMP/forgejo/actualizador.conf" &&
+		grep -q "^FORGEJO_REPO='dueno/panel'" "$TMP/forgejo/actualizador.conf" ||
+		fallo "FORGEJO_URL y FORGEJO_REPO no llegan a actualizador.conf"
+else
+	cat "$TMP/salida" >&2
+	fallo "install.sh --plantillas con FORGEJO_URL"
+fi
+# La arroba aparte: no es un correo.
+ARROBA=@
+for malo in 'FORGEJO_URL=forge.example' 'FORGEJO_URL=https://forge.example/' "FORGEJO_URL=https://u${ARROBA}forge.example" \
+	'FORGEJO_REPO=dueno' 'FORGEJO_REPO=dueno/a/b' 'FORGEJO_REPO=-x/y'; do
+	{ cat "$DEPLOY/config.example"; echo "$malo"; } >"$TMP/forgejo-malo.conf"
+	if sh "$DEPLOY/freebsd-jail/install.sh" --config "$TMP/forgejo-malo.conf" \
+		--plantillas "$TMP/forgejo-malo" >"$TMP/salida" 2>&1; then
+		fallo "$malo no falla"
+	elif ! grep -q "${malo%%=*}" "$TMP/salida"; then
+		cat "$TMP/salida" >&2
+		fallo "el error de $malo no nombra la clave"
+	fi
+done
 {
 	cat "$DEPLOY/config.example"
 	echo 'GITHUB_REPO=dueno/movistar-RTF8115VW-panel'
@@ -156,10 +191,12 @@ done
 	echo 'DNS_IP=192.0.2.10'
 	echo 'TRABAJOS_COMPILACION=3'
 	echo 'PRECOMPILADAS_ESPERA=20'
+	echo 'PC_COMPILAR_SSH=pc-de-compilacion'
+	echo 'PRECOMPILADAS_BUZON_SSH=servidor'
 } >"$TMP/antes.conf"
 if sh "$DEPLOY/freebsd-jail/install.sh" --config "$TMP/antes.conf" \
 	--plantillas "$TMP/antes" >"$TMP/salida" 2>&1; then
-	if grep -q 'COMPILAR\|ESPERA\|TRABAJOS' "$TMP/antes/actualizador.conf"; then
+	if grep -q 'COMPILAR\|ESPERA\|TRABAJOS\|BUZON' "$TMP/antes/actualizador.conf"; then
 		fallo "una configuración de antes pasa claves de compilación al actualizador"
 	fi
 	cmp -s "$TMP/antes/pf.conf" "$P/pf.conf" && cmp -s "$TMP/antes/jail.conf" "$P/jail.conf" ||

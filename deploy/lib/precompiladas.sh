@@ -2,24 +2,25 @@
 #
 # Versiones precompiladas para FreeBSD: el servidor nunca compila. El
 # actualizador (deploy/freebsd-jail/actualizar.sh) instala la versión de una
-# etiqueta de una de estas dos fuentes:
+# etiqueta de una de estas dos fuentes, en este orden:
 #
-# - el buzón del servidor, donde la deja el PC de compilación (deploy/cross/);
+# - la release de la etiqueta en Forgejo (FORGEJO_URL y FORGEJO_REPO), que
+#   publica el runner de Actions del PC con .forgejo/workflows/freebsd.yml y
+#   deploy/cross/publicar-forgejo.sh (preparar_forgejo);
 # - la release vX.Y.Z del repositorio en GitHub (GITHUB_REPO), que publica
 #   .github/workflows/release.yml con su atestación de origen
 #   (preparar_github).
 #
 # Se carga con «.»; solo funciones, sin efectos al cargarse. Las usan el
-# actualizador (en el host, como root), el receptor del buzón
-# (deploy/freebsd-jail/recibir-precompilada.sh, como el usuario del buzón), el
-# PC de compilación y las pruebas (deploy/pruebas/precompiladas.sh).
+# actualizador (en el host, como root), el PC de compilación
+# (deploy/cross/) y las pruebas (deploy/pruebas/precompiladas.sh).
 #
 # El archivo es el de las releases de Linux (tools/empaquetar-release.sh) con
 # el objetivo de FreeBSD: routerpanel-<versión>-x86_64-unknown-freebsd.tar.gz,
 # con una única carpeta del mismo nombre (sin .tar.gz) que trae panel, site/ y
 # COMMIT (el commit completo de la etiqueta); lo hace
 # deploy/cross/empaquetar-freebsd.sh. SHA256SUMS va en el formato de
-# sha256sum. En el buzón, si hay clave de minisign, también
+# sha256sum. En Forgejo, si el PC firma con minisign, también
 # SHA256SUMS.minisig.
 
 PRECOMPILADA_OBJETIVO=x86_64-unknown-freebsd
@@ -61,15 +62,6 @@ ultima_version()
 	{ grep -Ex 'v[0-9]+\.[0-9]+\.[0-9]+' || true; } | sort -V | tail -n 1
 }
 
-# ¿Es $2 un fichero que se acepta en el buzón para la versión $1?
-fichero_de_buzon()
-{
-	case "$2" in
-	"$(archivo_precompilada "$1")" | SHA256SUMS | SHA256SUMS.minisig) return 0 ;;
-	esac
-	return 1
-}
-
 # sha256 de $1 en hexadecimal (sha256sum en Linux y en FreeBSD 14+; si no,
 # sha256 -q de FreeBSD).
 suma_sha256()
@@ -81,34 +73,19 @@ suma_sha256()
 	fi
 }
 
-# ¿Ha llegado ya al buzón $1 la versión $2 completa? Lo está cuando están el
-# archivo, SHA256SUMS (el PC lo sube el último) y, si $3 (la clave de
-# minisign) no está vacía, la firma. Solo cuentan los ficheros normales, nunca
-# los enlaces.
-precompilada_llegada()
-{
-	_dir=$1/$2
-	for _f in "$(archivo_precompilada "$2")" SHA256SUMS; do
-		[ -f "$_dir/$_f" ] && [ ! -L "$_dir/$_f" ] || return 1
-	done
-	if [ -n "$3" ]; then
-		[ -f "$_dir/SHA256SUMS.minisig" ] && [ ! -L "$_dir/SHA256SUMS.minisig" ] || return 1
-	fi
-	return 0
-}
-
-# Comprueba la versión $2 del buzón $1 y la deja desempaquetada en $5 (que no
-# debe existir), con panel, site/ y COMMIT y nada más. $3 es el commit
-# completo de la etiqueta (git ls-remote de REPO_URL) y $4 la clave pública de
-# minisign (vacía: sin firma). Escribe el motivo en la salida de error y sale
-# con 1 si algo no cuadra; $5 no queda creada en ese caso.
+# Comprueba la versión $2 de la carpeta $1 (descargada en $1/$2/) y la deja
+# desempaquetada en $5 (que no debe existir), con panel, site/ y COMMIT y nada
+# más. $3 es el commit completo de la etiqueta (git ls-remote de REPO_URL) y
+# $4 la clave pública de minisign (vacía: sin firma). Escribe el motivo en la
+# salida de error y sale con 1 si algo no cuadra; $5 no queda creada en ese
+# caso.
 #
-# Quien escribe en el buzón es otro usuario: antes de leer nada se copia a
-# una carpeta propia (con un tiempo máximo, por si hubiera una FIFO en lugar
-# de un fichero) y todo se comprueba sobre la copia.
+# Antes de leer nada se copia a una carpeta de trabajo propia (con un tiempo
+# máximo, por si hubiera una FIFO en lugar de un fichero) y todo se comprueba
+# sobre la copia.
 preparar_precompilada()
 {
-	_buzon=$1
+	_origen=$1
 	_ver=$2
 	_commit=$3
 	_clave=$4
@@ -134,10 +111,10 @@ preparar_precompilada()
 		if [ "$_f" = SHA256SUMS.minisig ] && [ -z "$_clave" ]; then
 			continue
 		fi
-		if [ ! -f "$_buzon/$_ver/$_f" ] || [ -L "$_buzon/$_ver/$_f" ] ||
-			! timeout 300 cp "$_buzon/$_ver/$_f" "$_trabajo/$_f" ||
+		if [ ! -f "$_origen/$_ver/$_f" ] || [ -L "$_origen/$_ver/$_f" ] ||
+			! timeout 300 cp "$_origen/$_ver/$_f" "$_trabajo/$_f" ||
 			[ ! -f "$_trabajo/$_f" ] || [ -L "$_trabajo/$_f" ]; then
-			echo "no se puede copiar $_f del buzón" >&2
+			echo "falta $_f o no se puede copiar" >&2
 			rm -rf "$_trabajo"
 			return 1
 		fi
@@ -315,7 +292,7 @@ preparar_github()
 		return 1
 	fi
 	# gh con una casa vacía: ni sesión, ni configuración, ni avisos.
-	if ! mkdir "$_gtrabajo/casa" "$_gtrabajo/buzon" "$_gtrabajo/buzon/$_gver"; then
+	if ! mkdir "$_gtrabajo/casa" "$_gtrabajo/carpeta" "$_gtrabajo/carpeta/$_gver"; then
 		rm -rf "$_gtrabajo"
 		return 1
 	fi
@@ -328,13 +305,211 @@ preparar_github()
 		rm -rf "$_gtrabajo"
 		return 2
 	fi
-	# El archivo, con su línea de SHA256SUMS, a un «buzón» solo suyo: el resto
-	# lo comprueba preparar_precompilada, igual que con el del PC.
-	if ! mv "$_gtrabajo/$_garch" "$_gtrabajo/buzon/$_gver/$_garch" ||
-		! printf '%s  %s\n' "$_gesperada" "$_garch" >"$_gtrabajo/buzon/$_gver/SHA256SUMS" ||
-		! preparar_precompilada "$_gtrabajo/buzon" "$_gver" "$_gcommit" '' "$_gdst"; then
+	# El archivo, con su línea de SHA256SUMS, a una carpeta solo suya: el resto
+	# lo comprueba preparar_precompilada, igual que con el de Forgejo.
+	if ! mv "$_gtrabajo/$_garch" "$_gtrabajo/carpeta/$_gver/$_garch" ||
+		! printf '%s  %s\n' "$_gesperada" "$_garch" >"$_gtrabajo/carpeta/$_gver/SHA256SUMS" ||
+		! preparar_precompilada "$_gtrabajo/carpeta" "$_gver" "$_gcommit" '' "$_gdst"; then
 		rm -rf "$_gtrabajo"
 		return 2
 	fi
 	rm -rf "$_gtrabajo"
+}
+
+# ¿Es $1 un repositorio de Forgejo «propietario/nombre»? Cada parte, de
+# [A-Za-z0-9._-], sin empezar por «.» ni «-» y de 100 caracteres como mucho.
+repo_forgejo_valido()
+{
+	case $1 in
+	*/*/* | *[!A-Za-z0-9._/-]*) return 1 ;;
+	?*/?*) ;;
+	*) return 1 ;;
+	esac
+	for _parte in "${1%%/*}" "${1#*/}"; do
+		case $_parte in
+		[.-]*) return 1 ;;
+		esac
+		[ "${#_parte}" -le 100 ] || return 1
+	done
+	return 0
+}
+
+# ¿Es $1 la URL base de un Forgejo? http(s)://equipo[:puerto][/ruta], sin
+# usuario, consulta, «..» ni «/» final: solo [A-Za-z0-9.:/_-].
+url_forgejo_valida()
+{
+	case $1 in
+	http://?* | https://?*) ;;
+	*) return 1 ;;
+	esac
+	case $1 in
+	*[!A-Za-z0-9.:/_-]* | */ | *..*) return 1 ;;
+	esac
+	case ${1#*://} in
+	/* | :* | .*) return 1 ;;
+	esac
+	return 0
+}
+
+# Lee el token de Forgejo del fichero $1 en FORGEJO_TOKEN_LEIDO. Solo si $1
+# es un fichero normal (no un enlace), del usuario con uid $2 (root en el
+# servidor), sin permisos para el grupo ni para otros, y su primera línea es
+# un token de [A-Za-z0-9_.-] (200 caracteres como mucho). Si no, dice por
+# qué en la salida de error y sale con 1 sin dejar nada en
+# FORGEJO_TOKEN_LEIDO.
+leer_token_forgejo()
+{
+	FORGEJO_TOKEN_LEIDO=
+	if [ ! -f "$1" ] || [ -L "$1" ]; then
+		echo "no existe el fichero del token ($1)" >&2
+		return 1
+	fi
+	# stat de GNU (pruebas) o de FreeBSD.
+	_st=$(stat -c '%u %a' "$1" 2>/dev/null || stat -f '%u %Lp' "$1" 2>/dev/null) || _st=
+	case $_st in
+	[0-9]*' '[0-7]*) ;;
+	*)
+		echo "no se pueden leer el dueño y los permisos de $1" >&2
+		return 1
+		;;
+	esac
+	if [ "${_st% *}" != "$2" ]; then
+		echo "$1 no es del dueño que toca (uid $2)" >&2
+		return 1
+	fi
+	case ${_st#* } in
+	*00) ;;
+	*)
+		echo "$1 lo pueden leer el grupo u otros (modo ${_st#* }; tiene que ser 0600)" >&2
+		return 1
+		;;
+	esac
+	_tok=$(head -n 1 "$1" | tr -d '\r')
+	case $_tok in
+	'' | *[!A-Za-z0-9_.-]*)
+		echo "el token de $1 no es válido" >&2
+		return 1
+		;;
+	esac
+	if [ "${#_tok}" -gt 200 ]; then
+		echo "el token de $1 no es válido" >&2
+		return 1
+	fi
+	FORGEJO_TOKEN_LEIDO=$_tok
+}
+
+# curl a la URL $1 con el token de FORGEJO_TOKEN_LEIDO en la cabecera
+# Authorization, que curl lee de la entrada estándar (-K -): nunca va en la
+# línea de órdenes (la vería cualquiera con ps) ni en la URL. Sin seguir
+# redirecciones: el token solo va al Forgejo configurado. Guarda la
+# respuesta en $2 (como mucho $3 bytes) y escribe el código HTTP (000 si no
+# hay respuesta). El resto de argumentos van a curl.
+curl_forgejo()
+{
+	_cu=$1
+	_cs=$2
+	_cm=$3
+	shift 3
+	printf 'header = "Authorization: token %s"\n' "$FORGEJO_TOKEN_LEIDO" |
+		timeout 960 curl -K - -sS --fail-with-body --connect-timeout 15 --max-time 900 \
+			--proto =https,http --max-filesize "$_cm" -o "$_cs" -w '%{http_code}' "$@" "$_cu" 2>/dev/null ||
+		true
+}
+
+# Descarga $1 del Forgejo en $2 (como mucho $3 bytes). Sale con 0 si llega
+# entera (HTTP 200 y no más de $3 bytes); si no, deja el código HTTP en
+# _fcodigo y sale con 1.
+descargar_forgejo()
+{
+	_fcodigo=$(curl_forgejo "$1" "$2" "$3")
+	[ "$_fcodigo" = 200 ] && [ -f "$2" ] && [ "$(wc -c <"$2" | tr -d ' ')" -le "$3" ]
+}
+
+# Trae de la release $5 (vX.Y.Z) del repositorio $2 («propietario/nombre»)
+# del Forgejo $1 la versión para FreeBSD y la deja desempaquetada en $8 (que
+# no debe existir), como preparar_precompilada. $3 es el fichero del token
+# de solo lectura (leer_token_forgejo, del uid $4), $6 el commit completo de
+# la etiqueta y $7 la clave pública de minisign (vacía: sin firma). Pasos, en
+# una carpeta de trabajo propia:
+# 1. GET $1/api/v1/repos/$2/releases/tags/$5: 404 es que aún no está.
+# 2. Descarga SHA256SUMS, el archivo y, con clave, SHA256SUMS.minisig, con
+#    los nombres que se esperan, de $1/$2/releases/download/$5/<nombre>: la
+#    URL sale de la configuración, nunca de la respuesta, así que el token
+#    solo va a $1.
+# 3. preparar_precompilada: sha256, firma, solo la carpeta de la versión con
+#    panel, site/ y COMMIT, COMMIT igual a $6 y panel ejecutable de FreeBSD
+#    x86-64.
+# Nada de lo descargado se ejecuta. Sale con 0 si queda en $8; 1 si aún no
+# se puede usar (sin publicar, a medias, sin red, falta curl); 2 si se
+# rechaza (configuración, sumas o archivo que no cuadran); 3 si el token no
+# vale (entonces no llama a curl). En todos los casos dice el motivo en la
+# salida de error y no deja $8. FORGEJO_MAX_ARCHIVO: bytes como mucho del
+# archivo.
+preparar_forgejo()
+{
+	_furl=$1
+	_frepo=$2
+	_fver=$5
+	_fcommit=$6
+	_fclave=$7
+	_fdst=$8
+	_fmax=${FORGEJO_MAX_ARCHIVO:-268435456}
+	case $_fmax in
+	'' | *[!0-9]*) _fmax=268435456 ;;
+	esac
+	if ! url_forgejo_valida "$_furl" || ! repo_forgejo_valido "$_frepo"; then
+		echo "FORGEJO_URL o FORGEJO_REPO no son válidos" >&2
+		return 2
+	fi
+	if ! version_final "$_fver"; then
+		echo "versión no válida (vX.Y.Z)" >&2
+		return 2
+	fi
+	if ! command -v curl >/dev/null 2>&1; then
+		echo "falta curl (pkg install curl)" >&2
+		return 1
+	fi
+	leer_token_forgejo "$3" "$4" || return 3
+	_farch=$(archivo_precompilada "$_fver")
+	_ftrabajo=$(mktemp -d) || return 1
+	mkdir "$_ftrabajo/carpeta" "$_ftrabajo/carpeta/$_fver" || {
+		rm -rf "$_ftrabajo"
+		return 1
+	}
+	_fcodigo=$(curl_forgejo "$_furl/api/v1/repos/$_frepo/releases/tags/$_fver" "$_ftrabajo/release.json" 1048576)
+	case $_fcodigo in
+	200) ;;
+	404)
+		echo "la release $_fver aún no está publicada en Forgejo" >&2
+		rm -rf "$_ftrabajo"
+		return 1
+		;;
+	*)
+		echo "Forgejo responde HTTP $_fcodigo a la release $_fver" >&2
+		rm -rf "$_ftrabajo"
+		return 1
+		;;
+	esac
+	_fbase=$_furl/$_frepo/releases/download/$_fver
+	_fdir=$_ftrabajo/carpeta/$_fver
+	if ! descargar_forgejo "$_fbase/SHA256SUMS" "$_fdir/SHA256SUMS" 65536; then
+		echo "la release $_fver de Forgejo aún no tiene SHA256SUMS (HTTP $_fcodigo)" >&2
+		rm -rf "$_ftrabajo"
+		return 1
+	fi
+	if ! descargar_forgejo "$_fbase/$_farch" "$_fdir/$_farch" "$_fmax"; then
+		echo "no se puede descargar $_farch de la release $_fver de Forgejo (HTTP $_fcodigo)" >&2
+		rm -rf "$_ftrabajo"
+		return 1
+	fi
+	if [ -n "$_fclave" ] && ! descargar_forgejo "$_fbase/SHA256SUMS.minisig" "$_fdir/SHA256SUMS.minisig" 4096; then
+		echo "la release $_fver de Forgejo no tiene SHA256SUMS.minisig (HTTP $_fcodigo)" >&2
+		rm -rf "$_ftrabajo"
+		return 1
+	fi
+	if ! preparar_precompilada "$_ftrabajo/carpeta" "$_fver" "$_fcommit" "$_fclave" "$_fdst"; then
+		rm -rf "$_ftrabajo"
+		return 2
+	fi
+	rm -rf "$_ftrabajo"
 }

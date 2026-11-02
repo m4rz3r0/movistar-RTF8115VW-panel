@@ -1,0 +1,43 @@
+# Compila para FreeBSD cada etiqueta v* en el runner de Actions del PC
+# (etiqueta «pc», ejecutor host: corre como el usuario del PC, con cross,
+# cargo, podman, git, curl y jq) y la publica como la release de esa
+# etiqueta en Forgejo, de donde la instala el actualizador del servidor
+# (deploy/freebsd-jail/README.md, «El runner de Actions del PC»).
+#
+# Si el PC está apagado, el trabajo espera en la cola hasta que el runner
+# vuelve (como mucho ABANDONED_JOB_TIMEOUT de Forgejo).
+#
+# Que exista .forgejo/workflows/ hace que Forgejo no ejecute los flujos de
+# .github/workflows/ (son los de GitHub). Sin acciones de terceros: git y
+# deploy/cross/publicar-forgejo.sh. El token del trabajo va siempre por el
+# entorno, nunca en una URL ni en los argumentos.
+name: FreeBSD
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  freebsd:
+    runs-on: pc
+    timeout-minutes: 120
+    env:
+      FORGEJO_TOKEN: ${{ forgejo.token }}
+      FORGEJO_SERVER: ${{ forgejo.server_url }}
+      FORGEJO_REPOSITORY: ${{ forgejo.repository }}
+      FORGEJO_TAG: ${{ forgejo.ref_name }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Traer la etiqueta
+        run: |
+          set -euo pipefail
+          rm -rf fuente
+          git init -q fuente
+          GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.extraheader \
+            GIT_CONFIG_VALUE_0="Authorization: token $FORGEJO_TOKEN" \
+            git -C fuente fetch -q --depth 1 "$FORGEJO_SERVER/$FORGEJO_REPOSITORY.git" "refs/tags/$FORGEJO_TAG"
+          git -C fuente checkout -q --detach FETCH_HEAD
+      - name: Compilar y publicar la release
+        run: bash fuente/deploy/cross/publicar-forgejo.sh

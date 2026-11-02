@@ -56,21 +56,26 @@ MODULOS="pf rc actualizador"
 # (ver freebsd-jail/README.md). Instala la de la primera fuente que la
 # tenga y pase las comprobaciones; si ninguna la tiene, espera.
 #
-# La release de GitHub del repositorio, «propietario/nombre» (opcional):
-# archivo, SHA256SUMS y su atestación de origen, comprobada con
+# La release de la etiqueta en Forgejo (opcional, la primera que se mira):
+# la publica el runner de Actions del PC (.forgejo/workflows/freebsd.yml) al
+# empujar una etiqueta v*. FORGEJO_URL es la URL base (https://forge.example,
+# sin «/» final) y FORGEJO_REPO, «propietario/nombre». El actualizador entra
+# con un token de solo lectura que se pone a mano en el servidor, en
+# /usr/local/etc/routerpanel-actualizar/forgejo-token (root, 0600). Con alguna
+# vacía no se mira Forgejo. Con ellas, install.sh instala curl en el host.
+FORGEJO_URL=
+FORGEJO_REPO=
+# La release de GitHub del repositorio, «propietario/nombre» (opcional, la
+# segunda): archivo, SHA256SUMS y su atestación de origen, comprobada con
 # gh attestation verify. Con ella, install.sh instala gh y jq en el host.
 # Vacía: no se mira GitHub.
 GITHUB_REPO=
-# El buzón donde deja las versiones el PC de compilación (deploy/cross/):
-# siempre se mira. Clave pública de minisign con la que el PC firma
-# SHA256SUMS (la segunda línea del .pub). Vacía: sin firma (vale con el
-# sha256 y la clave SSH del buzón). Con ella, el host necesita el paquete
-# minisign. No se aplica a GitHub, que va con su atestación.
+# Clave pública de minisign con la que el PC firma SHA256SUMS en la release
+# de Forgejo (la segunda línea del .pub; el runner firma si tiene
+# RP_MINISIGN_SECRETA). Vacía: sin firma (vale con el sha256 y el token).
+# Con ella, el host necesita el paquete minisign. No se aplica a GitHub, que
+# va con su atestación.
 PRECOMPILADAS_MINISIGN=
-# Para deploy/cross/lanzar.sh, desde este equipo: cómo se entra por SSH al PC
-# de compilación y, desde el PC, al usuario del buzón del servidor.
-PC_COMPILAR_SSH=
-PRECOMPILADAS_BUZON_SSH=
 
 # Webs que tienen que seguir respondiendo al cargar las reglas de pf,
 # separadas por espacios (opcional; si alguna falla, pf vuelve atrás solo).

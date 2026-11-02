@@ -21,38 +21,41 @@
 # 2. Si ya está desplegada, o ya falló, termina.
 # 3. La versión, ya compilada, de la primera fuente que la tenga y pase las
 #    comprobaciones (deploy/lib/precompiladas.sh):
-#    - el buzón ($BUZON), donde la deja el PC de compilación (deploy/cross/ y
-#      recibir-precompilada.sh): sha256, firma de minisign si hay
-#      PRECOMPILADAS_MINISIGN, COMMIT igual al commit de la etiqueta y panel
-#      ejecutable de FreeBSD x86-64;
+#    - la release de la etiqueta en Forgejo (FORGEJO_URL y FORGEJO_REPO), que
+#      publica el runner de Actions del PC (.forgejo/workflows/freebsd.yml):
+#      con el token de solo lectura de FORGEJO_TOKEN_FICHERO (de root y
+#      0600; si no, no se usa), sha256 de SHA256SUMS, firma de minisign si
+#      hay PRECOMPILADAS_MINISIGN, COMMIT igual al commit de la etiqueta y
+#      panel ejecutable de FreeBSD x86-64;
 #    - la release de GitHub (si hay GITHUB_REPO): sha256 de SHA256SUMS,
 #      atestación de origen (gh attestation verify: de GITHUB_REPO, de
 #      refs/tags/vX.Y.Z y de .github/workflows/release.yml) y lo mismo que
-#      el buzón salvo la firma.
+#      Forgejo salvo la firma.
 #    Si ninguna la tiene todavía, registra una vez por etiqueta «esperando la
 #    versión precompilada de vX.Y.Z» y sale con 0: lo vuelve a mirar en la
 #    siguiente pasada, sin límite de tiempo y sin contarlo como fallo. Lo que
-#    no cuadra se rechaza (nunca se instala nada sin comprobar) y cuenta como
-#    un fallo de la etiqueta.
+#    no cuadra se rechaza (nunca se instala nada sin comprobar), se registra
+#    una vez por etiqueta y fuente, y no cuenta como fallo de la etiqueta.
 # 4. La deja en releases/<versión>, de root; cambia el enlace «current» de la
 #    jail del panel, reinicia el servicio y espera a que /salud responda 200
 #    (60 s como mucho). Si no responde, vuelve a la versión anterior. Se
 #    conservan las 3 últimas versiones.
 #
 # Configuración: /usr/local/etc/routerpanel-actualizar.conf (JAILS_RAIZ,
-# JAIL_PANEL, REPO_URL, CLAVE_DESPLIEGUE, HOSTS_CONOCIDOS, GITHUB_REPO,
-# PRECOMPILADAS_MINISIGN; la escribe install.sh) y deploy/lib/git.sh y
-# deploy/lib/precompiladas.sh en /usr/local/libexec/routerpanel-actualizar.
-# La URL de /salud sale de routerpanel_listen en el rc.conf de la jail del
-# panel. Las claves de instalaciones anteriores (JAIL_COMPILAR,
-# TRABAJOS_COMPILACION, PRECOMPILADAS_ESPERA) se ignoran.
+# JAIL_PANEL, REPO_URL, CLAVE_DESPLIEGUE, HOSTS_CONOCIDOS, FORGEJO_URL,
+# FORGEJO_REPO, FORGEJO_TOKEN_FICHERO, GITHUB_REPO, PRECOMPILADAS_MINISIGN;
+# la escribe install.sh) y deploy/lib/git.sh y deploy/lib/precompiladas.sh en
+# /usr/local/libexec/routerpanel-actualizar. La URL de /salud sale de
+# routerpanel_listen en el rc.conf de la jail del panel. Las claves de
+# instalaciones anteriores (JAIL_COMPILAR, TRABAJOS_COMPILACION,
+# PRECOMPILADAS_ESPERA, BUZON) se ignoran.
 #
 # Registro: /var/log/routerpanel-update.log.
 
 set -u
 umask 027
 
-# cron da un PATH corto: gh y jq están en /usr/local/bin.
+# cron da un PATH corto: curl, gh y jq están en /usr/local/bin.
 PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
 export PATH
 
@@ -69,15 +72,23 @@ REPO_URL=
 # la clave del servidor git: de root, en el host.
 CLAVE_DESPLIEGUE=/usr/local/etc/routerpanel-actualizar/id_ed25519
 HOSTS_CONOCIDOS=/usr/local/etc/routerpanel-actualizar/known_hosts
+# URL base del Forgejo (https://forge.example) y «propietario/nombre» del
+# repositorio; con alguna vacía, no se mira Forgejo. El token, de solo
+# lectura, de root y 0600.
+FORGEJO_URL=
+FORGEJO_REPO=
+FORGEJO_TOKEN_FICHERO=/usr/local/etc/routerpanel-actualizar/forgejo-token
 # «propietario/nombre» del repositorio en GitHub; vacía, no se mira GitHub.
 GITHUB_REPO=
-# Clave pública de minisign de las versiones del buzón; vacía, sin firma.
+# Clave pública de minisign con la que el PC firma SHA256SUMS en Forgejo;
+# vacía, sin firma.
 PRECOMPILADAS_MINISIGN=
-BUZON=/var/db/routerpanel-buzon/entrada
 if [ -f "$CONF" ]; then
 	# shellcheck source=/dev/null
 	. "$CONF"
 fi
+# Dueño que tiene que tener el fichero del token (root).
+DUENO_TOKEN=0
 RUN_JAIL=$JAIL_PANEL
 RUN_USER=routerpanel
 RELEASES=/usr/local/routerpanel/releases
@@ -106,8 +117,8 @@ case "${1:-}" in
 	exit 0
 	;;
 --ref)
-	echo "--ref ya no existe: el servidor no compila. Crea una etiqueta vX.Y.Z y deja" \
-		"su versión precompilada en el buzón (deploy/cross/) o en la release de GitHub." >&2
+	echo "--ref ya no existe: el servidor no compila. Crea una etiqueta vX.Y.Z: el runner" \
+		"del PC la compila y la publica en la release de Forgejo (o la publica GitHub)." >&2
 	exit 2
 	;;
 *)
@@ -276,61 +287,89 @@ asentar_release()
 		chmod 755 "$1/panel"
 }
 
+# Registra $3 solo si $STATE/$1 no tiene ya el valor $2 (y lo deja); sale
+# con 0 si lo ha registrado. Para no repetir lo mismo en cada pasada del
+# cron: una vez por etiqueta, o por etiqueta y fuente.
+una_vez()
+{
+	if [ "$(cat "$STATE/$1" 2>/dev/null)" = "$2" ]; then
+		return 1
+	fi
+	echo "$2" >"$STATE/$1"
+	log "$3"
+}
+
+# Prueba la fuente $1 («forgejo» o «github»; $2, su nombre para el
+# registro) con la función $3 y sus argumentos (el último, la carpeta
+# temporal $_tmp). Sale con 0 si deja releases/$_et instalada. Si no, según
+# lo que diga la función: 1, aún no la tiene (el motivo, a _motivos); 2, la
+# rechaza (FUENTE=rechazada, una vez por etiqueta y fuente); 3, la fuente no
+# está disponible (una vez por etiqueta y fuente).
+probar_fuente()
+{
+	_fuente=$1
+	_nombre=$2
+	shift 2
+	rm -rf "$_tmp"
+	_err=$("$@" 2>&1)
+	_rf=$?
+	_err=$(printf '%s' "${_err:-no se puede instalar}" | head -n 1)
+	if [ "$_rf" -eq 0 ] && asentar_release "$_tmp" && mv "$_tmp" "$RELEASES/$_et"; then
+		FUENTE=instalada
+		return 0
+	fi
+	rm -rf "$_tmp"
+	case $_rf in
+	1) _motivos="$_motivos
+$_nombre: $_err" ;;
+	3) una_vez "no-disponible-$_fuente" "$_et" "$_nombre no está disponible: $_err" || true ;;
+	*)
+		FUENTE=rechazada
+		una_vez "rechazada-$_fuente" "$_et" "ERROR: versión de $_nombre de $_et rechazada: $_err" || true
+		;;
+	esac
+	return 1
+}
+
 # Deja en releases/$1 la versión de la etiqueta $1 (commit $2) de la primera
-# fuente que la tenga. Pone FUENTE a «instalada», «esperar» (ninguna fuente
-# la tiene aún) o «rechazada» (alguna la tenía y no cuadraba; no se instala
-# nada).
+# fuente que la tenga: Forgejo y después GitHub. Pone FUENTE a «instalada»,
+# «esperar» (ninguna fuente la tiene aún) o «rechazada» (alguna la tenía y no
+# cuadraba; no se instala nada).
 obtener()
 {
 	_et=$1
 	_commit=$2
 	_tmp=$RELEASES/.$_et.tmp
 	FUENTE=esperar
-	_motivo_github=
+	_motivos=
+	_donde=
 
-	if precompilada_llegada "$BUZON" "$_et" "$PRECOMPILADAS_MINISIGN"; then
-		rm -rf "$_tmp"
-		if _err=$(preparar_precompilada "$BUZON" "$_et" "$_commit" \
-			"$PRECOMPILADAS_MINISIGN" "$_tmp" 2>&1) &&
-			asentar_release "$_tmp" && mv "$_tmp" "$RELEASES/$_et"; then
-			FUENTE=instalada
-			log "instalada la versión precompilada de $_et del buzón ($(echo "$_commit" | cut -c1-12))"
-		else
-			FUENTE=rechazada
-			log "ERROR: versión precompilada de $_et rechazada: $(printf '%s' "${_err:-no se puede instalar}" | head -n 1)"
-		fi
-		rm -rf "$_tmp" "${BUZON:?}/$_et"
-		if [ "$FUENTE" = instalada ]; then
+	if [ -n "$FORGEJO_URL" ] && [ -n "$FORGEJO_REPO" ]; then
+		rm -f "$STATE/forgejo-desactivado"
+		_donde=Forgejo
+		if probar_fuente forgejo Forgejo preparar_forgejo "$FORGEJO_URL" "$FORGEJO_REPO" \
+			"$FORGEJO_TOKEN_FICHERO" "$DUENO_TOKEN" "$_et" "$_commit" "$PRECOMPILADAS_MINISIGN" "$_tmp"; then
+			log "instalada la versión de Forgejo de $_et ($FORGEJO_REPO, $(echo "$_commit" | cut -c1-12))"
 			return 0
 		fi
+	else
+		una_vez forgejo-desactivado si "Forgejo: sin FORGEJO_URL o FORGEJO_REPO; no se mira su release" || true
 	fi
 
 	if [ -n "$GITHUB_REPO" ]; then
-		rm -rf "$_tmp"
-		_err=$(preparar_github "$GITHUB_REPO" "$_et" "$_commit" "$_tmp" 2>&1)
-		_rg=$?
-		_err=$(printf '%s' "${_err:-no se puede instalar}" | head -n 1)
-		if [ "$_rg" -eq 0 ] && asentar_release "$_tmp" && mv "$_tmp" "$RELEASES/$_et"; then
-			FUENTE=instalada
+		_donde=${_donde:+$_donde ni en }GitHub
+		if probar_fuente github GitHub preparar_github "$GITHUB_REPO" "$_et" "$_commit" "$_tmp"; then
 			log "instalada la versión de GitHub de $_et ($GITHUB_REPO, atestación comprobada)"
 			return 0
-		fi
-		rm -rf "$_tmp"
-		if [ "$_rg" -eq 1 ]; then
-			_motivo_github=$_err
-		else
-			FUENTE=rechazada
-			log "ERROR: versión de GitHub de $_et rechazada: $_err"
 		fi
 	fi
 
 	# Una vez por etiqueta: el cron vuelve a mirar cada 15 minutos.
-	if [ "$FUENTE" = esperar ] && [ "$(cat "$STATE/esperando" 2>/dev/null)" != "$_et" ]; then
-		echo "$_et" >"$STATE/esperando"
-		log "esperando la versión precompilada de $_et (no está en el buzón${GITHUB_REPO:+ ni en GitHub}; se vuelve a mirar en cada ejecución)"
-		if [ -n "$_motivo_github" ]; then
-			log "GitHub: $_motivo_github"
-		fi
+	if [ "$FUENTE" = esperar ] && una_vez esperando "$_et" \
+		"esperando la versión precompilada de $_et (no está en ${_donde:-ninguna fuente}; se vuelve a mirar en cada ejecución)"; then
+		printf '%s\n' "$_motivos" | while IFS= read -r _m; do
+			if [ -n "$_m" ]; then log "$_m"; fi
+		done
 	fi
 }
 
@@ -401,10 +440,10 @@ deploy()
 }
 
 # Un fallo de la etiqueta $1. Un fallo suelto puede ser transitorio (una
-# entrega a medias, la red): la etiqueta sólo queda en «fallida» (y el cron
+# descarga a medias, la red): la etiqueta sólo queda en «fallida» (y el cron
 # deja de intentarlo) tras $MAX_TRIES fallos seguidos; hasta entonces se
 # reintenta en la ejecución siguiente. Esperar a la versión, o que se
-# rechace una entrega, no cuenta.
+# rechace una release, no cuenta.
 tag_failed()
 {
 	_n=1
@@ -477,9 +516,9 @@ main()
 		obtener "$_tag" "$_commit"
 		case $FUENTE in
 		esperar) exit 0 ;;
-		# Una entrega rechazada no cuenta como fallo de la etiqueta: otra
-		# entrega buena (el PC repite, o sale la release de GitHub) tiene
-		# que poder instalarse en la pasada siguiente.
+		# Una release rechazada no cuenta como fallo de la etiqueta: otra
+		# buena (el runner repite el trabajo, o sale la de GitHub) tiene que
+		# poder instalarse en la pasada siguiente.
 		rechazada) exit 1 ;;
 		esac
 	fi
@@ -488,7 +527,8 @@ main()
 		tag_failed "$_tag"
 		exit 1
 	fi
-	rm -f "$STATE/fallida" "$STATE/intentos" "$STATE/esperando"
+	rm -f "$STATE/fallida" "$STATE/intentos" "$STATE/esperando" \
+		"$STATE"/rechazada-* "$STATE"/no-disponible-*
 	prune
 }
 

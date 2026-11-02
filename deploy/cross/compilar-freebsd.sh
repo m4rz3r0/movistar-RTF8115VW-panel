@@ -1,29 +1,28 @@
 #!/usr/bin/env bash
 # Compila el panel para FreeBSD (x86_64-unknown-freebsd) en el PC de
-# compilación, un Linux con rustup, podman y cross, y lo empaqueta para el
-# buzón del servidor (deploy/freebsd-jail/recibir-precompilada.sh). El
-# servidor nunca compila: su actualizador instala lo que llega aquí o a la
-# release de GitHub (deploy/freebsd-jail/README.md).
+# compilación, un Linux con rustup, podman y cross, y lo empaqueta. Lo lanza
+# el runner de Forgejo Actions del PC (.forgejo/workflows/freebsd.yml, con
+# publicar-forgejo.sh, que sube el resultado a la release de la etiqueta).
+# El servidor nunca compila: su actualizador instala lo que hay en la release
+# de Forgejo o en la de GitHub (deploy/freebsd-jail/README.md).
 #
-#   compilar-freebsd.sh --release vX.Y.Z [--bundle FICHERO] [--repo URL] [--entregar DESTINO]
-#   compilar-freebsd.sh --ultima --repo URL [--entregar DESTINO]
-#   compilar-freebsd.sh --prueba [REF] [--bundle FICHERO]
+#   compilar-freebsd.sh --release vX.Y.Z [--bundle FICHERO] [--repo URL]
+#   compilar-freebsd.sh --prueba [REF] [--bundle FICHERO] [--repo URL]
 #
 # --release   compila la etiqueta vX.Y.Z (tiene que ser una etiqueta v*, no
 #             una rama ni un commit) y deja en salida/<versión>/ el archivo
 #             routerpanel-<versión>-x86_64-unknown-freebsd.tar.gz y su
 #             SHA256SUMS (más SHA256SUMS.minisig con RP_MINISIGN_SECRETA).
-# --ultima    trae las etiquetas de --repo y compila la vX.Y.Z más reciente
-#             (sort -V, como el actualizador) si aún no se ha entregado;
-#             para el temporizador opcional (rtf-cross.timer).
 # --prueba    compila REF (por defecto HEAD del bundle o del clon) para probar
 #             la compilación: la versión se llama prueba-<sha corto> y el
-#             buzón no la admite.
-# --bundle    un `git bundle` que trae la referencia (lo manda lanzar.sh desde
-#             el equipo de trabajo); sin él, el clon tiene que tenerla ya.
-# --repo      URL de git de la que traer las etiquetas (como REPO_URL).
-# --entregar  al terminar una versión, la sube al buzón con entregar.sh
-#             (DESTINO: el usuario del buzón, p. ej. rpentrega@servidor).
+#             actualizador no la admite.
+# --bundle    un `git bundle` que trae la referencia; sin él, el clon tiene
+#             que tenerla ya (o traerla de --repo).
+# --repo      URL de git de la que traer las etiquetas (como REPO_URL). Si
+#             hace falta autenticarse, con GIT_CONFIG_COUNT/GIT_CONFIG_KEY_0/
+#             GIT_CONFIG_VALUE_0 en el entorno (http.extraheader, como hace
+#             publicar-forgejo.sh): nunca en la URL. Esas variables se borran
+#             en cuanto se han traído las etiquetas, antes de compilar.
 #
 # Todo vive en RP_CROSS_DIR (por defecto ~/rtf-cross): repo/ (clon desnudo),
 # fuente/ (el código de la referencia, con target/ dentro para que la
@@ -67,7 +66,6 @@ modo=
 ref=
 bundle=
 repo_url=
-entregar=
 while [ "$#" -gt 0 ]; do
 	case $1 in
 	--release)
@@ -75,10 +73,6 @@ while [ "$#" -gt 0 ]; do
 		ref=${2:-}
 		[ -n "$ref" ] || uso
 		shift 2
-		;;
-	--ultima)
-		modo=ultima
-		shift
 		;;
 	--prueba)
 		modo=prueba
@@ -98,23 +92,12 @@ while [ "$#" -gt 0 ]; do
 		[ -n "$repo_url" ] || uso
 		shift 2
 		;;
-	--entregar)
-		entregar=${2:-}
-		[ -n "$entregar" ] || uso
-		shift 2
-		;;
 	*) uso ;;
 	esac
 done
 [ -n "$modo" ] || uso
 if [ -n "$bundle" ]; then
 	bundle=$(realpath -e "$bundle") || error "no existe el bundle"
-fi
-if [ "$modo" = ultima ] && [ -z "$repo_url" ]; then
-	error "--ultima necesita --repo"
-fi
-if [ "$modo" = prueba ] && [ -n "$entregar" ]; then
-	error "las compilaciones de --prueba no se entregan"
 fi
 
 for orden in git cross cargo podman file sha256sum tar gzip rsync flock; do
@@ -144,17 +127,15 @@ if [ -n "$repo_url" ]; then
 	git -C "$REPO" fetch --quiet --force --prune --prune-tags "$repo_url" '+refs/tags/*:refs/tags/*' ||
 		error "no se pueden traer las etiquetas del repositorio"
 fi
-if [ "$modo" = ultima ]; then
-	ref=$(git -C "$REPO" tag -l 'v*' | ultima_version)
-	[ -n "$ref" ] || {
-		echo "no hay ninguna etiqueta vX.Y.Z"
-		exit 0
-	}
-	if [ -f "$BASE/salida/$ref/.entregada" ]; then
-		echo "$ref ya está compilada y entregada"
-		exit 0
-	fi
-	modo=release
+# Las credenciales de git (si las hay) no llegan a la compilación: el código
+# de la etiqueta (build.rs, macros) no tiene por qué verlas.
+if [ -n "${GIT_CONFIG_COUNT:-}" ]; then
+	_n=0
+	while [ "$_n" -lt "$GIT_CONFIG_COUNT" ] && [ "$_n" -lt 100 ]; do
+		unset "GIT_CONFIG_KEY_$_n" "GIT_CONFIG_VALUE_$_n"
+		_n=$((_n + 1))
+	done
+	unset GIT_CONFIG_COUNT _n
 fi
 
 if [ "$modo" = release ]; then
@@ -239,6 +220,3 @@ if [ -n "${RP_MINISIGN_SECRETA:-}" ]; then
 		error "no se puede firmar SHA256SUMS"
 fi
 echo "$SALIDA/$NOMBRE.tar.gz"
-if [ -n "$entregar" ]; then
-	bash "$AQUI/entregar.sh" --destino "$entregar" "$SALIDA"
-fi

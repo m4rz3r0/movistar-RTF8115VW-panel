@@ -7,7 +7,7 @@
 #   empaquetar-freebsd.sh <versión> <commit> <panel> <site> <fuente> <salida>
 #
 # <versión>  la etiqueta (vX.Y.Z…; version_precompilable) o, para probar la
-#            compilación, prueba-<sha corto> (el buzón no la admite)
+#            compilación, prueba-<sha corto> (el actualizador no la admite)
 # <commit>   el commit completo de la etiqueta (40 cifras hex): va en COMMIT
 # <panel>    el binario para x86_64-unknown-freebsd
 # <site>     su web (target/site de cargo-leptos, con hash.txt y

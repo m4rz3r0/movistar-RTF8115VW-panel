@@ -8,6 +8,6 @@
 # Eso no puede funcionar: doas.conf es del host y desde dentro de una jail no
 # se llega al doas del host. Por eso el actualizador corre EN EL HOST como root
 # (/usr/local/sbin/routerpanel-actualizar, desde /usr/local/etc/cron.d): no
-# compila (instala versiones ya compiladas del buzón o de la release de
+# compila (instala versiones ya compiladas de la release de Forgejo o de la de
 # GitHub), cambia «current», reinicia el servicio con jexec y comprueba
 # /salud. Ver deploy/freebsd-jail/README.md.

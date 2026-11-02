@@ -10,10 +10,11 @@ CLAVES_OBLIGATORIAS="SERVIDOR_SSH JAILS_RAIZ ZFS_DATASET JAIL_PANEL JAIL_PANEL_I
 	INTERFAZ_EXT ROUTER_IP PANEL_ORIGEN PANEL_ESCUCHA PROXIES_CONFIANZA REPO_URL MODULOS"
 # Las de la jail de compilación de instalaciones anteriores (JAIL_COMPILAR,
 # JAIL_COMPILAR_IP, UID_COMPILAR, RED_LAN, RED_VPN, DNS_IP,
-# TRABAJOS_COMPILACION, PRECOMPILADAS_ESPERA) ya no se usan: si siguen en
-# config.local, no molestan.
-CLAVES_OPCIONALES="REPO_HOST_CLAVE GITHUB_REPO COMPROBAR_URLS PRECOMPILADAS_MINISIGN
-	PC_COMPILAR_SSH PRECOMPILADAS_BUZON_SSH"
+# TRABAJOS_COMPILACION, PRECOMPILADAS_ESPERA) y las del buzón que había antes
+# del runner de Forgejo (PC_COMPILAR_SSH, PRECOMPILADAS_BUZON_SSH) ya no se
+# usan: si siguen en config.local, no molestan.
+CLAVES_OPCIONALES="REPO_HOST_CLAVE FORGEJO_URL FORGEJO_REPO GITHUB_REPO COMPROBAR_URLS
+	PRECOMPILADAS_MINISIGN"
 MODULOS_CONOCIDOS="pf rc actualizador caddyfile unbound"
 
 # ¿Es $1 una IPv4 escrita como cuatro números de 0 a 255?
@@ -73,6 +74,21 @@ cargar_config()
 	*/*/* | /* | */ | -* | */-* | */. | */.. | *[!A-Za-z0-9._/-]*) _malas="$_malas GITHUB_REPO" ;;
 	*/*) ;;
 	*) _malas="$_malas GITHUB_REPO" ;;
+	esac
+	# Vacía (sin Forgejo) o una URL base http(s)://equipo[:puerto][/ruta],
+	# sin usuario ni «/» final (como url_forgejo_valida).
+	case ${FORGEJO_URL-} in
+	'') ;;
+	*[!A-Za-z0-9.:/_-]* | */ | *..* | http:///* | https:///*) _malas="$_malas FORGEJO_URL" ;;
+	http://?* | https://?*) ;;
+	*) _malas="$_malas FORGEJO_URL" ;;
+	esac
+	# Vacía o «propietario/nombre» (como repo_forgejo_valido).
+	case ${FORGEJO_REPO-} in
+	'') ;;
+	*/*/* | *[!A-Za-z0-9._/-]* | [.-]* | */[.-]*) _malas="$_malas FORGEJO_REPO" ;;
+	?*/?*) ;;
+	*) _malas="$_malas FORGEJO_REPO" ;;
 	esac
 	case $PANEL_ORIGEN in
 	http://?* | https://?*) ;;
