@@ -197,8 +197,7 @@ doas jexec <JAIL_PANEL> service routerpanel status
 ```
 
 Los actualizadores tienen su propio registro: en FreeBSD,
-`/var/log/routerpanel-update.log` (y `/var/log/routerpanel-build.log` para la
-última compilación); en Linux, la salida de `routerpanel-actualizar` o
+`/var/log/routerpanel-update.log`; en Linux, la salida de `routerpanel-actualizar` o
 `journalctl -u routerpanel-actualizar` si lo lanza un temporizador.
 
 ## Actualizar
@@ -212,12 +211,13 @@ vuelven solos a la versión anterior si la nueva no responde en `/salud`.
   `current` ([`deploy/linux/`](../deploy/linux/README.md#actualizar)).
 - **Podman o Docker**: trae la versión nueva del repositorio (`git pull` o la etiqueta
   que quieras) y ejecuta `compose up -d --build`.
-- **FreeBSD**: el actualizador del host compila la última etiqueta `v*` en la
-  jail de compilación cada 15 minutos
+- **FreeBSD**: el actualizador del host mira cada 15 minutos la última
+  etiqueta `vX.Y.Z` y la instala en cuanto su versión ya compilada está en la
+  release de GitHub (comprueba su atestación) o en el buzón del PC de
+  compilación; el servidor nunca compila
   ([`deploy/freebsd-jail/`](../deploy/freebsd-jail/README.md#actualizador)).
-  Una compilación tarda bastante: si la lanzas a mano, hazlo desligada de la
-  sesión (`doas daemon -f /usr/local/sbin/routerpanel-actualizar`). Los cambios
-  en `deploy/` no los despliega el actualizador: hay que repetir `install.sh`.
+  Los cambios en `deploy/` no los despliega el actualizador: hay que repetir
+  `install.sh`.
 
 Para volver atrás a mano, apunta `current` a la versión anterior y, si la
 nueva cambió el esquema de la base de datos, recupera la copia de antes de

@@ -101,7 +101,9 @@ Hay tres formas; cada una tiene su guía en [`deploy/`](deploy/README.md):
 - **Podman o Docker con Compose** ([`deploy/docker/`](deploy/docker/README.md)).
   Incluye el panel y un proxy Caddy de ejemplo.
 - **Jails de FreeBSD** ([`deploy/freebsd-jail/`](deploy/freebsd-jail/README.md)).
-  Compila desde el código y se actualiza solo con cada etiqueta.
+  El servidor no compila: se actualiza solo con cada etiqueta, con la
+  versión ya compilada (la release de GitHub, con su atestación, o un PC de
+  compilación).
 
 El panel no habla HTTPS. Necesita delante un **proxy inverso con HTTPS**
 (Caddy, nginx…) limitado a la red local, que le pase la IP del cliente en

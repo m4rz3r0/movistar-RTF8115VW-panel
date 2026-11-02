@@ -1,15 +1,19 @@
 # Instalación en jails de FreeBSD
 
-El panel corre en un servidor FreeBSD (probado en 15.x) con dos jails PkgBase:
+El panel corre en un servidor FreeBSD (probado en 15.x) en una jail PkgBase:
 
 | Jail (`config.local`) | Contenido |
 |---|---|
 | `JAIL_PANEL` (`JAIL_PANEL_IP`) | base mínima (`FreeBSD-set-minimal-jail`), el binario y su web; servicio `routerpanel` en `PANEL_ESCUCHA` |
-| `JAIL_COMPILAR` (`JAIL_COMPILAR_IP`) | base completa, `git`, `binaryen` (`wasm-opt`), `rustup` 1.28.1 o posterior y `cargo-leptos` 0.3.11; usuario sin privilegios `rpbuild` (uid `UID_COMPILAR`) con el clon en `/home/rpbuild/panel` |
 
-`rustup` instala al compilar la versión de Rust de `rust-toolchain.toml` con
-`wasm32-unknown-unknown` (la 1.28.0 no lo hace). El actualizador instala
-`wasm-bindgen-cli` en la versión que pida el `Cargo.lock`.
+El servidor nunca compila: no tiene Rust, ni jail de compilación, ni ejecuta
+nada del repositorio. Su actualizador instala versiones ya compiladas para
+`x86_64-unknown-freebsd`, de una de estas dos fuentes:
+
+- la [release de GitHub](#la-release-de-github) de cada etiqueta `vX.Y.Z`,
+  que publica `.github/workflows/release.yml` con su atestación de origen;
+- el [buzón](#el-pc-de-compilación-buzón) del servidor, donde las deja un PC
+  con Linux (`deploy/cross/`).
 
 Se entra por un proxy inverso con HTTPS (`PROXIES_CONFIANZA`) en
 `PANEL_ORIGEN`. Con el módulo `caddyfile`, `install.sh` imprime el sitio para
@@ -28,10 +32,9 @@ Para ver lo que se va a instalar sin conectarte a nada:
 deploy/freebsd-jail/install.sh --plantillas /tmp/plantillas
 ```
 
-Deja ahí `jail.conf`, `pf.conf`, `rc.conf` (las variables del servicio), el
-`resolv.conf` de la jail de compilación, `actualizador.conf`, la
-configuración SSH del usuario que compila y, según `MODULOS`,
-`Caddyfile.routerpanel` y `unbound.conf`.
+Deja ahí `jail.conf`, `pf.conf`, `rc.conf` (las variables del servicio),
+`actualizador.conf`, `known_hosts` si pusiste `REPO_HOST_CLAVE` y, según
+`MODULOS`, `Caddyfile.routerpanel` y `unbound.conf`.
 
 ## Ficheros
 
@@ -43,7 +46,7 @@ configuración SSH del usuario que compila y, según `MODULOS`,
 | `routerpanel.rc` | `/usr/local/etc/rc.d/routerpanel` en la jail del panel |
 | `actualizar.sh` | `/usr/local/sbin/routerpanel-actualizar` en el host |
 | `../lib/git.sh`, `../lib/precompiladas.sh` | `/usr/local/libexec/routerpanel-actualizar/` en el host |
-| `recibir-precompilada.sh` | `/usr/local/libexec/routerpanel-actualizar/` en el host ([versiones precompiladas](#versiones-precompiladas-el-pc-de-compilación)) |
+| `recibir-precompilada.sh` | `/usr/local/libexec/routerpanel-actualizar/` en el host ([buzón](#el-pc-de-compilación-buzón)) |
 | `doas.conf.snippet` | nada: explica por qué no hace falta ninguna regla de doas |
 
 ## Rutas
@@ -51,18 +54,21 @@ configuración SSH del usuario que compila y, según `MODULOS`,
 En el host:
 
 - `/usr/local/routerpanel/releases/<versión>/{panel,site/,COMMIT}`: las
-  versiones compiladas, de root. Entran por nullfs `ro,late` (`/etc/fstab`)
+  versiones instaladas, de root. Entran por nullfs `ro,late` (`/etc/fstab`)
   en la misma ruta de la jail del panel.
 - `/usr/local/etc/routerpanel-actualizar.conf` (600): configuración del
   actualizador.
+- `/usr/local/etc/routerpanel-actualizar/` (700): `id_ed25519` (la clave de
+  despliegue, de solo lectura en el servidor git) y `known_hosts` (la clave
+  del servidor git).
 - `/usr/local/etc/cron.d/routerpanel`: el actualizador cada 15 minutos.
 - `/var/log/routerpanel-update.log`, rotado por
-  `/usr/local/etc/newsyslog.conf.d/routerpanel.conf`, y
-  `/var/log/routerpanel-build.log`, con la salida de la última compilación.
-- `/var/db/routerpanel-actualizar/fallida`: la última etiqueta que falló dos
-  veces seguidas. No se reintenta hasta que haya otra.
-- `/var/db/routerpanel-buzon/entrada/<versión>/`: solo con versiones
-  precompiladas, lo que deja el PC de compilación.
+  `/usr/local/etc/newsyslog.conf.d/routerpanel.conf`.
+- `/var/db/routerpanel-actualizar/`: `fallida` (la última etiqueta que falló
+  dos veces seguidas; no se reintenta hasta que haya otra) y `esperando` (la
+  etiqueta cuya versión precompilada se espera).
+- `/var/db/routerpanel-buzon/entrada/<versión>/`: lo que deja el PC de
+  compilación, si lo usas.
 
 En la jail del panel:
 
@@ -110,18 +116,17 @@ del panel (`/instalar`, ver
 [`docs/operacion.md`](../../docs/operacion.md#primera-instalación-el-asistente)).
 Puedes repetirlo cuantas veces quieras; solo hace lo que falta. Pasos:
 
-1. Sube los guiones de `deploy/`, la configuración ya resuelta y un
-   `git bundle` del repositorio a `~/routerpanel-deploy` de `SERVIDOR_SSH`.
+1. Sube los guiones de `deploy/` y la configuración ya resuelta a
+   `~/routerpanel-deploy` de `SERVIDOR_SSH`.
 2. Ejecuta allí `install.sh --servidor` como root con `doas`. Comprueba la
-   sintaxis de los guiones y añade las jails a `/etc/jail.conf`. Según
+   sintaxis de los guiones y añade la jail a `/etc/jail.conf`. Según
    `MODULOS`:
    - `rc`: dataset ZFS (`ZFS_DATASET/<jail>`) y base de la jail del panel,
      usuario `routerpanel` (uid 3159), nullfs, rc.d con sus variables y
      newsyslog. Si el panel ya está desplegado y no tiene usuarios, dice
      dónde está el token del asistente (no lo imprime).
-   - `actualizador`: la jail de compilación con sus paquetes, `rustup`,
-     `cargo-leptos`, la clave de despliegue y el clon de `REPO_URL` (si el
-     servidor git aún no acepta la clave, clona del bundle). En el host, el
+   - `actualizador`: en el host, `git` (y `gh` y `jq` si pusiste
+     `GITHUB_REPO`), la clave de despliegue, la clave del servidor git, el
      actualizador, su configuración y su cron. Al final imprime la clave
      pública de despliegue.
    - `unbound`: `/var/unbound/conf.d/routerpanel.conf` con el nombre de
@@ -136,11 +141,11 @@ Puedes repetirlo cuantas veces quieras; solo hace lo que falta. Pasos:
    180 s y carga las reglas.
 4. El equipo de trabajo abre una conexión SSH nueva, comprueba las webs de
    `COMPROBAR_URLS` y lanza `--comprobar-red`. El panel tiene que llegar al
-   router por el puerto 80 y no a Internet ni al proxy. La jail de
-   compilación tiene que llegar a crates.io, a `/salud` y al repositorio
-   («Permission denied (publickey)» cuenta como que llega), pero no al
-   router ni al proxy. Solo si todo cuadra, `--pf-confirmar` desarma el
-   interruptor. Si no, las reglas anteriores vuelven solas a los 180 s.
+   router por el puerto 80 y no a Internet ni al proxy, y a su propio
+   `/salud`; el host tiene que llegar al repositorio («Permission denied
+   (publickey)» cuenta como que llega). Solo si todo cuadra,
+   `--pf-confirmar` desarma el interruptor. Si no, las reglas anteriores
+   vuelven solas a los 180 s.
 
 Si `--pf-confirmar` dice «el interruptor ya saltó», pf tiene otra vez las
 reglas anteriores: repite `install.sh`.
@@ -148,83 +153,134 @@ reglas anteriores: repite `install.sh`.
 ### Repositorio y clave de despliegue
 
 `REPO_URL` admite cualquier URL de git: `https://…` o
-`ssh://git@equipo:puerto/…`. Si el servidor git está en tu red, pon su IP en
-la URL: pf solo abre a la jail de compilación esa IP y ese puerto.
+`ssh://git@equipo:puerto/…`. El actualizador solo lanza
+`git ls-remote --tags` contra ella desde el host: no clona, no saca código y
+no ejecuta nada del repositorio. Le basta con ver las etiquetas y sus
+commits.
 
 Por SSH, da de alta en el servidor git la clave pública que imprime
 `install.sh` como clave de despliegue de solo lectura. También está en
-`<JAILS_RAIZ>/<JAIL_COMPILAR>/home/rpbuild/.ssh/id_ed25519.pub`. Hasta
-entonces el actualizador registra «sin acceso al repositorio» y no hace nada.
-La clave del servidor git queda fijada: la de `REPO_HOST_CLAVE` (una línea de
-`known_hosts`) o, si está vacía, la primera que presente.
+`/usr/local/etc/routerpanel-actualizar/id_ed25519.pub`. Hasta entonces el
+actualizador registra «sin acceso al repositorio» y no hace nada. La clave
+del servidor git queda fijada en
+`/usr/local/etc/routerpanel-actualizar/known_hosts`: la de
+`REPO_HOST_CLAVE` (una línea de `known_hosts`) o, si está vacía, la primera
+que presente cuando `install.sh` se conecta. El actualizador nunca acepta
+una clave nueva.
 
 ### Primer despliegue
 
-Mientras no exista ninguna etiqueta `v*`, el actualizador no tiene nada que
-desplegar. La primera vez compila una rama a mano:
+No hay despliegue a mano: crea la primera etiqueta `vX.Y.Z` y, en cuanto su
+versión precompilada esté en GitHub o en el buzón, el actualizador la
+instala (como mucho 15 minutos después). Para no esperar al cron:
 
 ```sh
-ssh SERVIDOR doas routerpanel-actualizar --ref RAMA
+ssh SERVIDOR doas routerpanel-actualizar
 deploy/freebsd-jail/install.sh   # otra vez: dice dónde está el token del asistente
 ```
 
 Después abre `PANEL_ORIGEN/instalar` con ese token. El asistente crea el
 administrador, guarda las credenciales del router y hace la lectura inicial.
 
-`--ref` acepta una rama o un commit y la versión se llama
-`<ref>-<sha corto>`. Si no hay acceso al repositorio, compila lo que ya tenga
-el clon.
-
 ## Actualizador
 
 `routerpanel-actualizar` corre en el host como root, desde cron cada 15
 minutos y sin solaparse (`lockf`). Así no hace falta ninguna regla de doas.
-En cada ejecución:
+No llama nunca a `cargo` ni a `rustc`. `routerpanel-actualizar --ayuda`
+muestra el uso; no tiene más opciones. En cada ejecución:
 
-1. En la jail de compilación, como `rpbuild`, trae el repositorio y saca la
-   última etiqueta `v*` (por `sort -V`). Nunca hace merge, así que no le
-   afecta que el remoto reescriba su historial.
-2. Si esa etiqueta ya está desplegada, o ya falló, termina. Si el nombre de
-   la versión o el commit tienen una forma rara, registra el error y no hace
-   nada.
-3. Con `PRECOMPILADAS_ESPERA`, mira antes el buzón (ver
-   [versiones precompiladas](#versiones-precompiladas-el-pc-de-compilación)).
-   Si instala la precompilada, salta al paso 5.
-4. Compila con `cargo leptos build --release --precompress`, con prioridad
-   baja, una hora como mucho y, si fijaste `TRABAJOS_COMPILACION`, ese número
-   de trabajos a la vez (gasta menos memoria). Copia el binario y la web a
-   `releases/<versión>/`, de root.
-5. Para el servicio y copia `panel.db` a
+1. Con `git ls-remote --tags REPO_URL`, saca la última etiqueta `vX.Y.Z`
+   (por `sort -V`) y su commit. Como lee el remoto en cada pasada, no le
+   afecta que reescriba su historial.
+2. Si esa etiqueta ya está desplegada, o ya falló, termina.
+3. Busca la versión ya compilada, primero en el buzón y después en GitHub
+   (si hay `GITHUB_REPO`), y la instala de la primera que la tenga y pase
+   todas las comprobaciones (abajo). La deja en `releases/<versión>/`, de
+   root.
+   - Si ninguna la tiene todavía, registra una sola vez «esperando la
+     versión precompilada de vX.Y.Z» y termina sin error. La vuelve a buscar
+     en cada ejecución, sin límite de tiempo, y esperar no cuenta como fallo.
+   - Si alguna la tiene pero algo no cuadra, la rechaza (lo registra con el
+     motivo y vacía esa carpeta del buzón) y cuenta como un fallo de la
+     etiqueta. Nunca se instala nada sin comprobar.
+4. Para el servicio y copia `panel.db` a
    `/var/db/routerpanel/antes-de-actualizar/`.
-6. Cambia `current`, arranca y espera como mucho 60 s a que `/salud` responda
-   con `"ok":true` desde el binario nuevo.
-7. Si no responde, para el servicio, restaura la base de datos de antes,
+5. Cambia `current`, arranca y espera como mucho 60 s a que `/salud`
+   (preguntado desde la propia jail del panel) responda con `"ok":true`
+   desde el binario nuevo.
+6. Si no responde, para el servicio, restaura la base de datos de antes,
    vuelve a la versión anterior y borra la nueva. La etiqueta se reintenta en
    la siguiente ejecución y solo queda marcada como fallida si falla dos
    veces seguidas. Si no hay versión anterior (primer despliegue), el
    servicio queda parado y sin `current`, también tras reiniciar el host.
-8. Conserva las 3 versiones más recientes; nunca borra la desplegada.
+7. Conserva las 3 versiones más recientes; nunca borra la desplegada.
 
-Un `--ref` que da la misma versión que la desplegada solo reinicia el
-servicio y comprueba `/salud`. Si no responde, la deja como estaba.
-
-El servidor solo compila, no ejecuta las pruebas. Pásalas en el equipo de
-desarrollo antes de crear la etiqueta (`cargo test --workspace`,
+Las pruebas no corren en ninguna parte del camino al servidor. Pásalas en el
+equipo de desarrollo antes de crear la etiqueta (`cargo test --workspace`,
 `cargo test --workspace --features panel/ssr` y los e2e): el actualizador
-despliega cualquier `v*` que compile, y solo `/salud` y la vuelta atrás te
-protegen de una versión rota.
+despliega cualquier `vX.Y.Z` cuya versión precompilada pase las
+comprobaciones, y solo `/salud` y la vuelta atrás te protegen de una versión
+rota.
 
 El actualizador solo despliega el panel. Si una versión cambia algo de
 `deploy/` (el actualizador, `routerpanel.rc`, las reglas de pf…), repite
 `install.sh` desde el equipo de trabajo; hasta entonces el servidor sigue con
 los ficheros de antes.
 
-## Versiones precompiladas (el PC de compilación)
+### Qué se comprueba
 
-Es opcional. Un PC con Linux más potente compila la versión para FreeBSD y
-la deja en un buzón del servidor, y el actualizador la instala en lugar de
-compilarla. Si el PC está apagado, el servidor compila él mismo pasado un
-rato. Sin `PRECOMPILADAS_ESPERA` no se usa nada de esto.
+Las dos fuentes traen el mismo archivo,
+`routerpanel-<versión>-x86_64-unknown-freebsd.tar.gz`
+(`deploy/cross/empaquetar-freebsd.sh`), y `SHA256SUMS`. Antes de instalarlo,
+sobre una copia propia:
+
+- el sha256 del archivo es el de `SHA256SUMS`;
+- trae una sola carpeta, la de la versión, con `panel`, `site/` y `COMMIT`,
+  y solo ficheros y carpetas normales;
+- `COMMIT` es el commit de la etiqueta que dio `git ls-remote`;
+- `panel` es un ejecutable de FreeBSD x86-64.
+
+Además, según la fuente:
+
+- **GitHub**: la atestación de origen del archivo (la de
+  `api.github.com/repos/<GITHUB_REPO>/attestations/sha256:<sha256>`, sin
+  token) tiene que pasar `gh attestation verify --bundle` con
+  `--repo GITHUB_REPO`, `--source-ref refs/tags/vX.Y.Z` y
+  `--signer-workflow GITHUB_REPO/.github/workflows/release.yml`: el archivo
+  lo compiló el flujo de release de ese repositorio para esa etiqueta.
+- **Buzón**: con `PRECOMPILADAS_MINISIGN`, la firma de `SHA256SUMS`.
+
+Nada de lo que llega se ejecuta antes de desplegarlo: `jq` y `gh` solo lo
+leen.
+
+## La release de GitHub
+
+Con `GITHUB_REPO=propietario/nombre` en `config.local` (y repitiendo
+`install.sh`, que instala `gh` y `jq` en el host), el actualizador descarga
+la versión de
+`https://github.com/<GITHUB_REPO>/releases/download/vX.Y.Z/`. El flujo
+`.github/workflows/release.yml` compila la versión para FreeBSD con
+[`cross`](https://github.com/cross-rs/cross) al subir cada etiqueta, la mete
+en `SHA256SUMS` junto a las de Linux y publica una atestación de origen
+(SLSA, firmada con Sigstore) de cada archivo. Tarda un rato en terminar:
+hasta entonces el actualizador espera.
+
+Si `REPO_URL` no es GitHub (por ejemplo, un servidor git propio), las
+etiquetas tienen que ser las mismas en los dos sitios: el `COMMIT` del
+archivo de GitHub tiene que ser el commit de la etiqueta en `REPO_URL`.
+
+Para comprobar a mano una versión publicada:
+
+```sh
+gh attestation verify routerpanel-vX.Y.Z-x86_64-unknown-freebsd.tar.gz --repo <GITHUB_REPO>
+```
+
+## El PC de compilación (buzón)
+
+Es opcional. Un PC con Linux compila la versión para FreeBSD y la deja en un
+buzón del servidor; el actualizador la instala de ahí. Sirve sin GitHub, o
+para tener la versión antes de que termine la release. Si el PC está
+apagado, el servidor no compila: espera a GitHub o a que el PC la entregue.
 
 ### Cómo funciona
 
@@ -237,36 +293,23 @@ rato. Sin `PRECOMPILADAS_ESPERA` no se usa nada de esto.
    Comprueba que es una etiqueta `vX.Y.Z` y que no hay cambios sin
    confirmar, y manda al PC (`PC_COMPILAR_SSH`) los guiones y un `git bundle`
    de la etiqueta. Allí `compilar-freebsd.sh` compila y `entregar.sh` lo sube
-   al buzón (`PRECOMPILADAS_BUZON_SSH`). Si el PC no
-   responde en 5 s, lo dice y sale con 3: el servidor compilará él mismo.
-   `--prueba [REF]` compila cualquier referencia sin entregarla.
+   al buzón (`PRECOMPILADAS_BUZON_SSH`). Si el PC no responde en 5 s, lo dice
+   y sale con 3. `--prueba [REF]` compila cualquier referencia sin
+   entregarla.
 2. El PC saca el código del commit de la etiqueta con `git archive` a
-   `~/rtf-cross/fuente`, nunca de una copia de trabajo. Compila como el
-   servidor, con la misma versión de `cargo-leptos`, y el binario para
-   `x86_64-unknown-freebsd` con [`cross`](https://github.com/cross-rs/cross).
-   Empaqueta `routerpanel-<versión>-x86_64-unknown-freebsd.tar.gz` y
+   `~/rtf-cross/fuente`, nunca de una copia de trabajo. Compila con la misma
+   versión de `cargo-leptos` que la release de GitHub, y el binario para
+   `x86_64-unknown-freebsd` con `cross`. Empaqueta con
+   `empaquetar-freebsd.sh` (el mismo archivo que GitHub) y escribe
    `SHA256SUMS`; con `RP_MINISIGN_SECRETA`, también `SHA256SUMS.minisig`.
 3. `entregar.sh` sube los ficheros por SSH como el usuario `rpentrega` del
    servidor, que solo puede ejecutar `recibir-precompilada.sh`. Este guarda
    cada fichero en `/var/db/routerpanel-buzon/entrada/<versión>/`, solo con
    los nombres admitidos, hasta 300 MB por fichero y las 3 versiones más
    recientes.
-4. Cuando el actualizador ve una etiqueta nueva:
-   - Si ya está en el buzón, comprueba la firma (con
-     `PRECOMPILADAS_MINISIGN`), el sha256, que `COMMIT` es el de la etiqueta
-     y que `panel` es un ejecutable de FreeBSD x86-64. Si todo cuadra, la
-     despliega como una versión propia, con copia de la base de datos,
-     `/salud` y vuelta atrás. Si algo falla, lo registra y compila en la
-     misma ejecución. En los dos casos vacía esa carpeta del buzón.
-   - Si no ha llegado, espera hasta `PRECOMPILADAS_ESPERA` minutos desde que
-     vio la etiqueta y después compila él mismo. Como el cron va cada 15
-     minutos, la espera se redondea hacia arriba: 20 minutos pueden ser 30.
-     Con `PRECOMPILADAS_ESPERA=0` no espera, pero usa la precompilada si ya
-     está.
-
-   Si la precompilada no arranca, la vuelta atrás es la de siempre y el
-   siguiente intento compila en el servidor. Los `--ref` nunca miran el
-   buzón.
+4. Cuando el actualizador ve la etiqueta, mira el buzón antes que GitHub y,
+   si la versión está y pasa las comprobaciones, la despliega. En los dos
+   casos (instalada o rechazada) vacía esa carpeta del buzón.
 
 ### Seguridad del buzón
 
@@ -280,14 +323,14 @@ Quien controle el PC de compilación o su clave del buzón puede desplegar
 otro binario en la jail del panel, igual que quien pueda crear etiquetas en
 el repositorio: el commit tiene que ser el de la etiqueta, pero el binario no
 se puede comprobar contra el código. Con minisign solo vale lo firmado con
-una clave que no sale del PC.
+una clave que no sale del PC. Las versiones de GitHub no tienen ese
+problema: su atestación dice qué flujo y qué etiqueta las compilaron.
 
 ### Instalar (a mano, una vez)
 
 En `deploy/config.local` del equipo de trabajo:
 
 ```sh
-PRECOMPILADAS_ESPERA=20
 PC_COMPILAR_SSH=usuario@pc-de-compilacion
 PRECOMPILADAS_BUZON_SSH=rpentrega@<IP del servidor vista desde el PC>
 # Opcional: PRECOMPILADAS_MINISIGN=<la línea de la clave pública>
@@ -331,9 +374,9 @@ sshd -T | grep -Ei '^(allowusers|allowgroups|denyusers|denygroups)'
   y el PC firma solo.
 
 Después repite `deploy/freebsd-jail/install.sh` desde el equipo de trabajo,
-que pasa `PRECOMPILADAS_ESPERA` y `PRECOMPILADAS_MINISIGN` al actualizador.
-Por último, en el PC, fija la clave del servidor y prueba el buzón
-(`recibir` sin argumentos responde con el uso y no guarda nada):
+que pasa `PRECOMPILADAS_MINISIGN` al actualizador. Por último, en el PC, fija
+la clave del servidor y prueba el buzón (`recibir` sin argumentos responde
+con el uso y no guarda nada):
 
 ```sh
 ssh-keyscan -t ed25519 <servidor> >>~/.ssh/known_hosts   # compárala con ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub del servidor
@@ -360,16 +403,58 @@ systemctl --user enable --now rtf-cross.timer
 Las unidades de usuario solo corren con la sesión abierta, salvo que
 actives `loginctl enable-linger`.
 
+## Migrar una instalación existente
+
+Las instalaciones anteriores tenían una jail de compilación
+(`JAIL_COMPILAR`, normalmente `routerpanel-build`) donde el actualizador
+clonaba el repositorio y compilaba. Ya no se usa. Para pasar a la
+instalación sin compilar:
+
+1. En `deploy/config.local`, pon `GITHUB_REPO=propietario/nombre` si vas a
+   usar la release de GitHub (o prepara el [buzón](#el-pc-de-compilación-buzón)).
+   Las claves de la jail de compilación (`JAIL_COMPILAR`,
+   `JAIL_COMPILAR_IP`, `UID_COMPILAR`, `RED_LAN`, `RED_VPN`, `DNS_IP`,
+   `TRABAJOS_COMPILACION`, `PRECOMPILADAS_ESPERA`) ya no hacen nada; puedes
+   quitarlas.
+2. Repite `deploy/freebsd-jail/install.sh`. Pasa la clave de despliegue de la
+   jail de compilación al host
+   (`/usr/local/etc/routerpanel-actualizar/id_ed25519`), así que la que ya
+   diste de alta en el servidor git sigue valiendo; si no la encuentra, crea
+   una nueva e imprime su parte pública para darla de alta. Fija la clave del
+   servidor git en el host (`REPO_HOST_CLAVE` o la primera que presente),
+   instala el actualizador nuevo, quita de pf las reglas de la jail de
+   compilación y deja a la jail del panel llegar a su `/salud`.
+3. Comprueba que el actualizador funciona sin la jail:
+
+   ```sh
+   ssh SERVIDOR doas routerpanel-actualizar
+   ssh SERVIDOR doas tail /var/log/routerpanel-update.log
+   ```
+
+   No debe decir «sin acceso al repositorio». Si la última etiqueta ya está
+   desplegada, no registra nada; si no, la instala o dice que la espera.
+4. Cuando funcione, borra la jail de compilación. Desde el servidor, como
+   root:
+
+   ```sh
+   service jail stop routerpanel-build
+   zfs destroy -r <ZFS_DATASET>/routerpanel-build
+   ```
+
+   y quita su bloque `routerpanel-build { … }` de `/etc/jail.conf`. El
+   registro de compilación `/var/log/routerpanel-build.log` también sobra.
+
 ## Red (pf)
 
-- Al puerto del panel solo llegan los proxies de confianza y la jail de
-  compilación. El resto se bloquea, también desde la red local y la VPN.
+- Al puerto del panel solo llegan los proxies de confianza y la propia
+  jail del panel (el actualizador pregunta `/salud` desde ella). El resto se
+  bloquea, también desde la red local y la VPN.
 - La jail del panel solo puede salir a la web del router (`ROUTER_IP`, tcp
   80).
-- La jail de compilación ejecuta código del repositorio. Sale libremente a
-  Internet (crates.io, rustup, pkg), pero de `RED_LAN` y `RED_VPN` solo
-  alcanza el repositorio git (si `REPO_URL` lleva una IP), el DNS
-  (`DNS_IP`:53) y el panel.
+- El actualizador corre en el host: necesita llegar al repositorio
+  (`REPO_URL`) y, con `GITHUB_REPO`, a GitHub por HTTPS (las descargas de
+  la release y `api.github.com`). Eso lo deciden las reglas del propio
+  host, no estas.
 
 Como la jail del panel no tiene red ni `pkg`, no se actualiza con `pkg -j`.
 Hazlo desde el host:
@@ -378,8 +463,6 @@ Hazlo desde el host:
 doas pkg --rootdir <JAILS_RAIZ>/<JAIL_PANEL> upgrade -r FreeBSD-base
 doas jexec <JAIL_PANEL> service routerpanel restart
 ```
-
-La de compilación sí, como cualquier otra: `doas pkg -j <JAIL_COMPILAR> upgrade`.
 
 ## Operación
 
