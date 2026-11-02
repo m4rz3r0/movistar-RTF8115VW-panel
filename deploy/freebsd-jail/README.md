@@ -201,8 +201,9 @@ muestra el uso; no tiene más opciones. En cada ejecución:
      versión precompilada de vX.Y.Z» y termina sin error. La vuelve a buscar
      en cada ejecución, sin límite de tiempo, y esperar no cuenta como fallo.
    - Si alguna la tiene pero algo no cuadra, la rechaza (lo registra con el
-     motivo y vacía esa carpeta del buzón) y cuenta como un fallo de la
-     etiqueta. Nunca se instala nada sin comprobar.
+     motivo y vacía esa carpeta del buzón) y vuelve a esperar: una entrega
+     rechazada no cuenta como fallo de la etiqueta, para que una buena
+     posterior se pueda instalar. Nunca se instala nada sin comprobar.
 4. Para el servicio y copia `panel.db` a
    `/var/db/routerpanel/antes-de-actualizar/`.
 5. Cambia `current`, arranca y espera como mucho 60 s a que `/salud`

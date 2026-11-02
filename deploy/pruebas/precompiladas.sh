@@ -522,7 +522,7 @@ actualizar
 [ "$RC" = 0 ] && ! grep -q service "$H/llamadas" || fallo "b: con la versión ya desplegada hace algo"
 sin_compilar b
 
-# c. Del buzón, pero de otro commit: rechazada, borrada, un fallo.
+# c. Del buzón, pero de otro commit: rechazada y borrada, sin contar fallo.
 preparar_servidor
 hacer_archivo "$H/buzon/entrada/v1.0.0" v1.0.0 "$OTRO"
 actualizar
@@ -531,7 +531,7 @@ actualizar
 [ ! -e "$H/releases/v1.0.0" ] || fallo "c: deja la versión rechazada en releases"
 registro | grep -q 'rechazada: el archivo es de otro commit' || fallo "c: no dice por qué la rechaza: $(registro)"
 [ ! -e "$H/buzon/entrada/v1.0.0" ] || fallo "c: deja la precompilada mala en el buzón"
-[ "$(sed -n 2p "$H/state/intentos" 2>/dev/null)" = 1 ] || fallo "c: no cuenta el fallo"
+[ ! -e "$H/state/intentos" ] && [ ! -e "$H/state/fallida" ] || fallo "c: cuenta la entrega rechazada como fallo"
 sin_compilar c
 
 # d. De GitHub, con su atestación.

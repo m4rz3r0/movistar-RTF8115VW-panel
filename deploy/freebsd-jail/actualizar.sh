@@ -403,7 +403,8 @@ deploy()
 # Un fallo de la etiqueta $1. Un fallo suelto puede ser transitorio (una
 # entrega a medias, la red): la etiqueta sólo queda en «fallida» (y el cron
 # deja de intentarlo) tras $MAX_TRIES fallos seguidos; hasta entonces se
-# reintenta en la ejecución siguiente. Esperar a la versión no cuenta.
+# reintenta en la ejecución siguiente. Esperar a la versión, o que se
+# rechace una entrega, no cuenta.
 tag_failed()
 {
 	_n=1
@@ -476,10 +477,10 @@ main()
 		obtener "$_tag" "$_commit"
 		case $FUENTE in
 		esperar) exit 0 ;;
-		rechazada)
-			tag_failed "$_tag"
-			exit 1
-			;;
+		# Una entrega rechazada no cuenta como fallo de la etiqueta: otra
+		# entrega buena (el PC repite, o sale la release de GitHub) tiene
+		# que poder instalarse en la pasada siguiente.
+		rechazada) exit 1 ;;
 		esac
 	fi
 	log "etiqueta nueva $_tag (desplegada: $(deployed))"
