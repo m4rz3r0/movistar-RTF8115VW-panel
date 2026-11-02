@@ -258,7 +258,7 @@ github()
 }
 publicar_github "$REPO_GH" v1.2.3 "$C"
 github 0 bien "$REPO_GH" v1.2.3 "$C"
-[ "$(find "$TMP/gh-destino" -mindepth 1 -maxdepth 1 -printf '%f\n' 2>/dev/null | sort | tr '\n' ' ')" = "COMMIT panel site " ] ||
+[ "$(find "$TMP/gh-destino" -mindepth 1 -maxdepth 1 -printf '%f\n' 2>/dev/null | LC_ALL=C sort | tr '\n' ' ')" = "COMMIT panel site " ] ||
 	fallo "github: la versión no queda solo con panel, site/ y COMMIT"
 github 2 "otro commit" "$REPO_GH" v1.2.3 "$OTRO"
 github 1 "aún no está publicada" "$REPO_GH" v9.9.9 "$C"
@@ -477,7 +477,7 @@ forjar()
 }
 publicar_forgejo v1.2.3 "$C"
 forjar 0 bien v1.2.3
-[ "$(find "$TMP/fj-destino" -mindepth 1 -maxdepth 1 -printf '%f\n' 2>/dev/null | sort | tr '\n' ' ')" = "COMMIT panel site " ] ||
+[ "$(find "$TMP/fj-destino" -mindepth 1 -maxdepth 1 -printf '%f\n' 2>/dev/null | LC_ALL=C sort | tr '\n' ' ')" = "COMMIT panel site " ] ||
 	fallo "forgejo: la versión no queda solo con panel, site/ y COMMIT"
 grep -q "/dueno/panel/releases/download/v1.2.3/SHA256SUMS" "$TMP/curl-argv" ||
 	fallo "forgejo: no descarga de FORGEJO_URL/FORGEJO_REPO/releases/download"
@@ -519,7 +519,7 @@ V=v1.2.3
 hacer_archivo "$B/$V" "$V" "$C"
 
 if preparar_precompilada "$B" "$V" "$C" '' "$TMP/bueno" 2>"$TMP/err"; then
-	[ "$(find "$TMP/bueno" -mindepth 1 -maxdepth 1 -printf '%f\n' | sort | tr '\n' ' ')" = "COMMIT panel site " ] ||
+	[ "$(find "$TMP/bueno" -mindepth 1 -maxdepth 1 -printf '%f\n' | LC_ALL=C sort | tr '\n' ' ')" = "COMMIT panel site " ] ||
 		fallo "el archivo bueno no queda solo con panel, site/ y COMMIT"
 	[ "$(cat "$TMP/bueno/COMMIT")" = "$C" ] || fallo "COMMIT no es el de la etiqueta"
 else
@@ -935,11 +935,12 @@ fi
 hacer_archivo "$TMP/pub-fuente/v2.0.0" v2.0.0 "$OTRO"
 if publicar v2.0.0; then
 	if grep -q '^creada' "$TMP/forja-log"; then fallo "publicar-forgejo.sh crea otra vez la release"; fi
-	grep -qx "borrado $ARCH2" "$TMP/forja-log" && grep -qx "borrado SHA256SUMS" "$TMP/forja-log" ||
-		fallo "publicar-forgejo.sh no borra los adjuntos que ya estaban: $(cat "$TMP/forja-log")"
+	# SHA256SUMS se va el primero y vuelve el último.
+	[ "$(tr '\n' ' ' <"$TMP/forja-log")" = "borrado SHA256SUMS borrado $ARCH2 subido $ARCH2 subido SHA256SUMS " ] ||
+		fallo "publicar-forgejo.sh no sustituye los adjuntos en orden: $(cat "$TMP/forja-log")"
 	cmp -s "$FORJA/v2.0.0/adjuntos/$ARCH2" "$TMP/pub-fuente/v2.0.0/$ARCH2" ||
 		fallo "publicar-forgejo.sh no sustituye el archivo"
-	[ "$(awk '{ print $2 }' "$FORJA/v2.0.0/adjuntos.ids" | sort | tr '\n' ' ')" = "$ARCH2 SHA256SUMS " ] ||
+	[ "$(awk '{ print $2 }' "$FORJA/v2.0.0/adjuntos.ids" | LC_ALL=C sort | tr '\n' ' ')" = "SHA256SUMS $ARCH2 " ] ||
 		fallo "la release no queda con un archivo y un SHA256SUMS: $(cat "$FORJA/v2.0.0/adjuntos.ids")"
 else
 	fallo "publicar-forgejo.sh falla al repetir: $(cat "$TMP/salida")"

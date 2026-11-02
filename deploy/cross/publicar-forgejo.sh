@@ -66,8 +66,9 @@ TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
 # --- 1. compilar -------------------------------------------------------------
+# Sin los demás tokens que el runner pueda poner en el entorno del trabajo.
 GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.extraheader GIT_CONFIG_VALUE_0="Authorization: token $TOKEN" \
-	RP_CROSS_DIR=$BASE bash "$COMPILAR" --release "$TAG" --repo "$FORGEJO_SERVER/$FORGEJO_REPOSITORY.git"
+	RP_CROSS_DIR=$BASE env -u GITHUB_TOKEN -u GITEA_TOKEN -u ACTIONS_RUNTIME_TOKEN bash "$COMPILAR" --release "$TAG" --repo "$FORGEJO_SERVER/$FORGEJO_REPOSITORY.git"
 
 SALIDA=$BASE/salida/$TAG
 ARCH=$(archivo_precompilada "$TAG")
@@ -122,7 +123,11 @@ if [ -f "$SALIDA/SHA256SUMS.minisig" ]; then
 	ficheros+=(SHA256SUMS.minisig)
 fi
 ficheros+=(SHA256SUMS)
-for f in "${ficheros[@]}"; do
+# Primero se borra lo que ya estaba, SHA256SUMS el primero, y luego se sube,
+# SHA256SUMS el último: el servidor nunca ve un SHA256SUMS de otro archivo,
+# solo una release a medias, y espera.
+for ((i = ${#ficheros[@]} - 1; i >= 0; i--)); do
+	f=${ficheros[i]}
 	while read -r adjunto; do
 		case $adjunto in
 		'' | *[!0-9]*) error "Forgejo da un id de adjunto que no es un número" ;;
@@ -131,6 +136,8 @@ for f in "${ficheros[@]}"; do
 		[ "$codigo" = 204 ] || error "Forgejo no borra el $f anterior (HTTP $codigo)"
 		echo "borrado el $f anterior"
 	done < <(jq -r --arg n "$f" '.[] | select(.name == $n) | .id' "$TMP/adjuntos.json")
+done
+for f in "${ficheros[@]}"; do
 	codigo=$(api POST "/releases/$ID/assets?name=$f" "$TMP/subido.json" -F "attachment=@$SALIDA/$f")
 	[ "$codigo" = 201 ] || error "Forgejo no acepta $f (HTTP $codigo): $(head -c 300 "$TMP/subido.json")"
 	echo "subido $f"
