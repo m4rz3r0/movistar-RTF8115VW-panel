@@ -171,9 +171,9 @@ ls_remote()
 {
 	_ssh="ssh -F /dev/null -o BatchMode=yes -o ConnectTimeout=15 -o IdentitiesOnly=yes"
 	_ssh="$_ssh -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOSTS_CONOCIDOS"
-	if [ -f "$CLAVE_DESPLIEGUE" ]; then
-		_ssh="$_ssh -i $CLAVE_DESPLIEGUE"
-	fi
+	# Siempre -i: sin él, ssh probaría las claves de root (~/.ssh/id_*). Si
+	# falta la clave de despliegue, ssh falla y se registra sin acceso.
+	_ssh="$_ssh -o GlobalKnownHostsFile=/dev/null -i $CLAVE_DESPLIEGUE"
 	GIT_SSH_COMMAND=$_ssh GIT_SSH_VARIANT=ssh GIT_TERMINAL_PROMPT=0 \
 		GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null \
 		GIT_ALLOW_PROTOCOL=https:http:ssh:git:file \
