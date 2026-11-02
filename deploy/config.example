@@ -20,26 +20,12 @@ ZFS_DATASET=zroot/jails/containers
 JAIL_PANEL=routerpanel
 JAIL_PANEL_IP=192.0.2.20
 
-# Jail de compilación: Rust y el clon del repositorio. Sale a
-# Internet, pero de tu red solo alcanza el DNS, el repositorio y el panel.
-JAIL_COMPILAR=routerpanel-build
-JAIL_COMPILAR_IP=192.0.2.21
-# uid (y gid) del usuario que compila; que no lo use nadie en el host.
-UID_COMPILAR=3160
-
 # Interfaz de salida del host para el nat de pf (o una macro de tu pf.conf,
 # entre comillas simples).
 INTERFAZ_EXT=em0
-# Tu red local y, si tienes, la de tu VPN: la jail de compilación no entra en
-# ninguna de las dos. RED_VPN vacía = sin regla para la VPN. También valen
-# macros de tu pf.conf, entre comillas simples.
-RED_LAN=192.0.2.0/24
-RED_VPN=
 
 # IP de la web del router (la de fábrica es 192.168.1.1).
 ROUTER_IP=192.168.1.1
-# DNS que usa la jail de compilación (el del host o el de tu red).
-DNS_IP=192.0.2.10
 
 # Dirección pública del panel, como la escribe el navegador (RP_ORIGIN; varias
 # separadas por comas).
@@ -47,40 +33,39 @@ PANEL_ORIGEN=https://panel.example
 # IP:puerto donde escucha el panel dentro de su jail (RP_LISTEN).
 PANEL_ESCUCHA=192.0.2.20:3000
 # Proxies inversos delante del panel: IPs o redes separadas por comas
-# (RP_TRUSTED_PROXY). pf solo les deja llegar a ellos y a la jail de
-# compilación.
+# (RP_TRUSTED_PROXY). pf solo les deja llegar a ellos (y a la propia jail,
+# para /salud).
 PROXIES_CONFIANZA=192.0.2.10
 
-# Repositorio del que se compila: cualquier URL de git (https://… o
-# ssh://git@equipo:puerto/…). Si está en tu red, pon su IP: pf solo abre a la
-# jail de compilación una IP de tu red.
+# Repositorio en el que el actualizador busca las etiquetas vX.Y.Z (con
+# git ls-remote desde el host; el servidor no compila ni clona): cualquier
+# URL de git (https://… o ssh://git@equipo:puerto/…).
 REPO_URL=https://git.example/routerpanel.git
 # Línea de known_hosts del servidor git por SSH, p. ej.
-# «[192.0.2.30]:2222 ssh-ed25519 …». Vacía: se acepta la primera clave que
-# presente (y se fija). Con https no hace falta.
+# «[192.0.2.30]:2222 ssh-ed25519 …». Vacía: install.sh fija la primera
+# clave que presente. Con https no hace falta.
 REPO_HOST_CLAVE=
 
 # Qué se instala: pf (reglas con interruptor de hombre muerto), rc (jail y
-# servicio del panel), actualizador (jail de compilación y cron). Opcionales:
-# caddyfile (genera el sitio para tu Caddyfile) y unbound (nombre del panel
-# en el unbound del host).
+# servicio del panel), actualizador (actualizador y cron en el host, con su
+# clave de despliegue). Opcionales: caddyfile (genera el sitio para tu
+# Caddyfile) y unbound (nombre del panel en el unbound del host).
 MODULOS="pf rc actualizador"
 
-# Trabajos de compilación a la vez en la jail de compilación (opcional).
-# Vacía: los que decida cargo, uno por núcleo. Un número menor gasta menos
-# memoria; útil si la compilación deja al servidor sin ella.
-TRABAJOS_COMPILACION=
-
-# Versiones precompiladas por el PC de compilación (opcional; ver
-# freebsd-jail/README.md, «Versiones precompiladas»). Minutos que el
-# actualizador espera a que llegue al buzón la versión ya compilada de una
-# etiqueta nueva antes de compilarla él. Vacía: no se usa el buzón y el
-# actualizador compila como siempre. 0: usa la precompilada si ya está, sin
-# esperar.
-PRECOMPILADAS_ESPERA=
-# Clave pública de minisign con la que el PC firma SHA256SUMS (la segunda
-# línea del .pub). Vacía: sin firma (vale con el sha256 y la clave SSH del
-# buzón). Con ella, el host necesita el paquete minisign.
+# De dónde saca el actualizador las versiones ya compiladas para FreeBSD
+# (ver freebsd-jail/README.md). Instala la de la primera fuente que la
+# tenga y pase las comprobaciones; si ninguna la tiene, espera.
+#
+# La release de GitHub del repositorio, «propietario/nombre» (opcional):
+# archivo, SHA256SUMS y su atestación de origen, comprobada con
+# gh attestation verify. Con ella, install.sh instala gh y jq en el host.
+# Vacía: no se mira GitHub.
+GITHUB_REPO=
+# El buzón donde deja las versiones el PC de compilación (deploy/cross/):
+# siempre se mira. Clave pública de minisign con la que el PC firma
+# SHA256SUMS (la segunda línea del .pub). Vacía: sin firma (vale con el
+# sha256 y la clave SSH del buzón). Con ella, el host necesita el paquete
+# minisign. No se aplica a GitHub, que va con su atestación.
 PRECOMPILADAS_MINISIGN=
 # Para deploy/cross/lanzar.sh, desde este equipo: cómo se entra por SSH al PC
 # de compilación y, desde el PC, al usuario del buzón del servidor.

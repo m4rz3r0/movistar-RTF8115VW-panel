@@ -1,7 +1,9 @@
 #!/bin/sh
 # shellcheck disable=SC2016,SC2029 # guiones que se expanden en la jail o en el servidor
 #
-# Instala el panel del router en dos jails de un servidor FreeBSD. Desde el
+# Instala el panel del router en una jail de un servidor FreeBSD, con su
+# actualizador en el host. El servidor nunca compila: las versiones llegan ya
+# compiladas (buzón del PC de compilación o release de GitHub). Desde el
 # equipo de trabajo, en el repositorio:
 #
 #   deploy/freebsd-jail/install.sh [--config FICHERO]
@@ -13,36 +15,36 @@
 # conectarse a nada.
 #
 # Sin --plantillas es idempotente: se puede repetir y sólo hace lo que falte.
-# Sube deploy/ (con la configuración ya resuelta) y un git bundle del
-# repositorio a ~/routerpanel-deploy en SERVIDOR_SSH, y allí, como root
-# (doas), según MODULOS:
+# Sube deploy/ (con la configuración ya resuelta) a ~/routerpanel-deploy en
+# SERVIDOR_SSH, y allí, como root (doas), según MODULOS:
 #
-#   --servidor      siempre: las dos jails en /etc/jail.conf.
+#   --servidor      siempre: la jail del panel en /etc/jail.conf.
 #                   rc: base PkgBase de la jail del panel, usuario, nullfs de
 #                   releases, rc.d con sus variables y newsyslog; si el panel
 #                   aún no tiene usuarios, dice dónde está el token del
 #                   asistente de instalación (/instalar).
-#                   actualizador: jail de compilación con su toolchain de Rust,
-#                   clave de despliegue y clon del repositorio; el
-#                   actualizador y su cron en el host.
+#                   actualizador: en el host, el actualizador y su cron, la
+#                   clave de despliegue y el known_hosts del servidor git
+#                   (para git ls-remote), y gh y jq si hay GITHUB_REPO.
 #                   unbound: el nombre del panel en el unbound del host.
 #                   caddyfile: el sitio para el Caddyfile (lo imprime; no lo instala).
 #   --pf-cargar     (pf) mete las reglas en /etc/pf.conf y las carga con un
 #                   interruptor de hombre muerto: si nadie lo desarma en 180 s,
 #                   vuelve a cargar la copia anterior.
 #   --pf-confirmar  desarma el interruptor.
-#   --comprobar-red qué alcanzan las dos jails con las reglas cargadas (el
-#                   equipo de trabajo lo lanza antes de desarmar).
+#   --comprobar-red qué alcanzan la jail del panel y el actualizador con las
+#                   reglas cargadas (el equipo de trabajo lo lanza antes de
+#                   desarmar).
 #
 # Entre --pf-cargar y --pf-confirmar, el equipo de trabajo comprueba por una
 # conexión SSH NUEVA que el servidor sigue respondiendo (y las webs de
-# COMPROBAR_URLS), y con --comprobar-red lo que alcanzan las jails; si algo
-# falla no confirma y el servidor vuelve solo a las reglas anteriores.
+# COMPROBAR_URLS), y con --comprobar-red lo que alcanzan la jail del panel y
+# el actualizador; si algo falla no confirma y el servidor vuelve solo a las
+# reglas anteriores.
 #
-# El primer despliegue (antes de que exista ninguna etiqueta v*) se hace a mano:
-#   ssh SERVIDOR doas routerpanel-actualizar --ref RAMA
-# y después se abre PANEL_ORIGEN/instalar con el token que imprime install.sh
-# si se repite (o el registro del panel).
+# El primer despliegue es el de la primera etiqueta vX.Y.Z con su versión
+# precompilada; después se abre PANEL_ORIGEN/instalar con el token que
+# imprime install.sh si se repite (o el registro del panel).
 
 set -eu
 
@@ -57,11 +59,8 @@ STAGE=routerpanel-deploy
 # carpeta de subida del usuario.
 PLANTILLAS=
 RELEASES=/usr/local/routerpanel/releases
-BUILD_USER=rpbuild
 # uid/gid del usuario del servicio en la jail del panel.
 UID_PANEL=3159
-SRC=/home/$BUILD_USER/panel
-CARGO_LEPTOS_VERSION=0.3.11
 # Token del asistente de instalación: lo escribe el panel al arrancar sin
 # usuarios, junto a su base de datos (ruta en la jail).
 TOKEN=/var/db/routerpanel/instalar.token
@@ -73,6 +72,11 @@ PF_BACKUP=/etc/pf.conf.bak-routerpanel
 # Lo que el actualizador necesita en el host.
 ACTUALIZADOR_CONF=/usr/local/etc/routerpanel-actualizar.conf
 ACTUALIZADOR_LIB=/usr/local/libexec/routerpanel-actualizar
+# Clave de despliegue y known_hosts del servidor git, de root (0700).
+ACTUALIZADOR_CLAVES=/usr/local/etc/routerpanel-actualizar
+# Jail de compilación de instalaciones anteriores: solo para llevarse su
+# clave de despliegue al host y avisar de que ya no se usa.
+JAIL_COMPILAR_ANTIGUA=routerpanel-build
 
 say()
 {
@@ -94,15 +98,13 @@ uso()
 # ----------------------------------------------------------- configuración --
 
 # Carga la configuración $1 (vacío: deploy/config.local) y calcula lo que
-# sale de ella: nombres y rutas de las jails y los valores derivados que usan
-# las plantillas (exportados, como las claves).
+# sale de ella: nombre y ruta de la jail y los valores derivados que usan las
+# plantillas (exportados, como las claves).
 configurar()
 {
 	cargar_config "$1" || exit 1
 	RUN_JAIL=$JAIL_PANEL
-	BUILD_JAIL=$JAIL_COMPILAR
 	RJ=$JAILS_RAIZ/$RUN_JAIL
-	BJ=$JAILS_RAIZ/$BUILD_JAIL
 
 	PANEL_PUERTO=${PANEL_ESCUCHA##*:}
 	# Lista de pf: una sola dirección tal cual; varias, entre llaves.
@@ -120,44 +122,7 @@ configurar()
 	if [ -n "$PROXY_IP" ] && ! _es_ipv4 "$PROXY_IP"; then
 		PROXY_IP=
 	fi
-	REDES_PROPIAS="{ $RED_LAN${RED_VPN:+ $RED_VPN} }"
-	repo_destino
-	if [ -n "$REPO_IP" ]; then
-		REGLA_REPO="pass quick proto tcp from $JAIL_COMPILAR_IP to $REPO_IP port $REPO_PUERTO"
-	else
-		REGLA_REPO="# (el repositorio no está en una IP de la red propia: sale como Internet)"
-	fi
-	export PANEL_PUERTO PROXIES_PF REDES_PROPIAS REGLA_REPO
-}
-
-# Equipo y puerto de REPO_URL: REPO_IP (vacía si el equipo no es una IPv4) y
-# REPO_PUERTO. Formas: esquema://[usuario@]equipo[:puerto]/… y la de scp,
-# [usuario@]equipo:ruta (SSH, puerto 22).
-repo_destino()
-{
-	REPO_IP=
-	REPO_PUERTO=
-	case $REPO_URL in
-	ssh://*) _r=${REPO_URL#ssh://} _p=22 ;;
-	https://*) _r=${REPO_URL#https://} _p=443 ;;
-	http://*) _r=${REPO_URL#http://} _p=80 ;;
-	git://*) _r=${REPO_URL#git://} _p=9418 ;;
-	*://*) return 0 ;;
-	*:*) _r=${REPO_URL%%:*} _p=22 ;;
-	*) return 0 ;;
-	esac
-	_r=${_r%%/*}
-	_r=${_r##*@}
-	case $_r in
-	*:*)
-		_p=${_r##*:}
-		_r=${_r%:*}
-		;;
-	esac
-	if _es_ipv4 "$_r"; then
-		REPO_IP=$_r
-		REPO_PUERTO=$_p
-	fi
+	export PANEL_PUERTO PROXIES_PF
 }
 
 # Genera en $1 los ficheros del host a partir de la configuración cargada.
@@ -174,26 +139,18 @@ generar_plantillas()
 		echo "routerpanel_listen=$PANEL_ESCUCHA"
 		echo "routerpanel_trusted_proxy=$PROXIES_CONFIANZA"
 	} >"$_dst/rc.conf"
-	echo "nameserver $DNS_IP" >"$_dst/resolv.conf"
-	volcar_config JAILS_RAIZ JAIL_PANEL JAIL_COMPILAR REPO_URL TRABAJOS_COMPILACION \
-		PRECOMPILADAS_ESPERA PRECOMPILADAS_MINISIGN >"$_dst/actualizador.conf"
-	# SSH del usuario que compila: sólo su clave de despliegue, y la clave del
-	# servidor git fijada (la de REPO_HOST_CLAVE o, sin ella, la primera que
-	# presente).
+	{
+		volcar_config JAILS_RAIZ JAIL_PANEL REPO_URL GITHUB_REPO PRECOMPILADAS_MINISIGN
+		echo "CLAVE_DESPLIEGUE='$ACTUALIZADOR_CLAVES/id_ed25519'"
+		echo "HOSTS_CONOCIDOS='$ACTUALIZADOR_CLAVES/known_hosts'"
+	} >"$_dst/actualizador.conf"
+	# La clave del servidor git fijada: la de REPO_HOST_CLAVE o, sin ella, la
+	# primera que presente (setup_updater).
 	if [ -n "$REPO_HOST_CLAVE" ]; then
-		_estricto=yes
 		echo "$REPO_HOST_CLAVE" >"$_dst/known_hosts"
 	else
-		_estricto=accept-new
 		rm -f "$_dst/known_hosts"
 	fi
-	cat >"$_dst/ssh_config" <<-EOF
-		Host *
-		    IdentityFile ~/.ssh/id_ed25519
-		    IdentitiesOnly yes
-		    StrictHostKeyChecking $_estricto
-		    UserKnownHostsFile ~/.ssh/known_hosts
-	EOF
 	if tiene_modulo caddyfile; then
 		{
 			echo "# Sitio del panel del router: añádelo al Caddyfile."
@@ -218,17 +175,6 @@ generar_plantillas()
 
 # ---------------------------------------------------------------- servidor --
 
-# Ejecuta $1 como $BUILD_USER en la jail de compilación, con su toolchain.
-as_builder()
-{
-	_script=$1
-	shift
-	jexec -l -U "$BUILD_USER" "$BUILD_JAIL" /bin/sh -c "
-		PATH=\$HOME/.cargo/bin:/usr/local/bin:/usr/bin:/bin
-		export PATH
-		$_script" sh "$@"
-}
-
 check_syntax()
 {
 	for f in "$DIR/install.sh" "$DIR/actualizar.sh" "$DIR/recibir-precompilada.sh" \
@@ -242,7 +188,7 @@ setup_jail_conf()
 	if grep -q "^$RUN_JAIL {" /etc/jail.conf; then
 		return
 	fi
-	say "jail.conf: añadiendo $RUN_JAIL y $BUILD_JAIL"
+	say "jail.conf: añadiendo $RUN_JAIL"
 	cp -p /etc/jail.conf /etc/jail.conf.bak-routerpanel
 	cat "$PLANTILLAS/jail.conf" >>/etc/jail.conf
 }
@@ -332,87 +278,90 @@ setup_runtime_jail()
 		>"$RJ/etc/newsyslog.conf.d/routerpanel.conf"
 }
 
-setup_build_jail()
+# git ls-remote de REPO_URL desde el host, como lo hace el actualizador, con
+# StrictHostKeyChecking=$1 (yes, o accept-new para fijar la primera clave).
+ls_remote_host()
 {
-	create_jail "$BUILD_JAIL" FreeBSD-set-base-jail
-	cp "$PLANTILLAS/resolv.conf" "$BJ/etc/resolv.conf"
-	start_jail "$BUILD_JAIL"
-	for p in pkg git binaryen rustup-init; do
-		if ! pkg -j "$BUILD_JAIL" info -e "$p" 2>/dev/null; then
-			say "$BUILD_JAIL: instalando $p"
-			if [ "$p" = pkg ]; then
-				pkg --rootdir "$BJ" install -y -r FreeBSD-ports pkg
+	GIT_SSH_COMMAND="ssh -F /dev/null -o BatchMode=yes -o ConnectTimeout=10 -o IdentitiesOnly=yes -i $ACTUALIZADOR_CLAVES/id_ed25519 -o StrictHostKeyChecking=$1 -o UserKnownHostsFile=$ACTUALIZADOR_CLAVES/known_hosts" \
+		GIT_TERMINAL_PROMPT=0 GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null \
+		timeout 60 git ls-remote --tags -- "$REPO_URL"
+}
+
+# Clave de despliegue y known_hosts del servidor git, en el host y de root.
+# La clave: la que ya hubiera; si no, la de la jail de compilación de una
+# instalación anterior (leída dentro de esa jail como su usuario, para que un
+# enlace simbólico de allí no lleve a root a otro fichero, y comprobada con
+# ssh-keygen); si no, una nueva.
+setup_clave_despliegue()
+{
+	install -d -m 0700 -o root -g wheel "$ACTUALIZADOR_CLAVES"
+	_k=$ACTUALIZADOR_CLAVES/id_ed25519
+	if [ ! -f "$_k" ] && jls -j "$JAIL_COMPILAR_ANTIGUA" jid >/dev/null 2>&1; then
+		_t=$(mktemp "$ACTUALIZADOR_CLAVES/.clave.XXXXXX")
+		if jexec -U rpbuild "$JAIL_COMPILAR_ANTIGUA" /bin/cat /home/rpbuild/.ssh/id_ed25519 >"$_t" 2>/dev/null &&
+			ssh-keygen -y -f "$_t" >"$_t.pub" 2>/dev/null; then
+			say "actualizador: clave de despliegue traída de $JAIL_COMPILAR_ANTIGUA"
+			mv "$_t.pub" "$_k.pub"
+			mv "$_t" "$_k"
+		fi
+		rm -f "$_t" "$_t.pub"
+	fi
+	if [ ! -f "$_k" ]; then
+		say "actualizador: clave de despliegue nueva"
+		ssh-keygen -q -t ed25519 -N "" -C "routerpanel-actualizar@$(hostname -s)" -f "$_k"
+	fi
+	chmod 600 "$_k"
+	chmod 644 "$_k.pub"
+
+	_h=$ACTUALIZADOR_CLAVES/known_hosts
+	if [ -f "$PLANTILLAS/known_hosts" ]; then
+		install -m 0644 -o root -g wheel "$PLANTILLAS/known_hosts" "$_h"
+	elif [ ! -s "$_h" ]; then
+		case $REPO_URL in
+		https://* | http://*) : >"$_h" ;;
+		*)
+			# Sin REPO_HOST_CLAVE: se fija la primera clave que presente.
+			if ls_remote_host accept-new >/dev/null 2>&1 || [ -s "$_h" ]; then
+				say "actualizador: clave del servidor git fijada en $_h (compárala con la del servidor):"
+				ssh-keygen -lf "$_h" || true
 			else
-				pkg -j "$BUILD_JAIL" install -y "$p"
+				echo "    aviso: no se llega al servidor git para fijar su clave; repite install.sh o pon REPO_HOST_CLAVE"
 			fi
+			;;
+		esac
+	fi
+}
+
+# Herramientas del host que necesita el actualizador: git siempre; gh y jq
+# solo con GITHUB_REPO (comprobar la atestación de la release).
+setup_paquetes_host()
+{
+	_p=git
+	if [ -n "$GITHUB_REPO" ]; then
+		_p="$_p gh jq"
+	fi
+	for _x in $_p; do
+		if ! pkg info -e "$_x" 2>/dev/null; then
+			say "host: instalando $_x"
+			pkg install -y "$_x"
 		fi
 	done
-	if ! pw -R "$BJ" usershow "$BUILD_USER" >/dev/null 2>&1; then
-		say "$BUILD_JAIL: usuario $BUILD_USER"
-		pw -R "$BJ" groupadd "$BUILD_USER" -g "$UID_COMPILAR"
-		pw -R "$BJ" useradd "$BUILD_USER" -u "$UID_COMPILAR" -g "$BUILD_USER" -c "Compilación del panel" -m -s /bin/sh
-	fi
+}
 
-	# Sin toolchain por defecto: la versión de Rust la fija rust-toolchain.toml
-	# del repositorio, y rustup la instala (con su objetivo wasm y sus
-	# componentes) la primera vez que se compila en el clon.
-	if ! as_builder 'command -v rustup' >/dev/null 2>&1; then
-		say "$BUILD_JAIL: rustup (Rust de rust-toolchain.toml)"
-		as_builder 'rustup-init -y --no-modify-path --profile minimal --default-toolchain none'
-	fi
-
-	# Clave de despliegue (de sólo lectura en el servidor git) y la clave del
-	# servidor git, fijada.
-	#
-	# Todo lo de ~rpbuild se escribe como rpbuild desde dentro de la jail: es
-	# su directorio, y el código que compila podría haber dejado enlaces
-	# simbólicos que una escritura de root desde el host seguiría.
-	as_builder 'mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"'
-	if ! as_builder 'test -f "$HOME/.ssh/id_ed25519"'; then
-		say "$BUILD_JAIL: clave de despliegue"
-		as_builder 'ssh-keygen -q -t ed25519 -N "" -C "$1" -f "$HOME/.ssh/id_ed25519"' "$BUILD_JAIL"
-	fi
-	as_builder 'umask 077; rm -f "$HOME/.ssh/config" && cat >"$HOME/.ssh/config"' <"$PLANTILLAS/ssh_config"
-	if [ -f "$PLANTILLAS/known_hosts" ]; then
-		as_builder 'umask 077; rm -f "$HOME/.ssh/known_hosts" && cat >"$HOME/.ssh/known_hosts"' \
-			<"$PLANTILLAS/known_hosts"
-	fi
-
-	if [ -d "$BJ$SRC/.git" ]; then
-		as_builder 'git -C "$1" remote set-url origin "$2"' "$SRC" "$REPO_URL"
-	fi
-	if [ -d "$BJ$SRC/.git" ] && [ -f "$DEPLOY_DIR/panel.bundle" ] &&
-		! as_builder 'cd "$1" && GIT_SSH_COMMAND="ssh -o BatchMode=yes" git ls-remote -q origin >/dev/null' \
-			"$SRC" 2>/dev/null; then
-		# Mientras el servidor git no acepte la clave, el clon se pone al día
-		# con el bundle (para compilar a mano con --ref).
-		say "$BUILD_JAIL: sin acceso al repositorio; actualizando el clon con el bundle"
-		as_builder 'b=$(mktemp) && cat >"$b" &&
-			git -C "$1" fetch --quiet --tags --force "$b" "+refs/heads/*:refs/remotes/origin/*"
-			r=$?; rm -f "$b"; exit $r' "$SRC" <"$DEPLOY_DIR/panel.bundle"
-	fi
-	if [ ! -d "$BJ$SRC/.git" ]; then
-		say "$BUILD_JAIL: clonando el repositorio"
-		if ! as_builder 'GIT_SSH_COMMAND="ssh -o BatchMode=yes" git clone --quiet "$1" "$2"' \
-			"$REPO_URL" "$SRC" 2>/dev/null; then
-			[ -f "$DEPLOY_DIR/panel.bundle" ] || die "sin acceso al repositorio y sin bundle"
-			echo "    sin acceso al repositorio todavía: se clona del bundle"
-			as_builder 'b=$(mktemp) && cat >"$b" &&
-				git clone --quiet "$b" "$2" &&
-				git -C "$2" remote set-url origin "$1"
-				r=$?; rm -f "$b"; exit $r' "$REPO_URL" "$SRC" <"$DEPLOY_DIR/panel.bundle"
-		fi
-	fi
-
-	# Dentro del clon, para que cargo use la Rust de rust-toolchain.toml.
-	if [ "$(as_builder 'cd "$1" && cargo leptos --version 2>/dev/null' "$SRC")" != "cargo-leptos $CARGO_LEPTOS_VERSION" ]; then
-		say "$BUILD_JAIL: cargo-leptos $CARGO_LEPTOS_VERSION (tarda)"
-		as_builder 'cd "$1" && cargo install --locked cargo-leptos --version "$2"' "$SRC" "$CARGO_LEPTOS_VERSION"
+# Si queda la jail de compilación de una instalación anterior, avisa: ya no
+# se usa (README, «Migrar una instalación existente»).
+aviso_jail_compilar()
+{
+	if jls -j "$JAIL_COMPILAR_ANTIGUA" jid >/dev/null 2>&1 ||
+		grep -q "^$JAIL_COMPILAR_ANTIGUA {" /etc/jail.conf 2>/dev/null; then
+		say "la jail $JAIL_COMPILAR_ANTIGUA ya no se usa: el servidor no compila. Cuando el actualizador funcione sin ella, bórrala (deploy/freebsd-jail/README.md, «Migrar una instalación existente»)"
 	fi
 }
 
 setup_updater()
 {
+	setup_paquetes_host
+	setup_clave_despliegue
 	install -m 0755 -o root -g wheel "$DIR/actualizar.sh" /usr/local/sbin/routerpanel-actualizar
 	install -d -m 0755 -o root -g wheel "$ACTUALIZADOR_LIB"
 	install -m 0644 -o root -g wheel "$DEPLOY_DIR/lib/git.sh" "$ACTUALIZADOR_LIB/git.sh"
@@ -504,7 +453,6 @@ servidor()
 		setup_runtime_jail
 	fi
 	if tiene_modulo actualizador; then
-		setup_build_jail
 		setup_updater
 	fi
 	if tiene_modulo unbound; then
@@ -521,9 +469,10 @@ servidor()
 		aviso_asistente
 	fi
 	if tiene_modulo actualizador; then
+		aviso_jail_compilar
 		echo
 		echo "Clave pública de despliegue (darla de alta en el servidor git como clave de sólo lectura):"
-		as_builder 'cat "$HOME/.ssh/id_ed25519.pub"'
+		cat "$ACTUALIZADOR_CLAVES/id_ed25519.pub"
 	fi
 }
 
@@ -612,8 +561,9 @@ pf_confirmar()
 	echo "pf: confirmadas; copia anterior en $PF_BACKUP"
 }
 
-# Lo que pf debe dejar (y no dejar) a las dos jails. Se ejecuta con las
-# reglas nuevas cargadas y el interruptor aún armado.
+# Lo que pf debe dejar (y no dejar) a la jail del panel, y que el
+# actualizador llega al repositorio. Se ejecuta con las reglas nuevas
+# cargadas y el interruptor aún armado.
 comprobar_red()
 {
 	_ok=0
@@ -631,29 +581,22 @@ comprobar_red()
 	if [ -n "$PROXY_IP" ]; then
 		_check bloqueado "panel -> proxy" jexec "$RUN_JAIL" fetch -T 5 -qo /dev/null "http://$PROXY_IP/"
 	fi
-	_check sale "compilación -> crates.io" jexec -U "$BUILD_USER" "$BUILD_JAIL" \
-		fetch -T 10 -qo /dev/null https://index.crates.io/config.json
-	_check bloqueado "compilación -> router" jexec -U "$BUILD_USER" "$BUILD_JAIL" \
-		fetch -T 5 -qo /dev/null "http://$ROUTER_IP/"
-	if [ -n "$PROXY_IP" ]; then
-		_check bloqueado "compilación -> proxy" jexec -U "$BUILD_USER" "$BUILD_JAIL" \
-			fetch -T 5 -qo /dev/null "http://$PROXY_IP/"
-	fi
 	if [ -e "$RJ/usr/local/routerpanel/current" ]; then
-		_check sale "compilación -> panel /salud" jexec -U "$BUILD_USER" "$BUILD_JAIL" \
+		_check sale "panel -> su /salud (el actualizador)" jexec -U routerpanel "$RUN_JAIL" \
 			fetch -T 5 -qo /dev/null "http://$JAIL_PANEL_IP:$PANEL_PUERTO/salud"
 	fi
-	# Sin la clave dada de alta en el servidor git, «Permission denied
-	# (publickey)» también demuestra que se llega.
-	_git=$(as_builder 'cd "$1" && GIT_SSH_COMMAND="ssh -o BatchMode=yes -o ConnectTimeout=10" \
-		git ls-remote -q origin 2>&1 >/dev/null; echo "rc=$?"' "$SRC" 2>&1)
-	case $_git in
-	*rc=0* | *"Permission denied (publickey)"*) echo "  compilación -> repositorio: sale" ;;
-	*)
-		echo "  compilación -> repositorio: NO ($(echo "$_git" | head -n 1))"
-		_ok=1
-		;;
-	esac
+	if tiene_modulo actualizador; then
+		# Sin la clave dada de alta en el servidor git, «Permission denied
+		# (publickey)» también demuestra que se llega.
+		_git=$(ls_remote_host yes 2>&1 >/dev/null; echo "rc=$?")
+		case $_git in
+		*rc=0* | *"Permission denied (publickey)"*) echo "  host -> repositorio: sale" ;;
+		*)
+			echo "  host -> repositorio: NO ($(echo "$_git" | head -n 1))"
+			_ok=1
+			;;
+		esac
+	fi
 	return $_ok
 }
 
@@ -681,7 +624,6 @@ services_ok()
 instalar()
 {
 	HOST=$SERVIDOR_SSH
-	_repo=$(dirname "$DEPLOY_DIR")
 	_tmp=$(mktemp -d)
 	trap 'rm -rf "$_tmp"' EXIT
 	# Las plantillas se generan también aquí, para fallar antes de subir nada.
@@ -693,7 +635,6 @@ instalar()
 	cp "$DEPLOY_DIR"/lib/*.sh "$_tmp/lib/"
 	# La configuración ya resuelta: en el servidor no hace falta config.example.
 	volcar_config >"$_tmp/config.local"
-	git -C "$_repo" bundle create "$_tmp/panel.bundle" HEAD --branches --tags 2>/dev/null
 
 	say "subiendo a ~/$STAGE del servidor"
 	tar cf - -C "$_tmp" . | ssh "$HOST" "rm -rf ~/$STAGE && mkdir -p ~/$STAGE && tar xf - -C ~/$STAGE"

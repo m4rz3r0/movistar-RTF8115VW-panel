@@ -7,10 +7,13 @@
 # lleva datos de la red de quien instala.
 
 CLAVES_OBLIGATORIAS="SERVIDOR_SSH JAILS_RAIZ ZFS_DATASET JAIL_PANEL JAIL_PANEL_IP
-	JAIL_COMPILAR JAIL_COMPILAR_IP UID_COMPILAR INTERFAZ_EXT RED_LAN ROUTER_IP DNS_IP
-	PANEL_ORIGEN PANEL_ESCUCHA PROXIES_CONFIANZA REPO_URL MODULOS"
-CLAVES_OPCIONALES="RED_VPN REPO_HOST_CLAVE COMPROBAR_URLS TRABAJOS_COMPILACION
-	PRECOMPILADAS_ESPERA PRECOMPILADAS_MINISIGN PC_COMPILAR_SSH PRECOMPILADAS_BUZON_SSH"
+	INTERFAZ_EXT ROUTER_IP PANEL_ORIGEN PANEL_ESCUCHA PROXIES_CONFIANZA REPO_URL MODULOS"
+# Las de la jail de compilación de instalaciones anteriores (JAIL_COMPILAR,
+# JAIL_COMPILAR_IP, UID_COMPILAR, RED_LAN, RED_VPN, DNS_IP,
+# TRABAJOS_COMPILACION, PRECOMPILADAS_ESPERA) ya no se usan: si siguen en
+# config.local, no molestan.
+CLAVES_OPCIONALES="REPO_HOST_CLAVE GITHUB_REPO COMPROBAR_URLS PRECOMPILADAS_MINISIGN
+	PC_COMPILAR_SSH PRECOMPILADAS_BUZON_SSH"
 MODULOS_CONOCIDOS="pf rc actualizador caddyfile unbound"
 
 # ¿Es $1 una IPv4 escrita como cuatro números de 0 a 255?
@@ -60,22 +63,16 @@ cargar_config()
 	fi
 
 	_malas=
-	for _k in JAIL_PANEL_IP JAIL_COMPILAR_IP ROUTER_IP DNS_IP; do
+	for _k in JAIL_PANEL_IP ROUTER_IP; do
 		eval "_v=\$$_k"
 		_es_ipv4 "$_v" || _malas="$_malas $_k"
 	done
-	case $UID_COMPILAR in
-	*[!0-9]*) _malas="$_malas UID_COMPILAR" ;;
-	esac
-	# Vacía (cargo decide) o un entero positivo.
-	case ${TRABAJOS_COMPILACION-} in
+	# Vacía (sin GitHub) o «propietario/nombre».
+	case ${GITHUB_REPO-} in
 	'') ;;
-	*[!0-9]* | 0*) _malas="$_malas TRABAJOS_COMPILACION" ;;
-	esac
-	# Vacía (sin versiones precompiladas) o minutos: 0 o un entero.
-	case ${PRECOMPILADAS_ESPERA-} in
-	'' | 0) ;;
-	*[!0-9]* | 0*) _malas="$_malas PRECOMPILADAS_ESPERA" ;;
+	*/*/* | /* | */ | -* | */-* | */. | */.. | *[!A-Za-z0-9._/-]*) _malas="$_malas GITHUB_REPO" ;;
+	*/*) ;;
+	*) _malas="$_malas GITHUB_REPO" ;;
 	esac
 	case $PANEL_ORIGEN in
 	http://?* | https://?*) ;;

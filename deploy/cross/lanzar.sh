@@ -12,7 +12,8 @@
 # la referencia; nada de la copia de trabajo acaba en el binario.
 #
 # Si el PC no responde (apagado o en el otro sistema), lo dice y sale con 3:
-# el servidor compilará él mismo cuando pase PRECOMPILADAS_ESPERA.
+# el servidor no compila; espera a que la versión llegue al buzón o a la
+# release de GitHub.
 
 set -euo pipefail
 
@@ -70,7 +71,7 @@ fi
 
 SSH=(ssh -o BatchMode=yes -o ConnectTimeout=5 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
 if ! "${SSH[@]}" "$PC_COMPILAR_SSH" true 2>/dev/null; then
-	echo "el PC de compilación no responde; el servidor compilará la versión él mismo" >&2
+	echo "el PC de compilación no responde; el servidor espera a la versión del buzón o de GitHub" >&2
 	exit 3
 fi
 

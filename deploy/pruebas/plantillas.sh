@@ -6,11 +6,16 @@
 # - install.sh --plantillas con config.example no deja ninguna @CLAVE@;
 # - comprobar-publicacion no encuentra nada en deploy/ (sin listas locales);
 # - una configuración sin ROUTER_IP falla y el mensaje nombra la clave;
-# - TRABAJOS_COMPILACION (opcional) llega a actualizador.conf y un valor que
-#   no es un entero positivo falla nombrando la clave.
-# - PRECOMPILADAS_ESPERA y PRECOMPILADAS_MINISIGN (opcionales) llegan a
-#   actualizador.conf, vacías con el ejemplo; una espera que no es 0 ni un
-#   entero positivo falla nombrando la clave.
+# - sin jail de compilación: jail.conf solo trae la del panel, pf.conf no
+#   tiene reglas de compilación y deja a la jail del panel llegar a su
+#   propio puerto (/salud); no se genera resolv.conf ni ssh_config;
+# - actualizador.conf lleva REPO_URL, CLAVE_DESPLIEGUE y HOSTS_CONOCIDOS (en
+#   el host), y GITHUB_REPO y PRECOMPILADAS_MINISIGN, vacías con el ejemplo;
+#   un GITHUB_REPO que no es «propietario/nombre» falla nombrando la clave;
+#   REPO_HOST_CLAVE acaba en known_hosts;
+# - una configuración de antes, con las claves de la jail de compilación
+#   (JAIL_COMPILAR, TRABAJOS_COMPILACION, PRECOMPILADAS_ESPERA…), sigue
+#   valiendo y no las pasa al actualizador.
 #
 # Uso: deploy/pruebas/plantillas.sh (desde cualquier sitio). El comprobador
 # se toma de $COMPROBAR (ruta al binario) o, si no, de «cargo run».
@@ -62,7 +67,7 @@ if sh "$DEPLOY/freebsd-jail/install.sh" --config "$DEPLOY/config.example" \
 	if grep -rn '@[A-Za-z_][A-Za-z0-9_]*@' "$TMP/plantillas" >&2; then
 		fallo "quedan @CLAVE@ sin sustituir"
 	fi
-	for f in jail.conf pf.conf rc.conf actualizador.conf resolv.conf; do
+	for f in jail.conf pf.conf rc.conf actualizador.conf; do
 		[ -s "$TMP/plantillas/$f" ] || fallo "--plantillas no genera $f"
 	done
 else
@@ -91,57 +96,78 @@ elif ! grep -q 'ROUTER_IP' "$TMP/salida"; then
 	fallo "el error de una configuración sin ROUTER_IP no nombra la clave"
 fi
 
-# --- trabajos de compilación -----------------------------------------------
-# Vacía por defecto (cargo decide); un número llega a actualizador.conf; lo
-# que no es un número entero positivo falla y nombra la clave.
-grep -q "^TRABAJOS_COMPILACION=''" "$TMP/plantillas/actualizador.conf" 2>/dev/null ||
-	fallo "actualizador.conf no lleva TRABAJOS_COMPILACION vacía con el ejemplo"
-{ cat "$DEPLOY/config.example"; echo 'TRABAJOS_COMPILACION=3'; } >"$TMP/trabajos.conf"
-if sh "$DEPLOY/freebsd-jail/install.sh" --config "$TMP/trabajos.conf" \
-	--plantillas "$TMP/trabajos" >"$TMP/salida" 2>&1; then
-	grep -q "^TRABAJOS_COMPILACION='3'" "$TMP/trabajos/actualizador.conf" ||
-		fallo "TRABAJOS_COMPILACION no llega a actualizador.conf"
+# --- sin jail de compilación -----------------------------------------------
+P=$TMP/plantillas
+[ "$(grep -c '^[^ #].* {$' "$P/jail.conf" 2>/dev/null)" = 1 ] && grep -q '^routerpanel {' "$P/jail.conf" ||
+	fallo "jail.conf no trae solo la jail del panel: $(cat "$P/jail.conf")"
+if grep -qi 'build\|compil\|192\.0\.2\.21' "$P/jail.conf" "$P/pf.conf"; then
+	fallo "jail.conf o pf.conf hablan todavía de la jail de compilación"
+fi
+grep -q '^pass quick proto tcp from 192.0.2.20 to 192.0.2.20 port 3000$' "$P/pf.conf" ||
+	fallo "pf.conf no deja a la jail del panel llegar a su /salud"
+for f in resolv.conf ssh_config; do
+	[ ! -e "$P/$f" ] || fallo "--plantillas genera todavía $f"
+done
+
+# --- actualizador.conf -------------------------------------------------------
+for k in GITHUB_REPO PRECOMPILADAS_MINISIGN; do
+	grep -q "^$k=''" "$P/actualizador.conf" 2>/dev/null ||
+		fallo "actualizador.conf no lleva $k vacía con el ejemplo"
+done
+grep -q "^REPO_URL='https://git.example/routerpanel.git'" "$P/actualizador.conf" ||
+	fallo "actualizador.conf no lleva REPO_URL"
+grep -q "^CLAVE_DESPLIEGUE='/usr/local/etc/routerpanel-actualizar/id_ed25519'" "$P/actualizador.conf" &&
+	grep -q "^HOSTS_CONOCIDOS='/usr/local/etc/routerpanel-actualizar/known_hosts'" "$P/actualizador.conf" ||
+	fallo "actualizador.conf no lleva CLAVE_DESPLIEGUE y HOSTS_CONOCIDOS del host"
+[ ! -e "$P/known_hosts" ] || fallo "sin REPO_HOST_CLAVE se genera known_hosts"
+{
+	cat "$DEPLOY/config.example"
+	echo 'GITHUB_REPO=dueno/movistar-RTF8115VW-panel'
+	echo "REPO_HOST_CLAVE='[192.0.2.30]:2222 clave-de-prueba'"
+} >"$TMP/github.conf"
+if sh "$DEPLOY/freebsd-jail/install.sh" --config "$TMP/github.conf" \
+	--plantillas "$TMP/github" >"$TMP/salida" 2>&1; then
+	grep -q "^GITHUB_REPO='dueno/movistar-RTF8115VW-panel'" "$TMP/github/actualizador.conf" ||
+		fallo "GITHUB_REPO no llega a actualizador.conf"
+	[ "$(cat "$TMP/github/known_hosts" 2>/dev/null)" = '[192.0.2.30]:2222 clave-de-prueba' ] ||
+		fallo "REPO_HOST_CLAVE no llega a known_hosts"
 else
 	cat "$TMP/salida" >&2
-	fallo "install.sh --plantillas con TRABAJOS_COMPILACION=3"
+	fallo "install.sh --plantillas con GITHUB_REPO"
 fi
-for malo in x 0 -2; do
-	{ cat "$DEPLOY/config.example"; echo "TRABAJOS_COMPILACION=$malo"; } >"$TMP/trabajos.conf"
-	if sh "$DEPLOY/freebsd-jail/install.sh" --config "$TMP/trabajos.conf" \
-		--plantillas "$TMP/trabajos-malo" >"$TMP/salida" 2>&1; then
-		fallo "TRABAJOS_COMPILACION=$malo no falla"
-	elif ! grep -q TRABAJOS_COMPILACION "$TMP/salida"; then
+for malo in dueno 'dueno/a/b' '/x' 'dueno/' 'du eno/x' '-x/y' 'x/..'; do
+	{ cat "$DEPLOY/config.example"; echo "GITHUB_REPO='$malo'"; } >"$TMP/github-malo.conf"
+	if sh "$DEPLOY/freebsd-jail/install.sh" --config "$TMP/github-malo.conf" \
+		--plantillas "$TMP/github-malo" >"$TMP/salida" 2>&1; then
+		fallo "GITHUB_REPO=$malo no falla"
+	elif ! grep -q GITHUB_REPO "$TMP/salida"; then
 		cat "$TMP/salida" >&2
-		fallo "el error de TRABAJOS_COMPILACION=$malo no nombra la clave"
+		fallo "el error de GITHUB_REPO=$malo no nombra la clave"
 	fi
 done
 
-# --- versiones precompiladas -------------------------------------------------
-for k in PRECOMPILADAS_ESPERA PRECOMPILADAS_MINISIGN; do
-	grep -q "^$k=''" "$TMP/plantillas/actualizador.conf" 2>/dev/null ||
-		fallo "actualizador.conf no lleva $k vacía con el ejemplo"
-done
-for bueno in 0 20; do
-	{ cat "$DEPLOY/config.example"; echo "PRECOMPILADAS_ESPERA=$bueno"; } >"$TMP/precompiladas.conf"
-	if sh "$DEPLOY/freebsd-jail/install.sh" --config "$TMP/precompiladas.conf" \
-		--plantillas "$TMP/precompiladas" >"$TMP/salida" 2>&1; then
-		grep -q "^PRECOMPILADAS_ESPERA='$bueno'" "$TMP/precompiladas/actualizador.conf" ||
-			fallo "PRECOMPILADAS_ESPERA=$bueno no llega a actualizador.conf"
-	else
-		cat "$TMP/salida" >&2
-		fallo "install.sh --plantillas con PRECOMPILADAS_ESPERA=$bueno"
+# --- configuración de antes ----------------------------------------------------
+{
+	cat "$DEPLOY/config.example"
+	echo 'JAIL_COMPILAR=routerpanel-build'
+	echo 'JAIL_COMPILAR_IP=192.0.2.21'
+	echo 'UID_COMPILAR=3160'
+	echo 'RED_LAN=192.0.2.0/24'
+	echo 'DNS_IP=192.0.2.10'
+	echo 'TRABAJOS_COMPILACION=3'
+	echo 'PRECOMPILADAS_ESPERA=20'
+} >"$TMP/antes.conf"
+if sh "$DEPLOY/freebsd-jail/install.sh" --config "$TMP/antes.conf" \
+	--plantillas "$TMP/antes" >"$TMP/salida" 2>&1; then
+	if grep -q 'COMPILAR\|ESPERA\|TRABAJOS' "$TMP/antes/actualizador.conf"; then
+		fallo "una configuración de antes pasa claves de compilación al actualizador"
 	fi
-done
-for malo in x 020 -5 '1 2'; do
-	{ cat "$DEPLOY/config.example"; echo "PRECOMPILADAS_ESPERA='$malo'"; } >"$TMP/precompiladas.conf"
-	if sh "$DEPLOY/freebsd-jail/install.sh" --config "$TMP/precompiladas.conf" \
-		--plantillas "$TMP/precompiladas-malo" >"$TMP/salida" 2>&1; then
-		fallo "PRECOMPILADAS_ESPERA=$malo no falla"
-	elif ! grep -q PRECOMPILADAS_ESPERA "$TMP/salida"; then
-		cat "$TMP/salida" >&2
-		fallo "el error de PRECOMPILADAS_ESPERA=$malo no nombra la clave"
-	fi
-done
+	cmp -s "$TMP/antes/pf.conf" "$P/pf.conf" && cmp -s "$TMP/antes/jail.conf" "$P/jail.conf" ||
+		fallo "una configuración de antes cambia jail.conf o pf.conf"
+else
+	cat "$TMP/salida" >&2
+	fallo "install.sh --plantillas con una configuración de antes"
+fi
 
 # --- plantillas en el servidor: temporal de root -----------------------------
 # servidor() y pf_cargar() corren como root y no pueden probarse enteras sin
